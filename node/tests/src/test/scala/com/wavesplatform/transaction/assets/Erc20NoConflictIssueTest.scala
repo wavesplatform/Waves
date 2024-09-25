@@ -20,11 +20,11 @@ class Erc20NoConflictIssueTest extends FreeSpec with Matchers with BlockchainStu
         b.stub.setScript(
           TxHelpers.defaultAddress,
           TxHelpers.scriptV5("""
-            |@Callable(i)
-            |func test() = {
-            |  [Issue("test", "test", 1, 1, true, unit, 1)]
-            |}
-            |""".stripMargin)
+                               |@Callable(i)
+                               |func test() = {
+                               |  [Issue("test", "test", 1, 1, true, unit, 1)]
+                               |}
+                               |""".stripMargin)
         )
       }
       val differ = blockchain.stub.transactionDiffer().andThen(_.resultE)

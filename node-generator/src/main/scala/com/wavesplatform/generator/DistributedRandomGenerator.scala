@@ -24,8 +24,8 @@ object DistributedRandomGenerator {
       case 1 => new SingleOutcome[T](filteredProbabilities.head._1)
       case _ =>
         import Ordering.Double.TotalOrdering
-        val (treeMap, total) = filteredProbabilities.foldLeft((TreeMap.empty[Double, T], 0d)) {
-          case ((tm, acc), (v, p)) => (tm + ((acc + p) -> v), acc + p)
+        val (treeMap, total) = filteredProbabilities.foldLeft((TreeMap.empty[Double, T], 0d)) { case ((tm, acc), (v, p)) =>
+          (tm + ((acc + p) -> v), acc + p)
         }
 
         new MultipleOutcomes[T](treeMap, total)

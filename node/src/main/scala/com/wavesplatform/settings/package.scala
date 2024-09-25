@@ -57,7 +57,7 @@ package object settings {
   object SizeInBytes extends TaggedType[Long]
   type SizeInBytes = SizeInBytes.Type
 
-  implicit val sizeInBytesReader: ValueReader[SizeInBytes] = {(cfg: Config, path: String) =>
+  implicit val sizeInBytesReader: ValueReader[SizeInBytes] = { (cfg: Config, path: String) =>
     SizeInBytes(cfg.getBytes(path).toLong)
   }
 
@@ -112,8 +112,7 @@ package object settings {
         if (bc == "CUSTOM") {
           val char = config.getString("waves.blockchain.custom.address-scheme-character").headOption.getOrElse(0.toChar)
           s"custom-${Integer.toHexString(char)}"
-        } else
-          bc.toLowerCase
+        } else bc.toLowerCase
 
       s"waves-$suffix"
     }

@@ -20,7 +20,10 @@ class ScriptedSponsorTest extends PropSpec with WithState {
   val SPONSOR_FEE: Long = 100000
 
   private val fs = TestFunctionalitySettings.Enabled
-    .copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
+    .copy(
+      featureCheckBlocksPeriod = 1,
+      blocksForFeatureActivation = 1,
+      preActivatedFeatures = Map(
         BlockchainFeatures.BlockV5.id                         -> 0,
         BlockchainFeatures.NG.id                              -> 0,
         BlockchainFeatures.MassTransfer.id                    -> 0,
@@ -32,7 +35,8 @@ class ScriptedSponsorTest extends PropSpec with WithState {
         BlockchainFeatures.SmartAssets.id                     -> 0,
         BlockchainFeatures.SmartAccountTrading.id             -> 0,
         BlockchainFeatures.SmallerMinimalGeneratingBalance.id -> 0
-      ))
+      )
+    )
 
   private val estimator = ScriptEstimatorV2
 

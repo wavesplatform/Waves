@@ -1325,8 +1325,8 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       )
     )
 
-  private val blockMiner                           = TxHelpers.signer(10001)
-  private val initialMinerBalance                  = 100_000.waves
+  private val blockMiner          = TxHelpers.signer(10001)
+  private val initialMinerBalance = 100_000.waves
 
   private def assertBalances(blockchain: Blockchain, expectedBalances: (Address, Long)*)(implicit pos: Position): Unit =
     expectedBalances.foreach { case (address, balance) =>
@@ -1425,10 +1425,12 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     )
 
     d.blockchain.wavesAmount(15) shouldBe
-      BigInt(100_000_000.waves + // 1: genesis
-        3 * 6.waves +            // 2..4: before boost activation
-        5 * 60.waves +           // 5..9: boosted reward before change
-        5 * (6.waves + rewardDelta) * 10 + // 10..14: boosted reward after change
-        6.waves + rewardDelta)   // 15: non-boosted after change
+      BigInt(
+        100_000_000.waves +                  // 1: genesis
+          3 * 6.waves +                      // 2..4: before boost activation
+          5 * 60.waves +                     // 5..9: boosted reward before change
+          5 * (6.waves + rewardDelta) * 10 + // 10..14: boosted reward after change
+          6.waves + rewardDelta
+      ) // 15: non-boosted after change
   }
 }

@@ -56,8 +56,7 @@ class InvokeAffectedAddressTest extends PropSpec with WithDomain {
         if (failed) {
           d.appendBlock(aliasTx, invokeTx)
           d.liquidSnapshot.errorMessage(invokeTx.id()) shouldBe defined
-        } else
-          d.appendAndAssertSucceed(aliasTx, invokeTx)
+        } else d.appendAndAssertSucceed(aliasTx, invokeTx)
         d.liquidSnapshot.transactions(invokeTx.id()).affected shouldBe Set(defaultAddress, secondAddress)
       }
     }

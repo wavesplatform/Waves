@@ -23,7 +23,7 @@ class UpdateAssetInfoTransactionSpecification extends PropSpec {
     val validNames = Seq("a" * MinAssetNameLength, "a" * MaxAssetNameLength)
 
     invalidNames.foreach { name =>
-       createUpdateAssetInfoTx(name = name) shouldBe Left(InvalidName)
+      createUpdateAssetInfoTx(name = name) shouldBe Left(InvalidName)
     }
 
     validNames.foreach { name =>
@@ -33,7 +33,7 @@ class UpdateAssetInfoTransactionSpecification extends PropSpec {
 
   property("new asset description validation") {
     val invalidDescs = Seq("a" * (MaxAssetDescriptionLength + 1))
-    val validDescs = Seq("", "a" * MaxAssetDescriptionLength)
+    val validDescs   = Seq("", "a" * MaxAssetDescriptionLength)
 
     invalidDescs.foreach { desc =>
       createUpdateAssetInfoTx(description = desc) shouldBe Left(TooBigArray)
@@ -44,8 +44,10 @@ class UpdateAssetInfoTransactionSpecification extends PropSpec {
     }
   }
 
-  def createUpdateAssetInfoTx(name: String = "updated_name",
-                              description: String = "updated_description"): Either[ValidationError, UpdateAssetInfoTransaction] =
+  def createUpdateAssetInfoTx(
+      name: String = "updated_name",
+      description: String = "updated_description"
+  ): Either[ValidationError, UpdateAssetInfoTransaction] =
     UpdateAssetInfoTransaction.create(
       version = TxVersion.V1,
       sender = TxHelpers.signer(1).publicKey,

@@ -12,7 +12,10 @@ object TestSettings {
 
     def withNG: WavesSettings =
       ws.withFunctionalitySettings(
-        ws.blockchainSettings.functionalitySettings.copy(blockVersion3AfterHeight = 0, preActivatedFeatures = ws.blockchainSettings.functionalitySettings.preActivatedFeatures ++ Map(BlockchainFeatures.NG.id -> 0))
+        ws.blockchainSettings.functionalitySettings.copy(
+          blockVersion3AfterHeight = 0,
+          preActivatedFeatures = ws.blockchainSettings.functionalitySettings.preActivatedFeatures ++ Map(BlockchainFeatures.NG.id -> 0)
+        )
       )
   }
 }

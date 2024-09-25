@@ -133,8 +133,7 @@ class RideExceptionsTest extends PropSpec with WithDomain {
       if (rejectBefore) {
         d.appendBlockE(invoke()) should produce(error)
         d.appendBlock()
-      } else
-        d.appendAndAssertFailed(invoke(), error)
+      } else d.appendAndAssertFailed(invoke(), error)
 
       // dApp before activation with enough complexity to fail
       val complexCond = TestCompiler(V7).compileExpression(s"${(1 to 6).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}")
@@ -145,15 +144,13 @@ class RideExceptionsTest extends PropSpec with WithDomain {
       if (rejectBefore) {
         d.appendBlockE(invoke()) should produce(error)
         d.appendBlock()
-      } else
-        d.appendAndAssertFailed(invoke(), error)
+      } else d.appendAndAssertFailed(invoke(), error)
 
       // verifier before activation
       if (checkVerifier) {
         d.appendBlock(setScript(signer(2), ExprScriptImpl(V7, false, complexExpr)))
         d.appendBlockE(transfer(signer(2), defaultAddress)) should produce(error)
-      } else
-        d.appendBlock()
+      } else d.appendBlock()
 
       // dApp after activation
       d.blockchain.isFeatureActivated(LightNode) shouldBe false

@@ -70,16 +70,16 @@ class NetworkSeparationTestSuite extends BaseFreeSpec with WaitForHeight2 {
 object NetworkSeparationTestSuite {
   import com.wavesplatform.it.NodeConfigs._
   private val woFeatureConfig = ConfigFactory.parseString(s"""
-                                                            |waves {
-                                                            |  synchronization.synchronization-timeout = 10s
-                                                            |  blockchain.custom.functionality {
-                                                            |    pre-activated-features = {
-                                                            |     1 = 0
-                                                            |     6 = 100
-                                                            |     }
-                                                            |  }
-                                                            |  miner.quorum = 0 
-                                                            |}""".stripMargin)
+                                                             |waves {
+                                                             |  synchronization.synchronization-timeout = 10s
+                                                             |  blockchain.custom.functionality {
+                                                             |    pre-activated-features = {
+                                                             |     1 = 0
+                                                             |     6 = 100
+                                                             |     }
+                                                             |  }
+                                                             |  miner.quorum = 0 
+                                                             |}""".stripMargin)
 
   private val withFeatureConfig = ConfigFactory.parseString(s"""
                                                                |waves {

@@ -46,7 +46,7 @@ object FunctionCallCopyBenchmark {
       List(
         FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(simpleCall)),
         FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(simpleCall)),
-        FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(simpleCall)),
+        FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(simpleCall))
       )
     )
 
@@ -55,7 +55,7 @@ object FunctionCallCopyBenchmark {
       List(
         FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(twoLevelsDeep)),
         FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(twoLevelsDeep)),
-        FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(twoLevelsDeep)),
+        FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(twoLevelsDeep))
       )
     )
 
@@ -64,7 +64,7 @@ object FunctionCallCopyBenchmark {
       List(
         FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(threeLevelsDeep)),
         FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(threeLevelsDeep)),
-        FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(threeLevelsDeep)),
+        FUNCTION_CALL(FunctionHeader.User("fooBar"), List.fill(3)(threeLevelsDeep))
       )
     )
   }

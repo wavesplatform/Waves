@@ -26,30 +26,28 @@ class AddressFromRecipientScenarioTest extends PropSpec with WithState {
   }
 
   val script: String = """
-    | match tx {
-    |  case t : TransferTransaction =>  addressFromRecipient(t.recipient)
-    |  case _ => throw()
-    |  }
-    |  """.stripMargin
+                         | match tx {
+                         |  case t : TransferTransaction =>  addressFromRecipient(t.recipient)
+                         |  case _ => throw()
+                         |  }
+                         |  """.stripMargin
 
   property("Script can resolve AddressOrAlias") {
     val (gen, aliasTx, transferViaAddress, transferViaAlias) = preconditionsAndAliasCreations
-    assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(aliasTx))) {
-      case (_, state) =>
-        val addressBytes = runScript[CaseObj](script, transferViaAddress, state).explicitGet().fields("bytes").asInstanceOf[CONST_BYTESTR]
-        addressBytes.bs.arr.sameElements(transferViaAddress.recipient.bytes) shouldBe true
-        val resolvedAddressBytes =
-          runScript[CaseObj](script, transferViaAlias, state).explicitGet().fields("bytes").asInstanceOf[CONST_BYTESTR]
+    assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(aliasTx))) { case (_, state) =>
+      val addressBytes = runScript[CaseObj](script, transferViaAddress, state).explicitGet().fields("bytes").asInstanceOf[CONST_BYTESTR]
+      addressBytes.bs.arr.sameElements(transferViaAddress.recipient.bytes) shouldBe true
+      val resolvedAddressBytes =
+        runScript[CaseObj](script, transferViaAlias, state).explicitGet().fields("bytes").asInstanceOf[CONST_BYTESTR]
 
-        resolvedAddressBytes.bs.arr.sameElements(transferViaAddress.recipient.bytes) shouldBe true
+      resolvedAddressBytes.bs.arr.sameElements(transferViaAddress.recipient.bytes) shouldBe true
     }
   }
 
   property("Script can't resolve alias that doesn't exist") {
     val (gen, _, _, transferViaAlias) = preconditionsAndAliasCreations
-    assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq())) {
-      case (_, state) =>
-        runScript(script, transferViaAlias, state) should produce(" does not exist")
+    assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq())) { case (_, state) =>
+      runScript(script, transferViaAlias, state) should produce(" does not exist")
     }
   }
 }

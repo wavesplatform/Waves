@@ -11,35 +11,35 @@ import scala.concurrent.duration._
 class NetworkSettingsSpecification extends FlatSpec {
 
   "NetworkSpecification" should "read values from config" in {
-    val config          = loadConfig(ConfigFactory.parseString("""waves.network {
-        |  bind-address: "127.0.0.1"
-        |  port: 6868
-        |  node-name: "default-node-name"
-        |  declared-address: "127.0.0.1:6868"
-        |  nonce: 0
-        |  known-peers = ["8.8.8.8:6868", "4.4.8.8:6868"]
-        |  local-only: no
-        |  peers-data-residence-time: 1d
-        |  black-list-residence-time: 10m
-        |  break-idle-connections-timeout: 53s
-        |  max-inbound-connections: 30
-        |  max-outbound-connections = 20
-        |  max-single-host-connections = 2
-        |  connection-timeout: 30s
-        |  max-unverified-peers: 0
-        |  peers-broadcast-interval: 2m
-        |  black-list-threshold: 50
-        |  unrequested-packets-threshold: 100
-        |  upnp {
-        |    enable: yes
-        |    gateway-timeout: 10s
-        |    discover-timeout: 10s
-        |  }
-        |  traffic-logger {
-        |    ignore-tx-messages = [28]
-        |    ignore-rx-messages = [23]
-        |  }
-        |}""".stripMargin))
+    val config = loadConfig(ConfigFactory.parseString("""waves.network {
+                                                        |  bind-address: "127.0.0.1"
+                                                        |  port: 6868
+                                                        |  node-name: "default-node-name"
+                                                        |  declared-address: "127.0.0.1:6868"
+                                                        |  nonce: 0
+                                                        |  known-peers = ["8.8.8.8:6868", "4.4.8.8:6868"]
+                                                        |  local-only: no
+                                                        |  peers-data-residence-time: 1d
+                                                        |  black-list-residence-time: 10m
+                                                        |  break-idle-connections-timeout: 53s
+                                                        |  max-inbound-connections: 30
+                                                        |  max-outbound-connections = 20
+                                                        |  max-single-host-connections = 2
+                                                        |  connection-timeout: 30s
+                                                        |  max-unverified-peers: 0
+                                                        |  peers-broadcast-interval: 2m
+                                                        |  black-list-threshold: 50
+                                                        |  unrequested-packets-threshold: 100
+                                                        |  upnp {
+                                                        |    enable: yes
+                                                        |    gateway-timeout: 10s
+                                                        |    discover-timeout: 10s
+                                                        |  }
+                                                        |  traffic-logger {
+                                                        |    ignore-tx-messages = [28]
+                                                        |    ignore-rx-messages = [23]
+                                                        |  }
+                                                        |}""".stripMargin))
     val networkSettings = config.as[NetworkSettings]("waves.network")
 
     networkSettings.bindAddress should be(Some(new InetSocketAddress("127.0.0.1", 6868)))

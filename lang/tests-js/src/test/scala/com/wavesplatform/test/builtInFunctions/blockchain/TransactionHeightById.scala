@@ -7,12 +7,11 @@ import testHelpers.TestDataConstantsAndMethods.{actualVersions, invalidFunctionE
 import utest.{Tests, test}
 
 object TransactionHeightById extends JsTestBase {
-  private val transactionHeightById = "transactionHeightById(callerTestData)"
+  private val transactionHeightById              = "transactionHeightById(callerTestData)"
   private val transactionHeightByIdArgBeforeFunc = "callerTestData.transactionHeightById()"
 
-  private val invalidTransactionHeightById = "transactionHeightById()"
+  private val invalidTransactionHeightById    = "transactionHeightById()"
   private val invalidTransactionHeightByIdArg = s"callerTestData.transactionHeightById(callerTestData)"
-
 
   val tests: Tests = Tests {
     test("RIDE-42. TransactionHeightById function should compile") {
@@ -21,7 +20,7 @@ object TransactionHeightById extends JsTestBase {
         for (
           (data, function) <- Seq(
             (randomByteVectorArrayElement, transactionHeightById),
-            (randomByteVectorArrayElement, transactionHeightByIdArgBeforeFunc),
+            (randomByteVectorArrayElement, transactionHeightByIdArgBeforeFunc)
           )
         ) {
           val script = precondition.onlyMatcherContract(data, function)

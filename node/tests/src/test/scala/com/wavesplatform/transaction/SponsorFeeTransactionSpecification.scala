@@ -21,8 +21,13 @@ import play.api.libs.json.Json
 
 class SponsorFeeTransactionSpecification extends PropSpec with WithState {
   val One = 100000000L
-  val NgAndSponsorshipSettings: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(NG.id -> 0, FeeSponsorship.id -> 0, SmartAccounts.id -> 0))
-  val BlockV5Settings: FunctionalitySettings = NgAndSponsorshipSettings.copy(preActivatedFeatures = NgAndSponsorshipSettings.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
+  val NgAndSponsorshipSettings: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(
+    featureCheckBlocksPeriod = 1,
+    blocksForFeatureActivation = 1,
+    preActivatedFeatures = Map(NG.id -> 0, FeeSponsorship.id -> 0, SmartAccounts.id -> 0)
+  )
+  val BlockV5Settings: FunctionalitySettings =
+    NgAndSponsorshipSettings.copy(preActivatedFeatures = NgAndSponsorshipSettings.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
   property("SponsorFee serialization roundtrip") {
     forAll(sponsorFeeGen) { (tx: SponsorFeeTransaction) =>
@@ -36,20 +41,20 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
       "AA4BDgG2DPWVCbVaxm9js3LYdZnhlWTRzVqNW4nurEvoDdnFLfweiKVqJfyZOK39MkvNISLB/ylUNT0ycoPSLGCPR6oaAAAAAAJIpUEAAAAABfXhAAAADF1swIRMAQABAEAlGGbLsMhr+34lYt3/Tx7XT76Al4D/V5xOhHwntdW2jR+/1XA6ku20SU6tPHphxo2+wFOxyJcPWEOBptAuw1oL"
     )
     val json = Json.parse("""
-        |{
-        |  "senderPublicKey" : "DFefQsRMtXtTKtpVBwsrD3mPAzerWxLXWHPEe9ANc548",
-        |  "sender" : "3N3dKf1VfhfF6QuxeyBcKL73czXE6nys27u",
-        |  "feeAssetId" : null,
-        |  "proofs" : [ "k1ve9smBuVvEiRHGjVSpBwtUfPG4yETrxpXWPGEu83ddo5DdycGcEY4qfav8A1Ej9reCEdEivwRpWZ72zZ12X54" ],
-        |  "assetId" : "HyAkA27DbuhLcFmimoSXoD9H5FP99JX5PcSXvMni4UWM",
-        |  "fee" : 100000000,
-        |  "minSponsoredAssetFee" : 38315329,
-        |  "id" : "QhCGqFtJncL8y6eAgyGFP4xQBoXbBH4uaB3iKaRZLy8",
-        |  "type" : 14,
-        |  "version" : 1,
-        |  "timestamp" : 13595396047948
-        |}
-        |""".stripMargin)
+                            |{
+                            |  "senderPublicKey" : "DFefQsRMtXtTKtpVBwsrD3mPAzerWxLXWHPEe9ANc548",
+                            |  "sender" : "3N3dKf1VfhfF6QuxeyBcKL73czXE6nys27u",
+                            |  "feeAssetId" : null,
+                            |  "proofs" : [ "k1ve9smBuVvEiRHGjVSpBwtUfPG4yETrxpXWPGEu83ddo5DdycGcEY4qfav8A1Ej9reCEdEivwRpWZ72zZ12X54" ],
+                            |  "assetId" : "HyAkA27DbuhLcFmimoSXoD9H5FP99JX5PcSXvMni4UWM",
+                            |  "fee" : 100000000,
+                            |  "minSponsoredAssetFee" : 38315329,
+                            |  "id" : "QhCGqFtJncL8y6eAgyGFP4xQBoXbBH4uaB3iKaRZLy8",
+                            |  "type" : 14,
+                            |  "version" : 1,
+                            |  "timestamp" : 13595396047948
+                            |}
+                            |""".stripMargin)
 
     val tx = SponsorFeeTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
@@ -211,16 +216,14 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
         .explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer)
 
-    forAll(setup) {
-      case (acc, genesis, issue, sponsor, transfer) =>
-        val b0 = block(acc, Seq(genesis, issue, sponsor))
-        val b1 = block(acc, Seq(transfer))
-        val b2 = block(acc, Seq.empty)
+    forAll(setup) { case (acc, genesis, issue, sponsor, transfer) =>
+      val b0 = block(acc, Seq(genesis, issue, sponsor))
+      val b1 = block(acc, Seq(transfer))
+      val b2 = block(acc, Seq.empty)
 
-        assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) {
-          case (_, state) =>
-            state.balance(acc.toAddress, Waves) - ENOUGH_AMT shouldBe 0
-        }
+      assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) { case (_, state) =>
+        state.balance(acc.toAddress, Waves) - ENOUGH_AMT shouldBe 0
+      }
     }
   }
 
@@ -241,16 +244,14 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
         .explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer1, transfer2)
 
-    forAll(setup) {
-      case (acc, genesis, issue, sponsor, transfer1, transfer2) =>
-        val b0 = block(acc, Seq(genesis, issue, sponsor))
-        val b1 = block(acc, Seq(transfer1, transfer2))
-        val b2 = block(acc, Seq.empty)
+    forAll(setup) { case (acc, genesis, issue, sponsor, transfer1, transfer2) =>
+      val b0 = block(acc, Seq(genesis, issue, sponsor))
+      val b1 = block(acc, Seq(transfer1, transfer2))
+      val b2 = block(acc, Seq.empty)
 
-        assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) {
-          case (_, state) =>
-            state.balance(acc.toAddress, Waves) - ENOUGH_AMT shouldBe 0
-        }
+      assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) { case (_, state) =>
+        state.balance(acc.toAddress, Waves) - ENOUGH_AMT shouldBe 0
+      }
     }
   }
 
@@ -273,16 +274,14 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
         .explicitGet()
     } yield (acc, genesis, issue, sponsor1, transfer1, sponsor2, transfer2)
 
-    forAll(setup) {
-      case (acc, genesis, issue, sponsor1, transfer1, sponsor2, transfer2) =>
-        val b0 = block(acc, Seq(genesis, issue, sponsor1))
-        val b1 = block(acc, Seq(transfer1, sponsor2, transfer2))
-        val b2 = block(acc, Seq.empty)
+    forAll(setup) { case (acc, genesis, issue, sponsor1, transfer1, sponsor2, transfer2) =>
+      val b0 = block(acc, Seq(genesis, issue, sponsor1))
+      val b1 = block(acc, Seq(transfer1, sponsor2, transfer2))
+      val b2 = block(acc, Seq.empty)
 
-        assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) {
-          case (_, state) =>
-            state.balance(acc.toAddress, Waves) - ENOUGH_AMT shouldBe 0
-        }
+      assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) { case (_, state) =>
+        state.balance(acc.toAddress, Waves) - ENOUGH_AMT shouldBe 0
+      }
     }
   }
 
@@ -298,19 +297,18 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
       sponsor = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minSponsoredAssetFee), minFee, ts).explicitGet()
     } yield (genesis, issue, sponsor, minFee)
 
-    forAll(setup) {
-      case (genesis, issue, sponsor, actualFee) =>
-        val b0 = block(Seq(genesis, issue))
-        val b1 = block(Seq(sponsor))
-        val b2 = block(Seq(sponsor), Block.ProtoBlockVersion)
+    forAll(setup) { case (genesis, issue, sponsor, actualFee) =>
+      val b0 = block(Seq(genesis, issue))
+      val b1 = block(Seq(sponsor))
+      val b2 = block(Seq(sponsor), Block.ProtoBlockVersion)
 
-        assertDiffEi(Seq(b0), b1, NgAndSponsorshipSettings) { ei =>
-          ei should produce(s"Fee for SponsorFeeTransaction ($actualFee in WAVES) does not exceed minimal value of $One WAVES.")
-        }
+      assertDiffEi(Seq(b0), b1, NgAndSponsorshipSettings) { ei =>
+        ei should produce(s"Fee for SponsorFeeTransaction ($actualFee in WAVES) does not exceed minimal value of $One WAVES.")
+      }
 
-        assertDiffEi(Seq(b0), b2, BlockV5Settings) { ei =>
-          ei.explicitGet()
-        }
+      assertDiffEi(Seq(b0), b2, BlockV5Settings) { ei =>
+        ei.explicitGet()
+      }
     }
   }
 }

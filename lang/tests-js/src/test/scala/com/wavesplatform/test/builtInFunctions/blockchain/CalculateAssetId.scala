@@ -35,7 +35,7 @@ object CalculateAssetId extends JsTestBase {
           (data, function, error) <- Seq(
             (randomDigestAlgorithmTypeArrayElement, calculateAssetId, nonMatchingTypes("Issue")),
             (randomDigestAlgorithmTypeArrayElement, calculateAssetIdArgBeforeFunc, nonMatchingTypes("Issue")),
-            (randomDigestAlgorithmTypeArrayElement, invalidCalculateAssetId, invalidFunctionError("calculateAssetId", 1)),
+            (randomDigestAlgorithmTypeArrayElement, invalidCalculateAssetId, invalidFunctionError("calculateAssetId", 1))
           )
         ) {
           val script = precondition.codeForCalculateAssetId(data, function)
@@ -45,15 +45,15 @@ object CalculateAssetId extends JsTestBase {
     }
 
     test("RIDE-35. Negative cases for CalculateAssetId function for version V3") {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-        for (
-          (data, function) <- Seq(
-            (randomIssuesArrayElement, calculateAssetId),
-            (randomIssuesArrayElement, calculateAssetIdArgBeforeFunc)
-          )
-        ) {
-          val script = precondition.codeForCalculateAssetId(data, function)
-          assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
+      val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
+      for (
+        (data, function) <- Seq(
+          (randomIssuesArrayElement, calculateAssetId),
+          (randomIssuesArrayElement, calculateAssetIdArgBeforeFunc)
+        )
+      ) {
+        val script = precondition.codeForCalculateAssetId(data, function)
+        assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
       }
     }
   }

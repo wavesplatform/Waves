@@ -30,13 +30,16 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         issueFee,
         2: Byte,
         script = Some(
-          TestCompiler.DefaultVersion.compileAsset(
-            s"""
-              |match tx {
-              |  case _: Order => true
-              |  case _ => false
-              |}""".stripMargin,
-          ).bytes().base64
+          TestCompiler.DefaultVersion
+            .compileAsset(
+              s"""
+                 |match tx {
+                 |  case _: Order => true
+                 |  case _ => false
+                 |}""".stripMargin
+            )
+            .bytes()
+            .base64
         )
       )
 
@@ -60,15 +63,20 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         issueFee,
         2: Byte,
         script = Some(
-          ScriptCompiler.compile(
-            s"""
+          ScriptCompiler
+            .compile(
+              s"""
                 let proof = base58'assetWProofs'
                 match tx {
                   case _: SetAssetScriptTransaction | TransferTransaction | ReissueTransaction | BurnTransaction => tx.proofs[0] == proof
                   case _ => false
                 }""".stripMargin,
-            estimator
-          ).explicitGet()._1.bytes().base64
+              estimator
+            )
+            .explicitGet()
+            ._1
+            .bytes()
+            .base64
         ),
         waitForTx = true
       )

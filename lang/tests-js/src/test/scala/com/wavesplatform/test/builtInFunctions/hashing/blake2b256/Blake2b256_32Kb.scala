@@ -11,7 +11,7 @@ object Blake2b256_32Kb extends JsTestBase {
   private val blake2b256_32KbArgBeforeFunc        = "callerTestData.blake2b256_32Kb()"
   private val invalidBlake2b256_32Kb              = "blake2b256_32Kb()"
   private val invalidBlake2b256_32KbArgBeforeFunc = "callerTestData.blake2b256_32Kb(callerTestData)"
-  private val invalidErrorBlake2b256_32Kb  = testData.invalidFunctionError("blake2b256_32Kb", 1)
+  private val invalidErrorBlake2b256_32Kb         = testData.invalidFunctionError("blake2b256_32Kb", 1)
 
   val tests: Tests = Tests {
     test("RIDE-126. Function blake2b256 should compile for valid ByteVector") {

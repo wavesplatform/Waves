@@ -1337,8 +1337,7 @@ class RocksDBWriter(
 
       @tailrec
       def collectBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
-        if (hh < from || hh <= 0)
-          acc :+ hh
+        if (hh < from || hh <= 0) acc :+ hh
         else {
           val bn     = balanceAtHeightCache.get((hh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(hh))))
           val newAcc = if (hh > toHeight) acc else acc :+ hh
@@ -1347,8 +1346,7 @@ class RocksDBWriter(
 
       @tailrec
       def collectLeaseBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
-        if (hh < from || hh <= 0)
-          acc :+ hh
+        if (hh < from || hh <= 0) acc :+ hh
         else {
           val lbn    = leaseBalanceAtHeightCache.get((hh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(hh))))
           val newAcc = if (hh > toHeight) acc else acc :+ hh

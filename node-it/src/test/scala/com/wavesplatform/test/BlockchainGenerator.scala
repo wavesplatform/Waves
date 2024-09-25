@@ -107,13 +107,13 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
       override def getTimestamp(): Long = time
     }
     Using.Manager { use =>
-      val db = use(RDB.open(dbSettings))
+      val db                         = use(RDB.open(dbSettings))
       val (blockchain, rdbWriterRaw) = StorageFactory(settings, db, time, BlockchainUpdateTriggers.noop)
       use(rdbWriterRaw)
-      val utxPool = use(new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable))
-      val pos = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
+      val utxPool     = use(new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable))
+      val pos         = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
       val extAppender = BlockAppender(blockchain, time, utxPool, pos, scheduler)(_, None)
-      val utxEvents = ConcurrentSubject.publish[UtxEvent]
+      val utxEvents   = ConcurrentSubject.publish[UtxEvent]
 
       val miner = new MinerImpl(
         new DefaultChannelGroup("", null),
@@ -132,7 +132,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
 
       checkGenesis(settings, blockchain, Miner.Disabled)
       val result = genBlocks.foldLeft[Either[ValidationError, Unit]](Right(())) {
-        case (res@Left(_), _) => res
+        case (res @ Left(_), _) => res
         case (_, genBlock) =>
           time.time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, genBlock.signer).explicitGet()
           val correctedTimeTxs = genBlock.txs.map(correctTxTimestamp(_, time))

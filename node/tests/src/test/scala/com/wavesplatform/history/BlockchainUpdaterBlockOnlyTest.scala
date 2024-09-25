@@ -22,60 +22,55 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with DomainScenarioDrivenP
 
   property("can apply valid blocks") {
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
-    scenario(preconditionsAndPayments(1)) {
-      case (domain, (genesis, payments)) =>
-        val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments.head)))
-        blocks.map(block => domain.blockchainUpdater.processBlock(block) should beRight)
+    scenario(preconditionsAndPayments(1)) { case (domain, (genesis, payments)) =>
+      val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments.head)))
+      blocks.map(block => domain.blockchainUpdater.processBlock(block) should beRight)
     }
   }
 
   property("can apply, rollback and reprocess valid blocks") {
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
-    scenario(preconditionsAndPayments(2)) {
-      case (domain, (genesis, payments)) =>
-        val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments.head), Seq(payments(1))))
-        domain.blockchainUpdater.processBlock(blocks.head) should beRight
-        domain.blockchainUpdater.height shouldBe 1
-        domain.blockchainUpdater.processBlock(blocks(1)) should beRight
-        domain.blockchainUpdater.height shouldBe 2
-        domain.blockchainUpdater.removeAfter(blocks.head.id()) should beRight
-        domain.blockchainUpdater.height shouldBe 1
-        domain.blockchainUpdater.processBlock(blocks(1)) should beRight
-        domain.blockchainUpdater.processBlock(blocks(2)) should beRight
+    scenario(preconditionsAndPayments(2)) { case (domain, (genesis, payments)) =>
+      val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments.head), Seq(payments(1))))
+      domain.blockchainUpdater.processBlock(blocks.head) should beRight
+      domain.blockchainUpdater.height shouldBe 1
+      domain.blockchainUpdater.processBlock(blocks(1)) should beRight
+      domain.blockchainUpdater.height shouldBe 2
+      domain.blockchainUpdater.removeAfter(blocks.head.id()) should beRight
+      domain.blockchainUpdater.height shouldBe 1
+      domain.blockchainUpdater.processBlock(blocks(1)) should beRight
+      domain.blockchainUpdater.processBlock(blocks(2)) should beRight
     }
   }
 
   property("can't apply block with invalid signature") {
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
-    scenario(preconditionsAndPayments(1)) {
-      case (domain, (genesis, payment)) =>
-        val blocks = chainBlocks(Seq(Seq(genesis), payment))
-        domain.blockchainUpdater.processBlock(blocks.head) should beRight
-        domain.blockchainUpdater.processBlock(spoilSignature(blocks.last)) should produce("invalid signature")
+    scenario(preconditionsAndPayments(1)) { case (domain, (genesis, payment)) =>
+      val blocks = chainBlocks(Seq(Seq(genesis), payment))
+      domain.blockchainUpdater.processBlock(blocks.head) should beRight
+      domain.blockchainUpdater.processBlock(spoilSignature(blocks.last)) should produce("invalid signature")
     }
   }
 
   property("can't apply block with invalid signature after rollback") {
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
-    scenario(preconditionsAndPayments(1)) {
-      case (domain, (genesis, payment)) =>
-        val blocks = chainBlocks(Seq(Seq(genesis), payment))
-        domain.blockchainUpdater.processBlock(blocks.head) should beRight
-        domain.blockchainUpdater.processBlock(blocks(1)) should beRight
-        domain.blockchainUpdater.removeAfter(blocks.head.id()) should beRight
-        domain.blockchainUpdater.processBlock(spoilSignature(blocks(1))) should produce("invalid signature")
+    scenario(preconditionsAndPayments(1)) { case (domain, (genesis, payment)) =>
+      val blocks = chainBlocks(Seq(Seq(genesis), payment))
+      domain.blockchainUpdater.processBlock(blocks.head) should beRight
+      domain.blockchainUpdater.processBlock(blocks(1)) should beRight
+      domain.blockchainUpdater.removeAfter(blocks.head.id()) should beRight
+      domain.blockchainUpdater.processBlock(spoilSignature(blocks(1))) should produce("invalid signature")
     }
   }
 
   property("can process 11 blocks and then rollback to genesis") {
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
-    scenario(preconditionsAndPayments(10)) {
-      case (domain, (genesis, payments)) =>
-        val blocks = chainBlocks(Seq(genesis) +: payments.map(Seq(_)))
-        blocks.foreach { b =>
-          domain.blockchainUpdater.processBlock(b) should beRight
-        }
-        domain.blockchainUpdater.removeAfter(blocks.head.id()) should beRight
+    scenario(preconditionsAndPayments(10)) { case (domain, (genesis, payments)) =>
+      val blocks = chainBlocks(Seq(genesis) +: payments.map(Seq(_)))
+      blocks.foreach { b =>
+        domain.blockchainUpdater.processBlock(b) should beRight
+      }
+      domain.blockchainUpdater.removeAfter(blocks.head.id()) should beRight
     }
   }
 }

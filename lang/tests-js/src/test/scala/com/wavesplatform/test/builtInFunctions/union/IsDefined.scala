@@ -2,7 +2,16 @@ package com.wavesplatform.test.builtInFunctions.union
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomBoolean, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt, randomStringArrayElement, randomUnionArrayElement}
+import testHelpers.RandomDataGenerator.{
+  randomAddressDataArrayElement,
+  randomAliasDataArrayElement,
+  randomBoolean,
+  randomByteVectorArrayElement,
+  randomDigestAlgorithmTypeArrayElement,
+  randomInt,
+  randomStringArrayElement,
+  randomUnionArrayElement
+}
 import testHelpers.TestDataConstantsAndMethods.{MATCHING_NOT_EXHAUSTIVE, actualVersions, invalidFunctionError}
 import utest.{Tests, test}
 

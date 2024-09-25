@@ -37,25 +37,25 @@ class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
 
     val genesis = Seq(company, king, notary, accountA, accountB).map(acc => TxHelpers.genesis(acc.toAddress))
 
-    val assetScript   = s"""
-                     |
-                     | match tx {
-                     |   case ttx: TransferTransaction =>
-                     |      let king = Address(base58'${king.toAddress}')
-                     |      let company = Address(base58'${company.toAddress}')
-                     |      let notary1 = addressFromPublicKey(extract(getBinary(king, "notary1PK")))
-                     |      let txIdBase58String = toBase58String(ttx.id)
-                     |      let isNotary1Agreed = match getBoolean(notary1,txIdBase58String) {
-                     |        case b : Boolean => b
-                     |        case _ : Unit => false
-                     |      }
-                     |      let recipientAddress = addressFromRecipient(ttx.recipient)
-                     |      let recipientAgreement = getBoolean(recipientAddress,txIdBase58String)
-                     |      let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
-                     |      let senderAddress = addressFromPublicKey(ttx.senderPublicKey)
-                     |      senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
-                     |   case _ => throw()
-                     | }
+    val assetScript = s"""
+                         |
+                         | match tx {
+                         |   case ttx: TransferTransaction =>
+                         |      let king = Address(base58'${king.toAddress}')
+                         |      let company = Address(base58'${company.toAddress}')
+                         |      let notary1 = addressFromPublicKey(extract(getBinary(king, "notary1PK")))
+                         |      let txIdBase58String = toBase58String(ttx.id)
+                         |      let isNotary1Agreed = match getBoolean(notary1,txIdBase58String) {
+                         |        case b : Boolean => b
+                         |        case _ : Unit => false
+                         |      }
+                         |      let recipientAddress = addressFromRecipient(ttx.recipient)
+                         |      let recipientAgreement = getBoolean(recipientAddress,txIdBase58String)
+                         |      let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
+                         |      let senderAddress = addressFromPublicKey(ttx.senderPublicKey)
+                         |      senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
+                         |   case _ => throw()
+                         | }
         """.stripMargin
     val untypedScript = Parser.parseExpr(assetScript).get.value
     val typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untypedScript).explicitGet()._1)
@@ -115,7 +115,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
       append(Seq(issue, kingDataTransaction, transferFromCompanyToA)).explicitGet()
       append(Seq(transferFromAToB)) should produce("NotAllowedByScript")
       append(Seq(notaryDataTransaction)).explicitGet()
-      append(Seq(transferFromAToB)) should produce("NotAllowedByScript") //recipient should accept tx
+      append(Seq(transferFromAToB)) should produce("NotAllowedByScript") // recipient should accept tx
       append(Seq(accountBDataTransaction)).explicitGet()
       append(Seq(transferFromAToB)).explicitGet()
     }

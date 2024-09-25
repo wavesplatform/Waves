@@ -2,8 +2,7 @@ package com.wavesplatform.settings
 
 import com.wavesplatform.Version
 
-/**
-  * System constants here.
+/** System constants here.
   */
 object Constants {
   val ApplicationName = "waves"

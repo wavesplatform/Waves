@@ -4,7 +4,12 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V5
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, actualVersionsWithoutV3, nonMatchingTypes, versionsSupportingTheNewFeatures}
+import testHelpers.TestDataConstantsAndMethods.{
+  CANT_FIND_A_FUNCTION_OVERLOAD,
+  actualVersionsWithoutV3,
+  nonMatchingTypes,
+  versionsSupportingTheNewFeatures
+}
 import utest.{Tests, test}
 
 object Median extends JsTestBase {

@@ -24,16 +24,17 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
   val AMOUNT     = 10000000000L
   val FEE        = 5000000
 
-
   def mkScripts(num: Int): List[(Script, Long)] = {
     (0 until num).map { ind =>
-      ScriptCompiler.compile(
-        s"""
-           |let ind = $ind
-           |true
+      ScriptCompiler
+        .compile(
+          s"""
+             |let ind = $ind
+             |true
           """.stripMargin,
-        ScriptEstimatorV2
-      ).explicitGet()
+          ScriptEstimatorV2
+        )
+        .explicitGet()
     }.toList
   }
 

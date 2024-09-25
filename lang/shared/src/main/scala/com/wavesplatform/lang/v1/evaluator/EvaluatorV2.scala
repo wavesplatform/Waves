@@ -146,8 +146,7 @@ class EvaluatorV2(
             if (newMode) {
               val cost = f.costByLibVersion(stdLibVersion).toInt
               Some(limit - cost)
-            } else
-              None
+            } else None
           (func, precalculatedLimit, parentBlocks)
         }
         .orElse(findUserFunction(name, parentBlocks).map { case (func, blocks) => (func, None, blocks) })
@@ -271,8 +270,7 @@ class EvaluatorV2(
             if (argsEvaluated && unusedArgsComplexity > 0) {
               logFunc(fc, ctx, stdLibVersion, unusedArgsComplexity, enableExecutionLog)
               evaluateFunction(fc, startArgs, unusedArgsComplexity)
-            } else
-              EvaluationResult(unusedArgsComplexity)
+            } else EvaluationResult(unusedArgsComplexity)
           }
 
       case evaluated: EVALUATED =>

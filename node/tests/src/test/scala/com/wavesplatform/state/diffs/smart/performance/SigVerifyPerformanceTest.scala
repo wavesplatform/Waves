@@ -40,8 +40,7 @@ class SigVerifyPerformanceTest extends PropSpec with WithState {
 
     def simpleCheck(): Unit = assertDiffAndState(Seq(TestBlock.create(Seq(gen))), TestBlock.create(transfers), smartEnabledFS) { case _ => }
     def scriptedCheck(): Unit =
-      assertDiffAndState(Seq(TestBlock.create(Seq(gen, setScript))), TestBlock.create(scriptTransfers), smartEnabledFS) {
-        case _ =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(gen, setScript))), TestBlock.create(scriptTransfers), smartEnabledFS) { case _ =>
       }
 
     val simeplCheckTime   = Instrumented.withTimeMillis(simpleCheck())._2

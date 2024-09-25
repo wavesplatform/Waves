@@ -16,24 +16,22 @@ abstract class GenericTransactionSpecification[T <: Transaction] extends PropSpe
   def preserBytesJson: Option[(Array[Byte], JsValue)] = None
 
   property(s"$transactionName serialization roundtrip") {
-    forAll(generator) {
-      case (_, tx) =>
-        assertTxs(transactionParser.parseBytes(tx.bytes()).get.asInstanceOf[T], tx)
+    forAll(generator) { case (_, tx) =>
+      assertTxs(transactionParser.parseBytes(tx.bytes()).get.asInstanceOf[T], tx)
     }
   }
 
-  preserBytesJson.foreach {
-    case (bytes, json) =>
-      property(s"$transactionName deserialize bytes") {
-        val tx = transactionParser.parseBytes(bytes).get
-        tx.json() shouldBe json
-        tx match {
-          case tx: ProvenTransaction =>
-            assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
+  preserBytesJson.foreach { case (bytes, json) =>
+    property(s"$transactionName deserialize bytes") {
+      val tx = transactionParser.parseBytes(bytes).get
+      tx.json() shouldBe json
+      tx match {
+        case tx: ProvenTransaction =>
+          assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
 
-          case _ => // Ignore
-        }
+        case _ => // Ignore
       }
+    }
   }
 
   property(s"$transactionName serialization from TypedTransaction") {
@@ -45,10 +43,9 @@ abstract class GenericTransactionSpecification[T <: Transaction] extends PropSpe
   }
 
   property(s"$transactionName id doesn't depend on proof") {
-    forAll(generator, proofsGen) {
-      case ((pref, tx), proofs1) =>
-        val tx1 = updateProofs(tx, proofs1)
-        tx1.id() shouldBe tx.id()
+    forAll(generator, proofsGen) { case ((pref, tx), proofs1) =>
+      val tx1 = updateProofs(tx, proofs1)
+      tx1.id() shouldBe tx.id()
     }
   }
 

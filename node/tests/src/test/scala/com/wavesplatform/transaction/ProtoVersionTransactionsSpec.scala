@@ -96,7 +96,9 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
       val buyOrder =
         Order.buy(Order.V3, buyer, Account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime / 2, MinFee * 3).explicitGet()
       val sellOrder =
-        Order.sell(Order.V3, seller, Account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime / 2, MinFee * 3).explicitGet()
+        Order
+          .sell(Order.V3, seller, Account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime / 2, MinFee * 3)
+          .explicitGet()
 
       val exchangeTx =
         ExchangeTransaction

@@ -20,7 +20,7 @@ object Split extends JsTestBase {
         for (
           (data, list, function) <- Seq(
             (randomStringArrayElement, randomStringArrayElement, split),
-            (randomStringArrayElement, randomStringArrayElement, splitArgBeforeFunc),
+            (randomStringArrayElement, randomStringArrayElement, splitArgBeforeFunc)
           )
         ) {
           val script = precondition.simpleRideCode(data, list, function)
@@ -37,7 +37,7 @@ object Split extends JsTestBase {
             (randomInt.toString, randomAliasDataArrayElement, splitArgBeforeFunc, nonMatchingTypes("String")),
             (randomInt.toString, randomIssuesArrayElement, splitArgBeforeFunc, nonMatchingTypes("String")),
             (randomStringArrayElement, randomStringArrayElement, invalidSplit, invalidErrorSplit),
-            (randomStringArrayElement, randomStringArrayElement, invalidSplitArgBeforeFunc, invalidErrorSplit),
+            (randomStringArrayElement, randomStringArrayElement, invalidSplitArgBeforeFunc, invalidErrorSplit)
           )
         ) {
           val script = precondition.simpleRideCode(data, list, function)

@@ -319,15 +319,15 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
         d.blockchain.height shouldBe 10
 
         d.blockchain.balanceAtHeight(account1.toAddress, 10) shouldBe Some(9 -> 11.waves)
-        d.blockchain.balanceAtHeight(account1.toAddress,  9) shouldBe Some(9 -> 11.waves)
-        d.blockchain.balanceAtHeight(account1.toAddress,  8) shouldBe Some(6 -> 10.waves)
-        d.blockchain.balanceAtHeight(account1.toAddress,  6) shouldBe Some(6 -> 10.waves)
-        d.blockchain.balanceAtHeight(account1.toAddress,  5) shouldBe None
+        d.blockchain.balanceAtHeight(account1.toAddress, 9) shouldBe Some(9 -> 11.waves)
+        d.blockchain.balanceAtHeight(account1.toAddress, 8) shouldBe Some(6 -> 10.waves)
+        d.blockchain.balanceAtHeight(account1.toAddress, 6) shouldBe Some(6 -> 10.waves)
+        d.blockchain.balanceAtHeight(account1.toAddress, 5) shouldBe None
 
         d.blockchain.balanceAtHeight(account1.toAddress, 10, issueTx.asset) shouldBe Some(10 -> 600)
-        d.blockchain.balanceAtHeight(account1.toAddress,  9, issueTx.asset) shouldBe Some(7  -> 100)
-        d.blockchain.balanceAtHeight(account1.toAddress,  8, issueTx.asset) shouldBe Some(7  -> 100)
-        d.blockchain.balanceAtHeight(account1.toAddress,  6, issueTx.asset) shouldBe None
+        d.blockchain.balanceAtHeight(account1.toAddress, 9, issueTx.asset) shouldBe Some(7 -> 100)
+        d.blockchain.balanceAtHeight(account1.toAddress, 8, issueTx.asset) shouldBe Some(7 -> 100)
+        d.blockchain.balanceAtHeight(account1.toAddress, 6, issueTx.asset) shouldBe None
 
         d.appendBlock(TxHelpers.transfer(richAccount, account2.toAddress, 20.waves))
         d.appendBlock(TxHelpers.transfer(richAccount, account2.toAddress, 700, issueTx.asset))

@@ -43,9 +43,9 @@ class FractionIntRoundsTest extends EvaluatorSpec {
   property("fraction roundings") {
     // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/math/RoundingMode.html
     val exprs = List[String => String](
-      r => s"fraction(5, 1, 2, $r)", //  2.5
-      r => s"fraction(2, 4, 5, $r)", //  1.6
-      r => s"fraction(-2, 4, 5, $r)", // -1.6
+      r => s"fraction(5, 1, 2, $r)",   //  2.5
+      r => s"fraction(2, 4, 5, $r)",   //  1.6
+      r => s"fraction(-2, 4, 5, $r)",  // -1.6
       r => s"fraction(-5, 11, 10, $r)" // -5.5
     )
     val resultByRounding = Map(

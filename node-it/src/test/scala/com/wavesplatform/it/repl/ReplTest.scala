@@ -41,25 +41,25 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
     val failDApp = ScriptCompiler
       .compile(
         s"""
-               |{-# STDLIB_VERSION 4 #-}
-               |{-# CONTENT_TYPE DAPP #-}
-               |{-# SCRIPT_TYPE ACCOUNT #-}
-               |
-               |@Callable(i)
-               |func default() = {
-               |  let action = valueOrElse(getString(this, "crash"), "no")
-               |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
-               |
-               |  if (action == "yes")
-               |  then {
-               |    if (check)
-               |    then throw("Crashed by dApp")
-               |    else throw("Crashed by dApp")
-               |  }
-               |  else []
-               |}
-               |
-               |""".stripMargin,
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func default() = {
+           |  let action = valueOrElse(getString(this, "crash"), "no")
+           |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+           |
+           |  if (action == "yes")
+           |  then {
+           |    if (check)
+           |    then throw("Crashed by dApp")
+           |    else throw("Crashed by dApp")
+           |  }
+           |  else []
+           |}
+           |
+           |""".stripMargin,
         ScriptEstimatorV3.latest
       )
       .explicitGet()
@@ -70,12 +70,12 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
     val assetScript = ScriptCompiler
       .compile(
         """
-               |{-# STDLIB_VERSION 2 #-}
-               |{-# CONTENT_TYPE EXPRESSION #-}
-               |{-# SCRIPT_TYPE ASSET #-}
-               |
-               | false
-               |""".stripMargin,
+          |{-# STDLIB_VERSION 2 #-}
+          |{-# CONTENT_TYPE EXPRESSION #-}
+          |{-# SCRIPT_TYPE ASSET #-}
+          |
+          | false
+          |""".stripMargin,
         ScriptEstimatorV3.latest
       )
       .explicitGet()

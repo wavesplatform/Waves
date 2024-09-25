@@ -50,53 +50,55 @@ class BlockchainUpdaterBurnTest extends PropSpec with DomainScenarioDrivenProper
 
   val localBlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings
-      .copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0, BlockchainFeatures.DataTransaction.id -> 0))
+      .copy(
+        featureCheckBlocksPeriod = 1,
+        blocksForFeatureActivation = 1,
+        preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)
+      )
   )
   val localWavesSettings: WavesSettings = settings.copy(blockchainSettings = localBlockchainSettings)
 
   property("issue -> burn -> reissue in sequential blocks works correctly") {
-    scenario(preconditions, localWavesSettings) {
-      case (domain, (ts, genesis, masterToAlice, issue, burn, reissue)) =>
-        val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, 1.toByte, ts)
-        val block1 = customBuildBlockOfTxs(block0.id(), Seq(masterToAlice), defaultSigner, TxVersion.V1, ts + 150)
-        val block2 = customBuildBlockOfTxs(block1.id(), Seq(issue), defaultSigner, TxVersion.V1, ts + 250)
-        val block3 = customBuildBlockOfTxs(block2.id(), Seq(burn), defaultSigner, TxVersion.V1, ts + 350)
-        val block4 = customBuildBlockOfTxs(block3.id(), Seq(reissue), defaultSigner, TxVersion.V1, ts + 450)
+    scenario(preconditions, localWavesSettings) { case (domain, (ts, genesis, masterToAlice, issue, burn, reissue)) =>
+      val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, 1.toByte, ts)
+      val block1 = customBuildBlockOfTxs(block0.id(), Seq(masterToAlice), defaultSigner, TxVersion.V1, ts + 150)
+      val block2 = customBuildBlockOfTxs(block1.id(), Seq(issue), defaultSigner, TxVersion.V1, ts + 250)
+      val block3 = customBuildBlockOfTxs(block2.id(), Seq(burn), defaultSigner, TxVersion.V1, ts + 350)
+      val block4 = customBuildBlockOfTxs(block3.id(), Seq(reissue), defaultSigner, TxVersion.V1, ts + 450)
 
-        domain.appendBlock(block0)
-        domain.appendBlock(block1)
+      domain.appendBlock(block0)
+      domain.appendBlock(block1)
 
-        domain.appendBlock(block2)
-        val assetDescription1 = domain.blockchainUpdater.assetDescription(issue.asset).get
-        assetDescription1.reissuable should be(false)
-        assetDescription1.totalVolume should be(issue.quantity.value)
+      domain.appendBlock(block2)
+      val assetDescription1 = domain.blockchainUpdater.assetDescription(issue.asset).get
+      assetDescription1.reissuable should be(false)
+      assetDescription1.totalVolume should be(issue.quantity.value)
 
-        domain.appendBlock(block3)
-        val assetDescription2 = domain.blockchainUpdater.assetDescription(issue.asset).get
-        assetDescription2.reissuable should be(false)
-        assetDescription2.totalVolume should be(issue.quantity.value - burn.quantity.value)
+      domain.appendBlock(block3)
+      val assetDescription2 = domain.blockchainUpdater.assetDescription(issue.asset).get
+      assetDescription2.reissuable should be(false)
+      assetDescription2.totalVolume should be(issue.quantity.value - burn.quantity.value)
 
-        domain.blockchainUpdater.processBlock(block4) should produce("Asset is not reissuable")
+      domain.blockchainUpdater.processBlock(block4) should produce("Asset is not reissuable")
     }
   }
 
   property("issue -> burn -> reissue in micro blocks works correctly") {
-    scenario(preconditions, localWavesSettings) {
-      case (domain, (ts, genesis, masterToAlice, issue, burn, reissue)) =>
-        val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, TxVersion.V1, ts)
-        val block1 = customBuildBlockOfTxs(block0.id(), Seq(masterToAlice), defaultSigner, TxVersion.V1, ts + 150)
-        val block2 = customBuildBlockOfTxs(block1.id(), Seq(issue), defaultSigner, TxVersion.V1, ts + 250)
-        val block3 = customBuildBlockOfTxs(block2.id(), Seq(burn, reissue), defaultSigner, TxVersion.V1, ts + 350)
+    scenario(preconditions, localWavesSettings) { case (domain, (ts, genesis, masterToAlice, issue, burn, reissue)) =>
+      val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, TxVersion.V1, ts)
+      val block1 = customBuildBlockOfTxs(block0.id(), Seq(masterToAlice), defaultSigner, TxVersion.V1, ts + 150)
+      val block2 = customBuildBlockOfTxs(block1.id(), Seq(issue), defaultSigner, TxVersion.V1, ts + 250)
+      val block3 = customBuildBlockOfTxs(block2.id(), Seq(burn, reissue), defaultSigner, TxVersion.V1, ts + 350)
 
-        domain.appendBlock(block0)
-        domain.appendBlock(block1)
+      domain.appendBlock(block0)
+      domain.appendBlock(block1)
 
-        domain.appendBlock(block2)
-        val assetDescription1 = domain.blockchainUpdater.assetDescription(issue.asset).get
-        assetDescription1.reissuable should be(false)
-        assetDescription1.totalVolume should be(issue.quantity.value)
+      domain.appendBlock(block2)
+      val assetDescription1 = domain.blockchainUpdater.assetDescription(issue.asset).get
+      assetDescription1.reissuable should be(false)
+      assetDescription1.totalVolume should be(issue.quantity.value)
 
-        domain.blockchainUpdater.processBlock(block3) should produce("Asset is not reissuable")
+      domain.blockchainUpdater.processBlock(block3) should produce("Asset is not reissuable")
     }
   }
 }

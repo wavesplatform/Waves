@@ -253,8 +253,7 @@ object GenesisBlockGenerator {
       }
 
       def calc(hitSources: Seq[ByteStr], timestamps: Seq[Long], baseTargets: Seq[Long], height: Int, n: Int): Seq[Long] =
-        if (n == 0)
-          baseTargets
+        if (n == 0) baseTargets
         else {
           val currentHitSource = if (height > 100) hitSources(100) else hitSources.head
           val (delay, newHitSource) = parallelMapMin[(FullAddressInfo, Share), (Long, ByteStr), Long](

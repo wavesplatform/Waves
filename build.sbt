@@ -139,7 +139,7 @@ lazy val `waves-node` = (project in file("."))
     `node-generator`,
     benchmark,
     `repl-js`,
-    `repl-jvm`,
+    `repl-jvm`
 //    `ride-runner`
   )
 

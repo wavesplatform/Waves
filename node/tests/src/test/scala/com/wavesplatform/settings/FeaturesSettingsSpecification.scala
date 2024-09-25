@@ -7,14 +7,16 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 class FeaturesSettingsSpecification extends FlatSpec {
   "FeaturesSettings" should "read values" in {
-    val config = ConfigFactory.parseString("""
-        |waves {
-        |  features {
-        |    auto-shutdown-on-unsupported-feature = yes
-        |    supported = [123,124,135]
-        |  }
-        |}
-      """.stripMargin).resolve()
+    val config = ConfigFactory
+      .parseString("""
+                     |waves {
+                     |  features {
+                     |    auto-shutdown-on-unsupported-feature = yes
+                     |    supported = [123,124,135]
+                     |  }
+                     |}
+      """.stripMargin)
+      .resolve()
 
     val settings = config.as[FeaturesSettings]("waves.features")
 

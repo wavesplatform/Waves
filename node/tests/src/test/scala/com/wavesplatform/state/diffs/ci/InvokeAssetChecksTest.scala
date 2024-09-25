@@ -56,8 +56,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         if (activated) {
           val expectingMessage = if (func == "invalidLength") lengthError else nonExistentError
           d.appendAndAssertFailed(invoke, expectingMessage)
-        } else
-          d.appendAndAssertSucceed(invoke)
+        } else d.appendAndAssertSucceed(invoke)
       }
     }
   }

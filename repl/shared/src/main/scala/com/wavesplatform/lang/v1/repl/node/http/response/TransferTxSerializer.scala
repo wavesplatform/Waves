@@ -31,19 +31,31 @@ object TransferTxSerializer {
   ): Array[Byte] = {
     val baseBytes =
       sender ++
-      assetId.fold(Array(0: Byte))(bytes => (1: Byte) +: bytes) ++
-      feeAssetId.fold(Array(0: Byte))(bytes => (1: Byte) +: bytes) ++
-      ByteBuffer.allocate(8).putLong(timestamp).array ++
-      ByteBuffer.allocate(8).putLong(amount).array ++
-      ByteBuffer.allocate(8).putLong(fee).array ++
-      toBytes(recipient, chainId) ++
-      serializeArrayWithLength(attachment)
+        assetId.fold(Array(0: Byte))(bytes => (1: Byte) +: bytes) ++
+        feeAssetId.fold(Array(0: Byte))(bytes => (1: Byte) +: bytes) ++
+        ByteBuffer.allocate(8).putLong(timestamp).array ++
+        ByteBuffer.allocate(8).putLong(amount).array ++
+        ByteBuffer.allocate(8).putLong(fee).array ++
+        toBytes(recipient, chainId) ++
+        serializeArrayWithLength(attachment)
 
     version match {
       case 1 => Array(typeId) ++ baseBytes
       case 2 => Array(typeId, version) ++ baseBytes
       case _ =>
-        protobufBytes(bs(sender), chainId, amount, assetId.map(bs), fee, feeAssetId.map(bs), timestamp, version, proofs.map(bs), bs(attachment), recipient)
+        protobufBytes(
+          bs(sender),
+          chainId,
+          amount,
+          assetId.map(bs),
+          fee,
+          feeAssetId.map(bs),
+          timestamp,
+          version,
+          proofs.map(bs),
+          bs(attachment),
+          recipient
+        )
     }
   }
 
@@ -63,21 +75,21 @@ object TransferTxSerializer {
     arr.slice(2, arr.length - EnvironmentFunctions.ChecksumLength)
 
   private def protobufBytes(
-     sender: ByteString,
-     chainId: Byte,
-     amount: Long,
-     assetId: Option[ByteString],
-     fee: Long ,
-     feeAssetId: Option[ByteString],
-     timestamp: Long,
-     version: Int,
-     proofs: Seq[ByteString],
-     attachment: ByteString,
-     recipient: LangRecipient
+      sender: ByteString,
+      chainId: Byte,
+      amount: Long,
+      assetId: Option[ByteString],
+      fee: Long,
+      feeAssetId: Option[ByteString],
+      timestamp: Long,
+      version: Int,
+      proofs: Seq[ByteString],
+      attachment: ByteString,
+      recipient: LangRecipient
   ): Array[Byte] = {
-    val pbAmount    = Amount().withAmount(amount)
-    val assetAmount = assetId.fold(pbAmount)(pbAmount.withAssetId)
-    val data = Data.Transfer(TransferTransactionData(Some(toProtobufRecipient(recipient)), Some(assetAmount), attachment))
+    val pbAmount       = Amount().withAmount(amount)
+    val assetAmount    = assetId.fold(pbAmount)(pbAmount.withAssetId)
+    val data           = Data.Transfer(TransferTransactionData(Some(toProtobufRecipient(recipient)), Some(assetAmount), attachment))
     val feeAmount      = Amount().withAmount(fee)
     val feeAssetAmount = feeAssetId.fold(feeAmount)(feeAmount.withAssetId)
     val transaction =

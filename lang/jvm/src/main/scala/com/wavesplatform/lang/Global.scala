@@ -103,8 +103,7 @@ object Global extends BaseGlobal {
       } else {
         BigDecimalMath.pow(baseBD, expBD, context)
       }
-      if (useNewPrecision)
-        setScale(resultPrecision, round, context.getPrecision, result)
+      if (useNewPrecision) setScale(resultPrecision, round, context.getPrecision, result)
       else {
         val value = result.setScale(resultPrecision.toInt, round.mode).unscaledValue
         Right(BigInt(value))

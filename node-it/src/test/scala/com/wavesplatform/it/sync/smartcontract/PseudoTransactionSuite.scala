@@ -30,26 +30,31 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
     super.beforeAll()
     smartAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(scriptBase64), waitForTx = true).id
 
-    val dAppScript = ScriptCompiler.compile(
-      s"""
-         |{-# STDLIB_VERSION 4 #-}
-         |{-# CONTENT_TYPE DAPP #-}
-         |{-# SCRIPT_TYPE ACCOUNT #-}
-         |
-         |@Callable (i)
-         |func reissueAsset(a: ByteVector, r: Boolean, q: Int) = [Reissue(a, q, r)]
-         |
-         |@Callable (i)
-         |func burnAsset(a: ByteVector, q: Int) = [Burn(a, q)]
-         |
-         |@Callable (i)
-         |func transferAsset(r: ByteVector, a: ByteVector, q: Int) = [ScriptTransfer(Address(r), q, a)]
-         |
-         |@Callable (i)
-         |func transferAssetByAlias(r: String, a: ByteVector, q: Int) = [ScriptTransfer(Alias(r), q, a)]
+    val dAppScript = ScriptCompiler
+      .compile(
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable (i)
+           |func reissueAsset(a: ByteVector, r: Boolean, q: Int) = [Reissue(a, q, r)]
+           |
+           |@Callable (i)
+           |func burnAsset(a: ByteVector, q: Int) = [Burn(a, q)]
+           |
+           |@Callable (i)
+           |func transferAsset(r: ByteVector, a: ByteVector, q: Int) = [ScriptTransfer(Address(r), q, a)]
+           |
+           |@Callable (i)
+           |func transferAssetByAlias(r: String, a: ByteVector, q: Int) = [ScriptTransfer(Alias(r), q, a)]
          """.stripMargin,
-      ScriptEstimatorV3.latest
-    ).explicitGet()._1.bytes().base64
+        ScriptEstimatorV3.latest
+      )
+      .explicitGet()
+      ._1
+      .bytes()
+      .base64
 
     sender.setScript(firstDApp, Some(dAppScript), waitForTx = true)
     sender.setScript(recipient, Some(dAppScript), waitForTx = true)
@@ -131,45 +136,48 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
   }
 
   private def smartAssetScript(invokeId: String): String =
-    TestCompiler.DefaultVersion.compileAsset(
-      s"""
-       |{-# STDLIB_VERSION 4 #-}
-       |{-# CONTENT_TYPE EXPRESSION #-}
-       |{-# SCRIPT_TYPE ASSET #-}
-       |
-         |  match tx {
-       |    case t: TransferTransaction => t.senderPublicKey.toBase58String() == "${firstDApp.publicKey.toString}"
-       |     && t.assetId.value().toBase58String() == "$smartAssetId"
-       |     && toBase64String(t.attachment) == ""
-       |     && t.bodyBytes.size() == 0
-       |     && t.fee == 0
-       |     && t.feeAssetId == unit
-       |     && t.id == fromBase58String("$invokeId")
-       |     && (toBase58String(addressFromRecipient(t.recipient).bytes) == "${recipient.toAddress.toString}" ||
-       |     toBase58String(addressFromRecipient(t.recipient).bytes) == "$recipientAlias")
-       |     && toBase58String(t.sender.bytes) == "${firstDApp.toAddress.toString}"
-       |     && t.version == 0
-       |    case r: ReissueTransaction => r.senderPublicKey.toBase58String() == "${firstDApp.publicKey.toString}"
-       |     && r.assetId.value().toBase58String() == "$smartAssetId"
-       |     && r.bodyBytes.size() == 0
-       |     && r.fee == 0
-       |     && r.id.size() != 0
-       |     && toBase58String(r.sender.bytes) == "${firstDApp.toAddress.toString}"
-       |     && r.version == 0
-       |     && r.quantity == 100000
-       |     && r.reissuable == true
-       |    case b: BurnTransaction => b.senderPublicKey.toBase58String() == "${firstDApp.publicKey.toString}"
-       |     && b.assetId.value().toBase58String() == "$smartAssetId"
-       |     && b.bodyBytes.size() == 0
-       |     && b.fee == 0
-       |     && b.id.size() != 0
-       |     && toBase58String(b.sender.bytes) == "${firstDApp.toAddress.toString}"
-       |     && b.version == 0
-       |     && b.quantity == 100000
-       |    case _ => true
-       |  }
+    TestCompiler.DefaultVersion
+      .compileAsset(
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE EXPRESSION #-}
+           |{-# SCRIPT_TYPE ASSET #-}
+           |
+           |  match tx {
+           |    case t: TransferTransaction => t.senderPublicKey.toBase58String() == "${firstDApp.publicKey.toString}"
+           |     && t.assetId.value().toBase58String() == "$smartAssetId"
+           |     && toBase64String(t.attachment) == ""
+           |     && t.bodyBytes.size() == 0
+           |     && t.fee == 0
+           |     && t.feeAssetId == unit
+           |     && t.id == fromBase58String("$invokeId")
+           |     && (toBase58String(addressFromRecipient(t.recipient).bytes) == "${recipient.toAddress.toString}" ||
+           |     toBase58String(addressFromRecipient(t.recipient).bytes) == "$recipientAlias")
+           |     && toBase58String(t.sender.bytes) == "${firstDApp.toAddress.toString}"
+           |     && t.version == 0
+           |    case r: ReissueTransaction => r.senderPublicKey.toBase58String() == "${firstDApp.publicKey.toString}"
+           |     && r.assetId.value().toBase58String() == "$smartAssetId"
+           |     && r.bodyBytes.size() == 0
+           |     && r.fee == 0
+           |     && r.id.size() != 0
+           |     && toBase58String(r.sender.bytes) == "${firstDApp.toAddress.toString}"
+           |     && r.version == 0
+           |     && r.quantity == 100000
+           |     && r.reissuable == true
+           |    case b: BurnTransaction => b.senderPublicKey.toBase58String() == "${firstDApp.publicKey.toString}"
+           |     && b.assetId.value().toBase58String() == "$smartAssetId"
+           |     && b.bodyBytes.size() == 0
+           |     && b.fee == 0
+           |     && b.id.size() != 0
+           |     && toBase58String(b.sender.bytes) == "${firstDApp.toAddress.toString}"
+           |     && b.version == 0
+           |     && b.quantity == 100000
+           |    case _ => true
+           |  }
          """.stripMargin
-    ).bytes().base64
+      )
+      .bytes()
+      .base64
 
   private def invokeScriptTransaction(func: String, args: List[EXPR]): InvokeScriptTransaction =
     Signed.invokeScript(

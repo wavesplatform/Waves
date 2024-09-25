@@ -39,10 +39,10 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
     val priceAssetSpending = amount * price / 100000000L
     val pair               = AssetPair.createAssetPair("WAVES", exchAssetId).get
     for ((o1ver, o2ver, tver) <- versions) {
-      val ts                       = ntpTime.correctedTime()
-      val expirationTimestamp      = ts + Order.MaxLiveTime / 2
-      val buy                      = Order.buy(o1ver, buyer, matcher.publicKey, pair, amount, price, ts, expirationTimestamp, matcherFee).explicitGet()
-      val sell                     = Order.sell(o2ver, seller, matcher.publicKey, pair, amount, price, ts, expirationTimestamp, matcherFee).explicitGet()
+      val ts                  = ntpTime.correctedTime()
+      val expirationTimestamp = ts + Order.MaxLiveTime / 2
+      val buy                 = Order.buy(o1ver, buyer, matcher.publicKey, pair, amount, price, ts, expirationTimestamp, matcherFee).explicitGet()
+      val sell                = Order.sell(o2ver, seller, matcher.publicKey, pair, amount, price, ts, expirationTimestamp, matcherFee).explicitGet()
       val buyerWavesBalanceBefore  = sender.wavesBalance(buyerAddress).available
       val sellerWavesBalanceBefore = sender.wavesBalance(sellerAddress).available
       val buyerAssetBalanceBefore  = sender.assetsBalance(buyerAddress, Seq(exchAssetId)).getOrElse(exchAssetId, 0L)
@@ -73,14 +73,16 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       waitForTx = true
     )
 
-    for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2, buyerWavesDelta, sellerWavesDelta, buyerAssetDelta, sellerAssetDelta) <- Seq(
-           (1: Byte, 3: Byte, Waves, IssuedAsset(feeAssetId), amount - matcherFee, -amount, -priceAssetSpending, priceAssetSpending - matcherFee),
-           (1: Byte, 3: Byte, Waves, Waves, amount - matcherFee, -amount - matcherFee, -priceAssetSpending, priceAssetSpending),
-           (2: Byte, 3: Byte, Waves, IssuedAsset(feeAssetId), amount - matcherFee, -amount, -priceAssetSpending, priceAssetSpending - matcherFee),
-           (3: Byte, 1: Byte, IssuedAsset(feeAssetId), Waves, amount, -amount - matcherFee, -priceAssetSpending - matcherFee, priceAssetSpending),
-           (2: Byte, 3: Byte, Waves, Waves, amount - matcherFee, -amount - matcherFee, -priceAssetSpending, priceAssetSpending),
-           (3: Byte, 2: Byte, IssuedAsset(feeAssetId), Waves, amount, -amount - matcherFee, -priceAssetSpending - matcherFee, priceAssetSpending)
-         )) {
+    for (
+      (o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2, buyerWavesDelta, sellerWavesDelta, buyerAssetDelta, sellerAssetDelta) <- Seq(
+        (1: Byte, 3: Byte, Waves, IssuedAsset(feeAssetId), amount - matcherFee, -amount, -priceAssetSpending, priceAssetSpending - matcherFee),
+        (1: Byte, 3: Byte, Waves, Waves, amount - matcherFee, -amount - matcherFee, -priceAssetSpending, priceAssetSpending),
+        (2: Byte, 3: Byte, Waves, IssuedAsset(feeAssetId), amount - matcherFee, -amount, -priceAssetSpending, priceAssetSpending - matcherFee),
+        (3: Byte, 1: Byte, IssuedAsset(feeAssetId), Waves, amount, -amount - matcherFee, -priceAssetSpending - matcherFee, priceAssetSpending),
+        (2: Byte, 3: Byte, Waves, Waves, amount - matcherFee, -amount - matcherFee, -priceAssetSpending, priceAssetSpending),
+        (3: Byte, 2: Byte, IssuedAsset(feeAssetId), Waves, amount, -amount - matcherFee, -priceAssetSpending - matcherFee, priceAssetSpending)
+      )
+    ) {
       if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
         sender.broadcastTransfer(
           buyer,

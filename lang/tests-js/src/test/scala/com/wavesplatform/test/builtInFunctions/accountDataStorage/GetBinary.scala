@@ -59,7 +59,7 @@ object GetBinary extends JsTestBase {
     }
 
     test("RIDE-6. Test negative scenarios for getBinary functions") {
-      val invalidFunction = s"getBinaryValue($randomInt)"
+      val invalidFunction          = s"getBinaryValue($randomInt)"
       val invalidArgBeforeFunction = s"$randomInt.getBinaryValue()"
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
@@ -70,7 +70,7 @@ object GetBinary extends JsTestBase {
             (randomInt.toString, getBinary),
             (randomInt.toString, getBinaryValue),
             (randomInt.toString, invalidFunction),
-            (randomInt.toString, invalidArgBeforeFunction),
+            (randomInt.toString, invalidArgBeforeFunction)
           )
         ) {
           val script = precondition.codeFromMatchingAndCase(addressOrAlias, binary, rideV3Result, GreaterV3ResultBinaryEntry)

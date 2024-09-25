@@ -114,7 +114,7 @@ package object smartcontract {
      """.stripMargin
 
   def exchangeTx(pair: AssetPair, exTxFee: Long, orderFee: Long, time: Time, ord1Ver: Byte, ord2Ver: Byte, accounts: KeyPair*): JsObject = {
-    val buyer       = accounts.head // first one
+    val buyer       = accounts.head      // first one
     val seller      = accounts.tail.head // second one
     val matcher     = accounts.last
     val sellPrice   = (0.50 * Order.PriceConstant).toLong
@@ -146,7 +146,7 @@ package object smartcontract {
   }
 
   def orders(pair: AssetPair, ord1Ver: Byte, ord2Ver: Byte, fee: Long, time: Time, accounts: KeyPair*): (Order, Order) = {
-    val buyer               = accounts.head // first one
+    val buyer               = accounts.head      // first one
     val seller              = accounts.tail.head // second one
     val matcher             = accounts.last
     val ts                  = time.correctedTime()

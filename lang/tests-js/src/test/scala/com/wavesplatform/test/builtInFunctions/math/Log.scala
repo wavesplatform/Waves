@@ -14,11 +14,11 @@ import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, a
 import utest.{Tests, test}
 
 object Log extends JsTestBase {
-  private val union: String          = randomUnionArrayElement
-  private val logInt                 = s"log(callerTestData, $randomInt, $randomInt, 4, 2, $union)"
-  private val logIntArgBeforeFunc    = s"callerTestData.log($randomInt, $randomInt, 4, 2, $union)"
-  private val logBigInt              = s"log(callerTestData, 6, callerTestData, $randomInt, 2, $union)"
-  private val logBigIntArgBeforeFunc = s"callerTestData.log(6, callerTestData, $randomInt, 2, $union)"
+  private val union: String              = randomUnionArrayElement
+  private val logInt                     = s"log(callerTestData, $randomInt, $randomInt, 4, 2, $union)"
+  private val logIntArgBeforeFunc        = s"callerTestData.log($randomInt, $randomInt, 4, 2, $union)"
+  private val logBigInt                  = s"log(callerTestData, 6, callerTestData, $randomInt, 2, $union)"
+  private val logBigIntArgBeforeFunc     = s"callerTestData.log(6, callerTestData, $randomInt, 2, $union)"
   private val invalidLogInt              = s"log(callerTestData, 10, $union)"
   private val invalidLogIntArgBeforeFunc = s"callerTestData.log(10, $union)"
   private val logError: String           = testData.invalidFunctionError("log", 6)

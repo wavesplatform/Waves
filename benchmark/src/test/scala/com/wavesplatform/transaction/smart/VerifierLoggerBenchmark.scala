@@ -43,7 +43,13 @@ object VerifierLoggerBenchmark {
     val writer: BufferedWriter = Files.newBufferedWriter(resultFile)
 
     private val dataTx: DataTransaction = DataTransaction
-      .selfSigned(1.toByte, KeyPair(Array[Byte]()), (1 to 4).map(i => BinaryDataEntry(s"data$i", ByteStr(Array.fill(1024 * 30)(1)))).toList, 100000000, 0)
+      .selfSigned(
+        1.toByte,
+        KeyPair(Array[Byte]()),
+        (1 to 4).map(i => BinaryDataEntry(s"data$i", ByteStr(Array.fill(1024 * 30)(1)))).toList,
+        100000000,
+        0
+      )
       .explicitGet()
 
     private val dataTxObj: Terms.CaseObj = Bindings.transactionObject(

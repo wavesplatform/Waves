@@ -19,14 +19,16 @@ object Tasks {
     def toMapChecked[K, V](data: Seq[V], key: V => K): Map[K, V] =
       data.distinct
         .groupBy(key)
-        .ensuring(_.forall {
-          case (_, v) =>
+        .ensuring(
+          _.forall { case (_, v) =>
             if (v.size == 1) true
             else {
               println(v)
               false
             }
-        }, "Duplicate detected")
+          },
+          "Duplicate detected"
+        )
         .mapValues(_.head)
 
     def str(s: String): String = "\"" + s + "\""

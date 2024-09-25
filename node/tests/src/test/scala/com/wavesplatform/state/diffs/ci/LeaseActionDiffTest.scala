@@ -35,7 +35,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = features)
   }
 
-  private def extractFee(sender: Address): PartialFunction[Transaction, Long] = { case z: Authorized if z.sender.toAddress == sender => z.assetFee._2 }
+  private def extractFee(sender: Address): PartialFunction[Transaction, Long] = {
+    case z: Authorized if z.sender.toAddress == sender => z.assetFee._2
+  }
 
   private val v4Features = features(V4)
   private val v5Features = features(V5)

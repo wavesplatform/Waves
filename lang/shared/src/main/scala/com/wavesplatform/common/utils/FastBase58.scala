@@ -109,8 +109,7 @@ object FastBase58 extends BaseXXEncDec {
     java.util.Arrays.copyOfRange(outBytes, outBytesStart, outBytesCount)
   }
 
-  /**
-    * Scala.js linking errors fix (from java.lang.Byte)
+  /** Scala.js linking errors fix (from java.lang.Byte)
     */
   private[this] object ByteOps {
     @inline

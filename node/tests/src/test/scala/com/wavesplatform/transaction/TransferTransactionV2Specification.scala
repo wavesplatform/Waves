@@ -54,35 +54,34 @@ class TransferTransactionV2Specification extends PropSpec {
   }
 
   property("VersionedTransferTransactionSpecification id doesn't depend on proof") {
-    forAll(accountGen, accountGen, proofsGen, proofsGen, attachmentGen) {
-      case (_, acc2, proofs1, proofs2, attachment) =>
-        val tx1 = TransferTransaction(
-          2.toByte,
-          acc2.publicKey,
-          acc2.toAddress,
-          Waves,
-          TxPositiveAmount.unsafeFrom(1),
-          Waves,
-          TxPositiveAmount.unsafeFrom(1),
-          attachment,
-          1,
-          proofs1,
-          acc2.toAddress.chainId
-        )
-        val tx2 = TransferTransaction(
-          2.toByte,
-          acc2.publicKey,
-          acc2.toAddress,
-          Waves,
-          TxPositiveAmount.unsafeFrom(1),
-          Waves,
-          TxPositiveAmount.unsafeFrom(1),
-          attachment,
-          1,
-          proofs2,
-          acc2.toAddress.chainId
-        )
-        tx1.id() shouldBe tx2.id()
+    forAll(accountGen, accountGen, proofsGen, proofsGen, attachmentGen) { case (_, acc2, proofs1, proofs2, attachment) =>
+      val tx1 = TransferTransaction(
+        2.toByte,
+        acc2.publicKey,
+        acc2.toAddress,
+        Waves,
+        TxPositiveAmount.unsafeFrom(1),
+        Waves,
+        TxPositiveAmount.unsafeFrom(1),
+        attachment,
+        1,
+        proofs1,
+        acc2.toAddress.chainId
+      )
+      val tx2 = TransferTransaction(
+        2.toByte,
+        acc2.publicKey,
+        acc2.toAddress,
+        Waves,
+        TxPositiveAmount.unsafeFrom(1),
+        Waves,
+        TxPositiveAmount.unsafeFrom(1),
+        attachment,
+        1,
+        proofs2,
+        acc2.toAddress.chainId
+      )
+      tx1.id() shouldBe tx2.id()
     }
   }
 

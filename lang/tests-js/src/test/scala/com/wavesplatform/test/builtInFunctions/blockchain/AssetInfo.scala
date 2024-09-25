@@ -8,12 +8,11 @@ import utest.{Tests, test}
 
 object AssetInfo extends JsTestBase {
 
-  private val assetInfo = "assetInfo(callerTestData)"
+  private val assetInfo              = "assetInfo(callerTestData)"
   private val assetInfoArgBeforeFunc = "callerTestData.assetInfo()"
 
-  private val invalidAssetInfo = "assetInfo()"
+  private val invalidAssetInfo    = "assetInfo()"
   private val invalidAssetInfoArg = s"$randomInt.assetInfo()"
-
 
   val tests: Tests = Tests {
     test("RIDE-30. Compile assetInfo function for asset") {
@@ -39,7 +38,7 @@ object AssetInfo extends JsTestBase {
             (randomByteVectorArrayElement, invalidAssetInfo, invalidFunctionError("assetInfo", 1)),
             (randomByteVectorArrayElement, invalidAssetInfoArg, nonMatchingTypes("ByteVector")),
             (randomAliasDataArrayElement, assetInfo, nonMatchingTypes("ByteVector")),
-            (randomBoolean.toString, assetInfoArgBeforeFunc, nonMatchingTypes("ByteVector")),
+            (randomBoolean.toString, assetInfoArgBeforeFunc, nonMatchingTypes("ByteVector"))
           )
         ) {
           val script = precondition.onlyMatcherContract(asset, function)

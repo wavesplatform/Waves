@@ -185,18 +185,18 @@ class ScriptEstimatorV1V2Test extends ScriptEstimatorTestBase(ScriptEstimatorV1,
     val cost = estimate(functionCosts(V3), expr).explicitGet()
 
     cost shouldBe
-        5     /* func decl              */ +
-        5 * 3 /* func call args count   */ +
-        1     /* first call a at inc()  */ +
-        2     /* call a at inc()        */ +
-        1     /* call + at inc()        */ +
-        2     /* call a at inc()        */ +
-        1     /* call + at inc()        */ +
-        1     /* first call b at inc()  */ +
-        2     /* call b at inc()        */ +
-        3     /* 1 + 1 param            */ +
-        1     /* 1 param                */ +
-        1     /* 1 param                */
+      5 /* func decl              */ +
+      5 * 3 /* func call args count   */ +
+      1 /* first call a at inc()  */ +
+      2 /* call a at inc()        */ +
+      1 /* call + at inc()        */ +
+      2 /* call a at inc()        */ +
+      1 /* call + at inc()        */ +
+      1 /* first call b at inc()  */ +
+      2 /* call b at inc()        */ +
+      3 /* 1 + 1 param            */ +
+      1 /* 1 param                */ +
+      1 /* 1 param                */
   }
 
 }

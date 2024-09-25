@@ -20,7 +20,7 @@ import org.influxdb.dto.Point
 private class ResponsivenessLogs(csvPrefix: String, metricName: String) extends ScorexLogging {
   import ResponsivenessLogs.TxEvent
 
-  //noinspection ScalaStyle
+  // noinspection ScalaStyle
   private[this] case class MetricSnapshot(point: Point.Builder = null, nano: Long = System.nanoTime(), millis: Long = System.currentTimeMillis())
 
   private[this] case class TxState(
@@ -76,48 +76,46 @@ private class ResponsivenessLogs(csvPrefix: String, metricName: String) extends 
           .addField("height", height)
 
         if (eventType == TxEvent.Mined) {
-          stateMap.get(tx.id()).foreach {
-            case TxState(received, lastReceived, firstMined, _, _, attempt, _) =>
-              val delta     = toMillis(nowNanos - received)
-              val lastDelta = toMillis(nowNanos - lastReceived)
-              log.trace(s"Neutrino mining time for ${tx.id()} (attempt #$attempt): $delta ms ($lastDelta from last recv)")
+          stateMap.get(tx.id()).foreach { case TxState(received, lastReceived, firstMined, _, _, attempt, _) =>
+            val delta     = toMillis(nowNanos - received)
+            val lastDelta = toMillis(nowNanos - lastReceived)
+            log.trace(s"Neutrino mining time for ${tx.id()} (attempt #$attempt): $delta ms ($lastDelta from last recv)")
 
-              val snapshot = MetricSnapshot(basePoint.addField("time-to-mine", delta).addField("time-to-last-mine", lastDelta), nowNanos)
-              stateMap(tx.id()) = TxState(
-                received,
-                lastReceived,
-                firstMined.orElse(Some(snapshot)),
-                Some(snapshot),
-                None,
-                attempt,
-                height
-              )
+            val snapshot = MetricSnapshot(basePoint.addField("time-to-mine", delta).addField("time-to-last-mine", lastDelta), nowNanos)
+            stateMap(tx.id()) = TxState(
+              received,
+              lastReceived,
+              firstMined.orElse(Some(snapshot)),
+              Some(snapshot),
+              None,
+              attempt,
+              height
+            )
           }
         } else if (eventType == TxEvent.Expired || (eventType == TxEvent.Invalidated && !isAlreadyInTheState)) {
-          stateMap.get(tx.id()).foreach {
-            case st @ TxState(received, lastReceived, firstMined, _, _, _, _) =>
-              val delta     = toMillis(nowNanos - received)
-              val lastDelta = toMillis(nowNanos - lastReceived)
-              log.trace(s"Neutrino fail time for ${tx.id()}: $delta ms")
+          stateMap.get(tx.id()).foreach { case st @ TxState(received, lastReceived, firstMined, _, _, _, _) =>
+            val delta     = toMillis(nowNanos - received)
+            val lastDelta = toMillis(nowNanos - lastReceived)
+            log.trace(s"Neutrino fail time for ${tx.id()}: $delta ms")
 
-              val baseFailedPoint = basePoint
-                .tag("reason", reasonClass)
-                .addField("time-to-fail", delta)
-                .addField("time-to-last-fail", lastDelta)
+            val baseFailedPoint = basePoint
+              .tag("reason", reasonClass)
+              .addField("time-to-fail", delta)
+              .addField("time-to-last-fail", lastDelta)
 
-              val failedPoint = firstMined match {
-                case Some(ms) =>
-                  val ffDelta    = toMillis(nowNanos - ms.nano)
-                  val firstDelta = toMillis(ms.nano - received)
-                  baseFailedPoint
-                    .addField("time-to-first-mine", firstDelta)
-                    .addField("time-to-finish-after-first-mining", ffDelta)
+            val failedPoint = firstMined match {
+              case Some(ms) =>
+                val ffDelta    = toMillis(nowNanos - ms.nano)
+                val firstDelta = toMillis(ms.nano - received)
+                baseFailedPoint
+                  .addField("time-to-first-mine", firstDelta)
+                  .addField("time-to-finish-after-first-mining", ffDelta)
 
-                case None =>
-                  baseFailedPoint
-              }
+              case None =>
+                baseFailedPoint
+            }
 
-              stateMap(tx.id()) = st.copy(failed = Some(MetricSnapshot(failedPoint)))
+            stateMap(tx.id()) = st.copy(failed = Some(MetricSnapshot(failedPoint)))
           }
         }
 

@@ -73,11 +73,13 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
   }
 
   test("V4: can't invoke itself with payment") {
-    for (payment <- List(
-           Seq(InvokeScriptTransaction.Payment(1, Waves)),
-           Seq(InvokeScriptTransaction.Payment(1, asset1)),
-           Seq(InvokeScriptTransaction.Payment(1, Waves), InvokeScriptTransaction.Payment(1, asset1))
-         )) {
+    for (
+      payment <- List(
+        Seq(InvokeScriptTransaction.Payment(1, Waves)),
+        Seq(InvokeScriptTransaction.Payment(1, asset1)),
+        Seq(InvokeScriptTransaction.Payment(1, Waves), InvokeScriptTransaction.Payment(1, asset1))
+      )
+    ) {
       assertApiError(
         sender.invokeScript(dAppV4, dAppV4Address, payment = payment, fee = smartMinFee + smartFee),
         AssertiveApiError(ScriptExecutionError.Id, "DApp self-payment is forbidden since V4", matchMessage = true)
@@ -90,10 +92,12 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
   }
 
   test("V4: can't send tokens to itself from a script") {
-    for (args <- List(
-           List(CONST_STRING("WAVES").explicitGet()),
-           List(CONST_STRING(asset1Id).explicitGet())
-         )) {
+    for (
+      args <- List(
+        List(CONST_STRING("WAVES").explicitGet()),
+        List(CONST_STRING(asset1Id).explicitGet())
+      )
+    ) {
       assertApiError(
         sender.invokeScript(caller, dAppV4Address, Some("paySelf"), args),
         AssertiveApiError(ScriptExecutionError.Id, "Error while executing dApp: DApp self-transfer is forbidden since V4")

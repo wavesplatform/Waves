@@ -14,7 +14,19 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, CompositePattern, ConstsPat, MATCH_CASE, ObjPat, PART, Pos, Single, TuplePat, Type, TypedVar}
+import com.wavesplatform.lang.v1.parser.Expressions.{
+  BINARY_OP,
+  CompositePattern,
+  ConstsPat,
+  MATCH_CASE,
+  ObjPat,
+  PART,
+  Pos,
+  Single,
+  TuplePat,
+  Type,
+  TypedVar
+}
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports.*
@@ -595,8 +607,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
       f: FunctionTypeSignature
   ): Either[CompilationError, (EXPR, FINAL)] = {
     val argTypes = f.args
-    if (funcArgs.lengthCompare(argTypes.size) != 0)
-      Left(WrongArgumentsNumber(p.start, p.end, funcName, argTypes.size, funcArgs.size))
+    if (funcArgs.lengthCompare(argTypes.size) != 0) Left(WrongArgumentsNumber(p.start, p.end, funcName, argTypes.size, funcArgs.size))
     else {
       val typedExpressionArgumentsAndTypedPlaceholders = resolvedArgs.zip(argTypes)
 
@@ -732,8 +743,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
                       val compareSize = BINARY_OP(pos, getSize, BinaryOperation.EQ_OP, size)
                       BINARY_OP(pos, cond, BinaryOperation.AND_OP, compareSize)
                     }
-                  } else
-                    cond
+                  } else cond
                 makeIfCase(
                   p.caseType.fold(checkingCond)(t =>
                     BINARY_OP(

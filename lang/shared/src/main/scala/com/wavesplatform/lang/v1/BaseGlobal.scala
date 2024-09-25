@@ -362,8 +362,7 @@ trait BaseGlobal {
     val pivot =
       (arr: ArrayView[T]) => arr(Random.nextInt(arr.size))
 
-    if (seq.length % 2 == 1)
-      findKMedianInPlace(ArrayView[T](seq), (seq.size - 1) / 2)(pivot)
+    if (seq.length % 2 == 1) findKMedianInPlace(ArrayView[T](seq), (seq.size - 1) / 2)(pivot)
     else {
       val r1 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2 - 1)(pivot)
       val r2 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2)(pivot)
@@ -393,7 +392,7 @@ object BaseGlobal {
     def apply(n: Int): T =
       if (from + n < until) arr(from + n)
       else throw new ArrayIndexOutOfBoundsException(n)
-      // should be never thrown due to passing Random.nextInt(arr.size) at the single point of call
+    // should be never thrown due to passing Random.nextInt(arr.size) at the single point of call
 
     def partitionInPlace(p: T => Boolean): (ArrayView[T], ArrayView[T]) = {
       var upper = until - 1

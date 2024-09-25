@@ -68,18 +68,18 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
     val dAppScript = ScriptCompiler
       .compile(
         s"""
-         |{-# STDLIB_VERSION 3 #-}
-         |{-# CONTENT_TYPE DAPP #-}
-         |
-         |let receiver = Address(base58'${receiver.toAddress.toString}')
-         |
-         |@Callable(i)
-         |func resendPayment() = {
-         |  if (isDefined(i.payment)) then
-         |    let pay = extract(i.payment)
-         |    TransferSet([ScriptTransfer(receiver, 1, pay.assetId)])
-         |  else throw("need payment in WAVES or any Asset")
-         |}
+           |{-# STDLIB_VERSION 3 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |
+           |let receiver = Address(base58'${receiver.toAddress.toString}')
+           |
+           |@Callable(i)
+           |func resendPayment() = {
+           |  if (isDefined(i.payment)) then
+           |    let pay = extract(i.payment)
+           |    TransferSet([ScriptTransfer(receiver, 1, pay.assetId)])
+           |  else throw("need payment in WAVES or any Asset")
+           |}
         """.stripMargin,
         estimator
       )

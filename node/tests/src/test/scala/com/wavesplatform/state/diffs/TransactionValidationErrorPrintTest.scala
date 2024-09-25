@@ -57,7 +57,10 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
       .explicitGet()
 
     val preTypedScript =
-      ExprScript(V6, ExpressionCompiler(compilerContext(V6, Expression, isAssetScript = false), V6, Parser.parseExpr("true").get.value).explicitGet()._1)
+      ExprScript(
+        V6,
+        ExpressionCompiler(compilerContext(V6, Expression, isAssetScript = false), V6, Parser.parseExpr("true").get.value).explicitGet()._1
+      )
         .explicitGet()
 
     val seed     = Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet()

@@ -2,7 +2,13 @@ package com.wavesplatform.test.builtInFunctions.converting
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomBoolean, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt, randomUnionArrayElement}
+import testHelpers.RandomDataGenerator.{
+  randomBoolean,
+  randomByteVectorArrayElement,
+  randomDigestAlgorithmTypeArrayElement,
+  randomInt,
+  randomUnionArrayElement
+}
 import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, versionsSupportingTheNewFeatures}
 import utest.{Tests, test}
 

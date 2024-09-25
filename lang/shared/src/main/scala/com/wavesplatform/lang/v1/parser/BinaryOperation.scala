@@ -46,7 +46,7 @@ object BinaryOperation {
     val func = ">="
   }
   case object GT_OP extends BinaryOperation {
-    val func                  = ">"
+    val func                                      = ">"
     override def parser[A: P]: P[BinaryOperation] = P(">" ~ !P("=")).map(_ => this)
   }
   case object SUM_OP extends BinaryOperation {

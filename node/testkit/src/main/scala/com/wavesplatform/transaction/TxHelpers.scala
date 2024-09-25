@@ -114,9 +114,18 @@ object TxHelpers {
       version: Byte = TxVersion.V2,
       chainId: Byte = AddressScheme.current.chainId
   ): MassTransferTransaction =
-    MassTransferTransaction.selfSigned(version, from, asset,
-      to.map { case (r, a) => MassTransferTransaction.ParsedTransfer(r, TxNonNegativeAmount.unsafeFrom(a)) },
-      fee, timestamp, ByteStr.empty, chainId).explicitGet()
+    MassTransferTransaction
+      .selfSigned(
+        version,
+        from,
+        asset,
+        to.map { case (r, a) => MassTransferTransaction.ParsedTransfer(r, TxNonNegativeAmount.unsafeFrom(a)) },
+        fee,
+        timestamp,
+        ByteStr.empty,
+        chainId
+      )
+      .explicitGet()
 
   def issue(
       issuer: KeyPair = defaultSigner,

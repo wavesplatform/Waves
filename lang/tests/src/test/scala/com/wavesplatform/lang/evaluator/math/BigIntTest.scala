@@ -44,7 +44,9 @@ class BigIntTest extends EvaluatorSpec {
     eval("toBigInt(base58'3ZRuyAbxDY78aZf8nGASFCZKPhJ5LuDAuALLdoAqCqaFuAjqgmZ47WsE11LKt2JuF5Pasqx65bzvjWMzHB2b4vuCa').toString()") should produce(
       "Too big ByteVector for BigInt (65 > 64 bytes)"
     )
-    eval("let bin = base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T' ; toBytes(toBigInt(bin)) == bin") shouldBe Right(
+    eval(
+      "let bin = base58'2Ana1pUpv2ZbMVkwF5FXapYeBEjdxDatLn7nvJkhgTSXbs59SyZSx866bXirPgj8QQVB57uxHJBG1YFvkRbFj4T' ; toBytes(toBigInt(bin)) == bin"
+    ) shouldBe Right(
       CONST_BOOLEAN(true)
     )
     eval(
@@ -246,12 +248,13 @@ class BigIntTest extends EvaluatorSpec {
     val d18 = """parseBigIntValue("987654321012345678")"""
     val d19 = """parseBigIntValue("1987654321012345678")"""
 
-    val e1  = """parseBigIntValue("3259987654320123456789")"""
-    val e2  = """parseBigIntValue("515598765432101234567")"""
-    val e3  = s"""$max / (${List.fill(7)(s"""toBigInt(${Long.MaxValue})""").mkString(" * ")} / toBigInt(4))"""
+    val e1 = """parseBigIntValue("3259987654320123456789")"""
+    val e2 = """parseBigIntValue("515598765432101234567")"""
+    val e3 = s"""$max / (${List.fill(7)(s"""toBigInt(${Long.MaxValue})""").mkString(" * ")} / toBigInt(4))"""
 
     val r = BigInt(
-      "6670795527762621906375444802568692078004471712158714717165576501880318489264376534028344582079701518666593922923767238664173166263805614917588045354008642")
+      "6670795527762621906375444802568692078004471712158714717165576501880318489264376534028344582079701518666593922923767238664173166263805614917588045354008642"
+    )
 
     eval(s"pow($max, 0, $max, 18, 18, DOWN)") shouldBe Left("Overflow on BigInt pow calculation")
     eval(s"pow($max, 0, $max, 0, 0, DOWN)") shouldBe Left("Overflow on BigInt pow calculation")
@@ -266,9 +269,17 @@ class BigIntTest extends EvaluatorSpec {
   }
 
   property("sqrt") {
-    eval(s"pow($max, 0, toBigInt(5), 1, 18, DOWN)") shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524036944801")))
-    eval(s"pow($max, 18, toBigInt(5), 1, 18, DOWN)") shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524")))
-    eval(s"sqrt($max, 0, 18, DOWN)")(V6) shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524036944801")))
-    eval(s"sqrt($max, 18, 18, DOWN)")(V6) shouldBe Right(CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524")))
+    eval(s"pow($max, 0, toBigInt(5), 1, 18, DOWN)") shouldBe Right(
+      CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524036944801"))
+    )
+    eval(s"pow($max, 18, toBigInt(5), 1, 18, DOWN)") shouldBe Right(
+      CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524"))
+    )
+    eval(s"sqrt($max, 0, 18, DOWN)")(V6) shouldBe Right(
+      CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524036944801"))
+    )
+    eval(s"sqrt($max, 18, 18, DOWN)")(V6) shouldBe Right(
+      CONST_BIGINT(BigInt("81877371507464127617551201542979628307507432471243237061821853600756754782485292915524"))
+    )
   }
 }

@@ -29,7 +29,6 @@ class NegativeSponsorFeeTest extends PropSpec with WithDomain {
        """.stripMargin
     )
 
-
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls, RideV6)

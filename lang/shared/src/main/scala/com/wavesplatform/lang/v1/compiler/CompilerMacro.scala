@@ -11,7 +11,7 @@ object CompilerMacro {
     def call(id: Short, args: List[EXPR])        = FUNCTION_CALL(Native(id), args)
     def callUser(name: String, args: List[EXPR]) = FUNCTION_CALL(User(name), args)
 
-    val funcName = s"$$f${index}_1"
+    val funcName     = s"$$f${index}_1"
     val lastFuncName = s"$$f${index}_2"
 
     def step(last: Boolean) = FUNC(

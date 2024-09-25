@@ -21,8 +21,10 @@ trait TypedScriptGen {
       expr <- exprGen
     } yield Terms.LET(name, expr)
 
-  private def funcGen(nameGen: Gen[String] = Gen.alphaStr.filter(_.getBytes("UTF-8").length <= ContractLimits.MaxDeclarationNameInBytes),
-                      withArgs: Boolean = true) =
+  private def funcGen(
+      nameGen: Gen[String] = Gen.alphaStr.filter(_.getBytes("UTF-8").length <= ContractLimits.MaxDeclarationNameInBytes),
+      withArgs: Boolean = true
+  ) =
     for {
       name <- nameGen
       arg0 <- Gen.alphaStr

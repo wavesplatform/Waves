@@ -33,7 +33,7 @@ object MakeString_11C extends JsTestBase {
         (data, list, function, error) <- Seq(
           (randomStringArrayElement, stringList, invalidMakeString_11CFunction, invalidErrorMakeString_11C),
           (randomIssuesArrayElement, stringList, makeString_11C, nonMatchingTypes("String")),
-          (randomInt.toString, stringList, makeString_11CArgBeforeFunc, nonMatchingTypes("String")),
+          (randomInt.toString, stringList, makeString_11CArgBeforeFunc, nonMatchingTypes("String"))
         )
       ) {
         val script = precondition.simpleRideCode(data, list, function)
@@ -47,7 +47,7 @@ object MakeString_11C extends JsTestBase {
         for (
           (data, list, function) <- Seq(
             (randomStringArrayElement, stringList, makeString_11C),
-            (randomStringArrayElement, stringList, makeString_11CArgBeforeFunc),
+            (randomStringArrayElement, stringList, makeString_11CArgBeforeFunc)
           )
         ) {
           val script = precondition.simpleRideCode(data, list, function)

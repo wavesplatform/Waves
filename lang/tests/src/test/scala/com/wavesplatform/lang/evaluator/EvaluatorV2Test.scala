@@ -1030,8 +1030,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         generatedSum: Int = 0,
         acc: List[Int] = Nil
     ): List[Int] =
-      if (acc.size + 1 == piecesNumber)
-        expectedSum - generatedSum :: acc
+      if (acc.size + 1 == piecesNumber) expectedSum - generatedSum :: acc
       else {
         val max                     = expectedSum - generatedSum - piecesNumber + acc.size + 1
         val distributionCoefficient = random.nextInt(Math.min(max, piecesNumber)) + 1

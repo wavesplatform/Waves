@@ -36,22 +36,24 @@ package object compiler {
 
   def getTestContext(v: StdLibVersion, t: ScriptType = Account): CTX[Environment] = {
     Monoid
-      .combineAll(Seq(
-        PureContext.build(v, useNewPowPrecision = true).withEnvironment[Environment],
-        CryptoContext.build(Global, v).withEnvironment[Environment],
-        WavesContext.build(Global, DirectiveSet(v, t, Expression).explicitGet(), fixBigScriptField = true),
-        CTX[NoContext](
-          Seq(pointType, Common.pointTypeA, Common.pointTypeB, Common.pointTypeC),
-          Map(
-            ("p", (Common.AorB, null)),
-            ("tv", (Common.AorBorC, null)),
-            ("l", (LIST(LONG), ContextfulVal.pure[NoContext](ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)), false).explicitGet()))),
-            ("lpa", (LIST(Common.pointTypeA), ContextfulVal.pure[NoContext](arr))),
-            ("lpabc", (LIST(Common.AorBorC), ContextfulVal.pure[NoContext](arr)))
-          ),
-          Array(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, returnsListLong, idOptionLong)
-        ).withEnvironment[Environment]
-      ))
+      .combineAll(
+        Seq(
+          PureContext.build(v, useNewPowPrecision = true).withEnvironment[Environment],
+          CryptoContext.build(Global, v).withEnvironment[Environment],
+          WavesContext.build(Global, DirectiveSet(v, t, Expression).explicitGet(), fixBigScriptField = true),
+          CTX[NoContext](
+            Seq(pointType, Common.pointTypeA, Common.pointTypeB, Common.pointTypeC),
+            Map(
+              ("p", (Common.AorB, null)),
+              ("tv", (Common.AorBorC, null)),
+              ("l", (LIST(LONG), ContextfulVal.pure[NoContext](ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)), false).explicitGet()))),
+              ("lpa", (LIST(Common.pointTypeA), ContextfulVal.pure[NoContext](arr))),
+              ("lpabc", (LIST(Common.AorBorC), ContextfulVal.pure[NoContext](arr)))
+            ),
+            Array(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, returnsListLong, idOptionLong)
+          ).withEnvironment[Environment]
+        )
+      )
   }
 
   val compilerContext   = getTestContext(V3).compilerContext

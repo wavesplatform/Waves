@@ -23,12 +23,12 @@ package object converters {
   implicit def fromOptionCO(v: Option[CaseObj]): EVALUATED = v.getOrElse(unit)
 
   implicit def pure[F[_]: Monad, A <: EVALUATED](
-    v: Either[ExecutionError, A]
+      v: Either[ExecutionError, A]
   ): F[Either[ExecutionError, EVALUATED]] =
     v.asInstanceOf[Either[ExecutionError, EVALUATED]].pure[F]
 
   implicit def pureEval[F[_], A <: EVALUATED](
-    v: Eval[Either[ExecutionError, A]]
+      v: Eval[Either[ExecutionError, A]]
   )(implicit m: Monad[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
     v.map(ei => pure(ei)(m))
 }

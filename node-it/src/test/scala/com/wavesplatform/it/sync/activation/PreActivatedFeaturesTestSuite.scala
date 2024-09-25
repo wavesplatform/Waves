@@ -63,10 +63,10 @@ class PreActivatedFeaturesTestSuite extends BaseFreeSpec with ActivationStatusRe
 
 object PreActivatedFeaturesTestSuite {
   import com.wavesplatform.it.NodeConfigs._
-  val votingInterval             = 10
-  val featureNum: Short          = BlockchainFeatures.SmallerMinimalGeneratingBalance.id
-  val featureDescr               = BlockchainFeatures.SmallerMinimalGeneratingBalance.description
-  private val supportedConfig    = ConfigFactory.parseString(s"""waves {
+  val votingInterval    = 10
+  val featureNum: Short = BlockchainFeatures.SmallerMinimalGeneratingBalance.id
+  val featureDescr      = BlockchainFeatures.SmallerMinimalGeneratingBalance.description
+  private val supportedConfig = ConfigFactory.parseString(s"""waves {
                                                              |  blockchain.custom.functionality {
                                                              |    pre-activated-features = {}
                                                              |    feature-check-blocks-period = $votingInterval

@@ -8,9 +8,9 @@ import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_FUNCTION, actualVersio
 import utest.{Tests, test}
 
 object SigVerify_128Kb extends JsTestBase {
-  private val sigVerify_128Kb              = s"sigVerify_128Kb(callerTestData, callerTestData, callerTestData)"
-  private val sigVerify_128KbArgBeforeFunc = s"callerTestData.sigVerify_128Kb(callerTestData, callerTestData)"
-  private val invalidSigVerify_128Kb       = "sigVerify_128Kb()"
+  private val sigVerify_128Kb                     = s"sigVerify_128Kb(callerTestData, callerTestData, callerTestData)"
+  private val sigVerify_128KbArgBeforeFunc        = s"callerTestData.sigVerify_128Kb(callerTestData, callerTestData)"
+  private val invalidSigVerify_128Kb              = "sigVerify_128Kb()"
   private val invalidSigVerify_128KbArgBeforeFunc = "callerTestData.sigVerify_128Kb(callerTestData)"
   private val invalidErrorSigVerify_128Kb         = testData.invalidFunctionError("sigVerify_128Kb", 3)
 
@@ -49,7 +49,7 @@ object SigVerify_128Kb extends JsTestBase {
 
     test("RIDE-264. Can't find a function sigVerify_128Kb for RIDE V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.onlyMatcherContract(randomByteVectorArrayElement, sigVerify_128Kb)
+      val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, sigVerify_128Kb)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
     }
   }

@@ -9,11 +9,12 @@ case class ImplicitMappings(chainId: Byte) {
   private val chainDependentMapper = new ChainDependentMapper(chainId)
 
   implicit val heightO: HeightResponse => Option[Long] =
-    (r: HeightResponse) => if(r.succeed) {
-      Some(r.height)
-    } else {
-      None
-    }
+    (r: HeightResponse) =>
+      if (r.succeed) {
+        Some(r.height)
+      } else {
+        None
+      }
 
   implicit val heightM: HeightResponse => Long =
     _.height

@@ -31,15 +31,15 @@ object FairPoSTestSuite {
 
   private val config =
     ConfigFactory.parseString(s"""
-    |waves {
-    |   blockchain.custom {
-    |      functionality {
-    |        pre-activated-features {1 = $microblockActivationHeight, 8 = $fairPoSActivationHeight, 17 = $vrfActivationHeight}
-    |        generation-balance-depth-from-50-to-1000-after-height = 1000
-    |      }
-    |   }
-    |   miner.quorum = 1
-    |}""".stripMargin)
+                                 |waves {
+                                 |   blockchain.custom {
+                                 |      functionality {
+                                 |        pre-activated-features {1 = $microblockActivationHeight, 8 = $fairPoSActivationHeight, 17 = $vrfActivationHeight}
+                                 |        generation-balance-depth-from-50-to-1000-after-height = 1000
+                                 |      }
+                                 |   }
+                                 |   miner.quorum = 1
+                                 |}""".stripMargin)
 
   val Configs: Seq[Config] = Default.map(config.withFallback(_)).take(3)
 }

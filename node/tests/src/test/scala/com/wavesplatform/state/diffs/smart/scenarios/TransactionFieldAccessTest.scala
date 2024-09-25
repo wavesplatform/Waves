@@ -46,8 +46,8 @@ class TransactionFieldAccessTest extends PropSpec with WithState {
   property("accessing field of transaction without checking its type first results on exception") {
     val (genesis, setScript, lease, transfer) = preconditionsTransferAndLease(script)
     assertDiffAndState(Seq(TestBlock.create(Seq(genesis, setScript))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
-    assertDiffEi(Seq(TestBlock.create(Seq(genesis, setScript))), TestBlock.create(Seq(lease)), smartEnabledFS)(
-      snapshotEi => snapshotEi should produce("TransactionNotAllowedByScript")
+    assertDiffEi(Seq(TestBlock.create(Seq(genesis, setScript))), TestBlock.create(Seq(lease)), smartEnabledFS)(snapshotEi =>
+      snapshotEi should produce("TransactionNotAllowedByScript")
     )
   }
 }

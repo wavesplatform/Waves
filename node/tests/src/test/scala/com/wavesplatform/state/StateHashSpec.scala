@@ -19,11 +19,11 @@ class StateHashSpec extends FreeSpec {
     val testScript = ScriptCompiler
       .compile(
         """
-        |{-# STDLIB_VERSION 2 #-}
-        |{-# CONTENT_TYPE EXPRESSION #-}
-        |{-# SCRIPT_TYPE ACCOUNT #-}
-        |true
-        |""".stripMargin,
+          |{-# STDLIB_VERSION 2 #-}
+          |{-# CONTENT_TYPE EXPRESSION #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |true
+          |""".stripMargin,
         ScriptEstimatorV1
       )
       .explicitGet()

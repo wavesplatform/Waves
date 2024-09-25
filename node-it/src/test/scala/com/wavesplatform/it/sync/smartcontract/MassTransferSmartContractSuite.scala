@@ -28,35 +28,35 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
   test("airdrop emulation via MassTransfer") {
     val scriptText = s"""
-       |{-# STDLIB_VERSION 2 #-}
-       |match tx {
-       |  case ttx: MassTransferTransaction =>
-       |    let commonAmount = (ttx.transfers[0].amount + ttx.transfers[1].amount)
-       |    let totalAmountToUsers = commonAmount == 8000000000
-       |    let totalAmountToGov = commonAmount == 2000000000
-       |    let massTxSize = size(ttx.transfers) == 2
-       |
-       |    let accountPK = base58'${notMiner.publicKey}'
-       |    let accSig = sigVerify(ttx.bodyBytes,ttx.proofs[0],accountPK)
-       |
-       |    let txToUsers = (massTxSize && totalAmountToUsers)
-       |
-       |    let mTx = transactionById(ttx.proofs[1])
-       |
-       |    if (txToUsers && accSig) then true
-       |    else
-       |    if(isDefined(mTx)) then
-       |        match extract(mTx) {
-       |          case mt2: MassTransferTransaction =>
-       |            let txToGov = (massTxSize && totalAmountToGov)
-       |            let txToGovComplete = (ttx.timestamp > mt2.timestamp + 30000) && sigVerify(mt2.bodyBytes,mt2.proofs[0], accountPK)
-       |            txToGovComplete && accSig && txToGov
-       |          case _ => false
-       |        }
-       |    else false
-       |case _ => false
-       |}
-       |""".stripMargin
+                        |{-# STDLIB_VERSION 2 #-}
+                        |match tx {
+                        |  case ttx: MassTransferTransaction =>
+                        |    let commonAmount = (ttx.transfers[0].amount + ttx.transfers[1].amount)
+                        |    let totalAmountToUsers = commonAmount == 8000000000
+                        |    let totalAmountToGov = commonAmount == 2000000000
+                        |    let massTxSize = size(ttx.transfers) == 2
+                        |
+                        |    let accountPK = base58'${notMiner.publicKey}'
+                        |    let accSig = sigVerify(ttx.bodyBytes,ttx.proofs[0],accountPK)
+                        |
+                        |    let txToUsers = (massTxSize && totalAmountToUsers)
+                        |
+                        |    let mTx = transactionById(ttx.proofs[1])
+                        |
+                        |    if (txToUsers && accSig) then true
+                        |    else
+                        |    if(isDefined(mTx)) then
+                        |        match extract(mTx) {
+                        |          case mt2: MassTransferTransaction =>
+                        |            let txToGov = (massTxSize && totalAmountToGov)
+                        |            let txToGovComplete = (ttx.timestamp > mt2.timestamp + 30000) && sigVerify(mt2.bodyBytes,mt2.proofs[0], accountPK)
+                        |            txToGovComplete && accSig && txToGov
+                        |          case _ => false
+                        |        }
+                        |    else false
+                        |case _ => false
+                        |}
+                        |""".stripMargin
 
     // set script
     val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
@@ -64,10 +64,10 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     notMiner.addressScriptInfo(notMiner.address).scriptText.isEmpty shouldBe false
 
-    //save time
+    // save time
     val currTime = System.currentTimeMillis()
 
-    //make transfer to users
+    // make transfer to users
     val transfers =
       MassTransferTransaction
         .parseTransfersList(List(Transfer(thirdAddress, 4 * transferAmount), Transfer(secondAddress, 4 * transferAmount)))
@@ -82,7 +82,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     val signed     = unsigned.copy(1.toByte, proofs = Proofs(Seq(accountSig)))
     val toUsersID  = notMiner.signedBroadcast(signed.json(), waitForTx = true).id
 
-    //make transfer with incorrect time
+    // make transfer with incorrect time
     val heightBefore = notMiner.height
 
     val transfersToGov =
@@ -100,7 +100,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
       "Transaction is not allowed by account-script"
     )
 
-    //make correct transfer to government after some time
+    // make correct transfer to government after some time
     notMiner.waitForHeight(heightBefore + 10, 5.minutes)
 
     val unsignedToGovSecond =

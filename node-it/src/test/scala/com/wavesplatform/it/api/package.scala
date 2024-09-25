@@ -78,15 +78,14 @@ package object api {
         }
       }
       f.map { r =>
-          val value  = parse(r.getResponseBody(StandardCharsets.UTF_8))
-          val result = if (numberAsString) convert(value) else value.asRight
-          result.left.foreach(err => log.error(s"Error converting ${Json.prettyPrint(value)}", err))
-          result
-        }
-        .flatMap {
-          case Right(value) => Future(value.as[A])
-          case Left(err)    => Future.failed(err)
-        }
+        val value  = parse(r.getResponseBody(StandardCharsets.UTF_8))
+        val result = if (numberAsString) convert(value) else value.asRight
+        result.left.foreach(err => log.error(s"Error converting ${Json.prettyPrint(value)}", err))
+        result
+      }.flatMap {
+        case Right(value) => Future(value.as[A])
+        case Left(err)    => Future.failed(err)
+      }
     }
   }
 
@@ -100,9 +99,8 @@ package object api {
 
   implicit val dstMapReads: Reads[Map[com.wavesplatform.account.Address, Long]] = Reads { json =>
     json.validate[Map[String, Long]].map { dst =>
-      dst.map {
-        case (addrStr, balance) =>
-          com.wavesplatform.account.Address.fromString(addrStr).explicitGet() -> balance
+      dst.map { case (addrStr, balance) =>
+        com.wavesplatform.account.Address.fromString(addrStr).explicitGet() -> balance
       }
     }
   }

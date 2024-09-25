@@ -74,74 +74,74 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
 
     val result = TracedResult(Right(tx), trace)
     json(result) should matchJson("""{
-                                      |  "type": 16,
-                                      |  "id": "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
-                                      |  "sender": "3MvtiFpnSA7uYKXV3myLwRK3u2NEV91iJYW",
-                                      |  "senderPublicKey": "9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT",
-                                      |  "fee": 10000000,
-                                      |  "feeAssetId": null,
-                                      |  "timestamp": 1111,
-                                      |  "proofs": [
-                                      |    "4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ"
-                                      |  ],
-                                      |  "version": 1,
-                                      |  "dApp": "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
-                                      |  "payment": [
-                                      |    {
-                                      |      "amount": 1,
-                                      |      "assetId": null
-                                      |    }
-                                      |  ],
-                                      |  "call": {
-                                      |    "function": "func",
-                                      |    "args": [
-                                      |      {
-                                      |        "type": "string",
-                                      |        "value": "param"
-                                      |      },
-                                      |      {
-                                      |        "type": "integer",
-                                      |        "value": 1
-                                      |      }
-                                      |    ]
-                                      |  },
-                                      |  "trace": [
-                                      |    {
-                                      |      "type": "dApp",
-                                      |      "id": "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
-                                      |      "function": "func",
-                                      |      "args": [
-                                      |        "param",
-                                      |        "1"
-                                      |      ],
-                                      |      "invocations": [],
-                                      |      "result": {
-                                      |        "data": [
-                                      |          {
-                                      |            "key": "3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To",
-                                      |            "type": "integer",
-                                      |            "value": 700000000
-                                      |          }
-                                      |        ],
-                                      |        "transfers": [
-                                      |          {
-                                      |            "address": "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
-                                      |            "asset": null,
-                                      |            "amount": 1
-                                      |          }
-                                      |        ],
-                                      |        "issues": [],
-                                      |        "reissues": [],
-                                      |        "burns": [],
-                                      |        "sponsorFees": [],
-                                      |        "leases" : [],
-                                      |        "leaseCancels" : [],
-                                      |        "invokes": []
-                                      |      },
-                                      |      "error": null
-                                      |    }
-                                      |  ]
-                                      |}""".stripMargin)
+                                    |  "type": 16,
+                                    |  "id": "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
+                                    |  "sender": "3MvtiFpnSA7uYKXV3myLwRK3u2NEV91iJYW",
+                                    |  "senderPublicKey": "9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT",
+                                    |  "fee": 10000000,
+                                    |  "feeAssetId": null,
+                                    |  "timestamp": 1111,
+                                    |  "proofs": [
+                                    |    "4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ"
+                                    |  ],
+                                    |  "version": 1,
+                                    |  "dApp": "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+                                    |  "payment": [
+                                    |    {
+                                    |      "amount": 1,
+                                    |      "assetId": null
+                                    |    }
+                                    |  ],
+                                    |  "call": {
+                                    |    "function": "func",
+                                    |    "args": [
+                                    |      {
+                                    |        "type": "string",
+                                    |        "value": "param"
+                                    |      },
+                                    |      {
+                                    |        "type": "integer",
+                                    |        "value": 1
+                                    |      }
+                                    |    ]
+                                    |  },
+                                    |  "trace": [
+                                    |    {
+                                    |      "type": "dApp",
+                                    |      "id": "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+                                    |      "function": "func",
+                                    |      "args": [
+                                    |        "param",
+                                    |        "1"
+                                    |      ],
+                                    |      "invocations": [],
+                                    |      "result": {
+                                    |        "data": [
+                                    |          {
+                                    |            "key": "3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To",
+                                    |            "type": "integer",
+                                    |            "value": 700000000
+                                    |          }
+                                    |        ],
+                                    |        "transfers": [
+                                    |          {
+                                    |            "address": "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+                                    |            "asset": null,
+                                    |            "amount": 1
+                                    |          }
+                                    |        ],
+                                    |        "issues": [],
+                                    |        "reissues": [],
+                                    |        "burns": [],
+                                    |        "sponsorFees": [],
+                                    |        "leases" : [],
+                                    |        "leaseCancels" : [],
+                                    |        "invokes": []
+                                    |      },
+                                    |      "error": null
+                                    |    }
+                                    |  ]
+                                    |}""".stripMargin)
 
     loggedJson(result) should matchJson(
       """{
@@ -249,67 +249,67 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
 
     val result = TracedResult(Left(scriptExecutionError), trace)
     json(result) should matchJson("""{
-                                      |  "error": 306,
-                                      |  "message": "Error while executing account-script: error reason",
-                                      |  "transaction": {
-                                      |    "type": 16,
-                                      |    "id": "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
-                                      |    "sender": "3MvtiFpnSA7uYKXV3myLwRK3u2NEV91iJYW",
-                                      |    "senderPublicKey": "9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT",
-                                      |    "fee": 10000000,
-                                      |    "feeAssetId": null,
-                                      |    "timestamp": 1111,
-                                      |    "proofs": [
-                                      |      "4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ"
-                                      |    ],
-                                      |    "version": 1,
-                                      |    "dApp": "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
-                                      |    "payment": [
-                                      |      {
-                                      |        "amount": 1,
-                                      |        "assetId": null
-                                      |      }
-                                      |    ],
-                                      |    "call": {
-                                      |      "function": "func",
-                                      |      "args": [
-                                      |        {
-                                      |          "type": "string",
-                                      |          "value": "param"
-                                      |        },
-                                      |        {
-                                      |          "type": "integer",
-                                      |          "value": 1
-                                      |        }
-                                      |      ]
-                                      |    }
-                                      |  },
-                                      |  "trace": [
-                                      |    {
-                                      |      "type": "dApp",
-                                      |      "id": "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
-                                      |      "function": "func",
-                                      |      "args": [
-                                      |        "param",
-                                      |        "1"
-                                      |      ],
-                                      |      "invocations": [],
-                                      |      "result": "failure",
-                                      |      "vars": [
-                                      |        {
-                                      |          "name": "amount",
-                                      |          "type": "Int",
-                                      |          "value": 12345
-                                      |        },
-                                      |        {
-                                      |          "name": "invocation",
-                                      |          "type": "String",
-                                      |          "value": "str"
-                                      |        }
-                                      |      ],
-                                      |      "error": "error reason"
-                                      |    }
-                                      |  ]
-                                      |}""".stripMargin)
+                                    |  "error": 306,
+                                    |  "message": "Error while executing account-script: error reason",
+                                    |  "transaction": {
+                                    |    "type": 16,
+                                    |    "id": "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
+                                    |    "sender": "3MvtiFpnSA7uYKXV3myLwRK3u2NEV91iJYW",
+                                    |    "senderPublicKey": "9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT",
+                                    |    "fee": 10000000,
+                                    |    "feeAssetId": null,
+                                    |    "timestamp": 1111,
+                                    |    "proofs": [
+                                    |      "4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ"
+                                    |    ],
+                                    |    "version": 1,
+                                    |    "dApp": "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+                                    |    "payment": [
+                                    |      {
+                                    |        "amount": 1,
+                                    |        "assetId": null
+                                    |      }
+                                    |    ],
+                                    |    "call": {
+                                    |      "function": "func",
+                                    |      "args": [
+                                    |        {
+                                    |          "type": "string",
+                                    |          "value": "param"
+                                    |        },
+                                    |        {
+                                    |          "type": "integer",
+                                    |          "value": 1
+                                    |        }
+                                    |      ]
+                                    |    }
+                                    |  },
+                                    |  "trace": [
+                                    |    {
+                                    |      "type": "dApp",
+                                    |      "id": "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+                                    |      "function": "func",
+                                    |      "args": [
+                                    |        "param",
+                                    |        "1"
+                                    |      ],
+                                    |      "invocations": [],
+                                    |      "result": "failure",
+                                    |      "vars": [
+                                    |        {
+                                    |          "name": "amount",
+                                    |          "type": "Int",
+                                    |          "value": 12345
+                                    |        },
+                                    |        {
+                                    |          "name": "invocation",
+                                    |          "type": "String",
+                                    |          "value": "str"
+                                    |        }
+                                    |      ],
+                                    |      "error": "error reason"
+                                    |    }
+                                    |  ]
+                                    |}""".stripMargin)
   }
 }

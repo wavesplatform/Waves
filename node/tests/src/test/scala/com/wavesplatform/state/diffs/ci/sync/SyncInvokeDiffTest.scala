@@ -1137,10 +1137,11 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invokeTx     = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments)
     val preparingTxs = Seq(gTx1, gTx2, gTx3, ssTxMain, ssTxSecond, dataTxSecond, dataTxSecond2)
 
-    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
-      snapshot.errorMessage(invokeTx.id()) shouldBe None
-      bc.accountData(thirdAddress, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
-      bc.accountData(thirdAddress, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
+    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+      case (snapshot, bc) =>
+        snapshot.errorMessage(invokeTx.id()) shouldBe None
+        bc.accountData(thirdAddress, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
+        bc.accountData(thirdAddress, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
     }
   }
 
@@ -1196,10 +1197,11 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invokeTx     = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments)
     val preparingTxs = Seq(gTx1, gTx2, ssTxMain, dataTxMain, dataTxMain2)
 
-    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
-      snapshot.errorMessage(invokeTx.id()) shouldBe None
-      bc.accountData(dAppAddress, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
-      bc.accountData(dAppAddress, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
+    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+      case (snapshot, bc) =>
+        snapshot.errorMessage(invokeTx.id()) shouldBe None
+        bc.accountData(dAppAddress, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
+        bc.accountData(dAppAddress, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
     }
   }
 
@@ -1300,10 +1302,11 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invokeTx     = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments)
     val preparingTxs = Seq(gTx1, gTx2, gTx3, gTx4, ssTxMain, ssTxSecond, ssTxThird, paymentIssue, transferIssue)
 
-    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
-      snapshot.errorMessage(invokeTx.id()) shouldBe None
-      bc.balance(thirdAcc.toAddress, IssuedAsset(transferIssue.id())) shouldBe transferAssetAmount
-      bc.balance(thirdAcc.toAddress, IssuedAsset(paymentIssue.id())) shouldBe paymentAssetAmount
+    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+      case (snapshot, bc) =>
+        snapshot.errorMessage(invokeTx.id()) shouldBe None
+        bc.balance(thirdAcc.toAddress, IssuedAsset(transferIssue.id())) shouldBe transferAssetAmount
+        bc.balance(thirdAcc.toAddress, IssuedAsset(paymentIssue.id())) shouldBe paymentAssetAmount
     }
   }
 }

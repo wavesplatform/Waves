@@ -40,20 +40,20 @@ object LeaseStatusTestSuite {
   import com.wavesplatform.it.NodeConfigs.Default
 
   private val minerConfig = ConfigFactory.parseString(s"""waves {
-       |   miner{
-       |      enable = yes
-       |      minimal-block-generation-offset = $blockGenerationOffset
-       |      quorum = 0
-       |      micro-block-interval = 3s
-       |      max-transactions-in-key-block = 0
-       |   }
-       |}
+                                                         |   miner{
+                                                         |      enable = yes
+                                                         |      minimal-block-generation-offset = $blockGenerationOffset
+                                                         |      quorum = 0
+                                                         |      micro-block-interval = 3s
+                                                         |      max-transactions-in-key-block = 0
+                                                         |   }
+                                                         |}
      """.stripMargin)
 
   private val notMinerConfig = ConfigFactory.parseString(s"""waves {
-       |   miner.enable = no
-       |   miner.minimal-block-generation-offset = $blockGenerationOffset
-       |}
+                                                            |   miner.enable = no
+                                                            |   miner.minimal-block-generation-offset = $blockGenerationOffset
+                                                            |}
      """.stripMargin)
 
   val Configs: Seq[Config] = Seq(

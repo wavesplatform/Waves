@@ -17,7 +17,8 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
 
   private val activationHeight = 4
 
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
+    preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -26,7 +27,9 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
       BlockchainFeatures.BlockReward.id      -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> activationHeight
-    ), estimatorPreCheckHeight = Int.MaxValue)
+    ),
+    estimatorPreCheckHeight = Int.MaxValue
+  )
 
   private val verifier: Script =
     TestCompiler(V4).compileExpression(

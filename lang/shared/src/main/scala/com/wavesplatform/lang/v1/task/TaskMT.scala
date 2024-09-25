@@ -7,13 +7,16 @@ import cats.{Eval, Functor, Monad}
 import com.wavesplatform.lang.EvalF
 import monix.execution.atomic.{Atomic, AtomicBuilder}
 
-/**
-  * Monad with ability to handle errors and deal with stateful computations
+/** Monad with ability to handle errors and deal with stateful computations
   *
-  * @tparam S - State type
-  * @tparam E - Error type
-  * @tparam R - Result type
-  * @tparam F - Result context type
+  * @tparam S
+  *   - State type
+  * @tparam E
+  *   - Error type
+  * @tparam R
+  *   - Result type
+  * @tparam F
+  *   - Result context type
   */
 trait TaskMT[F[_], S, E, R] {
   protected[task] val inner: Kleisli[Eval, EvalRef[S], F[Either[E, R]]]

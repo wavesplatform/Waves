@@ -3,23 +3,30 @@ package com.wavesplatform.test.builtInFunctions.accountDataStorage
 import com.wavesplatform.JsTestBase
 import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
 import _root_.testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{GreaterV3ResultBooleanEntry, actualVersions, oldVersions, rideV3Result, thisVariable, versionsSupportingTheNewFeatures}
+import testHelpers.TestDataConstantsAndMethods.{
+  GreaterV3ResultBooleanEntry,
+  actualVersions,
+  oldVersions,
+  rideV3Result,
+  thisVariable,
+  versionsSupportingTheNewFeatures
+}
 import utest.{Tests, test}
 
 object GetBoolean extends JsTestBase {
   // getBoolean
-  private val getBoolean = s"getBoolean(callerTestData, $randomStringArrayElement)"
-  private val getBooleanArgBeforeFunc = s"callerTestData.getBoolean($randomStringArrayElement)"
-  private val ownDataGetBoolean = s"getBoolean($randomStringArrayElement)"
+  private val getBoolean                     = s"getBoolean(callerTestData, $randomStringArrayElement)"
+  private val getBooleanArgBeforeFunc        = s"callerTestData.getBoolean($randomStringArrayElement)"
+  private val ownDataGetBoolean              = s"getBoolean($randomStringArrayElement)"
   private val ownDataGetBooleanArgBeforeFunc = s"$randomStringArrayElement.getBoolean()"
 
   // getBooleanValue
-  private val getBooleanValue = s"getBooleanValue(callerTestData, $randomStringArrayElement)"
-  private val getBooleanValueArgBeforeFunc = s"callerTestData.getBooleanValue($randomStringArrayElement)"
-  private val ownDataGetBooleanValue = s"getBooleanValue($randomStringArrayElement)"
+  private val getBooleanValue                     = s"getBooleanValue(callerTestData, $randomStringArrayElement)"
+  private val getBooleanValueArgBeforeFunc        = s"callerTestData.getBooleanValue($randomStringArrayElement)"
+  private val ownDataGetBooleanValue              = s"getBooleanValue($randomStringArrayElement)"
   private val ownDataGetBooleanValueArgBeforeFunc = s"$randomStringArrayElement.getBooleanValue()"
 
-  private val invalidGetBoolean = s"getBoolean(callerTestData)"
+  private val invalidGetBoolean      = s"getBoolean(callerTestData)"
   private val invalidGetBooleanValue = s"getBooleanValue(callerTestData)"
 
   val tests: Tests = Tests {
@@ -59,7 +66,7 @@ object GetBoolean extends JsTestBase {
     }
 
     test("RIDE-10. Negative tests for getBoolean functions") {
-      val invalidFunction = s"getBooleanValue($randomInt)"
+      val invalidFunction          = s"getBooleanValue($randomInt)"
       val invalidArgBeforeFunction = s"$randomInt.getBooleanValue()"
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
@@ -70,7 +77,7 @@ object GetBoolean extends JsTestBase {
             (randomInt.toString, getBoolean),
             (randomInt.toString, getBooleanValue),
             (randomInt.toString, invalidFunction),
-            (randomInt.toString, invalidArgBeforeFunction),
+            (randomInt.toString, invalidArgBeforeFunction)
           )
         ) {
           val script = precondition.codeFromMatchingAndCase(addressOrAlias, booleanData, rideV3Result, GreaterV3ResultBooleanEntry)

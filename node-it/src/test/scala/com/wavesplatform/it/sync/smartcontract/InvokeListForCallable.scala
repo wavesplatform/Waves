@@ -23,37 +23,37 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
   test("prerequisite: set contract and issue asset") {
     val source =
       s"""
-      |{-# STDLIB_VERSION 4 #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}
-      |
-      |
-      |@Callable(inv)
-      |func f(a:List[Int], b:List[String], c:List[ByteVector], y: List[Boolean]) = [
-      |  IntegerEntry("a", a[0]),
-      |  StringEntry("b", b[0]),
-      |  BinaryEntry("c", c[0]),
-      |  BooleanEntry("y", y[0])
-      |]
-      |
-      |@Callable(inv)
-      |func f2(a:List[Boolean], idx: Int) = [
-      |  BooleanEntry("a", a[idx])
-      |]
-      |
-      |@Callable(inv)
-      |func checksize(a:List[Boolean|Int|ByteVector|String]) = {
-      |  func checkType(acc: List[IntegerEntry|StringEntry|BinaryEntry|BooleanEntry], arg: Int|String|ByteVector|Boolean) = {
-      |    match arg {
-      |      case x: Int => acc :+ IntegerEntry("a", x)
-      |      case y: String => acc :+ StringEntry("b", y)
-      |      case z: ByteVector => acc :+ BinaryEntry("c", z)
-      |      case w: Boolean => acc :+ BooleanEntry("y", w)
-      |      case _ => throw("unknown type")
-      |    }
-      |  }
-      |  IntegerEntry("listsize", a.size()) :: ${Common.fold(4, "a", "[]", "checkType")()}
-      |}
+         |{-# STDLIB_VERSION 4 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |
+         |
+         |@Callable(inv)
+         |func f(a:List[Int], b:List[String], c:List[ByteVector], y: List[Boolean]) = [
+         |  IntegerEntry("a", a[0]),
+         |  StringEntry("b", b[0]),
+         |  BinaryEntry("c", c[0]),
+         |  BooleanEntry("y", y[0])
+         |]
+         |
+         |@Callable(inv)
+         |func f2(a:List[Boolean], idx: Int) = [
+         |  BooleanEntry("a", a[idx])
+         |]
+         |
+         |@Callable(inv)
+         |func checksize(a:List[Boolean|Int|ByteVector|String]) = {
+         |  func checkType(acc: List[IntegerEntry|StringEntry|BinaryEntry|BooleanEntry], arg: Int|String|ByteVector|Boolean) = {
+         |    match arg {
+         |      case x: Int => acc :+ IntegerEntry("a", x)
+         |      case y: String => acc :+ StringEntry("b", y)
+         |      case z: ByteVector => acc :+ BinaryEntry("c", z)
+         |      case w: Boolean => acc :+ BooleanEntry("y", w)
+         |      case _ => throw("unknown type")
+         |    }
+         |  }
+         |  IntegerEntry("listsize", a.size()) :: ${Common.fold(4, "a", "[]", "checkType")()}
+         |}
       """.stripMargin
     val script = ScriptCompiler.compile(source, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)

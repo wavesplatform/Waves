@@ -20,7 +20,7 @@ object Value extends JsTestBase {
         for (
           (data, function) <- Seq(
             (randomInt.toString, value),
-            (randomInt.toString, valueArgBeforeFunc),
+            (randomInt.toString, valueArgBeforeFunc)
           )
         ) {
           val script = precondition.onlyMatcherContract(data, function)
@@ -37,7 +37,7 @@ object Value extends JsTestBase {
             (randomUnionArrayElement, value, MATCHING_NOT_EXHAUSTIVE),
             (randomAddressDataArrayElement, valueArgBeforeFunc, MATCHING_NOT_EXHAUSTIVE),
             (randomInt.toString, invalidValue, invalidErrorValue),
-            (randomInt.toString, invalidValueArgBeforeFunc, invalidErrorValue),
+            (randomInt.toString, invalidValueArgBeforeFunc, invalidErrorValue)
           )
         ) {
           val script = precondition.onlyMatcherContract(data, function)

@@ -121,7 +121,7 @@ object Importer extends ScorexLogging {
       appenderScheduler: Scheduler,
       extensionTime: Time,
       utxPool: UtxPool,
-      rdb: RDB,
+      rdb: RDB
   ): Seq[Extension] =
     if (wavesSettings.extensions.isEmpty) Seq.empty
     else {
@@ -308,7 +308,7 @@ object Importer extends ScorexLogging {
               case _ =>
                 counter = counter + 1
             }
-          } else if (!quit){
+          } else if (!quit) {
             log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
           }
         }
@@ -345,7 +345,7 @@ object Importer extends ScorexLogging {
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
 
-    val rdb         = RDB.open(settings.dbSettings)
+    val rdb = RDB.open(settings.dbSettings)
     val (blockchainUpdater, rdbWriter) =
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)

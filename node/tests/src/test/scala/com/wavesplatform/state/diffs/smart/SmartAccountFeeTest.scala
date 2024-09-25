@@ -18,43 +18,46 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
   private val activationHeight = 4
 
   private val scriptWithEmptyVerifier = TestCompiler(V4).compileContract("""
-    | {-# STDLIB_VERSION 4       #-}
-    | {-# CONTENT_TYPE   DAPP    #-}
-    | {-# SCRIPT_TYPE    ACCOUNT #-}
-    |
-    |""".stripMargin)
+                                                                           | {-# STDLIB_VERSION 4       #-}
+                                                                           | {-# CONTENT_TYPE   DAPP    #-}
+                                                                           | {-# SCRIPT_TYPE    ACCOUNT #-}
+                                                                           |
+                                                                           |""".stripMargin)
 
   private val scriptWithSmallVerifier = TestCompiler(V4).compileContract("""
-    | {-# STDLIB_VERSION 4       #-}
-    | {-# CONTENT_TYPE   DAPP    #-}
-    | {-# SCRIPT_TYPE    ACCOUNT #-}
-    |
-    | @Verifier(tx)
-    | func verify() =
-    |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
-    |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
-    |   sigVerify_8Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
-    |
-    | @Callable(i)
-    | func default() = []
-    |""".stripMargin)
+                                                                           | {-# STDLIB_VERSION 4       #-}
+                                                                           | {-# CONTENT_TYPE   DAPP    #-}
+                                                                           | {-# SCRIPT_TYPE    ACCOUNT #-}
+                                                                           |
+                                                                           | @Verifier(tx)
+                                                                           | func verify() =
+                                                                           |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
+                                                                           |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
+                                                                           |   sigVerify_8Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
+                                                                           |
+                                                                           | @Callable(i)
+                                                                           | func default() = []
+                                                                           |""".stripMargin)
 
   private val scriptWithPaidVerifier = TestCompiler(V4).compileContract("""
-    | {-# STDLIB_VERSION 4       #-}
-    | {-# CONTENT_TYPE   DAPP    #-}
-    | {-# SCRIPT_TYPE    ACCOUNT #-}
-    |
-    | @Verifier(tx)
-    | func verify() =
-    |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
-    |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
-    |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
-    |
-    | @Callable(i)
-    | func default() = []
-    |""".stripMargin)
+                                                                          | {-# STDLIB_VERSION 4       #-}
+                                                                          | {-# CONTENT_TYPE   DAPP    #-}
+                                                                          | {-# SCRIPT_TYPE    ACCOUNT #-}
+                                                                          |
+                                                                          | @Verifier(tx)
+                                                                          | func verify() =
+                                                                          |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
+                                                                          |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) &&
+                                                                          |   sigVerify_16Kb(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
+                                                                          |
+                                                                          | @Callable(i)
+                                                                          | func default() = []
+                                                                          |""".stripMargin)
 
-  private val features = TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
+  private val features = TestFunctionalitySettings.Enabled.copy(
+    featureCheckBlocksPeriod = 1,
+    blocksForFeatureActivation = 1,
+    preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -63,7 +66,8 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
       BlockchainFeatures.BlockReward.id      -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> activationHeight
-    ))
+    )
+  )
 
   private val preconditions = {
     val accountWithPaidVerifier  = TxHelpers.signer(0)

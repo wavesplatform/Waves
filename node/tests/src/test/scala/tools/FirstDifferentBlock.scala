@@ -31,8 +31,7 @@ object FirstDifferentBlock extends App {
 
   def firstDifferent(min: Int, max: Int, areSame: Int => Boolean): Int = {
     println("searching [" + min + ", " + max + ")")
-    if (max - min <= 1)
-      max
+    if (max - min <= 1) max
     else {
       val split = (min + max) / 2
       if (areSame(split))

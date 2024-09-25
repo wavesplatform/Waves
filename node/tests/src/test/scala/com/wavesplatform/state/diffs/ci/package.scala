@@ -36,8 +36,8 @@ package object ci {
         callables.head.u.body
       ) { c =>
         val callable = callables.find(_.u.name == c.function.funcName).get.u
-        (callable.args zip c.args).foldLeft(callable.body) {
-          case (resultExpr, (argName, arg)) => BLOCK(LET(argName, arg), resultExpr)
+        (callable.args zip c.args).foldLeft(callable.body) { case (resultExpr, (argName, arg)) =>
+          BLOCK(LET(argName, arg), resultExpr)
         }
       }
     InvokeExpressionTransaction

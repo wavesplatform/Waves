@@ -1,11 +1,7 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
-import testHelpers.RandomDataGenerator.{
-  randomByteVectorArrayElement,
-  randomDigestAlgorithmTypeArrayElement,
-  randomStringArrayElement
-}
+import testHelpers.RandomDataGenerator.{randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, randomStringArrayElement}
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.TestDataConstantsAndMethods.{actualVersions, invalidFunctionError, nonMatchingTypes}
 import utest.{Tests, test}

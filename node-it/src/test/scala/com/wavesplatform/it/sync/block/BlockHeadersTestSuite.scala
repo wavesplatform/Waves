@@ -31,20 +31,20 @@ class BlockHeadersTestSuite
       .overrideBase(
         _.raw(
           s"""waves {
-           |  blockchain.custom.functionality {
-           |    pre-activated-features = {
-           |      ${BlockchainFeatures.BlockReward.id} = $activationHeight
-           |    }
-           |  }
-           |  blockchain.custom.rewards {
-           |    term = $rewardTerm
-           |    initial = $initialReward
-           |    min-increment = $minIncrement
-           |    voting-interval = $votingInterval
-           |  }
-           |  rewards.desired = $minerDesiredReward
-           |  miner.quorum = 1
-           |}""".stripMargin
+             |  blockchain.custom.functionality {
+             |    pre-activated-features = {
+             |      ${BlockchainFeatures.BlockReward.id} = $activationHeight
+             |    }
+             |  }
+             |  blockchain.custom.rewards {
+             |    term = $rewardTerm
+             |    initial = $initialReward
+             |    min-increment = $minIncrement
+             |    voting-interval = $votingInterval
+             |  }
+             |  rewards.desired = $minerDesiredReward
+             |  miner.quorum = 1
+             |}""".stripMargin
         )
       )
       .withDefault(1)
@@ -94,14 +94,13 @@ class BlockHeadersTestSuite
     val blocks       = nodes.head.blockSeq(baseHeight + 1, baseHeight + 3)
     val blockHeaders = nodes.head.blockHeadersSeq(baseHeight + 1, baseHeight + 3)
 
-    blocks.zip(blockHeaders).foreach {
-      case (block, header) =>
-        header.generator shouldBe block.generator
-        header.timestamp shouldBe block.timestamp
-        header.signature shouldBe block.signature
-        header.desiredReward shouldBe block.desiredReward
-        header.reward shouldBe block.reward
-        header.transactionCount shouldBe block.transactions.size
+    blocks.zip(blockHeaders).foreach { case (block, header) =>
+      header.generator shouldBe block.generator
+      header.timestamp shouldBe block.timestamp
+      header.signature shouldBe block.signature
+      header.desiredReward shouldBe block.desiredReward
+      header.reward shouldBe block.reward
+      header.transactionCount shouldBe block.transactions.size
     }
   }
 

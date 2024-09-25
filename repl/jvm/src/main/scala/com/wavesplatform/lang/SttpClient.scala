@@ -8,7 +8,7 @@ import scala.concurrent.Future
 
 class SttpClient {
   private val backend: SttpBackend[Identity, Any] = HttpURLConnectionBackend()
-  private val schemaRegex = "^\\w+://.+".r
+  private val schemaRegex                         = "^\\w+://.+".r
 
   def requestNode(url: String): Future[NodeResponse] = {
     val urlPrefix =

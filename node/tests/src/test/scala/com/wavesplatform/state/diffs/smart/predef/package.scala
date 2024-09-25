@@ -208,9 +208,9 @@ package object predef {
 
   def provenPart(t: Transaction with Authorized, emptyBodyBytes: Boolean = false, checkProofs: Boolean = true): String = {
     val version = t match {
-      case _: EthereumTransaction  => 0
-      case v: Versioned => v.version
-      case _                       => 1
+      case _: EthereumTransaction => 0
+      case v: Versioned           => v.version
+      case _                      => 1
     }
     val proofs = t match {
       case p: ProvenTransaction => p.proofs
@@ -230,7 +230,7 @@ package object predef {
        | let sender = t.sender == Address(base58'${t.sender.toAddress}')
        | let senderPublicKey = t.senderPublicKey == base58'${t.sender}'
        | let version = t.version == $version
-       | ${ if (checkProofs) Range(0, 8).map(letProof(proofs, "t")).mkString("\n") else ""}
+       | ${if (checkProofs) Range(0, 8).map(letProof(proofs, "t")).mkString("\n") else ""}
      """.stripMargin
   }
 

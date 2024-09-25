@@ -12,10 +12,10 @@ private[node] object DataEntry {
       key     <- c.downField("key").as[String]
       v = c.downField("value")
       (value, resolvedType) <- rawType match {
-        case "binary"  => v.as[ByteString] map(b => (b.byteStr, DataType.ByteArray))
-        case "boolean" => v.as[Boolean]    map((_, DataType.Boolean))
-        case "integer" => v.as[Long]       map((_, DataType.Long))
-        case "string"  => v.as[String]     map((_, DataType.String))
+        case "binary"  => v.as[ByteString] map (b => (b.byteStr, DataType.ByteArray))
+        case "boolean" => v.as[Boolean] map ((_, DataType.Boolean))
+        case "integer" => v.as[Long] map ((_, DataType.Long))
+        case "string"  => v.as[String] map ((_, DataType.String))
         case t         => Left(DecodingFailure(s"Illegal data entry type: $t", Nil))
       }
     } yield DataEntry(key, value, resolvedType)

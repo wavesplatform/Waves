@@ -20,7 +20,7 @@ object MakeString extends JsTestBase {
         for (
           (data, list, function) <- Seq(
             (randomStringArrayElement, stringList, makeString),
-            (randomStringArrayElement, stringList, makeStringArgBeforeFunc),
+            (randomStringArrayElement, stringList, makeStringArgBeforeFunc)
           )
         ) {
           val script = precondition.simpleRideCode(data, list, function)
@@ -37,7 +37,7 @@ object MakeString extends JsTestBase {
             (randomInt.toString, randomAliasDataArrayElement, makeStringArgBeforeFunc, nonMatchingTypes("List[String]")),
             (randomInt.toString, randomIssuesArrayElement, makeStringArgBeforeFunc, nonMatchingTypes("List[String]")),
             (randomStringArrayElement, stringList, invalidMakeString, invalidErrorMakeString),
-            (randomStringArrayElement, stringList, invalidMakeStringArgBeforeFunc, invalidErrorMakeString),
+            (randomStringArrayElement, stringList, invalidMakeStringArgBeforeFunc, invalidErrorMakeString)
           )
         ) {
           val script = precondition.simpleRideCode(data, list, function)

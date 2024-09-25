@@ -69,8 +69,8 @@ object TypeInferrer {
 
   // ((1, "a", false), (2, "b", true)) => ((1, 2), ("a", "b"), (false, true))
   private def groupByPosition[T](list: List[List[T]]): List[List[T]] =
-    list.foldRight(List.fill(list.head.length)(List.empty[T])) {
-      case (list, acc) => (list zip acc).map { case (element, p) => element :: p }
+    list.foldRight(List.fill(list.head.length)(List.empty[T])) { case (list, acc) =>
+      (list zip acc).map { case (element, p) => element :: p }
     }
 
   private def matchTypes(
@@ -114,23 +114,21 @@ object TypeInferrer {
         else {
           val error = s"Can't resolve correct type for parameterized $placeholder, actual: $argType".asLeft[Option[MatchResult]]
           parameterized
-            .foldLeft(error) {
-              case (result, nextParameter) =>
-                val nonMatchedArgTypes = argType match {
-                  case NOTHING            => ???
-                  case UNION(argTypes, _) => UNION(argTypes.filterNot(concretes.typeList.contains))
-                  case ANY                => ANY
-                  case s: SINGLE          => s
-                }
-                if (result.isLeft)
-                  matchTypes(nonMatchedArgTypes, nextParameter, knownTypes, argTypeStr, matchingTypeStr)
-                else {
-                  val nextResult = matchTypes(nonMatchedArgTypes, nextParameter, knownTypes, argTypeStr, matchingTypeStr)
-                  if (nextResult.isLeft)
-                    result
-                  else
-                    error
-                }
+            .foldLeft(error) { case (result, nextParameter) =>
+              val nonMatchedArgTypes = argType match {
+                case NOTHING            => ???
+                case UNION(argTypes, _) => UNION(argTypes.filterNot(concretes.typeList.contains))
+                case ANY                => ANY
+                case s: SINGLE          => s
+              }
+              if (result.isLeft) matchTypes(nonMatchedArgTypes, nextParameter, knownTypes, argTypeStr, matchingTypeStr)
+              else {
+                val nextResult = matchTypes(nonMatchedArgTypes, nextParameter, knownTypes, argTypeStr, matchingTypeStr)
+                if (nextResult.isLeft)
+                  result
+                else
+                  error
+              }
             }
         }
 

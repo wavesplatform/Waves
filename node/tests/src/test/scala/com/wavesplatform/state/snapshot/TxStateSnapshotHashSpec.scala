@@ -88,13 +88,12 @@ class TxStateSnapshotHashSpec extends PropSpec {
       TSS.LeaseBalance(bs(address2.bytes), in = 55.waves)
     ),
     newLeases = Seq(
-      TSS.NewLease(leaseId,  bs(signer101.publicKey.arr), bs(address2.bytes), 25.waves)
+      TSS.NewLease(leaseId, bs(signer101.publicKey.arr), bs(address2.bytes), 25.waves)
     )
   )
 
   private val cancelledLease = TSS(
-    leaseBalances = Seq(
-      TSS.LeaseBalance(bs(address3.bytes), out = 20.waves), TSS.LeaseBalance(bs(TxHelpers.address(104).bytes), in = 0.waves)),
+    leaseBalances = Seq(TSS.LeaseBalance(bs(address3.bytes), out = 20.waves), TSS.LeaseBalance(bs(TxHelpers.address(104).bytes), in = 0.waves)),
     cancelledLeases = Seq(
       TSS.CancelledLease(leaseId)
     )
@@ -129,13 +128,15 @@ class TxStateSnapshotHashSpec extends PropSpec {
 
   private val reissuedAsset = TSS(
     assetVolumes = Seq(
-      TSS.AssetVolume(hashInt(0x23aadd55), false, bs((BigInt(10000000_00L)).toByteArray)),
+      TSS.AssetVolume(hashInt(0x23aadd55), false, bs((BigInt(10000000_00L)).toByteArray))
     )
   )
   private val renamedAsset = TSS(
     assetNamesAndDescriptions = Seq(
       TSS.AssetNameAndDescription(
-        assetId2, "newname", "some fancy description"
+        assetId2,
+        "newname",
+        "some fancy description"
       )
     )
   )

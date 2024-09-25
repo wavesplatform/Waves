@@ -11,16 +11,20 @@ class TypeInferrerTest extends FreeSpec {
 
   "no types to infer" - {
     "all types are correct" in {
-      TypeInferrer(Seq((STRING, STRING), (STRING, STRING), (CASETYPEREF("User", List()), CASETYPEREF("User", List()))),
-                   Map("User" -> CASETYPEREF("User", List.empty))) shouldBe Right(Map.empty)
+      TypeInferrer(
+        Seq((STRING, STRING), (STRING, STRING), (CASETYPEREF("User", List()), CASETYPEREF("User", List()))),
+        Map("User" -> CASETYPEREF("User", List.empty))
+      ) shouldBe Right(Map.empty)
     }
     "fails if no simple common type" in {
       TypeInferrer(Seq((LONG, BYTESTR))) should produce("Non-matching types")
     }
 
     "fails if no obj common type" in {
-      TypeInferrer(Seq((CASETYPEREF("User", List()), CASETYPEREF("Admin", List()))),
-                   Map("User" -> CASETYPEREF("User", List.empty), "Admin" -> CASETYPEREF("Admin", List.empty))) should produce("Non-matching types")
+      TypeInferrer(
+        Seq((CASETYPEREF("User", List()), CASETYPEREF("Admin", List()))),
+        Map("User" -> CASETYPEREF("User", List.empty), "Admin" -> CASETYPEREF("Admin", List.empty))
+      ) should produce("Non-matching types")
     }
   }
 
@@ -34,7 +38,8 @@ class TypeInferrerTest extends FreeSpec {
         Seq(
           (LONG, typeparamT),
           (BYTESTR, typeparamG)
-        )) shouldBe Right(Map(typeparamT -> LONG, typeparamG -> BYTESTR))
+        )
+      ) shouldBe Right(Map(typeparamT -> LONG, typeparamG -> BYTESTR))
     }
 
     "one simple same type" in {
@@ -52,7 +57,8 @@ class TypeInferrerTest extends FreeSpec {
 
       "containing same inner type" in {
         TypeInferrer(Seq((LIST(LONG), PARAMETERIZEDLIST(typeparamT)), (LIST(LONG), PARAMETERIZEDLIST(typeparamT)))) shouldBe Right(
-          Map(typeparamT -> LONG))
+          Map(typeparamT -> LONG)
+        )
       }
 
       "containing inner and separate type" in {
@@ -125,7 +131,8 @@ class TypeInferrerTest extends FreeSpec {
 
       "Lists" in {
         TypeInferrer(Seq( /*(LONG, typeparamT),*/ (LIST(NOTHING), PARAMETERIZEDLIST(typeparamG)))) shouldBe Right(
-          Map( /*typeparamT -> LONG,*/ typeparamG -> NOTHING))
+          Map( /*typeparamT -> LONG,*/ typeparamG -> NOTHING)
+        )
       }
     }
   }

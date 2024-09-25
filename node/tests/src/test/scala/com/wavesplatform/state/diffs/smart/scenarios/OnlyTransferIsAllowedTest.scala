@@ -36,8 +36,8 @@ class OnlyTransferIsAllowedTest extends PropSpec with WithState {
 
     val (genesis, script, lease, transfer) = preconditions(transferAllowed)
     assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
-    assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(
-      snapshotEi => snapshotEi should produce("TransactionNotAllowedByScript")
+    assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(snapshotEi =>
+      snapshotEi should produce("TransactionNotAllowedByScript")
     )
   }
 

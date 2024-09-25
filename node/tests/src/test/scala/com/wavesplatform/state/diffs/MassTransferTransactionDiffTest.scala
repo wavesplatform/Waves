@@ -83,7 +83,7 @@ class MassTransferTransactionDiffTest extends PropSpec with WithDomain {
     val setup = {
       val (genesis, master) = baseSetup
       val recipient         = Alias.create("alias").explicitGet()
-      val transfer = TxHelpers.massTransfer(master, Seq(recipient -> 100000L), version = TxVersion.V1)
+      val transfer          = TxHelpers.massTransfer(master, Seq(recipient -> 100000L), version = TxVersion.V1)
 
       (genesis, transfer)
     }

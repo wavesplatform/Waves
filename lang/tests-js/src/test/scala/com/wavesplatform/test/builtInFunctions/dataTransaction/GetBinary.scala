@@ -65,7 +65,7 @@ object GetBinary extends JsTestBase {
             (binaryEntryForTests, getBinaryValueIndexArgBeforeFunc),
             (integerEntryForTests, getBinaryValueIndexArgBeforeFunc),
             (stringEntryForTests, getBinaryValueIndexArgBeforeFunc),
-            (booleanEntryForTests, getBinaryValueIndexArgBeforeFunc),
+            (booleanEntryForTests, getBinaryValueIndexArgBeforeFunc)
           )
         ) {
           val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
@@ -115,22 +115,22 @@ object GetBinary extends JsTestBase {
     }
 
     test("RIDE-95. getBinary function should throw an error for invalid data type for V3") {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-        for (
-          (data, binary) <- Seq(
-            (randomInt.toString, getBinaryKey),
-            (randomBoolean.toString, getBinaryKeyArgBeforeFunc),
-            (randomInt.toString, getBinaryIndex),
-            (randomBoolean.toString, getBinaryIndexArgBeforeFunc),
-            (randomInt.toString, getBinaryValueKey),
-            (randomBoolean.toString, getBinaryValueKeyArgBeforeFunc),
-            (randomInt.toString, getBinaryValueIndex),
-            (randomBoolean.toString, getBinaryValueIndexArgBeforeFunc)
-          )
-        ) {
-          val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
-          assertCompileErrorDApp(script, V3, CANT_FIND_A_FUNCTION_OVERLOAD)
-        }
+      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
+      for (
+        (data, binary) <- Seq(
+          (randomInt.toString, getBinaryKey),
+          (randomBoolean.toString, getBinaryKeyArgBeforeFunc),
+          (randomInt.toString, getBinaryIndex),
+          (randomBoolean.toString, getBinaryIndexArgBeforeFunc),
+          (randomInt.toString, getBinaryValueKey),
+          (randomBoolean.toString, getBinaryValueKeyArgBeforeFunc),
+          (randomInt.toString, getBinaryValueIndex),
+          (randomBoolean.toString, getBinaryValueIndexArgBeforeFunc)
+        )
+      ) {
+        val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
+        assertCompileErrorDApp(script, V3, CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
     }
 
     test("RIDE-96. Invalid getBinary functions should not compile for versions V4 and above") {
@@ -141,7 +141,7 @@ object GetBinary extends JsTestBase {
             (integerEntryForTests, invalidGetBinaryKey),
             (binaryEntryForTests, invalidGetBinaryArgBeforeFunc),
             (integerEntryForTests, invalidGetBinaryValue),
-            (binaryEntryForTests, invalidGetBinaryValueArgBeforeFunc),
+            (binaryEntryForTests, invalidGetBinaryValueArgBeforeFunc)
           )
         ) {
           val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
@@ -151,18 +151,18 @@ object GetBinary extends JsTestBase {
     }
 
     test("RIDE-97. Invalid getBinary functions should not compile for V3") {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-        for (
-          (data, binary) <- Seq(
-            (dataEntryForTests(randomStringArrayElement), invalidGetBinaryKey),
-            (dataEntryForTests(randomStringArrayElement), invalidGetBinaryArgBeforeFunc),
-            (dataEntryForTests(randomStringArrayElement), invalidGetBinaryValue),
-            (dataEntryForTests(randomStringArrayElement), invalidGetBinaryValueArgBeforeFunc),
-          )
-        ) {
-          val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
-          assertCompileErrorDApp(script, V3, CANT_FIND_A_FUNCTION_OVERLOAD)
-        }
+      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
+      for (
+        (data, binary) <- Seq(
+          (dataEntryForTests(randomStringArrayElement), invalidGetBinaryKey),
+          (dataEntryForTests(randomStringArrayElement), invalidGetBinaryArgBeforeFunc),
+          (dataEntryForTests(randomStringArrayElement), invalidGetBinaryValue),
+          (dataEntryForTests(randomStringArrayElement), invalidGetBinaryValueArgBeforeFunc)
+        )
+      ) {
+        val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
+        assertCompileErrorDApp(script, V3, CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
     }
   }
 }

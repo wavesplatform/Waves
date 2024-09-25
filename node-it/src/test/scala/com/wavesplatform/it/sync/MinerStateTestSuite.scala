@@ -65,17 +65,17 @@ class MinerStateTestSuite extends BaseFunSuite {
 object MinerStateTestSuite {
   import com.wavesplatform.it.NodeConfigs._
   private val minerConfig = ConfigFactory.parseString(s"""
-    |waves {
-    |  synchronization.synchronization-timeout = 10s
-    |  blockchain.custom.functionality {
-    |    pre-activated-features.1 = 0
-    |    generation-balance-depth-from-50-to-1000-after-height = 100
-    |  }
-    |  blockchain.custom.genesis {
-    |     average-block-delay = 5s
-    |  }
-    |  miner.quorum = 1
-    |}""".stripMargin)
+                                                         |waves {
+                                                         |  synchronization.synchronization-timeout = 10s
+                                                         |  blockchain.custom.functionality {
+                                                         |    pre-activated-features.1 = 0
+                                                         |    generation-balance-depth-from-50-to-1000-after-height = 100
+                                                         |  }
+                                                         |  blockchain.custom.genesis {
+                                                         |     average-block-delay = 5s
+                                                         |  }
+                                                         |  miner.quorum = 1
+                                                         |}""".stripMargin)
 
   val Configs: Seq[Config] = Seq(
     minerConfig.withFallback(Default.head),

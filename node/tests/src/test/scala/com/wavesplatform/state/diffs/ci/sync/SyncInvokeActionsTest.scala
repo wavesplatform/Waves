@@ -71,7 +71,9 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
       d.appendAndAssertSucceed(invoke(dApp1Address, fee = invokeFee(issues = 1)))
       d.liquidSnapshot.balances.get((dApp1Address, Waves)) shouldBe empty
       d.liquidSnapshot.balances.get((dApp2Address, Waves)) shouldBe empty
-      d.liquidSnapshot.balances.collect { case ((address, asset), amount) if address == defaultAddress && asset != Waves => amount}.head shouldBe 1000
+      d.liquidSnapshot.balances.collect {
+        case ((address, asset), amount) if address == defaultAddress && asset != Waves => amount
+      }.head shouldBe 1000
     }
   }
 

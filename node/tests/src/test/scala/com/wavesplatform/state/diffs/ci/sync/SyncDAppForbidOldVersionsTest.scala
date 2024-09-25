@@ -13,7 +13,7 @@ import org.scalatest.{EitherValues, Inside}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class SyncDAppForbidOldVersionsTest
-  extends PropSpec
+    extends PropSpec
     with ScalaCheckPropertyChecks
     with Inside
     with WithState
@@ -50,16 +50,16 @@ class SyncDAppForbidOldVersionsTest
   }
 
   private def scenario(version: StdLibVersion, invokeExpression: Boolean) = {
-    val invoker = TxHelpers.signer(0)
+    val invoker     = TxHelpers.signer(0)
     val callingDApp = TxHelpers.signer(1)
-    val proxyDApp = TxHelpers.signer(2)
+    val proxyDApp   = TxHelpers.signer(2)
 
     val balances = AddrWithBalance.enoughBalances(invoker, callingDApp, proxyDApp)
 
     val ssTx1 = TxHelpers.setScript(callingDApp, callingDAppScript(version))
     val ssTx2 = TxHelpers.setScript(proxyDApp, proxyDAppScript(callingDApp.toAddress))
 
-    val invoke = TxHelpers.invoke(proxyDApp.toAddress, func = None, invoker = invoker, version = TxVersion.V3)
+    val invoke   = TxHelpers.invoke(proxyDApp.toAddress, func = None, invoker = invoker, version = TxVersion.V3)
     val invokeTx = if (invokeExpression) ci.toInvokeExpression(ssTx2, invoker) else invoke
 
     (balances, Seq(ssTx1, ssTx2), invokeTx, proxyDApp.toAddress, callingDApp.toAddress)

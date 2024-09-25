@@ -19,18 +19,18 @@ class NotActivateFeatureTestSuite extends BaseFreeSpec with ActivationStatusRequ
       .overrideBase(
         _.raw(
           s"""waves {
-         |  blockchain {
-         |    custom {
-         |      functionality {
-         |        pre-activated-features = {}
-         |        feature-check-blocks-period = $votingInterval
-         |        blocks-for-feature-activation = $blocksForActivation
-         |      }
-         |    }
-         |  }
-         |  features.supported=[$nonVotingFeatureNum]
-         |  miner.quorum = 1
-         |}""".stripMargin
+             |  blockchain {
+             |    custom {
+             |      functionality {
+             |        pre-activated-features = {}
+             |        feature-check-blocks-period = $votingInterval
+             |        blocks-for-feature-activation = $blocksForActivation
+             |      }
+             |    }
+             |  }
+             |  features.supported=[$nonVotingFeatureNum]
+             |  miner.quorum = 1
+             |}""".stripMargin
         )
       )
       .withDefault(2)

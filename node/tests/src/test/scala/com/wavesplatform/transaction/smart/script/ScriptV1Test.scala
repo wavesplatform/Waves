@@ -31,7 +31,9 @@ class ScriptV1Test extends PropSpec with TypedScriptGen {
       }
       .reduceLeft[EXPR](IF(_, _, FALSE))
 
-    Script.estimate(ExprScript(expr).explicitGet(), ScriptEstimatorV2, fixEstimateOfVerifier = true, useContractVerifierLimit = false) should produce("Script is too complex")
+    Script.estimate(ExprScript(expr).explicitGet(), ScriptEstimatorV2, fixEstimateOfVerifier = true, useContractVerifierLimit = false) should produce(
+      "Script is too complex"
+    )
   }
 
   property("ScriptV1.apply should deny too big scripts") {

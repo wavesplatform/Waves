@@ -52,7 +52,9 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       }
     }
 
-    test("RIDE-281. compilation error 'invalid data invoke' should occur for RIDE versions V3 and V4 when an argument is placed before the function.") {
+    test(
+      "RIDE-281. compilation error 'invalid data invoke' should occur for RIDE versions V3 and V4 when an argument is placed before the function."
+    ) {
       for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomAddressDataArrayElement, invokeArgBeforeFunc)
@@ -92,31 +94,31 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
 
     test("RIDE-284. containsElement functions should throw an error for RIDE version V3.") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script = precondition.simpleRideCode(randomStringArrayElement, stringList, containsElement)
+      val script       = precondition.simpleRideCode(randomStringArrayElement, stringList, containsElement)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
     }
 
     test("RIDE-285. indexOf functions should throw an error for RIDE version V3.") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script = precondition.simpleRideCode(randomInt.toString, intList, indexOf)
+      val script       = precondition.simpleRideCode(randomInt.toString, intList, indexOf)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
     }
 
     test("RIDE-286. max functions should throw an error for RIDE version V3.") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script = precondition.simpleRideCode(randomInt.toString, intList, max)
+      val script       = precondition.simpleRideCode(randomInt.toString, intList, max)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
     }
 
     test("RIDE-287. min functions should throw an error for RIDE version V3.") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script = precondition.simpleRideCode(randomInt.toString, intList, min)
+      val script       = precondition.simpleRideCode(randomInt.toString, intList, min)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
     }
 
     test("RIDE-288. removeByIndex functions should throw an error for RIDE version V3.") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script = precondition.simpleRideCode(randomInt.toString, intList, removeByIndex)
+      val script       = precondition.simpleRideCode(randomInt.toString, intList, removeByIndex)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
     }
   }

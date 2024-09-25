@@ -708,10 +708,8 @@ object PureContext {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
         val limit = Terms.DataEntryValueMax
         if (checkLimits) {
-          if (number < 0)
-            Left(s"Unexpected negative number = $number passed to take()")
-          else if (number > limit)
-            Left(s"Number = $number passed to take() exceeds String limit = $limit")
+          if (number < 0) Left(s"Unexpected negative number = $number passed to take()")
+          else if (number > limit) Left(s"Number = $number passed to take() exceeds String limit = $limit")
           else {
             val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
             CONST_STRING(xs.take(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
@@ -791,10 +789,8 @@ object PureContext {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
         val limit = Terms.DataEntryValueMax
         if (checkLimits) {
-          if (number < 0)
-            Left(s"Unexpected negative number = $number passed to drop()")
-          else if (number > limit)
-            Left(s"Number = $number passed to drop() exceeds String limit = $limit")
+          if (number < 0) Left(s"Unexpected negative number = $number passed to drop()")
+          else if (number > limit) Left(s"Number = $number passed to drop() exceeds String limit = $limit")
           else {
             val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
             CONST_STRING(xs.drop(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
@@ -867,10 +863,8 @@ object PureContext {
     ) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
         val limit = Terms.DataEntryValueMax
-        if (number < 0)
-          Left(s"Unexpected negative number = $number passed to takeRight()")
-        else if (number > limit)
-          Left(s"Number = $number passed to takeRight() exceeds String limit = $limit")
+        if (number < 0) Left(s"Unexpected negative number = $number passed to takeRight()")
+        else if (number > limit) Left(s"Number = $number passed to takeRight() exceeds String limit = $limit")
         else {
           val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
           CONST_STRING(xs.takeRight(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
@@ -936,10 +930,8 @@ object PureContext {
     ) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil =>
         val limit = Terms.DataEntryValueMax
-        if (number < 0)
-          Left(s"Unexpected negative number = $number passed to dropRight()")
-        else if (number > limit)
-          Left(s"Number = $number passed to dropRight() exceeds String limit = $limit")
+        if (number < 0) Left(s"Unexpected negative number = $number passed to dropRight()")
+        else if (number > limit) Left(s"Number = $number passed to dropRight() exceeds String limit = $limit")
         else {
           val correctedNumber = number.max(0).min(xs.codePointCount(0, xs.length))
           CONST_STRING(xs.dropRight(xs.offsetByCodePoints(0, trimLongToInt(correctedNumber))))
@@ -1196,8 +1188,7 @@ object PureContext {
     val name = if (id == SPLIT) "split" else s"split_${v6Complexity}C"
     NativeFunction(name, Map(V3 -> 100L, V4 -> 75L, V5 -> 75L, V6 -> v6Complexity), id, listString, ("str", STRING), ("separator", STRING)) {
       case (s @ CONST_STRING(str)) :: CONST_STRING(sep) :: Nil =>
-        if (s.weight > inputLimit)
-          Left(s"Input string size = ${s.weight} bytes exceeds limit = $inputLimit for $name")
+        if (s.weight > inputLimit) Left(s"Input string size = ${s.weight} bytes exceeds limit = $inputLimit for $name")
         else {
           val result = split(str, sep, unicode = true).toIndexedSeq
           if (result.size > outputLimit)
@@ -1252,8 +1243,7 @@ object PureContext {
     val name = if (id == MAKESTRING) "makeString" else s"makeString_${complexityV6}C"
     NativeFunction(name, Map(V4 -> 30L, V5 -> 30L, V6 -> complexityV6), id, STRING, ("list", LIST(STRING)), ("separator", STRING)) {
       case (arr: ARR) :: CONST_STRING(separator) :: Nil =>
-        if (arr.xs.length > inputLimit)
-          Left(s"Input list size = ${arr.xs.length} for $name should not exceed $inputLimit")
+        if (arr.xs.length > inputLimit) Left(s"Input list size = ${arr.xs.length} for $name should not exceed $inputLimit")
         else {
           val separatorStringSize =
             if (arr.xs.length > 1) (arr.xs.length - 1) * separator.length

@@ -22,32 +22,32 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
 
   private val scriptText =
     s"""
-      |{-# STDLIB_VERSION 4 #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}
-      |
-      |@Callable(i)
-      |func foo(txProtoBytes: ByteVector) = {
-      |    let transferTx = transferTransactionFromProto(txProtoBytes).value()
-      |    let transferTxAttachment = transferTx.attachment.toBase58String()
-      |    let assetId = if (!transferTx.assetId.isDefined()) then {"WAVES"} else {transferTx.assetId.value().toBase58String()}
-      |    let feeAssetId = if (!transferTx.feeAssetId.isDefined()) then {"WAVES"} else {transferTx.feeAssetId.value().toBase58String()}
-      |[
-      |IntegerEntry("amount", transferTx.amount),
-      |StringEntry("senderPublicKey", transferTx.senderPublicKey.toBase58String()),
-      |StringEntry("sender", transferTx.sender.bytes.toBase58String()),
-      |StringEntry("recipient", addressFromRecipient(transferTx.recipient).bytes.toBase58String()),
-      |StringEntry("assetId", assetId),
-      |StringEntry("attachment", transferTxAttachment),
-      |IntegerEntry("fee", transferTx.fee),
-      |StringEntry("feeAssetId", feeAssetId),
-      |StringEntry("id", transferTx.id.toBase58String()),
-      |IntegerEntry("version", transferTx.version),
-      |BinaryEntry("bodyBytes",transferTx.bodyBytes)
-      |]
-      |}
-      |
-      |""".stripMargin
+       |{-# STDLIB_VERSION 4 #-}
+       |{-# CONTENT_TYPE DAPP #-}
+       |{-# SCRIPT_TYPE ACCOUNT #-}
+       |
+       |@Callable(i)
+       |func foo(txProtoBytes: ByteVector) = {
+       |    let transferTx = transferTransactionFromProto(txProtoBytes).value()
+       |    let transferTxAttachment = transferTx.attachment.toBase58String()
+       |    let assetId = if (!transferTx.assetId.isDefined()) then {"WAVES"} else {transferTx.assetId.value().toBase58String()}
+       |    let feeAssetId = if (!transferTx.feeAssetId.isDefined()) then {"WAVES"} else {transferTx.feeAssetId.value().toBase58String()}
+       |[
+       |IntegerEntry("amount", transferTx.amount),
+       |StringEntry("senderPublicKey", transferTx.senderPublicKey.toBase58String()),
+       |StringEntry("sender", transferTx.sender.bytes.toBase58String()),
+       |StringEntry("recipient", addressFromRecipient(transferTx.recipient).bytes.toBase58String()),
+       |StringEntry("assetId", assetId),
+       |StringEntry("attachment", transferTxAttachment),
+       |IntegerEntry("fee", transferTx.fee),
+       |StringEntry("feeAssetId", feeAssetId),
+       |StringEntry("id", transferTx.id.toBase58String()),
+       |IntegerEntry("version", transferTx.version),
+       |BinaryEntry("bodyBytes",transferTx.bodyBytes)
+       |]
+       |}
+       |
+       |""".stripMargin
   private val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
 
   test("TransferTransaction with Waves from proto bytes") {

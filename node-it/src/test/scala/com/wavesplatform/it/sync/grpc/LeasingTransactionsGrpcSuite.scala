@@ -69,7 +69,7 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
       val firstBalance  = sender.wavesBalance(firstAddress)
       val secondBalance = sender.wavesBalance(secondAddress)
 
-      //secondAddress effective balance more than general balance
+      // secondAddress effective balance more than general balance
       assertGrpcError(
         sender.broadcastLease(secondAcc, Recipient().withPublicKeyHash(firstAddress), secondBalance.regular + 1.waves, minFee, version = v),
         errorMessage,

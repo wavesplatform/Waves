@@ -2,7 +2,13 @@ package com.wavesplatform.test.builtInFunctions.dappToDappInvocation
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt, randomStringArrayElement}
+import testHelpers.RandomDataGenerator.{
+  randomAddressDataArrayElement,
+  randomByteVectorArrayElement,
+  randomDigestAlgorithmTypeArrayElement,
+  randomInt,
+  randomStringArrayElement
+}
 import testHelpers.TestDataConstantsAndMethods.{invalidFunctionError, nonMatchingTypes, versionsSupportingTheNewFeatures}
 import utest.{Tests, test}
 

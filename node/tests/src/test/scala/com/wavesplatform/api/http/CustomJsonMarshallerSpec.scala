@@ -25,7 +25,7 @@ class CustomJsonMarshallerSpec
     with ApiErrorMatchers
     with ApiMarshallers
     with SharedDomain
-      with SharedSchedulerMixin {
+    with SharedSchedulerMixin {
 
   private val numberFormat = Accept(`application/json`.withParams(Map("large-significand-format" -> "string")))
   private val richAccount  = TxHelpers.signer(55)

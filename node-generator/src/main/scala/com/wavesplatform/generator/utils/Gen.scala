@@ -47,13 +47,15 @@ object Gen {
 
   def oracleScript(oracle: KeyPair, data: Set[DataEntry[?]], estimator: ScriptEstimator): Script = {
     val conditions =
-      data.map {
-        case IntegerDataEntry(key, value) => s"""(extract(getInteger(oracle, "$key")) == $value)"""
-        case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
-        case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
-        case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
-        case EmptyDataEntry(_)            => ???
-      }.reduce[String] { case (l, r) => s"$l && $r " }
+      data
+        .map {
+          case IntegerDataEntry(key, value) => s"""(extract(getInteger(oracle, "$key")) == $value)"""
+          case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
+          case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
+          case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
+          case EmptyDataEntry(_)            => ???
+        }
+        .reduce[String] { case (l, r) => s"$l && $r " }
 
     val src =
       s"""
@@ -101,7 +103,8 @@ object Gen {
          |$finalStatement
       """.stripMargin
 
-    val (script, _) = ScriptCompiler.compile(src, estimator)
+    val (script, _) = ScriptCompiler
+      .compile(src, estimator)
       .explicitGet()
 
     script

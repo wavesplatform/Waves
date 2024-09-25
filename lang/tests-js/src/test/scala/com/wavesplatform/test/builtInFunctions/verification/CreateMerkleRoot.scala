@@ -38,7 +38,7 @@ object CreateMerkleRoot extends JsTestBase {
             (randomUnionArrayElement, createMerkleRoot, nonMatchingTypes("List[ByteVector]")),
             (randomAddressDataArrayElement, createMerkleRootArgBeforeFunc, nonMatchingTypes("List[ByteVector]")),
             (randomByteVectorArrayElement, invalidCreateMerkleRoot, invalidErrorCreateMerkleRoot),
-            (randomByteVectorArrayElement, invalidCreateMerkleRootArgBeforeFunc, invalidErrorCreateMerkleRoot),
+            (randomByteVectorArrayElement, invalidCreateMerkleRootArgBeforeFunc, invalidErrorCreateMerkleRoot)
           )
         ) {
           val script = precondition.onlyMatcherContract(data, function)

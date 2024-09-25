@@ -406,7 +406,7 @@ object Explorer extends ScorexLogging {
           var thisAddressId = 0L
           var prevHeight    = 0
           var key           = ""
-          var addressCount = 0
+          var addressCount  = 0
           rdb.db.iterateOver(KeyTags.DataHistory.prefixBytes, None) { e =>
             val addressIdFromKey = Longs.fromByteArray(e.getKey.slice(2, 10))
             val heightFromKey    = Ints.fromByteArray(e.getKey.takeRight(4))
@@ -433,7 +433,7 @@ object Explorer extends ScorexLogging {
           var thisAddressId = 0L
           var prevHeight    = 0
           var key           = IssuedAsset(ByteStr(new Array[Byte](32)))
-          var addressCount = 0
+          var addressCount  = 0
           rdb.db.iterateOver(KeyTags.AssetBalanceHistory.prefixBytes, None) { e =>
             val addressIdFromKey = Longs.fromByteArray(e.getKey.slice(34, 42))
             val heightFromKey    = Ints.fromByteArray(e.getKey.takeRight(4))
@@ -459,7 +459,7 @@ object Explorer extends ScorexLogging {
           log.info("Looking for balance history corruptions")
           var thisAddressId = 0L
           var prevHeight    = 0
-          var addressCount = 0
+          var addressCount  = 0
           rdb.db.iterateOver(KeyTags.WavesBalanceHistory.prefixBytes, None) { e =>
             val addressIdFromKey = Longs.fromByteArray(e.getKey.slice(2, 10))
             val heightFromKey    = Ints.fromByteArray(e.getKey.takeRight(4))

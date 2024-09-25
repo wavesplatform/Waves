@@ -84,12 +84,11 @@ class ObsoleteTransactionBindingsTest extends PropSpec with WithState {
 
   val settings: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(blockVersion3AfterHeight = 100)
   property("Obsolete transaction bindings") {
-    preconditionsAndPayments.foreach {
-      case (genesis, payment, setScriptTransaction, nextTransfer) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, payment, setScriptTransaction))), TestBlock.create(Seq(nextTransfer)), settings) {
-          (_, _) =>
-            ()
-        }
+    preconditionsAndPayments.foreach { case (genesis, payment, setScriptTransaction, nextTransfer) =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(genesis, payment, setScriptTransaction))), TestBlock.create(Seq(nextTransfer)), settings) {
+        (_, _) =>
+          ()
+      }
     }
   }
 }

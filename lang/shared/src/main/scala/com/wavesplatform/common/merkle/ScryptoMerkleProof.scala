@@ -9,13 +9,12 @@ case class ScryptoMerkleProof(leafData: LeafData, levels: Seq[(Digest, Byte)]) {
     val leafHash = Merkle.hash(LeafPrefix +: leafData)
 
     levels
-      .foldLeft(leafHash) {
-        case (prevHash, (hash, side)) =>
-          if (side == ScryptoMerkleProof.LeftSide) {
-            Merkle.hash(InternalNodePrefix +: (prevHash ++ hash))
-          } else {
-            Merkle.hash(InternalNodePrefix +: (hash ++ prevHash))
-          }
+      .foldLeft(leafHash) { case (prevHash, (hash, side)) =>
+        if (side == ScryptoMerkleProof.LeftSide) {
+          Merkle.hash(InternalNodePrefix +: (prevHash ++ hash))
+        } else {
+          Merkle.hash(InternalNodePrefix +: (hash ++ prevHash))
+        }
       }
       .sameElements(expectedRootHash)
   }
@@ -52,9 +51,8 @@ object ScryptoMerkleProof {
     def parseLevels(arr: Array[Byte], acc: List[(Digest, Byte)]): Either[String, List[(Digest, Byte)]] = {
       if (arr.nonEmpty) {
         parseHashAndSide(arr)
-          .flatMap {
-            case (side, hash, rest) =>
-              parseLevels(rest, (hash, side) :: acc)
+          .flatMap { case (side, hash, rest) =>
+            parseLevels(rest, (hash, side) :: acc)
           }
       } else Right(acc.reverse)
     }

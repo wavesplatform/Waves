@@ -29,5 +29,3 @@ object ListMinMaxBenchmark {
     val list = (Long.MinValue to Long.MinValue + PureContext.MaxListLengthV4).toVector
   }
 }
-
-

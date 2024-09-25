@@ -25,28 +25,28 @@ class RemoveEntrySuite extends BaseFreeSpec {
   def writeEntry(we: WriteEntry): String = s"@Callable(i) func write${we.ct}(k: String, v: ${we.t}) = [${we.ct}Entry(k, v)]"
 
   private val script = s"""
-                 |{-# STDLIB_VERSION 4 #-}
-                 |{-# SCRIPT_TYPE ACCOUNT #-}
-                 |{-# CONTENT_TYPE DAPP #-}
-                 |
-                 |func writeEntry(acc: List[StringEntry], e: Int) = StringEntry(e.toString(), "value") :: acc
-                 |
-                 |@Callable(i) func delete100Entries() = { ${(1 to 100).map(i => s"""DeleteEntry("$i")""").mkString("[", ",", "]")} }
-                 |
-                 |@Callable(i) func delete101Entries() = { ${(1 to 101).map(i => s"""DeleteEntry("$i")""").mkString("[", ",", "]")} }
-                 |
-                 |@Callable(i) func write(k: String, v: String) = [StringEntry(k, v)]
-                 |
-                 |@Callable(i) func write4() = [
-                 |   StringEntry("96", "1"),
-                 |   IntegerEntry("97", 1),
-                 |   BooleanEntry("98", true),
-                 |   BinaryEntry("99", "1".toBytes()),
-                 |   BinaryEntry("100", "1".toBytes())
-                 |]
-                 |
-                 |@Callable(i) func delete(k: String) = [DeleteEntry(k)]
-                 |
+                          |{-# STDLIB_VERSION 4 #-}
+                          |{-# SCRIPT_TYPE ACCOUNT #-}
+                          |{-# CONTENT_TYPE DAPP #-}
+                          |
+                          |func writeEntry(acc: List[StringEntry], e: Int) = StringEntry(e.toString(), "value") :: acc
+                          |
+                          |@Callable(i) func delete100Entries() = { ${(1 to 100).map(i => s"""DeleteEntry("$i")""").mkString("[", ",", "]")} }
+                          |
+                          |@Callable(i) func delete101Entries() = { ${(1 to 101).map(i => s"""DeleteEntry("$i")""").mkString("[", ",", "]")} }
+                          |
+                          |@Callable(i) func write(k: String, v: String) = [StringEntry(k, v)]
+                          |
+                          |@Callable(i) func write4() = [
+                          |   StringEntry("96", "1"),
+                          |   IntegerEntry("97", 1),
+                          |   BooleanEntry("98", true),
+                          |   BinaryEntry("99", "1".toBytes()),
+                          |   BinaryEntry("100", "1".toBytes())
+                          |]
+                          |
+                          |@Callable(i) func delete(k: String) = [DeleteEntry(k)]
+                          |
        """.stripMargin
 
   "Remove entry from account storage" - {
@@ -56,7 +56,7 @@ class RemoveEntrySuite extends BaseFreeSpec {
 
       invokeScript(keyPair, s"write${data.ct}", data.k, data.v.toString)
 
-      nodes.waitForHeightArise() //TODO: delete this line after NODE-2099 will be done
+      nodes.waitForHeightArise() // TODO: delete this line after NODE-2099 will be done
 
       val address = keyPair.toAddress.toString
       miner.getData(address) should have size 1

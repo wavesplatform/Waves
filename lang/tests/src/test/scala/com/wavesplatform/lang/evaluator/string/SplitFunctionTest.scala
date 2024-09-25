@@ -16,149 +16,133 @@ class SplitFunctionTest extends EvaluatorSpec {
     }
 
   property("split string containing separators") {
-    assertSuccess(
-      f => s"""
-              |   let strs = $f("str1;str2;str3;str4", ";")
-              |   strs.size() == 4  &&
-              |   strs[0] == "str1" &&
-              |   strs[1] == "str2" &&
-              |   strs[2] == "str3" &&
-              |   strs[3] == "str4"
-            """.stripMargin
-    )
+    assertSuccess(f => s"""
+                          |   let strs = $f("str1;str2;str3;str4", ";")
+                          |   strs.size() == 4  &&
+                          |   strs[0] == "str1" &&
+                          |   strs[1] == "str2" &&
+                          |   strs[2] == "str3" &&
+                          |   strs[3] == "str4"
+            """.stripMargin)
   }
 
   property("split around empty string") {
-    assertSuccess(
-      f => s"""
-              |   let strs = $f("some", "")
-              |   strs.size() == 4 &&
-              |   strs[0] == "s"   &&
-              |   strs[1] == "o"   &&
-              |   strs[2] == "m"   &&
-              |   strs[3] == "e"
-              |
-            """.stripMargin
-    )
+    assertSuccess(f => s"""
+                          |   let strs = $f("some", "")
+                          |   strs.size() == 4 &&
+                          |   strs[0] == "s"   &&
+                          |   strs[1] == "o"   &&
+                          |   strs[2] == "m"   &&
+                          |   strs[3] == "e"
+                          |
+            """.stripMargin)
   }
 
   property("splitted string containing empty strings") {
-    assertSuccess(
-      f => s"""
-              |   let strs1 = $f(";;some;", ";")
-              |   let result1 = strs1.size() == 4  &&
-              |                 strs1[0] == ""     &&
-              |                 strs1[1] == ""     &&
-              |                 strs1[2] == "some" &&
-              |                 strs1[3] == ""
-              |
-              |   let strs2 = $f(";Q;Qsome;Q", ";Q")
-              |   let result2 = strs2.size() == 4  &&
-              |                 strs2[0] == ""     &&
-              |                 strs2[1] == ""     &&
-              |                 strs2[2] == "some" &&
-              |                 strs2[3] == ""
-              |
-              |   let strs3 = $f("QQ;someQ;Q;;", "Q;")
-              |   let result3 = strs3.size() == 4  &&
-              |                 strs3[0] == "Q"    &&
-              |                 strs3[1] == "some" &&
-              |                 strs3[2] == ""     &&
-              |                 strs3[3] == ";"
-              |
-              |   let strs4 = $f("q;Q;someQ;Q;;", "Q;")
-              |   let result4 = strs4.size() == 4  &&
-              |                 strs4[0] == "q;"   &&
-              |                 strs4[1] == "some" &&
-              |                 strs4[2] == ""     &&
-              |                 strs4[3] == ";"
-              |
-              |   result1 && result2 && result3 && result4
-            """.stripMargin
-    )
+    assertSuccess(f => s"""
+                          |   let strs1 = $f(";;some;", ";")
+                          |   let result1 = strs1.size() == 4  &&
+                          |                 strs1[0] == ""     &&
+                          |                 strs1[1] == ""     &&
+                          |                 strs1[2] == "some" &&
+                          |                 strs1[3] == ""
+                          |
+                          |   let strs2 = $f(";Q;Qsome;Q", ";Q")
+                          |   let result2 = strs2.size() == 4  &&
+                          |                 strs2[0] == ""     &&
+                          |                 strs2[1] == ""     &&
+                          |                 strs2[2] == "some" &&
+                          |                 strs2[3] == ""
+                          |
+                          |   let strs3 = $f("QQ;someQ;Q;;", "Q;")
+                          |   let result3 = strs3.size() == 4  &&
+                          |                 strs3[0] == "Q"    &&
+                          |                 strs3[1] == "some" &&
+                          |                 strs3[2] == ""     &&
+                          |                 strs3[3] == ";"
+                          |
+                          |   let strs4 = $f("q;Q;someQ;Q;;", "Q;")
+                          |   let result4 = strs4.size() == 4  &&
+                          |                 strs4[0] == "q;"   &&
+                          |                 strs4[1] == "some" &&
+                          |                 strs4[2] == ""     &&
+                          |                 strs4[3] == ";"
+                          |
+                          |   result1 && result2 && result3 && result4
+            """.stripMargin)
   }
 
   property("split around unexisting separator") {
-    assertSuccess(
-      f => s"""
-           |   let str      = "a;b;c"
-           |   let splitted = $f(str, ",")
-           |   splitted.size() == 1 &&
-           |   splitted[0] == str
-           |
-         """.stripMargin
-    )
+    assertSuccess(f => s"""
+                          |   let str      = "a;b;c"
+                          |   let splitted = $f(str, ",")
+                          |   splitted.size() == 1 &&
+                          |   splitted[0] == str
+                          |
+         """.stripMargin)
   }
 
   property("split empty string") {
-    assertSuccess(
-      f => s"""
-           |   let strs1 = $f("", ",")
-           |   let strs2 = $f("", ",,,")
-           |   let strs3 = $f("", "")
-           |
-           |   strs1.size() == 1 &&
-           |   strs2.size() == 1 &&
-           |   strs3.size() == 1 &&
-           |   strs1[0] == ""    &&
-           |   strs2[0] == ""    &&
-           |   strs3[0] == ""
-           |
-         """.stripMargin
-    )
+    assertSuccess(f => s"""
+                          |   let strs1 = $f("", ",")
+                          |   let strs2 = $f("", ",,,")
+                          |   let strs3 = $f("", "")
+                          |
+                          |   strs1.size() == 1 &&
+                          |   strs2.size() == 1 &&
+                          |   strs3.size() == 1 &&
+                          |   strs1[0] == ""    &&
+                          |   strs2[0] == ""    &&
+                          |   strs3[0] == ""
+                          |
+         """.stripMargin)
   }
 
   property("split separator around separator") {
-    assertSuccess(
-      f => s"""
-           |   let strs1 = $f(",", ",")
-           |   let strs2 = $f(",x,", ",x,")
-           |
-           |   strs1.size() == 2 &&
-           |   strs1[0] == ""    &&
-           |   strs1[1] == ""    &&
-           |   strs2.size() == 2 &&
-           |   strs2[0] == ""    &&
-           |   strs2[1] == ""
-           |
-         """.stripMargin
-    )
+    assertSuccess(f => s"""
+                          |   let strs1 = $f(",", ",")
+                          |   let strs2 = $f(",x,", ",x,")
+                          |
+                          |   strs1.size() == 2 &&
+                          |   strs1[0] == ""    &&
+                          |   strs1[1] == ""    &&
+                          |   strs2.size() == 2 &&
+                          |   strs2[0] == ""    &&
+                          |   strs2[1] == ""
+                          |
+         """.stripMargin)
   }
 
   property("split string containing only separators") {
     val sep   = ";;;"
     val count = 10
-    assertSuccess(
-      f => s"""
-           |  let strs = $f("${sep * count}", "$sep")
-           |  strs.size() == ${count + 1} &&
-           |  ${(0 to count).map(i => s"""strs[$i] == "" """).mkString(" && ")}
-         """.stripMargin
-    )
+    assertSuccess(f => s"""
+                          |  let strs = $f("${sep * count}", "$sep")
+                          |  strs.size() == ${count + 1} &&
+                          |  ${(0 to count).map(i => s"""strs[$i] == "" """).mkString(" && ")}
+         """.stripMargin)
   }
 
   property("split perceives regex as plain text") {
     val strContainingRegex = "aaa1bbb2ccc"
     val regex              = "[12]+"
     strContainingRegex.split(regex) shouldBe Array("aaa", "bbb", "ccc")
-    assertSuccess(
-      f => s"""
-           |   let regex = "$regex"
-           |
-           |   let strContainingRegex = "$strContainingRegex"
-           |   let splitted1 = $f(strContainingRegex, regex)
-           |   let result1   = splitted1.size() == 1 &&
-           |                   splitted1[0] == strContainingRegex
-           |  
-           |   let strContainingRegexText = "aaa${regex}bbb"
-           |   let splitted2 = $f(strContainingRegexText, regex)
-           |   let result2   = splitted2.size() == 2 &&
-           |                   splitted2[0] == "aaa" &&
-           |                   splitted2[1] == "bbb"
-           |
-           |   result1 && result2
-         """.stripMargin
-    )
+    assertSuccess(f => s"""
+                          |   let regex = "$regex"
+                          |
+                          |   let strContainingRegex = "$strContainingRegex"
+                          |   let splitted1 = $f(strContainingRegex, regex)
+                          |   let result1   = splitted1.size() == 1 &&
+                          |                   splitted1[0] == strContainingRegex
+                          |  
+                          |   let strContainingRegexText = "aaa${regex}bbb"
+                          |   let splitted2 = $f(strContainingRegexText, regex)
+                          |   let result2   = splitted2.size() == 2 &&
+                          |                   splitted2[0] == "aaa" &&
+                          |                   splitted2[1] == "bbb"
+                          |
+                          |   result1 && result2
+         """.stripMargin)
   }
 
   property("split function input limit") {
@@ -208,7 +192,7 @@ class SplitFunctionTest extends EvaluatorSpec {
   }
 
   property("function family output limits") {
-    val elem = "a"
+    val elem                                    = "a"
     def str(f: BaseFunction[NoContext], n: Int) = s""" ${f.name}("${s"$elem," * (n - 1)}$elem", ",") """
     for ((f, limit) <- List((PureContext.splitStr4C, 100), (PureContext.splitStr51C, MaxListLengthV4))) {
       eval(str(f, limit + 1))(V6) shouldBe Left(s"Output list size = ${limit + 1} exceeds limit = $limit for ${f.name}")

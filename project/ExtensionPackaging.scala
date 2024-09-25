@@ -14,8 +14,8 @@ import com.typesafe.sbt.packager.universal.UniversalDeployPlugin
 import sbt.Keys._
 import sbt._
 
-/**
-  * @note Specify "maintainer" to solve DEB warnings
+/** @note
+  *   Specify "maintainer" to solve DEB warnings
   */
 object ExtensionPackaging extends AutoPlugin {
 
@@ -50,7 +50,7 @@ object ExtensionPackaging extends AutoPlugin {
           Seq(localFile -> artifactPath)
         } else Seq.empty
       },
-      classpath := makeRelativeClasspathNames(classpathOrdering.value),
+      classpath       := makeRelativeClasspathNames(classpathOrdering.value),
       nodePackageName := (LocalProject("node") / Linux / packageName).value,
       debianPackageDependencies +=
         s"${(LocalProject("node") / Debian / packageName).value} (= ${(LocalProject("node") / version).value})",
@@ -66,11 +66,11 @@ object ExtensionPackaging extends AutoPlugin {
              |set -e
              |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
       ),
-      Linux / maintainer := "wavesplatform.com",
-      Linux / packageSummary := s"Waves node ${name.value}${network.value.packageSuffix} extension",
+      Linux / maintainer         := "wavesplatform.com",
+      Linux / packageSummary     := s"Waves node ${name.value}${network.value.packageSuffix} extension",
       Linux / packageDescription := s"Waves node ${name.value}${network.value.packageSuffix} extension",
-      Debian / normalizedName := s"${name.value}${network.value.packageSuffix}",
-      Debian / packageName := s"${name.value}${network.value.packageSuffix}",
+      Debian / normalizedName    := s"${name.value}${network.value.packageSuffix}",
+      Debian / packageName       := s"${name.value}${network.value.packageSuffix}",
       libraryDependencies ++= Dependencies.logDeps,
       run / javaOptions ++= extensionClasses.value.zipWithIndex.map { case (extension, index) => s"-Dwaves.extensions.$index=$extension" }
     )
@@ -94,8 +94,7 @@ object ExtensionPackaging extends AutoPlugin {
       else "../" + name
     }
 
-  /**
-    * Constructs a jar name from components...(ModuleID/Artifact)
+  /** Constructs a jar name from components...(ModuleID/Artifact)
     */
   def makeJarName(org: String, name: String, revision: String, artifactName: String, artifactClassifier: Option[String]): String =
     org + "." +
@@ -110,7 +109,7 @@ object ExtensionPackaging extends AutoPlugin {
   private def getJarFullFilename(dep: Attributed[File]): String = {
     val filename: Option[String] = for {
       module <- dep.metadata
-      // sbt 0.13.x key
+        // sbt 0.13.x key
         .get(AttributeKey[ModuleID]("module-id"))
         // sbt 1.x key
         .orElse(dep.metadata.get(AttributeKey[ModuleID]("moduleID")))

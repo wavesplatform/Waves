@@ -47,9 +47,9 @@ class ScriptEstimatorV2Test extends ScriptEstimatorTestBase(ScriptEstimatorV2) {
 
     estimate(functionCosts(V3), expr).explicitGet() shouldBe
       firstCallCost * firstCallCount +
-        firstCallCount - 1 /* pluses */ +
-        5 * 4 /* all blocks */ +
-        7 /* calc 1 + 1 + 1 + 1 exactly once */
+      firstCallCount - 1 /* pluses */ +
+      5 * 4 /* all blocks */ +
+      7 /* calc 1 + 1 + 1 + 1 exactly once */
   }
 
   property("interrupting") {

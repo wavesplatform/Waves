@@ -22,95 +22,108 @@ class TypeEntrySuite extends BaseTransactionSuite {
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    val smartAssetScript =TestCompiler.DefaultVersion.compileAsset(
-      s"""
-         |{-# STDLIB_VERSION 4 #-}
-         |{-# CONTENT_TYPE EXPRESSION #-}
-         |{-# SCRIPT_TYPE ASSET #-}
-         |
-         |getBinaryValue(addressFromStringValue(""), "bin") == fromBase58String("$base58String").value()
-         |  && getIntegerValue(addressFromStringValue(""), "int") == 1
-         |  && getBooleanValue(addressFromStringValue(""), "bool") == true
-         |  && getStringValue(addressFromStringValue(""), "str") == "string"
+    val smartAssetScript = TestCompiler.DefaultVersion
+      .compileAsset(
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE EXPRESSION #-}
+           |{-# SCRIPT_TYPE ASSET #-}
+           |
+           |getBinaryValue(addressFromStringValue(""), "bin") == fromBase58String("$base58String").value()
+           |  && getIntegerValue(addressFromStringValue(""), "int") == 1
+           |  && getBooleanValue(addressFromStringValue(""), "bool") == true
+           |  && getStringValue(addressFromStringValue(""), "str") == "string"
          """.stripMargin
-    ).bytes().base64
+      )
+      .bytes()
+      .base64
 
     firstAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
 
-    val dAppScript = ScriptCompiler.compile(
-      s"""
-         |{-# STDLIB_VERSION 4 #-}
-         |{-# CONTENT_TYPE DAPP #-}
-         |{-# SCRIPT_TYPE ACCOUNT #-}
-         |let binary = fromBase58String("$base58String").value()
-         |let boolean = true
-         |let integer = 1
-         |let string = "string"
-         |
-         |@Callable(i)
-         |func writeEntries() = {
-         |  [
-         |    BinaryEntry("bin", binary),
-         |    BooleanEntry("bool", boolean),
-         |    IntegerEntry("int", integer),
-         |    StringEntry("str", string)
-         |  ]
-         |}
-         |
-         |@Callable(i)
-         |func writeDeleteEntries() = {
-         |  [
-         |    BinaryEntry("bin", binary),
-         |    BooleanEntry("bool", boolean),
-         |    IntegerEntry("int", integer),
-         |    StringEntry("str", string),
-         |    DeleteEntry("bin"),
-         |    DeleteEntry("bool"),
-         |    DeleteEntry("int"),
-         |    DeleteEntry("str"),
-         |    Burn(fromBase58String("$firstAssetId"), 1000)
-         |  ]
-         |}
-         |
-         |
-         |@Callable(i)
-         |func deleteEntries() = {
-         |  [
-         |    DeleteEntry("bin"),
-         |    DeleteEntry("bool"),
-         |    DeleteEntry("int"),
-         |    DeleteEntry("str"),
-         |    Burn(fromBase58String("$firstAssetId"), 1000)
-         |  ]
-         |}
-         |
-         |@Callable(i)
-         |func checkEntries() = {
-         |  [BooleanEntry("check",
-         |   getBinaryValue(this, "bin") == binary
-         |  && getIntegerValue(this, "int") == integer
-         |  && getBooleanValue(this, "bool") == boolean
-         |  && getStringValue(this, "str") == string)]
-         |}
-         |
+    val dAppScript = ScriptCompiler
+      .compile(
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |let binary = fromBase58String("$base58String").value()
+           |let boolean = true
+           |let integer = 1
+           |let string = "string"
+           |
+           |@Callable(i)
+           |func writeEntries() = {
+           |  [
+           |    BinaryEntry("bin", binary),
+           |    BooleanEntry("bool", boolean),
+           |    IntegerEntry("int", integer),
+           |    StringEntry("str", string)
+           |  ]
+           |}
+           |
+           |@Callable(i)
+           |func writeDeleteEntries() = {
+           |  [
+           |    BinaryEntry("bin", binary),
+           |    BooleanEntry("bool", boolean),
+           |    IntegerEntry("int", integer),
+           |    StringEntry("str", string),
+           |    DeleteEntry("bin"),
+           |    DeleteEntry("bool"),
+           |    DeleteEntry("int"),
+           |    DeleteEntry("str"),
+           |    Burn(fromBase58String("$firstAssetId"), 1000)
+           |  ]
+           |}
+           |
+           |
+           |@Callable(i)
+           |func deleteEntries() = {
+           |  [
+           |    DeleteEntry("bin"),
+           |    DeleteEntry("bool"),
+           |    DeleteEntry("int"),
+           |    DeleteEntry("str"),
+           |    Burn(fromBase58String("$firstAssetId"), 1000)
+           |  ]
+           |}
+           |
+           |@Callable(i)
+           |func checkEntries() = {
+           |  [BooleanEntry("check",
+           |   getBinaryValue(this, "bin") == binary
+           |  && getIntegerValue(this, "int") == integer
+           |  && getBooleanValue(this, "bool") == boolean
+           |  && getStringValue(this, "str") == string)]
+           |}
+           |
          """.stripMargin,
-      ScriptEstimatorV3.latest
-    ).explicitGet()._1.bytes().base64
+        ScriptEstimatorV3.latest
+      )
+      .explicitGet()
+      ._1
+      .bytes()
+      .base64
 
-    val accountScript = ScriptCompiler.compile(
-      s"""
+    val accountScript = ScriptCompiler
+      .compile(
+        s"""
          {-# STDLIB_VERSION 4 #-}
-         |{-# CONTENT_TYPE EXPRESSION #-}
-         |{-# SCRIPT_TYPE ACCOUNT #-}
-         |
-         |getBinaryValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "bin") == fromBase58String("$base58String").value()
-         |  && getIntegerValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "int") == 1
-         |  && getBooleanValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "bool") == true
-         |  && getStringValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "str") == "string"
-         |
+           |{-# CONTENT_TYPE EXPRESSION #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |getBinaryValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "bin") == fromBase58String("$base58String").value()
+           |  && getIntegerValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "int") == 1
+           |  && getBooleanValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "bool") == true
+           |  && getStringValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "str") == "string"
+           |
          """.stripMargin,
-      ScriptEstimatorV3.latest
-    ).explicitGet()._1.bytes().base64
+        ScriptEstimatorV3.latest
+      )
+      .explicitGet()
+      ._1
+      .bytes()
+      .base64
 
     sender.setScript(firstDApp, Some(dAppScript), waitForTx = true)
     sender.setScript(secondDApp, Some(accountScript), waitForTx = true)

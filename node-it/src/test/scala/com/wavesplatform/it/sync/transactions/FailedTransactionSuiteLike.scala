@@ -280,30 +280,34 @@ object FailedTransactionSuiteLike {
       sellMatcherFee: Long
   ): ExchangeTransaction = {
     val timestamp = System.currentTimeMillis()
-    val buy = Order.buy(
-      Order.V4,
-      buyer,
-      matcher.publicKey,
-      assetPair,
-      100,
-      100,
-      timestamp,
-      timestamp + Order.MaxLiveTime / 2,
-      buyMatcherFee,
-      Asset.fromString(Some(buyMatcherFeeAsset))
-    ).explicitGet()
-    val sell = Order.sell(
-      Order.V4,
-      seller,
-      matcher.publicKey,
-      assetPair,
-      100,
-      100,
-      timestamp,
-      timestamp + Order.MaxLiveTime / 2,
-      sellMatcherFee,
-      Asset.fromString(Some(sellMatcherFeeAsset))
-    ).explicitGet()
+    val buy = Order
+      .buy(
+        Order.V4,
+        buyer,
+        matcher.publicKey,
+        assetPair,
+        100,
+        100,
+        timestamp,
+        timestamp + Order.MaxLiveTime / 2,
+        buyMatcherFee,
+        Asset.fromString(Some(buyMatcherFeeAsset))
+      )
+      .explicitGet()
+    val sell = Order
+      .sell(
+        Order.V4,
+        seller,
+        matcher.publicKey,
+        assetPair,
+        100,
+        100,
+        timestamp,
+        timestamp + Order.MaxLiveTime / 2,
+        sellMatcherFee,
+        Asset.fromString(Some(sellMatcherFeeAsset))
+      )
+      .explicitGet()
     ExchangeTransaction
       .signed(
         TxVersion.V3,

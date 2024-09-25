@@ -676,8 +676,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
   @tailrec
   private def clearChar(source: StringBuilder, pos: Int): Int =
     if (pos >= 0)
-      if (" \n\r".contains(source.charAt(pos)))
-        clearChar(source, pos - 1)
+      if (" \n\r".contains(source.charAt(pos))) clearChar(source, pos - 1)
       else {
         source.setCharAt(pos, ' ')
         pos

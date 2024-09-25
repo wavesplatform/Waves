@@ -4,28 +4,37 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{dataEntryForTests, randomBoolean, randomInt, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, GreaterV3ResultBooleanEntry, actualVersionsWithoutV3, binaryEntryForTests, booleanEntryForTests, integerEntryForTests, rideV3Result, stringEntryForTests}
+import testHelpers.TestDataConstantsAndMethods.{
+  CANT_FIND_A_FUNCTION_OVERLOAD,
+  GreaterV3ResultBooleanEntry,
+  actualVersionsWithoutV3,
+  binaryEntryForTests,
+  booleanEntryForTests,
+  integerEntryForTests,
+  rideV3Result,
+  stringEntryForTests
+}
 import utest.{Tests, test}
 
 object GetBoolean extends JsTestBase {
   // getBooleanKey
-  private val getBooleanKey = s"getBoolean(callerTestData, \"key\")"
+  private val getBooleanKey              = s"getBoolean(callerTestData, \"key\")"
   private val getBooleanKeyArgBeforeFunc = s"callerTestData.getBoolean(\"key\")"
   // getBooleanIndex
-  private val getBooleanIndex = s"getBoolean(callerTestData, $randomInt)"
+  private val getBooleanIndex              = s"getBoolean(callerTestData, $randomInt)"
   private val getBooleanIndexArgBeforeFunc = s"callerTestData.getBoolean($randomInt)"
   // getBooleanValueKey
-  private val getBooleanValueKey = s"getBooleanValue(callerTestData, \"key\")"
+  private val getBooleanValueKey              = s"getBooleanValue(callerTestData, \"key\")"
   private val getBooleanValueKeyArgBeforeFunc = s"callerTestData.getBooleanValue(\"key\")"
   // getBooleanValueIndex
-  private val getBooleanValueIndex = s"getBooleanValue(callerTestData, $randomInt)"
+  private val getBooleanValueIndex              = s"getBooleanValue(callerTestData, $randomInt)"
   private val getBooleanValueIndexArgBeforeFunc = s"callerTestData.getBooleanValue($randomInt)"
 
   // invalid getBoolean
-  private val invalidGetBooleanKey = s"getBoolean()"
+  private val invalidGetBooleanKey           = s"getBoolean()"
   private val invalidGetBooleanArgBeforeFunc = s"callerTestData.getBoolean()"
   // invalid getBooleanValue
-  private val invalidGetBooleanValue = s"getBooleanValue()"
+  private val invalidGetBooleanValue              = s"getBooleanValue()"
   private val invalidGetBooleanValueArgBeforeFunc = s"callerTestData.getBooleanValue()"
 
   val tests: Tests = Tests {
@@ -65,7 +74,7 @@ object GetBoolean extends JsTestBase {
             (binaryEntryForTests, getBooleanValueIndexArgBeforeFunc),
             (integerEntryForTests, getBooleanValueIndexArgBeforeFunc),
             (stringEntryForTests, getBooleanValueIndexArgBeforeFunc),
-            (booleanEntryForTests, getBooleanValueIndexArgBeforeFunc),
+            (booleanEntryForTests, getBooleanValueIndexArgBeforeFunc)
           )
         ) {
           val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBooleanEntry)
@@ -141,7 +150,7 @@ object GetBoolean extends JsTestBase {
             (integerEntryForTests, invalidGetBooleanKey),
             (binaryEntryForTests, invalidGetBooleanArgBeforeFunc),
             (integerEntryForTests, invalidGetBooleanValue),
-            (binaryEntryForTests, invalidGetBooleanValueArgBeforeFunc),
+            (binaryEntryForTests, invalidGetBooleanValueArgBeforeFunc)
           )
         ) {
           val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBooleanEntry)
@@ -157,7 +166,7 @@ object GetBoolean extends JsTestBase {
           (dataEntryForTests(randomStringArrayElement), invalidGetBooleanKey),
           (dataEntryForTests(randomStringArrayElement), invalidGetBooleanArgBeforeFunc),
           (dataEntryForTests(randomStringArrayElement), invalidGetBooleanValue),
-          (dataEntryForTests(randomStringArrayElement), invalidGetBooleanValueArgBeforeFunc),
+          (dataEntryForTests(randomStringArrayElement), invalidGetBooleanValueArgBeforeFunc)
         )
       ) {
         val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBooleanEntry)

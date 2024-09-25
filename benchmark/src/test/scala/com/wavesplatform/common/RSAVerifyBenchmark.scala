@@ -88,15 +88,15 @@ object RSAVerifyBenchmark {
     generator.generateKeyPair()
   }
 
-  class RSASt(val alg: DigestAlgorithm, val  messageSize: Int) {
+  class RSASt(val alg: DigestAlgorithm, val messageSize: Int) {
     val message = randomBytes(messageSize * 1024)
 
     val publicKey = pair.getPublic.getEncoded
 
     val signature = {
       val privateKey = pair.getPrivate
-      val prefix = RSA.digestAlgorithmPrefix(alg)
-      val provider = new BouncyCastleProvider()
+      val prefix     = RSA.digestAlgorithmPrefix(alg)
+      val provider   = new BouncyCastleProvider()
 
       val privateSignature = JavaSignature.getInstance(s"${prefix}withRSA", provider)
       privateSignature.initSign(privateKey)

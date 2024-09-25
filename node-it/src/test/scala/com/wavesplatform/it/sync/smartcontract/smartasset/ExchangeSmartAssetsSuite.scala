@@ -43,14 +43,19 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     combination of smart accounts and smart assets
      */
     val s = Some(
-      ScriptCompiler.compile(
-        s"""{-# SCRIPT_TYPE ASSET #-}
-           |match tx {
-           |case _: SetAssetScriptTransaction => true
-           |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc2.publicKey}')
-           |case _ => false}""".stripMargin,
-        estimator
-      ).explicitGet()._1.bytes().base64
+      ScriptCompiler
+        .compile(
+          s"""{-# SCRIPT_TYPE ASSET #-}
+             |match tx {
+             |case _: SetAssetScriptTransaction => true
+             |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc2.publicKey}')
+             |case _ => false}""".stripMargin,
+          estimator
+        )
+        .explicitGet()
+        ._1
+        .bytes()
+        .base64
     )
 
     val sAsset = sender
@@ -59,10 +64,12 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
 
     val smartPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(sAsset).get), Waves)
 
-    for ((contr1, contr2, mcontr) <- Seq(
-           (sc1, sc1, sc1),
-           (None, sc1, None)
-         )) {
+    for (
+      (contr1, contr2, mcontr) <- Seq(
+        (sc1, sc1, sc1),
+        (None, sc1, None)
+      )
+    ) {
 
       setContracts((contr1, acc0), (contr2, acc1), (mcontr, acc2))
 
@@ -73,14 +80,19 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     }
 
     val sUpdated = Some(
-      ScriptCompiler.compile(
-        s"""{-# SCRIPT_TYPE ASSET #-}
-           |match tx {
-           |case _: SetAssetScriptTransaction => true
-           |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc1.publicKey}')
-           |case _ => false}""".stripMargin,
-        estimator
-      ).explicitGet()._1.bytes().base64
+      ScriptCompiler
+        .compile(
+          s"""{-# SCRIPT_TYPE ASSET #-}
+             |match tx {
+             |case _: SetAssetScriptTransaction => true
+             |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc1.publicKey}')
+             |case _ => false}""".stripMargin,
+          estimator
+        )
+        .explicitGet()
+        ._1
+        .bytes()
+        .base64
     )
 
     sender.setAssetScript(sAsset, firstKeyPair, setAssetScriptFee, sUpdated, waitForTx = true)
@@ -106,16 +118,21 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     sender.transfer(firstKeyPair, secondAddress, 1000, minFee + smartFee, Some(assetA), waitForTx = true)
 
     val script = Some(
-      ScriptCompiler.compile(
-        s"""{-# SCRIPT_TYPE ASSET #-}
-                                        |let assetA = base58'$assetA'
-                                        |let assetB = base58'$assetB'
-                                        |match tx {
-                                        |case _: SetAssetScriptTransaction => true
-                                        |case e: ExchangeTransaction => (e.sellOrder.assetPair.priceAsset == assetA || e.sellOrder.assetPair.amountAsset == assetA) && (e.sellOrder.assetPair.priceAsset == assetB || e.sellOrder.assetPair.amountAsset == assetB)
-                                        |case _ => false}""".stripMargin,
-        estimator
-      ).explicitGet()._1.bytes().base64
+      ScriptCompiler
+        .compile(
+          s"""{-# SCRIPT_TYPE ASSET #-}
+             |let assetA = base58'$assetA'
+             |let assetB = base58'$assetB'
+             |match tx {
+             |case _: SetAssetScriptTransaction => true
+             |case e: ExchangeTransaction => (e.sellOrder.assetPair.priceAsset == assetA || e.sellOrder.assetPair.amountAsset == assetA) && (e.sellOrder.assetPair.priceAsset == assetB || e.sellOrder.assetPair.amountAsset == assetB)
+             |case _ => false}""".stripMargin,
+          estimator
+        )
+        .explicitGet()
+        ._1
+        .bytes()
+        .base64
     )
 
     sender.setAssetScript(assetA, firstKeyPair, setAssetScriptFee, script, waitForTx = true)
@@ -163,7 +180,8 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
   test("use all functions from RIDE for asset script") {
     val script1 = Some(ScriptCompiler.compile("{-# SCRIPT_TYPE ASSET #-}" + cryptoContextScript(false), estimator).explicitGet()._1.bytes().base64)
     val script2 = Some(ScriptCompiler.compile("{-# SCRIPT_TYPE ASSET #-}" + pureContextScript(dtx, false), estimator).explicitGet()._1.bytes().base64)
-    val script3 = Some(ScriptCompiler.compile("{-# SCRIPT_TYPE ASSET #-}" + wavesContextScript(dtx, false), estimator).explicitGet()._1.bytes().base64)
+    val script3 =
+      Some(ScriptCompiler.compile("{-# SCRIPT_TYPE ASSET #-}" + wavesContextScript(dtx, false), estimator).explicitGet()._1.bytes().base64)
 
     List(script1, script2, script3)
       .map { i =>

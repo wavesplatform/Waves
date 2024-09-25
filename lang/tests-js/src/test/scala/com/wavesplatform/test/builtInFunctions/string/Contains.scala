@@ -21,7 +21,7 @@ object Contains extends JsTestBase {
         for (
           (data, list, function) <- Seq(
             (randomStringArrayElement, randomStringArrayElement, contains),
-            (randomStringArrayElement, randomStringArrayElement, containsArgBeforeFunc),
+            (randomStringArrayElement, randomStringArrayElement, containsArgBeforeFunc)
           )
         ) {
           val script = precondition.simpleRideCode(data, list, function)
@@ -38,7 +38,7 @@ object Contains extends JsTestBase {
             (randomInt.toString, randomAliasDataArrayElement, containsArgBeforeFunc, nonMatchingTypes("String")),
             (randomInt.toString, randomIssuesArrayElement, containsArgBeforeFunc, nonMatchingTypes("String")),
             (randomStringArrayElement, randomStringArrayElement, invalidContains, invalidErrorContains),
-            (randomStringArrayElement, randomStringArrayElement, invalidContainsArgBeforeFunc, invalidErrorContains),
+            (randomStringArrayElement, randomStringArrayElement, invalidContainsArgBeforeFunc, invalidErrorContains)
           )
         ) {
           val script = precondition.simpleRideCode(data, list, function)
@@ -49,8 +49,8 @@ object Contains extends JsTestBase {
     }
 
     test("RIDE-210. Can't find a function contains for RIDE V3") {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", V3)
-        val script = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, contains)
+      val precondition = new GeneratorContractsForBuiltInFunctions("String", V3)
+      val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, contains)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
   }

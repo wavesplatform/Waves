@@ -43,23 +43,23 @@ class LeaseActionGrpcSuite extends GrpcBaseTransactionSuite {
   test("set script") {
     val dApp = compile(
       s"""
-       |  {-# STDLIB_VERSION 5 #-}
-       |  {-# CONTENT_TYPE DAPP #-}
-       |  {-# SCRIPT_TYPE ACCOUNT #-}
-       |
-       |  @Callable(i)
-       |  func lease() = {
-       |    [
-       |      Lease(i.caller, $dAppLeaseAmount)
-       |    ]
-       |  }
-       |
-       |  @Callable(i)
-       |  func leaseCancel(leaseId: ByteVector) = {
-       |    [
-       |      LeaseCancel(leaseId)
-       |    ]
-       |  }
+         |  {-# STDLIB_VERSION 5 #-}
+         |  {-# CONTENT_TYPE DAPP #-}
+         |  {-# SCRIPT_TYPE ACCOUNT #-}
+         |
+         |  @Callable(i)
+         |  func lease() = {
+         |    [
+         |      Lease(i.caller, $dAppLeaseAmount)
+         |    ]
+         |  }
+         |
+         |  @Callable(i)
+         |  func leaseCancel(leaseId: ByteVector) = {
+         |    [
+         |      LeaseCancel(leaseId)
+         |    ]
+         |  }
      """.stripMargin
     )
     sender.setScript(dAppAcc, Right(Some(dApp)), waitForTx = true)

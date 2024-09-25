@@ -18,10 +18,9 @@ class InvokePaymentsLimitTest extends PropSpec with Inside with WithState with D
   import DomainPresets.*
 
   private def dApp(version: StdLibVersion, nestedInvoke: Option[(Address, Seq[Payment])]): Script = {
-    val nested = nestedInvoke.fold("") {
-      case (address, payments) =>
-        val paymentsStr = payments.map(p => s"AttachedPayment(base58'${p.assetId}', ${p.amount})").mkString("[", ", ", "]")
-        s""" strict r = invoke(Address(base58'$address'), "default", [], $paymentsStr) """
+    val nested = nestedInvoke.fold("") { case (address, payments) =>
+      val paymentsStr = payments.map(p => s"AttachedPayment(base58'${p.assetId}', ${p.amount})").mkString("[", ", ", "]")
+      s""" strict r = invoke(Address(base58'$address'), "default", [], $paymentsStr) """
     }
     TestCompiler(version).compileContract(
       s"""

@@ -28,10 +28,9 @@ object SignedIssueV2Request {
   implicit val writes: Writes[SignedIssueV2Request] =
     Json
       .writes[SignedIssueV2Request]
-      .transform(
-        (request: JsObject) =>
-          request + ("version" -> JsNumber(2))
-            + ("type"          -> JsNumber(IssueTransaction.typeId.toInt))
+      .transform((request: JsObject) =>
+        request + ("version" -> JsNumber(2))
+          + ("type"          -> JsNumber(IssueTransaction.typeId.toInt))
       )
 }
 

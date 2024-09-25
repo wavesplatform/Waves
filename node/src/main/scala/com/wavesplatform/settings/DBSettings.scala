@@ -9,5 +9,5 @@ case class DBSettings(
     maxCacheSize: Int,
     maxRollbackDepth: Int,
     cleanupInterval: Option[Int] = None,
-    rocksdb: RocksDBSettings,
+    rocksdb: RocksDBSettings
 )

@@ -16,15 +16,15 @@ class BlocksApiSuite extends GrpcBaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.raw(s"""waves {
-          |  miner { 
-          |    quorum = 0
-          |    max-transactions-in-micro-block = 1
-          |  }
-          |  blockchain.custom.functionality.pre-activated-features {
-          |    14 = $BlockV4Height
-          |    15 = $BlockV5Height
-          |  }
-          |}""".stripMargin))
+                             |  miner { 
+                             |    quorum = 0
+                             |    max-transactions-in-micro-block = 1
+                             |  }
+                             |  blockchain.custom.functionality.pre-activated-features {
+                             |    14 = $BlockV4Height
+                             |    15 = $BlockV5Height
+                             |  }
+                             |}""".stripMargin))
       .withDefault(1)
       .buildNonConflicting()
 
@@ -34,12 +34,11 @@ class BlocksApiSuite extends GrpcBaseTransactionSuite {
     val headersByHeight = range.map(height => blocksApi.getBlock(BlockRequest(request = BlockRequest.Request.Height(height))))
     val headersRange    = blocksApi.getBlockRange(BlockRangeRequest(range.min, range.max))
 
-    headersByHeight zip headersRange foreach {
-      case (h1, h2) =>
-        h1.getBlock.header shouldEqual h2.getBlock.header
-        h1.getBlock.signature shouldEqual h2.getBlock.signature
-        h1.getBlock.transactions should be(empty)
-        h1.height shouldEqual h2.height
+    headersByHeight zip headersRange foreach { case (h1, h2) =>
+      h1.getBlock.header shouldEqual h2.getBlock.header
+      h1.getBlock.signature shouldEqual h2.getBlock.signature
+      h1.getBlock.transactions should be(empty)
+      h1.height shouldEqual h2.height
     }
 
     (headersByHeight ++ headersRange).foreach(bwh => assertion(bwh.block.get.header.get))

@@ -348,7 +348,8 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
              )
              .map(Some(_))
          }
-     } else TracedResult(Right(None))).flatMap { stateHash =>
+     } else TracedResult(Right(None)))
+    .flatMap { stateHash =>
       TracedResult(
         Block
           .buildAndSign(

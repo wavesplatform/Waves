@@ -29,9 +29,12 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
   Feature("Blacklist") {
     Scenario("Peer blacklist another peer") {
       Given("Peer database is empty")
-      val peerDatabase = new PeerDatabaseImpl(networkSettings, new Ticker {
-        override def read(): Long = timestamp
-      })
+      val peerDatabase = new PeerDatabaseImpl(
+        networkSettings,
+        new Ticker {
+          override def read(): Long = timestamp
+        }
+      )
 
       def isBlacklisted(address: InetSocketAddress) = peerDatabase.isBlacklisted(address.getAddress)
 

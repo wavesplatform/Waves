@@ -21,13 +21,13 @@ class SmartAssetEvalTest extends PropSpec with WithState {
 
     val genesis = TxHelpers.genesis(firstAcc.toAddress)
 
-    val emptyScript       = s"""
-                     |{-# STDLIB_VERSION 3 #-}
-                     |{-# CONTENT_TYPE EXPRESSION #-}
-                     |{-# SCRIPT_TYPE ASSET #-}
-                     |
-                     |true
-                     |
+    val emptyScript = s"""
+                         |{-# STDLIB_VERSION 3 #-}
+                         |{-# CONTENT_TYPE EXPRESSION #-}
+                         |{-# SCRIPT_TYPE ASSET #-}
+                         |
+                         |true
+                         |
         """.stripMargin
     val parsedEmptyScript = Parser.parseExpr(emptyScript).get.value
     val emptyExprScript =
@@ -36,18 +36,18 @@ class SmartAssetEvalTest extends PropSpec with WithState {
     val issue = TxHelpers.issue(firstAcc, 100, script = Some(emptyExprScript), reissuable = false)
     val asset = IssuedAsset(issue.id())
 
-    val assetScript   = s"""
-                     | {-# STDLIB_VERSION 3 #-}
-                     | {-# CONTENT_TYPE EXPRESSION #-}
-                     | {-# SCRIPT_TYPE ASSET #-}
-                     |
-                     | this.id         == base58'${asset.id.toString}' &&
-                     | this.quantity   == 100                        &&
-                     | this.decimals   == 0                          &&
-                     | this.reissuable == false                      &&
-                     | this.scripted   == true                       &&
-                     | this.sponsored  == false
-                     |
+    val assetScript = s"""
+                         | {-# STDLIB_VERSION 3 #-}
+                         | {-# CONTENT_TYPE EXPRESSION #-}
+                         | {-# SCRIPT_TYPE ASSET #-}
+                         |
+                         | this.id         == base58'${asset.id.toString}' &&
+                         | this.quantity   == 100                        &&
+                         | this.decimals   == 0                          &&
+                         | this.reissuable == false                      &&
+                         | this.scripted   == true                       &&
+                         | this.sponsored  == false
+                         |
         """.stripMargin
     val untypedScript = Parser.parseExpr(assetScript).get.value
     val typedScript = ExprScript(V3, ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), V3, untypedScript).explicitGet()._1)

@@ -3,23 +3,30 @@ package com.wavesplatform.test.builtInFunctions.accountDataStorage
 import com.wavesplatform.JsTestBase
 import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
 import _root_.testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{GreaterV3ResultIntegerEntry, actualVersions, oldVersions, rideV3Result, thisVariable, versionsSupportingTheNewFeatures}
+import testHelpers.TestDataConstantsAndMethods.{
+  GreaterV3ResultIntegerEntry,
+  actualVersions,
+  oldVersions,
+  rideV3Result,
+  thisVariable,
+  versionsSupportingTheNewFeatures
+}
 import utest.{Tests, test}
 
 object GetInteger extends JsTestBase {
   // getInteger
-  private val getInteger = s"getInteger(callerTestData, $randomStringArrayElement)"
-  private val getIntegerArgBeforeFunc = s"callerTestData.getInteger($randomStringArrayElement)"
-  private val ownDataGetInt = s"getInteger($randomStringArrayElement)"
+  private val getInteger                 = s"getInteger(callerTestData, $randomStringArrayElement)"
+  private val getIntegerArgBeforeFunc    = s"callerTestData.getInteger($randomStringArrayElement)"
+  private val ownDataGetInt              = s"getInteger($randomStringArrayElement)"
   private val ownDataGetIntArgBeforeFunc = s"$randomStringArrayElement.getInteger()"
 
   // getIntegerValue
-  private val getIntegerValue = s"getIntegerValue(callerTestData, $randomStringArrayElement)"
-  private val getIntegerValueArgBeforeFunc = s"callerTestData.getIntegerValue($randomStringArrayElement)"
-  private val ownDataGetIntValue = s"getIntegerValue($randomStringArrayElement)"
+  private val getIntegerValue                 = s"getIntegerValue(callerTestData, $randomStringArrayElement)"
+  private val getIntegerValueArgBeforeFunc    = s"callerTestData.getIntegerValue($randomStringArrayElement)"
+  private val ownDataGetIntValue              = s"getIntegerValue($randomStringArrayElement)"
   private val ownDataGetIntValueArgBeforeFunc = s"$randomStringArrayElement.getIntegerValue()"
 
-  private val invalidGetInt = s"getInteger(callerTestData)"
+  private val invalidGetInt      = s"getInteger(callerTestData)"
   private val invalidGetIntValue = s"getIntegerValue(callerTestData)"
 
   val tests: Tests = Tests {
@@ -59,7 +66,7 @@ object GetInteger extends JsTestBase {
     }
 
     test("RIDE-14. Test negative scenarios for getInteger functions") {
-      val invalidFunction = s"getIntegerValue($randomInt)"
+      val invalidFunction          = s"getIntegerValue($randomInt)"
       val invalidArgBeforeFunction = s"$randomInt.getIntegerValue()"
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
@@ -70,7 +77,7 @@ object GetInteger extends JsTestBase {
             (randomInt.toString, getInteger),
             (randomInt.toString, getIntegerValue),
             (randomInt.toString, invalidFunction),
-            (randomInt.toString, invalidArgBeforeFunction),
+            (randomInt.toString, invalidArgBeforeFunction)
           )
         ) {
           val script = precondition.codeFromMatchingAndCase(addressOrAlias, intData, rideV3Result, GreaterV3ResultIntegerEntry)

@@ -132,8 +132,8 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         ): (Option[Seq[Transaction]], MiningConstraint, Option[ByteStr]) = {
           val (txs, constraint, stateHash) = inner.packUnconfirmed(rest, None, strategy, cancelled)
           val waitingConstraint = new MiningConstraint {
-            def isFull      : Boolean                                          = { eventHasBeenSent.await(); constraint.isFull }
-            def isOverfilled      : Boolean                                             = constraint.isOverfilled
+            def isFull: Boolean                                                         = { eventHasBeenSent.await(); constraint.isFull }
+            def isOverfilled: Boolean                                                   = constraint.isOverfilled
             def put(b: Blockchain, tx: Transaction, s: StateSnapshot): MiningConstraint = constraint.put(b, tx, s)
           }
           (txs, waitingConstraint, stateHash)

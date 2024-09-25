@@ -9,8 +9,8 @@ import org.scalatest.Inside
 class SmartConstructorTest extends PropSpec with Inside {
   property("CONST_BYTESTR size limit") {
     val allowedBytes = ByteStr.fill(Terms.DataEntryValueMax)(1)
-    inside(CONST_BYTESTR(allowedBytes)) {
-      case Right(CONST_BYTESTR(bytes)) => bytes shouldBe allowedBytes
+    inside(CONST_BYTESTR(allowedBytes)) { case Right(CONST_BYTESTR(bytes)) =>
+      bytes shouldBe allowedBytes
     }
 
     val illegalBytes = ByteStr.fill(Terms.DataEntryValueMax + 1)(1)
@@ -19,10 +19,9 @@ class SmartConstructorTest extends PropSpec with Inside {
 
   property("CONST_STRING size limit") {
     val allowedString = "ё" * (Terms.DataEntryValueMax / 2)
-    inside(CONST_STRING(allowedString)) {
-      case Right(CONST_STRING(str)) =>
-        str shouldBe allowedString
-        str.getBytes("UTF-8").length shouldBe Terms.DataEntryValueMax - 1
+    inside(CONST_STRING(allowedString)) { case Right(CONST_STRING(str)) =>
+      str shouldBe allowedString
+      str.getBytes("UTF-8").length shouldBe Terms.DataEntryValueMax - 1
     }
 
     val illegalString = "ё" * (Terms.DataEntryValueMax / 2 + 1)

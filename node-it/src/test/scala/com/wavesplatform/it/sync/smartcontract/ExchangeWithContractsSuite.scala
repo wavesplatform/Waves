@@ -22,15 +22,15 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
   val sc1: Option[String] = Some(s"true")
   val sc2: Option[String] = Some(s"""
-               |match tx {
-               |  case _: SetScriptTransaction => true
-               |  case _ => false
-               |}""".stripMargin)
+                                    |match tx {
+                                    |  case _: SetScriptTransaction => true
+                                    |  case _ => false
+                                    |}""".stripMargin)
   val sc3: Option[String] = Some(s"""
-               |match tx {
-               |  case _: SetScriptTransaction => true
-               |  case _ => throw("Some generic error")
-               |}""".stripMargin)
+                                    |match tx {
+                                    |  case _: SetScriptTransaction => true
+                                    |  case _ => throw("Some generic error")
+                                    |}""".stripMargin)
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -66,29 +66,33 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     val sc5 = Some(pureContextScript(dtx, accountScript = true))
     val sc6 = Some(wavesContextScript(dtx, accountScript = true))
 
-    for ((contr1, contr2, mcontr) <- Seq(
-           (sc1, sc1, sc1),
-           (None, sc1, None),
-           (None, None, sc1),
-           (None, None, sc4),
-           (None, None, sc5),
-           (None, None, sc6),
-           (sc5, None, sc5)
-         )) {
+    for (
+      (contr1, contr2, mcontr) <- Seq(
+        (sc1, sc1, sc1),
+        (None, sc1, None),
+        (None, None, sc1),
+        (None, None, sc4),
+        (None, None, sc5),
+        (None, None, sc6),
+        (sc5, None, sc5)
+      )
+    ) {
 
       setContracts(
         (contr1, acc0),
         (contr2, acc1),
         (mcontr, acc2)
       )
-      for ((o1ver, o2ver) <- Seq(
-             (2: Byte, 2: Byte),
-             (2: Byte, 3: Byte)
-           )) {
+      for (
+        (o1ver, o2ver) <- Seq(
+          (2: Byte, 2: Byte),
+          (2: Byte, 3: Byte)
+        )
+      ) {
 
         sender.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2), waitForTx = true)
 
-        //TODO : add assert balances
+        // TODO : add assert balances
       }
     }
 
@@ -100,26 +104,30 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
   }
 
   test("negative - set simple contracts and put exchange transaction in blockchain") {
-    for ((contr1, contr2, mcontr) <- Seq(
-           (sc1, sc2, sc1),
-           (sc1, sc1, sc2),
-           (None, None, sc2),
-           (None, sc2, None)
-         )) {
+    for (
+      (contr1, contr2, mcontr) <- Seq(
+        (sc1, sc2, sc1),
+        (sc1, sc1, sc2),
+        (None, None, sc2),
+        (None, sc2, None)
+      )
+    ) {
       setContracts(
         (contr1, acc0),
         (contr2, acc1),
         (mcontr, acc2)
       )
-      for ((o1ver, o2ver) <- Seq(
-             (2: Byte, 2: Byte),
-             (3: Byte, 3: Byte)
-           )) {
+      for (
+        (o1ver, o2ver) <- Seq(
+          (2: Byte, 2: Byte),
+          (3: Byte, 3: Byte)
+        )
+      ) {
         assertBadRequestAndMessage(
           sender.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2)),
           "Transaction is not allowed by account-script"
         )
-        //TODO : add assert balances
+        // TODO : add assert balances
       }
     }
     setContracts(
@@ -130,21 +138,25 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
   }
 
   test("negative - check custom exception") {
-    for ((contr1, contr2, mcontr) <- Seq(
-           (sc1, sc1, sc3)
-         )) {
+    for (
+      (contr1, contr2, mcontr) <- Seq(
+        (sc1, sc1, sc3)
+      )
+    ) {
       setContracts(
         (contr1, acc0),
         (contr2, acc1),
         (mcontr, acc2)
       )
-      for ((o1ver, o2ver) <- Seq(
-             (2: Byte, 2: Byte),
-             (3: Byte, 3: Byte)
-           )) {
+      for (
+        (o1ver, o2ver) <- Seq(
+          (2: Byte, 2: Byte),
+          (3: Byte, 3: Byte)
+        )
+      ) {
         val tx = exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2)
         assertBadRequestAndMessage(sender.signedBroadcast(tx), "Error while executing account-script: Some generic error")
-        //TODO : add assert balances
+        // TODO : add assert balances
       }
     }
     setContracts(
@@ -155,11 +167,13 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
   }
 
   test("positive - versioning verification") {
-    for ((contr1, contr2, mcontr) <- Seq(
-           (None, None, None),
-           (sc1, None, None),
-           (None, None, sc1)
-         )) {
+    for (
+      (contr1, contr2, mcontr) <- Seq(
+        (None, None, None),
+        (sc1, None, None),
+        (None, None, sc1)
+      )
+    ) {
       setContracts(
         (contr1, acc0),
         (contr2, acc1),
@@ -168,10 +182,12 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
       val matcher   = acc2
       val sellPrice = (0.50 * Order.PriceConstant).toLong
-      for ((o1ver, o2ver) <- Seq(
-             (1: Byte, 2: Byte),
-             (1: Byte, 3: Byte)
-           )) {
+      for (
+        (o1ver, o2ver) <- Seq(
+          (1: Byte, 2: Byte),
+          (1: Byte, 3: Byte)
+        )
+      ) {
 
         val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
@@ -195,7 +211,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         val txId = sender.signedBroadcast(tx).id
         nodes.waitForTransaction(txId)
 
-        //TODO : add assert balances
+        // TODO : add assert balances
       }
     }
     setContracts(
@@ -211,10 +227,12 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     val matcher   = acc2
     val sellPrice = (0.50 * Order.PriceConstant).toLong
 
-    for ((o1ver, o2ver) <- Seq(
-           (2: Byte, 1: Byte),
-           (3: Byte, 1: Byte)
-         )) {
+    for (
+      (o1ver, o2ver) <- Seq(
+        (2: Byte, 1: Byte),
+        (3: Byte, 1: Byte)
+      )
+    ) {
       val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
       val amount = math.min(buy.amount.value, sell.amount.value)

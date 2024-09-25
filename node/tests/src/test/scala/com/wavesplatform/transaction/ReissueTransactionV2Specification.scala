@@ -96,19 +96,19 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
       "AAUCVOCOBZFLfURuJuj21iJgASjQvAM23mv7tVou6+6LYG9l3/w8Zu3PQZcoDmkz3yU/mqiFs096Lu5f6yVf+kZXIlsAy3rx4HUSowAAAAAAAqOonQAAF8vvN3seAQABAEDckjd4IQexe7RX1/MU8IOp6W/n3DpUa1BgOKRENUYcKTCELzSA71sNELc3tWG8YYX8EWHUbdmnD8VDbJQMOi0M"
     ) ->
       Json.parse("""{
-                 |  "senderPublicKey" : "G7ZvtLKf7FitWFevdEaqs9fPaVnrLF4JrxteRwBSt3uE",
-                 |  "quantity" : 57274599543739043,
-                 |  "fee" : 44279965,
-                 |  "type" : 5,
-                 |  "version" : 2,
-                 |  "reissuable" : false,
-                 |  "sender" : "3N33A9YpVvk2eNCdUfABmUCTFAKDjvzhL23",
-                 |  "feeAssetId" : null,
-                 |  "chainId" : 84,
-                 |  "proofs" : [ "5Qmz5hWdaTD4jNSPvkF1dyZob3sesJp9ruHBNtGCp7fXgmUaXGtv6GWBt2Ed6Yf4gpMAF6PKXzfmKVhjUWq919Co" ],
-                 |  "assetId" : "G5LzjMfuvAYNEX3kcS1tDyBiaTgE6ta1nNTq8HVnYryY",
-                 |  "id" : "6G3Vne25wTUA9fC6H1tjXhXhYQkBvfPVgSZKn1a5mUPH",
-                 |  "timestamp" : 26164659190558
-                 |}""".stripMargin)
+                   |  "senderPublicKey" : "G7ZvtLKf7FitWFevdEaqs9fPaVnrLF4JrxteRwBSt3uE",
+                   |  "quantity" : 57274599543739043,
+                   |  "fee" : 44279965,
+                   |  "type" : 5,
+                   |  "version" : 2,
+                   |  "reissuable" : false,
+                   |  "sender" : "3N33A9YpVvk2eNCdUfABmUCTFAKDjvzhL23",
+                   |  "feeAssetId" : null,
+                   |  "chainId" : 84,
+                   |  "proofs" : [ "5Qmz5hWdaTD4jNSPvkF1dyZob3sesJp9ruHBNtGCp7fXgmUaXGtv6GWBt2Ed6Yf4gpMAF6PKXzfmKVhjUWq919Co" ],
+                   |  "assetId" : "G5LzjMfuvAYNEX3kcS1tDyBiaTgE6ta1nNTq8HVnYryY",
+                   |  "id" : "6G3Vne25wTUA9fC6H1tjXhXhYQkBvfPVgSZKn1a5mUPH",
+                   |  "timestamp" : 26164659190558
+                   |}""".stripMargin)
   )
 }

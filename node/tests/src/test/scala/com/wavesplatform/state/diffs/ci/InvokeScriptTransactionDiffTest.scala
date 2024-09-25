@@ -920,8 +920,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         s"Data entry key size = ${ContractLimits.MaxKeySizeInBytesByVersion(version) + 1} bytes " +
           s"must be less than ${ContractLimits.MaxKeySizeInBytesByVersion(version)}"
 
-      if (version == V3)
-        d.appendBlockE(ci) should produce(error)
+      if (version == V3) d.appendBlockE(ci) should produce(error)
       else if (version >= V6) {
         d.appendBlockE(ci) should produceRejectOrFailedDiff(error)
       } else {

@@ -30,48 +30,58 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
   private lazy val (dApp1, dAppAddress1)   = (secondKeyPair, secondAddress)
   private lazy val (dApp2, dAppAddress2)   = (thirdKeyPair, thirdAddress)
 
-  private val dAppScript1 = ScriptCompiler.compile(
-    s"""
-       |{-# STDLIB_VERSION 5 #-}
-       |{-# CONTENT_TYPE DAPP #-}
-       |{-# SCRIPT_TYPE ACCOUNT #-}
-       |
-       |@Callable (i)
-       |func foo() = {
-       |  strict inv = invoke(this, "bar", [], [AttachedPayment(unit, 100)])
-       |  ([], nil)
-       |}
-       |
-       |@Callable (i)
-       |func bar() = {
-       |  ([], nil)
-       |}
-       |
+  private val dAppScript1 = ScriptCompiler
+    .compile(
+      s"""
+         |{-# STDLIB_VERSION 5 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |
+         |@Callable (i)
+         |func foo() = {
+         |  strict inv = invoke(this, "bar", [], [AttachedPayment(unit, 100)])
+         |  ([], nil)
+         |}
+         |
+         |@Callable (i)
+         |func bar() = {
+         |  ([], nil)
+         |}
+         |
          """.stripMargin,
-    ScriptEstimatorV3.latest
-  ).explicitGet()._1.bytes().base64
+      ScriptEstimatorV3.latest
+    )
+    .explicitGet()
+    ._1
+    .bytes()
+    .base64
 
-  private val dAppScript2 = ScriptCompiler.compile(
-    s"""
-       |{-# STDLIB_VERSION 5 #-}
-       |{-# CONTENT_TYPE DAPP #-}
-       |{-# SCRIPT_TYPE ACCOUNT #-}
-       |
-       |@Callable (i)
-       |func foo() = {
-       |  strict inv = invoke(i.caller, "foo", [], [AttachedPayment(unit, 100)])
-       |  ([], nil)
-       |}
-       |
-       |@Callable (i)
-       |func bar() = {
-       |  strict inv = invoke(i.caller, "bar", [], [AttachedPayment(unit, 100)])
-       |  ([], nil)
-       |}
-       |
+  private val dAppScript2 = ScriptCompiler
+    .compile(
+      s"""
+         |{-# STDLIB_VERSION 5 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |
+         |@Callable (i)
+         |func foo() = {
+         |  strict inv = invoke(i.caller, "foo", [], [AttachedPayment(unit, 100)])
+         |  ([], nil)
+         |}
+         |
+         |@Callable (i)
+         |func bar() = {
+         |  strict inv = invoke(i.caller, "bar", [], [AttachedPayment(unit, 100)])
+         |  ([], nil)
+         |}
+         |
          """.stripMargin,
-    ScriptEstimatorV3.latest
-  ).explicitGet()._1.bytes().base64
+      ScriptEstimatorV3.latest
+    )
+    .explicitGet()
+    ._1
+    .bytes()
+    .base64
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()

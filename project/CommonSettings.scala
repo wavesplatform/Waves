@@ -14,23 +14,24 @@ object CommonSettings extends AutoPlugin {
 
   val assemblySettings: Seq[Def.Setting[?]] = Seq(
     assemblyJarName := s"${name.value}-all-${version.value}.jar",
-    test := {},
+    test            := {},
     assemblyMergeStrategy := {
-    case p
-        if p.endsWith(".proto") ||
-          p.endsWith("module-info.class") ||
-          p.endsWith("io.netty.versions.properties") ||
-          p.endsWith(".kotlin_module") =>
-      MergeStrategy.discard
+      case p
+          if p.endsWith(".proto") ||
+            p.endsWith("module-info.class") ||
+            p.endsWith("io.netty.versions.properties") ||
+            p.endsWith(".kotlin_module") =>
+        MergeStrategy.discard
 
-    case "scala-collection-compat.properties" =>
-      MergeStrategy.discard
+      case "scala-collection-compat.properties" =>
+        MergeStrategy.discard
 
-    case "logback.xml" | PathList("scala", "util", "control", "compat") | PathList("scala", "collection", "compat") |
-        PathList("swagger-ui", "openapi.yaml") =>
-      MergeStrategy.last
-    case other => (assembly / assemblyMergeStrategy).value(other)
-  })
+      case "logback.xml" | PathList("scala", "util", "control", "compat") | PathList("scala", "collection", "compat") |
+          PathList("swagger-ui", "openapi.yaml") =>
+        MergeStrategy.last
+      case other => (assembly / assemblyMergeStrategy).value(other)
+    }
+  )
 }
 
 trait CommonKeys {

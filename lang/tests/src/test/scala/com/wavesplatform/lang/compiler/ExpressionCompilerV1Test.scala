@@ -515,8 +515,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     DirectiveDictionary[StdLibVersion].all
       .foreach { version =>
         val result = ExpressionCompiler(getTestContext(version).compilerContext, version, expr(version))
-        if (version < V5)
-          result shouldBe Symbol("right")
+        if (version < V5) result shouldBe Symbol("right")
         else {
           val error = result.swap.getOrElse(???)
           error should include("A definition of 'UP' is not found")

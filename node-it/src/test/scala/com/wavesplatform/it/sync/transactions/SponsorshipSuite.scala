@@ -71,8 +71,10 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
 
     sponsorWavesBalance = sender.accountBalances(sponsorAddress)._2
     minerWavesBalance = sender.accountBalances(miner.address)._2
-    minerWavesBalanceAfterFirstXferTest = minerWavesBalance + 2 * issueFee + 2 * sponsorReducedFee + 2 * minFee + 2 * FeeValidation.FeeUnit * SmallFee / minSponsorFee
-    sponsorWavesBalanceAfterFirstXferTest = sponsorWavesBalance - 2 * issueFee - 2 * sponsorReducedFee - 2 * minFee - 2 * FeeValidation.FeeUnit * SmallFee / minSponsorFee
+    minerWavesBalanceAfterFirstXferTest =
+      minerWavesBalance + 2 * issueFee + 2 * sponsorReducedFee + 2 * minFee + 2 * FeeValidation.FeeUnit * SmallFee / minSponsorFee
+    sponsorWavesBalanceAfterFirstXferTest =
+      sponsorWavesBalance - 2 * issueFee - 2 * sponsorReducedFee - 2 * minFee - 2 * FeeValidation.FeeUnit * SmallFee / minSponsorFee
 
     firstSponsorAssetId = sender
       .issue(
@@ -168,7 +170,7 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         sender.assertAssetBalance(bobAddress, secondSponsorAssetId, 10 * Token)
 
         val aliceTxs = sender.transactionsByAddress(aliceAddress, 100)
-        aliceTxs.size shouldBe 5 //not 4, because there was one more transaction in IntegrationSuiteWithThreeAddresses class
+        aliceTxs.size shouldBe 5 // not 4, because there was one more transaction in IntegrationSuiteWithThreeAddresses class
         aliceTxs.count(tx => tx.sender.contains(aliceAddress) || tx.recipient.contains(aliceAddress)) shouldBe 5
         aliceTxs.map(_.id) should contain allElementsOf Seq(
           firstTransferTxToAlice,
@@ -188,7 +190,7 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         minerTxs.size shouldBe 4
 
         val sponsorTxs = sender.transactionsByAddress(sponsorAddress, 100)
-        sponsorTxs.size shouldBe 9 //TODO: bug?
+        sponsorTxs.size shouldBe 9 // TODO: bug?
         sponsorTxs.count(tx => tx.sender.contains(sponsorAddress) || tx.recipient.contains(sponsorAddress)) shouldBe 7
         sponsorTxs.map(_.id) should contain allElementsOf Seq(
           firstSponsorAssetId,
@@ -476,7 +478,8 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
       nodes.waitForHeightAriseAndTxPresent(aliceTransferWaves1)
       nodes.waitForHeightAriseAndTxPresent(aliceTransferWaves2)
 
-      val totalWavesFee = FeeValidation.FeeUnit * 2 * SmallFee / Token + 2 * issueFee + 2 * sponsorReducedFee + 2 * burnFee + 2 * minFee + 2 * issueFee
+      val totalWavesFee =
+        FeeValidation.FeeUnit * 2 * SmallFee / Token + 2 * issueFee + 2 * sponsorReducedFee + 2 * burnFee + 2 * minFee + 2 * issueFee
       miner.assertBalances(miner.address, minerBalance._1 + totalWavesFee, minerBalance._2 + totalWavesFee)
       sender.assertBalances(sponsorAddress, sponsorBalance._1 - totalWavesFee, sponsorBalance._2 - totalWavesFee)
       sender.assertAssetBalance(sponsorAddress, firstSponsorAssetId2, SmallFee + sponsorAssetTotal)

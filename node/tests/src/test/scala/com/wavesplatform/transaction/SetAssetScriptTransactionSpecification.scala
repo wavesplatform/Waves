@@ -95,21 +95,21 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
       ) ->
         Json.parse(
           """
-          |{
-          |  "senderPublicKey" : "FnHJjy1pBYrUY3KFdNH6uTJBscSAF5UwzrUJzqasEGEg",
-          |  "sender" : "3N7wSJNF2JzHRTURTTnDpGC3k862354135G",
-          |  "feeAssetId" : null,
-          |  "chainId" : 84,
-          |  "proofs" : [ "3jiSeBNS2Ggc98F4W9BoPJGaiKXCXNskKqhNtQy4EEGdHGnkBJMTGUzTHzukusR9guiaK7KTBd7MLFva4J95TjCN" ],
-          |  "assetId" : "2WVVbDwzjg4bSBJq3ykcKu2L1TmpChzygECpqUy6fFKT",
-          |  "fee" : 100400000,
-          |  "id" : "BZ5MPGipw7F9ZwsGwrrwNaMDbKcJh8VzywZqY8MNoAHE",
-          |  "type" : 15,
-          |  "version" : 1,
-          |  "script" : "base64:AQMDCQAAZAAAAAIAAAAAAAAAAAEAAAAAAAAAAAEDCQAAZAAAAAIAAAAAAAAAAAEAAAAAAAAAAAEDBgYGCgAAAAABaAYKAAAAAAF2BgYKAAAAAAFzBgoAAAAAAWEGCgAAAAABbwYKAAAAAAFsBgYHCQAAZAAAAAIAAAAAAAAAAAEAAAAAAAAAAAFHzRMG",
-          |  "timestamp" : 936748391133318382
-          |}
-          |""".stripMargin
+            |{
+            |  "senderPublicKey" : "FnHJjy1pBYrUY3KFdNH6uTJBscSAF5UwzrUJzqasEGEg",
+            |  "sender" : "3N7wSJNF2JzHRTURTTnDpGC3k862354135G",
+            |  "feeAssetId" : null,
+            |  "chainId" : 84,
+            |  "proofs" : [ "3jiSeBNS2Ggc98F4W9BoPJGaiKXCXNskKqhNtQy4EEGdHGnkBJMTGUzTHzukusR9guiaK7KTBd7MLFva4J95TjCN" ],
+            |  "assetId" : "2WVVbDwzjg4bSBJq3ykcKu2L1TmpChzygECpqUy6fFKT",
+            |  "fee" : 100400000,
+            |  "id" : "BZ5MPGipw7F9ZwsGwrrwNaMDbKcJh8VzywZqY8MNoAHE",
+            |  "type" : 15,
+            |  "version" : 1,
+            |  "script" : "base64:AQMDCQAAZAAAAAIAAAAAAAAAAAEAAAAAAAAAAAEDCQAAZAAAAAIAAAAAAAAAAAEAAAAAAAAAAAEDBgYGCgAAAAABaAYKAAAAAAF2BgYKAAAAAAFzBgoAAAAAAWEGCgAAAAABbwYKAAAAAAFsBgYHCQAAZAAAAAIAAAAAAAAAAAEAAAAAAAAAAAFHzRMG",
+            |  "timestamp" : 936748391133318382
+            |}
+            |""".stripMargin
         )
     )
 }

@@ -189,19 +189,19 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     val script = ScriptCompiler
       .compile(
         s"""
-         |  {-# STDLIB_VERSION 3       #-}
-         |  {-# CONTENT_TYPE   DAPP    #-}
-         |  {-# SCRIPT_TYPE    ACCOUNT #-}
-         |
-         |  @Verifier(tx)
-         |  func verify() = {
-         |    let block = extract(blockInfoByHeight(height))
-         |
-         |    let checkTs = lastBlock.timestamp == block.timestamp
-         |    let checkHeight = block.height == height
-         |    let checkHeightLast = lastBlock.height == height
-         |    checkTs && checkHeight && checkHeightLast
-         |  }
+           |  {-# STDLIB_VERSION 3       #-}
+           |  {-# CONTENT_TYPE   DAPP    #-}
+           |  {-# SCRIPT_TYPE    ACCOUNT #-}
+           |
+           |  @Verifier(tx)
+           |  func verify() = {
+           |    let block = extract(blockInfoByHeight(height))
+           |
+           |    let checkTs = lastBlock.timestamp == block.timestamp
+           |    let checkHeight = block.height == height
+           |    let checkHeightLast = lastBlock.height == height
+           |    checkTs && checkHeight && checkHeightLast
+           |  }
       """.stripMargin,
         estimator
       )

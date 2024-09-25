@@ -1,9 +1,21 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
-import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomIssuesArrayElement, randomStringArrayElement}
+import testHelpers.RandomDataGenerator.{
+  randomAddressDataArrayElement,
+  randomAliasDataArrayElement,
+  randomDigestAlgorithmTypeArrayElement,
+  randomIssuesArrayElement,
+  randomStringArrayElement
+}
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, CANT_FIND_FUNCTION, invalidFunctionError, oldVersions, versionsSupportingTheNewFeatures}
+import testHelpers.TestDataConstantsAndMethods.{
+  CANT_FIND_A_FUNCTION_OVERLOAD,
+  CANT_FIND_FUNCTION,
+  invalidFunctionError,
+  oldVersions,
+  versionsSupportingTheNewFeatures
+}
 import utest.{Tests, test}
 
 object CalculateLeaseId extends JsTestBase {
@@ -37,7 +49,7 @@ object CalculateLeaseId extends JsTestBase {
             (randomStringArrayElement, calculateLeaseId, CANT_FIND_A_FUNCTION_OVERLOAD),
             (randomDigestAlgorithmTypeArrayElement, calculateLeaseIdArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD),
             (randomAddressDataArrayElement, invalidCalculateLeaseId, invalidFunctionError("calculateLeaseId", 1)),
-            (randomAliasDataArrayElement, invalidCalculateLeaseId, invalidFunctionError("calculateLeaseId", 1)),
+            (randomAliasDataArrayElement, invalidCalculateLeaseId, invalidFunctionError("calculateLeaseId", 1))
           )
         ) {
           val script = precondition.codeForCalculateLeaseId(data, function)

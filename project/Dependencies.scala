@@ -41,8 +41,8 @@ object Dependencies {
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.4" % Test)
 
-  val sttp3      = "com.softwaremill.sttp.client3" %% "core" % "3.9.7"
-  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.9.7"
+  val sttp3      = "com.softwaremill.sttp.client3" %% "core"  % "3.9.7"
+  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix" % "3.9.7"
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.78.1"
 
@@ -86,7 +86,7 @@ object Dependencies {
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
     "org.scalacheck"    %% "scalacheck"      % "1.18.0",
     "org.mockito"        % "mockito-all"     % "1.10.19",
-    ("org.scalamock"     %% "scalamock"       % "6.0.0").cross(CrossVersion.for3Use2_13) // https://github.com/paulbutcher/ScalaMock/pull/490
+    ("org.scalamock"    %% "scalamock"       % "6.0.0").cross(CrossVersion.for3Use2_13) // https://github.com/paulbutcher/ScalaMock/pull/490
   ).map(_ % Test)
 
   lazy val qaseReportDeps = Seq(
@@ -105,7 +105,7 @@ object Dependencies {
   lazy val node = Def.setting(
     Seq(
       rocksdb,
-      ("org.rudogma"       %%% "supertagged"              % "2.0-RC2")
+      ("org.rudogma" %%% "supertagged" % "2.0-RC2")
         .exclude("org.scala-js", "scalajs-library_2.13")
         .cross(CrossVersion.for3Use2_13),
       "commons-net"          % "commons-net"              % "3.11.1",
@@ -137,7 +137,7 @@ object Dependencies {
   )
 
   lazy val nodeTests = Seq(
-    akkaModule("testkit")               % Test,
+    akkaModule("testkit")                                               % Test,
     akkaHttpModule("akka-http-testkit").cross(CrossVersion.for3Use2_13) % Test
   ) ++ test
 
@@ -172,11 +172,11 @@ object Dependencies {
       kamonModule("prometheus"),
       sttp3,
       sttp3Monix,
-      "org.scala-lang.modules"           %% "scala-xml"              % "2.3.0", // JUnit reports
+      "org.scala-lang.modules"            %% "scala-xml"              % "2.3.0", // JUnit reports
       (akkaHttpModule("akka-http-testkit") % Test).cross(CrossVersion.for3Use2_13),
-      "com.softwaremill.diffx"           %% "diffx-core"             % "0.9.0" % Test,
-      "com.softwaremill.diffx"           %% "diffx-scalatest-should" % "0.9.0" % Test,
-      grpcModule("grpc-inprocess")        % Test
+      "com.softwaremill.diffx"            %% "diffx-core"             % "0.9.0" % Test,
+      "com.softwaremill.diffx"            %% "diffx-scalatest-should" % "0.9.0" % Test,
+      grpcModule("grpc-inprocess")         % Test
     ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 

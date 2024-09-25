@@ -33,7 +33,7 @@ object MakeString_2C extends JsTestBase {
         (data, list, function, error) <- Seq(
           (randomStringArrayElement, stringList, invalidMakeString_2CFunction, invalidErrorMakeString_2C),
           (randomIssuesArrayElement, stringList, makeString_2C, nonMatchingTypes("String")),
-          (randomInt.toString, stringList, makeString_2CArgBeforeFunc, nonMatchingTypes("String")),
+          (randomInt.toString, stringList, makeString_2CArgBeforeFunc, nonMatchingTypes("String"))
         )
       ) {
         val script = precondition.simpleRideCode(data, list, function)
@@ -47,7 +47,7 @@ object MakeString_2C extends JsTestBase {
         for (
           (data, list, function) <- Seq(
             (randomStringArrayElement, stringList, makeString_2C),
-            (randomStringArrayElement, stringList, makeString_2CArgBeforeFunc),
+            (randomStringArrayElement, stringList, makeString_2CArgBeforeFunc)
           )
         ) {
           val script = precondition.simpleRideCode(data, list, function)

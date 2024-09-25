@@ -24,7 +24,7 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
     s"""
        |let self = Address(base58'$firstAddress')
        |
-      |match tx {
+       |match tx {
        |	case dtx: DataTransaction =>
        |		let v00 = extract(getBinary(self, "k0"))
        |		let v01 = extract(getBinary(self, "k1"))

@@ -62,11 +62,10 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
   def transactionName: String = "SetScriptTransaction"
 
   property("SetScriptTransaction id doesn't depend on proof (spec)") {
-    forAll(accountGen, proofsGen, proofsGen, contractOrExpr) {
-      case (acc: KeyPair, proofs1, proofs2, script) =>
-        val tx1 = SetScriptTransaction.create(1.toByte, acc.publicKey, Some(script), 1, 1, proofs1).explicitGet()
-        val tx2 = SetScriptTransaction.create(1.toByte, acc.publicKey, Some(script), 1, 1, proofs2).explicitGet()
-        tx1.id() shouldBe tx2.id()
+    forAll(accountGen, proofsGen, proofsGen, contractOrExpr) { case (acc: KeyPair, proofs1, proofs2, script) =>
+      val tx1 = SetScriptTransaction.create(1.toByte, acc.publicKey, Some(script), 1, 1, proofs1).explicitGet()
+      val tx2 = SetScriptTransaction.create(1.toByte, acc.publicKey, Some(script), 1, 1, proofs2).explicitGet()
+      tx1.id() shouldBe tx2.id()
     }
   }
 

@@ -47,7 +47,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val (balance2, eff2) = miner.accountBalances(secondAddress)
 
-      //secondAddress effective balance more than general balance
+      // secondAddress effective balance more than general balance
       assertBadRequestAndResponse(sender.lease(secondKeyPair, firstAddress, balance2 + 1.waves, minFee, version = v), errorMessage)
       nodes.waitForHeightArise()
 

@@ -12,10 +12,14 @@ class GetTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val txId = PBTransactions
       .vanilla(
         sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferAmount, minFee, waitForTx = true),
-      unsafe = false
-    ).explicitGet().id().toString
+        unsafe = false
+      )
+      .explicitGet()
+      .id()
+      .toString
     val transactionBySenderAndId = sender.getTransaction(sender = firstAddress, id = txId).getWavesTransaction
-    val transactionByRecipientAndId = sender.getTransaction(recipient = Some(Recipient().withPublicKeyHash(secondAddress)), id = txId).getWavesTransaction
+    val transactionByRecipientAndId =
+      sender.getTransaction(recipient = Some(Recipient().withPublicKeyHash(secondAddress)), id = txId).getWavesTransaction
     val transactionBySenderRecipientAndId =
       sender.getTransaction(sender = firstAddress, recipient = Some(Recipient().withPublicKeyHash(secondAddress)), id = txId).getWavesTransaction
 

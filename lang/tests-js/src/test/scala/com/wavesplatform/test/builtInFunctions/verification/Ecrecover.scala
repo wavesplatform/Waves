@@ -38,7 +38,7 @@ object Ecrecover extends JsTestBase {
             (randomUnionArrayElement, ecrecover, nonMatchingTypes("ByteVector")),
             (randomAddressDataArrayElement, ecrecoverArgBeforeFunc, nonMatchingTypes("ByteVector")),
             (randomByteVectorArrayElement, invalidEcrecover, invalidErrorEcrecover),
-            (randomByteVectorArrayElement, invalidEcrecoverArgBeforeFunc, invalidErrorEcrecover),
+            (randomByteVectorArrayElement, invalidEcrecoverArgBeforeFunc, invalidErrorEcrecover)
           )
         ) {
           val script = precondition.onlyMatcherContract(data, function)
@@ -49,7 +49,7 @@ object Ecrecover extends JsTestBase {
 
     test("RIDE-276. Can't find a function ecrecover") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.onlyMatcherContract(randomByteVectorArrayElement, ecrecover)
+      val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, ecrecover)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
     }
   }

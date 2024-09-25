@@ -12,7 +12,7 @@ import com.wavesplatform.common.utils.EitherExt2
 object ScriptReader {
 
   private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
-  private val checksumLength = 4
+  private val checksumLength     = 4
 
   def fromBytes(bytes: Array[Byte]): Either[ScriptParseError, Script] = {
     val checkSum         = bytes.takeRight(checksumLength)
@@ -34,7 +34,7 @@ object ScriptReader {
             else
               Right((contentTypes(bytes(1)), stdLibVersions(bytes(2)), 3))
           case v if !stdLibVersions.contains(v) => Left(ScriptParseError(s"Invalid version of script: $v"))
-          case v if v < V6.id => Right((Expression, stdLibVersions(v.toInt), 1))
+          case v if v < V6.id                   => Right((Expression, stdLibVersions(v.toInt), 1))
           case v =>
             if (bytes.length < 2)
               Left(ScriptParseError(s"Illegal length of script: ${bytes.length}"))

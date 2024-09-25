@@ -22,20 +22,20 @@ class LeaseTransactionSpecification extends PropSpec {
       "17RZzWQkD4AuKFYXkzg66BTVv7Fwp8nS3kNdmdkM3NfSFCVb9ZndDksiafmwrSDzAXmSZF7bZ7MnCzXdVopLrMnMUTa4E9Y48xCWn1op36wTCQppVD6VEYovPTm9UyVCTtWsGrA6Wk9sHXTaw9T1vhV76Mcsoq2zXe2CUBwCGnNxevSBGNSNp7EmnT7iVzVRsu1TKFFUdYVy9T6UnLc"
     )
     val json = Json.parse("""
-        |{
-        |  "senderPublicKey" : "D2gYkCwGYjoYhUTBTNzexhwRTtvoaKahytk7RwuUwH5d",
-        |  "amount" : 5023249666181,
-        |  "sender" : "3NA5AnR3UHvZQNuxPrVU4EBABn9vmMoL4cx",
-        |  "feeAssetId" : null,
-        |  "proofs" : [ "2CEU2jY9ExM7y1WRYp7EjREG3JkBhy87UUhu4UpUZxePpH3iqRNcBXx6L6rRnLxCnqJrXuGpWPJDc1LBnRRCtG6g" ],
-        |  "fee" : 34738831,
-        |  "recipient" : "3N1HWMWFprz1RkF9KQggeVGyvKn7SGJoqrt",
-        |  "id" : "CiqQ1F74XnEuE23rAN7r29vRQ78L5WDNSEeW4dE2bvrg",
-        |  "type" : 8,
-        |  "version" : 2,
-        |  "timestamp" : 5173516202896675941
-        |}
-        |""".stripMargin)
+                            |{
+                            |  "senderPublicKey" : "D2gYkCwGYjoYhUTBTNzexhwRTtvoaKahytk7RwuUwH5d",
+                            |  "amount" : 5023249666181,
+                            |  "sender" : "3NA5AnR3UHvZQNuxPrVU4EBABn9vmMoL4cx",
+                            |  "feeAssetId" : null,
+                            |  "proofs" : [ "2CEU2jY9ExM7y1WRYp7EjREG3JkBhy87UUhu4UpUZxePpH3iqRNcBXx6L6rRnLxCnqJrXuGpWPJDc1LBnRRCtG6g" ],
+                            |  "fee" : 34738831,
+                            |  "recipient" : "3N1HWMWFprz1RkF9KQggeVGyvKn7SGJoqrt",
+                            |  "id" : "CiqQ1F74XnEuE23rAN7r29vRQ78L5WDNSEeW4dE2bvrg",
+                            |  "type" : 8,
+                            |  "version" : 2,
+                            |  "timestamp" : 5173516202896675941
+                            |}
+                            |""".stripMargin)
 
     val tx = LeaseTxSerializer.parseBytes(bytes)
     tx.get.json() shouldBe json

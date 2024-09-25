@@ -92,8 +92,8 @@ class SerdeTest extends FreeSpec {
       "simple" in roundTripTest(caseObj, allowObjects = true)
     }
 
-    "general" in forAll(BOOLgen(10)) {
-      case (untypedExpr, _) => roundTripTest(untypedExpr)
+    "general" in forAll(BOOLgen(10)) { case (untypedExpr, _) =>
+      roundTripTest(untypedExpr)
     }
 
     "stack safety" in serializers.foreach { ser =>

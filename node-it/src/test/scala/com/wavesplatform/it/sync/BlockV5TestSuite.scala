@@ -54,7 +54,7 @@ class BlockV5TestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
     }
 
     "check block v5 at next height" in {
-      //Activation height + 1
+      // Activation height + 1
       nodes.head.waitForHeight(currentHeight + 1)
 
       val blockAfterVRFUsing = nodes.head.blockAt(currentHeight + 1)

@@ -3,7 +3,12 @@ package com.wavesplatform.test.builtInFunctions.verification.rsaVerify
 import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, randomUnionArrayElement}
+import testHelpers.RandomDataGenerator.{
+  randomAddressDataArrayElement,
+  randomByteVectorArrayElement,
+  randomDigestAlgorithmTypeArrayElement,
+  randomUnionArrayElement
+}
 import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_FUNCTION, actualVersionsWithoutV3, nonMatchingTypes}
 import utest.{Tests, test}
 
@@ -49,7 +54,7 @@ object RsaVerify_64Kb extends JsTestBase {
 
     test("RIDE-247. Can't find a function rsaVerify_64Kb for RIDE V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.onlyMatcherContract(randomByteVectorArrayElement, rsaVerify_64Kb)
+      val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, rsaVerify_64Kb)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
     }
   }

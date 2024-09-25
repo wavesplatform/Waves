@@ -22,7 +22,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
   private val inetAddressGen = Gen.listOfN(4, Arbitrary.arbitrary[Byte]).map(_.toArray).map(InetAddress.getByAddress)
   private val inetSocketAddressGen = for {
     address <- inetAddressGen
-    port    <- Gen.chooseNum(0, 0xFFFF)
+    port    <- Gen.chooseNum(0, 0xffff)
   } yield new InetSocketAddress(address, port)
 
   private val versionGen = for {
@@ -79,8 +79,8 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
       val result = Get(routePath("/all")) ~> route ~> runRoute
 
       check {
-        responseAs[AllPeers].peers should contain theSameElementsAs m.map {
-          case (address, timestamp) => Peer(address.toString, timestamp)
+        responseAs[AllPeers].peers should contain theSameElementsAs m.map { case (address, timestamp) =>
+          Peer(address.toString, timestamp)
         }
       }(result)
     }

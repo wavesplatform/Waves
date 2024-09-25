@@ -20,19 +20,23 @@ abstract class RouteSpec(basePath: String) extends FreeSpec with ScalatestRouteT
 
   implicit class RouteTestingOps(route: Route) {
 
-    /**
-      * Convenient utility for testing multi-routes created with the [[com.wavesplatform.api.http.CustomDirectives#anyParam(java.lang.String)]] directive
-      * @param baseUrl Base route URL
-      * @param paramName Parameter name
-      * @param values Values passed to routes
-      * @param doCheck Check response function
+    /** Convenient utility for testing multi-routes created with the [[com.wavesplatform.api.http.CustomDirectives#anyParam(java.lang.String)]]
+      * directive
+      * @param baseUrl
+      *   Base route URL
+      * @param paramName
+      *   Parameter name
+      * @param values
+      *   Values passed to routes
+      * @param doCheck
+      *   Check response function
       */
     def anyParamTest(baseUrl: String, paramName: String)(values: String*)(doCheck: => Unit): Unit = {
       withClue(s"$baseUrl GET with query params")(Get(s"$baseUrl?${values.map(v => s"$paramName=$v").mkString("&")}") ~> route ~> check {
         doCheck
       })
 
-      withClue(s"$baseUrl POST with form data")(Post(baseUrl, FormData(values.map(paramName -> _) *)) ~> route ~> check {
+      withClue(s"$baseUrl POST with form data")(Post(baseUrl, FormData(values.map(paramName -> _)*)) ~> route ~> check {
         doCheck
       })
 

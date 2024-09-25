@@ -50,17 +50,17 @@ class InvokePaymentsFeeSuite extends BaseTransactionSuite {
     ScriptCompiler
       .compile(
         s"""
-         | {-# STDLIB_VERSION 4       #-}
-         | {-# CONTENT_TYPE   DAPP    #-}
-         | {-# SCRIPT_TYPE    ACCOUNT #-}
-         |
-         | @Callable(i)
-         | func default() =
-         |   [
-         |     ScriptTransfer(i.caller, 1, base58'$assetId'),
-         |     Burn(base58'$assetId', 1),
-         |     Reissue(base58'$assetId', 1, false)
-         |   ]
+           | {-# STDLIB_VERSION 4       #-}
+           | {-# CONTENT_TYPE   DAPP    #-}
+           | {-# SCRIPT_TYPE    ACCOUNT #-}
+           |
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     ScriptTransfer(i.caller, 1, base58'$assetId'),
+           |     Burn(base58'$assetId', 1),
+           |     Reissue(base58'$assetId', 1, false)
+           |   ]
        """.stripMargin,
         ScriptEstimatorV3.latest
       )

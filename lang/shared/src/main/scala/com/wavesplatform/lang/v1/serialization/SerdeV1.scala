@@ -91,39 +91,36 @@ object SerdeV1 extends Serde[ByteBuffer, ByteArrayOutputStream] {
       case E_FUNCALL =>
         Coeval
           .now((bb.getFunctionHeader, bb.getInt))
-          .flatMap {
-            case (header, argc) =>
-              if (argc <= (bb.limit() - bb.position()) && argc >= 0) {
-                val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAuxR(bb, allowObjects, acc)).toList
-                args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
-              } else {
-                tooBigArray(bb)
-              }
+          .flatMap { case (header, argc) =>
+            if (argc <= (bb.limit() - bb.position()) && argc >= 0) {
+              val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAuxR(bb, allowObjects, acc)).toList
+              args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
+            } else {
+              tooBigArray(bb)
+            }
           }
       case E_ARR =>
         Coeval
           .now(bb.getInt)
-          .flatMap(
-            argsCount =>
-              if (argsCount <= (bb.limit() - bb.position()) && argsCount >= 0)
-                (1 to argsCount)
-                  .to(LazyList)
-                  .traverse(_ => evaluatedOnly(desAuxR(bb, allowObjects, acc)))
-                  .map(elements => ARR(elements.toIndexedSeq, limited = false).explicitGet())
-              else
-                tooBigArray(bb)
+          .flatMap(argsCount =>
+            if (argsCount <= (bb.limit() - bb.position()) && argsCount >= 0)
+              (1 to argsCount)
+                .to(LazyList)
+                .traverse(_ => evaluatedOnly(desAuxR(bb, allowObjects, acc)))
+                .map(elements => ARR(elements.toIndexedSeq, limited = false).explicitGet())
+            else
+              tooBigArray(bb)
           )
       case E_CASE_OBJ if allowObjects =>
         for {
           (typeName, fieldsNumber) <- Coeval((bb.getString, bb.getInt))
           fields <- (1 to fieldsNumber)
             .to(LazyList)
-            .traverse(
-              _ =>
-                for {
-                  fieldName  <- Coeval.now(bb.getString)
-                  fieldValue <- evaluatedOnly(desAuxR(bb, allowObjects, acc))
-                } yield (fieldName, fieldValue)
+            .traverse(_ =>
+              for {
+                fieldName  <- Coeval.now(bb.getString)
+                fieldValue <- evaluatedOnly(desAuxR(bb, allowObjects, acc))
+              } yield (fieldName, fieldValue)
             )
         } yield CaseObj(CASETYPEREF(typeName, Nil), fields.toMap)
     }
@@ -138,10 +135,11 @@ object SerdeV1 extends Serde[ByteBuffer, ByteArrayOutputStream] {
     val res = Try(desAux(bb, allowObjects).value()).toEither.left
       .map(_.getMessage)
     (if (all)
-      res.flatMap { r =>
-        if (bb.hasRemaining) Left(s"${bb.remaining()} bytes left")
-        else Right(r)
-      } else res)
+       res.flatMap { r =>
+         if (bb.hasRemaining) Left(s"${bb.remaining()} bytes left")
+         else Right(r)
+       }
+     else res)
       .map((_, bb.remaining()))
   }
 
@@ -151,7 +149,7 @@ object SerdeV1 extends Serde[ByteBuffer, ByteArrayOutputStream] {
   def deserializeFunctionCall(bb: ByteBuffer): Either[Throwable, FUNCTION_CALL] =
     Try(desAux(bb).value()).toEither.flatMap {
       case fc: FUNCTION_CALL => Right(fc)
-      case other => Left(new RuntimeException(s"Not a function call: $other"))
+      case other             => Left(new RuntimeException(s"Not a function call: $other"))
     }
 
   def deserializeFunctionCall(bb: Array[Byte]): Either[Throwable, FUNCTION_CALL] =
@@ -226,12 +224,11 @@ object SerdeV1 extends Serde[ByteBuffer, ByteArrayOutputStream] {
           out.writeString(caseType.name)
           out.writeInt(fields.size)
         }
-        fields.foldLeft(dataInfo) {
-          case (acc, (fieldName, fieldValue)) =>
-            for {
-              _ <- Coeval.now(out.writeString(fieldName))
-              r <- serAux(out, acc, fieldValue, allowObjects)
-            } yield r
+        fields.foldLeft(dataInfo) { case (acc, (fieldName, fieldValue)) =>
+          for {
+            _ <- Coeval.now(out.writeString(fieldName))
+            r <- serAux(out, acc, fieldValue, allowObjects)
+          } yield r
         }
 
       case x =>

@@ -11,7 +11,7 @@ object Keccak256 extends JsTestBase {
   private val keccak256ArgBeforeFunc        = "callerTestData.keccak256()"
   private val invalidKeccak256              = "keccak256()"
   private val invalidKeccak256ArgBeforeFunc = "callerTestData.keccak256(callerTestData)"
-  private val invalidErrorKeccak256  = testData.invalidFunctionError("keccak256", 1)
+  private val invalidErrorKeccak256         = testData.invalidFunctionError("keccak256", 1)
 
   val tests: Tests = Tests {
     test("RIDE-132. Function Keccak256 should compile for valid ByteVector") {

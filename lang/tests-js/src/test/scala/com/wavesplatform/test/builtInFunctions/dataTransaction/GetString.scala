@@ -4,28 +4,37 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{dataEntryForTests, randomBoolean, randomInt, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, GreaterV3ResultStringEntry, actualVersionsWithoutV3, binaryEntryForTests, booleanEntryForTests, integerEntryForTests, rideV3Result, stringEntryForTests}
+import testHelpers.TestDataConstantsAndMethods.{
+  CANT_FIND_A_FUNCTION_OVERLOAD,
+  GreaterV3ResultStringEntry,
+  actualVersionsWithoutV3,
+  binaryEntryForTests,
+  booleanEntryForTests,
+  integerEntryForTests,
+  rideV3Result,
+  stringEntryForTests
+}
 import utest.{Tests, test}
 
 object GetString extends JsTestBase {
   // getStringKey
-  private val getStringKey = s"getString(callerTestData, \"key\")"
+  private val getStringKey              = s"getString(callerTestData, \"key\")"
   private val getStringKeyArgBeforeFunc = s"callerTestData.getString(\"key\")"
   // getStringIndex
-  private val getStringIndex = s"getString(callerTestData, $randomInt)"
+  private val getStringIndex              = s"getString(callerTestData, $randomInt)"
   private val getStringIndexArgBeforeFunc = s"callerTestData.getString($randomInt)"
   // getStringValueKey
-  private val getStringValueKey = s"getStringValue(callerTestData, \"key\")"
+  private val getStringValueKey              = s"getStringValue(callerTestData, \"key\")"
   private val getStringValueKeyArgBeforeFunc = s"callerTestData.getStringValue(\"key\")"
   // getStringValueIndex
-  private val getStringValueIndex = s"getStringValue(callerTestData, $randomInt)"
+  private val getStringValueIndex              = s"getStringValue(callerTestData, $randomInt)"
   private val getStringValueIndexArgBeforeFunc = s"callerTestData.getStringValue($randomInt)"
 
   // invalid getString
-  private val invalidGetStringKey = s"getString()"
+  private val invalidGetStringKey           = s"getString()"
   private val invalidGetStringArgBeforeFunc = s"callerTestData.getString()"
   // invalid getStringValue
-  private val invalidGetStringValue = s"getStringValue()"
+  private val invalidGetStringValue              = s"getStringValue()"
   private val invalidGetStringValueArgBeforeFunc = s"callerTestData.getStringValue()"
 
   val tests: Tests = Tests {

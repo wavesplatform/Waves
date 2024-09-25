@@ -44,8 +44,8 @@ class TypeCastTest extends EvaluatorSpec {
   property("exactAs") {
     eval(
       """
-         | func f(a: Any) = a.exactAs[Int] + 1
-         | f(5) == 6
+        | func f(a: Any) = a.exactAs[Int] + 1
+        | f(5) == 6
       """.stripMargin
     ) shouldBe Right(CONST_BOOLEAN(true))
   }
@@ -74,8 +74,8 @@ class TypeCastTest extends EvaluatorSpec {
   property("exactAs error") {
     eval(
       """
-         | func f(a: Any) = a.exactAs[Int]
-         | f("")
+        | func f(a: Any) = a.exactAs[Int]
+        | f("")
       """.stripMargin
     )(V6) shouldBe Left("String couldn't be cast to Int")
   }

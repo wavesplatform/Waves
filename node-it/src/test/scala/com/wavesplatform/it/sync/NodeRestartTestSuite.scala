@@ -71,31 +71,31 @@ class NodeRestartTestSuite extends BaseFreeSpec with WaitForHeight2 {
 object NodeRestartTestSuite {
   import com.wavesplatform.it.NodeConfigs._
   private val FirstNode = ConfigFactory.parseString(s"""
-                                                         |waves {
-                                                         |  synchronization.synchronization-timeout = 10s
-                                                         |  blockchain.custom.functionality {
-                                                         |    pre-activated-features.1 = 0
-                                                         |  }
-                                                         |  miner.quorum = 0
-                                                         |  wallet {
-                                                         |     file = "/tmp/wallet.dat"
-                                                         |     password = "bla"
-                                                         |  }
-                                                         |
-                                                         |}""".stripMargin)
+                                                       |waves {
+                                                       |  synchronization.synchronization-timeout = 10s
+                                                       |  blockchain.custom.functionality {
+                                                       |    pre-activated-features.1 = 0
+                                                       |  }
+                                                       |  miner.quorum = 0
+                                                       |  wallet {
+                                                       |     file = "/tmp/wallet.dat"
+                                                       |     password = "bla"
+                                                       |  }
+                                                       |
+                                                       |}""".stripMargin)
 
   private val SecondNode = ConfigFactory.parseString(s"""
-                                                            |waves {
-                                                            |  synchronization.synchronization-timeout = 10s
-                                                            |  blockchain.custom.functionality {
-                                                            |    pre-activated-features.1 = 0
-                                                            |  }
-                                                            |  miner.enable = no
-                                                            |  wallet {
-                                                            |     file = "/tmp/wallet.dat"
-                                                            |     password = "bla"
-                                                            |  }
-                                                            |}""".stripMargin)
+                                                        |waves {
+                                                        |  synchronization.synchronization-timeout = 10s
+                                                        |  blockchain.custom.functionality {
+                                                        |    pre-activated-features.1 = 0
+                                                        |  }
+                                                        |  miner.enable = no
+                                                        |  wallet {
+                                                        |     file = "/tmp/wallet.dat"
+                                                        |     password = "bla"
+                                                        |  }
+                                                        |}""".stripMargin)
 
   val Configs: Seq[Config] = Seq(
     FirstNode.withFallback(Default.head),

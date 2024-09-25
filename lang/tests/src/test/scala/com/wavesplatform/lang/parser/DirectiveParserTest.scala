@@ -13,9 +13,9 @@ class DirectiveParserTest extends PropSpec {
     parse("{-# STDLIB_VERSION 1 #-}") shouldBe Right(List(Directive(STDLIB_VERSION, V1)))
 
     parse("""
-        |
-        |{-# STDLIB_VERSION 1 #-}
-        |
+            |
+            |{-# STDLIB_VERSION 1 #-}
+            |
       """.stripMargin) shouldBe Right(List(Directive(STDLIB_VERSION, V1)))
 
     parse("""
@@ -34,34 +34,34 @@ class DirectiveParserTest extends PropSpec {
   property("parse directives with wrong key should produce error") {
     val wrongKey = "WRONG_DIRECTIVE_KEY"
     parse(s"""
-            |
-            |{-# $wrongKey VALUE #-}
-            |
+             |
+             |{-# $wrongKey VALUE #-}
+             |
       """.stripMargin) shouldBe Left("Illegal directive key " + wrongKey)
 
     parse(s"""
-            |
-            |{-# STDLIB_VERSION 1 #-}
-            |{-# CONTENT_TYPE EXPRESSION #-}
-            |{-# $wrongKey VALUE #-}
-            |
+             |
+             |{-# STDLIB_VERSION 1 #-}
+             |{-# CONTENT_TYPE EXPRESSION #-}
+             |{-# $wrongKey VALUE #-}
+             |
       """.stripMargin) shouldBe Left("Illegal directive key " + wrongKey)
   }
 
   property("parse directives with existing key and wrong value should produce error") {
     val wrongValue = "WRONG"
     parse(s"""
-            |
-            |{-# SCRIPT_TYPE $wrongValue #-}
-            |
+             |
+             |{-# SCRIPT_TYPE $wrongValue #-}
+             |
       """.stripMargin) shouldBe Left(s"Illegal directive value $wrongValue for key SCRIPT_TYPE")
 
     parse(s"""
-            |
-            |{-# STDLIB_VERSION 1 #-}
-            |{-# CONTENT_TYPE EXPRESSION #-}
-            |{-# SCRIPT_TYPE $wrongValue #-}
-            |
+             |
+             |{-# STDLIB_VERSION 1 #-}
+             |{-# CONTENT_TYPE EXPRESSION #-}
+             |{-# SCRIPT_TYPE $wrongValue #-}
+             |
       """.stripMargin) shouldBe Left(s"Illegal directive value $wrongValue for key SCRIPT_TYPE")
   }
 
@@ -93,11 +93,13 @@ class DirectiveParserTest extends PropSpec {
          |
          | {-# SCRIPT_TYPE  ASSET #-}
       """.stripMargin
-    ) shouldBe Right(List(
-      Directive(STDLIB_VERSION, V3),
-      Directive(CONTENT_TYPE, Expression),
-      Directive(SCRIPT_TYPE, Asset)
-    ))
+    ) shouldBe Right(
+      List(
+        Directive(STDLIB_VERSION, V3),
+        Directive(CONTENT_TYPE, Expression),
+        Directive(SCRIPT_TYPE, Asset)
+      )
+    )
   }
 
   property("dashes, spaces, dots, underscores") {

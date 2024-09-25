@@ -27,7 +27,9 @@ class ByteStrTest extends wordspec.AnyWordSpec with matchers.should.Matchers {
     }
 
     "be correctly concatenated with another one" in {
-      ByteStr(Array[Byte](1, 2, 3)) ++ ByteStr(Array[Byte](4, 5, 6)) shouldBe ByteStr(getSeqBytesArr(6)) // ByteVector(Array[Byte](1, 2, 3)) ++ ByteVector(Array[Byte](4, 5, 6))
+      ByteStr(Array[Byte](1, 2, 3)) ++ ByteStr(Array[Byte](4, 5, 6)) shouldBe ByteStr(
+        getSeqBytesArr(6)
+      ) // ByteVector(Array[Byte](1, 2, 3)) ++ ByteVector(Array[Byte](4, 5, 6))
     }
 
     "correctly take several bytes" in {

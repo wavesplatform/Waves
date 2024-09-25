@@ -33,7 +33,7 @@ object Split_4C extends JsTestBase {
         (data, list, function, error) <- Seq(
           (randomIssuesArrayElement, randomStringArrayElement, split_4C, nonMatchingTypes("String")),
           (randomInt.toString, randomStringArrayElement, split_4CArgBeforeFunc, nonMatchingTypes("String")),
-          (randomStringArrayElement, randomStringArrayElement, invalidSplit_4C, invalidErrorSplit_4C),
+          (randomStringArrayElement, randomStringArrayElement, invalidSplit_4C, invalidErrorSplit_4C)
         )
       ) {
         val script = precondition.simpleRideCode(data, list, function)
@@ -47,7 +47,7 @@ object Split_4C extends JsTestBase {
         for (
           (data, list, function) <- Seq(
             (randomStringArrayElement, randomStringArrayElement, split_4C),
-            (randomStringArrayElement, randomStringArrayElement, split_4CArgBeforeFunc),
+            (randomStringArrayElement, randomStringArrayElement, split_4CArgBeforeFunc)
           )
         ) {
           val script = precondition.simpleRideCode(data, list, function)

@@ -26,8 +26,8 @@ class OneProofForNonScriptedAccountTest extends PropSpec with WithState {
 
     val (genesis, _, transfer) = s
     val transferWithExtraProof = transfer.copy(proofs = Proofs(Seq(ByteStr.empty, ByteStr(Array(1: Byte)))))
-    assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transferWithExtraProof)), smartEnabledFS)(
-      snapshotEi => snapshotEi should produce("must have exactly 1 proof")
+    assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transferWithExtraProof)), smartEnabledFS)(snapshotEi =>
+      snapshotEi should produce("must have exactly 1 proof")
     )
   }
 

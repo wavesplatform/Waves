@@ -22,41 +22,41 @@ class ObservedLoadingCacheSpecification extends FreeSpec with MockFactory {
     "on refresh" in test { (loadingCache, changes, _) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
 
-        loadingCache.refresh("foo")
+      loadingCache.refresh("foo")
     }
 
     "on put" in test { (loadingCache, changes, _) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
 
-        loadingCache.put("foo", 10)
+      loadingCache.put("foo", 10)
     }
 
     "on putAll" in test { (loadingCache, changes, _) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
       (changes.onNext _).expects("bar").returning(Future.successful(Ack.Continue)).once()
 
-        loadingCache.putAll(Map[String, Integer]("foo" -> 10, "bar" -> 11).asJava)
+      loadingCache.putAll(Map[String, Integer]("foo" -> 10, "bar" -> 11).asJava)
     }
 
     "on invalidate" in test { (loadingCache, changes, _) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
 
-        loadingCache.invalidate("foo")
+      loadingCache.invalidate("foo")
     }
 
     "on invalidateAll" in test { (loadingCache, changes, _) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
       (changes.onNext _).expects("bar").returning(Future.successful(Ack.Continue)).once()
 
-        loadingCache.invalidateAll(Seq("foo", "bar").asJava)
+      loadingCache.invalidateAll(Seq("foo", "bar").asJava)
     }
   }
 
   "don't notify" - {
     "on cache expiration" in test { (loadingCache, changes, ticker) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
-        loadingCache.put("foo", 1)
-        ticker.advance(ExpiringTime.toMillis + 100, TimeUnit.MILLISECONDS)
+      loadingCache.put("foo", 1)
+      ticker.advance(ExpiringTime.toMillis + 100, TimeUnit.MILLISECONDS)
     }
   }
 

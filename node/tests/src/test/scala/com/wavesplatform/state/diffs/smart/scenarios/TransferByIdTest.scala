@@ -38,13 +38,12 @@ class TransferByIdTest extends PropSpec with WithState {
   }
 
   property("Transfer by id works fine") {
-    preconditions.foreach {
-      case (genesis, transfer, setScript, data) =>
-        assertDiffEi(
-          Seq(TestBlock.create(Seq(genesis, transfer))),
-          TestBlock.create(Seq(setScript, data)),
-          smartEnabledFS
-        )(_ shouldBe an[Right[_, _]])
+    preconditions.foreach { case (genesis, transfer, setScript, data) =>
+      assertDiffEi(
+        Seq(TestBlock.create(Seq(genesis, transfer))),
+        TestBlock.create(Seq(setScript, data)),
+        smartEnabledFS
+      )(_ shouldBe an[Right[_, _]])
     }
   }
 

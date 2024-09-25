@@ -29,13 +29,16 @@ class FractionIntBenchmark {
   def fraction3(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3, LogExtraInfo(), V5, true, true, false, true))
 
   @Benchmark
-  def fraction1Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1Round, LogExtraInfo(), V5, true, true, false, true))
+  def fraction1Round(bh: Blackhole, s: St): Unit =
+    bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1Round, LogExtraInfo(), V5, true, true, false, true))
 
   @Benchmark
-  def fraction2Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2Round, LogExtraInfo(), V5, true, true, false, true))
+  def fraction2Round(bh: Blackhole, s: St): Unit =
+    bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2Round, LogExtraInfo(), V5, true, true, false, true))
 
   @Benchmark
-  def fraction3Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3Round, LogExtraInfo(), V5, true, true, false, true))
+  def fraction3Round(bh: Blackhole, s: St): Unit =
+    bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3Round, LogExtraInfo(), V5, true, true, false, true))
 }
 
 @State(Scope.Benchmark)

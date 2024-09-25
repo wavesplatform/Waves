@@ -154,7 +154,7 @@ class UtxSuite extends BaseFunSuite {
           .explicitGet()
       }
       val byDApp = (1 to 5).map { i =>
-          utils.Signed.invokeScript(TxVersion.V1, invokeAccount, whitelistedDAppAccount.toAddress, None, Seq.empty, minInvokeFee + i, Waves, time)
+        utils.Signed.invokeScript(TxVersion.V1, invokeAccount, whitelistedDAppAccount.toAddress, None, Seq.empty, minInvokeFee + i, Waves, time)
       }
       bySender ++ byDApp
     }
@@ -164,7 +164,9 @@ class UtxSuite extends BaseFunSuite {
     miner.waitForEmptyUtx()
     val endHeight = miner.height
 
-    miner.blockSeq(startHeight, endHeight).flatMap(_.transactions).map(_.id).take(10) should contain theSameElementsAs whitelistedTxs.map(_.id().toString)
+    miner.blockSeq(startHeight, endHeight).flatMap(_.transactions).map(_.id).take(10) should contain theSameElementsAs whitelistedTxs.map(
+      _.id().toString
+    )
   }
 
   def txInBlockchain(txId: String, nodes: Seq[Node]): Boolean = {

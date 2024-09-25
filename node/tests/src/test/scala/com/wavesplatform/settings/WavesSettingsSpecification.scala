@@ -43,10 +43,10 @@ class WavesSettingsSpecification extends FlatSpec {
 
   "WavesSettings" should "resolve folders correctly" in {
     val config = loadConfig(ConfigFactory.parseString(s"""waves {
-         |  directory = "/xxx"
-         |  data-directory = "/xxx/data"
-         |  ntp-server = "example.com"
-         |}""".stripMargin))
+                                                         |  directory = "/xxx"
+                                                         |  data-directory = "/xxx/data"
+                                                         |  ntp-server = "example.com"
+                                                         |}""".stripMargin))
 
     val settings = WavesSettings.fromRootConfig(config.resolve())
 

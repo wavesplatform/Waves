@@ -24,10 +24,9 @@ class DataTransactionSpecification extends PropSpec {
     parsed.timestamp shouldEqual tx.timestamp
     parsed.fee shouldEqual tx.fee
 
-    parsed.data.zip(tx.data).foreach {
-      case (r, t) =>
-        r.key shouldEqual t.key
-        r.value shouldEqual t.value
+    parsed.data.zip(tx.data).foreach { case (r, t) =>
+      r.key shouldEqual t.key
+      r.value shouldEqual t.value
     }
 
     parsed.bytes() shouldEqual tx.bytes()
@@ -42,35 +41,35 @@ class DataTransactionSpecification extends PropSpec {
       "AAwB1SiqvsNcoQDYfHt6EoYy+vGc1EUxgZRXRFEToyoh7yIAAwADaW50AAAAAAAAAAAYAARib29sAQEABGJsb2ICAAVhbGljZQAAAWODBPoKAAAAAAABhqABAAEAQGWOW7SpwumpOCG4fGjUQXv5VRNt1PRVH8+C5J1OyNjxNwJpmm06hc7D143OEcxpzQakHhC5lb09xQ7wtesPa4s="
     )
     val json = Json.parse("""{
-        |  "type": 12,
-        |  "id": "87SfuGJXH1cki2RGDH7WMTGnTXeunkc5mEjNKmmMdRzM",
-        |  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
-        |  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
-        |  "fee": 100000,
-        |  "feeAssetId": null,
-        |  "timestamp": 1526911531530,
-        |  "proofs": [
-        |    "32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94"
-        |  ],
-        |  "version": 1,
-        |  "data": [
-        |    {
-        |      "key": "int",
-        |      "type": "integer",
-        |      "value": 24
-        |    },
-        |    {
-        |      "key": "bool",
-        |      "type": "boolean",
-        |      "value": true
-        |    },
-        |    {
-        |      "key": "blob",
-        |      "type": "binary",
-        |      "value": "base64:YWxpY2U="
-        |    }
-        |  ]
-        |}""".stripMargin)
+                            |  "type": 12,
+                            |  "id": "87SfuGJXH1cki2RGDH7WMTGnTXeunkc5mEjNKmmMdRzM",
+                            |  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                            |  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                            |  "fee": 100000,
+                            |  "feeAssetId": null,
+                            |  "timestamp": 1526911531530,
+                            |  "proofs": [
+                            |    "32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94"
+                            |  ],
+                            |  "version": 1,
+                            |  "data": [
+                            |    {
+                            |      "key": "int",
+                            |      "type": "integer",
+                            |      "value": 24
+                            |    },
+                            |    {
+                            |      "key": "bool",
+                            |      "type": "boolean",
+                            |      "value": true
+                            |    },
+                            |    {
+                            |      "key": "blob",
+                            |      "type": "binary",
+                            |      "value": "base64:YWxpY2U="
+                            |    }
+                            |  ]
+                            |}""".stripMargin)
 
     val tx = DataTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
@@ -86,18 +85,17 @@ class DataTransactionSpecification extends PropSpec {
 
   property("unknown type handing") {
     val badTypeIdGen = Gen.choose[Int](DataEntry.Type.maxId + 1, Byte.MaxValue)
-    forAll(dataTransactionGen, badTypeIdGen) {
-      case (tx, badTypeId) =>
-        val bytes      = tx.bytes()
-        val entryCount = Shorts.fromByteArray(bytes.drop(35))
-        if (entryCount > 0) {
-          val key1Length = Shorts.fromByteArray(bytes.drop(37))
-          val p          = 39 + key1Length
-          bytes(p) = badTypeId.toByte
-          val parsed = DataTransaction.parseBytes(bytes)
-          parsed.isFailure shouldBe true
-          parsed.failed.get.getMessage shouldBe s"Unknown type $badTypeId"
-        }
+    forAll(dataTransactionGen, badTypeIdGen) { case (tx, badTypeId) =>
+      val bytes      = tx.bytes()
+      val entryCount = Shorts.fromByteArray(bytes.drop(35))
+      if (entryCount > 0) {
+        val key1Length = Shorts.fromByteArray(bytes.drop(37))
+        val p          = 39 + key1Length
+        bytes(p) = badTypeId.toByte
+        val parsed = DataTransaction.parseBytes(bytes)
+        parsed.isFailure shouldBe true
+        parsed.failed.get.getMessage shouldBe s"Unknown type $badTypeId"
+      }
     }
   }
 
@@ -111,16 +109,15 @@ class DataTransactionSpecification extends PropSpec {
       req.fee shouldEqual tx.fee.value
       req.timestamp shouldEqual tx.timestamp
 
-      req.data zip tx.data foreach {
-        case (re, te) =>
-          re match {
-            case BinaryDataEntry(k, v) =>
-              k shouldEqual te.key
-              v shouldEqual te.value
-            case _: DataEntry[_] =>
-              re shouldEqual te
-            case _ => fail()
-          }
+      req.data zip tx.data foreach { case (re, te) =>
+        re match {
+          case BinaryDataEntry(k, v) =>
+            k shouldEqual te.key
+            v shouldEqual te.value
+          case _: DataEntry[_] =>
+            re shouldEqual te
+          case _ => fail()
+        }
       }
     }
   }
@@ -128,52 +125,50 @@ class DataTransactionSpecification extends PropSpec {
   property("positive validation cases") {
     import DataTransaction.MaxEntryCount
     import com.wavesplatform.state._
-    forAll(dataTransactionGen, dataEntryGen(500)) {
-      case (DataTransaction(version, sender, _, fee, timestamp, proofs, chainId), _) =>
-        def check(data: List[DataEntry[_]]): Assertion = {
-          val txEi = DataTransaction.create(version, sender, data, fee.value, timestamp, proofs)
-          txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs, chainId))
-          checkSerialization(txEi.explicitGet())
-        }
+    forAll(dataTransactionGen, dataEntryGen(500)) { case (DataTransaction(version, sender, _, fee, timestamp, proofs, chainId), _) =>
+      def check(data: List[DataEntry[_]]): Assertion = {
+        val txEi = DataTransaction.create(version, sender, data, fee.value, timestamp, proofs)
+        txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs, chainId))
+        checkSerialization(txEi.explicitGet())
+      }
 
-        check(List.empty)                                                               // no data
-        check(List.tabulate(MaxEntryCount)(n => IntegerDataEntry(n.toString, n)))       // maximal data
-        check(List.tabulate(30)(n => StringDataEntry(n.toString, "a" * 5109)))          // maximal data
-        check(List(IntegerDataEntry("a" * MaxKeySize, 0xa)))                            // max key size
-        check(List(BinaryDataEntry("bin", ByteStr.empty)))                              // empty binary
-        check(List(BinaryDataEntry("bin", ByteStr(Array.fill(MaxValueSize)(1: Byte))))) // max binary value size
-        check(List(StringDataEntry("str", "")))                                         // empty string
-        check(List(StringDataEntry("str", "A" * MaxValueSize)))                         // max string size
+      check(List.empty)                                                               // no data
+      check(List.tabulate(MaxEntryCount)(n => IntegerDataEntry(n.toString, n)))       // maximal data
+      check(List.tabulate(30)(n => StringDataEntry(n.toString, "a" * 5109)))          // maximal data
+      check(List(IntegerDataEntry("a" * MaxKeySize, 0xa)))                            // max key size
+      check(List(BinaryDataEntry("bin", ByteStr.empty)))                              // empty binary
+      check(List(BinaryDataEntry("bin", ByteStr(Array.fill(MaxValueSize)(1: Byte))))) // max binary value size
+      check(List(StringDataEntry("str", "")))                                         // empty string
+      check(List(StringDataEntry("str", "A" * MaxValueSize)))                         // max string size
     }
   }
 
   property("negative validation cases") {
     val gen = Arbitrary.arbBool.arbitrary.flatMap(proto => dataTransactionGen(DataTransaction.MaxEntryCount, withDeleteEntry = proto))
-    forAll(gen) {
-      case tx @ DataTransaction(version, sender, data, fee, timestamp, proofs, _) =>
-        val emptyKey   = List(IntegerDataEntry("", 2))
-        val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee.value, timestamp, proofs)
-        emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)
+    forAll(gen) { case tx @ DataTransaction(version, sender, data, fee, timestamp, proofs, _) =>
+      val emptyKey   = List(IntegerDataEntry("", 2))
+      val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee.value, timestamp, proofs)
+      emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)
 
-        val maxKeySize   = MaxPBKeySize
-        val keyTooLong   = data :+ BinaryDataEntry("a" * (maxKeySize + 1), ByteStr(Array(1, 2)))
-        val keyTooLongEi = DataTransaction.create(version, sender, keyTooLong, fee.value, timestamp, proofs)
-        keyTooLongEi shouldBe Left(TxValidationError.TooBigArray)
+      val maxKeySize   = MaxPBKeySize
+      val keyTooLong   = data :+ BinaryDataEntry("a" * (maxKeySize + 1), ByteStr(Array(1, 2)))
+      val keyTooLongEi = DataTransaction.create(version, sender, keyTooLong, fee.value, timestamp, proofs)
+      keyTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
-        val valueTooLong   = data :+ BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1: Byte)))
-        val valueTooLongEi = DataTransaction.create(version, sender, valueTooLong, fee.value, timestamp, proofs)
-        valueTooLongEi shouldBe Left(TxValidationError.TooBigArray)
+      val valueTooLong   = data :+ BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1: Byte)))
+      val valueTooLongEi = DataTransaction.create(version, sender, valueTooLong, fee.value, timestamp, proofs)
+      valueTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
-        val e               = BooleanDataEntry("dupe", value = true)
-        val duplicateKeys   = e +: data.drop(3) :+ e
-        val duplicateKeysEi = DataTransaction.create(version, sender, duplicateKeys, fee.value, timestamp, proofs)
-        duplicateKeysEi shouldBe Left(TxValidationError.DuplicatedDataKeys)
+      val e               = BooleanDataEntry("dupe", value = true)
+      val duplicateKeys   = e +: data.drop(3) :+ e
+      val duplicateKeysEi = DataTransaction.create(version, sender, duplicateKeys, fee.value, timestamp, proofs)
+      duplicateKeysEi shouldBe Left(TxValidationError.DuplicatedDataKeys)
 
-        val noFeeEi = DataTransaction.create(1.toByte, sender, data, 0, timestamp, proofs)
-        noFeeEi shouldBe Left(TxValidationError.InsufficientFee)
+      val noFeeEi = DataTransaction.create(1.toByte, sender, data, 0, timestamp, proofs)
+      noFeeEi shouldBe Left(TxValidationError.InsufficientFee)
 
-        val negativeFeeEi = DataTransaction.create(1.toByte, sender, data, -100, timestamp, proofs)
-        negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee)
+      val negativeFeeEi = DataTransaction.create(1.toByte, sender, data, -100, timestamp, proofs)
+      negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee)
     }
   }
 

@@ -14,8 +14,8 @@ import play.api.libs.json._
 
 trait FicusImplicits {
 
-  private[this] val byName: Map[String, TransactionParser] = TransactionParsers.all.map {
-    case (_, builder) => builder.getClass.getSimpleName.replaceAll("\\$$", "") -> builder
+  private[this] val byName: Map[String, TransactionParser] = TransactionParsers.all.map { case (_, builder) =>
+    builder.getClass.getSimpleName.replaceAll("\\$$", "") -> builder
   }
 
   private def by(name: String): Option[TransactionParser] = byName.get(name)
@@ -25,9 +25,8 @@ trait FicusImplicits {
     def toTxType(key: String): TransactionParser = by(converter.convert(key)).get
 
     CollectionReaders.mapValueReader[Double].map { xs =>
-      xs.map {
-        case (k, v) =>
-          toTxType(k) -> v
+      xs.map { case (k, v) =>
+        toTxType(k) -> v
       }
     }
   }
@@ -37,9 +36,8 @@ trait FicusImplicits {
     def toTxType(key: String): TransactionType = TransactionType.withName(converter.convert(key).replace("Transaction", ""))
 
     CollectionReaders.mapValueReader[Double].map { xs =>
-      xs.map {
-        case (k, v) =>
-          toTxType(k) -> v
+      xs.map { case (k, v) =>
+        toTxType(k) -> v
       }
     }
   }

@@ -42,7 +42,7 @@ object ParseBigInt extends JsTestBase {
         for (
           (data, function, error) <- Seq(
             (randomStringArrayElement, parseBigInt, UNDEFINED_TYPE),
-            (randomStringArrayElement, parseBigIntArgBeforeFunc, UNDEFINED_TYPE),
+            (randomStringArrayElement, parseBigIntArgBeforeFunc, UNDEFINED_TYPE)
           )
         ) {
           val script = precondition.onlyMatcherContract(data, function)
@@ -59,7 +59,7 @@ object ParseBigInt extends JsTestBase {
             (randomInt.toString, parseBigInt, nonMatchingTypes("String")),
             (randomBoolean.toString, parseBigIntArgBeforeFunc, nonMatchingTypes("String")),
             (randomStringArrayElement, invalidFunctionParseBigInt, invalidFunctionErrorResultParseBigInt),
-            (randomStringArrayElement, invalidValueParseBigIntArgBeforeFunc, invalidFunctionErrorResultParseBigInt),
+            (randomStringArrayElement, invalidValueParseBigIntArgBeforeFunc, invalidFunctionErrorResultParseBigInt)
           )
         ) {
           val script = precondition.onlyMatcherContract(data, function)
@@ -89,7 +89,7 @@ object ParseBigInt extends JsTestBase {
         for (
           (data, function, error) <- Seq(
             (randomStringArrayElement, parseBigIntValue, UNDEFINED_TYPE),
-            (randomStringArrayElement, parseBigIntValueArgBeforeFunc, UNDEFINED_TYPE),
+            (randomStringArrayElement, parseBigIntValueArgBeforeFunc, UNDEFINED_TYPE)
           )
         ) {
           val script = precondition.onlyMatcherContract(data, function)
@@ -106,7 +106,7 @@ object ParseBigInt extends JsTestBase {
             (randomInt.toString, parseBigIntValue, nonMatchingTypes("String")),
             (randomBoolean.toString, parseBigIntValueArgBeforeFunc, nonMatchingTypes("String")),
             (randomStringArrayElement, invalidFunctionParseBigIntValue, invalidFunctionErrorResultParseBigIntValue),
-            (randomStringArrayElement, invalidValueParseBigIntValueArgBeforeFunc, invalidFunctionErrorResultParseBigIntValue),
+            (randomStringArrayElement, invalidValueParseBigIntValueArgBeforeFunc, invalidFunctionErrorResultParseBigIntValue)
           )
         ) {
           val script = precondition.onlyMatcherContract(data, function)

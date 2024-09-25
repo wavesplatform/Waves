@@ -36,7 +36,7 @@ object Extract extends JsTestBase {
           (randomUnionArrayElement, extract, MATCHING_NOT_EXHAUSTIVE),
           (randomUnionArrayElement, extractArgBeforeFunc, MATCHING_NOT_EXHAUSTIVE),
           (randomInt.toString, invalidExtract, invalidErrorExtract),
-          (randomInt.toString, invalidExtractArgBeforeFunc, invalidErrorExtract),
+          (randomInt.toString, invalidExtractArgBeforeFunc, invalidErrorExtract)
         )
       ) {
         val script = precondition.onlyMatcherContract(data, function)
@@ -50,7 +50,7 @@ object Extract extends JsTestBase {
         for (
           (data, function) <- Seq(
             (randomInt.toString, extract),
-            (randomInt.toString, extractArgBeforeFunc),
+            (randomInt.toString, extractArgBeforeFunc)
           )
         ) {
           val script = precondition.onlyMatcherContract(data, function)

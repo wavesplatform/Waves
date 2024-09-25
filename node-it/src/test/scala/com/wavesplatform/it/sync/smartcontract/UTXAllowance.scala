@@ -65,21 +65,21 @@ class UTXAllowance extends BaseFreeSpec with WaitForHeight2 {
 object UTXAllowance {
   import com.wavesplatform.it.NodeConfigs._
   private val FirstNode = ConfigFactory.parseString(s"""
-                                                         |waves {
-                                                         |  utx.allow-transactions-from-smart-accounts = false
-                                                         |  miner {
-                                                         |      quorum = 0
-                                                         |      enable = yes
-                                                         |  }
-                                                         |}""".stripMargin)
+                                                       |waves {
+                                                       |  utx.allow-transactions-from-smart-accounts = false
+                                                       |  miner {
+                                                       |      quorum = 0
+                                                       |      enable = yes
+                                                       |  }
+                                                       |}""".stripMargin)
 
   private val SecondNode = ConfigFactory.parseString(s"""
-                                                          |waves {
-                                                          |  utx.allow-transactions-from-smart-accounts = true
-                                                          |  miner {
-                                                          |      enable = no
-                                                          |  }
-                                                          |}""".stripMargin)
+                                                        |waves {
+                                                        |  utx.allow-transactions-from-smart-accounts = true
+                                                        |  miner {
+                                                        |      enable = no
+                                                        |  }
+                                                        |}""".stripMargin)
 
   val Configs: Seq[Config] = Seq(
     FirstNode.withFallback(Default.head),

@@ -3,7 +3,13 @@ package com.wavesplatform.test.builtInFunctions.converting
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomBoolean, randomInt, randomStringArrayElement, randomUnionArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, GreaterV3ResultBinaryEntry, actualVersions, rideV3Result, versionsSupportingTheNewFeatures}
+import testHelpers.TestDataConstantsAndMethods.{
+  CANT_FIND_A_FUNCTION_OVERLOAD,
+  GreaterV3ResultBinaryEntry,
+  actualVersions,
+  rideV3Result,
+  versionsSupportingTheNewFeatures
+}
 import utest.{Tests, test}
 
 object ToBytes extends JsTestBase {
@@ -56,7 +62,7 @@ object ToBytes extends JsTestBase {
             (randomAddressDataArrayElement, toBytes, CANT_FIND_A_FUNCTION_OVERLOAD),
             (randomUnionArrayElement, toBytesArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD),
             (randomInt.toString, invalidToBytes, CANT_FIND_A_FUNCTION_OVERLOAD),
-            (randomStringArrayElement, invalidToBytesArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomStringArrayElement, invalidToBytesArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD)
           )
         ) {
           val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultBinaryEntry)

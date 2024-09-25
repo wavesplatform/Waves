@@ -56,48 +56,48 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
     val dAppScript = ScriptCompiler
       .compile(
         s"""
-          |{-# STDLIB_VERSION 3 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |let dAppAsset = base58'$dAppAsset'
-          |let callerAsset = base58'$callerAsset'
-          |let smartAsset = base58'$smartAsset'
-          |
-          |@Callable(i)
-          |func payCallerGetDAppAsset() = {
-          |  if (isDefined(i.payment) && extract(i.payment).assetId == callerAsset) then
-          |    TransferSet([
-          |      ScriptTransfer(i.caller, 1, dAppAsset),
-          |      ScriptTransfer(i.caller, 1, dAppAsset),
-          |      ScriptTransfer(i.caller, 1, dAppAsset),
-          |      ScriptTransfer(i.caller, 1, dAppAsset),
-          |      ScriptTransfer(i.caller, 1, dAppAsset),
-          |      ScriptTransfer(i.caller, 1, dAppAsset),
-          |      ScriptTransfer(i.caller, 1, dAppAsset),
-          |      ScriptTransfer(i.caller, 1, dAppAsset),
-          |      ScriptTransfer(i.caller, 1, dAppAsset),
-          |      ScriptTransfer(i.caller, 1, dAppAsset)
-          |    ])
-          |  else throw("need payment in callerAsset " + toBase58String(callerAsset))
-          |}
-          |
-          |@Callable(i)
-          |func spendMaxFee() = {
-          |  if (isDefined(i.payment) && extract(i.payment).assetId == smartAsset) then
-          |    TransferSet([
-          |      ScriptTransfer(i.caller, 1, smartAsset),
-          |      ScriptTransfer(i.caller, 1, smartAsset),
-          |      ScriptTransfer(i.caller, 1, smartAsset),
-          |      ScriptTransfer(i.caller, 1, smartAsset),
-          |      ScriptTransfer(i.caller, 1, smartAsset),
-          |      ScriptTransfer(i.caller, 1, smartAsset),
-          |      ScriptTransfer(i.caller, 1, smartAsset),
-          |      ScriptTransfer(i.caller, 1, smartAsset),
-          |      ScriptTransfer(i.caller, 1, smartAsset),
-          |      ScriptTransfer(i.caller, 1, smartAsset)
-          |    ])
-          |  else throw("need payment in smartAsset " + toBase58String(smartAsset))
-          |}
+           |{-# STDLIB_VERSION 3 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |
+           |let dAppAsset = base58'$dAppAsset'
+           |let callerAsset = base58'$callerAsset'
+           |let smartAsset = base58'$smartAsset'
+           |
+           |@Callable(i)
+           |func payCallerGetDAppAsset() = {
+           |  if (isDefined(i.payment) && extract(i.payment).assetId == callerAsset) then
+           |    TransferSet([
+           |      ScriptTransfer(i.caller, 1, dAppAsset),
+           |      ScriptTransfer(i.caller, 1, dAppAsset),
+           |      ScriptTransfer(i.caller, 1, dAppAsset),
+           |      ScriptTransfer(i.caller, 1, dAppAsset),
+           |      ScriptTransfer(i.caller, 1, dAppAsset),
+           |      ScriptTransfer(i.caller, 1, dAppAsset),
+           |      ScriptTransfer(i.caller, 1, dAppAsset),
+           |      ScriptTransfer(i.caller, 1, dAppAsset),
+           |      ScriptTransfer(i.caller, 1, dAppAsset),
+           |      ScriptTransfer(i.caller, 1, dAppAsset)
+           |    ])
+           |  else throw("need payment in callerAsset " + toBase58String(callerAsset))
+           |}
+           |
+           |@Callable(i)
+           |func spendMaxFee() = {
+           |  if (isDefined(i.payment) && extract(i.payment).assetId == smartAsset) then
+           |    TransferSet([
+           |      ScriptTransfer(i.caller, 1, smartAsset),
+           |      ScriptTransfer(i.caller, 1, smartAsset),
+           |      ScriptTransfer(i.caller, 1, smartAsset),
+           |      ScriptTransfer(i.caller, 1, smartAsset),
+           |      ScriptTransfer(i.caller, 1, smartAsset),
+           |      ScriptTransfer(i.caller, 1, smartAsset),
+           |      ScriptTransfer(i.caller, 1, smartAsset),
+           |      ScriptTransfer(i.caller, 1, smartAsset),
+           |      ScriptTransfer(i.caller, 1, smartAsset),
+           |      ScriptTransfer(i.caller, 1, smartAsset)
+           |    ])
+           |  else throw("need payment in smartAsset " + toBase58String(smartAsset))
+           |}
         """.stripMargin,
         estimator
       )
@@ -108,20 +108,20 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
     val callerScript = ScriptCompiler
       .compile(
         s"""
-          |{-# STDLIB_VERSION 3 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Verifier(tx)
-          |func verify() = {
-          |  let callerAsset = base58'$callerAsset'
-          |  let smartAsset = base58'$smartAsset'
-          |  match (tx) {
-          |    case tx:InvokeScriptTransaction =>
-          |      let pay = extract(tx.payment)
-          |      pay.assetId == callerAsset || pay.assetId == smartAsset
-          |    case _ => false
-          |  }
-          |}
+           |{-# STDLIB_VERSION 3 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |
+           |@Verifier(tx)
+           |func verify() = {
+           |  let callerAsset = base58'$callerAsset'
+           |  let smartAsset = base58'$smartAsset'
+           |  match (tx) {
+           |    case tx:InvokeScriptTransaction =>
+           |      let pay = extract(tx.payment)
+           |      pay.assetId == callerAsset || pay.assetId == smartAsset
+           |    case _ => false
+           |  }
+           |}
         """.stripMargin,
         estimator
       )

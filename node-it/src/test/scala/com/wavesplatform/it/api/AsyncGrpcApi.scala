@@ -97,7 +97,7 @@ object AsyncGrpcApi {
       )
 
       script match {
-        case Left(_)   => transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.EMPTY)))
+        case Left(_) => transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.EMPTY)))
         case Right(sc) =>
           // IssueTxSerializer.bodyBytes can't be used here because we must be able to test broadcasting issue transaction with incorrect data
           val baseBytes = Bytes.concat(
@@ -154,10 +154,17 @@ object AsyncGrpcApi {
         )
       )
       try {
-        val proofs = crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false).explicitGet().bodyBytes())
+        val proofs = crypto.sign(
+          source.privateKey,
+          PBTransactions
+            .vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false)
+            .explicitGet()
+            .bodyBytes()
+        )
         transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       } catch {
-        case _: IllegalArgumentException => transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.EMPTY)))
+        case _: IllegalArgumentException =>
+          transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.EMPTY)))
       }
     }
 
@@ -183,7 +190,10 @@ object AsyncGrpcApi {
         )
       )
 
-      val proofs      = crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false).explicitGet().bodyBytes())
+      val proofs = crypto.sign(
+        source.privateKey,
+        PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false).explicitGet().bodyBytes()
+      )
       val transaction = SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr)))
 
       transactions.broadcast(transaction)
@@ -201,7 +211,13 @@ object AsyncGrpcApi {
       if (Alias.create(alias).isLeft) {
         transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.EMPTY)))
       } else {
-        val proofs = crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false).explicitGet().bodyBytes())
+        val proofs = crypto.sign(
+          source.privateKey,
+          PBTransactions
+            .vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false)
+            .explicitGet()
+            .bodyBytes()
+        )
         transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       }
     }
@@ -261,7 +277,10 @@ object AsyncGrpcApi {
         )
       )
 
-      val proofs      = crypto.sign(matcher.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false).explicitGet().bodyBytes())
+      val proofs = crypto.sign(
+        matcher.privateKey,
+        PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false).explicitGet().bodyBytes()
+      )
       val transaction = SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr)))
 
       transactions.broadcast(transaction)
@@ -293,7 +312,13 @@ object AsyncGrpcApi {
         case Left(_) => transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.EMPTY)))
         case _ =>
           val proofs =
-            crypto.sign(sender.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+            crypto.sign(
+              sender.privateKey,
+              PBTransactions
+                .vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true)
+                .explicitGet()
+                .bodyBytes()
+            )
           transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       }
     }
@@ -361,7 +386,10 @@ object AsyncGrpcApi {
         )
       )
 
-      val proofs      = crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      val proofs = crypto.sign(
+        source.privateKey,
+        PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes()
+      )
       val transaction = SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr)))
       transactions.broadcast(transaction)
     }
@@ -378,7 +406,10 @@ object AsyncGrpcApi {
         version,
         PBTransaction.Data.SponsorFee(SponsorFeeTransactionData.of(minFee))
       )
-      val proofs = crypto.sign(sender.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      val proofs = crypto.sign(
+        sender.privateKey,
+        PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes()
+      )
       transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
     }
 
@@ -432,7 +463,10 @@ object AsyncGrpcApi {
           )
         )
       )
-      val proofs = crypto.sign(caller.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      val proofs = crypto.sign(
+        caller.privateKey,
+        PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes()
+      )
       transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
     }
 
@@ -451,7 +485,10 @@ object AsyncGrpcApi {
         version,
         PBTransaction.Data.InvokeExpression(InvokeExpressionTransactionData(ByteString.copyFrom(expression.bytes.value().arr)))
       )
-      val proofs = crypto.sign(caller.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      val proofs = crypto.sign(
+        caller.privateKey,
+        PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes()
+      )
       transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
     }
 
@@ -464,7 +501,10 @@ object AsyncGrpcApi {
         version,
         PBTransaction.Data.Lease(LeaseTransactionData.of(Some(recipient), amount))
       )
-      val proofs = crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      val proofs = crypto.sign(
+        source.privateKey,
+        PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes()
+      )
       transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
     }
 
@@ -477,7 +517,10 @@ object AsyncGrpcApi {
         version,
         PBTransaction.Data.LeaseCancel(LeaseCancelTransactionData.of(ByteString.copyFrom(Base58.decode(leaseId))))
       )
-      val proofs = crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      val proofs = crypto.sign(
+        source.privateKey,
+        PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes()
+      )
       transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
     }
 
@@ -502,7 +545,13 @@ object AsyncGrpcApi {
         case Left(_) => transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.EMPTY)))
         case _ =>
           val proofs =
-            crypto.sign(sender.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+            crypto.sign(
+              sender.privateKey,
+              PBTransactions
+                .vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true)
+                .explicitGet()
+                .bodyBytes()
+            )
           transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       }
     }
@@ -531,7 +580,10 @@ object AsyncGrpcApi {
         )
       )
 
-      val proofs      = crypto.sign(sender.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      val proofs = crypto.sign(
+        sender.privateKey,
+        PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes()
+      )
       val transaction = SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr)))
 
       transactions.broadcast(transaction)

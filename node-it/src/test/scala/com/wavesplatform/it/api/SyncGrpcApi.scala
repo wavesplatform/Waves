@@ -214,8 +214,7 @@ object SyncGrpcApi extends Assertions {
         val status        = getStatuses(TransactionsByIdRequest.of(Seq(ByteString.copyFrom(Base58.decode(txId))))).head
         val currentHeight = this.height
 
-        if (status.status.isConfirmed && currentHeight > status.height)
-          ()
+        if (status.status.isConfirmed && currentHeight > status.height) ()
         else if (status.status.isUnconfirmed || status.status.isNotExists) {
           waitForTransaction(txId)
           recWait()

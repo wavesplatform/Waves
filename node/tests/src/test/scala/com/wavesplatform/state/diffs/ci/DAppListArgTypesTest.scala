@@ -127,7 +127,7 @@ class DAppListArgTypesTest extends PropSpec with WithDomain with Inside {
     assert(forbidAfterActivation = true, rideList(rideList().head))
   }
 
-    property("NODE-799. list of object as callable argument is forbidden by serialization") {
+  property("NODE-799. list of object as callable argument is forbidden by serialization") {
     val (_, invoke, _) = preconditions(dApp, rideList(CaseObj(Types.UNIT, Map())))
     (the[Throwable] thrownBy invoke()).getMessage should include("Serialization of value Unit is unsupported")
   }

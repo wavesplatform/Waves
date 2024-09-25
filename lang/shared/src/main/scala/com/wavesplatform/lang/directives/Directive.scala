@@ -17,7 +17,10 @@ object Directive {
       })
       .asInstanceOf[key.Value]
 
-  def extractDirectives(directives: Iterable[Directive], defaultStdLib: => STDLIB_VERSION.Value = StdLibVersion.VersionDic.default): Either[String, DirectiveSet] =
+  def extractDirectives(
+      directives: Iterable[Directive],
+      defaultStdLib: => STDLIB_VERSION.Value = StdLibVersion.VersionDic.default
+  ): Either[String, DirectiveSet] =
     DirectiveSet(
       directives.find(_.key == STDLIB_VERSION).fold(defaultStdLib)(_.value.asInstanceOf[STDLIB_VERSION.Value]),
       extractValue(directives, SCRIPT_TYPE)(None),

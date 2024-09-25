@@ -33,18 +33,19 @@ object Merkle {
 
   /** Makes proofs for data (from top to bottom)
     *
-    * @param index of data
-    * @param levels of merkle tree (from top to bottom)
-    * */
+    * @param index
+    *   of data
+    * @param levels
+    *   of merkle tree (from top to bottom)
+    */
   def mkProofs(index: Int, levels: Seq[Level]): Seq[Digest] = {
-    val (result, _) = levels.tail.reverse.foldLeft((Seq.empty[Digest], index)) {
-      case ((proofs, idx), level) =>
-        val proof = isLeft(idx) match {
-          case true if idx + 1 == level.size => empty
-          case true                          => level(idx + 1)
-          case false                         => level(idx - 1)
-        }
-        (proof +: proofs, idx / 2)
+    val (result, _) = levels.tail.reverse.foldLeft((Seq.empty[Digest], index)) { case ((proofs, idx), level) =>
+      val proof = isLeft(idx) match {
+        case true if idx + 1 == level.size => empty
+        case true                          => level(idx + 1)
+        case false                         => level(idx - 1)
+      }
+      (proof +: proofs, idx / 2)
     }
     result
   }
@@ -62,10 +63,14 @@ object Merkle {
 
   /** Verifies proofs
     *
-    * @param digest data digest
-    * @param index data index
-    * @param proofs merkle proofs (from top to bottom)
-    * @param root merkle root
+    * @param digest
+    *   data digest
+    * @param index
+    *   data index
+    * @param proofs
+    *   merkle proofs (from top to bottom)
+    * @param root
+    *   merkle root
     */
   def verify(digest: Digest, index: Int, proofs: Seq[Digest], root: Digest): Boolean = {
     (1 << proofs.length) > index && index >= 0 && (createRoot(digest, index, proofs) sameElements root)

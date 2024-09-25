@@ -4,7 +4,14 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V4
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomDigestAlgorithmTypeArrayElement, randomInt, randomUnionArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, actualVersionsWithoutV3, intList, invalidFunctionError, nonMatchingTypes, versionsSupportingTheNewFeatures}
+import testHelpers.TestDataConstantsAndMethods.{
+  CANT_FIND_A_FUNCTION_OVERLOAD,
+  actualVersionsWithoutV3,
+  intList,
+  invalidFunctionError,
+  nonMatchingTypes,
+  versionsSupportingTheNewFeatures
+}
 import utest.{Tests, test}
 
 object Max extends JsTestBase {
@@ -26,7 +33,7 @@ object Max extends JsTestBase {
           )
         ) {
           val precondition = new GeneratorContractsForBuiltInFunctions(dataType, version)
-          val script = precondition.onlyMatcherContract(data, function)
+          val script       = precondition.onlyMatcherContract(data, function)
           assertCompileSuccessDApp(script, version)
         }
       }
@@ -41,7 +48,7 @@ object Max extends JsTestBase {
           )
         ) {
           val precondition = new GeneratorContractsForBuiltInFunctions(dataType, version)
-          val script = precondition.onlyMatcherContract(data, function)
+          val script       = precondition.onlyMatcherContract(data, function)
           assertCompileSuccessDApp(script, version)
         }
       }
@@ -55,11 +62,11 @@ object Max extends JsTestBase {
             (randomDigestAlgorithmTypeArrayElement, maxArgBeforeFunc, "Int", nonMatchingTypes("List[Int]")),
             (intList, invalidMax, "Int", invalidFunctionError("max", 1)),
             (intList, invalidMaxArgBeforeFunc, "Int", invalidFunctionError("max", 1)),
-            (intList, invalidMaxForBigInt, "Int", invalidFunctionError("max", 1)),
+            (intList, invalidMaxForBigInt, "Int", invalidFunctionError("max", 1))
           )
         ) {
           val precondition = new GeneratorContractsForBuiltInFunctions(dataType, version)
-          val script = precondition.onlyMatcherContract(data, function)
+          val script       = precondition.onlyMatcherContract(data, function)
           if (version == V4) {
             assertCompileErrorDApp(script, version, error)
           } else {

@@ -6,7 +6,7 @@ object VersionObject extends AutoPlugin {
   object autoImport {
     object V {
       val scalaPackage = SettingKey[String]("version-scala-package", "Scala package name where Version object is created")
-      val fallback = SettingKey[(Int, Int, Int)]("version-fallback", "Version tuple to use when Git version is not available")
+      val fallback     = SettingKey[(Int, Int, Int)]("version-fallback", "Version tuple to use when Git version is not available")
     }
   }
 
@@ -14,7 +14,6 @@ object VersionObject extends AutoPlugin {
 
   override def globalSettings: Seq[Def.Setting[_]] = Seq(
     V.fallback := (0, 0, 1)
-
   )
   override def projectSettings: Seq[Def.Setting[_]] = Seq(
     V.scalaPackage := s"${organization.value}.${name.value}",

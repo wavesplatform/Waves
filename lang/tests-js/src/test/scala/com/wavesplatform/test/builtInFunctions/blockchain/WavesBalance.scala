@@ -3,7 +3,12 @@ package com.wavesplatform.test.builtInFunctions.blockchain
 import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomStringArrayElement}
+import testHelpers.RandomDataGenerator.{
+  randomAddressDataArrayElement,
+  randomAliasDataArrayElement,
+  randomDigestAlgorithmTypeArrayElement,
+  randomStringArrayElement
+}
 import testHelpers.TestDataConstantsAndMethods.{actualVersionsWithoutV3, invalidFunctionError, nonMatchingTypes, thisVariable}
 import utest.{Tests, test}
 
@@ -51,19 +56,19 @@ object WavesBalance extends JsTestBase {
     }
 
     test("RIDE-48. Functions wavesBalance for V3 compiles for address, alias and 'this'") {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-        for (
-          (data, function) <- Seq(
-            (randomAddressDataArrayElement, wavesBalance),
-            (randomAliasDataArrayElement, wavesBalance),
-            (thisVariable, wavesBalance),
-            (randomAddressDataArrayElement, wavesBalanceArgBeforeFunc),
-            (randomAliasDataArrayElement, wavesBalanceArgBeforeFunc),
-            (thisVariable, wavesBalanceArgBeforeFunc)
-          )
-        ) {
-          val script = precondition.onlyMatcherContract(data, function)
-          assertCompileSuccessDApp(script, V3)
+      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
+      for (
+        (data, function) <- Seq(
+          (randomAddressDataArrayElement, wavesBalance),
+          (randomAliasDataArrayElement, wavesBalance),
+          (thisVariable, wavesBalance),
+          (randomAddressDataArrayElement, wavesBalanceArgBeforeFunc),
+          (randomAliasDataArrayElement, wavesBalanceArgBeforeFunc),
+          (thisVariable, wavesBalanceArgBeforeFunc)
+        )
+      ) {
+        val script = precondition.onlyMatcherContract(data, function)
+        assertCompileSuccessDApp(script, V3)
       }
     }
 

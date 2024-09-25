@@ -55,14 +55,13 @@ class SyncDAppMultiVersionTest extends PropSpec with WithDomain {
 
   property("sync call can be performed between V5 and V6 dApps") {
     Seq((V5, V6), (V6, V5))
-      .foreach {
-        case (version1, version2) =>
-          val (preparingTxs, invoke) = scenario(version1, version2).sample.get
-          withDomain(RideV6) { d =>
-            d.appendBlock(preparingTxs*)
-            d.appendBlock(invoke)
-            d.blockchain.transactionSucceeded(invoke.txId) shouldBe true
-          }
+      .foreach { case (version1, version2) =>
+        val (preparingTxs, invoke) = scenario(version1, version2).sample.get
+        withDomain(RideV6) { d =>
+          d.appendBlock(preparingTxs*)
+          d.appendBlock(invoke)
+          d.blockchain.transactionSucceeded(invoke.txId) shouldBe true
+        }
       }
   }
 }

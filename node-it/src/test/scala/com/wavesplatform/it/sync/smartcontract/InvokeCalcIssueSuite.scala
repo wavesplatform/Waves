@@ -81,15 +81,15 @@ object InvokeCalcIssueSuite {
 
   private val dAppV4: String =
     s"""{-# STDLIB_VERSION 4 #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |
-      |@Callable(i)
-      |func i() = {
-      |let issue = Issue("$assetName", "$assetDescr", $amount, $decimals, $reissuable, unit, 0)
-      |let id = calculateAssetId(issue)
-      |[issue,
-      | BinaryEntry("id", id)]
-      |}
-      |
-      |""".stripMargin
+       |{-# CONTENT_TYPE DAPP #-}
+       |
+       |@Callable(i)
+       |func i() = {
+       |let issue = Issue("$assetName", "$assetDescr", $amount, $decimals, $reissuable, unit, 0)
+       |let id = calculateAssetId(issue)
+       |[issue,
+       | BinaryEntry("id", id)]
+       |}
+       |
+       |""".stripMargin
 }

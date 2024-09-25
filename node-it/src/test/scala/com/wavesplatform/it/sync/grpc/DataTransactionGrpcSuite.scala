@@ -35,10 +35,10 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
           ScriptCompiler
             .compile(
               """{-# STDLIB_VERSION 2 #-}
-              |{-# CONTENT_TYPE EXPRESSION #-}
-              |{-# SCRIPT_TYPE ACCOUNT #-}
-              |
-              |true""".stripMargin,
+                |{-# CONTENT_TYPE EXPRESSION #-}
+                |{-# SCRIPT_TYPE ACCOUNT #-}
+                |
+                |true""".stripMargin,
               ScriptEstimatorV1
             )
             .explicitGet()
@@ -121,14 +121,14 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("max transaction size") {
-    //Max size of transaction V1
+    // Max size of transaction V1
     val maxKeySizeV1 = 100
     val key          = "\u6fae" * (maxKeySizeV1 - 1)
     val data         = List.tabulate(26)(n => DataEntry(key + n.toChar, DataEntry.Value.BinaryValue(ByteString.copyFrom(Array.fill(5599)(n.toByte)))))
     val fee          = calcDataFee(data, TxVersion.V1)
     sender.putData(firstAcc, data, fee, version = TxVersion.V1, waitForTx = true)
 
-    //Max size of transaction V2
+    // Max size of transaction V2
     val maxKeySizeV2 = 400
     val key2         = "u" * (maxKeySizeV2 - 1)
     val data2 =
@@ -282,23 +282,21 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("try to make address with 1000 DataEntries") {
     for (v <- dataTxSupportedVersions) {
-      val dataSet = 0 until 200 flatMap (
-          i =>
-            List(
-              DataEntry(s"int$i", DataEntry.Value.IntValue(1000 + i)),
-              DataEntry(s"bool$i", DataEntry.Value.BoolValue(false)),
-              DataEntry(s"blob$i", DataEntry.Value.BinaryValue(ByteString.copyFrom(Array[Byte](127.toByte, 0, 1, 1)))),
-              DataEntry(s"str$i", DataEntry.Value.StringValue(s"hi there! + $i")),
-              DataEntry(s"integer$i", DataEntry.Value.IntValue(1000 - i))
-            )
+      val dataSet = 0 until 200 flatMap (i =>
+        List(
+          DataEntry(s"int$i", DataEntry.Value.IntValue(1000 + i)),
+          DataEntry(s"bool$i", DataEntry.Value.BoolValue(false)),
+          DataEntry(s"blob$i", DataEntry.Value.BinaryValue(ByteString.copyFrom(Array[Byte](127.toByte, 0, 1, 1)))),
+          DataEntry(s"str$i", DataEntry.Value.StringValue(s"hi there! + $i")),
+          DataEntry(s"integer$i", DataEntry.Value.IntValue(1000 - i))
         )
+      )
 
       val txIds = dataSet
         .grouped(100)
         .map(_.toList)
-        .map(
-          data =>
-            PBTransactions.vanilla(sender.putData(fourthAcc, data, calcDataFee(data, v), version = v), unsafe = false).explicitGet().id().toString
+        .map(data =>
+          PBTransactions.vanilla(sender.putData(fourthAcc, data, calcDataFee(data, v), version = v), unsafe = false).explicitGet().id().toString
         )
       txIds.foreach(tx => sender.waitForTransaction(tx))
       val r = scala.util.Random.nextInt(199)

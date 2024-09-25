@@ -72,7 +72,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
   }
 
   protected def estimate(script: String): Either[String, Long] = {
-    val expr = compile(script)(V6)
+    val expr    = compile(script)(V6)
     val results = estimators.map(_(lets, functionCosts(V6), expr))
     if (results.distinct.length == 1)
       results.head
@@ -85,12 +85,11 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
       script2: EXPR,
       functionCosts: Map[FunctionHeader, Coeval[Long]] = v3FunctionCosts
   ): Either[String, Long] = {
-    val results = estimators.map(
-      e =>
-        for {
-          cost2 <- e(lets, functionCosts, script2)
-          cost1 <- e(lets, functionCosts, script1)
-        } yield cost2 - cost1
+    val results = estimators.map(e =>
+      for {
+        cost2 <- e(lets, functionCosts, script2)
+        cost1 <- e(lets, functionCosts, script1)
+      } yield cost2 - cost1
     )
     if (results.distinct.length == 1)
       results.head

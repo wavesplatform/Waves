@@ -11,9 +11,8 @@ trait DockerBased extends BeforeAndAfterAll {
   final def docker: Docker                      = dockerSingleton()
 
   abstract override protected def runTest(testName: String, args: Args): Status = {
-    def printThreadDump(): Unit = nodes.collect {
-      case node: DockerNode =>
-        docker.printThreadDump(node)
+    def printThreadDump(): Unit = nodes.collect { case node: DockerNode =>
+      docker.printThreadDump(node)
     }
     val r = super.runTest(testName, args)
     if (!r.succeeds()) printThreadDump()

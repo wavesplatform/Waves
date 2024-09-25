@@ -25,19 +25,17 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest extends PropSpec with DomainSce
 
   property("block generator can spend fee after transaction before applyMinerFeeWithTransactionAfter") {
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
-    scenario(preconditionsAndPayments, DefaultWavesSettings) {
-      case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
-        val blocks = chainBlocks(Seq(Seq(genesis), Seq(generatorPaymentOnFee, somePayment)))
-        blocks.foreach(block => domain.blockchainUpdater.processBlock(block) should beRight)
+    scenario(preconditionsAndPayments, DefaultWavesSettings) { case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
+      val blocks = chainBlocks(Seq(Seq(genesis), Seq(generatorPaymentOnFee, somePayment)))
+      blocks.foreach(block => domain.blockchainUpdater.processBlock(block) should beRight)
     }
   }
 
   property("block generator can't spend fee after transaction after applyMinerFeeWithTransactionAfter") {
-    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
-      case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
-        val blocks = chainBlocks(Seq(Seq(genesis), Seq(generatorPaymentOnFee, somePayment)))
-        blocks.init.foreach(block => domain.blockchainUpdater.processBlock(block) should beRight)
-        domain.blockchainUpdater.processBlock(blocks.last) should produce("unavailable funds")
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
+      val blocks = chainBlocks(Seq(Seq(genesis), Seq(generatorPaymentOnFee, somePayment)))
+      blocks.init.foreach(block => domain.blockchainUpdater.processBlock(block) should beRight)
+      domain.blockchainUpdater.processBlock(blocks.last) should produce("unavailable funds")
     }
   }
 }

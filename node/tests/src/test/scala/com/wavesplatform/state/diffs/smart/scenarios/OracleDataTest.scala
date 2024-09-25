@@ -30,29 +30,29 @@ class OracleDataTest extends PropSpec with WithState {
     val alias       = Alias.create("alias").explicitGet()
     val createAlias = TxHelpers.createAlias(alias.name, oracle)
 
-    val long                           = IntegerDataEntry("long", 1)
-    val bool                           = BooleanDataEntry("bool", true)
-    val bin                            = BinaryDataEntry("bin", ByteStr.fromLong(1))
-    val str                            = StringDataEntry("str", "test_str")
-    val dataTx                         = TxHelpers.data(oracle, Seq(long, bool, bin, str))
-    val allFieldsRequiredScript        = s"""
-                                   | match tx {
-                                   | case t : DataTransaction =>
-                                   |   let txId = match extract(transactionById(t.id)) {
-                                   |     case d: DataTransaction => d.bodyBytes == base64'${ByteStr(dataTx.bodyBytes.apply()).base64}'
-                                   |     case _ => false
-                                   |   }
-                                   |   let txHeightId = extract(transactionHeightById(t.id)) > 0
-                                   |   txId && txHeightId
-                                   | case _ : CreateAliasTransaction => true
-                                   | case _ =>
-                                   |   let oracle = Alias("${alias.name}")
-                                   |   let long = extract(getInteger(oracle,"${long.key}")) == ${long.value}
-                                   |   let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
-                                   |   let bin = extract(getBinary(oracle,"${bin.key}")) == base58'${bin.value.toString}'
-                                   |   let str = extract(getString(oracle,"${str.key}")) == "${str.value}"
-                                   |   long && bool && bin && str
-                                   |}""".stripMargin
+    val long   = IntegerDataEntry("long", 1)
+    val bool   = BooleanDataEntry("bool", true)
+    val bin    = BinaryDataEntry("bin", ByteStr.fromLong(1))
+    val str    = StringDataEntry("str", "test_str")
+    val dataTx = TxHelpers.data(oracle, Seq(long, bool, bin, str))
+    val allFieldsRequiredScript = s"""
+                                     | match tx {
+                                     | case t : DataTransaction =>
+                                     |   let txId = match extract(transactionById(t.id)) {
+                                     |     case d: DataTransaction => d.bodyBytes == base64'${ByteStr(dataTx.bodyBytes.apply()).base64}'
+                                     |     case _ => false
+                                     |   }
+                                     |   let txHeightId = extract(transactionHeightById(t.id)) > 0
+                                     |   txId && txHeightId
+                                     | case _ : CreateAliasTransaction => true
+                                     | case _ =>
+                                     |   let oracle = Alias("${alias.name}")
+                                     |   let long = extract(getInteger(oracle,"${long.key}")) == ${long.value}
+                                     |   let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
+                                     |   let bin = extract(getBinary(oracle,"${bin.key}")) == base58'${bin.value.toString}'
+                                     |   let str = extract(getString(oracle,"${str.key}")) == "${str.value}"
+                                     |   long && bool && bin && str
+                                     |}""".stripMargin
     val untypedAllFieldsRequiredScript = Parser.parseExpr(allFieldsRequiredScript).get.value
     val typedAllFieldsRequiredScript =
       ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untypedAllFieldsRequiredScript).explicitGet()._1

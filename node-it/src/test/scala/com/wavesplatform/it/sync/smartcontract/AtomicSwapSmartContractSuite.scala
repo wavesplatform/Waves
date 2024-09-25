@@ -59,7 +59,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
   test("step2 - Create and setup smart contract for swapBC1") {
     val beforeHeight = sender.height
-    val scriptText   = s"""
+    val scriptText = s"""
     let Bob = Address(base58'${BobBC1.toAddress}')
     let Alice = Address(base58'${AliceBC1.toAddress}')
 

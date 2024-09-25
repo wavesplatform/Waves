@@ -74,7 +74,8 @@ class PBOrdersSpecification extends FlatSpec {
         protoOrder.copy(
           proofs = Seq(ByteString.copyFrom(Base58.decode("5f5irpd67tknEkHr9GejWSC7poZGfdaZabV84GjxifxqdtMKfcU8QnhZYBQR9F54GjfTcA8a91DSAb79CTtFoxnd")))
         )
-      ).explicitGet()
+      )
+      .explicitGet()
     Verifier.verifyAsEllipticCurveSignature(signed, true) shouldBe Symbol("right")
 
     val signedV4 = PBOrders
@@ -83,7 +84,8 @@ class PBOrdersSpecification extends FlatSpec {
           version = Order.V4,
           proofs = Seq(ByteString.copyFrom(Base58.decode("2kRQDV8TbSEVe9B2yy8XR8XijYrbxEXTvptxuCr42Vp6u1psZyEzaRj6eAb267zA2Tm5D8EGN8FTMQFGdQDcyNT8")))
         )
-      ).explicitGet()
+      )
+      .explicitGet()
 
     Verifier.verifyAsEllipticCurveSignature(signedV4, true) shouldBe Symbol("right")
   }
