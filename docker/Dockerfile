@@ -12,7 +12,6 @@ ENV WVLOG=/var/log/waves
 ENV WAVES_INSTALL_PATH=/usr/share/waves
 ENV WAVES_CONFIG=/etc/waves/waves.conf
 COPY target /tmp/
-COPY waves.conf.template $WAVES_CONFIG
 
 # Setup node
 COPY entrypoint.sh $WAVES_INSTALL_PATH/bin/entrypoint.sh
@@ -41,4 +40,4 @@ WORKDIR $WVDATA
 HEALTHCHECK CMD curl -f http://localhost:6869/node/status || exit 1
 
 STOPSIGNAL SIGINT
-ENTRYPOINT ["/usr/share/waves/bin/entrypoint.sh"]
+ENTRYPOINT ["${WAVES_INSTALL_PATH}/bin/entrypoint.sh"]

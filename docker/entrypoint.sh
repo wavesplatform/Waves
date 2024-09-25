@@ -1,28 +1,24 @@
 #!/bin/bash
-shopt -s nullglob
 
-logEcho() {
-  echo $1 | gosu waves tee -a /var/log/waves/waves.log
-}
-JAVA_OPTS="${JAVA_OPTS} -Dwaves.defaults.blockchain.type=$WAVES_NETWORK -Dwaves.defaults.directory=$WVDATA"
-
-logEcho "Node is starting..."
-logEcho "WAVES_HEAP_SIZE='${WAVES_HEAP_SIZE}'"
-logEcho "WAVES_LOG_LEVEL='${WAVES_LOG_LEVEL}'"
-logEcho "JAVA_OPTS='${JAVA_OPTS}'"
-
-JAVA_OPTS="-Dlogback.stdout.level=${WAVES_LOG_LEVEL}
-  -XX:+ExitOnOutOfMemoryError
+JAVA_OPTS="-XX:+ExitOnOutOfMemoryError
   -Xmx${WAVES_HEAP_SIZE}
-  -Dlogback.file.directory=$WVLOG
-  -Dconfig.override_with_env_vars=true
+  --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED
+  -Dlogback.stdout.level=${WAVES_LOG_LEVEL}
+  -Dlogback.file.directory=${WVLOG}
+  -Dwaves.config.directory=/etc/waves
+  -Dwaves.defaults.blockchain.type=${WAVES_NETWORK}
+  -Dwaves.directory=${WVDATA}
+  -Dwaves.rest-api.bind-address=0.0.0.0
   ${JAVA_OPTS}"
 
-if [ $# -eq 0 ]
-  then
-    ARGS="$WAVES_CONFIG"
-  else
-    ARGS=$@
+echo "JAVA_OPTS=${JAVA_OPTS}" | tee -a ${WVLOG}/waves.log
+
+if [ -n ${WAVES_WALLET_SEED} ] ; then
+  JAVA_OPTS="-Dwaves.wallet.seed=${WAVES_WALLET_SEED} ${JAVA_OPTS}"
+fi
+
+if [ -n ${WAVES_WALLET_PASSWORD} ] ; then
+  JAVA_OPTS="-Dwaves.wallet.password=${WAVES_WALLET_PASSWORD} ${JAVA_OPTS}"
 fi
 
 exec java $JAVA_OPTS -cp "${WAVES_INSTALL_PATH}/lib/plugins/*:$WAVES_INSTALL_PATH/lib/*" com.wavesplatform.Application $ARGS
