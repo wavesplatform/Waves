@@ -27,3 +27,7 @@ libraryDependencies ++= Seq(
   ("com.spotify"                  % "docker-client"        % "8.16.0")
     .exclude("commons-logging", "commons-logging")
 )
+
+addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.2")
+// Usage:
+//   sbt scalafmtSbt scalafmtAll
