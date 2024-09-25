@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.traits.domain
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
-import com.wavesplatform.lang.v1.traits.domain.{Burn => BurnAction}
+import com.wavesplatform.lang.v1.traits.domain.{Burn as BurnAction}
 
 case class TransferItem(recipient: Recipient, amount: Long)
 

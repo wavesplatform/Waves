@@ -70,7 +70,7 @@ object TaskMT {
     }
 
   def apply[F[_], S, E, R](f: S => Eval[F[Either[E, R]]]): TaskMT[F, S, E, R] =
-    fromEvalRef(_.read flatMap f)
+    fromEvalRef(_.read.flatMap(f))
 
   private def fromEvalRef[F[_], S, E, R](f: EvalRef[S] => Eval[F[Either[E, R]]]): TaskMT[F, S, E, R] =
     new TaskMT[F, S, E, R] {
