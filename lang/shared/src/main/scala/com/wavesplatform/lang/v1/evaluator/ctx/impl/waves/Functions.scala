@@ -25,7 +25,6 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import com.wavesplatform.lang.{CoevalF, CommonError, ExecutionError, FailOrRejectError, ThrownError, toError}
 import monix.eval.Coeval
-import shapeless3.Coproduct.unsafeGet
 
 object Functions {
   private def getDataFromStateF(name: String, internalName: Short, dataType: DataType, selfCall: Boolean): BaseFunction[Environment] = {
@@ -61,7 +60,7 @@ object Functions {
 
       new ContextfulNativeFunction.Simple[Environment](name, resultType, args) {
         override def evaluate[F[_]: Monad](env: Environment[F], args: List[EVALUATED]): F[Either[ExecutionError, EVALUATED]] = {
-          (unsafeGet(env.tthis), args) match {
+          (env.tthis, args) match {
             case (address: Recipient.Address, CONST_STRING(key) :: Nil) if selfCall =>
               getData(env, Bindings.senderObject(address), key)
             case (_, (addressOrAlias: CaseObj) :: CONST_STRING(key) :: Nil) =>

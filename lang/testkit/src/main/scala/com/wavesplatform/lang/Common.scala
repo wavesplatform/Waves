@@ -17,7 +17,6 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
-import shapeless.Coproduct
 
 import scala.annotation.tailrec
 import scala.util.{Left, Right, Try}
@@ -89,7 +88,7 @@ object Common {
       def resolveAlias(name: String): Either[String, Recipient.Address]                   = ???
       def accountBalanceOf(a: Recipient, b: Option[Array[Byte]]): Either[String, Long]    = ???
       def accountWavesBalanceOf(a: Recipient): Either[String, Environment.BalanceDetails] = ???
-      def tthis: Environment.Tthis                                                        = Coproduct(Address(ByteStr.empty))
+      def tthis: Environment.Tthis                                                        = Address(ByteStr.empty)
       def multiPaymentAllowed: Boolean                                                    = true
       def txId: ByteStr                                                                   = ???
       def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]               = ???

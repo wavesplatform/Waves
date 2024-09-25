@@ -46,13 +46,13 @@ package object utils {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-    override def tthis: Environment.Tthis                                              = Coproduct(Recipient.Address(ByteStr.empty))
-    override def multiPaymentAllowed: Boolean                                          = true
-    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]     = ???
-    override def addressFromString(address: String): Either[String, Recipient.Address] = ???
-    override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]     = ???
-    override def accountScript(addressOrAlias: Recipient): Option[Script]              = ???
-    override def calculateDelay(gt: ByteStr, b: Long): Long                            = ???
+    override def tthis: Environment.Tthis                                                                        = Recipient.Address(ByteStr.empty)
+    override def multiPaymentAllowed: Boolean                                                                    = true
+    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
+    override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+    override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]                               = ???
+    override def accountScript(addressOrAlias: Recipient): Option[Script]                                        = ???
+    override def calculateDelay(gt: ByteStr, b: Long): Long                                                      = ???
     override def callScript(
         dApp: Address,
         func: String,
