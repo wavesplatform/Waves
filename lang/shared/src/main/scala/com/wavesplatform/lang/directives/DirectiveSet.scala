@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.directives
 
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 
 case class DirectiveSet(
     stdLibVersion: StdLibVersion,

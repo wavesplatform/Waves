@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.test.FreeSpec
 

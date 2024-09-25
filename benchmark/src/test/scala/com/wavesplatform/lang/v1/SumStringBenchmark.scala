@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.v1
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.evalV5
-import com.wavesplatform.lang.v1.SumStringBenchmark._
+import com.wavesplatform.lang.v1.SumStringBenchmark.*
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 import scala.util.Random

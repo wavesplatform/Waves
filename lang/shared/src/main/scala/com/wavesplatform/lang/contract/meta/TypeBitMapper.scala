@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.contract.meta
 
-import cats.syntax.either._
-import cats.syntax.traverse._
-import cats.instances.list._
-import cats.instances.either._
+import cats.syntax.either.*
+import cats.syntax.traverse.*
+import cats.instances.list.*
+import cats.instances.either.*
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LIST, UNION}
 
 import scala.util.Try

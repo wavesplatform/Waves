@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.estimator
 
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import monix.eval.Coeval
 
 object ScriptEstimatorV1 extends ScriptEstimator {

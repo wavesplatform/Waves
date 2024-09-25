@@ -5,20 +5,20 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import cats.Id
 import com.google.common.primitives.Longs
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.PureFunctionsRebenchmark._
+import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.*
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.{FunctionIds, Log}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Common, ExecutionError, v1}
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 import scala.util.Random

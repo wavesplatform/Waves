@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.Monad
-import cats.implicits._
+import cats.implicits.*
 import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_STRING, CaseObj}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types

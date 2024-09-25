@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.contract.serialization
 
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.option._
-import cats.syntax.traverse._
+import cats.instances.list.*
+import cats.syntax.either.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC}
-import com.wavesplatform.lang.utils.Serialize._
+import com.wavesplatform.lang.utils.Serialize.*
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.dapp.DAppMeta

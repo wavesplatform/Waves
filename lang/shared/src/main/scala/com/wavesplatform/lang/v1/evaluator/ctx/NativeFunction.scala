@@ -1,17 +1,17 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.Monad
-import cats.syntax.applicative._
+import cats.syntax.applicative.*
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
 
 import scala.annotation.meta.field
-import scala.scalajs.js.annotation._
+import scala.scalajs.js.annotation.*
 
 sealed trait BaseFunction[C[_[_]]] {
   @JSExport def signature: FunctionTypeSignature

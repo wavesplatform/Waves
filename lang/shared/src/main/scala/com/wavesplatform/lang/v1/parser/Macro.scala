@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
-import com.wavesplatform.lang.v1.parser.Expressions._
+import com.wavesplatform.lang.v1.parser.Expressions.*
 
 object Macro {
   def unwrapStrict(blockPos: Pos, strictLetDecs: Seq[LET], strictBody: EXPR): EXPR = {

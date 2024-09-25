@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.contract.serialization
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.lang.contract.DApp
 
 import scala.util.Try

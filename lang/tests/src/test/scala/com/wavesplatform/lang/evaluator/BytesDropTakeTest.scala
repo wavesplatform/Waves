@@ -4,8 +4,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{V1, V5, V6}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.test._
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
+import com.wavesplatform.test.*
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.NoLimit
 

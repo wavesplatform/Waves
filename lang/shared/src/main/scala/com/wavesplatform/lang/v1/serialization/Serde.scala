@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.serialization
 
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import monix.eval.Coeval
 
 trait Serde[In, Out] {

@@ -1,14 +1,14 @@
 package com.wavesplatform.lang.v1.estimator.v2
 
-import cats.instances.list._
-import cats.syntax.traverse._
+import cats.instances.list.*
+import cats.syntax.traverse.*
 import cats.{Id, Monad}
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.estimator.{EstimationError, ScriptEstimator}
 import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.EvalM
-import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.Lenses._
-import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.Lenses.*
+import com.wavesplatform.lang.v1.task.imports.*
 import monix.eval.Coeval
 
 object ScriptEstimatorV2 extends ScriptEstimator {

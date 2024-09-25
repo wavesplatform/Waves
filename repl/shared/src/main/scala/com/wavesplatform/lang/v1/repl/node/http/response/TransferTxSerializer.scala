@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Recipient => LangRecipient}
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction._
+import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 
 object TransferTxSerializer {
