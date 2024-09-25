@@ -3,6 +3,8 @@
 .ensime
 .ensime_cache/
 .bsp
+.bloop/
+.metals/
 
 # scala build folders and files
 target
