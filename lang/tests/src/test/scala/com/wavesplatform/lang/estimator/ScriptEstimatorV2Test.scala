@@ -68,8 +68,6 @@ class ScriptEstimatorV2Test extends ScriptEstimatorTestBase(ScriptEstimatorV2) {
     val run: Runnable = { () =>
       s.release()
       r = estimate(functionCosts(V3), compile(hangingScript))
-      s.release()
-
     }
     val t = new Thread(run)
     t.setDaemon(true)
@@ -77,7 +75,7 @@ class ScriptEstimatorV2Test extends ScriptEstimatorTestBase(ScriptEstimatorV2) {
     t.start()
     s.acquire()
     t.interrupt()
-    s.acquire()
+    t.join()
 
     r shouldBe Left("Script estimation was interrupted")
     t.getState shouldBe Thread.State.TERMINATED
