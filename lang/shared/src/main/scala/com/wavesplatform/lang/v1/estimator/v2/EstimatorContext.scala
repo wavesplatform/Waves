@@ -1,5 +1,4 @@
-
-ackage com.wavesplatform.lang.v1.estimator.v2
+package com.wavesplatform.lang.v1.estimator.v2
 
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNC
