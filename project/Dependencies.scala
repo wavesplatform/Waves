@@ -22,7 +22,7 @@ object Dependencies {
 
   private def grpcModule(module: String) = "io.grpc" % module % "1.62.2"
 
-  val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full)
+  // val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full)
 
   val akkaHttp        = akkaHttpModule("akka-http").cross(CrossVersion.for3Use2_13)
   val googleGuava     = "com.google.guava"    % "guava"             % "33.3.0-jre"
