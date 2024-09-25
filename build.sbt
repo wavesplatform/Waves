@@ -160,7 +160,7 @@ inScope(Global)(
       "-language:postfixOps",
       "-explain",
       "-Ykind-projector",
-      "-source:3.0-migration",
+      "-source:future-migration", // -future instead of better-monadic-for
       "-rewrite",
 //      "-Ywarn-unused:-implicits",
 //      "-Xlint",
