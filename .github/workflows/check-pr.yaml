@@ -16,7 +16,7 @@ jobs:
           gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
       - name: Check PR
-        run: sbt -J-XX:+UnlockExperimentalVMOptions -J-XX:+UseZGC --mem 4096 --batch ";checkPR;completeQaseRun"
+        run: sbt -J-Xlog:gc*=debug:file=./gc.log --mem 8096 --batch ";checkPR;completeQaseRun"
         env:
           QASE_ENABLE: true
           QASE_RUN_NAME: checkPR
@@ -56,12 +56,13 @@ jobs:
           version=$(echo ${{ github.base_ref }} | awk -F '[-\.]' '{print $2"."$3}')
           pr_number=${{ github.event.number }}
           sbt -Dproject.version=$version-$pr_number-SNAPSHOT --mem 4096 --batch publishSigned
-      - name: Save crash data
+      - name: Save debug data
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           if-no-files-found: ignore
-          name: crashes
+          name: debug-data
           path: |
+            gc.log
             hs*.log
             core*

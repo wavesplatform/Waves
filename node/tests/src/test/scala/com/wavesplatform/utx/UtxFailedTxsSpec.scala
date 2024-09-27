@@ -193,7 +193,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None)._1 shouldBe Some(Seq(tx))
   }
 
-  it should "cleanup transaction when script result changes" in utxTest { (d, utx) =>
+  it should s"cleanup transaction when script result changes and complexity < ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
     val (script, _) = ScriptCompiler
       .compile(
         """
@@ -206,13 +206,8 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
           |  if (height % 2 == 0) then
           |    []
           |  else
-          |    if (!sigVerify(base58'', base58'', base58'')
-          |    && !sigVerify(base58'', base58'', base58'')
-          |    && !sigVerify(base58'', base58'', base58'')
-          |    && !sigVerify(base58'', base58'', base58'')) then
-          |      throw("height is odd")
-          |    else [IntegerEntry("h", height)]
-          |  }
+          |    throw("height is odd")
+          |}
           |  """.stripMargin,
         ScriptEstimatorV3.latest
       )
@@ -229,11 +224,60 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.size shouldBe 100
     d.appendBlock() // Height is odd
     utx.addAndScheduleCleanup(Nil)
-    eventually(timeout(10 seconds), interval(500 millis)) {
+    eventually(timeout(5 seconds), interval(500 millis)) {
       utx.size shouldBe 0
       utx.all shouldBe Nil
     }
   }
+
+  it should s"not  cleanup transaction when script result changes and complexity > ${ContractLimits.FailFreeInvokeComplexity}" in withFS(
+    TestFunctionalitySettings
+      .withFeatures(
+        BlockchainFeatures.NG,
+        BlockchainFeatures.BlockV5,
+        BlockchainFeatures.Ride4DApps,
+        BlockchainFeatures.SynchronousCalls,
+        BlockchainFeatures.SmartAccounts
+      )
+  )(utxTest { (d, utx) =>
+    val (script, _) = ScriptCompiler
+      .compile(
+        s"""{-# STDLIB_VERSION 5 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func test1000() = {
+           |  if (height % 2 == 0) then
+           |    []
+           |  else
+           |    if (${"sigVerify(base58'', base58'', base58'') ||" * 8} true) then
+           |      throw("height is odd")
+           |   else throw("smth wrong")
+           |}
+           |""".stripMargin,
+        ScriptEstimatorV3.latest
+      )
+      .explicitGet()
+
+    d.appendBlock(TxHelpers.setScript(dApp, script))
+    assert(d.blockchainUpdater.height % 2 == 0)
+    val invoke = TxHelpers.invoke(dApp.toAddress, Some("test1000"))
+    utx.putIfNew(invoke, forceValidate = true).resultE.explicitGet()
+
+    utx.size shouldBe 1
+    d.appendKeyBlock() // Height is odd
+    utx.addAndScheduleCleanup(Nil)
+    eventually(timeout(3 seconds), interval(500 millis)) {
+      utx.size shouldBe 1
+      utx.all shouldBe Seq(invoke)
+    }
+
+    utx.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None)._1 shouldBe Some(Seq(invoke))
+    d.appendMicroBlock(invoke)
+
+    d.blockchain.transactionMeta(invoke.id()) shouldBe Some(TxMeta(Height(3), Status.Failed, 1614))
+  })
 
   private[this] def genExpr(targetComplexity: Int, result: Boolean): String = {
     s"""
