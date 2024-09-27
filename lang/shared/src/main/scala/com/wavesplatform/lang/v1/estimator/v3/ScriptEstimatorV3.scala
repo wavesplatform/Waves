@@ -7,7 +7,6 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.EvalM
-import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.Lenses.*
 import com.wavesplatform.lang.v1.estimator.{EstimationError, ScriptEstimator}
 import com.wavesplatform.lang.v1.task.imports.*
 import monix.eval.Coeval
@@ -82,7 +81,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
         letCosts <- usedRefs.toSeq.traverse { ref =>
           local {
             for {
-              _    <- update(funcs.set(_)(startCtx.funcs))
+              _    <- update(ec => ec.copy(funcs = startCtx.funcs))
               cost <- ctx.globalLetEvals.getOrElse(ref, zero)
             } yield cost
           }
@@ -100,22 +99,18 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
   }
 
   private def beforeNextExprEval(let: LET, eval: EvalM[Long]): EvalM[Unit] =
-    update(ctx =>
-      usedRefs
-        .modify(ctx)(_ - let.name)
-        .copy(refsCosts = ctx.refsCosts + (let.name -> local(eval)))
-    )
+    update(ctx => ctx.copy(usedRefs = ctx.usedRefs - let.name, refsCosts = ctx.refsCosts + (let.name -> local(eval))))
 
   private def afterNextExprEval(let: LET, startCtx: EstimatorContext): EvalM[Unit] =
     update(ctx =>
-      usedRefs
-        .modify(ctx)(r => if (startCtx.usedRefs.contains(let.name)) r + let.name else r - let.name)
-        .copy(refsCosts =
+      ctx.copy(
+        usedRefs = if (startCtx.usedRefs.contains(let.name)) ctx.usedRefs + let.name else ctx.usedRefs - let.name,
+        refsCosts =
           if (startCtx.refsCosts.contains(let.name))
             ctx.refsCosts + (let.name -> startCtx.refsCosts(let.name))
           else
             ctx.refsCosts - let.name
-        )
+      )
     )
 
   private def evalFuncBlock(func: FUNC, nextExpr: EXPR, activeFuncArgs: Set[String], globalDeclarationsMode: Boolean): EvalM[Long] =
@@ -142,14 +137,12 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       _ <- set[Id, EstimatorContext, EstimationError](ctx.copy(globalFunctionsCosts = ctx.globalFunctionsCosts + (name -> totalCost)))
     } yield ()
 
-  private def handleUsedRefs(name: String, cost: Long, ctx: EstimatorContext, refsUsedInBody: Set[String]): EvalM[Unit] =
-    update(
-      (funcs ~ usedRefs).modify(_) { case (funcs, _) =>
-        (
-          funcs + (User(name) -> (Coeval.now(cost), refsUsedInBody)),
-          ctx.usedRefs
-        )
-      }
+  private def handleUsedRefs(name: String, cost: Long, startCtx: EstimatorContext, refsUsedInBody: Set[String]): EvalM[Unit] =
+    update(ec =>
+      ec.copy(
+        funcs = ec.funcs + (User(name) -> (Coeval.now(cost), refsUsedInBody)),
+        usedRefs = startCtx.usedRefs
+      )
     )
 
   private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
@@ -165,7 +158,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
     if (activeFuncArgs.contains(key) && letFixes)
       const(overheadCost)
     else
-      update(usedRefs.modify(_)(_ + key)).map(_ => overheadCost)
+      update(ec => ec.copy(usedRefs = ec.usedRefs + key)).map(_ => overheadCost)
 
   private def evalGetter(expr: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
     evalExpr(expr, activeFuncArgs).flatMap(sum(_, overheadCost))
@@ -187,18 +180,15 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
     } yield result
 
   private def setFuncToCtx(header: FunctionHeader, bodyCost: Coeval[Long], bodyUsedRefs: Set[EstimationError]): EvalM[Unit] =
-    update(
-      (funcs ~ usedRefs).modify(_) { case (funcs, usedRefs) =>
-        (
-          funcs + (header -> (bodyCost, Set())),
-          usedRefs ++ bodyUsedRefs
-        )
-      }
+    update(ec =>
+      ec.copy(
+        funcs = ec.funcs + (header -> (bodyCost, Set())),
+        usedRefs = ec.usedRefs ++ bodyUsedRefs
+      )
     )
 
   private def getFuncCost(header: FunctionHeader, ctx: EstimatorContext): EvalM[(Coeval[Long], Set[EstimationError])] =
-    funcs
-      .get(ctx)
+    ctx.funcs
       .get(header)
       .map(const)
       .getOrElse(
@@ -217,9 +207,9 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
   ): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
-      _        <- ctxFuncsOpt.fold(doNothing.void)(ctxFuncs => update(funcs.set(_)(ctxFuncs)))
+      _        <- ctxFuncsOpt.fold(doNothing.void)(ctxFuncs => update(ec => ec.copy(funcs = ctxFuncs)))
       cost     <- evalExpr(expr, activeFuncArgs)
-      _        <- update(funcs.set(_)(startCtx.funcs))
+      _        <- update(ec => ec.copy(funcs = startCtx.funcs))
     } yield cost
 
   private def withUsedRefs[A](eval: EvalM[A]): EvalM[(A, Set[String])] =
