@@ -345,7 +345,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
         .handleError()
       compiledFuncBody <- local {
         val newArgs: VariableTypes = argTypesWithErr._1.getOrElse(List.empty).toMap
-        modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ newArgs))
+        modify[Id, CompilerContext, CompilationError](cc => cc.copy(varDefs = cc.varDefs ++ newArgs))
           .flatMap(_ => compileExprWithCtx(func.expr, saveExprContext, allowIllFormedStrings))
       }
 
@@ -368,10 +368,10 @@ class ExpressionCompiler(val version: StdLibVersion) {
   }
 
   protected def updateCtx(letName: String, letType: Types.FINAL, p: Pos): CompileM[Unit] =
-    modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> VariableInfo(p, letType))))
+    modify[Id, CompilerContext, CompilationError](cc => cc.copy(varDefs = cc.varDefs + (letName -> VariableInfo(p, letType))))
 
   protected def updateCtx(funcName: String, typeSig: FunctionTypeSignature, p: Pos): CompileM[Unit] =
-    modify[Id, CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> FunctionInfo(p, List(typeSig)))))
+    modify[Id, CompilerContext, CompilationError](cc => cc.copy(functionDefs = cc.functionDefs + (funcName -> FunctionInfo(p, List(typeSig)))))
 
   private def compileLetBlock(
       p: Pos,

@@ -12,7 +12,7 @@ import com.wavesplatform.lang.contract.DApp.*
 import com.wavesplatform.lang.contract.meta.{MetaMapper, V1 as MetaV1, V2 as MetaV2}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, UnionNotAllowedForCallableArgs, WrongArgumentType}
-import com.wavesplatform.lang.v1.compiler.CompilerContext.{VariableInfo, vars}
+import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.ContractCompiler.*
 import com.wavesplatform.lang.v1.compiler.ScriptResultSource.FreeCall
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
@@ -87,7 +87,7 @@ class ContractCompiler(version: StdLibVersion) extends ExpressionCompiler(versio
         .getOrElse(List.empty)
       unionInCallableErrs <- checkCallableUnions(af, annotationsWithErr._1.toList.flatten)
       compiledBody <- local {
-        modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings)).flatMap(_ =>
+        modify[Id, CompilerContext, CompilationError](cc => cc.copy(varDefs = cc.varDefs ++ annotationBindings)).flatMap(_ =>
           compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1), allowIllFormedStrings)
         )
       }
