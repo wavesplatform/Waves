@@ -20,19 +20,19 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.66.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.68.0"
 
   val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full)
 
   val akkaHttp        = akkaHttpModule("akka-http")
-  val googleGuava     = "com.google.guava"    % "guava"             % "33.3.0-jre"
+  val googleGuava     = "com.google.guava"    % "guava"             % "33.3.1-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.8"
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.0"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
-  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.100.Final"
+  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.110.Final"
 
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.12")
 
@@ -77,7 +77,7 @@ object Dependencies {
     logback,
     "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.22", // To support Apple ARM
     "com.spotify"                      % "docker-client"                 % "8.16.0",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.17.2",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.18.0",
     asyncHttpClient
   ).map(_ % Test)
 
@@ -107,7 +107,7 @@ object Dependencies {
       rocksdb,
       ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
       "commons-net"          % "commons-net"              % "3.11.1",
-      "commons-io"           % "commons-io"               % "2.16.1",
+      "commons-io"           % "commons-io"               % "2.17.0",
       "com.iheart"          %% "ficus"                    % "1.5.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "8.0" % Runtime,
       kamonCore,
@@ -128,7 +128,7 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.2" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "12.2.0",
+      "com.esaulpaugh"              % "headlong"      % "12.3.0",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
     ) ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value
@@ -139,7 +139,7 @@ object Dependencies {
     akkaHttpModule("akka-http-testkit") % Test
   ) ++ test
 
-  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.4" // grpc 1.64.0 still requires 3.25
+  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.5" // grpc 1.64.0 still requires 3.25
 
   lazy val scalapbRuntime = Def.setting(
     Seq(
@@ -165,7 +165,7 @@ object Dependencies {
     Seq(
       rocksdb,
       "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.8",
-      "net.logstash.logback"          % "logstash-logback-encoder" % "7.4" % Runtime,
+      "net.logstash.logback"          % "logstash-logback-encoder" % "8.0" % Runtime,
       kamonModule("caffeine"),
       kamonModule("prometheus"),
       sttp3,
