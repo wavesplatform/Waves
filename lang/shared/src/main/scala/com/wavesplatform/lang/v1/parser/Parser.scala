@@ -48,8 +48,9 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
   def unusedText[A: P] = comment ~ directive ~ comment
 
   def escapedUnicodeSymbolP[A: P]: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
+  def escapedUnicodeOrEndOfString[A: P]: P[Any] = escapedUnicodeSymbolP[A] | notEndOfString
   def stringP[A: P]: P[EXPR] =
-    P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~~ Index)
+    P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeOrEndOfString).!.repX ~~ "\"" ~~ Index)
       .map { case (start, xs, end) =>
         var errors         = Vector.empty[String]
         val consumedString = new StringBuilder
@@ -255,9 +256,9 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
     def funcBody       = singleBaseExpr
     def correctFunc    = Index ~~ funcKWAndName ~ comment ~/ args(min = 0) ~ ("=" ~ funcBody | "=" ~/ Fail.opaque("function body")) ~~ Index
     def noKeyword = {
-      def noArgs      = "(" ~ comment ~ ")" ~ comment
-      def validName   = NoCut(funcName).filter(_.isInstanceOf[VALID[?]])
-      def argsOrEqual = (NoCut(args(min = 1)) ~ "=".?) | (noArgs ~ "=" ~~ !"=")
+      def noArgs              = "(" ~ comment ~ ")" ~ comment
+      def validName           = NoCut(funcName).filter(_.isInstanceOf[VALID[?]])
+      def argsOrEqual: P[Any] = (NoCut(args(min = 1)) ~ "=".?) | (noArgs ~ "=" ~~ !"=")
       (validName ~ comment ~ argsOrEqual ~/ funcBody.? ~~ Fail)
         .asInstanceOf[P[Nothing]]
         .opaque(""""func" keyword""")

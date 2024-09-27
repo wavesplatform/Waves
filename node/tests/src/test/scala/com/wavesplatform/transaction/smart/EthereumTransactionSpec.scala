@@ -106,7 +106,7 @@ class EthereumTransactionSpec
     val assetTransfer   = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, Long.MaxValue, TestAsset)
 
     differ(assetTransfer).balances shouldBe Map(
-      (senderAddress, TestAsset)    -> 0,
+      (senderAddress, TestAsset)    -> 0L,
       (senderAddress, Waves)        -> (LongMaxMinusFee + transfer.fee.longValue()),
       (recipientAddress, TestAsset) -> Long.MaxValue
     )

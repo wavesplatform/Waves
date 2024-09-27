@@ -212,9 +212,9 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
           val expectedPortfolios = if (exceeding || raiseError) basePortfolios else basePortfolios |+| additionalPortfolios
           expectedPortfolios
             .foreach { case (address, expectedPortfolio) =>
-              expectedPortfolio.balance shouldBe snapshot.balances.get((address, Waves)).map(_ - db.balance(address)).getOrElse(0)
+              expectedPortfolio.balance shouldBe snapshot.balances.get((address, Waves)).map(_ - db.balance(address)).getOrElse(0L)
               expectedPortfolio.assets.foreach { case (asset, balance) =>
-                balance shouldBe snapshot.balances.get((address, asset)).map(_ - db.balance(address, asset)).getOrElse(0)
+                balance shouldBe snapshot.balances.get((address, asset)).map(_ - db.balance(address, asset)).getOrElse(0L)
               }
             }
         }
