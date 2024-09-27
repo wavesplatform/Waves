@@ -96,7 +96,7 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
             (1 to argc)
               .map(_ => desAuxR(in, allowObjects, acc))
               .toList
-              .sequence
+              .sequence[Coeval, EXPR]
               .map(FUNCTION_CALL(header, _))
           }
       case E_ARR =>

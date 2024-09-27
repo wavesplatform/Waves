@@ -123,7 +123,7 @@ object Decompiler {
       case _                     => ("", "")
     }
 
-    def argsStr(args: List[EXPR])  = args.map(argStr).toVector.sequence
+    def argsStr(args: List[EXPR])  = args.map(argStr).toVector.sequence[Coeval, String]
     def listStr(elems: List[EXPR]) = argsStr(elems).map(_.mkString("[", ", ", "]"))
     def argStr(elem: EXPR)         = expr(pure(elem), ctx, BracesWhenNeccessary, DontIndentFirstLine)
 
@@ -263,7 +263,7 @@ object Decompiler {
 
   def apply(e: DApp, ctx: DecompilerContext, stdLibVersion: StdLibVersion): String = {
 
-    def intersperse(s: Seq[Coeval[String]]): Coeval[String] = s.toVector.sequence.map(v => v.mkString(NEWLINE + NEWLINE))
+    def intersperse(s: Seq[Coeval[String]]): Coeval[String] = s.toVector.sequence[Coeval, String].map(v => v.mkString(NEWLINE + NEWLINE))
 
     val dApp = ContractScriptCompactor.decompact(e)
 
