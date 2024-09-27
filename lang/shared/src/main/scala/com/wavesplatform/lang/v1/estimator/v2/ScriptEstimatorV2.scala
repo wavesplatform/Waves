@@ -44,7 +44,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     local {
       val letResult = (false, evalExpr(let.value))
       for {
-        _ <- update(ec => ec.copy(letDefs = ec.letDefs.updated(let.name, letResult)))
+        _ <- update(ctx => ctx.copy(letDefs = ctx.letDefs.updated(let.name, letResult)))
         r <- evalExpr(inner)
       } yield r + 5
     }
@@ -60,7 +60,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     local {
       for {
         _ <- checkFuncCtx(func)
-        _ <- update(ec => ec.copy(userFuncs = ec.userFuncs + (FunctionHeader.User(func.name) -> func)))
+        _ <- update(ctx => ctx.copy(userFuncs = ctx.userFuncs + (FunctionHeader.User(func.name) -> func)))
         r <- evalExpr(inner)
       } yield r + 5
     }
@@ -68,7 +68,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
   private def checkFuncCtx(func: FUNC): EvalM[Unit] =
     local {
       for {
-        _ <- update(ec => ec.copy(letDefs = ec.letDefs ++ func.args.map((_, (true, const(0)))).toMap))
+        _ <- update(ctx => ctx.copy(letDefs = ctx.letDefs ++ func.args.map((_, (true, const(0)))).toMap))
         _ <- evalExpr(func.body)
       } yield ()
     }
@@ -84,7 +84,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     } yield r + 2
 
   private def setRefEvaluated(key: String, lzy: EvalM[Long]): EvalM[Long] =
-    update(ec => ec.copy(letDefs = ec.letDefs.updated(key, (true, lzy))))
+    update(ctx => ctx.copy(letDefs = ctx.letDefs.updated(key, (true, lzy))))
       .flatMap(_ => lzy)
 
   private def evalGetter(expr: EXPR): EvalM[Long] =
@@ -104,23 +104,23 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     for {
       argsComplexity <- evalFuncArgs(args)
       ctx            <- get[Id, EstimatorContext, EstimationError]
-      _              <- update(ec => ec.copy(letDefs = ec.letDefs ++ ctx.overlappedRefs))
+      _              <- update(ctx1 => ctx1.copy(letDefs = ctx1.letDefs ++ ctx.overlappedRefs))
       overlapped = func.args.flatMap(arg => ctx.letDefs.get(arg).map((arg, _))).toMap
       ctxArgs    = func.args.map((_, (false, const(1)))).toMap
-      _ <- update(ec =>
-        ec.copy(
-          letDefs = ec.letDefs ++ ctxArgs,
-          overlappedRefs = ec.overlappedRefs ++ overlapped
+      _ <- update(ctx1 =>
+        ctx1.copy(
+          letDefs = ctx1.letDefs ++ ctxArgs,
+          overlappedRefs = ctx1.overlappedRefs ++ overlapped
         )
       )
 
       bodyComplexity <- evalExpr(func.body).map(_ + func.args.size * 5)
       evaluatedCtx   <- get[Id, EstimatorContext, EstimationError]
       overlappedChanges = overlapped.map { case ref @ (name, _) => evaluatedCtx.letDefs.get(name).map((name, _)).getOrElse(ref) }
-      _ <- update(ec =>
-        ec.copy(
-          letDefs = ec.letDefs -- ctxArgs.keys ++ overlapped,
-          overlappedRefs = ec.overlappedRefs ++ overlappedChanges
+      _ <- update(ctx1 =>
+        ctx1.copy(
+          letDefs = ctx1.letDefs -- ctxArgs.keys ++ overlapped,
+          overlappedRefs = ctx1.overlappedRefs ++ overlappedChanges
         )
       )
     } yield bodyComplexity + argsComplexity

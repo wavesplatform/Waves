@@ -87,7 +87,7 @@ class ContractCompiler(version: StdLibVersion) extends ExpressionCompiler(versio
         .getOrElse(List.empty)
       unionInCallableErrs <- checkCallableUnions(af, annotationsWithErr._1.toList.flatten)
       compiledBody <- local {
-        modify[Id, CompilerContext, CompilationError](cc => cc.copy(varDefs = cc.varDefs ++ annotationBindings)).flatMap(_ =>
+        modify[Id, CompilerContext, CompilationError](ctx => ctx.copy(varDefs = ctx.varDefs ++ annotationBindings)).flatMap(_ =>
           compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1), allowIllFormedStrings)
         )
       }
