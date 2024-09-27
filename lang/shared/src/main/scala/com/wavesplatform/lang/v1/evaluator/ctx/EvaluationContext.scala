@@ -8,7 +8,6 @@ import com.wavesplatform.lang.v1.compiler.Terms.LET
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, LetExecResult, LetLogCallback}
-import shapeless3.{Lens, lens}
 
 import java.util
 
@@ -49,17 +48,6 @@ case class EnabledLogEvaluationContext[C[_[_]], F[_]: Monad](l: LetLogCallback[F
 
   private def add(let: LET, result: LetExecResult[F]): Unit =
     loggedLets.computeIfAbsent(let, _ => l(let.name)(result))
-}
-
-object EnabledLogEvaluationContext {
-  class Lenses[F[_]: Monad, C[_[_]]] {
-    val types: Lens[EnabledLogEvaluationContext[C, F], Map[String, FINAL]] =
-      lens[EnabledLogEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("typeDefs")
-    val lets: Lens[EnabledLogEvaluationContext[C, F], Map[String, LazyVal[F]]] =
-      lens[EnabledLogEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("letDefs")
-    val funcs: Lens[EnabledLogEvaluationContext[C, F], Map[FunctionHeader, BaseFunction[C]]] =
-      lens[EnabledLogEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("functions")
-  }
 }
 
 case class DisabledLogEvaluationContext[C[_[_]], F[_]](ec: EvaluationContext[C, F]) extends LoggedEvaluationContext[C, F] {

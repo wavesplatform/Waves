@@ -7,7 +7,6 @@ import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import shapeless3.*
 
 case class CompilerContext(
     predefTypes: Map[String, FINAL],
@@ -59,10 +58,6 @@ object CompilerContext {
       functionDefs = x.functionDefs ++ y.functionDefs,
       y.provideRuntimeTypeOnCastError
     )
-
-  val types: Lens[CompilerContext, Map[String, FINAL]] = lens[CompilerContext] >> Symbol("predefTypes")
-  val vars: Lens[CompilerContext, VariableTypes]       = lens[CompilerContext] >> Symbol("varDefs")
-  val functions: Lens[CompilerContext, FunctionTypes]  = lens[CompilerContext] >> Symbol("functionDefs")
 
   val empty = CompilerContext(Map(), Map(), Map(), true)
 }
