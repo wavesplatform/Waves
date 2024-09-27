@@ -284,8 +284,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
        |{-# CONTENT_TYPE DAPP #-}
        |{-# SCRIPT_TYPE ACCOUNT #-}
        |
-       |let looooooooooooooooooooooooongName = base58'${"a" * 3602}'
-       |${(1 to 18).map(i => s"let a$i = base58'${"a" * 12200}'").mkString("\n")}
+       |let looooooooooooooooooooooooongName = base64'${"A" * 3518}' # 2640 bytes
+       |${(1 to 18).map(i => s"let a$i = base64'${"A" * 11912}'").mkString("\n")} # 18 * 8934 bytes
        |func test() = looooooooooooooooooooooooongName == looooooooooooooooooooooooongName
      """.stripMargin
 
