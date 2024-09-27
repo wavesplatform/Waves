@@ -30,5 +30,5 @@ package object converters {
   implicit def pureEval[F[_], A <: EVALUATED](
       v: Eval[Either[ExecutionError, A]]
   )(implicit m: Monad[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
-    v.map(ei => pure(ei)(m))
+    v.map(ei => pure(ei)(using m))
 }

@@ -7,5 +7,5 @@ case class DAppEstimation(
     globalFunctionsCosts: Map[String, Long]
 ) {
   val maxAnnotatedComplexity: (String, Long) =
-    annotatedComplexities.toList.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
+    annotatedComplexities.toList.maximumOption(_._2 `compareTo` _._2).getOrElse(("", 0L))
 }

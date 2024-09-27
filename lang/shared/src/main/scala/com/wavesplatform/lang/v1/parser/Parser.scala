@@ -321,11 +321,11 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
         case TypedVar(_, t)    => checkForGenericAndGetLastPos(t)
         case ConstsPat(_, pos) => Right(Some(pos))
         case TuplePat(ps, pos) =>
-          ps.toList traverse checkPattern map { _ =>
+          ps.toList `traverse` checkPattern map { _ =>
             Some(pos)
           }
         case ObjPat(ps, _, pos) =>
-          ps.values.toList traverse checkPattern map { _ =>
+          ps.values.toList `traverse` checkPattern map { _ =>
             Some(pos)
           }
       }
@@ -507,14 +507,14 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
     comment ~ P(foldMacroP | ifP | matchP | ep | maybeAccessP) ~ comment
   }
 
-  def baseExpr[A: P] = P(strictLetBlockP | binaryOp(baseAtom(block(None)(_))(_), opsByPriority))
+  def baseExpr[A: P] = P(strictLetBlockP | binaryOp(baseAtom(block(None)(_))(using _), opsByPriority))
 
   def singleBaseAtom[A: P] =
     comment ~
       P(foldMacroP | ifP | matchP | maybeAccessP) ~
       comment
 
-  def singleBaseExpr[A: P] = P(binaryOp(singleBaseAtom(_), opsByPriority))
+  def singleBaseExpr[A: P] = P(binaryOp(singleBaseAtom(using _), opsByPriority))
 
   def declaration[A: P] = P(variableDefP("let") | funcP.map(Seq(_)))
 
@@ -533,13 +533,13 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
       case Left(kinds) :: restOps =>
         def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(_), restOps)
         val kindc = kinds
-          .map(o => { implicit c: fastparse.P[Any] =>
+          .map(o => { implicit (c: fastparse.P[Any]) =>
             o.parser
           })
           .reduce((plc, prc) => {
             def pl(implicit c: fastparse.P[Any]) = plc(c)
             def pr(implicit c: fastparse.P[Any]) = prc(c);
-            { implicit c: fastparse.P[Any] =>
+            { implicit (c: fastparse.P[Any]) =>
               P(pl | pr)
             }
           })
@@ -554,13 +554,13 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
       case Right(kinds) :: restOps =>
         def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(_), restOps)
         val kindc = kinds
-          .map(o => { implicit c: fastparse.P[Any] =>
+          .map(o => { implicit (c: fastparse.P[Any]) =>
             o.parser
           })
           .reduce((plc, prc) => {
             def pl(implicit c: fastparse.P[Any]) = plc(c)
             def pr(implicit c: fastparse.P[Any]) = prc(c);
-            { implicit c: fastparse.P[Any] =>
+            { implicit (c: fastparse.P[Any]) =>
               P(pl | pr)
             }
           })
@@ -578,7 +578,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
   def unaryOp(atom: fastparse.P[Any] => P[EXPR], ops: List[UnaryOperation])(implicit c: fastparse.P[Any]): P[EXPR] =
     ops.foldRight(atom) { case (op, accc) =>
       def acc(implicit c: fastparse.P[Any]) = accc(c);
-      { implicit c: fastparse.P[Any] =>
+      { implicit (c: fastparse.P[Any]) =>
         (Index ~~ op.parser.map(_ => ()) ~ P(unaryOp(atom, ops)) ~~ Index).map { case (start, expr, end) =>
           op.expr(start, end, expr)
         } | acc
@@ -587,14 +587,14 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
 
   def parseExpr(str: String): Parsed[EXPR] = {
     def expr[A: P] = P(Start ~ unusedText ~ (baseExpr | invalid | ("" ~/ Fail).opaque("result expression")) ~ End)
-    parse(str, expr(_), verboseFailures = true)
+    parse(str, expr(using _), verboseFailures = true)
   }
 
   def parseReplExpr(str: String): Parsed[EXPR] = {
     def unit[A: P]     = Pass(REF(AnyPos, VALID(AnyPos, GlobalValNames.Unit)))
     def replAtom[A: P] = baseAtom(block(Some(unit))(_))
-    def replExpr[A: P] = binaryOp(baseAtom(replAtom(_))(_), opsByPriority)
-    parse(str, replExpr(_), verboseFailures = true)
+    def replExpr[A: P] = binaryOp(baseAtom(replAtom(using _))(using _), opsByPriority)
+    parse(str, replExpr(using _), verboseFailures = true)
   }
 
   def parseContract(str: String): Parsed[DAPP] = {
@@ -604,10 +604,10 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
           (DAPP(Pos(0, end), ds.flatten.toList, fs.toList), t)
         }
 
-    parse(str, contract(_), verboseFailures = true) match {
+    parse(str, contract(using _), verboseFailures = true) match {
       case Parsed.Success((_, t), _) if t.nonEmpty =>
         def contract[A: P] = P(Start ~ unusedText ~ declaration.rep ~ comment ~ annotatedFunc.rep ~ !declaration.rep(1) ~ End ~~ Index)
-        parse(str, contract(_)) match {
+        parse(str, contract(using _)) match {
           case Parsed.Failure(_, o, e) =>
             Parsed.Failure(s"Local functions should be defined before @Callable one: ${str.substring(o)}", o, e)
           case _ => throw new Exception("Parser error")

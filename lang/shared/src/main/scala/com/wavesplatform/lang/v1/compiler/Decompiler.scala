@@ -50,7 +50,7 @@ object Decompiler {
     e match {
       case FUNCTION_CALL(FunctionHeader.Native(1), List(REF(Name), CONST_STRING(typeName))) => pure(Some(List(typeName)))
       case IF(FUNCTION_CALL(FunctionHeader.Native(1), List(REF(Name), CONST_STRING(typeName))), TRUE, t) =>
-        extrTypes(Name, t) map (_.map(tl => typeName :: tl))
+        extrTypes(Name, t) `map` (_.map(tl => typeName :: tl))
       case _ => pure(None)
     }
   }

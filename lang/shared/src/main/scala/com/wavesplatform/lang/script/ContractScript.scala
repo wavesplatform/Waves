@@ -198,7 +198,7 @@ object ContractScript {
   ): Either[String, ((String, Long), Map[String, Long])] =
     for {
       annotatedFunctionComplexities <- estimateAnnotatedFunctions(version, dApp, estimator, fixEstimateOfVerifier)
-      max = annotatedFunctionComplexities.toList.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
+      max = annotatedFunctionComplexities.toList.maximumOption(_._2 `compareTo` _._2).getOrElse(("", 0L))
     } yield (max, annotatedFunctionComplexities.toMap)
 
   def estimateFully(version: StdLibVersion, dApp: DApp, estimator: ScriptEstimator): Either[String, DAppEstimation] = {
