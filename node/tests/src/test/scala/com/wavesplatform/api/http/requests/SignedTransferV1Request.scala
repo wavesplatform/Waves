@@ -3,9 +3,9 @@ package com.wavesplatform.api.http.requests
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.transfer._
-import play.api.libs.functional.syntax._
-import play.api.libs.json._
+import com.wavesplatform.transaction.transfer.*
+import play.api.libs.functional.syntax.*
+import play.api.libs.json.*
 
 object SignedTransferV1Request {
   implicit val reads: Reads[SignedTransferV1Request] = (

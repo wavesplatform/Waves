@@ -1,6 +1,6 @@
 package com.wavesplatform.protobuf.utils
 
-import cats.syntax.applicativeError._
+import cats.syntax.applicativeError.*
 import com.google.protobuf.CodedOutputStream
 import com.wavesplatform.common.state.ByteStr
 import scalapb.{GeneratedMessage, GeneratedMessageCompanion}
@@ -28,7 +28,7 @@ object PBUtils {
     cmp
       .validate(msg)
       .toEither
-      .adaptErr {
-        case err => new RuntimeException(s"Error deserializing PB message: $cmp (bytes = ${ByteStr(msg)})", err)
+      .adaptErr { case err =>
+        new RuntimeException(s"Error deserializing PB message: $cmp (bytes = ${ByteStr(msg)})", err)
       }
 }

@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.{invoke, issue, secondSigner, setScript}
 
 class ScriptActionsTest extends PropSpec with WithDomain {
-  import DomainPresets._
+  import DomainPresets.*
 
   property("ScriptTransfer after burning whole amount") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>

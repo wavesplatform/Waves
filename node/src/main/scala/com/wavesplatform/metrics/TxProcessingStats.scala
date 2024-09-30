@@ -4,7 +4,7 @@ import com.google.common.base.CaseFormat
 import com.wavesplatform.transaction.{Transaction, TransactionType}
 import kamon.Kamon
 import kamon.metric.Metric
-import supertagged._
+import supertagged.*
 
 object TxProcessingStats {
   private val typeToName = {

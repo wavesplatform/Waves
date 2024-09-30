@@ -11,8 +11,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.test.PropSpec
 
 class FairPoSCalculatorTest extends PropSpec {
-  import FairPoSCalculatorTest._
-  import PoSCalculator._
+  import FairPoSCalculatorTest.*
+  import PoSCalculator.*
 
   val pos: PoSCalculator = FairPoSCalculator.V1
 
@@ -137,9 +137,9 @@ class FairPoSCalculatorTest extends PropSpec {
 }
 
 object FairPoSCalculatorTest {
-  import play.api.libs.functional.syntax._
-  import play.api.libs.json._
-  import play.api.libs.json.Reads._
+  import play.api.libs.functional.syntax.*
+  import play.api.libs.json.*
+  import play.api.libs.json.Reads.*
 
   case class Input(
       privateKey: PrivateKey,

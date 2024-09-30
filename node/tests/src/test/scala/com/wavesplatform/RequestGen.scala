@@ -1,10 +1,10 @@
 package com.wavesplatform
 
 import com.wavesplatform.account.Alias
-import com.wavesplatform.api.http.requests._
+import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.crypto._
-import com.wavesplatform.transaction.assets._
+import com.wavesplatform.crypto.*
+import com.wavesplatform.transaction.assets.*
 import org.scalacheck.Gen.{alphaNumChar, choose, listOfN, oneOf}
 import org.scalacheck.{Arbitrary, Gen => G}
 import org.scalatest.Suite

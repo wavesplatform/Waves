@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures

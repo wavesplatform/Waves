@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import play.api.libs.json._
+import play.api.libs.json.*
 
 sealed trait OrderPriceMode {
   private[OrderPriceMode] val jsonName: String = {

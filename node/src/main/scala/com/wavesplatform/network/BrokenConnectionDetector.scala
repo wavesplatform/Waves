@@ -4,7 +4,7 @@ import java.util.concurrent.{ConcurrentHashMap, ScheduledFuture}
 
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
-import io.netty.channel._
+import io.netty.channel.*
 
 import scala.concurrent.duration.FiniteDuration
 

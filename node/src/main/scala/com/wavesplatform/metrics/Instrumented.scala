@@ -25,7 +25,7 @@ object Instrumented {
   }
 
   def withTime[R](h: Metric.Histogram, f: => R): (R, Long) = {
-    import scala.concurrent.duration._
+    import scala.concurrent.duration.*
     val (result, nanoTime) = withTimeNanos(f)
     h.settings.unit match {
       case u if u == MeasurementUnit.time.nanoseconds =>

@@ -65,8 +65,8 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
   }
 
   private[this] object Preconditions {
-    import QuickTX._
-    import UnsafeBlocks._
+    import QuickTX.*
+    import UnsafeBlocks.*
 
     def conflictingTransfers(): Gen[(Block, Block, Seq[MicroBlock], Block)] = {
       for {

@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, Asset => AssetType, DApp => DAppType}
@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.traits.Environment.{InputEntity, Tthis}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget}
-import shapeless._
+import shapeless.*
 
 package object smart {
   def buildThisValue(

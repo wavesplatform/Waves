@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import io.netty.channel.ChannelHandler.Sharable
-import io.netty.channel._
+import io.netty.channel.*
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject

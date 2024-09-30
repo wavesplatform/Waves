@@ -6,8 +6,8 @@ import com.google.protobuf.{ByteString, CodedOutputStream, WireFormat}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.mining.MiningConstraints
-import com.wavesplatform.protobuf.block._
-import com.wavesplatform.protobuf.transaction._
+import com.wavesplatform.protobuf.block.*
+import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.SetScriptTransaction

@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.serialization._
+import com.wavesplatform.serialization.*
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import play.api.libs.json.{JsObject, Json}
@@ -12,7 +12,7 @@ import scala.util.Try
 
 object ReissueTxSerializer {
   def toJson(tx: ReissueTransaction): JsObject = {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"    -> asset.id.toString,
       "quantity"   -> quantity.value,
@@ -21,7 +21,7 @@ object ReissueTxSerializer {
   }
 
   def bodyBytes(tx: ReissueTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
     lazy val baseBytes = Bytes.concat(
       sender.arr,
       asset.id.arr,

@@ -2,7 +2,7 @@ package com.wavesplatform.features
 
 import com.wavesplatform.features.BlockchainFeatureStatus.{Activated, Approved, Undefined}
 import com.wavesplatform.features.api.NodeFeatureStatus.{Implemented, NotImplemented, Voted}
-import play.api.libs.json._
+import play.api.libs.json.*
 
 package object api {
   implicit val nodeFeatureStatusFormat: Format[NodeFeatureStatus] =

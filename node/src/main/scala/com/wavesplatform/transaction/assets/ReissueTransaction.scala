@@ -4,14 +4,14 @@ import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.serialization.impl.ReissueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.ReissueTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.util._
+import scala.util.*
 
 case class ReissueTransaction(
     version: TxVersion,

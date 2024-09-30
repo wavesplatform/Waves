@@ -3,7 +3,7 @@ package com.wavesplatform
 import org.scalatest.matchers.{MatchResult, Matcher}
 
 trait EitherMatchers {
-  import EitherMatchers._
+  import EitherMatchers.*
   def beRight: Matcher[Either[Any, Any]] = BeRight
   def beLeft: Matcher[Either[Any, Any]]  = BeLeft
 }

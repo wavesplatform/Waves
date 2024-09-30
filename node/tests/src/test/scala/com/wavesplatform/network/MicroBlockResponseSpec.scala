@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.common.utils.Base64
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 class MicroBlockResponseSpec extends FreeSpec {
   private val microBlockBytes = Base64.decode(

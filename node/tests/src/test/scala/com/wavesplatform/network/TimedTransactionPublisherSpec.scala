@@ -13,7 +13,7 @@ import io.netty.util.HashedWheelTimer
 import monix.execution.atomic.AtomicInt
 import org.scalatest.BeforeAndAfterAll
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class TimedTransactionPublisherSpec extends FreeSpec with BeforeAndAfterAll {
   private[this] val timer     = new HashedWheelTimer

@@ -4,9 +4,9 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.api.http.`X-Api-Key`
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.settings._
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import com.wavesplatform.settings.*
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 
 trait RestAPISettingsHelper {
   private val apiKey: String = "test_api_key"

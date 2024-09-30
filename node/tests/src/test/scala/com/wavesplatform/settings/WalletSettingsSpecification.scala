@@ -3,8 +3,8 @@ package com.wavesplatform.settings
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.FlatSpec
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 
 class WalletSettingsSpecification extends FlatSpec {
   "WalletSettings" should "read values from config" in {

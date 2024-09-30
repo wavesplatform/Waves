@@ -8,9 +8,9 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.Channel
-import play.api.libs.json._
+import play.api.libs.json.*
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 case class PeersApiRoute(
     settings: RestAPISettings,
@@ -20,7 +20,7 @@ case class PeersApiRoute(
 ) extends ApiRoute
     with AuthRoute {
 
-  import PeersApiRoute._
+  import PeersApiRoute.*
 
   override lazy val route: Route =
     pathPrefix("peers") {
@@ -34,12 +34,11 @@ case class PeersApiRoute(
           JsArray(
             peerDatabase.knownPeers
               .take(MaxPeersInResponse)
-              .map {
-                case (address, timestamp) =>
-                  Json.obj(
-                    "address"  -> address.toString,
-                    "lastSeen" -> timestamp
-                  )
+              .map { case (address, timestamp) =>
+                Json.obj(
+                  "address"  -> address.toString,
+                  "lastSeen" -> timestamp
+                )
               }
               .toList
           )
@@ -51,16 +50,15 @@ case class PeersApiRoute(
     val peers = establishedConnections
       .values()
       .stream()
-      .map[JsValue](
-        pi =>
-          Json.obj(
-            "address"            -> pi.remoteAddress.toString,
-            "declaredAddress"    -> pi.declaredAddress.fold("N/A")(_.toString),
-            "peerName"           -> pi.nodeName,
-            "peerNonce"          -> pi.nodeNonce,
-            "applicationName"    -> pi.applicationName,
-            "applicationVersion" -> s"${pi.applicationVersion._1}.${pi.applicationVersion._2}.${pi.applicationVersion._3}"
-          )
+      .map[JsValue](pi =>
+        Json.obj(
+          "address"            -> pi.remoteAddress.toString,
+          "declaredAddress"    -> pi.declaredAddress.fold("N/A")(_.toString),
+          "peerName"           -> pi.nodeName,
+          "peerNonce"          -> pi.nodeNonce,
+          "applicationName"    -> pi.applicationName,
+          "applicationVersion" -> s"${pi.applicationVersion._1}.${pi.applicationVersion._2}.${pi.applicationVersion._3}"
+        )
       )
       .collect(Collectors.toList())
       .asScala

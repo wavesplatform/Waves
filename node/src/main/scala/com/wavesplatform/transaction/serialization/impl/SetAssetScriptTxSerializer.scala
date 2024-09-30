@@ -12,7 +12,7 @@ import scala.util.Try
 
 object SetAssetScriptTxSerializer {
   def toJson(tx: SetAssetScriptTransaction): JsObject = {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId" -> asset.id.toString,
       "script"  -> script.map(_.bytes().base64)
@@ -20,7 +20,7 @@ object SetAssetScriptTxSerializer {
   }
 
   def bodyBytes(tx: SetAssetScriptTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
     version match {
       case TxVersion.V1 =>
         Bytes.concat(

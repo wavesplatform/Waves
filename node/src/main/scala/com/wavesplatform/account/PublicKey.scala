@@ -3,13 +3,13 @@ package com.wavesplatform.account
 import com.google.common.collect.Interners
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.crypto._
+import com.wavesplatform.crypto.*
 import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import com.wavesplatform.utils.base58Length
 import org.web3j.crypto.Keys
 import play.api.libs.json.{Format, Writes}
-import supertagged._
-import supertagged.postfix._
+import supertagged.*
+import supertagged.postfix.*
 
 object PublicKey extends TaggedType[ByteStr] {
   private[this] val interner = Interners.newWeakInterner[PublicKey]()

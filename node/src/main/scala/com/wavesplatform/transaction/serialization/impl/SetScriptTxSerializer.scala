@@ -12,14 +12,14 @@ import scala.util.Try
 
 object SetScriptTxSerializer {
   def toJson(tx: SetScriptTransaction): JsObject = {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++ Json.obj(
       "script" -> script.map(_.bytes().base64)
     ) ++ (if (tx.version == TxVersion.V1) Json.obj("chainId" -> chainId) else Json.obj())
   }
 
   def bodyBytes(tx: SetScriptTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
     version match {
       case TxVersion.V1 =>
         Bytes.concat(

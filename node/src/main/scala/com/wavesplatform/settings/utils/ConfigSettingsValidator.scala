@@ -1,15 +1,15 @@
 package com.wavesplatform.settings.utils
 
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
-import cats.instances.list._
-import cats.syntax.foldable._
-import cats.syntax.traverse._
+import cats.instances.list.*
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import com.typesafe.config.{Config, ConfigException}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ValueReader
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 object ConfigSettingsValidator {
@@ -64,10 +64,9 @@ class ConfigSettingsValidator(config: Config) {
       .asScala
       .toList
       .zipWithIndex
-      .traverse {
-        case (cfg, index) =>
-          val elemPath = s"$settingName.$index"
-          Validated fromTry Try(cfg.atPath(elemPath).as[T](elemPath)) leftMap (ex => List(ex.getMessage))
+      .traverse { case (cfg, index) =>
+        val elemPath = s"$settingName.$index"
+        Validated fromTry Try(cfg.atPath(elemPath).as[T](elemPath)) leftMap (ex => List(ex.getMessage))
       }
       .leftMap(errorsInList => createError(settingName, errorsInList.mkString(", "), showValue = false))
   }

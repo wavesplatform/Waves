@@ -18,7 +18,7 @@ object LeaseCancelTxSerializer {
       (if (tx.version == TxVersion.V2) Json.obj("chainId" -> tx.chainId) else Json.obj())
 
   def bodyBytes(tx: LeaseCancelTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
     val baseBytes = Bytes.concat(sender.arr, Longs.toByteArray(fee.value), Longs.toByteArray(timestamp), leaseId.arr)
 
     version match {

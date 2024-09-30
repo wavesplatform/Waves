@@ -8,7 +8,7 @@ import io.netty.channel.local.LocalChannel
 import monix.eval.Coeval
 import monix.reactive.subjects.PublishSubject
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class RxScoreObserverSpec extends FreeSpec with RxScheduler {
   override def testSchedulerName = "test-rx-score-observer"

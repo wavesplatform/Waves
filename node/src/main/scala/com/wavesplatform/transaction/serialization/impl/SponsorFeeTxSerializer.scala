@@ -12,7 +12,7 @@ import scala.util.Try
 
 object SponsorFeeTxSerializer {
   def toJson(tx: SponsorFeeTransaction): JsObject = {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"              -> asset.id.toString,
       "minSponsoredAssetFee" -> minSponsoredAssetFee.map(_.value)
@@ -20,7 +20,7 @@ object SponsorFeeTxSerializer {
   }
 
   def bodyBytes(tx: SponsorFeeTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
     version match {
       case TxVersion.V1 =>
         Bytes.concat(

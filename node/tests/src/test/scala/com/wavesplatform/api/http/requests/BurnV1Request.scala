@@ -6,8 +6,8 @@ case class BurnV1Request(sender: String, assetId: String, amount: Long, fee: Lon
 
 object BurnV1Request {
   implicit val burnV1Reads: Reads[BurnV1Request] = {
-    import play.api.libs.functional.syntax._
-    import play.api.libs.json._
+    import play.api.libs.functional.syntax.*
+    import play.api.libs.json.*
 
     ((JsPath \ "sender").read[String] ~
       (JsPath \ "assetId").read[String] ~

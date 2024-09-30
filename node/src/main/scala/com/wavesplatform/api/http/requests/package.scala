@@ -8,13 +8,13 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, Validation}
 import com.wavesplatform.transaction.{Asset, AssetIdStringLength, Proofs, TxValidationError, TxVersion}
 import com.wavesplatform.utils.base58Length
-import play.api.libs.json._
+import play.api.libs.json.*
 import supertagged.TaggedType
 
 package object requests {
-  import cats.instances.list._
-  import cats.syntax.either._
-  import cats.syntax.traverse._
+  import cats.instances.list.*
+  import cats.syntax.either.*
+  import cats.syntax.traverse.*
 
   val SignatureStringLength: Int = base58Length(SignatureLength)
   val DigestStringLength: Int    = base58Length(DigestLength)

@@ -4,9 +4,9 @@ import java.net.InetSocketAddress
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
-import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.Ficus.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class NetworkSettingsSpecification extends FlatSpec {
 

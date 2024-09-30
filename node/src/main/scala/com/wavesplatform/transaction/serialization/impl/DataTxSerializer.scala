@@ -16,12 +16,12 @@ import scala.util.Try
 
 object DataTxSerializer {
   def toJson(tx: DataTransaction): JsObject = {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++ Json.obj("data" -> Json.toJson(data))
   }
 
   def bodyBytes(tx: DataTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
     version match {
       case TxVersion.V1 =>
         Bytes.concat(

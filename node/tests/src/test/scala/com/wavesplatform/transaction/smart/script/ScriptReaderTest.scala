@@ -1,14 +1,14 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.{ContractScript, ScriptReader}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.test.PropSpec
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{EitherValues, Inside}
@@ -57,7 +57,7 @@ class ScriptReaderTest extends PropSpec with TypedScriptGen with Inside with Eit
   }
 
   property("should return correct error for invalid length script") {
-    import ScriptReaderTest._
+    import ScriptReaderTest.*
 
     forAll(invalidPrefixV0Length) { scBytes =>
       ScriptReader.fromBytes(scBytes).left.value
@@ -65,7 +65,7 @@ class ScriptReaderTest extends PropSpec with TypedScriptGen with Inside with Eit
   }
 
   property("should return correct error for script with invalid start bytes") {
-    import ScriptReaderTest._
+    import ScriptReaderTest.*
 
     forAll(Gen.oneOf(invalidPrefixV0, invalidPrefix)) { scBytes =>
       ScriptReader.fromBytes(scBytes).left.value

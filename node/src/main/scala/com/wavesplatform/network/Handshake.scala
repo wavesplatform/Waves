@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import com.google.common.base.Charsets
 import io.netty.buffer.ByteBuf
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 
 case class Handshake(
     applicationName: String,

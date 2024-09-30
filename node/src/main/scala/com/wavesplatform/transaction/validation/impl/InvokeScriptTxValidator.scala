@@ -24,7 +24,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
   }
 
   override def validate(tx: InvokeScriptTransaction): ValidatedV[InvokeScriptTransaction] = {
-    import tx._
+    import tx.*
 
     def checkLength: Either[GenericError, Unit] = {
       val length =

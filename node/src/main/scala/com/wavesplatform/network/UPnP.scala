@@ -6,7 +6,7 @@ import com.wavesplatform.settings.UPnPSettings
 import com.wavesplatform.utils.ScorexLogging
 import org.bitlet.weupnp.{GatewayDevice, GatewayDiscover}
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 class UPnP(settings: UPnPSettings) extends ScorexLogging {
@@ -28,9 +28,8 @@ class UPnP(settings: UPnPSettings) extends ScorexLogging {
     if (gatewayMap.isEmpty) {
       log.debug("There are no UPnP gateway devices")
     } else {
-      gatewayMap.foreach {
-        case (addr, _) =>
-          log.debug("UPnP gateway device found on " + addr.getHostAddress)
+      gatewayMap.foreach { case (addr, _) =>
+        log.debug("UPnP gateway device found on " + addr.getHostAddress)
       }
       Option(discover.getValidGateway) match {
         case None => log.debug("There is no connected UPnP gateway device")
@@ -40,9 +39,8 @@ class UPnP(settings: UPnPSettings) extends ScorexLogging {
           log.info("External IP address is " + externalAddress.map(_.getHostAddress).getOrElse("err"))
       }
     }
-  }.recover {
-    case t: Throwable =>
-      log.error("Unable to discover UPnP gateway devices: " + t.toString)
+  }.recover { case t: Throwable =>
+    log.error("Unable to discover UPnP gateway devices: " + t.toString)
   }
 
   def addPort(port: Int): Try[Unit] =
@@ -52,9 +50,8 @@ class UPnP(settings: UPnPSettings) extends ScorexLogging {
       } else {
         log.debug("Unable to map port " + port)
       }
-    }.recover {
-      case t: Throwable =>
-        log.error("Unable to map port " + port + ": " + t.toString)
+    }.recover { case t: Throwable =>
+      log.error("Unable to map port " + port + ": " + t.toString)
     }
 
   def deletePort(port: Int): Try[Unit] =
@@ -64,8 +61,7 @@ class UPnP(settings: UPnPSettings) extends ScorexLogging {
       } else {
         log.debug("Unable to delete mapping for port " + port)
       }
-    }.recover {
-      case t: Throwable =>
-        log.error("Unable to delete mapping for port " + port + ": " + t.toString)
+    }.recover { case t: Throwable =>
+      log.error("Unable to delete mapping for port " + port + ": " + t.toString)
     }
 }

@@ -7,12 +7,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry}
-import com.wavesplatform.state.DataEntry._
+import com.wavesplatform.state.DataEntry.*
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest._
+import org.scalatest.*
 import play.api.libs.json.Json
 
 class DataTransactionSpecification extends PropSpec {
@@ -124,7 +124,7 @@ class DataTransactionSpecification extends PropSpec {
 
   property("positive validation cases") {
     import DataTransaction.MaxEntryCount
-    import com.wavesplatform.state._
+    import com.wavesplatform.state.*
     forAll(dataTransactionGen, dataEntryGen(500)) { case (DataTransaction(version, sender, _, fee, timestamp, proofs, chainId), _) =>
       def check(data: List[DataEntry[_]]): Assertion = {
         val txEi = DataTransaction.create(version, sender, data, fee.value, timestamp, proofs)
