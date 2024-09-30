@@ -6,8 +6,8 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.traits.Environment
 
 case class InvariableContext(private val ctx: CTX[Environment]) {
-  private val constants                  = ctx.vars.collect { case (k, v) if v._2.isPure => k -> LazyVal.fromEval(v._2(environment)) }
-  private def vars(env: Environment[Id]) = ctx.vars.collect { case (k, v) if !v._2.isPure => k -> LazyVal.fromEval(v._2(env)) }
+  private val constants                  = ctx.vars.collect { case (k, v) if v._2.isPure => k -> LazyVal.fromEval[Id](v._2(environment)) }
+  private def vars(env: Environment[Id]) = ctx.vars.collect { case (k, v) if !v._2.isPure => k -> LazyVal.fromEval[Id](v._2(env)) }
 
   private val rawEvaluationContext: EvaluationContext[Environment, Id] =
     EvaluationContext[Environment, Id](
