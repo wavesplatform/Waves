@@ -126,11 +126,11 @@ object Bindings {
       "fee"             -> i.fee,
       "feeAssetId"      -> i.feeAssetId
     ) ++ (if (version >= V5)
-            Map(
+            Map[String, EVALUATED](
               "originCaller"          -> mapRecipient(i.originCaller)._2,
               "originCallerPublicKey" -> i.originCallerPublicKey
             )
-          else Map())
+          else Map.empty)
     CaseObj(invocationType(version), fields + buildPayments(i.payments))
   }
 
