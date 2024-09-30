@@ -17,7 +17,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.*
 import monix.eval.Coeval
-import shapeless.syntax.std.tuple.productTupleOps
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
@@ -387,7 +386,10 @@ object EvaluatorV2 {
       .value
       .redeem(
         e => Left((e.getMessage, limit, log.toList)),
-        _.bimap(_ :+ log.toList, _ :+ log.toList)
+        _.bimap(
+          { case (err, limit) => (err, limit, log.toList) },
+          { case (expr, limit) => (expr, limit, log.toList) }
+        )
       )
   }
 
