@@ -35,14 +35,22 @@ object DBResource {
     def multiGet[A](keys: ArrayBuffer[Key[A]], valBufferSize: Int): View[A] =
       db.multiGet(readOptions, keys, valBufferSize)
 
+    @volatile private var prefixIteratorWasOpened = false
     /**
      * Finds the exact key for iter.seek(key) if key.length < 10 and becomes invalid on iter.next().
      * Works as intended if prefix(key).length >= 10.
      * @see RDB.newColumnFamilyOptions
      */
-    override lazy val prefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
+    override lazy val prefixIterator: RocksIterator = {
+      prefixIteratorWasOpened = true
+      db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
+    }
 
-    override lazy val fullIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(true))
+    @volatile private var fullIteratorWasOpened = false
+    override lazy val fullIterator: RocksIterator = {
+      fullIteratorWasOpened = true
+      db.newIterator(readOptions.setTotalOrderSeek(true))
+    }
 
     override def withSafePrefixIterator[A](ifNotClosed: RocksIterator => A)(ifClosed: => A): A = prefixIterator.synchronized {
       if (prefixIterator.isOwningHandle) ifNotClosed(prefixIterator) else ifClosed
@@ -53,8 +61,8 @@ object DBResource {
     }
 
     override def close(): Unit = {
-      prefixIterator.synchronized(prefixIterator.close())
-      fullIterator.synchronized(fullIterator.close())
+      if (prefixIteratorWasOpened) prefixIterator.synchronized(prefixIterator.close())
+      if (fullIteratorWasOpened) fullIterator.synchronized(fullIterator.close())
       snapshot.close()
       readOptions.close()
     }
