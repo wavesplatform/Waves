@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.ctx.NativeFunction
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, *}
 import com.wavesplatform.lang.v1.traits.Environment
 
 package object compiler {

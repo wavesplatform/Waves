@@ -16,7 +16,7 @@ class BytesDropTakeTest extends EvaluatorSpec {
 
   private val b = s"base58'${ByteStr.fromBytes(1, 2, 3, 4, 5)}'"
 
-  private def bytes(bytes: Byte*) = CONST_BYTESTR(ByteStr.fromBytes(bytes: _*))
+  private def bytes(bytes: Byte*) = CONST_BYTESTR(ByteStr.fromBytes(bytes *))
 
   property("take") {
     eval(s""" take($b, 0) """) shouldBe bytes()
