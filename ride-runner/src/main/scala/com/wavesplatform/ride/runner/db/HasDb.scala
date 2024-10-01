@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.db
 
-import com.wavesplatform.database.rocksdb.Key
+import com.wavesplatform.database.Key
 import org.rocksdb.{ColumnFamilyHandle, RocksDB}
 
 trait HasDb {

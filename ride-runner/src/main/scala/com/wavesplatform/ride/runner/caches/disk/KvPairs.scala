@@ -9,8 +9,7 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{StaticAssetInfo, BlockMeta as PBBlockMeta}
-import com.wavesplatform.database.rocksdb.{Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readBlockMeta, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeBlockMeta}
-import com.wavesplatform.database.{AddressId, toVanillaTransaction, protobuf as pb}
+import com.wavesplatform.database.{protobuf as pb, *}
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
