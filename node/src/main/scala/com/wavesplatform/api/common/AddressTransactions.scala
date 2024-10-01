@@ -135,7 +135,7 @@ object AddressTransactions {
       types: Set[Transaction.Type]
   ) extends AbstractIterator[Seq[(TxMeta, Transaction, Option[TxNum])]] {
     private val seqNr = db.get(Keys.addressTransactionSeqNr(addressId, apiHandle))
-    db.withSafePrefixIterator(_.seekForPrev(Keys.addressTransactionHN(addressId, seqNr, apiHandle).keyBytes))()
+    db.withSafePrefixIterator(_.seekForPrev(Keys.addressTransactionHN(addressId, seqNr, apiHandle).keyBytes))(())
 
     final override def computeNext(): Seq[(TxMeta, Transaction, Option[TxNum])] = db.withSafePrefixIterator { dbIterator =>
       val keysBuffer  = new ArrayBuffer[Key[Option[(TxMeta, Transaction)]]]()

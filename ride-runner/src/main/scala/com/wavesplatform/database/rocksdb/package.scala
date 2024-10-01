@@ -1,10 +1,10 @@
 package com.wavesplatform.database
 
 import com.google.common.base.Charsets.UTF_8
-import com.google.common.collect.{Interners, Maps}
+import com.google.common.collect.Interners
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.google.common.primitives.{Ints, Longs}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
@@ -18,15 +18,12 @@ import com.wavesplatform.state.*
 import com.wavesplatform.transaction
 import com.wavesplatform.transaction.TxPositiveAmount
 import com.wavesplatform.utils.*
-import monix.eval.Task
-import monix.reactive.Observable
 import org.rocksdb.*
 import sun.nio.ch.Util
 
 import java.nio.ByteBuffer
 import java.util
 import java.util.Map as JMap
-import scala.annotation.tailrec
 import scala.collection.View
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
@@ -152,19 +149,18 @@ package object rocksdb {
       Right(
         LeaseDetails(
           LeaseStaticInfo(
-          d.senderPublicKey.toPublicKey,
-          PBRecipients.toAddress(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
-          TxPositiveAmount.unsafeFrom(d.amount),
+            d.senderPublicKey.toPublicKey,
+            PBRecipients.toAddress(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
+            TxPositiveAmount.unsafeFrom(d.amount),
             d.sourceId.toByteStr,
             d.height
           ),
           d.cancelReason match {
-            case pb.LeaseDetails.CancelReason.Empty                                   => LeaseDetails.Status.Active
+            case pb.LeaseDetails.CancelReason.Empty                                       => LeaseDetails.Status.Active
             case pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
             case pb.LeaseDetails.CancelReason.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
               LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
           }
-
         )
       )
     }
@@ -464,35 +460,6 @@ package object rocksdb {
     def get[A](key: Key[A]): A = key.parse(db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes))
     def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(readOptions, key.keyBytes))
     def has(key: Key[?]): Boolean                        = db.get(key.keyBytes) != null
-
-    def iterateOver(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOver(tag.prefixBytes)(f)
-
-    def iterateOver(prefix: Array[Byte], seekPrefix: Array[Byte] = Array.emptyByteArray, cfh: Option[ColumnFamilyHandle] = None)(
-        f: DBEntry => Unit
-    ): Unit = {
-      @tailrec
-      def loop(iter: RocksIterator): Unit = {
-        if (iter.isValid && iter.key().startsWith(prefix)) {
-          f(Maps.immutableEntry(iter.key(), iter.value()))
-          iter.next()
-          loop(iter)
-        } else ()
-      }
-
-      val iterator = db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), new ReadOptions().setTotalOrderSeek(true))
-      try {
-        iterator.seek(Bytes.concat(prefix, seekPrefix))
-        loop(iterator)
-      } finally iterator.close()
-    }
-
-    def resourceObservable: Observable[DBResource] = Observable.resource(Task(DBResource(db)))(r => Task(r.close()))
-
-    def withResource[A](f: DBResource => A): A = {
-      val resource = DBResource(db)
-      try f(resource)
-      finally resource.close()
-    }
 
     private def getKeyBuffersFromKeys(keys: collection.Seq[Key[?]]): util.List[ByteBuffer] =
       keys.map { k =>
