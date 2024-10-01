@@ -37,7 +37,6 @@ import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.*
-import shapeless.*
 
 object UtilsEvaluator {
   object ConflictingRequestStructure        extends ValidationError

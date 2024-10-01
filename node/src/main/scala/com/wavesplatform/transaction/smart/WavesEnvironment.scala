@@ -37,12 +37,11 @@ import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, DiffToLogConverter, TransactionBase, TransactionType}
 import monix.eval.Coeval
-import shapeless.*
 
 import scala.util.Try
 
 object WavesEnvironment {
-  type In = TransactionBase :+: Order :+: PseudoTx :+: CNil
+  type In = TransactionBase | Order | PseudoTx
 
   def apply(
       nByte: Byte,
