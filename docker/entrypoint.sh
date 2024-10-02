@@ -13,12 +13,18 @@ JAVA_OPTS="-XX:+ExitOnOutOfMemoryError
 
 echo "JAVA_OPTS=${JAVA_OPTS}" | tee -a ${WVLOG}/waves.log
 
-if [ -n ${WAVES_WALLET_SEED} ] ; then
+if [ -n "$WAVES_WALLET_SEED" ] ; then
   JAVA_OPTS="-Dwaves.wallet.seed=${WAVES_WALLET_SEED} ${JAVA_OPTS}"
 fi
 
-if [ -n ${WAVES_WALLET_PASSWORD} ] ; then
+if [ -n "$WAVES_WALLET_PASSWORD" ] ; then
   JAVA_OPTS="-Dwaves.wallet.password=${WAVES_WALLET_PASSWORD} ${JAVA_OPTS}"
 fi
 
-exec java $JAVA_OPTS -cp "${WAVES_INSTALL_PATH}/lib/plugins/*:$WAVES_INSTALL_PATH/lib/*" com.wavesplatform.Application $ARGS
+if [ $# -eq 0 ] && [ -f /etc/waves/waves.conf ] ; then
+  ARGS="/etc/waves/waves.conf"
+else
+  ARGS=$@
+fi
+
+exec java $JAVA_OPTS -cp "$WAVES_INSTALL_PATH/lib/plugins/*:$WAVES_INSTALL_PATH/lib/*" com.wavesplatform.Application $ARGS

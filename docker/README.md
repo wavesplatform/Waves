@@ -38,7 +38,7 @@ It is highly recommended to read more about [Waves Node configuration](https://d
     docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -p 6869:6869 -p 6862:6862 -e JAVA_OPTS="-Dwaves.rest-api.enable=yes -Dwaves.wallet.password=myWalletSuperPassword" -ti wavesplatform/wavesnode
     ```
 
-2. Waves Node is looking for a config in the directory `/etc/waves/waves.conf` which can be mounted using Docker volumes. During image build, a default configuration will be copied to this directory. While running container if the value of `WAVES_NETWORK` is not `mainnet`, `testnet` or `stagenet`, default configuration won't be enough for correct node working. This is a scenario of using `CUSTOM` network - correct configuration must be provided when running container. If you use `CUSTOM` network and `/etc/waves/waves.conf` is NOT found Waves Node container will exit.
+2. Waves Node is looking for a config in the directory `/etc/waves/waves.conf` which can be mounted using Docker volumes. For custom networks, correct configuration file must be provided when running container. If you use `CUSTOM` network and `/etc/waves/waves.conf` is NOT found Waves Node container will exit.
 
 3. You can use custom config  to override or the whole configuration. For additional information about Docker volumes mapping please refer to `Managing data` item.
 
