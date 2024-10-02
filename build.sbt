@@ -13,7 +13,7 @@ enablePlugins(GitVersioning)
 git.uncommittedSignifier       := Some("DIRTY")
 git.useGitDescribe             := true
 ThisBuild / git.useGitDescribe := true
-ThisBuild / PB.protocVersion   := "3.25.1" // https://protobuf.dev/support/version-support/#java
+ThisBuild / PB.protocVersion   := "3.25.5" // https://protobuf.dev/support/version-support/#java
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -145,7 +145,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "2.13.14",
+    scalaVersion         := "2.13.15",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),

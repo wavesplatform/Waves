@@ -141,7 +141,7 @@ object CommonAccountsApi {
 
     private val length: Int = entriesFromDiff.length
 
-    db.withSafePrefixIterator(_.seek(prefix))()
+    db.withSafePrefixIterator(_.seek(prefix))(())
 
     private var nextIndex                         = 0
     private var nextDbEntry: Option[DataEntry[?]] = None

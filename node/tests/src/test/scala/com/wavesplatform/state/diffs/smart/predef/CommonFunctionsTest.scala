@@ -140,7 +140,7 @@ class CommonFunctionsTest extends PropSpec {
       TxHelpers.issue(version = TxVersion.V1),
       createMassTransfer()
     ).foreach { tx =>
-      Try[Either[String, ?]] {
+      Try {
         runScript(
           s"""
              |let t = 100
@@ -153,7 +153,7 @@ class CommonFunctionsTest extends PropSpec {
              |""".stripMargin,
           Coproduct(tx)
         )
-      }.recover {
+      }.recover[Any] {
         case ex: MatchError =>
           Assertions.assert(ex.getMessage().contains("Compilation failed: Value 't' already defined in the scope"))
         case _: Throwable => Assertions.fail("Some unexpected error")
@@ -171,7 +171,7 @@ class CommonFunctionsTest extends PropSpec {
            | }
            |""".stripMargin
       )
-    }.recover {
+    }.recover[Any] {
       case ex: MatchError => Assertions.assert(ex.getMessage().contains("Compilation failed: A definition of 'p' is not found"))
       case _: Throwable   => Assertions.fail("Some unexpected error")
     }
@@ -274,7 +274,7 @@ class CommonFunctionsTest extends PropSpec {
       (s"Addr(base58'$realAddr')", "Can't find a function 'Addr'")
     )
     for ((clause, err) <- cases) {
-      Try[Either[String, ?]] {
+      Try {
         runScript(
           s"""
              |match tx {
@@ -285,7 +285,7 @@ class CommonFunctionsTest extends PropSpec {
              |}
              |""".stripMargin
         )
-      }.recover {
+      }.recover[Any] {
         case ex: MatchError => Assertions.assert(ex.getMessage().contains(err))
         case e: Throwable   => Assertions.fail("Unexpected error", e)
       }

@@ -1,19 +1,10 @@
-FROM eclipse-temurin:11-jre-jammy
+FROM eclipse-temurin:11-jre-noble
 
 ENV WAVES_LOG_LEVEL=INFO
 ENV WAVES_HEAP_SIZE=2g
 ENV WAVES_NETWORK=mainnet
 
-ENV YOURKIT_VERSION=2023.5
-
 SHELL ["/bin/bash", "-c"]
-
-# Additional dependencies
-RUN apt-get update && apt-get install -y wget unzip gosu || exit 1; \
-    export YOURKIT_ARCHIVE="YourKit-JavaProfiler-$YOURKIT_VERSION-docker.zip"; \
-    wget --quiet "https://www.yourkit.com/download/docker/$YOURKIT_ARCHIVE" -P /tmp/ && unzip /tmp/$YOURKIT_ARCHIVE -d /usr/local || exit 1; \
-    # Clean
-    apt-get remove -y wget unzip && apt-get autoremove -y && apt-get autoclean && rm -rf /var/lib/apt/lists/*
 
 # Node files
 ENV WVDATA=/var/lib/waves
@@ -21,7 +12,6 @@ ENV WVLOG=/var/log/waves
 ENV WAVES_INSTALL_PATH=/usr/share/waves
 ENV WAVES_CONFIG=/etc/waves/waves.conf
 COPY target /tmp/
-COPY waves.conf.template $WAVES_CONFIG
 
 # Setup node
 COPY entrypoint.sh $WAVES_INSTALL_PATH/bin/entrypoint.sh

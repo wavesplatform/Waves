@@ -1,6 +1,6 @@
 package com.wavesplatform.database.rocksdb.stats
 
-import com.wavesplatform.database.rocksdb.Key
+import com.wavesplatform.database.Key
 import kamon.Kamon
 import kamon.metric.{MeasurementUnit, Metric}
 

@@ -2,7 +2,7 @@ package com.wavesplatform.ride.runner.db
 
 import com.google.common.collect.Maps
 import com.wavesplatform.database.DBEntry
-import com.wavesplatform.database.rocksdb.Key
+import com.wavesplatform.database.Key
 import com.wavesplatform.database.rocksdb.stats.RocksDBStats
 import com.wavesplatform.database.rocksdb.stats.RocksDBStats.DbHistogramExt
 import org.rocksdb.*

@@ -567,7 +567,7 @@ object Application extends ScorexLogging {
           .map(_.toUpperCase)
           .getOrElse("TESTNET")
 
-        log.warn(s"Config file not defined, default $currentBlockchainType config will be used")
+        log.info(s"Config file not specified, default $currentBlockchainType config will be used")
       case Failure(exception) =>
         log.error(s"Couldn't read ${external.get.toPath.toAbsolutePath}", exception)
         forceStopApplication(Misconfiguration)
