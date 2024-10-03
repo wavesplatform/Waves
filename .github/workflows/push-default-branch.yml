@@ -12,6 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: scalacenter/sbt-dependency-submission@v3
+        with:
+          configs-ignore: test compile-internal provided
   publish-snapshot:
     name: Publish Snapshots to Sonatype
     runs-on: ubuntu-latest
@@ -30,5 +32,5 @@ jobs:
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
         run: |
-          version=$(echo ${{ github.base_ref }} | awk -F '[-\.]' '{print $2"."$3}')-SNAPSHOT
+          version=$(echo ${{ github.ref }} | awk -F '[-.]' '{print $2"."$3}')-SNAPSHOT
           sbt -Dproject.version=$version --mem 4096 --batch publishSigned
