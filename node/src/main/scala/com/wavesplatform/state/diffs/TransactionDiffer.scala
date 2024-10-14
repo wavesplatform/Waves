@@ -164,7 +164,7 @@ object TransactionDiffer {
         }
       } yield ()
 
-  private[this] def verifierDiff(blockchain: Blockchain, tx: Transaction, enableExecutionLog: Boolean): TracedResult[ValidationError, StateSnapshot] =
+  private def verifierDiff(blockchain: Blockchain, tx: Transaction, enableExecutionLog: Boolean): TracedResult[ValidationError, StateSnapshot] =
     Verifier(blockchain, enableExecutionLog = enableExecutionLog)(tx)
       .map(complexity => StateSnapshot(scriptsComplexity = complexity))
 
@@ -336,7 +336,7 @@ object TransactionDiffer {
         case _ => None
       }
 
-    private[this] def scriptResult(cf: FailedTransactionError): Option[InvokeScriptResult] =
+    private def scriptResult(cf: FailedTransactionError): Option[InvokeScriptResult] =
       Some(InvokeScriptResult(error = Some(ErrorMessage(cf.code, cf.message)), invokes = cf.invocations))
   }
 

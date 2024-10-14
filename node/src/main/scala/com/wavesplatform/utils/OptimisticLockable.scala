@@ -5,7 +5,7 @@ import java.util.concurrent.locks.StampedLock
 import scala.util.control.NonFatal
 
 trait OptimisticLockable {
-  private[this] val lock = new StampedLock
+  private val lock = new StampedLock
 
   protected def readLockCond[A](getValue: => A)(shouldRecheck: A => Boolean): A = {
     def readLocked(): A = {

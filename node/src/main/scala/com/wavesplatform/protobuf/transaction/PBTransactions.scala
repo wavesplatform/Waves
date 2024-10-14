@@ -114,7 +114,7 @@ object PBTransactions {
         } yield tx
     }
 
-  private[this] def createVanilla(
+  private def createVanilla(
       version: Int,
       chainId: Byte,
       sender: PublicKey,
@@ -351,7 +351,7 @@ object PBTransactions {
     result
   }
 
-  private[this] def createVanillaUnsafe(
+  private def createVanillaUnsafe(
       version: Int,
       chainId: Byte,
       sender: PublicKey,

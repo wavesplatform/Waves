@@ -12,7 +12,7 @@ import supertagged.*
 import supertagged.postfix.*
 
 object PublicKey extends TaggedType[ByteStr] {
-  private[this] val interner = Interners.newWeakInterner[PublicKey]()
+  private val interner = Interners.newWeakInterner[PublicKey]()
 
   val KeyStringLength: Int = base58Length(KeyLength)
 

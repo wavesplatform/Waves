@@ -17,7 +17,7 @@ object StateHash {
     val WavesBalance, AssetBalance, DataEntry, AccountScript, AssetScript, LeaseBalance, LeaseStatus, Sponsorship, Alias = Value
   }
 
-  private[this] val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_CAMEL)
+  private val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_CAMEL)
   implicit val writes: OWrites[StateHash] = OWrites { sh =>
     def lowerCamel(sectionId: SectionId.Value): String = converter.convert(sectionId.toString)
     def toHexString(bs: ByteStr)                       = Hex.toHexString(bs.arr)

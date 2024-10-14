@@ -21,7 +21,7 @@ trait PatchDataLoader {
 trait DiffPatchFactory extends PartialFunction[Blockchain, StateSnapshot]
 
 abstract class PatchAtHeight(chainIdToHeight: (Char, Int)*) extends PatchDataLoader with DiffPatchFactory {
-  private[this] val chainIdToHeightMap   = chainIdToHeight.toMap
+  private val chainIdToHeightMap   = chainIdToHeight.toMap
   protected def patchHeight: Option[Int] = chainIdToHeightMap.get(AddressScheme.current.chainId.toChar)
 
   override def isDefinedAt(blockchain: Blockchain): Boolean =

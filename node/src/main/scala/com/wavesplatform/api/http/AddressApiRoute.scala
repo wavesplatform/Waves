@@ -256,7 +256,7 @@ case class AddressApiRoute(
     Balance(acc.toString, confirmations, commonAccountsApi.effectiveBalance(acc, confirmations))
   }
 
-  private[this] def validateBalanceDepth(height: Int): Directive0 = {
+  private def validateBalanceDepth(height: Int): Directive0 = {
     if (height < blockchain.height - maxBalanceDepth)
       complete(CustomValidationError(s"Unable to get balance past height ${blockchain.height - maxBalanceDepth}"))
     else

@@ -251,7 +251,7 @@ object BlockchainSettings {
   // @deprecated("Use config.as[BlockchainSettings]", "0.17.0")
   def fromRootConfig(config: Config): BlockchainSettings = config.as[BlockchainSettings]("waves.blockchain")
 
-  private[this] def fromConfig(config: Config): BlockchainSettings = {
+  private def fromConfig(config: Config): BlockchainSettings = {
     val blockchainType = config.as[String]("type").toUpperCase
     val (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings) = blockchainType match {
       case BlockchainType.STAGENET =>

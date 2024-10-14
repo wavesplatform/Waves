@@ -46,7 +46,7 @@ object NetworkSettings {
   implicit val valueReader: ValueReader[NetworkSettings] =
     (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
 
-  private[this] def fromConfig(config: Config): NetworkSettings = {
+  private def fromConfig(config: Config): NetworkSettings = {
     val file        = config.getAs[File]("file")
     val bindAddress = config.getAs[String]("bind-address").map(addr => new InetSocketAddress(addr, config.as[Int]("port")))
     val nonce       = config.getOrElse("nonce", randomNonce)

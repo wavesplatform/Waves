@@ -20,7 +20,7 @@ object BlockchainContext {
 
   type In = WavesEnvironment.In
 
-  private[this] val cache = new util.HashMap[(StdLibVersion, Boolean, Boolean, Boolean, DirectiveSet), CTX[Environment]]()
+  private val cache = new util.HashMap[(StdLibVersion, Boolean, Boolean, Boolean, DirectiveSet), CTX[Environment]]()
 
   def build(
       version: StdLibVersion,

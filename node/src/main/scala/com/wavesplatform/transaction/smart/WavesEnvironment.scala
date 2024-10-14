@@ -307,7 +307,7 @@ object DAppEnvironment {
   final case class InvocationTreeTracker(root: DAppInvocation) {
     private var result: Either[ValidationError, ScriptResult] = Left(GenericError("No result"))
     private var log: Log[Id]                                  = Nil
-    private[this] var invocations                             = Vector.empty[InvocationTreeTracker]
+    private var invocations                             = Vector.empty[InvocationTreeTracker]
 
     def record(invocation: DAppInvocation): InvocationTreeTracker = {
       val tracker = InvocationTreeTracker(invocation)
@@ -353,7 +353,7 @@ object DAppEnvironment {
       }
     }
 
-    private[this] def errorMessage(ve: ValidationError): InvokeScriptResult.ErrorMessage = {
+    private def errorMessage(ve: ValidationError): InvokeScriptResult.ErrorMessage = {
       val fte = FailedTransactionError.asFailedScriptError(ve)
       InvokeScriptResult.ErrorMessage(fte.code, fte.message)
     }
@@ -418,7 +418,7 @@ class DAppEnvironment(
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id(), blockchain)
     with DAppEnvironmentInterface {
 
-  private[this] var mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
+  private var mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
 
   override def currentBlockchain(): SnapshotBlockchain = this.mutableBlockchain
 

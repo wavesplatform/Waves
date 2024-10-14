@@ -11,7 +11,7 @@ case object CancelAllLeases extends PatchAtHeight('W' -> 462000, 'T' -> 51500) {
   private[patch] case class LeaseData(senderPublicKey: String, amount: Long, recipient: String, id: String)
 
   private[patch] case class CancelledLeases(balances: Map[Address, LeaseBalance], cancelledLeases: Seq[LeaseData]) {
-    private[this] val height: Int = patchHeight.getOrElse(0)
+    private val height: Int = patchHeight.getOrElse(0)
     val leaseStates: Map[ByteStr, LeaseDetails.Status.Inactive] = cancelledLeases.map { data =>
       (ByteStr.decodeBase58(data.id).get, LeaseDetails.Status.Expired(height))
     }.toMap

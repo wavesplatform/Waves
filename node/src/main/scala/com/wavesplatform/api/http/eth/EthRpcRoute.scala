@@ -248,21 +248,21 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
     }
 
   @inline
-  private[this] def quantity(v: Long) = "0x" + java.lang.Long.toString(v, 16)
+  private def quantity(v: Long) = "0x" + java.lang.Long.toString(v, 16)
 
-  private[this] def resp(id: JsValue, resp: JsValueWrapper) = complete(Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> resp))
+  private def resp(id: JsValue, resp: JsValueWrapper) = complete(Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> resp))
 
-  private[this] def resp(id: JsValue, resp: Future[JsValueWrapper]) = complete(resp.map(r => Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> r)))
+  private def resp(id: JsValue, resp: Future[JsValueWrapper]) = complete(resp.map(r => Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> r)))
 
-  private[this] def assetDescription(contractAddress: String) =
+  private def assetDescription(contractAddress: String) =
     assetId(contractAddress).flatMap(blockchain.assetDescription)
 
-  private[this] def assetId(contractAddress: String): Option[IssuedAsset] =
+  private def assetId(contractAddress: String): Option[IssuedAsset] =
     blockchain.resolveERC20Address(ERC20Address(ByteStr(toBytes(contractAddress))))
 
-  private[this] def encodeResponse(values: Type*): String = "0x" + FunctionEncoder.encodeConstructor(values.map(Type.unwrap).asJava)
+  private def encodeResponse(values: Type*): String = "0x" + FunctionEncoder.encodeConstructor(values.map(Type.unwrap).asJava)
 
-  private[this] def extractTransaction(transactionHex: String) = TransactionDecoder.decode(transactionHex) match {
+  private def extractTransaction(transactionHex: String) = TransactionDecoder.decode(transactionHex) match {
     case srt: SignedRawTransaction => EthereumTransaction(srt)
     case _: RawTransaction         => throw new UnsupportedOperationException("Cannot process unsigned transactions")
   }

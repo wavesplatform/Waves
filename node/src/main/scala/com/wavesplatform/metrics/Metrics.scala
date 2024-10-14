@@ -34,13 +34,13 @@ object Metrics extends ScorexLogging {
       responsivenessMetricsRetentionPolicy: String
   )
 
-  private[this] implicit val scheduler: SchedulerService = Schedulers.singleThread("metrics")
+  private implicit val scheduler: SchedulerService = Schedulers.singleThread("metrics")
 
   private[this] var settings: Settings   = _
   private[this] var time: Time           = _
-  private[this] var db: Option[InfluxDB] = None
+  private var db: Option[InfluxDB] = None
 
-  private[this] def currentTimestamp: Long =
+  private def currentTimestamp: Long =
     if (time == null) System.currentTimeMillis()
     else time.getTimestamp()
 
@@ -78,7 +78,7 @@ object Metrics extends ScorexLogging {
     settings = config
     time = thatTime
     if (settings.enable) {
-      import config.{influxDb => dbSettings}
+      import config.{influxDb as dbSettings}
 
       log.info(s"Precise metrics are enabled and will be sent to ${dbSettings.uri}/${dbSettings.db}")
       try {

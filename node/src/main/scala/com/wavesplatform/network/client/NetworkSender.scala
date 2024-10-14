@@ -14,10 +14,10 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 
 class NetworkSender(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char, name: String, nonce: Long)(implicit ec: ExecutionContext)
     extends ScorexLogging {
-  private[this] val MessagesBatchSize = 100
+  private val MessagesBatchSize = 100
 
-  private[this] val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-  private[this] val client      = new NetworkClient(trafficLoggerSettings, chainId, name, nonce, allChannels)
+  private val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+  private val client      = new NetworkClient(trafficLoggerSettings, chainId, name, nonce, allChannels)
 
   def connect(address: InetSocketAddress): Future[Channel] =
     client.connect(address)

@@ -277,7 +277,7 @@ object Exporter extends ScorexLogging {
     }
   }
 
-  private[this] final case class ExporterOptions(
+  private final case class ExporterOptions(
       configFileName: Option[File] = None,
       blocksOutputFileNamePrefix: String = "blockchain",
       snapshotsFileNamePrefix: Option[String] = None,
@@ -285,7 +285,7 @@ object Exporter extends ScorexLogging {
       format: String = Formats.Binary
   )
 
-  private[this] lazy val commandParser = {
+  private lazy val commandParser = {
     import scopt.OParser
 
     val builder = OParser.builder[ExporterOptions]

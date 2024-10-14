@@ -61,7 +61,7 @@ package object database {
   }
 
   def writeIntSeq(values: Seq[Int]): Array[Byte] = {
-    values.foldLeft(ByteBuffer.allocate(4 * values.length))(_ putInt _).array()
+    values.foldLeft(ByteBuffer.allocate(4 * values.length))(_ `putInt` _).array()
   }
 
   def readIntSeq(data: Array[Byte]): Seq[Int] = Option(data).fold(Seq.empty[Int]) { d =>
@@ -655,9 +655,9 @@ package object database {
   def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {
     val (m, tx) = v
     val ptx = tx match {
-      case lps: PBSince with Versioned if PBSince.affects(lps) => TD.WavesTransaction(PBTransactions.protobuf(tx))
-      case et: EthereumTransaction                             => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
-      case _                                                   => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case lps: (PBSince & Versioned) if PBSince.affects(lps) => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case et: EthereumTransaction                            => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+      case _                                                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
     }
     pb.TransactionData(ptx, m.status.protobuf, m.spentComplexity).toByteArray
   }

@@ -51,7 +51,7 @@ object Asset {
   }
 
   implicit val assetReader: ValueReader[Asset] = { (cfg, path) =>
-    AssetPair.extractAssetId(cfg getString path).fold(ex => throw new Exception(ex.getMessage), identity)
+    AssetPair.extractAssetId(cfg `getString` path).fold(ex => throw new Exception(ex.getMessage), identity)
   }
 
   def fromString(maybeStr: Option[String]): Asset = {

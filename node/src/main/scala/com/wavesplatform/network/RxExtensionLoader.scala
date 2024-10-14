@@ -53,8 +53,7 @@ object RxExtensionLoader extends ScorexLogging {
     implicit val schdlr: SchedulerService = scheduler
 
     val extensions: ConcurrentSubject[(Channel, ExtensionBlocks), (Channel, ExtensionBlocks)] = ConcurrentSubject.publish[(Channel, ExtensionBlocks)]
-    val simpleBlocksWithSnapshot
-        : ConcurrentSubject[BlockWithSnapshot, BlockWithSnapshot] =
+    val simpleBlocksWithSnapshot: ConcurrentSubject[BlockWithSnapshot, BlockWithSnapshot] =
       ConcurrentSubject.publish[BlockWithSnapshot]
     @volatile var stateValue: State            = State(LoaderState.Idle, ApplierState.Idle)
     val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))

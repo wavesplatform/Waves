@@ -22,9 +22,9 @@ object Schedulers {
       super.afterExecute(r, t)
       var exception: Throwable = t
 
-      if ((exception eq null) && r.isInstanceOf[JavaFuture[_]]) {
+      if ((exception eq null) && r.isInstanceOf[JavaFuture[?]]) {
         try {
-          val future = r.asInstanceOf[JavaFuture[_]]
+          val future = r.asInstanceOf[JavaFuture[?]]
           if (future.isDone) future.get()
         } catch {
           case ex: ExecutionException =>
@@ -81,7 +81,7 @@ object Schedulers {
 
   private class TimedWrapper[V](timer: Timer, timeout: FiniteDuration, delegate: RunnableScheduledFuture[V]) extends RunnableScheduledFuture[V] {
     @volatile
-    private[this] var maybeScheduledTimeout     = Option.empty[Timeout]
+    private var maybeScheduledTimeout     = Option.empty[Timeout]
     override def isPeriodic: Boolean            = delegate.isPeriodic
     override def getDelay(unit: TimeUnit): Long = delegate.getDelay(unit)
     override def compareTo(o: Delayed): Int     = delegate.compareTo(o)

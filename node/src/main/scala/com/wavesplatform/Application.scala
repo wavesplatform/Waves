@@ -69,47 +69,47 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   import Application.*
   import monix.execution.Scheduler.Implicits.global as scheduler
 
-  private[this] val rdb = RDB.open(settings.dbSettings)
+  private val rdb = RDB.open(settings.dbSettings)
 
-  private[this] lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
+  private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
-  private[this] val wallet: Wallet = Wallet(settings.walletSettings)
+  private val wallet: Wallet = Wallet(settings.walletSettings)
 
-  private[this] val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
+  private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
   // This handler is needed in case Fatal exception is thrown inside the task
 
-  private[this] val stopOnAppendError = UncaughtExceptionReporter { cause =>
+  private val stopOnAppendError = UncaughtExceptionReporter { cause =>
     log.error("Error in Appender", cause)
     forceStopApplication(FatalDBError)
   }
 
-  private[this] val appenderScheduler = singleThread("appender", stopOnAppendError)
+  private val appenderScheduler = singleThread("appender", stopOnAppendError)
 
-  private[this] val extensionLoaderScheduler = singleThread("rx-extension-loader", reporter = log.error("Error in Extension Loader", _))
-  private[this] val microblockSynchronizerScheduler =
+  private val extensionLoaderScheduler = singleThread("rx-extension-loader", reporter = log.error("Error in Extension Loader", _))
+  private val microblockSynchronizerScheduler =
     singleThread("microblock-synchronizer", reporter = log.error("Error in Microblock Synchronizer", _))
-  private[this] val scoreObserverScheduler  = singleThread("rx-score-observer", reporter = log.error("Error in Score Observer", _))
-  private[this] val historyRepliesScheduler = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
-  private[this] val minerScheduler          = singleThread("block-miner", reporter = log.error("Error in Miner", _))
+  private val scoreObserverScheduler  = singleThread("rx-score-observer", reporter = log.error("Error in Score Observer", _))
+  private val historyRepliesScheduler = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
+  private val minerScheduler          = singleThread("block-miner", reporter = log.error("Error in Miner", _))
 
-  private[this] val utxEvents = ConcurrentSubject.publish[UtxEvent](scheduler)
+  private val utxEvents = ConcurrentSubject.publish[UtxEvent](scheduler)
 
   private var extensions = Seq.empty[Extension]
 
   private var triggers = Seq.empty[BlockchainUpdateTriggers]
 
-  private[this] var miner: Miner & MinerDebugInfo = Miner.Disabled
-  private[this] val (blockchainUpdater, rocksDB) =
+  private var miner: Miner & MinerDebugInfo = Miner.Disabled
+  private val (blockchainUpdater, rocksDB) =
     StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
-  private[this] val messageObserver = new MessageObserverL1
+  private val messageObserver = new MessageObserverL1
 
   @volatile
-  private[this] var maybeUtx: Option[UtxPool] = None
+  private var maybeUtx: Option[UtxPool] = None
 
   @volatile
-  private[this] var maybeNetworkServer: Option[NetworkServer] = None
+  private var maybeNetworkServer: Option[NetworkServer] = None
 
   @volatile
   private[this] var serverBinding: ServerBinding = _
@@ -492,7 +492,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     }
   }
 
-  private[this] val shutdownInProgress = new AtomicBoolean(false)
+  private val shutdownInProgress = new AtomicBoolean(false)
 
   def shutdown(): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
@@ -648,7 +648,7 @@ object Application extends ScorexLogging {
     }
   }
 
-  private[this] def startNode(configFile: Option[String]): Unit = {
+  private def startNode(configFile: Option[String]): Unit = {
     import com.wavesplatform.settings.Constants
     val settings = loadApplicationConfig(configFile.map(new File(_)))
 

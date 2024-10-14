@@ -16,7 +16,7 @@ import scala.util.Try
 case class DataTransaction(
     version: TxVersion,
     sender: PublicKey,
-    data: Seq[DataEntry[_]],
+    data: Seq[DataEntry[?]],
     fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
@@ -56,7 +56,7 @@ object DataTransaction extends TransactionParser {
   def create(
       version: TxVersion,
       sender: PublicKey,
-      data: Seq[DataEntry[_]],
+      data: Seq[DataEntry[?]],
       fee: Long,
       timestamp: TxTimestamp,
       proofs: Proofs,
@@ -70,7 +70,7 @@ object DataTransaction extends TransactionParser {
   def signed(
       version: TxVersion,
       sender: PublicKey,
-      data: Seq[DataEntry[_]],
+      data: Seq[DataEntry[?]],
       fee: Long,
       timestamp: TxTimestamp,
       signer: PrivateKey,
@@ -81,7 +81,7 @@ object DataTransaction extends TransactionParser {
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
-      data: Seq[DataEntry[_]],
+      data: Seq[DataEntry[?]],
       fee: Long,
       timestamp: TxTimestamp,
       chainId: Byte = AddressScheme.current.chainId

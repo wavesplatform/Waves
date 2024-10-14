@@ -181,7 +181,7 @@ case class NgState(
     block.mkTransactionsRoot(base.header.version, newTransactions)
   }
 
-  private[this] def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
+  private def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
     internalCaches.forgedBlockCache.get(
       blockId,
       { () =>

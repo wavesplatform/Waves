@@ -5,7 +5,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.*
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.{Recipient => PBRecipient}
+import com.wavesplatform.protobuf.transaction.{Recipient as PBRecipient}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBRecipients {

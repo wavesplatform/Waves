@@ -4,7 +4,7 @@ import com.wavesplatform.utils.LoggerFacade
 import kamon.metric.{MeasurementUnit, Metric}
 
 object Instrumented {
-  private[this] val NanosInMS = 1000000L
+  private val NanosInMS = 1000000L
 
   def withTimeNanos[R](f: => R): (R, Long) = {
     val startTime = System.nanoTime()

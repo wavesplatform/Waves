@@ -226,7 +226,7 @@ package object appender {
       BlockAppendError("Block state hash is not supported yet", block)
     )
 
-  private[this] object metrics {
+  private object metrics {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation").withoutTags()
     val appendBlock              = Kamon.timer("block-appender.blockchain-append-block").withoutTags()
   }

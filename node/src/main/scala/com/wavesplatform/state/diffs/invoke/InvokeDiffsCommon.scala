@@ -175,8 +175,7 @@ object InvokeDiffsCommon {
         blockchain.isFeatureActivated(BlockRewardDistribution)
       )
       feePortfolios <-
-        if (isSyncCall)
-          TracedResult.wrapValue(Map[Address, Portfolio]())
+        if (isSyncCall) TracedResult.wrapValue(Map[Address, Portfolio]())
         else {
           val feeActionsCount = if (blockchain.isFeatureActivated(SynchronousCalls)) verifierCount else additionalScriptsCount
           val stepLimit       = ContractLimits.MaxComplexityByVersion(version)

@@ -4,7 +4,7 @@ import scala.reflect.ClassTag
 import scala.util.Try
 
 abstract class MessageSpec[Content <: AnyRef](implicit contentCt: ClassTag[Content]) {
-  val contentClass: Class[_] = contentCt.runtimeClass
+  val contentClass: Class[?] = contentCt.runtimeClass
   val messageCode: Message.MessageCode
   final val messageName: String = """Spec\$$""".r.replaceAllIn(getClass.getSimpleName, "")
 

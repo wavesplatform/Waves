@@ -179,7 +179,7 @@ object ExchangeTransactionDiff {
     } yield totalDiff
   }
 
-  private[this] def checkOrderPriceModes(tx: ExchangeTransaction, blockchain: Blockchain): Either[GenericError, Unit] = {
+  private def checkOrderPriceModes(tx: ExchangeTransaction, blockchain: Blockchain): Either[GenericError, Unit] = {
     def isLegacyModeOrder(order: Order) = order.version >= Order.V4 && order.priceMode != OrderPriceMode.Default
     Either.cond(
       !Seq(tx.order1, tx.order2).exists(isLegacyModeOrder) || blockchain.isFeatureActivated(BlockchainFeatures.RideV6),

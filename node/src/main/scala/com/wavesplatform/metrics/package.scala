@@ -13,7 +13,7 @@ package object metrics {
     def measureOptional[T](f: => Option[T]): Option[T] =
       measureWithFilter(f)(_.isDefined)
 
-    private[this] def measureWithFilter[T](f: => T)(filter: T => Boolean): T = {
+    private def measureWithFilter[T](f: => T)(filter: T => Boolean): T = {
       val startedTimer = timer.start()
       val result       = f
       if (filter(result)) startedTimer.stop()

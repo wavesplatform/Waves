@@ -151,9 +151,9 @@ class RocksDBWriter(
     with AutoCloseable {
   import rdb.db as writableDB
 
-  private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[RocksDBWriter]))
+  private val log = LoggerFacade(LoggerFactory.getLogger(classOf[RocksDBWriter]))
 
-  private[this] var disabledAliases = writableDB.get(Keys.disabledAliases)
+  private var disabledAliases = writableDB.get(Keys.disabledAliases)
 
   import RocksDBWriter.*
 
@@ -165,7 +165,7 @@ class RocksDBWriter(
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
-  private[this] def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
+  private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
   override protected def loadMaxAddressId(): Long = writableDB.get(Keys.lastAddressId).getOrElse(0L)
 

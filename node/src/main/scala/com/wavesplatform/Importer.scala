@@ -113,7 +113,7 @@ object Importer extends ScorexLogging {
 
   def loadSettings(file: Option[File]): WavesSettings = Application.loadApplicationConfig(file)
 
-  private[this] var triggers = Seq.empty[BlockchainUpdateTriggers]
+  private var triggers = Seq.empty[BlockchainUpdateTriggers]
 
   def initExtensions(
       wavesSettings: WavesSettings,

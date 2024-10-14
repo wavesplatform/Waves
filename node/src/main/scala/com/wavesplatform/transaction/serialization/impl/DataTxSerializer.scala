@@ -55,7 +55,7 @@ object DataTxSerializer {
     else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
   def parseBytes(bytes: Array[Byte]): Try[DataTransaction] = Try {
-    def parseDataEntries(buf: ByteBuffer): Seq[DataEntry[_]] = {
+    def parseDataEntries(buf: ByteBuffer): Seq[DataEntry[?]] = {
       val entryCount = buf.getShort
       require(entryCount >= 0 && buf.remaining() > entryCount, s"Broken array size ($entryCount entries while ${buf.remaining()} bytes available)")
       Vector.fill(entryCount)(parseEntry(buf))
@@ -71,7 +71,7 @@ object DataTxSerializer {
     DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs, AddressScheme.current.chainId)
   }
 
-  def parseEntry(buf: ByteBuffer): DataEntry[_] = {
+  def parseEntry(buf: ByteBuffer): DataEntry[?] = {
     val key = new String(Deser.parseArrayWithLength(buf), UTF_8)
     buf.get match {
       case t if t == Type.Integer.id => IntegerDataEntry(key, buf.getLong)

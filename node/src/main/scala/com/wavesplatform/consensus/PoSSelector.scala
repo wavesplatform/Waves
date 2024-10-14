@@ -118,7 +118,7 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
     )
   }
 
-  private[this] def calculateBaseTarget(height: Int, timestamp: Long, parent: BlockHeader, grandParent: Option[BlockHeader]): Long = {
+  private def calculateBaseTarget(height: Int, timestamp: Long, parent: BlockHeader, grandParent: Option[BlockHeader]): Long = {
     posCalculator(height).calculateBaseTarget(
       blockchainSettings.genesisSettings.averageBlockDelay.toSeconds,
       height,

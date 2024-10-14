@@ -1,14 +1,14 @@
 package com.wavesplatform.protobuf.utils
 
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.{Amount, _}
+import com.wavesplatform.protobuf.{Amount, *}
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
 object PBImplicitConversions {
-  import com.google.protobuf.{ByteString => PBByteString}
-  import com.wavesplatform.{account => va}
+  import com.google.protobuf.{ByteString as PBByteString}
+  import com.wavesplatform.{account as va}
 
   implicit class AddressOrAliasToPBExt(val r: va.AddressOrAlias) extends AnyVal {
     def toPB: Recipient = r match {

@@ -46,7 +46,7 @@ trait ApiMarshallers extends JsonFormats {
         )
       )
 
-  private[this] lazy val jsonStringUnmarshaller =
+  private lazy val jsonStringUnmarshaller =
     Unmarshaller.byteStringUnmarshaller
       .forContentTypes(`application/json`)
       .mapWithCharset {
@@ -54,16 +54,16 @@ trait ApiMarshallers extends JsonFormats {
         case (data, charset)       => data.decodeString(charset.nioCharset.name)
       }
 
-  private[this] lazy val jsonByteStringMarshaller =
+  private lazy val jsonByteStringMarshaller =
     Marshaller.byteStringMarshaller(`application/json`)
 
-  private[this] lazy val customJsonByteStringMarshaller =
+  private lazy val customJsonByteStringMarshaller =
     Marshaller.byteStringMarshaller(CustomJson.jsonWithNumbersAsStrings)
 
-  private[this] lazy val jsonStringMarshaller =
+  private lazy val jsonStringMarshaller =
     Marshaller.stringMarshaller(`application/json`)
 
-  private[this] lazy val customJsonStringMarshaller =
+  private lazy val customJsonStringMarshaller =
     Marshaller.stringMarshaller(CustomJson.jsonWithNumbersAsStrings)
 
   implicit def playJsonUnmarshaller[A](implicit reads: Reads[A]): FromEntityUnmarshaller[A] =

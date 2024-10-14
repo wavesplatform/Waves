@@ -66,17 +66,17 @@ class MinerImpl(
     with MinerDebugInfo
     with ScorexLogging {
 
-  private[this] val minerSettings              = settings.minerSettings
-  private[this] val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
-  private[this] val blockchainSettings         = settings.blockchainSettings
+  private val minerSettings              = settings.minerSettings
+  private val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
+  private val blockchainSettings         = settings.blockchainSettings
 
-  private[this] val scheduledAttempts = SerialCancelable()
-  private[this] val microBlockAttempt = SerialCancelable()
+  private val scheduledAttempts = SerialCancelable()
+  private val microBlockAttempt = SerialCancelable()
 
   @volatile
-  private[this] var debugStateRef: MinerDebugInfo.State = MinerDebugInfo.Disabled
+  private var debugStateRef: MinerDebugInfo.State = MinerDebugInfo.Disabled
 
-  private[this] val microBlockMiner: MicroBlockMiner = MicroBlockMiner(
+  private val microBlockMiner: MicroBlockMiner = MicroBlockMiner(
     debugStateRef = _,
     allChannels,
     blockchainUpdater,
@@ -334,7 +334,7 @@ class MinerImpl(
     }
   }
 
-  private[this] def startMicroBlockMining(
+  private def startMicroBlockMining(
       account: KeyPair,
       lastBlock: Block,
       restTotalConstraint: MiningConstraint
@@ -347,7 +347,7 @@ class MinerImpl(
   }
 
   // noinspection TypeAnnotation,ScalaStyle
-  private[this] object metrics {
+  private object metrics {
     val blockBuildTimeStats = Kamon.timer("miner.pack-and-forge-block-time").withoutTags()
   }
 }

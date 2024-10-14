@@ -322,7 +322,7 @@ object BlockDiffer {
       TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
   }
 
-  private[this] def apply(
+  private def apply(
       blockchain: Blockchain,
       initConstraint: MiningConstraint,
       prevBlockTimestamp: Option[Long],
@@ -409,7 +409,7 @@ object BlockDiffer {
       }
   }
 
-  private[this] def apply(
+  private def apply(
       blockchain: Blockchain,
       prevStateHash: ByteStr,
       initSnapshot: StateSnapshot,

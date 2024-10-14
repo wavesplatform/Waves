@@ -21,9 +21,9 @@ private class ResponsivenessLogs(csvPrefix: String, metricName: String) extends 
   import ResponsivenessLogs.TxEvent
 
   // noinspection ScalaStyle
-  private[this] case class MetricSnapshot(point: Point.Builder = null, nano: Long = System.nanoTime(), millis: Long = System.currentTimeMillis())
+  private case class MetricSnapshot(point: Point.Builder = null, nano: Long = System.nanoTime(), millis: Long = System.currentTimeMillis())
 
-  private[this] case class TxState(
+  private case class TxState(
       received: Long,
       lastReceived: Long,
       firstMined: Option[MetricSnapshot],
@@ -32,7 +32,7 @@ private class ResponsivenessLogs(csvPrefix: String, metricName: String) extends 
       miningAttempt: Int,
       height: Int
   )
-  private[this] val stateMap = mutable.AnyRefMap.empty[ByteStr, TxState]
+  private val stateMap = mutable.AnyRefMap.empty[ByteStr, TxState]
 
   def writeEvent(
       height: Int,
@@ -176,8 +176,8 @@ object ResponsivenessLogs {
   var enableCsv       = false
   var retentionPolicy = ""
 
-  private[this] val neutrino = new ResponsivenessLogs("neutrino", "neutrino")
-  private[this] val ordinary = new ResponsivenessLogs("tx", "blockchain-responsiveness")
+  private val neutrino = new ResponsivenessLogs("neutrino", "neutrino")
+  private val ordinary = new ResponsivenessLogs("tx", "blockchain-responsiveness")
 
   type TxEvent = TxEvent.Value
   object TxEvent extends Enumeration {
