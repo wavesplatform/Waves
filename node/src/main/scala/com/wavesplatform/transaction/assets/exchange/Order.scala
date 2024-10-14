@@ -57,7 +57,7 @@ case class Order(
     case OrderAuthentication.Eip712Signature(_)     => Proofs.empty
   }
 
-  lazy val sender: PublicKey = senderPublicKey
+  val sender: PublicKey      = senderPublicKey
   def senderAddress: Address = sender.toAddress
 
   def withProofs(proofs: Proofs): Order = {
