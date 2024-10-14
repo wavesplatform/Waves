@@ -48,7 +48,7 @@ object IssueTransaction extends TransactionParser {
   val MinAssetNameLength        = 4
   val MaxAssetNameLength        = 16
   val MaxAssetDescriptionLength = 1000
-  val MaxAssetDecimals          = 8
+  final val MaxAssetDecimals    = 8
 
   override val typeId: TxType = 3: Byte
 
