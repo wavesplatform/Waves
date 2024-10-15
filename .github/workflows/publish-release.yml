@@ -1,12 +1,13 @@
-name: Build docker images for node
+name: Publish Release
 
 on:
   release:
     types: [published]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  publish-node-image:
+    name: Publish node image
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -88,3 +89,59 @@ jobs:
           push: true
           pull: true
           tags: ${{ steps.meta-ride-runner.outputs.tags }}
+
+  publish-node-sbt-builder-image:
+    name: Publish node SBT builder image
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - id: extract-versions
+        run: |
+          echo "waves-version=$(cut -d\" -f2 version.sbt)" >> $GITHUB_OUTPUT
+          echo "sbt-version=$(cut -d= -f2 project/build.properties)" >> $GITHUB_OUTPUT
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          file: ./docker/node-sbt-builder.Dockerfile
+          push: true
+          pull: true
+          tags: wavesplatform/node-sbt-builder:${{ steps.extract-versions.outputs.waves-version }}
+          build-args: |
+            WAVES_VERSION=${{ steps.extract-versions.outputs.waves-version }}
+            SBT_VERSION=${{ steps.extract-versions.outputs.sbt-version }}
+
+  publish-release-jars:
+    name: Publish jars to Sonatype
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - id: sbt-version
+        run: |
+          sbt_version=$(cut -d\" -f2 version.sbt)
+          echo "sbt_version=$sbt_version" >> "$GITHUB_OUTPUT"
+      - if: ${{ format('v{0}', steps.sbt-version.outputs.sbt_version) != github.ref_name }}
+        env:
+          SBT_VERSION: ${{ steps.sbt-version.outputs.sbt_version }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          echo "::error::Release version $RELEASE_VERSION does not match SBT version $SBT_VERSION"
+          exit 1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'sbt'
+          gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
+          gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
+      - name: Publish release jars
+        env:
+          SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
+        run: |
+          sbt --mem 4096 --batch ";publishSigned;sonatypeBundleRelease"

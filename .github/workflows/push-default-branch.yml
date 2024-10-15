@@ -8,7 +8,7 @@ on:
 jobs:
   update-graph:
     name: Update Dependency Graph
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: scalacenter/sbt-dependency-submission@v3
@@ -16,7 +16,7 @@ jobs:
           configs-ignore: test compile-internal provided
   publish-snapshot:
     name: Publish Snapshots to Sonatype
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
