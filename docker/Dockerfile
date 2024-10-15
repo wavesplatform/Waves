@@ -1,4 +1,5 @@
-FROM eclipse-temurin:11-jre-noble
+ARG baseImage=eclipse-temurin:11-jre-noble
+FROM $baseImage
 
 ENV WAVES_LOG_LEVEL=INFO
 ENV WAVES_HEAP_SIZE=2g
