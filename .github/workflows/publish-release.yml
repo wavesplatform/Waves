@@ -7,7 +7,7 @@ on:
 jobs:
   publish-node-image:
     name: Publish node image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -92,7 +92,7 @@ jobs:
 
   publish-node-sbt-builder-image:
     name: Publish node SBT builder image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - id: extract-versions
@@ -117,7 +117,7 @@ jobs:
 
   publish-release-jars:
     name: Publish jars to Sonatype
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - id: sbt-version
