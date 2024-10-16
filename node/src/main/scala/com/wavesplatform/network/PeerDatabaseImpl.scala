@@ -35,16 +35,16 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
 
   private val IPAndPort = """(\d+)\.(\d+)\.(\d+)\.(\d+):(\d+)""".r
 
-  for (f <- settings.file if f.exists()) try {
+  for (f <- settings.file if f.exists && f.isFile && f.length > 0) try {
     JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath).map {
       case IPAndPort(a, b, c, d, port) =>
-        addCandidate(new InetSocketAddress(InetAddress.getByAddress(Array(a.toByte, b.toByte, c.toByte, d.toByte)), port.toInt))
+        addCandidate(new InetSocketAddress(InetAddress.getByAddress(Array(a, b, c, d).map(_.toInt.toByte)), port.toInt))
       case _ =>
     }
 
     log.info(s"Loaded ${unverifiedPeers.size} known peer(s) from ${f.getName}")
   } catch {
-    case NonFatal(_) => log.info("Legacy or corrupted peers.dat, ignoring, starting all over from known-peers...")
+    case NonFatal(e) => log.info("Legacy or corrupted peers.dat, ignoring, starting all over from known-peers...", e)
   }
 
   override def addCandidate(socketAddress: InetSocketAddress): Boolean = unverifiedPeers.synchronized {

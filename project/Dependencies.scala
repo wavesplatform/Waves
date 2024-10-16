@@ -12,7 +12,7 @@ object Dependencies {
 
   private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.10"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.3"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.5"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.3"
 
@@ -28,7 +28,7 @@ object Dependencies {
   val googleGuava     = "com.google.guava"    % "guava"             % "33.3.1-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.8"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.11"
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.0"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
@@ -41,8 +41,8 @@ object Dependencies {
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.4" % Test)
 
-  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.9.8"
-  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.9.8"
+  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.10.1"
+  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.10.1"
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.78.1"
 
@@ -75,7 +75,7 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
-    "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.22", // To support Apple ARM
+    "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.23", // To support Apple ARM
     "com.spotify"                      % "docker-client"                 % "8.16.0",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.18.0",
     asyncHttpClient
@@ -128,7 +128,7 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.2" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "12.3.0",
+      "com.esaulpaugh"              % "headlong"      % "12.3.1",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
     ) ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value
