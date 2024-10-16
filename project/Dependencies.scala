@@ -107,7 +107,7 @@ object Dependencies {
       rocksdb,
       ("org.rudogma" %%% "supertagged" % "2.0-RC2")
         .exclude("org.scala-js", "scalajs-library_2.13")
-        .cross(CrossVersion.for3Use2_13),
+        .cross(CrossVersion.for3Use2_13), // TODO: [scala3] remove `supertagged` because it doesn't support Scala 3
       "commons-net"          % "commons-net"              % "3.11.1",
       "commons-io"           % "commons-io"               % "2.16.1",
       "com.iheart"          %% "ficus"                    % "1.5.2",
