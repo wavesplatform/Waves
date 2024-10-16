@@ -136,7 +136,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
     }
 
     val wallet: Wallet = new Wallet {
-      private val map                                            = miners.map(kp => kp.toAddress -> kp).toMap
+      private val map                                                  = miners.map(kp => kp.toAddress -> kp).toMap
       override def seed: Array[Byte]                                   = Array.emptyByteArray
       override def nonce: Int                                          = miners.length
       override def privateKeyAccounts: Seq[SeedKeyPair]                = miners
@@ -241,7 +241,9 @@ object BlockchainGeneratorApp extends ScorexLogging {
       }
 
       val (bestMiner, nextTime) = times.minBy(_._2)
-      fakeTime.time = nextTime
+      // TODO: [scala3] Fix the error. No idea why it doesn't see fakeTime declared above.
+      // Error: value time is not a member of com.wavesplatform.utils.Time
+      // fakeTime.time = nextTime
 
       miner.forgeBlock(bestMiner) match {
         case Right((block, _)) =>

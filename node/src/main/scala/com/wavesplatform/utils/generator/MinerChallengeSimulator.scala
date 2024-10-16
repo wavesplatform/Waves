@@ -254,7 +254,7 @@ object MinerChallengeSimulator {
       miner -> blockAppender
     }
 
-    private def createFakeTime(startTime: Long) =
+    private def createFakeTime(startTime: Long): Time & Object { var time: Long } =
       new Time {
         @volatile
         var time: Long = startTime
