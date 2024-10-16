@@ -3,12 +3,11 @@ package com.wavesplatform.transaction
 import cats.syntax.either.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, Expression, Asset => AssetType, DApp => DAppType}
+import com.wavesplatform.lang.directives.values.{Account, Expression, Asset as AssetType, DApp as DAppType}
 import com.wavesplatform.lang.v1.traits.Environment.{InputEntity, Tthis}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget}
-import shapeless.*
+import com.wavesplatform.transaction.smart.{DApp as DAppTarget}
 
 package object smart {
   def buildThisValue(

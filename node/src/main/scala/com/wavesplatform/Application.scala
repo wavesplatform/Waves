@@ -174,12 +174,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       } else None
 
     val processBlock =
-      BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, blockChallenger, appenderScheduler) _
+      BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, blockChallenger, appenderScheduler)
 
     val processFork =
-      ExtensionAppender(blockchainUpdater, utxStorage, pos, time, knownInvalidBlocks, peerDatabase, appenderScheduler) _
+      ExtensionAppender(blockchainUpdater, utxStorage, pos, time, knownInvalidBlocks, peerDatabase, appenderScheduler)
     val processMicroBlock =
-      MicroblockAppender(blockchainUpdater, utxStorage, allChannels, peerDatabase, blockChallenger, appenderScheduler) _
+      MicroblockAppender(blockchainUpdater, utxStorage, allChannels, peerDatabase, blockChallenger, appenderScheduler)
 
     import blockchainUpdater.lastBlockInfo
 

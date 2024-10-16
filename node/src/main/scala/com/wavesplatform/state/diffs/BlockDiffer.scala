@@ -340,7 +340,7 @@ object BlockDiffer {
     val blockGenerator  = blockchain.lastBlockHeader.get.header.generator.toAddress
     val rideV6Activated = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
 
-    val txDiffer = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
+    val txDiffer = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog)
 
     if (verify && txSignParCheck)
       ParSignatureChecker.checkTxSignatures(txs, rideV6Activated)
