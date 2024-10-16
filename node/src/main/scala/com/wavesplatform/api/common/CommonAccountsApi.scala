@@ -18,6 +18,7 @@ import org.rocksdb.RocksIterator
 import java.util.regex.Pattern
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
+import com.wavesplatform.database.LongExt // TODO: [scala3] Change when AddressId becomes an opaque type
 
 trait CommonAccountsApi {
   import CommonAccountsApi.*
