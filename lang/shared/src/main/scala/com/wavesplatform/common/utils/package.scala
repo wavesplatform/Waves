@@ -6,6 +6,7 @@ package object utils {
   val Base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
   /** Scala 3 version */
+  // TODO: [scala3] remove `EitherExt2` in favour of `EitherExt3`
   object EitherExt3 {
     extension [A, B](ei: Either[A, B]) {
       def explicitGet(): B = ei match {
