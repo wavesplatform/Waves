@@ -10,6 +10,7 @@ import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{ERC20Address, Transaction}
 import com.wavesplatform.utils.*
+import com.wavesplatform.database.LongExt // TODO: [scala3] Change when AddressId becomes an opaque type
 
 case class CurrentBalance(balance: Long, height: Height, prevHeight: Height)
 object CurrentBalance {

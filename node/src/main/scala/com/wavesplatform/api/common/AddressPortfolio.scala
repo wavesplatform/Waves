@@ -16,6 +16,7 @@ import java.nio.ByteBuffer
 import scala.collection.immutable.VectorMap
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
+import com.wavesplatform.database.LongExt // TODO: [scala3] Change when AddressId becomes an opaque type
 
 class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resource: DBResource)
     extends AbstractIterator[Seq[(IssuedAsset, Long)]]
