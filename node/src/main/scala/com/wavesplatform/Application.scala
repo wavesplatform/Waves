@@ -112,7 +112,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private var maybeNetworkServer: Option[NetworkServer] = None
 
   @volatile
-  private[this] var serverBinding: ServerBinding = _
+  private var serverBinding: ServerBinding = compiletime.uninitialized
 
   def run(): Unit = {
     // initialization

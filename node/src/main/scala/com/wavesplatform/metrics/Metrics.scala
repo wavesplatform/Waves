@@ -36,8 +36,8 @@ object Metrics extends ScorexLogging {
 
   private implicit val scheduler: SchedulerService = Schedulers.singleThread("metrics")
 
-  private[this] var settings: Settings   = _
-  private[this] var time: Time           = _
+  private var settings: Settings   = compiletime.uninitialized
+  private var time: Time           = compiletime.uninitialized
   private var db: Option[InfluxDB] = None
 
   private def currentTimestamp: Long =
