@@ -36,6 +36,7 @@ versionScheme := Some("pvp")
 
 Compile / packageDoc / publishArtifact := true
 Test / packageDoc / publishArtifact    := false
+Compile / packageDoc / mappings        := Seq()
 
 inConfig(Compile)(
   Seq(
@@ -88,6 +89,7 @@ linuxScriptReplacements += ("network" -> network.value.toString)
 
 inConfig(Universal)(
   Seq(
+    maintainer                                              := "com.wavesplatform",
     packageName                                             := s"waves-${version.value}",
     mappings += (baseDirectory.value / s"waves-sample.conf" -> "doc/waves.conf.sample"),
     javaOptions ++= Seq(
