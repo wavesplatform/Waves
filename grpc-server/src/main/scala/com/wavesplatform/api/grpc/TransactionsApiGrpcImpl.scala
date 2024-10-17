@@ -52,7 +52,10 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 
         // By ids
         case None =>
-          Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById))
+          for {
+            id <- Observable.fromIterable(transactionIds)
+            tx <- Observable.fromIterable(commonApi.transactionById(id))
+          } yield tx
       }
 
       val transactionIdSet = transactionIds.toSet
