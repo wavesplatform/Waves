@@ -9,7 +9,7 @@ import com.wavesplatform.state.LeaseDetails
 private class LeaseByAddressIterator(resource: DBResource, apiHandle: RDB.ApiHandle, addressId: AddressId)
     extends AbstractIterator[Seq[(ByteStr, LeaseDetails)]] {
   private val seqNr = resource.get(Keys.addressLeaseSeqNr(addressId, apiHandle))
-  resource.withSafePrefixIterator(_.seekForPrev(Keys.addressLeaseSeq(addressId, seqNr, apiHandle).keyBytes))()
+  resource.withSafePrefixIterator(_.seekForPrev(Keys.addressLeaseSeq(addressId, seqNr, apiHandle).keyBytes))(())
 
   final override def computeNext(): Seq[(ByteStr, LeaseDetails)] =
     resource.withSafePrefixIterator { iterator =>

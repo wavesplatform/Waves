@@ -13,7 +13,7 @@ enablePlugins(GitVersioning)
 git.uncommittedSignifier       := Some("DIRTY")
 git.useGitDescribe             := true
 ThisBuild / git.useGitDescribe := true
-ThisBuild / PB.protocVersion   := "3.25.1" // https://protobuf.dev/support/version-support/#java
+ThisBuild / PB.protocVersion   := "3.25.5" // https://protobuf.dev/support/version-support/#java
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -69,13 +69,23 @@ lazy val `lang-tests-js` = project
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
 
-lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test")
+lazy val node = project.dependsOn(`lang-jvm`)
 
-lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
-lazy val `ride-runner`    = project.dependsOn(node % "compile;test->test", `grpc-server`)
-lazy val `node-it`        = project.dependsOn(node % "compile;test->test", `lang-testkit`, `repl-jvm`, `grpc-server`)
-lazy val `node-generator` = project.dependsOn(node % "compile->test")
-lazy val benchmark        = project.dependsOn(node % "compile;test->test")
+lazy val `node-testkit` = project
+  .in(file("node/testkit"))
+  .dependsOn(`node`, `lang-testkit`)
+
+lazy val `node-tests` = project
+  .in(file("node/tests"))
+  .dependsOn(`lang-testkit` % "test->test", `node-testkit`)
+  .settings(libraryDependencies ++= Dependencies.nodeTests)
+
+lazy val `grpc-server` =
+  project.dependsOn(node % "compile;runtime->provided", `node-testkit`, `node-tests` % "test->test")
+lazy val `ride-runner`    = project.dependsOn(node, `grpc-server`, `node-tests` % "test->test")
+lazy val `node-it`        = project.dependsOn(`repl-jvm`, `grpc-server`, `node-tests` % "test->test")
+lazy val `node-generator` = project.dependsOn(node, `node-testkit`, `node-tests` % "compile->test")
+lazy val benchmark        = project.dependsOn(node, `node-tests` % "test->test")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
@@ -105,7 +115,8 @@ lazy val `repl-jvm` = repl.jvm
     )
   )
 
-lazy val `repl-js` = repl.js.dependsOn(`lang-js`)
+lazy val `repl-js` = repl.js
+  .dependsOn(`lang-js`)
   .settings(
     libraryDependencies += "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
   )
@@ -123,6 +134,8 @@ lazy val `waves-node` = (project in file("."))
     `repl-jvm`,
     node,
     `node-it`,
+    `node-testkit`,
+    `node-tests`,
     `node-generator`,
     benchmark,
     `repl-js`,
@@ -132,7 +145,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "2.13.12",
+    scalaVersion         := "2.13.15",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -150,7 +163,8 @@ inScope(Global)(
       "-Xlint",
       "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
-      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
+      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s",
+      "-Wconf:cat=deprecation&site=com\\.wavesplatform\\.(lang\\..*|JsApiUtils)&origin=com\\.wavesplatform\\.lang\\.v1\\.compiler\\.Terms\\.LET_BLOCK:s"
     ),
     crossPaths        := false,
     cancelable        := true,
@@ -168,7 +182,6 @@ inScope(Global)(
     network         := Network.default(),
     instrumentation := false,
     resolvers ++= Resolver.sonatypeOssRepos("releases") ++ Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
-    Compile / doc / sources                := Seq.empty,
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
     excludeLintKeys ++= Set(
@@ -217,8 +230,8 @@ checkPRRaw := Def
       (`repl-jvm` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
       (`lang-tests-js` / Test / test).value
-//      (`grpc-server` / Test / test).value
-      (node / Test / test).value
+      (`grpc-server` / Test / test).value
+      (`node-tests` / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value

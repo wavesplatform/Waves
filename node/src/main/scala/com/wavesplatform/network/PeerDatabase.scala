@@ -4,33 +4,23 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import io.netty.channel.Channel
 
-trait PeerDatabase extends AutoCloseable {
-
+trait PeerDatabase {
   def addCandidate(socketAddress: InetSocketAddress): Boolean
-
   def touch(socketAddress: InetSocketAddress): Unit
 
+  def nextCandidate(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
+
   def blacklist(host: InetAddress, reason: String): Unit
+  def blacklistAndClose(channel: Channel, reason: String): Unit
+  def isBlacklisted(address: InetAddress): Boolean
+  def clearBlacklist(): Unit
 
   def knownPeers: Map[InetSocketAddress, Long]
 
-  def blacklistedHosts: Set[InetAddress]
-
-  def suspendedHosts: Set[InetAddress]
-
-  def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
-
   def detailedBlacklist: Map[InetAddress, (Long, String)]
-
   def detailedSuspended: Map[InetAddress, Long]
 
-  def clearBlacklist(): Unit
-
   def suspend(host: InetSocketAddress): Unit
-
-  def blacklistAndClose(channel: Channel, reason: String): Unit
-
-  def suspendAndClose(channel: Channel): Unit
 }
 
 object PeerDatabase {
@@ -44,9 +34,7 @@ object PeerDatabase {
 
     override def knownPeers: Map[InetSocketAddress, Long] = Map.empty
 
-    override def blacklistedHosts: Set[InetAddress] = Set.empty
-
-    override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = None
+    override def nextCandidate(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = None
 
     override def detailedBlacklist: Map[InetAddress, (Long, String)] = Map.empty
 
@@ -54,14 +42,10 @@ object PeerDatabase {
 
     override def suspend(host: InetSocketAddress): Unit = {}
 
-    override val suspendedHosts: Set[InetAddress] = Set.empty
+    override def isBlacklisted(address: InetAddress): Boolean = false
 
     override val detailedSuspended: Map[InetAddress, Long] = Map.empty
 
     override def blacklistAndClose(channel: Channel, reason: String): Unit = channel.close()
-
-    override def suspendAndClose(channel: Channel): Unit = channel.close()
-
-    override def close(): Unit = {}
   }
 }

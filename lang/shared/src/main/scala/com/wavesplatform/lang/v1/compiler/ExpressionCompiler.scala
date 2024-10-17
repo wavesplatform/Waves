@@ -144,7 +144,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
 
   private def findGenericType(p: Pos, t: String): Either[CompilationError, FINAL => FINAL] =
     t match {
-      case Type.ListTypeName => Right(LIST)
+      case Type.ListTypeName => Right(LIST.apply)
       case _                 => Left(GenericTypeNotFound(p.start, p.end, t))
     }
 
@@ -345,7 +345,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
         .handleError()
       compiledFuncBody <- local {
         val newArgs: VariableTypes = argTypesWithErr._1.getOrElse(List.empty).toMap
-        modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ newArgs))
+        modify[Id, CompilerContext, CompilationError](ctx1 => ctx1.copy(varDefs = ctx1.varDefs ++ newArgs))
           .flatMap(_ => compileExprWithCtx(func.expr, saveExprContext, allowIllFormedStrings))
       }
 
@@ -368,10 +368,10 @@ class ExpressionCompiler(val version: StdLibVersion) {
   }
 
   protected def updateCtx(letName: String, letType: Types.FINAL, p: Pos): CompileM[Unit] =
-    modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> VariableInfo(p, letType))))
+    modify[Id, CompilerContext, CompilationError](ctx => ctx.copy(varDefs = ctx.varDefs + (letName -> VariableInfo(p, letType))))
 
   protected def updateCtx(funcName: String, typeSig: FunctionTypeSignature, p: Pos): CompileM[Unit] =
-    modify[Id, CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> FunctionInfo(p, List(typeSig)))))
+    modify[Id, CompilerContext, CompilationError](ctx => ctx.copy(functionDefs = ctx.functionDefs + (funcName -> FunctionInfo(p, List(typeSig)))))
 
   private def compileLetBlock(
       p: Pos,
@@ -789,9 +789,9 @@ class ExpressionCompiler(val version: StdLibVersion) {
           .collect {
             case Expressions.Single(t, None) =>
               Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t)))
-            case Expressions.Single(PART.VALID(pos, Type.ListTypeName), Some(PART.VALID(_, Expressions.AnyType(_)))) =>
+            case Expressions.Single(PART.VALID(vpos, Type.ListTypeName), Some(PART.VALID(_, Expressions.AnyType(_)))) =>
               val t = PART.VALID(pos, "List[Any]")
-              Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t)))
+              Expressions.FUNCTION_CALL(vpos, PART.VALID(vpos, IsInstanceOf), List(v, Expressions.CONST_STRING(vpos, t)))
           }
           .reduceRight[Expressions.EXPR](BINARY_OP(pos, _, BinaryOperation.OR_OP, _))
         Right(r)

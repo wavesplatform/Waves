@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import akka.actor.ActorSystem
 import cats.implicits.catsSyntaxOption
 import cats.syntax.apply.*
 import com.google.common.io.ByteStreams
@@ -123,7 +122,6 @@ object Importer extends ScorexLogging {
       extensionTime: Time,
       utxPool: UtxPool,
       rdb: RDB,
-      extensionActorSystem: ActorSystem
   ): Seq[Extension] =
     if (wavesSettings.extensions.isEmpty) Seq.empty
     else {
@@ -139,7 +137,6 @@ object Importer extends ScorexLogging {
 
           override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
             TracedResult.wrapE(Left(GenericError("Not implemented during import")))
-          override def actorSystem: ActorSystem        = extensionActorSystem
           override def utxEvents: Observable[UtxEvent] = Observable.empty
           override def transactionsApi: CommonTransactionsApi =
             CommonTransactionsApi(
@@ -348,7 +345,6 @@ object Importer extends ScorexLogging {
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
 
-    val actorSystem = ActorSystem("wavesplatform-import")
     val rdb         = RDB.open(settings.dbSettings)
     val (blockchainUpdater, rdbWriter) =
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
@@ -357,7 +353,7 @@ object Importer extends ScorexLogging {
     val extAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]] =
       BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify, txSignParCheck = false)
 
-    val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb, actorSystem)
+    val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
     val blocksFileOffset =
@@ -392,7 +388,6 @@ object Importer extends ScorexLogging {
 
     sys.addShutdownHook {
       quit = true
-      Await.result(actorSystem.terminate(), 10.second)
       lock.synchronized {
         if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG) && blockchainUpdater.liquidBlockMeta.nonEmpty) {
           // Force store liquid block in rocksdb

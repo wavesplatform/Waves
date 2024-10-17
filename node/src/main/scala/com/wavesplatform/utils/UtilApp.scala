@@ -7,10 +7,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.script.{Script, ScriptReader}
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{WalletSettings, WavesSettings}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{Transaction, TransactionFactory, TransactionType}
+import com.wavesplatform.transaction.{Transaction, TransactionFactory, TransactionSignOps, TransactionType}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, Version}
 import play.api.libs.json.{JsObject, Json}
@@ -19,6 +19,7 @@ import scopt.OParser
 import java.io.{ByteArrayInputStream, File, FileInputStream, FileOutputStream}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
+import scala.annotation.nowarn
 
 //noinspection ScalaStyle
 // TODO: Consider remove implemented methods from REST API
@@ -41,6 +42,7 @@ object UtilApp {
   case class VerifyOptions(publicKey: PublicKey = null, signature: ByteStr = ByteStr.empty, checkWeakPk: Boolean = false)
   case class HashOptions(mode: String = "fast")
   case class SignTxOptions(signerAddress: String = "")
+  case class KeyPairOptions(seedType: String = "account", nonce: Int = 0)
 
   sealed trait Input
   object Input {
@@ -48,6 +50,8 @@ object UtilApp {
     final case class File(file: String) extends Input
     final case class Str(str: String)   extends Input
   }
+
+  sealed trait SeedType
 
   case class Command(
       mode: Command.Mode = null,
@@ -60,14 +64,15 @@ object UtilApp {
       signOptions: SignOptions = SignOptions(),
       verifyOptions: VerifyOptions = VerifyOptions(),
       hashOptions: HashOptions = HashOptions(),
-      signTxOptions: SignTxOptions = SignTxOptions()
+      signTxOptions: SignTxOptions = SignTxOptions(),
+      keyPairOptions: KeyPairOptions = KeyPairOptions()
   )
 
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, Command()) match {
       case Some(cmd) =>
         val settings = Application.loadApplicationConfig(cmd.configFile.map(new File(_)))
-        val inBytes        = IO.readInput(cmd)
+        val inBytes  = IO.readInput(cmd)
         val result = {
           val doAction = cmd.mode match {
             case Command.CompileScript   => Actions.doCompile(settings) _
@@ -182,6 +187,16 @@ object UtilApp {
         cmd("create-keys")
           .text("Generate key pair from seed")
           .action((_, c) => c.copy(mode = Command.CreateKeyPair))
+          .children(
+            opt[String]("seed-type")
+              .validate {
+                case "account" | "wallet" => success
+                case _                    => failure("Invalid seed format")
+              }
+              .action((t, c) => c.copy(keyPairOptions = c.keyPairOptions.copy(seedType = t))),
+            opt[Int]("nonce")
+              .action((n, c) => c.copy(keyPairOptions = c.keyPairOptions.copy(nonce = n)))
+          )
       ),
       cmd("transaction").children(
         cmd("serialize")
@@ -224,7 +239,7 @@ object UtilApp {
   private[this] object Actions {
     type ActionResult = Either[String, Array[Byte]]
 
-    // noinspection ScalaDeprecation
+    @nowarn("cat=deprecation")
     def doCompile(settings: WavesSettings)(c: Command, str: Array[Byte]): ActionResult = {
       ScriptCompiler(new String(str), c.compileOptions.assetScript, settings.estimator)
         .map(_._1.bytes().arr)
@@ -250,12 +265,29 @@ object UtilApp {
         "Invalid signature"
       )
 
-    def doCreateKeyPair(c: Command, data: Array[Byte]): ActionResult =
-      KeyPair
-        .fromSeed(new String(data))
-        .left
+    def doCreateKeyPair(c: Command, data: Array[Byte]): ActionResult = {
+      import com.wavesplatform.utils.byteStrFormat
+      (c.keyPairOptions.seedType match {
+        case "account" =>
+          KeyPair.fromSeed(new String(data))
+        case "wallet" =>
+          Wallet(WalletSettings(None, Some("123"), Some(ByteStr(data))))
+            .generateNewAccount(c.keyPairOptions.nonce)
+            .toRight("Could not generate account")
+      }).left
         .map(_.toString)
-        .map(kp => Json.toBytes(Json.toJson(kp)))
+        .map(kp =>
+          Json.toBytes(
+            Json.obj(
+              "publicKey"  -> kp.publicKey,
+              "privateKey" -> kp.privateKey,
+              "address"    -> kp.publicKey.toAddress,
+              "walletSeed" -> ByteStr(data),
+              "nonce"      -> c.keyPairOptions.nonce
+            )
+          )
+        )
+    }
 
     def doHash(c: Command, data: Array[Byte]): ActionResult = c.hashOptions.mode match {
       case "fast"   => Right(com.wavesplatform.crypto.fastHash(data))

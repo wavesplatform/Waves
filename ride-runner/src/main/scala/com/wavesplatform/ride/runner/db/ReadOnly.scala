@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.db
 
 import com.wavesplatform.database.DBEntry
-import com.wavesplatform.database.rocksdb.Key
+import com.wavesplatform.database.Key
 import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.caches.disk.{KvHistoryPair, KvPair}
 import com.wavesplatform.state.Height

@@ -65,7 +65,7 @@ package object sync {
   val aliasTxSupportedVersions: List[Byte]        = List(1, 2, 3)
   val reissueTxSupportedVersions: List[Byte]      = List(1, 2, 3)
 
-  val script: Script          = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+  val script: Script          = ScriptCompiler.compile(s"""true""".stripMargin, ScriptEstimatorV2).explicitGet()._1
   val scriptBase64: String    = script.bytes().base64
   val scriptBase64Raw: String = script.bytes().base64Raw
 

@@ -231,7 +231,7 @@ object Explorer extends ScorexLogging {
           val result = new util.HashMap[Short, Stats]
           Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txSnapshotHandle.handle, rdb.txMetaHandle.handle).foreach { cf =>
             Using.Manager { use =>
-              val ro       = use(new ReadOptions().setTotalOrderSeek(true))
+              val ro       = use(new ReadOptions().setTotalOrderSeek(true).setVerifyChecksums(false))
               val iterator = use(rdb.db.newIterator(cf, ro))
               iterator.seekToFirst()
 
@@ -373,7 +373,7 @@ object Explorer extends ScorexLogging {
           log.info("Counting transaction IDs")
           var counter = 0
           Using.Manager { use =>
-            val ro   = use(new ReadOptions().setTotalOrderSeek(true))
+            val ro   = use(new ReadOptions().setTotalOrderSeek(true).setVerifyChecksums(false))
             val iter = use(rdb.db.newIterator(rdb.txMetaHandle.handle, ro))
             iter.seekToFirst()
             // iter.seek(KeyTags.TransactionMetaById.prefixBytes) // Doesn't work, because of CappedPrefixExtractor(10)

@@ -86,28 +86,8 @@ inConfig(Debian)(
 
 // Fat JAR settings
 inTask(assembly)(
-  Seq(
-    test            := {},
-    mainClass       := Some("com.wavesplatform.ride.runner.entrypoints.WavesRideRunnerWithPreparedStateApp"),
-    assemblyJarName := s"waves-ride-runner-all-${version.value}.jar",
-    assemblyMergeStrategy := {
-      case p
-          if p.endsWith(".proto") ||
-            p.endsWith("module-info.class") ||
-            p.endsWith("io.netty.versions.properties") ||
-            p.endsWith(".kotlin_module") =>
-        MergeStrategy.discard
-
-      case "scala-collection-compat.properties" =>
-        MergeStrategy.discard
-      case p
-          if Set("scala/util/control/compat", "scala/collection/compat")
-            .exists(p.replace('\\', '/').contains) =>
-        MergeStrategy.last
-
-      case "logback.xml" | "swagger-ui/openapi.yaml" => MergeStrategy.last
-
-      case other => (assembly / assemblyMergeStrategy).value(other)
-    }
-  )
+  CommonSettings.assemblySettings ++
+    Seq(
+      mainClass := Some("com.wavesplatform.ride.runner.entrypoints.WavesRideRunnerWithPreparedStateApp")
+    )
 )

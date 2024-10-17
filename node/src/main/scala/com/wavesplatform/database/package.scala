@@ -423,7 +423,8 @@ package object database {
 
     def withReadOptions[A](f: ReadOptions => A): A = {
       val snapshot = db.getSnapshot
-      val ro       = new ReadOptions().setSnapshot(snapshot)
+      // checksum may be verification is **very** expensive, so it's explicitly disabled
+      val ro = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
       try f(ro)
       finally {
         ro.close()
@@ -529,27 +530,29 @@ package object database {
         } else ()
       }
 
-      val iterator = db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), new ReadOptions().setTotalOrderSeek(true))
-      try {
-        iterator.seek(prefix)
-        loop(iterator)
-      } finally iterator.close()
+      withReadOptions { ro =>
+        val iterator = db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), ro.setTotalOrderSeek(true))
+        try {
+          iterator.seek(prefix)
+          loop(iterator)
+        } finally iterator.close()
+      }
     }
 
     def resourceObservable: Observable[DBResource] =
-      Observable.resource(Task(DBResource(db, None)))(r => Task(r.close()))
+      Observable.resource(Task(new DBResource(db, None)))(r => Task(r.close()))
 
     def resourceObservable(iteratorCfHandle: ColumnFamilyHandle): Observable[DBResource] =
-      Observable.resource(Task(DBResource(db, Some(iteratorCfHandle))))(r => Task(r.close()))
+      Observable.resource(Task(new DBResource(db, Some(iteratorCfHandle))))(r => Task(r.close()))
 
     def withResource[A](f: DBResource => A): A = {
-      val resource = DBResource(db)
+      val resource = new DBResource(db)
       try f(resource)
       finally resource.close()
     }
 
     def withResource[A](iteratorCfHandle: ColumnFamilyHandle)(f: DBResource => A): A = {
-      val resource = DBResource(db, Some(iteratorCfHandle))
+      val resource = new DBResource(db, Some(iteratorCfHandle))
       try f(resource)
       finally resource.close()
     }

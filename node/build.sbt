@@ -1,5 +1,3 @@
-name := "waves"
-
 enablePlugins(
   RunApplicationSettings,
   JavaServerAppPackaging,
@@ -20,6 +18,26 @@ javaAgents ++= {
   }
 }
 
+publishTo      := sonatypePublishToBundle.value
+publish / skip := false
+homepage       := Some(url("https://waves.tech/"))
+developers := List(
+  Developer("ismagin", "Ilya Smagin", "ilya.smagin@gmail.com", url("https://github.com/ismagin")),
+  Developer("asayadyan", "Artyom Sayadyan", "xrtm000@gmail.com", url("https://github.com/xrtm000")),
+  Developer("mpotanin", "Mike Potanin", "mpotanin@wavesplatform.com", url("https://github.com/potan")),
+  Developer("irakitnykh", "Ivan Rakitnykh", "mrkr.reg@gmail.com", url("https://github.com/mrkraft")),
+  Developer("akiselev", "Alexey Kiselev", "alexey.kiselev@gmail.com>", url("https://github.com/alexeykiselev")),
+  Developer("phearnot", "Sergey Nazarov", "snazarov@web3tech.ru", url("https://github.com/phearnot")),
+  Developer("tolsi", "Sergey Tolmachev", "tolsi.ru@gmail.com", url("https://github.com/tolsi")),
+  Developer("vsuharnikov", "Vyatcheslav Suharnikov", "arz.freezy@gmail.com", url("https://github.com/vsuharnikov")),
+  Developer("ivan-mashonskiy", "Ivan Mashonskii", "ivan.mashonsky@gmail.com", url("https://github.com/ivan-mashonskiy"))
+)
+versionScheme := Some("pvp")
+
+Compile / packageDoc / publishArtifact := true
+Test / packageDoc / publishArtifact    := false
+Compile / packageDoc / mappings        := Seq()
+
 inConfig(Compile)(
   Seq(
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
@@ -27,35 +45,11 @@ inConfig(Compile)(
     PB.generate / includeFilter := { (f: File) =>
       (** / "waves" / "*.proto").matches(f.toPath)
     },
-    PB.deleteTargetDirectory     := false,
-    packageDoc / publishArtifact := false,
-    packageSrc / publishArtifact := false
+    PB.deleteTargetDirectory := false
   )
 )
 
-inTask(assembly)(
-  Seq(
-    test            := {},
-    assemblyJarName := s"waves-all-${version.value}.jar",
-    assemblyMergeStrategy := {
-      case p
-          if p.endsWith(".proto") ||
-            p.endsWith("module-info.class") ||
-            p.endsWith("io.netty.versions.properties") ||
-            p.endsWith(".kotlin_module") =>
-        MergeStrategy.discard
-
-      case "scala-collection-compat.properties" =>
-        MergeStrategy.discard
-      case p
-          if Set("scala/util/control/compat", "scala/collection/compat")
-            .exists(p.replace('\\', '/').contains) =>
-        MergeStrategy.last
-
-      case other => (assembly / assemblyMergeStrategy).value(other)
-    }
-  )
-)
+inTask(assembly)(Seq(name := "waves") ++ CommonSettings.assemblySettings)
 
 // Adds "$lib_dir/*" to app_classpath in the executable file, this is needed for extensions
 scriptClasspath += "*"
@@ -95,6 +89,8 @@ linuxScriptReplacements += ("network" -> network.value.toString)
 
 inConfig(Universal)(
   Seq(
+    maintainer                                              := "com.wavesplatform",
+    packageName                                             := s"waves-${version.value}",
     mappings += (baseDirectory.value / s"waves-sample.conf" -> "doc/waves.conf.sample"),
     javaOptions ++= Seq(
       // -J prefix is required by the bash script
@@ -115,7 +111,7 @@ inConfig(Linux)(
   Seq(
     packageSummary     := "Waves node",
     packageDescription := "Waves node",
-    name               := s"${name.value}${network.value.packageSuffix}",
+    name               := s"waves${network.value.packageSuffix}",
     normalizedName     := name.value,
     packageName        := normalizedName.value
   )

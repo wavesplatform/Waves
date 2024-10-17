@@ -41,7 +41,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         }
       """.stripMargin
 
-      val script      = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+      val script      = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
       val estimatorV3 = ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = false)
       val scriptComplexity = Script
         .estimate(
@@ -183,7 +183,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("not able to broadcast tx from scripted acc if tx fee doesn't include smart fee") {
     for (v <- setScrTxSupportedVersions) {
       val (contract, contractAddr) = if (v < 2) (firstAcc, firstAddress) else (secondAcc, secondAddress)
-      val script                   = ScriptCompiler(s"true", isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+      val script                   = ScriptCompiler.compile(s"true", ScriptEstimatorV2).explicitGet()._1
       sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
 
       val contractBalance    = sender.wavesBalance(contractAddr).available

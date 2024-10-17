@@ -33,7 +33,7 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
   private lazy val (proxyDApp, proxyDAppAddress)     = (thirdKeyPair, thirdAddress)
 
   private def syncDApp(dApp: String) =
-    ScriptCompiler(
+    ScriptCompiler.compile(
       s"""
        |{-# STDLIB_VERSION 5 #-}
        |{-# CONTENT_TYPE DAPP #-}
@@ -52,12 +52,11 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
        | }
        |
          """.stripMargin,
-      isAssetScript = false,
       ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 
   private val dApp =
-    ScriptCompiler(
+    ScriptCompiler.compile(
       s"""
        | {-# STDLIB_VERSION 5       #-}
        | {-# CONTENT_TYPE   DAPP    #-}
@@ -72,7 +71,6 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
        |   ]
        | }
      """.stripMargin,
-      isAssetScript = false,
       ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 

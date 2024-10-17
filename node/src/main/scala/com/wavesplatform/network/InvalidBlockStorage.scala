@@ -4,6 +4,7 @@ import com.google.common.cache.CacheBuilder
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.InvalidBlockStorageImpl.*
+import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -26,7 +27,11 @@ class InvalidBlockStorageImpl(settings: InvalidBlockStorageSettings) extends Inv
     .expireAfterWrite(settings.timeout.length, settings.timeout.unit)
     .build[ByteStr, ValidationError]()
 
-  override def add(blockId: ByteStr, validationError: ValidationError): Unit = cache.put(blockId, validationError)
+  override def add(blockId: ByteStr, validationError: ValidationError): Unit =
+    validationError match {
+      case _: BlockFromFuture => // ignore because it's a temporary error
+      case _                  => cache.put(blockId, validationError)
+    }
 
   override def find(blockId: ByteStr): Option[ValidationError] = Option(cache.getIfPresent(blockId))
 }

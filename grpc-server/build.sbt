@@ -22,7 +22,7 @@ inConfig(Compile)(
 )
 
 enablePlugins(RunApplicationSettings, ExtensionPackaging)
-
+Universal / maintainer := "com.wavesplatform"
 Debian / debianControlFile := {
   val generatedFile = (Debian / debianControlFile).value
   IO.append(generatedFile, s"""Conflicts: grpc-server${network.value.packageSuffix}

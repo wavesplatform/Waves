@@ -77,7 +77,9 @@ case class FunctionalitySettings(
     daoAddress: Option[String] = None,
     xtnBuybackAddress: Option[String] = None,
     xtnBuybackRewardPeriod: Int = Int.MaxValue,
-    lightNodeBlockFieldsAbsenceInterval: Int = 1000
+    lightNodeBlockFieldsAbsenceInterval: Int = 1000,
+    blockRewardBoostPeriod: Int = 1000,
+    paymentsCheckHeight: Int = 0
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -130,7 +132,9 @@ object FunctionalitySettings {
     enforceTransferValidationAfter = 2959447,
     daoAddress = Some("3PEgG7eZHLFhcfsTSaYxgRhZsh4AxMvA4Ms"),
     xtnBuybackAddress = Some("3PFjHWuH6WXNJbwnfLHqNFBpwBS5dkYjTfv"),
-    xtnBuybackRewardPeriod = 100000
+    xtnBuybackRewardPeriod = 100000,
+    blockRewardBoostPeriod = 300_000,
+    paymentsCheckHeight = 4303300
   )
 
   val TESTNET: FunctionalitySettings = apply(
@@ -145,7 +149,8 @@ object FunctionalitySettings {
     enforceTransferValidationAfter = 1698800,
     daoAddress = Some("3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS"),
     xtnBuybackAddress = Some("3N13KQpdY3UU7JkWUBD9kN7t7xuUgeyYMTT"),
-    xtnBuybackRewardPeriod = 2000
+    xtnBuybackRewardPeriod = 2000,
+    blockRewardBoostPeriod = 2_000
   )
 
   val STAGENET: FunctionalitySettings = apply(
@@ -159,7 +164,8 @@ object FunctionalitySettings {
     ethInvokePaymentsCheckHeight = 1311110,
     daoAddress = Some("3MaFVH1vTv18FjBRugSRebx259D7xtRh9ic"),
     xtnBuybackAddress = Some("3MbhiRiLFLJ1EVKNP9npRszcLLQDjwnFfZM"),
-    xtnBuybackRewardPeriod = 1000
+    xtnBuybackRewardPeriod = 1000,
+    paymentsCheckHeight = 2195900
   )
 }
 

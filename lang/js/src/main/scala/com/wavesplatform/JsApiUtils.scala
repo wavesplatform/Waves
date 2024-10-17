@@ -8,6 +8,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext}
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.{PART, Type}
 
+import scala.annotation.nowarn
 import scala.scalajs.js
 import scala.scalajs.js.Any
 import scala.scalajs.js.Dynamic.literal as jObj
@@ -244,6 +245,7 @@ object JsApiUtils {
     jObj("posStart" -> err.start, "posEnd" -> err.end, "msg" -> err.message)
   }
 
+  @nowarn("cat=deprecation")
   def toJs(ast: EXPR): js.Object = {
     def r(expr: EXPR): js.Object = {
       expr match {

@@ -1,30 +1,25 @@
 package com.wavesplatform.it.sync.grpc
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.sync._
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.it.api.SyncGrpcApi.*
+import com.wavesplatform.it.sync.*
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
-  val estimator = ScriptEstimatorV2
-
   var assetWOScript = ""
   var assetWScript  = ""
-  private val unchangeableScript = ScriptCompiler(
+  private val unchangeableScript = TestCompiler.DefaultVersion.compileAsset(
     s"""
        |match tx {
        |  case _: SetAssetScriptTransaction => false
        |  case _ => true
        |}
-       """.stripMargin,
-    isAssetScript = true,
-    estimator
-  ).explicitGet()._1
+       """.stripMargin
+  )
 
   test("issuer cannot change script on asset w/o initial script") {
     val firstBalance    = sender.wavesBalance(firstAddress).available
@@ -57,16 +52,14 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
           fee = issueFee,
           script = Right(
             Some(
-              ScriptCompiler(
+              TestCompiler.DefaultVersion.compileAsset(
                 s"""
-               |match tx {
-               |  case s: SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${secondAcc.publicKey}')
-               |  case _ => false
-               |}
-               """.stripMargin,
-                isAssetScript = true,
-                estimator
-              ).explicitGet()._1
+                   |match tx {
+                   |  case s: SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${secondAcc.publicKey}')
+                   |  case _ => false
+                   |}
+               """.stripMargin
+              )
             )
           ),
           waitForTx = true
@@ -85,16 +78,14 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("sender's waves balance is decreased by fee") {
-    val script2 = ScriptCompiler(
+    val script2 = TestCompiler.DefaultVersion.compileAsset(
       s"""
          |match tx {
          |  case _: SetAssetScriptTransaction => true
          |  case _ => false
          |}
-         """.stripMargin,
-      isAssetScript = true,
-      estimator
-    ).explicitGet()._1
+         """.stripMargin
+    )
 
     val firstBalance    = sender.wavesBalance(firstAddress).available
     val firstEffBalance = sender.wavesBalance(firstAddress).effective

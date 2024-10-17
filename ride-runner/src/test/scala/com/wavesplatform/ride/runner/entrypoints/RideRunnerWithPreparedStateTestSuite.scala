@@ -10,6 +10,7 @@ class RideRunnerWithPreparedStateTestSuite extends BaseTestSuite with HasTestAcc
     val sampleInput = ConfigFactory.parseResources("sample-input.conf")
     val input       = RideRunnerInputParser.from(RideRunnerInputParser.prepare(sampleInput))
     val r           = WavesRideRunnerWithPreparedStateApp.run(input)
+    println(r)
     (r \ "result" \ "value" \ "_2" \ "value").validate[BigInt] shouldBe JsSuccess(BigInt("9007199361531057"))
   }
 }

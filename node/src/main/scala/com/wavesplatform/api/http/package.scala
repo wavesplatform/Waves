@@ -124,8 +124,8 @@ package object http {
     }
   }
 
-  val TransactionId: PathMatcher1[ByteStr] = idOrHash(InvalidTransactionId)
-  val BlockId: PathMatcher1[ByteStr]       = idOrHash(InvalidBlockId)
+  val TransactionId: PathMatcher1[ByteStr] = idOrHash(InvalidTransactionId.apply)
+  val BlockId: PathMatcher1[ByteStr]       = idOrHash(InvalidBlockId.apply)
 
   val AssetId: PathMatcher1[IssuedAsset] = base58Segment(Some(crypto.DigestLength), _ => InvalidAssetId).map(IssuedAsset(_))
 
@@ -170,7 +170,7 @@ package object http {
     case NonFatal(e)           => logger.error("Uncaught error", e); complete(ApiError.Unknown)
   }
 
-  /** Handles all [[scala.util.control.NonFatal non-fatal]] exceptions and tries to handle fatal errors.
+  /** Handles all [[scala.util.control.NonFatal]] exceptions and tries to handle fatal errors.
     *
     * This directive can't handle __fatal__ errors from:
     *

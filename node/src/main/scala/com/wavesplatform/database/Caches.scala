@@ -7,7 +7,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.protobuf.BlockMeta as PBBlockMeta
+import com.wavesplatform.database.protobuf.{BlockMeta as PBBlockMeta, BlockMetaExt}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
@@ -245,7 +245,8 @@ abstract class Caches extends Blockchain with Storage {
       reward.getOrElse(0),
       if (block.header.version >= Block.ProtoBlockVersion) ByteString.copyFrom(hitSource.arr) else ByteString.EMPTY,
       ByteString.copyFrom(newScore.toByteArray),
-      current.meta.fold(settings.genesisSettings.initialBalance)(_.totalWavesAmount) + reward.getOrElse(0L)
+      current.meta.fold(settings.genesisSettings.initialBalance)(_.totalWavesAmount) +
+        (reward.getOrElse(0L) * this.blockRewardBoost(newHeight))
     )
     current = CurrentBlockInfo(Height(newHeight), Some(newMeta), block.transactionData)
 

@@ -6,7 +6,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.database.AddressId
-import com.wavesplatform.database.rocksdb.Key
+import com.wavesplatform.database.*
 import com.wavesplatform.ride.runner.caches.*
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite, RideDbAccess}
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
