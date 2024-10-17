@@ -68,20 +68,17 @@ object UtilApp {
     OParser.parse(commandParser, args, Command()) match {
       case Some(cmd) =>
         val settings = Application.loadApplicationConfig(cmd.configFile.map(new File(_)))
-        val inBytes        = IO.readInput(cmd)
-        val result = {
-          val doAction = cmd.mode match {
-            case Command.CompileScript   => Actions.doCompile(settings) _
-            case Command.DecompileScript => Actions.doDecompile _
-            case Command.SignBytes       => Actions.doSign _
-            case Command.VerifySignature => Actions.doVerify _
-            case Command.CreateKeyPair   => Actions.doCreateKeyPair _
-            case Command.Hash            => Actions.doHash _
-            case Command.SerializeTx     => Actions.doSerializeTx _
-            case Command.SignTx          => Actions.doSignTx(new NodeState(cmd)) _
-            case Command.SignTxWithSk    => Actions.doSignTxWithSK _
-          }
-          doAction(cmd, inBytes)
+        val inBytes  = IO.readInput(cmd)
+        val result = cmd.mode match {
+          case Command.CompileScript   => Actions.doCompile(settings)(cmd, inBytes)
+          case Command.DecompileScript => Actions.doDecompile(cmd, inBytes)
+          case Command.SignBytes       => Actions.doSign(cmd, inBytes)
+          case Command.VerifySignature => Actions.doVerify(cmd, inBytes)
+          case Command.CreateKeyPair   => Actions.doCreateKeyPair(cmd, inBytes)
+          case Command.Hash            => Actions.doHash(cmd, inBytes)
+          case Command.SerializeTx     => Actions.doSerializeTx(cmd, inBytes)
+          case Command.SignTx          => Actions.doSignTx(new NodeState(cmd))(cmd, inBytes)
+          case Command.SignTxWithSk    => Actions.doSignTxWithSK(cmd, inBytes)
         }
 
         result match {
