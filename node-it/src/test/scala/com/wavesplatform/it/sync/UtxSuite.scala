@@ -22,7 +22,7 @@ class UtxSuite extends BaseFunSuite {
   private val ENOUGH_FEE = 5000000
   private val AMOUNT     = ENOUGH_FEE * 10
 
-  test("Invalid transaction should be removed from from utx") {
+  test("Invalid transaction should be removed from utx") {
     val account = UtxSuite.createAccount
 
     val transferToAccount = TransferTransaction
