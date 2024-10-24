@@ -18,7 +18,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -26,11 +26,15 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
+          fetch-tags: true
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '11'
           cache: 'sbt'
+      - uses: sbt/setup-sbt@v1
       - run: sbt --mem 4096 --batch buildTarballsForDocker
       - uses: docker/login-action@v3
         with:
