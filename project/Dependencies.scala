@@ -109,6 +109,7 @@ object Dependencies {
       "commons-net"          % "commons-net"              % "3.11.1",
       "commons-io"           % "commons-io"               % "2.17.0",
       "com.iheart"          %% "ficus"                    % "1.5.2",
+      "com.github.pureconfig" %% "pureconfig" % "0.17.7",
       "net.logstash.logback" % "logstash-logback-encoder" % "8.0" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),

@@ -6,6 +6,8 @@ import com.wavesplatform.utils.*
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.ValueReader
+import pureconfig.*
+import pureconfig.generic.auto.*
 
 import java.io.File
 import java.net.{InetSocketAddress, URI}
@@ -42,6 +44,73 @@ case class NetworkSettings(
 
 object NetworkSettings {
   private val MaxNodeNameBytesLength = 127
+
+  implicit val configReader: ConfigReader[(NetworkSettings)] = ConfigReader.fromCursor[NetworkSettings] { cur =>
+    for {
+      objCur <- cur.asObjectCursor
+
+      file        <- objCur.atKey("file").flatMap(ConfigReader[Option[File]].from)
+      bindAddress <- objCur.atKey("bind-address").flatMap(ConfigReader[Option[String]].from)
+      port        <- objCur.atKey("port").flatMap(ConfigReader[Option[Int]].from)
+      bindAddress1 = for {
+        addr <- bindAddress
+        p    <- port
+      } yield new InetSocketAddress(addr, p)
+
+      declaredAddress <- objCur
+        .atKey("declared-address")
+        .flatMap(ConfigReader[Option[String]].from)
+        .map(_.map { address =>
+          val uri = new URI(s"my://$address")
+          new InetSocketAddress(uri.getHost, uri.getPort)
+        })
+
+      nonce                       <- objCur.atKey("nonce").flatMap(ConfigReader[Option[Long]].from).map(_.getOrElse(randomNonce))
+      nodeName                    <- objCur.atKey("node-name").flatMap(ConfigReader[Option[String]].from).map(_.getOrElse(s"Node-$nonce"))
+      knownPeers                  <- objCur.atKey("known-peers").flatMap(ConfigReader[Seq[String]].from)
+      peersDataResidenceTime      <- objCur.atKey("peers-data-residence-time").flatMap(ConfigReader[FiniteDuration].from)
+      blackListResidenceTime      <- objCur.atKey("black-list-residence-time").flatMap(ConfigReader[FiniteDuration].from)
+      breakIdleConnectionsTimeout <- objCur.atKey("break-idle-connections-timeout").flatMap(ConfigReader[FiniteDuration].from)
+      maxInboundConnections       <- objCur.atKey("max-inbound-connections").flatMap(ConfigReader[Int].from)
+      maxOutboundConnections      <- objCur.atKey("max-outbound-connections").flatMap(ConfigReader[Int].from)
+      maxConnectionsPerHost       <- objCur.atKey("max-single-host-connections").flatMap(ConfigReader[Int].from)
+      minConnections              <- objCur.atKey("min-connections").flatMap(ConfigReader[Option[Int]].from)
+      connectionTimeout           <- objCur.atKey("connection-timeout").flatMap(ConfigReader[FiniteDuration].from)
+      maxUnverifiedPeers          <- objCur.atKey("max-unverified-peers").flatMap(ConfigReader[Int].from)
+      enablePeersExchange         <- objCur.atKey("enable-peers-exchange").flatMap(ConfigReader[Boolean].from)
+      enableBlacklisting          <- objCur.atKey("enable-blacklisting").flatMap(ConfigReader[Boolean].from)
+      peersBroadcastInterval      <- objCur.atKey("peers-broadcast-interval").flatMap(ConfigReader[FiniteDuration].from)
+      handshakeTimeout            <- objCur.atKey("handshake-timeout").flatMap(ConfigReader[FiniteDuration].from)
+      suspensionResidenceTime     <- objCur.atKey("suspension-residence-time").flatMap(ConfigReader[FiniteDuration].from)
+      receivedTxsCacheTimeout     <- objCur.atKey("received-txs-cache-timeout").flatMap(ConfigReader[FiniteDuration].from)
+      uPnPSettings                <- objCur.atKey("upnp").flatMap(ConfigReader[UPnPSettings].from)
+      trafficLogger               <- objCur.atKey("traffic-logger").flatMap(ConfigReader[TrafficLogger.Settings].from)
+    } yield NetworkSettings(
+      file = file,
+      bindAddress = bindAddress1,
+      declaredAddress = declaredAddress,
+      nodeName = nodeName,
+      nonce = nonce,
+      knownPeers = knownPeers,
+      peersDataResidenceTime = peersDataResidenceTime,
+      blackListResidenceTime = blackListResidenceTime,
+      breakIdleConnectionsTimeout = breakIdleConnectionsTimeout,
+      maxInboundConnections = maxInboundConnections,
+      maxOutboundConnections = maxOutboundConnections,
+      maxConnectionsPerHost = maxConnectionsPerHost,
+      minConnections = minConnections,
+      connectionTimeout = connectionTimeout,
+      maxUnverifiedPeers = maxUnverifiedPeers,
+      enablePeersExchange = enablePeersExchange,
+      enableBlacklisting = enableBlacklisting,
+      peersBroadcastInterval = peersBroadcastInterval,
+      handshakeTimeout = handshakeTimeout,
+      suspensionResidenceTime = suspensionResidenceTime,
+      receivedTxsCacheTimeout = receivedTxsCacheTimeout,
+      uPnPSettings = uPnPSettings,
+      trafficLogger = trafficLogger
+    )
+  }
 
   implicit val valueReader: ValueReader[NetworkSettings] =
     (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
