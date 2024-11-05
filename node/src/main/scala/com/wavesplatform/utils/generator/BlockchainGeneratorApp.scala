@@ -2,7 +2,6 @@ package com.wavesplatform.utils.generator
 
 import java.io.{File, FileOutputStream, PrintWriter}
 import java.util.concurrent.TimeUnit
-
 import cats.implicits.*
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
 import com.wavesplatform.{GenesisBlockGenerator, Version}
@@ -22,8 +21,8 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
 import monix.reactive.subjects.ConcurrentSubject
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 import play.api.libs.json.Json
 import scopt.OParser
 
@@ -96,7 +95,11 @@ object BlockchainGeneratorApp extends ScorexLogging {
 
     val config      = readConfFile(options.genesisConfigFile)
     val genSettings = GenesisBlockGenerator.parseSettings(config)
-    val genesis     = ConfigFactory.parseString(GenesisBlockGenerator.createConfig(genSettings)).as[GenesisSettings]("genesis")
+    val genesis =
+      ConfigSource
+        .fromConfig(ConfigFactory.parseString(GenesisBlockGenerator.createConfig(genSettings)))
+        .at("genesis")
+        .loadOrThrow[GenesisSettings]
 
     log.info(s"Initial base target is ${genesis.initialBaseTarget}")
 

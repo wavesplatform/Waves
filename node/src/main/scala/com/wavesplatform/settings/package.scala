@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import java.net.{InetSocketAddress, URI}
-import com.typesafe.config.{Config, ConfigException, ConfigFactory}
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.state.ByteStr
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
@@ -20,19 +20,17 @@ package object settings {
   implicit val byteStrReader: ConfigReader[ByteStr] =
     ConfigReader.fromString(str => ByteStr.decodeBase58(str).toEither.left.map(e => CannotConvert(str, "ByteStr", e.getMessage)))
   implicit val preactivatedFeaturesReader: ConfigReader[Map[Short, Int]] = genericMapReader(catchReadError(_.toShort))
-
-  // used by BlockchainGeneratorApp and MinerChallengeSimulator
-  implicit val byteReader: ValueReader[Byte] = { (cfg: Config, path: String) =>
-    val x = cfg.getInt(path)
-    if (x.isValidByte) x.toByte
-    else throw new ConfigException.WrongType(cfg.origin(), s"$path has an invalid value: '$x' expected to be a byte")
-  }
-
-  // used by TransactionsGeneratorApp
+  
   implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
     val uri = new URI(s"my://${config.getString(path)}")
     new InetSocketAddress(uri.getHost, uri.getPort)
   }
+
+  implicit val inetSocketAddressConfigReader: ConfigReader[InetSocketAddress] = ConfigReader[String].map { str =>
+    val uri = new URI(s"my://$str")
+    new InetSocketAddress(uri.getHost, uri.getPort)
+  }
+
 
   implicit val privateKeyReader: ConfigReader[PrivateKey] = ConfigReader[ByteStr].map(PrivateKey(_))
 
