@@ -7,9 +7,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import pureconfig.*
 import pureconfig.generic.auto.*
-import pureconfig.configurable.*
-import pureconfig.ConvertHelpers.*
-import pureconfig.error.CannotConvert
 import net.ceedubs.ficus.readers.ValueReader
 
 import scala.concurrent.duration.*
@@ -254,12 +251,6 @@ object BlockchainSettings {
   def fromRootConfig(config: Config): BlockchainSettings = fromConfig(config.getConfig("waves.blockchain"))
 
   def fromConfig(config: Config): BlockchainSettings = {
-    implicit val intMapReader: ConfigReader[Map[Short, Int]] = genericMapReader(catchReadError(_.toShort))
-
-    // Note: not sure if all ByteStr values are base58 encoded
-    implicit val byteStrReader: ConfigReader[ByteStr] =
-      ConfigReader.fromString(str => ByteStr.decodeBase58(str).toEither.left.map(e => CannotConvert(str, "ByteStr", e.getMessage)))
-
     val blockchainType = config.getString("type").toUpperCase
     val (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings) = blockchainType match {
       case BlockchainType.STAGENET =>

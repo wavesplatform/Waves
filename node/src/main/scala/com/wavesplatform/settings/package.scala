@@ -3,38 +3,28 @@ package com.wavesplatform
 import java.io.File
 import java.net.{InetSocketAddress, URI}
 import cats.data.NonEmptyList
-import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigValueType}
+import com.typesafe.config.{Config, ConfigException, ConfigFactory}
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.state.ByteStr
 import net.ceedubs.ficus.Ficus.traversableReader
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
+import pureconfig.ConfigReader
+import pureconfig.ConvertHelpers.catchReadError
+import pureconfig.configurable.genericMapReader
+import pureconfig.error.CannotConvert
 import supertagged.TaggedType
 
-import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 package object settings {
   implicit val hyphenCase: NameMapper = HyphenNameMapper
 
-  implicit val fileReader: ValueReader[File]        = (cfg, path) => new File(cfg.getString(path))
-  implicit val byteStrReader: ValueReader[ByteStr]  = (cfg, path) => ByteStr.decodeBase58(cfg.getString(path)).get
-  implicit val shortValueReader: ValueReader[Short] = (cfg, path) => cfg.getLong(path).toShort
-  implicit val preactivatedFeaturesReader: ValueReader[Map[Short, Int]] = (config: Config, path: String) =>
-    if (config.getIsNull(path)) Map.empty
-    else {
-      config.getValue(path).valueType() match {
-        case ConfigValueType.OBJECT =>
-          val paf = config.getConfig(path)
-          (for {
-            featureId <- paf.root().keySet().asScala
-          } yield featureId.toShort -> paf.getInt(featureId)).toMap
-        case ConfigValueType.STRING if config.getString(path).isEmpty =>
-          Map.empty
-        case other =>
-          throw new ConfigException.WrongType(config.getValue(path).origin(), path, ConfigValueType.OBJECT.name(), other.name())
-      }
-    }
+  implicit val fileReader: ValueReader[File] = (cfg, path) => new File(cfg.getString(path))
+  implicit val byteStrReader: ConfigReader[ByteStr] =
+    ConfigReader.fromString(str => ByteStr.decodeBase58(str).toEither.left.map(e => CannotConvert(str, "ByteStr", e.getMessage)))
+  implicit val shortValueReader: ValueReader[Short]                      = (cfg, path) => cfg.getLong(path).toShort
+  implicit val preactivatedFeaturesReader: ConfigReader[Map[Short, Int]] = genericMapReader(catchReadError(_.toShort))
 
   implicit val byteReader: ValueReader[Byte] = { (cfg: Config, path: String) =>
     val x = cfg.getInt(path)
@@ -47,7 +37,7 @@ package object settings {
     new InetSocketAddress(uri.getHost, uri.getPort)
   }
 
-  implicit val privateKeyReader: ValueReader[PrivateKey] = byteStrReader.map(PrivateKey(_))
+  implicit val privateKeyReader: ConfigReader[PrivateKey] = ConfigReader[ByteStr].map(PrivateKey(_))
 
   implicit def nonEmptyListReader[T: ValueReader]: ValueReader[NonEmptyList[T]] = implicitly[ValueReader[List[T]]].map {
     case Nil     => throw new IllegalArgumentException("Expected at least one element")
@@ -57,7 +47,7 @@ package object settings {
   object SizeInBytes extends TaggedType[Long]
   type SizeInBytes = SizeInBytes.Type
 
-  implicit val sizeInBytesReader: ValueReader[SizeInBytes] = {(cfg: Config, path: String) =>
+  implicit val sizeInBytesReader: ValueReader[SizeInBytes] = { (cfg: Config, path: String) =>
     SizeInBytes(cfg.getBytes(path).toLong)
   }
 

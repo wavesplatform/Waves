@@ -3,8 +3,8 @@ package com.wavesplatform.settings
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 
 import scala.concurrent.duration.*
 
@@ -28,7 +28,7 @@ class MinerSettingsSpecification extends FlatSpec {
       """.stripMargin)
       .resolve()
 
-    val settings = config.as[MinerSettings]("waves.miner")
+    val settings = ConfigSource.fromConfig(config).at("waves.miner").loadOrThrow[MinerSettings]
 
     settings.enable should be(true)
     settings.quorum should be(1)

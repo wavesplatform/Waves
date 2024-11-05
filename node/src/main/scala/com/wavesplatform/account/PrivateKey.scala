@@ -3,8 +3,6 @@ package com.wavesplatform.account
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.KeyLength
 import play.api.libs.json.{Format, Writes}
-import pureconfig.ConfigReader
-import pureconfig.error.CannotConvert
 import supertagged.*
 import supertagged.postfix.*
 
@@ -24,15 +22,4 @@ object PrivateKey extends TaggedType[ByteStr] {
     com.wavesplatform.utils.byteStrFormat.map(this.apply),
     Writes(pk => com.wavesplatform.utils.byteStrFormat.writes(pk))
   )
-
-  implicit val configReader: ConfigReader[PrivateKey] =
-    ConfigReader.fromString(str =>
-      ByteStr
-        .decodeBase58(str)
-        .toEither
-        .map(PrivateKey(_))
-        .left
-        .map(e => CannotConvert(str, "ByteStr", e.getMessage))
-    )
-
 }
