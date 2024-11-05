@@ -4,8 +4,8 @@ import com.google.common.base.Ticker
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.test.FeatureSpec
-import net.ceedubs.ficus.Ficus.*
 import org.scalatest.GivenWhenThen
+import pureconfig.ConfigSource
 
 import java.net.{InetAddress, InetSocketAddress}
 
@@ -19,7 +19,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
     .withFallback(ConfigFactory.load())
     .resolve()
 
-  private val networkSettings = config.as[NetworkSettings]("waves.network")
+  private val networkSettings = ConfigSource.fromConfig(config).at("waves.network").loadOrThrow[NetworkSettings]
   private var timestamp       = 0L
 
   info("As a Peer")

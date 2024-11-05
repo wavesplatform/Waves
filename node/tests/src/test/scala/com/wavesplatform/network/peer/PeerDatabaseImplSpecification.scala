@@ -5,7 +5,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.network.{PeerDatabase, PeerDatabaseImpl}
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.test.FreeSpec
-import net.ceedubs.ficus.Ficus.*
+import pureconfig.ConfigSource
 
 import java.net.InetSocketAddress
 import scala.concurrent.duration.*
@@ -25,7 +25,7 @@ class PeerDatabaseImplSpecification extends FreeSpec {
                    |}""".stripMargin)
     .withFallback(ConfigFactory.load())
     .resolve()
-  private val settings1 = config1.as[NetworkSettings]("waves.network")
+  private val settings1 = ConfigSource.fromConfig(config1).at("waves.network").loadOrThrow[NetworkSettings]
 
   private val config2 = ConfigFactory
     .parseString("""waves.network {
@@ -35,7 +35,7 @@ class PeerDatabaseImplSpecification extends FreeSpec {
                    |}""".stripMargin)
     .withFallback(ConfigFactory.load())
     .resolve()
-  private val settings2 = config2.as[NetworkSettings]("waves.network")
+  private val settings2 = ConfigSource.fromConfig(config2).at("waves.network").loadOrThrow[NetworkSettings]
 
   private var ts                 = 0L
   private def sleepLong(): Unit  = { ts += 2200.millis.toNanos }
@@ -136,7 +136,7 @@ class PeerDatabaseImplSpecification extends FreeSpec {
                         |}""".stripMargin)
         .withFallback(ConfigFactory.load())
         .resolve()
-      val settings = config.as[NetworkSettings]("waves.network")
+      val settings = ConfigSource.fromConfig(config).at("waves.network").loadOrThrow[NetworkSettings]
       val database = new PeerDatabaseImpl(settings)
       database.blacklist(address1.getAddress, "I don't like it")
 

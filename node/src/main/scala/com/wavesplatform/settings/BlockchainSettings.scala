@@ -5,8 +5,11 @@ import cats.syntax.traverse.*
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import pureconfig.*
+import pureconfig.generic.auto.*
+import pureconfig.configurable.*
+import pureconfig.ConvertHelpers.*
+import pureconfig.error.CannotConvert
 import net.ceedubs.ficus.readers.ValueReader
 
 import scala.concurrent.duration.*
@@ -248,11 +251,16 @@ object BlockchainSettings {
   implicit val valueReader: ValueReader[BlockchainSettings] =
     (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
 
-  // @deprecated("Use config.as[BlockchainSettings]", "0.17.0")
-  def fromRootConfig(config: Config): BlockchainSettings = config.as[BlockchainSettings]("waves.blockchain")
+  def fromRootConfig(config: Config): BlockchainSettings = fromConfig(config.getConfig("waves.blockchain"))
 
-  private[this] def fromConfig(config: Config): BlockchainSettings = {
-    val blockchainType = config.as[String]("type").toUpperCase
+  def fromConfig(config: Config): BlockchainSettings = {
+    implicit val intMapReader: ConfigReader[Map[Short, Int]] = genericMapReader[Short, Int](catchReadError(_.toShort))
+
+    // Note: not sure if all ByteStr values are base58 encoded
+    implicit val byteStrReader: ConfigReader[ByteStr] =
+      ConfigReader.fromString[ByteStr](str => ByteStr.decodeBase58(str).toEither.left.map(e => CannotConvert(str, "ByteStr", e.getMessage)))
+
+    val blockchainType = config.getString("type").toUpperCase
     val (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings) = blockchainType match {
       case BlockchainType.STAGENET =>
         ('S', FunctionalitySettings.STAGENET, GenesisSettings.STAGENET, RewardsSettings.STAGENET)
@@ -261,10 +269,12 @@ object BlockchainSettings {
       case BlockchainType.MAINNET =>
         ('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET, RewardsSettings.MAINNET)
       case _ => // Custom
-        val networkId     = config.as[String](s"custom.address-scheme-character").charAt(0)
-        val functionality = config.as[FunctionalitySettings](s"custom.functionality")
-        val genesis       = config.as[GenesisSettings](s"custom.genesis")
-        val rewards       = config.as[RewardsSettings](s"custom.rewards")
+        // Note: Mind the imperative approach to reading the config here. Be careful when refactoring.
+        val networkId                            = config.getString(s"custom.address-scheme-character").charAt(0)
+        val configSource                         = ConfigSource.fromConfig(config)
+        val functionality: FunctionalitySettings = configSource.at("custom.functionality").loadOrThrow[FunctionalitySettings]
+        val genesis                              = configSource.at("custom.genesis").loadOrThrow[GenesisSettings]
+        val rewards                              = configSource.at("custom.rewards").loadOrThrow[RewardsSettings]
         require(functionality.minBlockTime <= genesis.averageBlockDelay, "minBlockTime should be <= averageBlockDelay")
         (networkId, functionality, genesis, rewards)
     }

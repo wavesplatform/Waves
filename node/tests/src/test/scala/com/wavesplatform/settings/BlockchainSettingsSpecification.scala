@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.FlatSpec
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class BlockchainSettingsSpecification extends FlatSpec {
   "BlockchainSettings" should "read custom values" in {

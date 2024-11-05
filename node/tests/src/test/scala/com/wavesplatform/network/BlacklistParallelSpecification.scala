@@ -3,8 +3,8 @@ package com.wavesplatform.network
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.{NetworkSettings, loadConfig}
 import com.wavesplatform.test.FeatureSpec
-import net.ceedubs.ficus.Ficus.*
 import org.scalatest.{GivenWhenThen, ParallelTestExecution}
+import pureconfig.ConfigSource
 
 import java.net.{InetAddress, InetSocketAddress}
 
@@ -16,7 +16,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
                                                               |  black-list-residence-time: 1s
                                                               |}""".stripMargin))
 
-  private val networkSettings = config.as[NetworkSettings]("waves.network")
+  private val networkSettings = ConfigSource.fromConfig(config).at("waves.network").loadOrThrow[NetworkSettings]
 
   info("As a Peer")
   info("I want to blacklist other peers for certain time")
