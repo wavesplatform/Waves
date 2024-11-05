@@ -2,27 +2,29 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 
 class UtxSettingsSpecification extends FlatSpec {
   "UTXSettings" should "read values" in {
-    val config = ConfigFactory.parseString("""waves {
-        |  utx {
-        |    max-size = 100
-        |    max-bytes-size = 100
-        |    max-scripted-size = 100
-        |    blacklist-sender-addresses = ["a"]
-        |    allow-blacklisted-transfer-to = ["b"]
-        |    fast-lane-addresses = ["c"]
-        |    allow-transactions-from-smart-accounts = false
-        |    allow-skip-checks = false
-        |    force-validate-in-cleanup = false
-        |    always-unlimited-execution = true
-        |  }
-        |}""".stripMargin).resolve()
+    val config = ConfigFactory
+      .parseString("""waves {
+                     |  utx {
+                     |    max-size = 100
+                     |    max-bytes-size = 100
+                     |    max-scripted-size = 100
+                     |    blacklist-sender-addresses = ["a"]
+                     |    allow-blacklisted-transfer-to = ["b"]
+                     |    fast-lane-addresses = ["c"]
+                     |    allow-transactions-from-smart-accounts = false
+                     |    allow-skip-checks = false
+                     |    force-validate-in-cleanup = false
+                     |    always-unlimited-execution = true
+                     |  }
+                     |}""".stripMargin)
+      .resolve()
 
-    val settings = config.as[UtxSettings]("waves.utx")
+    val settings = ConfigSource.fromConfig(config).at("waves.utx").loadOrThrow[UtxSettings]
     settings.maxSize shouldBe 100
     settings.maxBytesSize shouldBe 100L
     settings.maxScriptedSize shouldBe 100

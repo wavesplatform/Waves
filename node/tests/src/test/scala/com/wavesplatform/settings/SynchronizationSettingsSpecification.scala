@@ -4,8 +4,8 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.network.InvalidBlockStorageImpl.InvalidBlockStorageSettings
 import com.wavesplatform.settings.SynchronizationSettings.{HistoryReplierSettings, MicroblockSynchronizerSettings, UtxSynchronizerSettings}
 import com.wavesplatform.test.FlatSpec
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 
 import scala.concurrent.duration.*
 
@@ -50,7 +50,7 @@ class SynchronizationSettingsSpecification extends FlatSpec {
       """.stripMargin)
       .resolve()
 
-    val settings = config.as[SynchronizationSettings]("waves.synchronization")
+    val settings = ConfigSource.fromConfig(config).at("waves.synchronization").loadOrThrow[SynchronizationSettings]
     settings.maxRollback should be(100)
     settings.synchronizationTimeout should be(30.seconds)
     settings.processedBlocksCacheTimeout should be(3.minutes)

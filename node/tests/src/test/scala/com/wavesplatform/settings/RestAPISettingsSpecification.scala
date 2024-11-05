@@ -3,8 +3,8 @@ package com.wavesplatform.settings
 import akka.http.scaladsl.model.HttpMethods.*
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 
 class RestAPISettingsSpecification extends FlatSpec {
   "RestAPISettings" should "read values" in {
@@ -36,7 +36,7 @@ class RestAPISettingsSpecification extends FlatSpec {
         |}
       """.stripMargin
     )
-    val settings = config.as[RestAPISettings]("waves.rest-api")
+    val settings = ConfigSource.fromConfig(config).at("waves.rest-api").loadOrThrow[RestAPISettings]
 
     settings.enable should be(true)
     settings.bindAddress should be("127.0.0.1")

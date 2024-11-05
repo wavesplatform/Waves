@@ -4,9 +4,9 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.api.http.`X-Api-Key`
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.settings._
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import com.wavesplatform.settings.*
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 
 trait RestAPISettingsHelper {
   private val apiKey: String = "test_api_key"
@@ -20,7 +20,7 @@ trait RestAPISettingsHelper {
 
   lazy val restAPISettings = {
     val keyHash = Base58.encode(crypto.secureHash(apiKey.getBytes("UTF-8")))
-    ConfigFactory
+    val config = ConfigFactory
       .parseString(
         s"""waves.rest-api {
            |  api-key-hash = $keyHash
@@ -32,6 +32,6 @@ trait RestAPISettingsHelper {
          """.stripMargin
       )
       .withFallback(ConfigFactory.load())
-      .as[RestAPISettings]("waves.rest-api")
+    ConfigSource.fromConfig(config).at("waves.rest-api").loadOrThrow[RestAPISettings]
   }
 }

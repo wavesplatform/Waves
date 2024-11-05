@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import java.io.File
 import java.net.{InetSocketAddress, URI}
 import cats.data.NonEmptyList
 import com.typesafe.config.{Config, ConfigException, ConfigFactory}
@@ -20,7 +19,6 @@ import scala.util.Try
 package object settings {
   implicit val hyphenCase: NameMapper = HyphenNameMapper
 
-  implicit val fileReader: ValueReader[File] = (cfg, path) => new File(cfg.getString(path))
   implicit val byteStrReader: ConfigReader[ByteStr] =
     ConfigReader.fromString(str => ByteStr.decodeBase58(str).toEither.left.map(e => CannotConvert(str, "ByteStr", e.getMessage)))
   implicit val shortValueReader: ValueReader[Short]                      = (cfg, path) => cfg.getLong(path).toShort
