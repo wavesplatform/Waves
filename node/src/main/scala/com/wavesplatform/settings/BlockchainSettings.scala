@@ -254,11 +254,11 @@ object BlockchainSettings {
   def fromRootConfig(config: Config): BlockchainSettings = fromConfig(config.getConfig("waves.blockchain"))
 
   def fromConfig(config: Config): BlockchainSettings = {
-    implicit val intMapReader: ConfigReader[Map[Short, Int]] = genericMapReader[Short, Int](catchReadError(_.toShort))
+    implicit val intMapReader: ConfigReader[Map[Short, Int]] = genericMapReader(catchReadError(_.toShort))
 
     // Note: not sure if all ByteStr values are base58 encoded
     implicit val byteStrReader: ConfigReader[ByteStr] =
-      ConfigReader.fromString[ByteStr](str => ByteStr.decodeBase58(str).toEither.left.map(e => CannotConvert(str, "ByteStr", e.getMessage)))
+      ConfigReader.fromString(str => ByteStr.decodeBase58(str).toEither.left.map(e => CannotConvert(str, "ByteStr", e.getMessage)))
 
     val blockchainType = config.getString("type").toUpperCase
     val (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings) = blockchainType match {

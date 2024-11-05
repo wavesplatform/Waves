@@ -2,9 +2,6 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.metrics.Metrics
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
-
 import scala.concurrent.duration.FiniteDuration
 import pureconfig.*
 import pureconfig.generic.auto.*
@@ -45,7 +42,7 @@ object WavesSettings {
     val networkSettings           = wavesConfigSource.at("network").loadOrThrow[NetworkSettings]
     val walletSettings            = wavesConfigSource.at("wallet").loadOrThrow[WalletSettings]
     val blockchainSettings        = BlockchainSettings.fromConfig(waves.getConfig("blockchain"))
-    val minerSettings             = waves.as[MinerSettings]("miner")
+    val minerSettings             = wavesConfigSource.at("miner").loadOrThrow[MinerSettings]
     val restAPISettings           = wavesConfigSource.at("rest-api").loadOrThrow[RestAPISettings]
     val synchronizationSettings   = wavesConfigSource.at("synchronization").loadOrThrow[SynchronizationSettings]
     val utxSettings               = wavesConfigSource.at("utx").loadOrThrow[UtxSettings]
