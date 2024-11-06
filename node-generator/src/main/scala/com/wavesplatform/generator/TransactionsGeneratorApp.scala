@@ -228,21 +228,20 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       log.info(s"Universe precondition tail transactions size: ${initialTailTransactions.size}")
       log.info(s"Generator precondition tail transactions size: ${initialGenTailTransactions.size}")
 
-      val workers = finalConfig.sendTo.map {
-        case NodeAddress(node, nodeRestUrl) =>
-          log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
-          // new Worker(finalConfig.worker, sender, node, generator, initialTransactions.map(RawBytes.from))
-          new Worker(
-            finalConfig.worker,
-            Iterator.continually(generator.next()).flatten,
-            sender,
-            node,
-            nodeRestUrl,
-            () => canContinue,
-            initialUniTransactions ++ initialGenTransactions,
-            finalConfig.privateKeyAccounts.map(_.toAddress.toString),
-            initialTailTransactions ++ initialGenTailTransactions
-          )
+      val workers = finalConfig.sendTo.map { case NodeAddress(node, nodeRestUrl) =>
+        log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
+        // new Worker(finalConfig.worker, sender, node, generator, initialTransactions.map(RawBytes.from))
+        new Worker(
+          finalConfig.worker,
+          Iterator.continually(generator.next()).flatten,
+          sender,
+          node,
+          nodeRestUrl,
+          () => canContinue,
+          initialUniTransactions ++ initialGenTransactions,
+          finalConfig.privateKeyAccounts.map(_.toAddress.toString),
+          initialTailTransactions ++ initialGenTailTransactions
+        )
       }
 
       def close(status: Int): Unit = {

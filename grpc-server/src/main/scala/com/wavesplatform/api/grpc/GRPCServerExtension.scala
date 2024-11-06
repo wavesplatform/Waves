@@ -8,16 +8,15 @@ import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
 import io.grpc.protobuf.services.ProtoReflectionService
 import monix.execution.Scheduler
-import net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 
 import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 import scala.concurrent.Future
 
 class GRPCServerExtension(context: ExtensionContext) extends Extension with ScorexLogging {
-  private val settings = context.settings.config.as[GRPCSettings]("waves.grpc")
+  private val settings = ConfigSource.fromConfig(context.settings.config).at("waves.grpc").loadOrThrow[GRPCSettings]
   private val executor = Executors.newFixedThreadPool(settings.workerThreads, new ThreadFactoryBuilder().setDaemon(true).setNameFormat("grpc-server-worker-%d").build())
   private implicit val apiScheduler: Scheduler = Scheduler(executor)
   private val bindAddress                      = new InetSocketAddress(settings.host, settings.port)

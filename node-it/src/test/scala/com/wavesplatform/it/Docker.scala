@@ -17,12 +17,12 @@ import com.wavesplatform.it.util.GlobalTimer.instance as timer
 import com.wavesplatform.settings.*
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl.*
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 
 import java.io.{FileOutputStream, IOException}
 import java.net.{InetAddress, InetSocketAddress, URL}
@@ -581,14 +581,19 @@ object Docker {
                                             |}""".stripMargin)
 
     val genesisConfig = timestampOverrides.withFallback(configTemplate)
-    val gs            = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
-    val features = featuresConfig
+    val gs            = ConfigSource.fromConfig(genesisConfig).at("waves.blockchain.custom.genesis").loadOrThrow[GenesisSettings]
+    val featuresConfigAdjusted = featuresConfig
       .map(_.withFallback(configTemplate))
       .getOrElse(configTemplate)
       .resolve()
-      .getAs[Map[Short, Int]]("waves.blockchain.custom.functionality.pre-activated-features")
-    val isRideV6Activated          = features.exists(_.get(BlockchainFeatures.RideV6.id).contains(0))
-    val isTxStateSnapshotActivated = features.exists(_.get(BlockchainFeatures.LightNode.id).contains(0))
+    val features =
+      ConfigSource
+        .fromConfig(featuresConfigAdjusted)
+        .at("waves.blockchain.custom.functionality.pre-activated-features")
+        .loadOrThrow[Map[Short, Int]]
+
+    val isRideV6Activated          = features.get(BlockchainFeatures.RideV6.id).contains(0)
+    val isTxStateSnapshotActivated = features.get(BlockchainFeatures.LightNode.id).contains(0)
 
     val genesisSignature = Block.genesis(gs, isRideV6Activated, isTxStateSnapshotActivated).explicitGet().id()
 
@@ -596,7 +601,7 @@ object Docker {
   }
 
   AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
+    override val chainId: Byte = ConfigSource.fromConfig(configTemplate).at("waves.blockchain.custom.address-scheme-character").loadOrThrow[String].charAt(0).toByte
   }
 
   def apply(owner: Class[?]): Docker = new Docker(tag = owner.getSimpleName)

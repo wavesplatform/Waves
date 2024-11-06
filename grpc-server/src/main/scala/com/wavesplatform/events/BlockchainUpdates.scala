@@ -12,10 +12,9 @@ import io.grpc.protobuf.services.ProtoReflectionService
 import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
-import net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import org.rocksdb.RocksDB
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
@@ -24,7 +23,7 @@ import scala.concurrent.duration.*
 import scala.util.Try
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
-  private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
+  private[this] val settings = ConfigSource.fromConfig(context.settings.config).at("waves.blockchain-updates").loadOrThrow[BlockchainUpdatesSettings]
   private[this] implicit val scheduler: SchedulerService = Schedulers.fixedPool(
     settings.workerThreads,
     "blockchain-updates",
