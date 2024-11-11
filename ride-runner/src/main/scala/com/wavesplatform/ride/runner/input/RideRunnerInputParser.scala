@@ -19,7 +19,10 @@ import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{TransactionFactory, TxNonNegativeAmount, TxValidationError}
 import com.wavesplatform.utils.byteArrayFromString
 import net.ceedubs.ficus.Ficus.*
+import pureconfig._
+import pureconfig.generic.auto.*
 import net.ceedubs.ficus.readers.{ArbitraryTypeReader, ValueReader}
+import pureconfig.error.CannotConvert
 import play.api.libs.json.*
 
 import java.nio.charset.StandardCharsets
@@ -36,9 +39,35 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
 
   /** Use after "prepare"
     */
-  def from(config: Config): RideRunnerInput = config.as[RideRunnerInput]
+  def from(config: Config): RideRunnerInput = {
+    val address     = ConfigSource.fromConfig(config).at("address").loadOrThrow[Address]
+    val request     = jsValueFromConfig[JsObject](config, "request")
+    val chainId     = getChainId(config)
+    val intAsString = ConfigSource.fromConfig(config).at("intAsString").load[Boolean].getOrElse(false)
+    val trace       = ConfigSource.fromConfig(config).at("trace").load[Boolean].getOrElse(false)
+    val evaluateScriptComplexityLimit =
+      ConfigSource.fromConfig(config).at("evaluateScriptComplexityLimit").load[Int].getOrElse(Int.MaxValue)
+    val maxTxErrorLogSize = ConfigSource.fromConfig(config).at("maxTxErrorLogSize").load[Int].getOrElse(1024)
+    // val state             = RideRunnerBlockchainState.fromConfig(config.getConfig("state"))
+    val state          = config.as[RideRunnerBlockchainState]("state")
+    val postProcessing = ConfigSource.fromConfig(config).at("postProcessing").load[List[RideRunnerPostProcessingMethod]].getOrElse(List.empty)
+    val test           = Try(jsValueFromConfig[JsValue](config, "test")).map(RideRunnerTest.apply).toOption
 
-  def getChainId(x: Config): Char = x.getAs[Char]("chainId").getOrElse(fail("chainId is not specified or wrong"))
+    RideRunnerInput(
+      address = address,
+      request = request,
+      chainId = chainId,
+      intAsString = intAsString,
+      trace = trace,
+      evaluateScriptComplexityLimit = evaluateScriptComplexityLimit,
+      maxTxErrorLogSize = maxTxErrorLogSize,
+      state = state,
+      postProcessing = postProcessing,
+      test = test
+    )
+  }
+
+  def getChainId(x: Config): Char = ConfigSource.fromConfig(x).at("chainId").load[Char].getOrElse(fail("chainId is not specified or wrong"))
 
   implicit val shortMapKeyValueReader: MapKeyValueReader[Short] = { key =>
     key.toShortOption.getOrElse(fail(s"Expected an integer value between ${Short.MinValue} and ${Short.MaxValue}"))
@@ -58,10 +87,6 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     if (x.isEmpty) None else byteStrDefaultBase58FromString(x).some
   }
 
-  implicit val charValueReader: ValueReader[Char] = ValueReader[String].map { x =>
-    if (x.length == 1) x.head else fail(s"Expected one char, got: $x")
-  }
-
   implicit val byteValueReader: ValueReader[Byte] = ValueReader[Int].map { x =>
     if (x.isValidByte) x.toByte
     else fail(s"Expected an integer value between ${Byte.MinValue} and ${Byte.MaxValue}")
@@ -72,6 +97,24 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     else fail(s"Expected a value between ${Short.MinValue} and ${Short.MaxValue}")
   }
 
+  implicit val shortMapKeyConfigReader: MapKeyConfigReader[Short] = { key =>
+    key.toShortOption.getOrElse(fail(s"Expected an integer value between ${Short.MinValue} and ${Short.MaxValue}"))
+  }
+
+  implicit val intMapKeyConfigReader: MapKeyConfigReader[Int] = { key =>
+    key.toIntOption.getOrElse(fail(s"Expected an integer value between ${Int.MinValue} and ${Int.MaxValue}"))
+  }
+
+  implicit val byteStrMapKeyConfigReader: MapKeyConfigReader[ByteStr] = byteStrDefaultBase58FromString(_)
+
+  implicit val addressMapKeyConfigReader: MapKeyConfigReader[Address] = Address.fromString(_).getOrFail
+
+  implicit val issuedAssetMapKeyConfigReader: MapKeyConfigReader[IssuedAsset] = IssuedAsset.fromString(_, identity, fail(_))
+
+  implicit val optBlockIdMapKeyConfigReader: MapKeyConfigReader[Option[BlockId]] = { x =>
+    if (x.isEmpty) None else byteStrDefaultBase58FromString(x).some
+  }
+
   implicit val heightValueReader: ValueReader[Height] = ValueReader[Int].map(Height(_))
 
   implicit val stdLibVersionValueReader: ValueReader[StdLibVersion] = ValueReader[Int].map(StdLibVersion.VersionDic.idMap.apply)
@@ -80,6 +123,8 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
   implicit val jsObjectValueReader: ValueReader[JsObject] = jsValueReader
 
   implicit val txNonNegativeAmountValueReader: ValueReader[TxNonNegativeAmount] = ValueReader[Long].map(TxNonNegativeAmount.unsafeFrom)
+
+  implicit val txNonNegativeAmountConfigReader: ConfigReader[TxNonNegativeAmount] = ConfigReader[Long].map(TxNonNegativeAmount.unsafeFrom)
 
   implicit val byteArrayValueReader: ValueReader[Array[Byte]] = ValueReader[String].map(byteArrayFromString(_, identity, fail(_)))
 
@@ -103,6 +148,9 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
   }
 
   implicit val addressValueReader: ValueReader[Address] = ValueReader[String].map(Address.fromString(_).getOrFail)
+
+  implicit val addressConfigReader: ConfigReader[Address] =
+    ConfigReader.fromString(s => Address.fromString(s).left.map(_ => CannotConvert(s, "Address", "invalid address")))
 
   implicit val aliasValueReader: ValueReader[Alias] = ValueReader[String].map { x =>
     val chainId = AddressScheme.current.chainId
@@ -129,6 +177,8 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
   }
 
   implicit val publicKeyValueReader: ValueReader[PublicKey] = ValueReader[ByteStr].map(PublicKey(_))
+
+  implicit val publicKeyConfigReader: ConfigReader[PublicKey] = ConfigReader[ByteStr].map(PublicKey(_))
 
   implicit val transferTransactionLikeValueReader: ValueReader[TransferTransactionLike] = jsObjectValueReader.map { js =>
     TransactionFactory
@@ -207,11 +257,32 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     }
   }
 
+  def jsValueFromConfig[T: Reads](config: Config, path: String): T = {
+    val fixedPath = if (path == "") "x" else s"x.$path"
+    val jsonStr   = config.atPath("x").root().render(ConfigRenderOptions.concise())
+    JsonManipulations
+      .pick(Json.parse(jsonStr), fixedPath)
+      .getOrElse(fail(s"Expected a value at $path"))
+      .validate[T] match {
+      case JsSuccess(value, _) => value
+      case JsError(errors)     => fail(s"Can't parse: ${errors.mkString("\n")}")
+    }
+  }
+
   private implicit final class ValidationErrorOps[E, T](private val self: Either[E, T]) extends AnyVal {
     def getOrFail: T = self.fold(e => fail(e.toString), identity)
   }
 
   private def fail(message: String, cause: Throwable = null) = throw new IllegalArgumentException(message, cause)
+
+  implicit def arbitraryKeyMapConfigReader[K, V: ConfigReader](implicit kReader: MapKeyConfigReader[K]): ConfigReader[Map[K, V]] =
+    ConfigReader[Map[String, V]].map { xs =>
+      xs.map { case (k, v) => kReader.readKey(k) -> v }
+    }
+
+  trait MapKeyConfigReader[T] {
+    def readKey(key: String): T
+  }
 
   implicit def arbitraryKeyMapValueReader[K, V: ValueReader](implicit kReader: MapKeyValueReader[K]): ValueReader[Map[K, V]] =
     ValueReader[Map[String, V]].map { xs =>
