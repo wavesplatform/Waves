@@ -163,18 +163,10 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
       regularBalance    <- ConfigReader[Option[TxNonNegativeAmount]].from(objCur.atKeyOrUndefined("regularBalance"))
       leasing           <- ConfigReader[Option[RideRunnerLeaseBalance]].from(objCur.atKeyOrUndefined("leasing"))
       generatingBalance <- ConfigReader[Option[TxNonNegativeAmount]].from(objCur.atKeyOrUndefined("generatingBalance"))
-      // data              <- ConfigReader[Option[Map[String, RideRunnerDataEntry]]].from(objCur.atKeyOrUndefined("data")) // TODO: fix
-      aliases    <- ConfigReader[Option[List[Alias]]].from(objCur.atKeyOrUndefined("aliases")).map(_.getOrElse(Nil))
-      scriptInfo <- ConfigReader[Option[RideRunnerScriptInfo]].from(objCur.atKeyOrUndefined("scriptInfo"))
-    } yield RideRunnerAccount(
-      assetBalances = assetBalances,
-      regularBalance = regularBalance,
-      leasing = leasing,
-      generatingBalance = generatingBalance,
-      // data = data,
-      aliases = aliases,
-      scriptInfo = scriptInfo
-    )
+      data              <- ConfigReader[Option[Map[String, RideRunnerDataEntry]]].from(objCur.atKeyOrUndefined("data"))
+      aliases           <- ConfigReader[Option[List[Alias]]].from(objCur.atKeyOrUndefined("aliases")).map(_.getOrElse(Nil))
+      scriptInfo        <- ConfigReader[Option[RideRunnerScriptInfo]].from(objCur.atKeyOrUndefined("scriptInfo"))
+    } yield RideRunnerAccount(assetBalances, regularBalance, leasing, generatingBalance, data, aliases, scriptInfo)
   }
 
   implicit val addressValueReader: ValueReader[Address] = ValueReader[String].map(Address.fromString(_).getOrFail)
@@ -240,6 +232,21 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
       case "binary"  => BinaryRideRunnerDataEntry(ByteStr(byteArrayDefaultUtf8FromString(config.getString("value"))))
       case x         => fail(s"Expected one of types: integer, boolean, string, binary. Got $x")
     }
+  }
+
+  implicit val rideRunnerDataEntryConfigReader: ConfigReader[RideRunnerDataEntry] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur   <- cur.asObjectCursor
+      dataType <- objCur.atKey("type").flatMap(ConfigReader[String].from)
+      data <- dataType match {
+        case "integer" => objCur.atKey("value").flatMap(ConfigReader[Long].from).map(IntegerRideRunnerDataEntry.apply)
+        case "boolean" => objCur.atKey("value").flatMap(ConfigReader[Boolean].from).map(BooleanRideRunnerDataEntry.apply)
+        case "string"  => objCur.atKey("value").flatMap(ConfigReader[String].from).map(StringRideRunnerDataEntry.apply)
+        case "binary" =>
+          objCur.atKey("value").flatMap(ConfigReader[String].from).map(x => BinaryRideRunnerDataEntry(ByteStr(byteArrayDefaultUtf8FromString(x))))
+        case x => fail(s"Expected one of types: integer, boolean, string, binary. Got $x")
+      }
+    } yield data
   }
 
   implicit val rideRunnerPostProcessingMethodValueReader: ValueReader[RideRunnerPostProcessingMethod] =
