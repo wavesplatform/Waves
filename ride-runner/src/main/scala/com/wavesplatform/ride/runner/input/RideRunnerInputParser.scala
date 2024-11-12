@@ -154,7 +154,7 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     else x.asLeft
   }
 
-  implicit val accountConfigReader: ConfigReader[RideRunnerAccount] = ConfigReader.fromCursor(cur =>
+  implicit val accountConfigReader: ConfigReader[RideRunnerAccount] = ConfigReader.fromCursor { cur =>
     for {
       objCur <- cur.asObjectCursor
       assetBalances <- ConfigReader[Option[Map[IssuedAsset, TxNonNegativeAmount]]]
@@ -164,7 +164,7 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
       leasing           <- ConfigReader[Option[RideRunnerLeaseBalance]].from(objCur.atKeyOrUndefined("leasing"))
       generatingBalance <- ConfigReader[Option[TxNonNegativeAmount]].from(objCur.atKeyOrUndefined("generatingBalance"))
       // data              <- ConfigReader[Option[Map[String, RideRunnerDataEntry]]].from(objCur.atKeyOrUndefined("data")) // TODO: fix
-      // aliases           <- ConfigReader[Option[List[Alias]]].from(objCur.atKeyOrUndefined("aliases")).map(_.getOrElse(Nil)) // TODO: fix
+      aliases    <- ConfigReader[Option[List[Alias]]].from(objCur.atKeyOrUndefined("aliases")).map(_.getOrElse(Nil))
       scriptInfo <- ConfigReader[Option[RideRunnerScriptInfo]].from(objCur.atKeyOrUndefined("scriptInfo"))
     } yield RideRunnerAccount(
       assetBalances = assetBalances,
@@ -172,10 +172,10 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
       leasing = leasing,
       generatingBalance = generatingBalance,
       // data = data,
-      // aliases = aliases,
+      aliases = aliases,
       scriptInfo = scriptInfo
     )
-  )
+  }
 
   implicit val addressValueReader: ValueReader[Address] = ValueReader[String].map(Address.fromString(_).getOrFail)
 
@@ -183,6 +183,18 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     ConfigReader.fromString(s => Address.fromString(s).left.map(_ => CannotConvert(s, "Address", "invalid address")))
 
   implicit val aliasValueReader: ValueReader[Alias] = ValueReader[String].map { x =>
+    val chainId = AddressScheme.current.chainId
+
+    val separatorNumber = x.count(_ == ':')
+    val alias =
+      if (separatorNumber == 2) Alias.fromString(x)
+      else if (separatorNumber == 1) Alias.createWithChainId(x.substring(x.indexOf(":") + 1), chainId)
+      else Alias.createWithChainId(x, chainId)
+
+    alias.flatMap { x => Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId)) }.getOrFail
+  }
+
+  implicit val aliasConfigReader: ConfigReader[Alias] = ConfigReader[String].map { x =>
     val chainId = AddressScheme.current.chainId
 
     val separatorNumber = x.count(_ == ':')

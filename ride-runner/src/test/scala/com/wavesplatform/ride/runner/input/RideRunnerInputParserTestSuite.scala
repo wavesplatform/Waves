@@ -374,7 +374,7 @@ func bar () = {
       actual.state.accounts.get(aliceAddr).map(_.leasing) shouldMatchTo expected.state.accounts.get(aliceAddr).map(_.leasing)
       actual.state.accounts.get(aliceAddr).map(_.generatingBalance) shouldMatchTo expected.state.accounts.get(aliceAddr).map(_.generatingBalance)
       // actual.state.accounts.get(aliceAddr).map(_.data) shouldMatchTo expected.state.accounts.get(aliceAddr).map(_.data)
-      // actual.state.accounts.get(aliceAddr).map(_.aliases) shouldMatchTo expected.state.accounts.get(aliceAddr).map(_.aliases)
+      actual.state.accounts.get(aliceAddr).map(_.aliases) shouldMatchTo expected.state.accounts.get(aliceAddr).map(_.aliases)
       actual.state.accounts.get(aliceAddr).map(_.scriptInfo) shouldMatchTo expected.state.accounts.get(aliceAddr).map(_.scriptInfo)
       // ---------------
       // actual shouldMatchTo expected
