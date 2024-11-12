@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{TransactionFactory, TxNonNegativeAmount, TxValidationError}
 import com.wavesplatform.utils.byteArrayFromString
 import net.ceedubs.ficus.Ficus.*
-import pureconfig._
+import pureconfig.*
 import pureconfig.generic.auto.*
 import net.ceedubs.ficus.readers.{ArbitraryTypeReader, ValueReader}
 import pureconfig.error.CannotConvert
@@ -48,10 +48,12 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     val evaluateScriptComplexityLimit =
       ConfigSource.fromConfig(config).at("evaluateScriptComplexityLimit").load[Int].getOrElse(Int.MaxValue)
     val maxTxErrorLogSize = ConfigSource.fromConfig(config).at("maxTxErrorLogSize").load[Int].getOrElse(1024)
-    // val state             = RideRunnerBlockchainState.fromConfig(config.getConfig("state"))
-    val state          = config.as[RideRunnerBlockchainState]("state")
-    val postProcessing = ConfigSource.fromConfig(config).at("postProcessing").load[List[RideRunnerPostProcessingMethod]].getOrElse(List.empty)
-    val test           = Try(jsValueFromConfig[JsValue](config, "test")).map(RideRunnerTest.apply).toOption
+    val state             = RideRunnerBlockchainState.fromConfig(config.getConfig("state"))
+    val postProcessing    = ConfigSource.fromConfig(config).at("postProcessing").load[List[RideRunnerPostProcessingMethod]].getOrElse(List.empty)
+    // val test           = Try(jsValueFromConfig[JsValue](config, "test")).map(RideRunnerTest.apply).toOption // pureconfig
+
+    // ficus
+    val test = config.as[Option[RideRunnerTest]]("test")
 
     RideRunnerInput(
       address = address,
@@ -147,6 +149,34 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     else x.asLeft
   }
 
+  implicit val srcOrCompiledScriptConfigReader: ConfigReader[SrcOrCompiledScript] = ConfigReader[String].map { x =>
+    if (x.startsWith(Base64.Prefix)) ScriptReader.fromBytes(Base64.decode(x)).getOrFail.asRight
+    else x.asLeft
+  }
+
+  implicit val accountConfigReader: ConfigReader[RideRunnerAccount] = ConfigReader.fromCursor(cur =>
+    for {
+      objCur <- cur.asObjectCursor
+      assetBalances <- ConfigReader[Option[Map[IssuedAsset, TxNonNegativeAmount]]]
+        .from(objCur.atKeyOrUndefined("assetBalances"))
+        .map(_.getOrElse(Map.empty))
+      regularBalance    <- ConfigReader[Option[TxNonNegativeAmount]].from(objCur.atKeyOrUndefined("regularBalance"))
+      leasing           <- ConfigReader[Option[RideRunnerLeaseBalance]].from(objCur.atKeyOrUndefined("leasing"))
+      generatingBalance <- ConfigReader[Option[TxNonNegativeAmount]].from(objCur.atKeyOrUndefined("generatingBalance"))
+      // data              <- ConfigReader[Option[Map[String, RideRunnerDataEntry]]].from(objCur.atKeyOrUndefined("data")) // TODO: fix
+      // aliases           <- ConfigReader[Option[List[Alias]]].from(objCur.atKeyOrUndefined("aliases")).map(_.getOrElse(Nil)) // TODO: fix
+      scriptInfo <- ConfigReader[Option[RideRunnerScriptInfo]].from(objCur.atKeyOrUndefined("scriptInfo"))
+    } yield RideRunnerAccount(
+      assetBalances = assetBalances,
+      regularBalance = regularBalance,
+      leasing = leasing,
+      generatingBalance = generatingBalance,
+      // data = data,
+      // aliases = aliases,
+      scriptInfo = scriptInfo
+    )
+  )
+
   implicit val addressValueReader: ValueReader[Address] = ValueReader[String].map(Address.fromString(_).getOrFail)
 
   implicit val addressConfigReader: ConfigReader[Address] =
@@ -227,6 +257,18 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     }
 
     RideRunnerScriptInfo(pk.getOrElse(EmptyPublicKey), compiledScript)
+  }
+
+  implicit val rideRunnerScriptInfoConfigReader: ConfigReader[RideRunnerScriptInfo] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur  <- cur.asObjectCursor
+      pk      <- ConfigReader[Option[PublicKey]].from(objCur.atKeyOrUndefined("publicKey")).map(_.getOrElse(EmptyPublicKey))
+      imports <- ConfigReader[Option[Map[String, String]]].from(objCur.atKeyOrUndefined("imports")).map(_.getOrElse(Map.empty))
+      compiledScript <- ConfigReader[SrcOrCompiledScript].from(objCur.atKeyOrUndefined("script")).map {
+        case Right(x)  => x
+        case Left(src) => ScriptUtil.from(src, imports)
+      }
+    } yield RideRunnerScriptInfo(pk, compiledScript)
   }
 
   private def byteArrayDefaultUtf8FromString(x: String): Array[Byte] = Try {
