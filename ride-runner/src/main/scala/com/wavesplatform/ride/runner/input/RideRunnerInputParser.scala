@@ -14,9 +14,9 @@ import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.state.Height
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{TransactionFactory, TxNonNegativeAmount, TxValidationError}
+import com.wavesplatform.transaction.{Asset, TransactionFactory, TxNonNegativeAmount, TxValidationError}
 import com.wavesplatform.utils.byteArrayFromString
 import net.ceedubs.ficus.Ficus.*
 import pureconfig.*
@@ -211,6 +211,27 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
       vrf         <- ConfigReader[Option[ByteStr]].from(objCur.atKeyOrUndefined("VRF"))
       blockReward <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("blockReward")).map(_.getOrElse(600_000_000L))
     } yield RideRunnerBlock(timestamp, baseTarget, generationSignature, generatorPublicKey, vrf, blockReward)
+  }
+
+  implicit val transactionConfigReader: ConfigReader[RideRunnerTransaction] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur          <- cur.asObjectCursor
+      amount          <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("amount")).map(_.getOrElse(1L))
+      assetId         <- ConfigReader[Option[Asset]].from(objCur.atKeyOrUndefined("assetId")).map(_.getOrElse(Waves))
+      fee             <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("fee")).map(_.getOrElse(100_000L))
+      feeAssetId      <- ConfigReader[Option[Asset]].from(objCur.atKeyOrUndefined("feeAssetId")).map(_.getOrElse(Waves))
+      recipient       <- objCur.atKey("recipient").flatMap(ConfigReader[AddressOrAlias].from)
+      senderPublicKey <- ConfigReader[Option[PublicKey]].from(objCur.atKeyOrUndefined("senderPublicKey")).map(_.getOrElse(EmptyPublicKey))
+      height          <- ConfigReader[Option[Int]].from(objCur.atKeyOrUndefined("height"))
+      // Note: `System.currentTimeMillis()` is a side effect, as well as the default value for the `timestamp` field in case class is.
+      // It would be a good idea not to use side effects in the default values of case class fields.
+      timestamp <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("timestamp")).map(_.getOrElse(System.currentTimeMillis()))
+      proofs    <- ConfigReader[Option[List[StringOrBytesAsByteArray]]].from(objCur.atKeyOrUndefined("proofs")).map(_.getOrElse(Nil))
+      version   <- ConfigReader[Option[Byte]].from(objCur.atKeyOrUndefined("version")).map(_.getOrElse(3: Byte))
+      attachment <- ConfigReader[Option[StringOrBytesAsByteArray]]
+        .from(objCur.atKeyOrUndefined("attachment"))
+        .map(_.getOrElse(StringOrBytesAsByteArray(Array.empty[Byte])))
+    } yield RideRunnerTransaction(amount, assetId, fee, feeAssetId, recipient, senderPublicKey, height, timestamp, proofs, version, attachment)
   }
 
   implicit val addressValueReader: ValueReader[Address] = ValueReader[String].map(Address.fromString(_).getOrFail)

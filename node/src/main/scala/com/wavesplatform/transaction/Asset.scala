@@ -6,6 +6,8 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.*
+import pureconfig.ConfigReader
+import pureconfig.error.CannotConvert
 
 import scala.util.Success
 
@@ -53,6 +55,9 @@ object Asset {
   implicit val assetReader: ValueReader[Asset] = { (cfg, path) =>
     AssetPair.extractAssetId(cfg getString path).fold(ex => throw new Exception(ex.getMessage), identity)
   }
+
+  implicit val assetConfigReader: ConfigReader[Asset] =
+    ConfigReader[String].emap(s => AssetPair.extractAssetId(s).fold(ex => Left(CannotConvert(s, "Asset", ex.getMessage)), Right(_)))
 
   def fromString(maybeStr: Option[String]): Asset = {
     maybeStr.map(x => IssuedAsset(ByteStr.decodeBase58(x).get)).getOrElse(Waves)
