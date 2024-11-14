@@ -13,8 +13,6 @@ import com.wavesplatform.ride.{DiffXInstances, ScriptUtil}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxNonNegativeAmount
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
-import net.ceedubs.ficus.Ficus.toFicusConfig
-import net.ceedubs.ficus.readers.ValueReader
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.*
 import pureconfig.*
@@ -40,13 +38,13 @@ class RideRunnerInputParserTestSuite extends BaseTestSuite with TableDrivenPrope
           """ { "foo": 1 } """ -> Json.obj("foo" -> 1)
         )
       ) { (rawContent, expected) =>
-        parseAsFicus[JsValue](rawContent) shouldBe expected
+        parseValue[JsValue](rawContent) shouldBe expected
       }
     }
 
     "JsObject" in {
-      parseAsFicus[JsObject](""" { "foo": 1 } """) shouldBe Json.obj("foo" -> 1)
-      Try(parseAsFicus[JsObject]("1")).isFailure shouldBe true
+      parseValue[JsObject](""" { "foo": 1 } """) shouldBe Json.obj("foo" -> 1)
+      Try(parseValue[JsObject]("1")).isFailure shouldBe true
     }
 
     "StringOrBytesAsByteArray" - {
@@ -378,5 +376,6 @@ func bar () = {
     ConfigSource.fromConfig(ConfigFactory.parseString(s"""x = \"\"\"$s\"\"\"""")).at("x").loadOrThrow[T]
   private def parseAs[T: ConfigReader: ClassTag](rawContent: String): T =
     ConfigSource.fromConfig(ConfigFactory.parseString(s"""x = $rawContent""")).at("x").loadOrThrow[T]
-  private def parseAsFicus[T: ValueReader](rawContent: String): T = ConfigFactory.parseString(s"""x = $rawContent""").as[T]("x")
+  private def parseValue[T: Reads: ClassTag](rawContent: String): T =
+    jsValueFromConfig(ConfigFactory.parseString(s"""x = $rawContent"""), "x")
 }
