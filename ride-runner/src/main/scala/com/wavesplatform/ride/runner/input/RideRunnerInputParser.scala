@@ -79,13 +79,27 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     key.toIntOption.getOrElse(fail(s"Expected an integer value between ${Int.MinValue} and ${Int.MaxValue}"))
   }
 
+  implicit val intMapKeyConfigReader: MapKeyConfigReader[Int] = { key =>
+    key.toIntOption.getOrElse(fail(s"Expected an integer value between ${Int.MinValue} and ${Int.MaxValue}"))
+  }
+
   implicit val byteStrMapKeyValueReader: MapKeyValueReader[ByteStr] = byteStrDefaultBase58FromString(_)
+
+  implicit val byteStrMapKeyConfigReader: MapKeyConfigReader[ByteStr] = byteStrDefaultBase58FromString(_)
 
   implicit val addressMapKeyValueReader: MapKeyValueReader[Address] = Address.fromString(_).getOrFail
 
+  implicit val addressMapKeyConfigReader: MapKeyConfigReader[Address] = Address.fromString(_).getOrFail
+
   implicit val issuedAssetMapKeyValueReader: MapKeyValueReader[IssuedAsset] = IssuedAsset.fromString(_, identity, fail(_))
 
+  implicit val issuedAssetMapKeyConfigReader: MapKeyConfigReader[IssuedAsset] = IssuedAsset.fromString(_, identity, fail(_))
+
   implicit val optBlockIdMapKeyValueReader: MapKeyValueReader[Option[BlockId]] = { x =>
+    if (x.isEmpty) None else byteStrDefaultBase58FromString(x).some
+  }
+
+  implicit val optBlockIdMapKeyConfigReader: MapKeyConfigReader[Option[BlockId]] = { x =>
     if (x.isEmpty) None else byteStrDefaultBase58FromString(x).some
   }
 
@@ -101,20 +115,6 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
 
   implicit val shortMapKeyConfigReader: MapKeyConfigReader[Short] = { key =>
     key.toShortOption.getOrElse(fail(s"Expected an integer value between ${Short.MinValue} and ${Short.MaxValue}"))
-  }
-
-  implicit val intMapKeyConfigReader: MapKeyConfigReader[Int] = { key =>
-    key.toIntOption.getOrElse(fail(s"Expected an integer value between ${Int.MinValue} and ${Int.MaxValue}"))
-  }
-
-  implicit val byteStrMapKeyConfigReader: MapKeyConfigReader[ByteStr] = byteStrDefaultBase58FromString(_)
-
-  implicit val addressMapKeyConfigReader: MapKeyConfigReader[Address] = Address.fromString(_).getOrFail
-
-  implicit val issuedAssetMapKeyConfigReader: MapKeyConfigReader[IssuedAsset] = IssuedAsset.fromString(_, identity, fail(_))
-
-  implicit val optBlockIdMapKeyConfigReader: MapKeyConfigReader[Option[BlockId]] = { x =>
-    if (x.isEmpty) None else byteStrDefaultBase58FromString(x).some
   }
 
   implicit val heightValueReader: ValueReader[Height] = ValueReader[Int].map(Height(_))
@@ -134,11 +134,22 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
 
   implicit val byteStrValueReader: ValueReader[ByteStr] = byteArrayValueReader.map(ByteStr(_))
 
+  implicit val byteStrConfigReader: ConfigReader[ByteStr] = ConfigReader[String].map(byteStrDefaultBase58FromString)
+
   implicit val stringOrBytesAsByteArratValueReader: ValueReader[StringOrBytesAsByteArray] = ValueReader[String].map { x =>
     StringOrBytesAsByteArray(byteArrayDefaultUtf8FromString(x))
   }
 
+  implicit val stringOrBytesAsByteArrayConfigReader: ConfigReader[StringOrBytesAsByteArray] = ConfigReader[String].map { x =>
+    StringOrBytesAsByteArray(byteArrayDefaultUtf8FromString(x))
+  }
+
   implicit val scriptValueReader: ValueReader[Script] = ValueReader[String].map { x =>
+    if (x.startsWith(Base64.Prefix)) ScriptReader.fromBytes(Base64.decode(x)).getOrFail
+    else ScriptUtil.from(x)
+  }
+
+  implicit val scriptConfigReader: ConfigReader[Script] = ConfigReader[String].map { x =>
     if (x.startsWith(Base64.Prefix)) ScriptReader.fromBytes(Base64.decode(x)).getOrFail
     else ScriptUtil.from(x)
   }
@@ -167,6 +178,39 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
       aliases           <- ConfigReader[Option[List[Alias]]].from(objCur.atKeyOrUndefined("aliases")).map(_.getOrElse(Nil))
       scriptInfo        <- ConfigReader[Option[RideRunnerScriptInfo]].from(objCur.atKeyOrUndefined("scriptInfo"))
     } yield RideRunnerAccount(assetBalances, regularBalance, leasing, generatingBalance, data, aliases, scriptInfo)
+  }
+
+  implicit val assetConfigReader: ConfigReader[RideRunnerAsset] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur          <- cur.asObjectCursor
+      issuerPublicKey <- ConfigReader[Option[PublicKey]].from(objCur.atKeyOrUndefined("issuerPublicKey")).map(_.getOrElse(EmptyPublicKey))
+      name <- ConfigReader[Option[StringOrBytesAsByteArray]].from(objCur.atKeyOrUndefined("name")).map(_.getOrElse(RideRunnerAsset.DefaultName))
+      description <- ConfigReader[Option[StringOrBytesAsByteArray]]
+        .from(objCur.atKeyOrUndefined("description"))
+        .map(_.getOrElse(RideRunnerAsset.DefaultDescription))
+      decimals             <- ConfigReader[Option[Int]].from(objCur.atKeyOrUndefined("decimals")).map(_.getOrElse(8))
+      reissuable           <- ConfigReader[Option[Boolean]].from(objCur.atKeyOrUndefined("reissuable")).map(_.getOrElse(false))
+      quantity             <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("quantity")).map(_.getOrElse(9007199254740991L))
+      script               <- ConfigReader[Option[Script]].from(objCur.atKeyOrUndefined("script"))
+      minSponsoredAssetFee <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("minSponsoredAssetFee")).map(_.getOrElse(0L))
+    } yield RideRunnerAsset(issuerPublicKey, name, description, decimals, reissuable, quantity, script, minSponsoredAssetFee)
+  }
+
+  implicit val blockConfigReader: ConfigReader[RideRunnerBlock] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur <- cur.asObjectCursor
+      // Note: `System.currentTimeMillis()` is a side effect, as well as the default value for the `timestamp` field in case class is.
+      // It would be a good idea not to use side effects in the default values of case class fields.
+      timestamp  <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("timestamp")).map(_.getOrElse(System.currentTimeMillis()))
+      baseTarget <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("baseTarget")).map(_.getOrElse(130L))
+      generationSignature <- ConfigReader[Option[ByteStr]]
+        .from(objCur.atKeyOrUndefined("generationSignature"))
+        .map(_.getOrElse(ByteStr(new Array[Byte](64))))
+      generatorPublicKey <- ConfigReader[Option[PublicKey]].from(objCur.atKeyOrUndefined("generatorPublicKey")).map(_.getOrElse(EmptyPublicKey))
+
+      vrf         <- ConfigReader[Option[ByteStr]].from(objCur.atKeyOrUndefined("VRF"))
+      blockReward <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("blockReward")).map(_.getOrElse(600_000_000L))
+    } yield RideRunnerBlock(timestamp, baseTarget, generationSignature, generatorPublicKey, vrf, blockReward)
   }
 
   implicit val addressValueReader: ValueReader[Address] = ValueReader[String].map(Address.fromString(_).getOrFail)
@@ -210,6 +254,18 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     addressOrAlias.flatMap { x => Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId)) }.getOrFail
   }
 
+  implicit val addressOrAliasConfigReader: ConfigReader[AddressOrAlias] = ConfigReader[String].map { x =>
+    val chainId = AddressScheme.current.chainId
+
+    val separatorNumber = x.count(_ == ':')
+    val addressOrAlias =
+      if (separatorNumber == 2) Alias.fromString(x)
+      else if (separatorNumber == 1) Alias.createWithChainId(x.substring(x.indexOf(":") + 1), chainId)
+      else Address.fromString(x)
+
+    addressOrAlias.flatMap { x => Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId)) }.getOrFail
+  }
+
   implicit val publicKeyValueReader: ValueReader[PublicKey] = ValueReader[ByteStr].map(PublicKey(_))
 
   implicit val publicKeyConfigReader: ConfigReader[PublicKey] = ConfigReader[ByteStr].map(PublicKey(_))
@@ -222,16 +278,6 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
         case _                           => Left(TxValidationError.UnsupportedTransactionType)
       }
       .getOrFail
-  }
-
-  implicit val rideRunnerDataEntryValueReader: ValueReader[RideRunnerDataEntry] = ValueReader.relative[RideRunnerDataEntry] { config =>
-    config.getString("type") match {
-      case "integer" => IntegerRideRunnerDataEntry(config.getLong("value"))
-      case "boolean" => BooleanRideRunnerDataEntry(config.getBoolean("value"))
-      case "string"  => StringRideRunnerDataEntry(config.getString("value"))
-      case "binary"  => BinaryRideRunnerDataEntry(ByteStr(byteArrayDefaultUtf8FromString(config.getString("value"))))
-      case x         => fail(s"Expected one of types: integer, boolean, string, binary. Got $x")
-    }
   }
 
   implicit val rideRunnerDataEntryConfigReader: ConfigReader[RideRunnerDataEntry] = ConfigReader.fromCursor { cur =>
@@ -264,6 +310,25 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
         case x => fail(s"Expected one of types: pick, pickAll, prune. Got $x")
       }
     }
+
+  implicit val rideRunnerPostProcessingMethodConfigReader: ConfigReader[RideRunnerPostProcessingMethod] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur <- cur.asObjectCursor
+      method <- objCur.atKey("type").flatMap(ConfigReader[String].from)
+      data <- method match {
+        case "pick"    => objCur.atKey("path").flatMap(ConfigReader[String].from).map(RideRunnerPostProcessingMethod.Pick.apply)
+        case "pickAll" => objCur.atKey("paths").flatMap(ConfigReader[List[String]].from).map(RideRunnerPostProcessingMethod.PickAll.apply)
+        case "prune"   => objCur.atKey("paths").flatMap(ConfigReader[List[String]].from).map(RideRunnerPostProcessingMethod.Prune.apply)
+        case "regex" =>
+          for {
+            path    <- objCur.atKey("path").flatMap(ConfigReader[String].from)
+            find    <- objCur.atKey("find").flatMap(ConfigReader[String].from)
+            replace <- objCur.atKey("replace").flatMap(ConfigReader[String].from)
+          } yield RideRunnerPostProcessingMethod.Regex(path, find, replace)
+        case x => fail(s"Expected one of types: pick, pickAll, prune. Got $x")
+      }
+    } yield data
+  }
 
   implicit val rideRunnerScriptInfoValueReader: ValueReader[RideRunnerScriptInfo] = ValueReader.relative[RideRunnerScriptInfo] { config =>
     val pk      = config.as[Option[PublicKey]]("publicKey")
