@@ -50,10 +50,7 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     val maxTxErrorLogSize = ConfigSource.fromConfig(config).at("maxTxErrorLogSize").load[Int].getOrElse(1024)
     val state             = RideRunnerBlockchainState.fromConfig(config.getConfig("state"))
     val postProcessing    = ConfigSource.fromConfig(config).at("postProcessing").load[List[RideRunnerPostProcessingMethod]].getOrElse(List.empty)
-    // val test           = Try(jsValueFromConfig[JsValue](config, "test")).map(RideRunnerTest.apply).toOption // pureconfig
-
-    // ficus
-    val test = config.as[Option[RideRunnerTest]]("test")
+    val test           = Try(jsValueFromConfig[JsValue](config, "test.expected")).map(RideRunnerTest.apply).toOption
 
     RideRunnerInput(
       address = address,
