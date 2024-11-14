@@ -4,7 +4,6 @@ import com.google.common.collect.Interners
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.*
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
@@ -50,10 +49,6 @@ object Asset {
   object Formats {
     implicit val assetJsonFormat: Format[IssuedAsset] = Format(assetReads, assetWrites)
     implicit val assetIdJsonFormat: Format[Asset]     = Format(assetIdReads, assetIdWrites)
-  }
-
-  implicit val assetReader: ValueReader[Asset] = { (cfg, path) =>
-    AssetPair.extractAssetId(cfg getString path).fold(ex => throw new Exception(ex.getMessage), identity)
   }
 
   implicit val assetConfigReader: ConfigReader[Asset] =

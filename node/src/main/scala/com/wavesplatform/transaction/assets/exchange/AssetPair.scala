@@ -6,7 +6,6 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves, WavesName}
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
-import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.{Failure, Success, Try}
@@ -66,6 +65,4 @@ object AssetPair {
     case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
     case xs => Failure(new Exception(s"$s (incorrect assets count, expected 2 but got ${xs.size}: ${xs.mkString(", ")})"))
   }
-
-  implicit val assetPairReader: ValueReader[AssetPair] = (cfg, path) => fromString(cfg.getString(path)).get
 }
