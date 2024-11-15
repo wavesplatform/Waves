@@ -49,7 +49,7 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
 
   override def addCandidate(socketAddress: InetSocketAddress): Boolean = unverifiedPeers.synchronized {
     val r = !socketAddress.getAddress.isAnyLocalAddress &&
-      !(socketAddress.getAddress.isLoopbackAddress && settings.bindAddress.exists(_.getPort == socketAddress.getPort)) &&
+      !(socketAddress.getAddress.isLoopbackAddress && settings.derivedBindAddress.exists(_.getPort == socketAddress.getPort)) &&
       Option(peersPersistence.getIfPresent(socketAddress)).isEmpty &&
       !unverifiedPeers.contains(socketAddress)
     if (r) unverifiedPeers.add(socketAddress)

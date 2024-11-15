@@ -39,7 +39,7 @@ object NetworkServer extends ScorexLogging {
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup,
       peerInfo: ConcurrentHashMap[Channel, PeerInfo],
-      protocolSpecificPipeline: => Seq[ChannelHandlerAdapter],
+      protocolSpecificPipeline: => Seq[ChannelHandlerAdapter]
   ): NetworkServer = {
     @volatile var shutdownInitiated = false
 
@@ -48,13 +48,13 @@ object NetworkServer extends ScorexLogging {
     val handshake = Handshake(
       applicationName,
       Version.VersionTuple,
-      networkSettings.nodeName,
-      networkSettings.nonce,
-      networkSettings.declaredAddress
+      networkSettings.derivedNodeName,
+      networkSettings.derivedNonce,
+      networkSettings.derivedDeclaredAddress
     )
 
     val excludedAddresses: Set[InetSocketAddress] =
-      networkSettings.bindAddress.fold(Set.empty[InetSocketAddress]) { bindAddress =>
+      networkSettings.derivedBindAddress.fold(Set.empty[InetSocketAddress]) { bindAddress =>
         val isLocal = Option(bindAddress.getAddress).exists(_.isAnyLocalAddress)
         val localAddresses = if (isLocal) {
           NetworkInterface.getNetworkInterfaces.asScala
@@ -62,7 +62,7 @@ object NetworkServer extends ScorexLogging {
             .toSet
         } else Set(bindAddress)
 
-        localAddresses ++ networkSettings.declaredAddress.toSet
+        localAddresses ++ networkSettings.derivedDeclaredAddress.toSet
       }
 
     val lengthFieldPrepender = new LengthFieldPrepender(4)
@@ -90,7 +90,7 @@ object NetworkServer extends ScorexLogging {
       ) ++ protocolSpecificPipeline ++
         Seq(writeErrorHandler, channelClosedHandler, fatalErrorHandler)
 
-    val serverChannel = networkSettings.bindAddress.map { bindAddress =>
+    val serverChannel = networkSettings.derivedBindAddress.map { bindAddress =>
       new ServerBootstrap()
         .group(bossGroup, workerGroup)
         .channel(classOf[NioServerSocketChannel])
@@ -203,7 +203,8 @@ object NetworkServer extends ScorexLogging {
     }
 
     def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
-      val delay = (if (peerConnectionsMap.isEmpty || networkSettings.minConnections.exists(_ > peerConnectionsMap.size())) AverageHandshakePeriod else 5.seconds) +
+      val delay = (if (peerConnectionsMap.isEmpty || networkSettings.minConnections.exists(_ > peerConnectionsMap.size())) AverageHandshakePeriod
+                   else 5.seconds) +
         (Random.nextInt(1000) - 500).millis // add some noise so that nodes don't attempt to connect to each other simultaneously
 
       workerGroup.schedule(delay) {

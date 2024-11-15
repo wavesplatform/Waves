@@ -481,7 +481,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
-    for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
+    for (addr <- settings.networkSettings.derivedDeclaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)
     }
 
@@ -501,7 +501,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Closing REST API")
       if (settings.restAPISettings.enable)
         Try(Await.ready(serverBinding.unbind(), 2.minutes)).failed.map(e => log.error("Failed to unbind REST API port", e))
-      for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) upnp.deletePort(addr.getPort)
+      for (addr <- settings.networkSettings.derivedDeclaredAddress if settings.networkSettings.uPnPSettings.enable) upnp.deletePort(addr.getPort)
 
       log.debug("Closing peer database")
       peerDatabase.close()
@@ -604,12 +604,12 @@ object Application extends ScorexLogging {
   }
 
   private[wavesplatform] def loadBlockAt(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl)(
-    height: Int
+      height: Int
   ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
     loadBlockInfoAt(rdb, blockchainUpdater)(height)
 
   private[wavesplatform] def loadBlockInfoAt(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl)(
-    height: Int
+      height: Int
   ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
     loadBlockMetaAt(rdb.db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater

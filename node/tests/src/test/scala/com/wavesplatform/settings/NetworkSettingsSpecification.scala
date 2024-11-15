@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
 import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 import pureconfig.error.ConfigReaderException
 import scala.concurrent.duration.*
 
@@ -41,10 +42,10 @@ class NetworkSettingsSpecification extends FlatSpec {
                                                         |}""".stripMargin))
     val networkSettings = ConfigSource.fromConfig(config).at("waves.network").loadOrThrow[NetworkSettings]
 
-    networkSettings.bindAddress should be(Some(new InetSocketAddress("127.0.0.1", 6868)))
-    networkSettings.nodeName should be("default-node-name")
-    networkSettings.declaredAddress should be(Some(new InetSocketAddress("127.0.0.1", 6868)))
-    networkSettings.nonce should be(0)
+    networkSettings.derivedBindAddress should be(Some(new InetSocketAddress("127.0.0.1", 6868)))
+    networkSettings.derivedNodeName should be("default-node-name")
+    networkSettings.derivedDeclaredAddress should be(Some(new InetSocketAddress("127.0.0.1", 6868)))
+    networkSettings.derivedNonce should be(0)
     networkSettings.knownPeers should be(List("8.8.8.8:6868", "4.4.8.8:6868"))
     networkSettings.peersDataResidenceTime should be(1.day)
     networkSettings.blackListResidenceTime should be(10.minutes)
