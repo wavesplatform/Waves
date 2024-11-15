@@ -12,7 +12,7 @@ import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.utils.NTP
-import net.ceedubs.ficus.Ficus.*
+import pureconfig.ConfigSource
 
 object BaseTargetChecker {
   def main(args: Array[String]): Unit = {
@@ -41,7 +41,7 @@ object BaseTargetChecker {
       blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature, None)
 
       NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
-        case cfg if cfg.as[Boolean]("waves.miner.enable") =>
+        case cfg if ConfigSource.fromConfig(cfg).at("waves.miner.enable").loadOrThrow[Boolean] =>
           val account = KeyPair.fromSeed(cfg.getString("account-seed")).explicitGet()
           val address = account.toAddress
           val balance = blockchainUpdater.balance(address, Waves)
