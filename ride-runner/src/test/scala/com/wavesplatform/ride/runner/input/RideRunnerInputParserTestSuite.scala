@@ -38,13 +38,13 @@ class RideRunnerInputParserTestSuite extends BaseTestSuite with TableDrivenPrope
           """ { "foo": 1 } """ -> Json.obj("foo" -> 1)
         )
       ) { (rawContent, expected) =>
-        parseValue[JsValue](rawContent) shouldBe expected
+        parseAs[JsValue](rawContent) shouldBe expected
       }
     }
 
     "JsObject" in {
-      parseValue[JsObject](""" { "foo": 1 } """) shouldBe Json.obj("foo" -> 1)
-      Try(parseValue[JsObject]("1")).isFailure shouldBe true
+      parseAs[JsObject](""" { "foo": 1 } """) shouldBe Json.obj("foo" -> 1)
+      Try(parseAs[JsObject]("1")).isFailure shouldBe true
     }
 
     "StringOrBytesAsByteArray" - {
@@ -376,6 +376,4 @@ func bar () = {
     ConfigSource.fromConfig(ConfigFactory.parseString(s"""x = \"\"\"$s\"\"\"""")).at("x").loadOrThrow[T]
   private def parseAs[T: ConfigReader: ClassTag](rawContent: String): T =
     ConfigSource.fromConfig(ConfigFactory.parseString(s"""x = $rawContent""")).at("x").loadOrThrow[T]
-  private def parseValue[T: Reads: ClassTag](rawContent: String): T =
-    jsValueFromConfig(ConfigFactory.parseString(s"""x = $rawContent"""), "x")
 }

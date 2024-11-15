@@ -33,16 +33,16 @@ object RideRunnerInputParser {
     */
   def from(config: Config): RideRunnerInput = {
     val address     = ConfigSource.fromConfig(config).at("address").loadOrThrow[Address]
-    val request     = jsValueFromConfig[JsObject](config, "request")
+    val request     = ConfigSource.fromConfig(config).at("request").loadOrThrow[JsObject]
     val chainId     = getChainId(config)
     val intAsString = ConfigSource.fromConfig(config).at("intAsString").load[Boolean].getOrElse(false)
     val trace       = ConfigSource.fromConfig(config).at("trace").load[Boolean].getOrElse(false)
     val evaluateScriptComplexityLimit =
       ConfigSource.fromConfig(config).at("evaluateScriptComplexityLimit").load[Int].getOrElse(Int.MaxValue)
     val maxTxErrorLogSize = ConfigSource.fromConfig(config).at("maxTxErrorLogSize").load[Int].getOrElse(1024)
-    val state             = RideRunnerBlockchainState.fromConfig(config.getConfig("state"))
+    val state             = ConfigSource.fromConfig(config).at("state").loadOrThrow[RideRunnerBlockchainState]
     val postProcessing    = ConfigSource.fromConfig(config).at("postProcessing").load[List[RideRunnerPostProcessingMethod]].getOrElse(List.empty)
-    val test              = Try(jsValueFromConfig[JsValue](config, "test.expected")).map(RideRunnerTest.apply).toOption
+    val test              = ConfigSource.fromConfig(config).at("test.expected").load[JsValue].map(RideRunnerTest.apply).toOption
 
     RideRunnerInput(
       address = address,
@@ -256,15 +256,24 @@ object RideRunnerInputParser {
     else Base58.tryDecodeWithLimit(x).fold(e => fail(s"Error parsing base58: ${e.getMessage}"), identity)
   }
 
-  def jsValueFromConfig[T: Reads](config: Config, path: String): T = {
-    val fixedPath = if (path == "") "x" else s"x.$path"
-    val jsonStr   = config.atPath("x").root().render(ConfigRenderOptions.concise())
-    JsonManipulations
-      .pick(Json.parse(jsonStr), fixedPath)
-      .getOrElse(fail(s"Expected a value at $path"))
-      .validate[T] match {
-      case JsSuccess(value, _) => value
-      case JsError(errors)     => fail(s"Can't parse: ${errors.mkString("\n")}")
+  implicit val jsObjectConfigReader: ConfigReader[JsObject] = playJsonConfigReader
+
+  implicit val jsValueConfigReader: ConfigReader[JsValue] = playJsonConfigReader
+
+  private def playJsonConfigReader[T: Reads]: ConfigReader[T] = ConfigReader.fromCursor { cur =>
+    for {
+      configValue <- cur.asConfigValue
+      stubKey = "stubKey"
+      config  = ConfigFactory.empty().withValue(stubKey, configValue)
+    } yield {
+      val jsonStr = config.root().render(ConfigRenderOptions.concise())
+      JsonManipulations
+        .pick(Json.parse(jsonStr), stubKey)
+        .getOrElse(fail(s"Expected a value"))
+        .validate[T] match {
+        case JsSuccess(value, _) => value
+        case JsError(errors)     => fail(s"Can't parse: ${errors.mkString("\n")}")
+      }
     }
   }
 
