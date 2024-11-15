@@ -82,10 +82,14 @@ lazy val `node-tests` = project
 
 lazy val `grpc-server` =
   project.dependsOn(node % "compile;runtime->provided", `node-testkit`, `node-tests` % "test->test")
-lazy val `ride-runner`    = project.dependsOn(node, `grpc-server`, `node-tests` % "test->test")
-lazy val `node-it`        = project.dependsOn(`repl-jvm`, `grpc-server`, `node-tests` % "test->test")
-lazy val `node-generator` = project.dependsOn(node, `node-testkit`, `node-tests` % "compile->test")
-lazy val benchmark        = project.dependsOn(node, `node-tests` % "test->test")
+lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-tests` % "test->test")
+lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `node-tests` % "test->test")
+lazy val `node-generator` = project
+  .dependsOn(node, `node-testkit`, `node-tests` % "compile->test")
+  .settings(
+    libraryDependencies += "com.iheart" %% "ficus" % "1.5.2"
+  )
+lazy val benchmark = project.dependsOn(node, `node-tests` % "test->test")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
