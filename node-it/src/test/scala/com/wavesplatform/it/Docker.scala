@@ -306,7 +306,7 @@ class Docker(
   private def getNodeInfo(containerId: String, settings: WavesSettings): NodeInfo = {
     val restApiPort = settings.restAPISettings.port
     // assume test nodes always have an open port
-    val networkPort = settings.networkSettings.bindAddress.get.getPort
+    val networkPort = settings.networkSettings.derivedBindAddress.get.getPort
 
     val containerInfo  = inspectContainer(containerId)
     val wavesIpAddress = containerInfo.networkSettings().networks().get(wavesNetwork.name()).ipAddress()
@@ -601,7 +601,8 @@ object Docker {
   }
 
   AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = ConfigSource.fromConfig(configTemplate).at("waves.blockchain.custom.address-scheme-character").loadOrThrow[String].charAt(0).toByte
+    override val chainId: Byte =
+      ConfigSource.fromConfig(configTemplate).at("waves.blockchain.custom.address-scheme-character").loadOrThrow[String].charAt(0).toByte
   }
 
   def apply(owner: Class[?]): Docker = new Docker(tag = owner.getSimpleName)

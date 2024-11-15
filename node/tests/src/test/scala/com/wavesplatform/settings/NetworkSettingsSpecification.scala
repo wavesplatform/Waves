@@ -5,7 +5,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
 import pureconfig.ConfigSource
 import pureconfig.generic.auto.*
-import pureconfig.error.ConfigReaderException
 import scala.concurrent.duration.*
 
 class NetworkSettingsSpecification extends FlatSpec {
@@ -67,32 +66,32 @@ class NetworkSettingsSpecification extends FlatSpec {
     val config          = loadConfig(ConfigFactory.empty())
     val networkSettings = ConfigSource.fromConfig(config).at("waves.network").loadOrThrow[NetworkSettings]
 
-    networkSettings.nonce should not be 0
+    networkSettings.derivedNonce should not be 0
   }
 
   it should "build node name using nonce" in {
     val config          = loadConfig(ConfigFactory.parseString("waves.network.nonce = 12345"))
     val networkSettings = ConfigSource.fromConfig(config).at("waves.network").loadOrThrow[NetworkSettings]
 
-    networkSettings.nonce should be(12345)
-    networkSettings.nodeName should be("Node-12345")
+    networkSettings.derivedNonce should be(12345)
+    networkSettings.derivedNodeName should be("Node-12345")
   }
 
   it should "build node name using random nonce" in {
     val config          = loadConfig(ConfigFactory.empty())
     val networkSettings = ConfigSource.fromConfig(config).at("waves.network").loadOrThrow[NetworkSettings]
 
-    networkSettings.nonce should not be 0
-    networkSettings.nodeName should be(s"Node-${networkSettings.nonce}")
+    networkSettings.derivedNonce should not be 0
+    networkSettings.derivedNodeName should be(s"Node-${networkSettings.derivedNonce}")
   }
 
-  it should "fail with ConfigReaderException on too long node name" in {
+  it should "fail with IllegalArgumentException on too long node name" in {
     val config = loadConfig(
       ConfigFactory.parseString(
         "waves.network.node-name = очень-длинное-название-в-многобайтной-кодировке-отличной-от-однобайтной-кодировки-американского-института-стандартов"
       )
     )
-    intercept[ConfigReaderException[NetworkSettings]] {
+    intercept[IllegalArgumentException] {
       ConfigSource.fromConfig(config).at("waves.network").loadOrThrow[NetworkSettings]
     }
   }
