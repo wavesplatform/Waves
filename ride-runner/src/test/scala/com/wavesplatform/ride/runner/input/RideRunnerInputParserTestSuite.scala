@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxNonNegativeAmount
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import org.scalatest.prop.TableDrivenPropertyChecks
+import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 import play.api.libs.json.*
 import pureconfig.*
 

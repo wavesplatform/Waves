@@ -7,8 +7,9 @@ import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache
 import com.wavesplatform.ride.runner.entrypoints.{Heights, WavesRideRunnerCompareService}
 import com.wavesplatform.ride.runner.requests.DefaultRequestService
 import com.wavesplatform.settings.*
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
+import pureconfig.*
+import pureconfig.generic.auto.*
 
 import scala.concurrent.duration.DurationInt
 
@@ -50,5 +51,5 @@ case class RideRunnerGlobalSettings(
 }
 
 object RideRunnerGlobalSettings {
-  def fromRootConfig(config: Config): RideRunnerGlobalSettings = config.getConfig("waves").as[RideRunnerGlobalSettings]
+  def fromRootConfig(config: Config): RideRunnerGlobalSettings = ConfigSource.fromConfig(config).at("waves").loadOrThrow[RideRunnerGlobalSettings]
 }

@@ -2,21 +2,20 @@ package com.wavesplatform.ride.runner.input
 
 import cats.syntax.either.*
 import cats.syntax.option.*
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.*
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
-import com.wavesplatform.json.JsonManipulations
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, TxNonNegativeAmount, TxValidationError}
 import pureconfig.*
 import pureconfig.generic.auto.*
-import pureconfig.error.CannotConvert
 import play.api.libs.json.*
+import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 
 import java.nio.charset.StandardCharsets
 import scala.util.Try
@@ -167,9 +166,6 @@ object RideRunnerInputParser {
     } yield RideRunnerTransaction(amount, assetId, fee, feeAssetId, recipient, senderPublicKey, height, timestamp, proofs, version, attachment)
   }
 
-  implicit val addressConfigReader: ConfigReader[Address] =
-    ConfigReader.fromString(s => Address.fromString(s).left.map(_ => CannotConvert(s, "Address", "invalid address")))
-
   implicit val aliasConfigReader: ConfigReader[Alias] = ConfigReader[String].map { x =>
     val chainId = AddressScheme.current.chainId
 
@@ -254,27 +250,6 @@ object RideRunnerInputParser {
       Base64.tryDecode(x.substring(7)).fold(e => fail(s"Error parsing base64: ${e.getMessage}", e), identity)
     else if (x.length > Base58.defaultDecodeLimit) fail(s"base58-encoded string length (${x.length}) exceeds maximum length of 192")
     else Base58.tryDecodeWithLimit(x).fold(e => fail(s"Error parsing base58: ${e.getMessage}"), identity)
-  }
-
-  implicit val jsObjectConfigReader: ConfigReader[JsObject] = playJsonConfigReader
-
-  implicit val jsValueConfigReader: ConfigReader[JsValue] = playJsonConfigReader
-
-  private def playJsonConfigReader[T: Reads]: ConfigReader[T] = ConfigReader.fromCursor { cur =>
-    for {
-      configValue <- cur.asConfigValue
-      stubKey = "stubKey"
-      config  = ConfigFactory.empty().withValue(stubKey, configValue)
-    } yield {
-      val jsonStr = config.root().render(ConfigRenderOptions.concise())
-      JsonManipulations
-        .pick(Json.parse(jsonStr), stubKey)
-        .getOrElse(fail(s"Expected a value"))
-        .validate[T] match {
-        case JsSuccess(value, _) => value
-        case JsError(errors)     => fail(s"Can't parse: ${errors.mkString("\n")}")
-      }
-    }
   }
 
   private implicit final class ValidationErrorOps[E, T](private val self: Either[E, T]) extends AnyVal {
