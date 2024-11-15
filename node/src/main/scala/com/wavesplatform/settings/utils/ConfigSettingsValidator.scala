@@ -1,15 +1,15 @@
 package com.wavesplatform.settings.utils
 
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
-import cats.instances.list._
-import cats.syntax.foldable._
-import cats.syntax.traverse._
-import com.typesafe.config.{Config, ConfigException}
+import cats.instances.list.*
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
+import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigValue}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ValueReader
+import pureconfig.*
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
+import scala.reflect.ClassTag
 import scala.util.Try
 
 object ConfigSettingsValidator {
@@ -46,11 +46,13 @@ class ConfigSettingsValidator(config: Config) {
     NonEmptyList.one(s"Invalid setting $settingName value: $msg")
   }
 
-  def validate[T: ValueReader](settingName: String, showError: Boolean = false): ErrorsListOr[T] = {
-    Validated fromTry Try(config.as[T](settingName)) leftMap (ex => createError(settingName, ex.getMessage, showError))
+  def validate[T: ConfigReader: ClassTag](settingName: String, showError: Boolean = false): ErrorsListOr[T] = {
+    Validated fromTry Try(ConfigSource.fromConfig(config).at(settingName).loadOrThrow[T]) leftMap (ex =>
+      createError(settingName, ex.getMessage, showError)
+    )
   }
 
-  def validateByPredicate[T: ValueReader](settingName: String)(predicate: T => Boolean, errorMsg: String): ErrorsListOr[T] = {
+  def validateByPredicate[T: ConfigReader: ClassTag](settingName: String)(predicate: T => Boolean, errorMsg: String): ErrorsListOr[T] = {
     validate[T](settingName, showError = true).ensure(createError(settingName, errorMsg))(predicate)
   }
 
@@ -58,21 +60,23 @@ class ConfigSettingsValidator(config: Config) {
     validateByPredicate[Double](settingName)(p => 0 < p && p <= 100, "required 0 < percent <= 100")
   }
 
-  def validateList[T: ValueReader](settingName: String): ErrorsListOr[List[T]] = {
+  private def configFromConfigValue(configValue: ConfigValue) =
+    ConfigFactory.empty().withValue("stubKey", configValue).getConfig("stubKey")
+
+  def validateList[T: ConfigReader: ClassTag](settingName: String): ErrorsListOr[List[T]] = {
     config
       .getList(settingName)
       .asScala
       .toList
       .zipWithIndex
-      .traverse {
-        case (cfg, index) =>
-          val elemPath = s"$settingName.$index"
-          Validated fromTry Try(cfg.atPath(elemPath).as[T](elemPath)) leftMap (ex => List(ex.getMessage))
+      .traverse { case (cfg, index) =>
+        val elemPath = s"$settingName.$index"
+        Validated fromTry Try(ConfigSource.fromConfig(configFromConfigValue(cfg)).at(elemPath).loadOrThrow[T]) leftMap (ex => List(ex.getMessage))
       }
       .leftMap(errorsInList => createError(settingName, errorsInList.mkString(", "), showValue = false))
   }
 
-  def validateMap[K, V: ValueReader](settingName: String)(keyValidator: String => Validated[String, K]): ErrorsListOr[Map[K, V]] = {
+  def validateMap[K, V: ConfigReader: ClassTag](settingName: String)(keyValidator: String => Validated[String, K]): ErrorsListOr[Map[K, V]] = {
     config
       .getConfig(settingName)
       .root()
@@ -82,20 +86,22 @@ class ConfigSettingsValidator(config: Config) {
       .traverse { entry =>
         val elemPath = s"$settingName.${entry.getKey}"
         val k        = keyValidator(entry.getKey).leftMap(List(_))
-        val v        = Validated fromTry Try(entry.getValue.atPath(elemPath).as[V](elemPath)) leftMap (ex => List(ex.getMessage))
+        val v = Validated fromTry Try(ConfigSource.fromConfig(configFromConfigValue(entry.getValue)).at(elemPath).loadOrThrow[V]) leftMap (ex =>
+          List(ex.getMessage)
+        )
         k.product(v)
       }
       .map(_.toMap)
       .leftMap(errorsInList => createError(settingName, errorsInList.mkString(", "), showValue = false))
   }
 
-  def validateWithDefault[T: ValueReader](settingName: String, defaultValue: T, showError: Boolean = false): ErrorsListOr[T] = {
+  def validateWithDefault[T: ConfigReader: ClassTag](settingName: String, defaultValue: T, showError: Boolean = false): ErrorsListOr[T] = {
     Validated
-      .fromTry(Try(config.as[T](settingName)).recover { case _: ConfigException.Missing => defaultValue })
+      .fromTry(Try(ConfigSource.fromConfig(config).at(settingName).loadOrThrow[T]).recover { case _: ConfigException.Missing => defaultValue })
       .leftMap(ex => createError(settingName, ex.getMessage, showError))
   }
 
-  def validateByPredicateWithDefault[T: ValueReader](
+  def validateByPredicateWithDefault[T: ConfigReader: ClassTag](
       settingName: String
   )(predicate: T => Boolean, errorMsg: String, defaultValue: T): ErrorsListOr[T] = {
     validateWithDefault[T](settingName, defaultValue, showError = true).ensure(createError(settingName, errorMsg))(predicate)

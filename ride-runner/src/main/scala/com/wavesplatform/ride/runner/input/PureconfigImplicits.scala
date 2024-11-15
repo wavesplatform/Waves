@@ -16,9 +16,9 @@ object PureconfigImplicits {
   private def playJsonConfigReader[T: Reads]: ConfigReader[T] = ConfigReader.fromCursor { cur =>
     for {
       configValue <- cur.asConfigValue
-      stubKey = "stubKey"
-      config  = ConfigFactory.empty().withValue(stubKey, configValue)
     } yield {
+      val stubKey = "stubKey"
+      val config  = ConfigFactory.empty().withValue(stubKey, configValue)
       val jsonStr = config.root().render(ConfigRenderOptions.concise())
       JsonManipulations
         .pick(Json.parse(jsonStr), stubKey)
@@ -29,7 +29,6 @@ object PureconfigImplicits {
       }
     }
   }
-
 
   implicit val addressConfigReader: ConfigReader[Address] =
     ConfigReader.fromString(s => Address.fromString(s).left.map(_ => CannotConvert(s, "Address", "invalid address")))

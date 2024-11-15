@@ -7,7 +7,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import pureconfig.*
 import pureconfig.generic.auto.*
-import net.ceedubs.ficus.readers.ValueReader
 
 import scala.concurrent.duration.*
 
@@ -245,9 +244,6 @@ private[settings] object BlockchainType {
 }
 
 object BlockchainSettings {
-  implicit val valueReader: ValueReader[BlockchainSettings] =
-    (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
-
   def fromRootConfig(config: Config): BlockchainSettings = fromConfig(config.getConfig("waves.blockchain"))
 
   def fromConfig(config: Config): BlockchainSettings = {
