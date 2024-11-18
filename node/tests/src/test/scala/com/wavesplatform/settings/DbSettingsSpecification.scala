@@ -2,6 +2,8 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 
 class DbSettingsSpecification extends FlatSpec {
   "DbSettingsSpecification" should "read values from config" in {
@@ -27,7 +29,8 @@ class DbSettingsSpecification extends FlatSpec {
                                                         |    max-open-files = 100
                                                         |  }
                                                         |}""".stripMargin))
-    val actualDbSettings = DBSettings.fromConfig(config.getConfig("waves.db"))
+
+    val actualDbSettings = ConfigSource.fromConfig(config).at("waves.db").loadOrThrow[DBSettings]
 
     val expectedDbSettings: DBSettings = DBSettings(
       directory = "/data",

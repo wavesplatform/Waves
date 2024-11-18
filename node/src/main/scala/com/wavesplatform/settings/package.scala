@@ -21,6 +21,16 @@ package object settings {
   object SizeInBytes extends TaggedType[Long]
   type SizeInBytes = SizeInBytes.Type
 
+  implicit val sizeInBytesConfigReader: ConfigReader[SizeInBytes] = ConfigReader.fromCursor(cur =>
+    for {
+      configValue <- cur.asConfigValue
+    } yield {
+      val config      = ConfigFactory.empty().withValue("stubKey", configValue)
+      val bytes: Long = config.getBytes("stubKey")
+      SizeInBytes(bytes)
+    }
+  )
+
   def loadConfig(userConfig: Config): Config = {
     loadConfig(Some(userConfig))
   }

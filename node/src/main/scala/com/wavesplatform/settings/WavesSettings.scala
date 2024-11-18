@@ -36,7 +36,7 @@ object WavesSettings {
     val enableLightMode           = wavesConfigSource.at("enable-light-mode").loadOrThrow[Boolean]
     val ntpServer                 = wavesConfigSource.at("ntp-server").loadOrThrow[String]
     val maxTxErrorLogSize         = wavesConfigSource.at("max-tx-error-log-size").loadOrThrow[Int]
-    val dbSettings                = DBSettings.fromConfig(waves.getConfig("db"))
+    val dbSettings                = wavesConfigSource.at("db").loadOrThrow[DBSettings]
     val extensions                = wavesConfigSource.at("extensions").loadOrThrow[Seq[String]]
     val extensionsShutdownTimeout = wavesConfigSource.at("extensions-shutdown-timeout").loadOrThrow[FiniteDuration]
     val networkSettings           = wavesConfigSource.at("network").loadOrThrow[NetworkSettings]
