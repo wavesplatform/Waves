@@ -244,33 +244,31 @@ private[settings] object BlockchainType {
 }
 
 object BlockchainSettings {
-  def fromRootConfig(config: Config): BlockchainSettings = fromConfig(config.getConfig("waves.blockchain"))
+  def fromRootConfig(config: Config): BlockchainSettings =
+    ConfigSource.fromConfig(config).at("waves.blockchain").loadOrThrow[BlockchainSettings]
 
-  def fromConfig(config: Config): BlockchainSettings = {
-    val blockchainType = config.getString("type").toUpperCase
-    val (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings) = blockchainType match {
-      case BlockchainType.STAGENET =>
-        ('S', FunctionalitySettings.STAGENET, GenesisSettings.STAGENET, RewardsSettings.STAGENET)
-      case BlockchainType.TESTNET =>
-        ('T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET, RewardsSettings.TESTNET)
-      case BlockchainType.MAINNET =>
-        ('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET, RewardsSettings.MAINNET)
-      case _ => // Custom
-        // Note: Mind the imperative approach to reading the config here. Be careful when refactoring.
-        val networkId                            = config.getString(s"custom.address-scheme-character").charAt(0)
-        val configSource                         = ConfigSource.fromConfig(config)
-        val functionality: FunctionalitySettings = configSource.at("custom.functionality").loadOrThrow[FunctionalitySettings]
-        val genesis                              = configSource.at("custom.genesis").loadOrThrow[GenesisSettings]
-        val rewards                              = configSource.at("custom.rewards").loadOrThrow[RewardsSettings]
-        require(functionality.minBlockTime <= genesis.averageBlockDelay, "minBlockTime should be <= averageBlockDelay")
-        (networkId, functionality, genesis, rewards)
-    }
+  implicit val configReader: ConfigReader[BlockchainSettings] = ConfigReader.fromCursor(cur =>
+    for {
+      objCur               <- cur.asObjectCursor
+      blockchainTypeString <- objCur.atKey("type").flatMap(_.asString).map(_.toUpperCase)
+      (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings) <- blockchainTypeString match {
+        case BlockchainType.STAGENET => Right(('S', FunctionalitySettings.STAGENET, GenesisSettings.STAGENET, RewardsSettings.STAGENET))
+        case BlockchainType.TESTNET  => Right(('T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
+        case BlockchainType.MAINNET  => Right(('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET, RewardsSettings.MAINNET))
+        case _                       =>
+          // Custom
+          for {
+            customObjCur  <- objCur.atKey("custom").flatMap(_.asObjectCursor)
+            networkId     <- customObjCur.atKey("address-scheme-character").flatMap(_.asString).map(_.charAt(0))
+            functionality <- customObjCur.atKey("functionality").flatMap(ConfigReader[FunctionalitySettings].from)
+            genesis       <- customObjCur.atKey("genesis").flatMap(ConfigReader[GenesisSettings].from)
+            rewards       <- customObjCur.atKey("rewards").flatMap(ConfigReader[RewardsSettings].from)
+          } yield {
+            require(functionality.minBlockTime <= genesis.averageBlockDelay, "minBlockTime should be <= averageBlockDelay")
+            (networkId, functionality, genesis, rewards)
+          }
+      }
 
-    BlockchainSettings(
-      addressSchemeCharacter = addressSchemeCharacter,
-      functionalitySettings = functionalitySettings,
-      genesisSettings = genesisSettings,
-      rewardsSettings = rewardsSettings
-    )
-  }
+    } yield BlockchainSettings(addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings)
+  )
 }

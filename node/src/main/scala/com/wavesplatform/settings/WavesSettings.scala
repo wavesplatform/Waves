@@ -33,7 +33,6 @@ object WavesSettings {
     val wavesConfigSource = ConfigSource.fromConfig(waves)
 
     val directory                 = wavesConfigSource.at("directory").loadOrThrow[String]
-    val enableLightMode           = wavesConfigSource.at("enable-light-mode").loadOrThrow[Boolean]
     val ntpServer                 = wavesConfigSource.at("ntp-server").loadOrThrow[String]
     val maxTxErrorLogSize         = wavesConfigSource.at("max-tx-error-log-size").loadOrThrow[Int]
     val dbSettings                = wavesConfigSource.at("db").loadOrThrow[DBSettings]
@@ -41,7 +40,7 @@ object WavesSettings {
     val extensionsShutdownTimeout = wavesConfigSource.at("extensions-shutdown-timeout").loadOrThrow[FiniteDuration]
     val networkSettings           = wavesConfigSource.at("network").loadOrThrow[NetworkSettings]
     val walletSettings            = wavesConfigSource.at("wallet").loadOrThrow[WalletSettings]
-    val blockchainSettings        = BlockchainSettings.fromConfig(waves.getConfig("blockchain"))
+    val blockchainSettings        = wavesConfigSource.at("blockchain").loadOrThrow[BlockchainSettings]
     val minerSettings             = wavesConfigSource.at("miner").loadOrThrow[MinerSettings]
     val restAPISettings           = wavesConfigSource.at("rest-api").loadOrThrow[RestAPISettings]
     val synchronizationSettings   = wavesConfigSource.at("synchronization").loadOrThrow[SynchronizationSettings]
@@ -49,6 +48,7 @@ object WavesSettings {
     val featuresSettings          = wavesConfigSource.at("features").loadOrThrow[FeaturesSettings]
     val rewardsSettings           = wavesConfigSource.at("rewards").loadOrThrow[RewardsVotingSettings]
     val metrics                   = ConfigSource.fromConfig(rootConfig).at("metrics").loadOrThrow[Metrics.Settings] // TODO: Move to waves section
+    val enableLightMode           = wavesConfigSource.at("enable-light-mode").loadOrThrow[Boolean]
 
     WavesSettings(
       directory,
