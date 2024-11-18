@@ -4,8 +4,23 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
 import pureconfig.ConfigSource
 import pureconfig.generic.auto.*
+import com.typesafe.config.ConfigException.BadValue
 
 class DbSettingsSpecification extends FlatSpec {
+  "SizeInBytes" should "should successfully read bytes values" in {
+    val config        = loadConfig(ConfigFactory.parseString("size-in-bytes-value = 512M"))
+    val actualValue   = ConfigSource.fromConfig(config).at("size-in-bytes-value").loadOrThrow[SizeInBytes]
+    val expectedValue = SizeInBytes(512L * 1024 * 1024)
+    actualValue should be(expectedValue)
+  }
+
+  "SizeInBytes" should "should fail on invalid values" in {
+    val config = loadConfig(ConfigFactory.parseString("size-in-bytes-value = 512X"))
+    assertThrows[BadValue] {
+      ConfigSource.fromConfig(config).at("size-in-bytes-value").loadOrThrow[SizeInBytes]
+    }
+  }
+
   "DbSettingsSpecification" should "read values from config" in {
     val config = loadConfig(ConfigFactory.parseString("""waves.db {
                                                         |  directory = "/data"
