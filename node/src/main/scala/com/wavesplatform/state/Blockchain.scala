@@ -237,14 +237,5 @@ object Blockchain {
         }
         .fold(1)(_ => BlockRewardCalculator.RewardBoost)
 
-    def unitIsApproved(dApp: AddressOrAlias): Boolean =
-      blockchain.resolveAlias(dApp).toOption.forall { chainContractAddress =>
-        blockchain.settings.functionalitySettings.unitsRegistryAddressParsed.toOption.flatten.forall { addr =>
-          blockchain.accountData(addr, s"unit_${chainContractAddress.toString}_approved") match {
-            case Some(BooleanDataEntry(_, value)) => value
-            case _                                => false
-          }
-        }
-      }
   }
 }
