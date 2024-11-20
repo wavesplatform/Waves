@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
@@ -33,17 +34,33 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
   def optimisticRead[T](f: => T)(shouldRecheck: T => Boolean): T =
     this.readLockCond(f)(shouldRecheck)
 
-  private[utx] def setPriorityDiffs(discDiffs: Seq[StateSnapshot]): Set[Transaction] =
-    if (discDiffs.isEmpty) {
-      clear()
-      Set.empty
-    } else {
-      val transactions = updateDiffs(_ => discDiffs.map(PriorityData(_)))
-      log.trace(
-        s"Priority pool updated with diffs: [${discDiffs.map(_.hashString).mkString(", ")}], transactions order: [${priorityTransactionIds.mkString(", ")}]"
-      )
-      transactions
+  private def evictChainContractTransactions(diffs: Seq[StateSnapshot]) =
+    diffs.takeWhile { s =>
+      s.transactions.forall { case (_, nti) =>
+        nti.transaction match {
+          case ist: InvokeScriptTransaction =>
+            ist.funcCall.function.funcName match {
+              case "extendMainChain"|"extendAltChain"|"startAltChain"|"appendBlock" => realBlockchain.unitIsApproved(ist.dApp)
+              case _ => true
+            }
+          case _ => true
+        }
+      }
     }
+
+  private[utx] def setPriorityDiffs(discDiffs: Seq[StateSnapshot]): Set[Transaction] = {
+      val filteredSnapshots = evictChainContractTransactions(discDiffs)
+      if (filteredSnapshots.isEmpty) {
+        clear()
+        Set.empty
+      } else {
+        val transactions = updateDiffs(_ => filteredSnapshots.map(PriorityData(_)))
+        log.trace(
+          s"Priority pool updated with diffs: [${filteredSnapshots.map(_.hashString).mkString(", ")}], transactions order: [${priorityTransactionIds.mkString(", ")}]"
+        )
+        transactions
+      }
+  }
 
   private[utx] def invalidateTxs(removed: Set[ByteStr]): Unit =
     updateDiffs(_.map { pd =>
