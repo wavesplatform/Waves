@@ -78,7 +78,8 @@ case class FunctionalitySettings(
     xtnBuybackRewardPeriod: Int = Int.MaxValue,
     lightNodeBlockFieldsAbsenceInterval: Int = 1000,
     blockRewardBoostPeriod: Int = 1000,
-    paymentsCheckHeight: Int = 0
+    paymentsCheckHeight: Int = 0,
+    unitsRegistryAddress: Option[String] = None
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -92,6 +93,8 @@ case class FunctionalitySettings(
     daoAddress.traverse(Address.fromString(_)).leftMap(_ => "Incorrect dao-address")
   lazy val xtnBuybackAddressParsed: Either[String, Option[Address]] =
     xtnBuybackAddress.traverse(Address.fromString(_)).leftMap(_ => "Incorrect xtn-buyback-address")
+  lazy val unitsRegistryAddressParsed: Either[String, Option[Address]] =
+    unitsRegistryAddress.traverse(Address.fromString(_)).leftMap(_ => "Incorrect units-registry-address")
 
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
   require(
@@ -133,7 +136,8 @@ object FunctionalitySettings {
     xtnBuybackAddress = Some("3PFjHWuH6WXNJbwnfLHqNFBpwBS5dkYjTfv"),
     xtnBuybackRewardPeriod = 100000,
     blockRewardBoostPeriod = 300_000,
-    paymentsCheckHeight = 4303300
+    paymentsCheckHeight = 4303300,
+    unitsRegistryAddress = Some("3P8LfPXcveST7WKkV3UACQNdr6J3shPYong")
   )
 
   val TESTNET: FunctionalitySettings = apply(
@@ -149,7 +153,8 @@ object FunctionalitySettings {
     daoAddress = Some("3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS"),
     xtnBuybackAddress = Some("3N13KQpdY3UU7JkWUBD9kN7t7xuUgeyYMTT"),
     xtnBuybackRewardPeriod = 2000,
-    blockRewardBoostPeriod = 2_000
+    blockRewardBoostPeriod = 2_000,
+    unitsRegistryAddress = Some("3N9fwNGJcUcAbhh7YPr6mrpuGJD4tApZFsT")
   )
 
   val STAGENET: FunctionalitySettings = apply(
