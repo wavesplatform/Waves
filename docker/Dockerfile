@@ -1,4 +1,4 @@
-ARG baseImage=eclipse-temurin:11-jre-noble
+ARG baseImage=eclipse-temurin:21-jre-noble
 FROM $baseImage
 
 ENV WAVES_LOG_LEVEL=INFO
