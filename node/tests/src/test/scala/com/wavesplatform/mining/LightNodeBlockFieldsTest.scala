@@ -45,8 +45,7 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
           d.settings.minerSettings,
           miner.minerScheduler,
           miner.appenderScheduler,
-          Observable.empty,
-          identity
+          Observable.empty
         )
         val challenger = new BlockChallengerImpl(
           d.blockchain,

@@ -1022,18 +1022,6 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.utxPool.nonPriorityTransactions.toSet shouldBe transfers.toSet
       }
 
-      "takes the priority diff into account" in withDomain() { d =>
-        d.helpers.creditWavesToDefaultSigner(11.waves)
-        val transfer1 = TxHelpers.transfer(amount = 10.waves)
-        val transfer2 = TxHelpers.transfer(amount = 10.waves) // Double spend
-
-        d.utxPool.priorityPool.setPriorityDiffs(Seq(d.createDiff(transfer1)))
-        d.utxPool.addTransaction(transfer2, verify = false)
-
-        d.utxPool.cleanUnconfirmed()
-        d.utxPool.nonPriorityTransactions shouldBe Nil
-      }
-
       "doesnt validate transactions which are removed" in {
         val gen = for {
           acc  <- accountGen

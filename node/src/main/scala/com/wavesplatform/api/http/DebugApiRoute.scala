@@ -55,7 +55,6 @@ case class DebugApiRoute(
     scoreReporter: Coeval[RxScoreObserver.Stats],
     configRoot: ConfigObject,
     db: RocksDBWriter,
-    priorityPoolBlockchain: () => Option[Blockchain],
     routeTimeout: RouteTimeout,
     heavyRequestScheduler: Scheduler
 ) extends ApiRoute
@@ -197,7 +196,7 @@ case class DebugApiRoute(
 
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
-      val resBlockchain = priorityPoolBlockchain().getOrElse(blockchain)
+      val resBlockchain = blockchain
       val startTime     = System.nanoTime()
 
       val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)

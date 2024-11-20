@@ -1878,8 +1878,8 @@ class BlockChallengeTest
       testTime.setTime(betterBlock.header.timestamp)
       appender(betterBlock).runSyncUnsafe() should beRight
       d.lastBlock shouldBe betterBlock
-      d.utxPool.priorityPool.priorityTransactions.size shouldBe txs.size
-      d.utxPool.priorityPool.priorityTransactions.toSet shouldBe txs.toSet
+      d.utxPool.size shouldBe txs.size
+      d.utxPool.all.toSet shouldBe txs.toSet
     }
   }
 

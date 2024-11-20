@@ -90,7 +90,6 @@ class DebugApiRouteSpec
       null,
       configObject,
       domain.rocksDBWriter,
-      () => Some(domain.blockchain),
       new RouteTimeout(60.seconds)(sharedScheduler),
       sharedScheduler
     )

@@ -42,8 +42,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         settings.minerSettings,
         scheduler,
         scheduler,
-        Observable.empty,
-        identity
+        Observable.empty
       )
 
       def generateBlocks(
@@ -165,8 +164,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         RideV6.minerSettings,
         miner,
         appender,
-        utxEvents.collect { case _: UtxEvent.TxAdded => () },
-        identity
+        utxEvents.collect { case _: UtxEvent.TxAdded => () }
       )
 
       val block      = d.appendBlock(ProtoBlockVersion)
