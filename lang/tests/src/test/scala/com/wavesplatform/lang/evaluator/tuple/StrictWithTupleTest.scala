@@ -3,7 +3,7 @@ package com.wavesplatform.lang.evaluator.tuple
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
 import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 class StrictWithTupleTest extends EvaluatorSpec {
   private implicit val version: StdLibVersion = V4

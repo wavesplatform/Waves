@@ -1,6 +1,6 @@
 package com.wavesplatform.common.merkle
 
-import com.wavesplatform.common.merkle.ScryptoMerkleProof._
+import com.wavesplatform.common.merkle.ScryptoMerkleProof.*
 
 import scala.util.Try
 

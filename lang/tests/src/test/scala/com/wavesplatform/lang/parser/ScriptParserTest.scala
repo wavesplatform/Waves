@@ -1355,6 +1355,6 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
     }
     val script = s"$manyLets\n$lastStmt"
 
-    Parser.parseExpr(script) shouldBe an[Success[_]]
+    Parser.parseExpr(script) shouldBe an[Success[?]]
   }
 }

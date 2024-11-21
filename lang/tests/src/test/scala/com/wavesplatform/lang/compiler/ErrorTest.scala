@@ -13,7 +13,7 @@ import com.wavesplatform.test.*
 
 class ErrorTest extends PropSpec {
 
-  import com.wavesplatform.lang.v1.parser.Expressions._
+  import com.wavesplatform.lang.v1.parser.Expressions.*
 
   errorTests(
     "can't define LET with the same name as predefined constant" -> "already defined in the scope" -> BLOCK(

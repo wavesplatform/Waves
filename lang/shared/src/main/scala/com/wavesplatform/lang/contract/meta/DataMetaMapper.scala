@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.contract.meta
 
-import cats.implicits._
+import cats.implicits.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.protobuf.dapp.DAppMeta

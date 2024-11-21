@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.task
 
 import cats.Eval
-import monix.execution.atomic.{Atomic, _}
+import monix.execution.atomic.{Atomic, *}
 
 sealed trait EvalRef[A] {
   def read: Eval[A]

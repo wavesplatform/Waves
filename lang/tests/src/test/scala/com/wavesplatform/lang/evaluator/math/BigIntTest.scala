@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BIGINT, CONST_BOOLEAN, CO
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, unit}
 import com.wavesplatform.test.produce
 
-import scala.math.BigDecimal.RoundingMode._
+import scala.math.BigDecimal.RoundingMode.*
 import scala.util.Random
 
 class BigIntTest extends EvaluatorSpec {

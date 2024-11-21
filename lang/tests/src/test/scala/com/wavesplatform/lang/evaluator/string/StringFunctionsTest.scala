@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.evaluator.string
 
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 class StringFunctionsTest extends EvaluatorSpec {
   private val min   = Long.MinValue

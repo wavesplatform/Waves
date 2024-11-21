@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.{Base58, Base64}
 import scala.util.Try
 
 case class ByteStr(arr: Array[Byte]) {
-  private[this] lazy val base58: String = Base58.encode(arr)
+  private lazy val base58: String = Base58.encode(arr)
   lazy val base64Raw: String            = Base64.encode(arr)
   lazy val base64: String               = "base64:" + base64Raw
   lazy val trim: String = (if (arr.length < 1024) {

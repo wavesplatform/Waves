@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.directives
 
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.directives.DirectiveKey._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.directives.DirectiveKey.*
 
 case class Directive(key: DirectiveKey, value: DirectiveValue)
 

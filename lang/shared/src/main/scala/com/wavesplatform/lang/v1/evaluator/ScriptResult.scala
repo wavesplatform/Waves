@@ -22,7 +22,7 @@ sealed trait ScriptResult {
   def actions: List[CallableAction]
 }
 
-case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer], unusedComplexity: Int) extends ScriptResult {
+case class ScriptResultV3(ds: List[DataItem[?]], ts: List[AssetTransfer], unusedComplexity: Int) extends ScriptResult {
   override lazy val actions: List[CallableAction] = ds ++ ts
 }
 
@@ -51,20 +51,20 @@ object ScriptResult {
         )
       )
 
-  private def processDataEntryV3(fields: Map[String, EVALUATED]): Either[ExecutionError, DataItem[_]] =
+  private def processDataEntryV3(fields: Map[String, EVALUATED]): Either[ExecutionError, DataItem[?]] =
     (processIntEntry orElse processBoolEntry orElse processBinaryEntry orElse processStringEntry)
       .lift((fields.get(FieldNames.Key), fields.get(FieldNames.Value)))
-      .fold(err[DataItem[_]](s"can't reconstruct ${FieldNames.DataEntry} from $fields", V3))(Right(_))
+      .fold(err[DataItem[?]](s"can't reconstruct ${FieldNames.DataEntry} from $fields", V3))(Right(_))
 
   private def processDataEntry(
       fields: Map[String, EVALUATED],
       dataType: String,
-      entryHandler: PartialFunction[(Option[EVALUATED], Option[EVALUATED]), DataItem[_]],
+      entryHandler: PartialFunction[(Option[EVALUATED], Option[EVALUATED]), DataItem[?]],
       version: StdLibVersion
-  ): Either[ExecutionError, DataItem[_]] =
+  ): Either[ExecutionError, DataItem[?]] =
     entryHandler
       .lift((fields.get(FieldNames.Key), fields.get(FieldNames.Value)))
-      .fold(err[DataItem[_]](s"can't reconstruct $dataType from $fields", version))(Right(_))
+      .fold(err[DataItem[?]](s"can't reconstruct $dataType from $fields", version))(Right(_))
 
   private val processIntEntry =
     processDataEntryPartially(
@@ -141,7 +141,7 @@ object ScriptResult {
     else
       err(obj, version, FieldNames.Recipient)
 
-  private def processWriteSetV3(fields: Map[String, EVALUATED]): Either[ExecutionError, List[DataItem[_]]] =
+  private def processWriteSetV3(fields: Map[String, EVALUATED]): Either[ExecutionError, List[DataItem[?]]] =
     fields(FieldNames.Data) match {
       case ARR(xs) =>
         xs.toList.traverse {

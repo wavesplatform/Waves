@@ -8,11 +8,11 @@ import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{buildAssetInfo, ordType, orderObject, transactionObject}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.*
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.OrdType
+import com.wavesplatform.lang.v1.traits.domain.{OrdType, Ord, Tx, PseudoTx, Recipient}
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, InvokePseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 
 object Vals {
@@ -22,7 +22,7 @@ object Vals {
       proofsEnabled: Boolean,
       fixBigScriptField: Boolean
   ): (String, (UNION, ContextfulVal[Environment])) =
-    (Tx, (scriptInputType(isTokenContext, version, proofsEnabled), inputEntityVal(version, proofsEnabled, fixBigScriptField)))
+    (GlobalValNames.Tx, (scriptInputType(isTokenContext, version, proofsEnabled), inputEntityVal(version, proofsEnabled, fixBigScriptField)))
 
   private def scriptInputType(isTokenContext: Boolean, version: StdLibVersion, proofsEnabled: Boolean) =
     if (isTokenContext)
@@ -34,23 +34,18 @@ object Vals {
     new ContextfulVal.Lifted[Environment] {
       override def liftF[F[_]: Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
         Eval.later(
-          env.inputEntity
-            .eliminate(
-              tx => transactionObject(tx, proofsEnabled, version, fixBigScriptField).asRight[ExecutionError],
-              _.eliminate(
-                o => orderObject(o, proofsEnabled, version).asRight[ExecutionError],
-                _.eliminate(
-                  {
-                    case b: BurnPseudoTx        => Bindings.mapBurnPseudoTx(b, version).asRight[ExecutionError]
-                    case r: ReissuePseudoTx     => Bindings.mapReissuePseudoTx(r, version).asRight[ExecutionError]
-                    case sf: SponsorFeePseudoTx => Bindings.mapSponsorFeePseudoTx(sf, version).asRight[ExecutionError]
-                    case st: ScriptTransfer     => Bindings.scriptTransfer(st, version).asRight[ExecutionError]
-                    case inv: InvokePseudoTx    => Bindings.mapInvokePseudoTx(inv, version).asRight[ExecutionError]
-                  },
-                  _ => CommonError("Expected Transaction or Order").asLeft[EVALUATED]
-                )
-              )
-            )
+          env.inputEntity match {
+            case tx: Tx => transactionObject(tx, proofsEnabled, version, fixBigScriptField).asRight[ExecutionError]
+            case o: Ord => orderObject(o, proofsEnabled, version).asRight[ExecutionError]
+            case ptx: PseudoTx =>
+              ptx match {
+                case b: BurnPseudoTx        => Bindings.mapBurnPseudoTx(b, version).asRight[ExecutionError]
+                case r: ReissuePseudoTx     => Bindings.mapReissuePseudoTx(r, version).asRight[ExecutionError]
+                case sf: SponsorFeePseudoTx => Bindings.mapSponsorFeePseudoTx(sf, version).asRight[ExecutionError]
+                case st: ScriptTransfer     => Bindings.scriptTransfer(st, version).asRight[ExecutionError]
+                case inv: InvokePseudoTx    => Bindings.mapInvokePseudoTx(inv, version).asRight[ExecutionError]
+              }
+          }
         )
     }
 
@@ -73,7 +68,10 @@ object Vals {
               .asRight[ExecutionError]
           } else {
             (Bindings.senderObject(
-              env.tthis.eliminate(identity, _ => throw new Exception("In the account's script value 'this` must be Address"))
+              env.tthis match {
+                case a: Recipient.Address => a
+                case _                    => throw new Exception("In the account's script value 'this` must be Address")
+              }
             ): EVALUATED)
               .asRight[ExecutionError]
           }
@@ -86,10 +84,10 @@ object Vals {
         Eval.later {
           env
             .assetInfoById(
-              env.tthis.eliminate(
-                _ => throw new Exception("In the account's script value 'this` must be Address"),
-                _.eliminate(_.id, v => throw new Exception(s"Incorrect value $v for 'this'"))
-              )
+              env.tthis match {
+                case a: Recipient.Address     => throw new Exception("In the account's script value 'this` must be Address")
+                case aid: Environment.AssetId => aid.id
+              }
             )
             .map(v => buildAssetInfo(v.get, version): EVALUATED)
             .map(_.asRight[ExecutionError])
@@ -107,18 +105,18 @@ object Vals {
         }
     }
 
-  def lastBlock(version: StdLibVersion) = (LastBlock, (blockInfo(version), lastBlockVal(version)))
+  def lastBlock(version: StdLibVersion) = (GlobalValNames.LastBlock, (blockInfo(version), lastBlockVal(version)))
 
   val sellOrdTypeVal: ContextfulVal[Environment] = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Sell))))
   val buyOrdTypeVal: ContextfulVal[Environment]  = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Buy))))
 
-  val sell = (Sell, (ordTypeType, sellOrdTypeVal))
-  val buy  = (Buy, (ordTypeType, buyOrdTypeVal))
+  val sell = (GlobalValNames.Sell, (ordTypeType, sellOrdTypeVal))
+  val buy  = (GlobalValNames.Buy, (ordTypeType, buyOrdTypeVal))
 
-  val height: (String, (LONG.type, ContextfulVal[Environment])) = (Height, (LONG, heightVal))
+  val height: (String, (LONG.type, ContextfulVal[Environment])) = (GlobalValNames.Height, (LONG, heightVal))
 
-  val accountThis: (String, (CASETYPEREF, ContextfulVal[Environment])) = (This, (addressType, accountThisVal))
+  val accountThis: (String, (CASETYPEREF, ContextfulVal[Environment])) = (GlobalValNames.This, (addressType, accountThisVal))
   def assetThis(version: StdLibVersion): (String, (CASETYPEREF, ContextfulVal[Environment])) =
-    (This, (assetType(version), assetThisVal(version)))
+    (GlobalValNames.This, (assetType(version), assetThisVal(version)))
 
 }

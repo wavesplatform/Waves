@@ -2,7 +2,7 @@ package com.wavesplatform.lang.evaluator
 
 import com.wavesplatform.lang.directives.values.{V3, V5, V6}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 class TypeCastTest extends EvaluatorSpec {
   property("as") {

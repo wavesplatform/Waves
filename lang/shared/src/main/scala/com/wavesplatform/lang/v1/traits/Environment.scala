@@ -8,15 +8,14 @@ import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.*
 import monix.eval.Coeval
-import shapeless.*
 
 object Environment {
   case class BalanceDetails(available: Long, regular: Long, generating: Long, effective: Long)
 
-  type InputEntity = Tx :+: Ord :+: PseudoTx :+: CNil
+  type InputEntity = Tx | Ord | PseudoTx
 
   case class AssetId(id: Array[Byte])
-  type Tthis = Recipient.Address :+: AssetId :+: CNil
+  type Tthis = Recipient.Address | AssetId
 }
 
 trait Environment[F[_]] {

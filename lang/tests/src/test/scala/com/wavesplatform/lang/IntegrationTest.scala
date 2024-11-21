@@ -243,10 +243,10 @@ class IntegrationTest extends PropSpec with Inside {
     val longMin = Long.MinValue
     eval(s"$longMax + 1 - 1") shouldBe Left("long overflow")
     eval(s"$longMin - 1 + 1") shouldBe Left("long overflow")
-    eval(s"$longMax - 1 + 1") shouldBe evaluated(longMax)
-    eval(s"$longMin + 1 - 1") shouldBe evaluated(longMin)
-    eval(s"$longMax / $longMin + 1") shouldBe evaluated(0)
-    eval(s"($longMax / 2) * 2") shouldBe evaluated(longMax - 1)
+    eval[EVALUATED](s"$longMax - 1 + 1") shouldBe evaluated(longMax)
+    eval[EVALUATED](s"$longMin + 1 - 1") shouldBe evaluated(longMin)
+    eval[EVALUATED](s"$longMax / $longMin + 1") shouldBe evaluated(0)
+    eval[EVALUATED](s"($longMax / 2) * 2") shouldBe evaluated(longMax - 1)
     eval[EVALUATED]("fraction(9223372036854775807, 3, 0)") shouldBe Left(
       s"Fraction: division by zero"
     )
@@ -260,7 +260,7 @@ class IntegrationTest extends PropSpec with Inside {
       s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1"
     )
     eval[EVALUATED](s"2 + 2 * 2") shouldBe evaluated(6)
-    eval("2 * 3 == 2 + 4") shouldBe evaluated(true)
+    eval[EVALUATED]("2 * 3 == 2 + 4") shouldBe evaluated(true)
   }
 
   property("equals works on primitive types") {
@@ -1419,10 +1419,10 @@ class IntegrationTest extends PropSpec with Inside {
     val base16String8Kb              = "fedcba9876543210" * 1024
     def script(base16String: String) = s"toBase16String(base16'$base16String')"
 
-    eval(script(base16String8Kb), version = V3) shouldBe CONST_STRING(base16String8Kb)
-    eval(script(base16String8Kb), version = V4) shouldBe CONST_STRING(base16String8Kb)
+    eval[EVALUATED](script(base16String8Kb), version = V3) shouldBe CONST_STRING(base16String8Kb)
+    eval[EVALUATED](script(base16String8Kb), version = V4) shouldBe CONST_STRING(base16String8Kb)
 
-    eval(script(base16String8Kb + "aa"), version = V3) shouldBe CONST_STRING(base16String8Kb + "aa")
+    eval[EVALUATED](script(base16String8Kb + "aa"), version = V3) shouldBe CONST_STRING(base16String8Kb + "aa")
     eval(script(base16String8Kb + "aa"), version = V4) shouldBe Left("Base16 encode input length=8193 should not exceed 8192")
   }
 
@@ -1432,7 +1432,7 @@ class IntegrationTest extends PropSpec with Inside {
     val value  = "fedcba9876543210FEDCBA9876543210"
     val script = s"""fromBase16String("$value")"""
 
-    eval(script) shouldBe CONST_BYTESTR(bytes(value.toUpperCase))
+    eval[EVALUATED](script) shouldBe CONST_BYTESTR(bytes(value.toUpperCase))
   }
 
   property("string limit") {
@@ -1441,8 +1441,8 @@ class IntegrationTest extends PropSpec with Inside {
     val constructingTooBigString      = s""" "$almostMaxString" + "aa" """
     val constructingMaxStringAndBytes = s""" ("$almostMaxString" + "a").toBytes() """
 
-    eval(constructingMaxStringAndBytes, version = V3) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
-    eval(constructingMaxStringAndBytes, version = V4) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
+    eval[EVALUATED](constructingMaxStringAndBytes, version = V3) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
+    eval[EVALUATED](constructingMaxStringAndBytes, version = V4) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
 
     eval(constructingTooBigString, version = V3) should produce("String size = 32768 exceeds 32767 bytes")
     eval(constructingTooBigString, version = V4) should produce("String size = 32768 exceeds 32767 bytes")

@@ -93,7 +93,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
     for {
       condWithErr <- local {
         compileExprWithCtx(condExpr, saveExprContext, allowIllFormedStrings).map { condCompRes =>
-          val error = Some(UnexpectedType(p.start, p.end, BOOLEAN.toString, condCompRes.t.toString)).filter(_ => !(condCompRes.t equivalent BOOLEAN))
+          val error = Some(UnexpectedType(p.start, p.end, BOOLEAN.toString, condCompRes.t.toString)).filter(_ => !(condCompRes.t `equivalent` BOOLEAN))
           (condCompRes, error)
         }
       }
@@ -239,7 +239,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
       matchedTypesUnion = UNION.create(checktypes._1)
       checkWithErr <- Either
         .cond(
-          (cases.last.pattern.isRest && (checktypes._2 >= matchedTypesUnion)) || (checktypes._2 equivalent matchedTypesUnion),
+          (cases.last.pattern.isRest && (checktypes._2 >= matchedTypesUnion)) || (checktypes._2 `equivalent` matchedTypesUnion),
           (),
           MatchNotExhaustive(p.start, p.end, exprTypes.typeList, matchTypes)
         )
@@ -965,7 +965,7 @@ object ExpressionCompiler {
           .map { compRes =>
             val errorList =
               compRes.errors ++
-                (if (compRes.t equivalent BOOLEAN) Nil else List(Generic(0, 0, "Script should return boolean"))) ++
+                (if (compRes.t `equivalent` BOOLEAN) Nil else List(Generic(0, 0, "Script should return boolean"))) ++
                 (if (removedCharPosOpt.isEmpty)
                    Nil
                  else

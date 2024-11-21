@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 
 import java.math.RoundingMode
-import java.math.RoundingMode._
+import java.math.RoundingMode.*
 
 sealed abstract class Rounding(typeName: String, val mode: RoundingMode) {
   val `type`: CASETYPEREF                                           = CASETYPEREF(typeName, Nil, hideConstructor = true)

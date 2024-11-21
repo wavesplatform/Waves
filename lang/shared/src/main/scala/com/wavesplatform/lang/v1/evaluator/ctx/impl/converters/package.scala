@@ -1,11 +1,12 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import cats.syntax.applicative._
+import cats.syntax.applicative.*
 import cats.{Eval, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.common.utils.EitherExt3.*
 
 package object converters {
 
@@ -30,5 +31,5 @@ package object converters {
   implicit def pureEval[F[_], A <: EVALUATED](
     v: Eval[Either[ExecutionError, A]]
   )(implicit m: Monad[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
-    v.map(ei => pure(ei)(m))
+    v.map(ei => pure(ei)(using m))
 }

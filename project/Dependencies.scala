@@ -53,7 +53,6 @@ object Dependencies {
       monixModule("eval").value,
       "org.typelevel" %%% s"cats-core" % "2.12.0",
       "com.lihaoyi"   %%% "fastparse"  % "3.1.1",
-      shapeless.value,
       "org.typelevel" %%% "cats-mtl" % "1.5.0",
       "ch.obermuhlner"  % "big-math" % "2.3.2",
       googleGuava, // BaseEncoding.base16()

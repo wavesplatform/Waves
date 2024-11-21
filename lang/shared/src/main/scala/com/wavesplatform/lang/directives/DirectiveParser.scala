@@ -42,7 +42,7 @@ object DirectiveParser {
     input
       .split("\n")
       .filter(_.matches(s"\\s*\\$start.*$end\\s*"))
-      .map(parse(_, parser(_)))
+      .map(parse(_, parser(using _)))
       .foldLeft(Map[DirectiveKey, Directive]().asRight[String]) {
         case (err: Left[?, ?], _)                                      => err
         case (_, _: Failure)                                           => Left(s"Directive $input has illegal format")

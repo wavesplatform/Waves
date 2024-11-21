@@ -4,8 +4,8 @@ import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V5, V6}
 import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding._
-import com.wavesplatform.test._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding.*
+import com.wavesplatform.test.*
 
 class FractionIntRoundsTest extends EvaluatorSpec {
   private implicit val version: StdLibVersion = V5

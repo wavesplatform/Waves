@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.task
 
 import cats.data.Kleisli
-import cats.syntax.either._
-import cats.syntax.functor._
+import cats.syntax.either.*
+import cats.syntax.functor.*
 import cats.{Eval, Functor, Monad}
 import com.wavesplatform.lang.EvalF
 import monix.execution.atomic.{Atomic, AtomicBuilder}

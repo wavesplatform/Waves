@@ -348,11 +348,11 @@ trait BaseGlobal {
     @tailrec
     def findKMedianInPlace(arr: ArrayView[T], k: Int)(implicit choosePivot: ArrayView[T] => T): T = {
       val a      = choosePivot(arr)
-      val (s, b) = arr partitionInPlace (a > _)
+      val (s, b) = arr `partitionInPlace` (a > _)
       if (s.size == k) a
       // The following test is used to avoid infinite repetition
       else if (s.isEmpty) {
-        val (s, b) = arr partitionInPlace (a == _)
+        val (s, b) = arr `partitionInPlace` (a == _)
         if (s.size > k) a
         else findKMedianInPlace(b, k - s.size)
       } else if (s.size < k) findKMedianInPlace(b, k - s.size)

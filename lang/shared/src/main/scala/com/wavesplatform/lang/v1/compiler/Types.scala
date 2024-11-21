@@ -131,17 +131,17 @@ object Types {
         (l1.types.length == l2.types.length) && {
           val unfolded = l1.unfold
           if (l1 == unfolded)
-            (l1.types zip l2.types).forall { case (t1, t2) => t1 equivalent t2 }
+            (l1.types zip l2.types).forall { case (t1, t2) => t1 `equivalent` t2 }
           else
-            unfolded equivalent l2.unfold
+            unfolded `equivalent` l2.unfold
         }
-      case (l1: LIST, l2: LIST) => l1.innerType equivalent l2.innerType
+      case (l1: LIST, l2: LIST) => l1.innerType `equivalent` l2.innerType
       case (l1: REAL, l2: REAL) => l1 == l2
       case (l1: UNION, l2: UNION) =>
         l1.typeList.length == l2.typeList.length &&
           (l1.unfold.typeList.sortBy(_.name) zip l2.unfold.typeList.sortBy(_.name))
-            .forall { case (t1, t2) => t1 equivalent t2 }
-      case (l1: FINAL, l2: FINAL) => l1.union equivalent l2.union
+            .forall { case (t1, t2) => t1 `equivalent` t2 }
+      case (l1: FINAL, l2: FINAL) => l1.union `equivalent` l2.union
     }
 
     def >=(l2: FINAL): Boolean = (l1, l2) match {
@@ -154,7 +154,7 @@ object Types {
       case (LIST(t1), LIST(t2)) => t1 >= t2
       case (TUPLE(types1), TUPLE(types2)) =>
         types1.length == types2.length && (types1 zip types2).forall { case (t1, t2) => t1 >= t2 }
-      case (l1: REAL, l2: REAL) => l1 equivalent l2
+      case (l1: REAL, l2: REAL) => l1 `equivalent` l2
     }
 
     def <=(l2: FINAL): Boolean = l2 >= l1
