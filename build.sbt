@@ -97,7 +97,6 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .settings(
     libraryDependencies ++=
       Dependencies.protobuf.value ++
-        Dependencies.langCompilerPlugins.value ++
         Dependencies.circe.value,
     inConfig(Compile)(
       Seq(
@@ -141,30 +140,34 @@ lazy val `waves-node` = (project in file("."))
     `node-testkit`,
     `node-tests`,
     `node-generator`,
-    benchmark,
+    // benchmark, // TODO: [scala3] enable
     `repl-js`,
-    `repl-jvm`,
-    `ride-runner`
+    `repl-jvm`
+    // `ride-runner` // TODO: [scala3] enable
   )
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "2.13.15",
+    scalaVersion         := "3.5.2",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses             := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     publish / skip       := true,
     scalacOptions ++= Seq(
-      "-Xsource:3",
       "-feature",
       "-deprecation",
       "-unchecked",
       "-language:higherKinds",
       "-language:implicitConversions",
       "-language:postfixOps",
+      "-Ykind-projector",
+      "-source:future-migration", // TODO: [scala3] switch from `future-migration` to `future`
       "-Ywarn-unused:-implicits",
       "-Xlint",
+      "-rewrite", // TODO: [scala3] remove
+      "-explain",  // TODO: [scala3] remove
+      "-nowarn",  // TODO: [scala3] remove
       "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s",

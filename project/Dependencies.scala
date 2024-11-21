@@ -12,7 +12,7 @@ object Dependencies {
 
   private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.10"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.5"
+  private def kamonModule(module: String) = ("io.kamon" %% s"kamon-$module" % "2.7.5").cross(CrossVersion.for3Use2_13)
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.3"
 
@@ -22,9 +22,7 @@ object Dependencies {
 
   private def grpcModule(module: String) = "io.grpc" % module % "1.68.0"
 
-  val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full)
-
-  val akkaHttp        = akkaHttpModule("akka-http")
+  val akkaHttp        = akkaHttpModule("akka-http").cross(CrossVersion.for3Use2_13)
   val googleGuava     = "com.google.guava"    % "guava"             % "33.3.1-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
@@ -34,26 +32,19 @@ object Dependencies {
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.110.Final"
 
-  val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.12")
+  val shapeless = Def.setting("org.typelevel" %% "shapeless3-deriving" % "3.4.3")
 
-  val playJson = "com.typesafe.play" %% "play-json" % "2.10.6"
+  val playJson = "org.playframework" %% "play-json" % "3.0.4"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.4" % Test)
 
-  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.10.1"
+  val sttp3      = "com.softwaremill.sttp.client3" %% "core"      % "3.10.1"
   val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.10.1"
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.78.1"
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
-
-  val langCompilerPlugins = Def.setting(
-    Seq(
-      compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-      kindProjector
-    )
-  )
 
   val lang = Def.setting(
     Seq(
@@ -70,7 +61,7 @@ object Dependencies {
       bouncyCastleProvider,
       "com.wavesplatform" % "zwaves" % "0.2.1",
       web3jModule("crypto").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
-    ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
+    ) ++ scalapbRuntime.value ++ protobuf.value
   )
 
   lazy val it = scalaTest +: Seq(
@@ -86,7 +77,7 @@ object Dependencies {
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
     "org.scalacheck"    %% "scalacheck"      % "1.18.1",
     "org.mockito"        % "mockito-all"     % "1.10.19",
-    "org.scalamock"     %% "scalamock"       % "6.0.0"
+    ("org.scalamock"    %% "scalamock"       % "6.0.0").cross(CrossVersion.for3Use2_13) // https://github.com/paulbutcher/ScalaMock/pull/490
   ).map(_ % Test)
 
   lazy val qaseReportDeps = Seq(
@@ -105,10 +96,12 @@ object Dependencies {
   lazy val node = Def.setting(
     Seq(
       rocksdb,
-      ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
+      ("org.rudogma" %%% "supertagged" % "2.0-RC2")
+        .exclude("org.scala-js", "scalajs-library_2.13")
+        .cross(CrossVersion.for3Use2_13), // TODO: [scala3] remove `supertagged` because it doesn't support Scala 3
       "commons-net"          % "commons-net"              % "3.11.1",
       "commons-io"           % "commons-io"               % "2.17.0",
-      "com.github.pureconfig" %% "pureconfig" % "0.17.7",
+      "com.github.pureconfig" %% "pureconfig-core" % "0.17.7",
       "net.logstash.logback" % "logstash-logback-encoder" % "8.0" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),
@@ -123,7 +116,6 @@ object Dependencies {
       akkaModule("stream"),
       akkaHttp,
       "org.bitlet" % "weupnp" % "0.1.4",
-      kindProjector,
       monixModule("reactive").value,
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
@@ -131,12 +123,12 @@ object Dependencies {
       "com.esaulpaugh"              % "headlong"      % "12.3.1",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
-    ) ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value
+    ) ++ console ++ logDeps ++ protobuf.value
   )
 
   lazy val nodeTests = Seq(
     akkaModule("testkit")               % Test,
-    akkaHttpModule("akka-http-testkit") % Test
+    akkaHttpModule("akka-http-testkit").cross(CrossVersion.for3Use2_13) % Test
   ) ++ test
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.5" // grpc 1.64.0 still requires 3.25
@@ -171,7 +163,7 @@ object Dependencies {
       sttp3,
       sttp3Monix,
       "org.scala-lang.modules"           %% "scala-xml"              % "2.3.0", // JUnit reports
-      akkaHttpModule("akka-http-testkit") % Test,
+      (akkaHttpModule("akka-http-testkit") % Test).cross(CrossVersion.for3Use2_13),
       "com.softwaremill.diffx"           %% "diffx-core"             % "0.9.0" % Test,
       "com.softwaremill.diffx"           %% "diffx-scalatest-should" % "0.9.0" % Test,
       grpcModule("grpc-inprocess")        % Test
