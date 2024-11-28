@@ -9,9 +9,15 @@ import org.apache.commons.net.ntp.NTPUDPClient
 import java.time.Duration
 import scala.concurrent.duration.DurationInt
 
-trait Time {
+trait Time extends AutoCloseable {
   def correctedTime(): Long
   def getTimestamp(): Long
+  override def close(): Unit = {}
+}
+
+object SystemTime extends Time {
+  def correctedTime(): Long = System.currentTimeMillis()
+  def getTimestamp(): Long  = System.currentTimeMillis()
 }
 
 class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable {

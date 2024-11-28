@@ -8,7 +8,7 @@ import pureconfig.generic.auto.*
 
 case class WavesSettings(
     directory: String,
-    ntpServer: String,
+    ntpServer: Option[String],
     maxTxErrorLogSize: Int,
     dbSettings: DBSettings,
     extensions: Seq[String],
@@ -33,7 +33,7 @@ object WavesSettings {
     val wavesConfigSource = ConfigSource.fromConfig(waves)
 
     val directory                 = wavesConfigSource.at("directory").loadOrThrow[String]
-    val ntpServer                 = wavesConfigSource.at("ntp-server").loadOrThrow[String]
+    val ntpServer                 = wavesConfigSource.at("ntp-server").loadOrThrow[Option[String]]
     val maxTxErrorLogSize         = wavesConfigSource.at("max-tx-error-log-size").loadOrThrow[Int]
     val dbSettings                = wavesConfigSource.at("db").loadOrThrow[DBSettings]
     val extensions                = wavesConfigSource.at("extensions").loadOrThrow[Seq[String]]

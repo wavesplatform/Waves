@@ -26,7 +26,7 @@ import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.utils.{Schedulers, Time}
+import com.wavesplatform.utils.{Schedulers, SystemTime}
 import io.netty.util.HashedWheelTimer
 import monix.execution.schedulers.SchedulerService
 import org.scalacheck.Gen
@@ -38,7 +38,7 @@ import play.api.libs.json.*
 import scala.concurrent.duration.*
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory with Inside with WithDomain {
-  private val estimator = ScriptEstimatorV2
+  private val estimator                                              = ScriptEstimatorV2
   protected override implicit val routeTestTimeout: RouteTestTimeout = RouteTestTimeout(20.seconds)
 
   private val timeBounded: SchedulerService = Schedulers.timeBoundedFixedPool(
@@ -48,11 +48,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     "rest-time-limited"
   )
   private val utilsApi: UtilsApiRoute = UtilsApiRoute(
-    new Time {
-      def correctedTime(): Long = System.currentTimeMillis()
-
-      def getTimestamp(): Long = System.currentTimeMillis()
-    },
+    SystemTime,
     restAPISettings,
     Int.MaxValue,
     () => estimator,

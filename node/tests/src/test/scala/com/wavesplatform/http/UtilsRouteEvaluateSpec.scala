@@ -20,7 +20,7 @@ import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.{Asset, AssetIdLength, TxHelpers}
-import com.wavesplatform.utils.{Schedulers, Time}
+import com.wavesplatform.utils.{Schedulers, SystemTime}
 import io.netty.util.HashedWheelTimer
 import monix.execution.schedulers.SchedulerService
 import org.scalamock.scalatest.PathMockFactory
@@ -44,10 +44,7 @@ class UtilsRouteEvaluateSpec
     "rest-time-limited"
   )
   private val utilsApi: UtilsApiRoute = UtilsApiRoute(
-    new Time {
-      def correctedTime(): Long = System.currentTimeMillis()
-      def getTimestamp(): Long  = System.currentTimeMillis()
-    },
+    SystemTime,
     restAPISettings,
     Int.MaxValue,
     () => ScriptEstimatorV3.latest,
