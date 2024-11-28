@@ -52,7 +52,7 @@ class WavesSettingsSpecification extends FlatSpec {
 
     settings.directory should be("/xxx")
     settings.dbSettings.directory should be("/xxx/data")
-    settings.ntpServer should be("example.com")
+    settings.ntpServer should be(Some("example.com"))
     settings.networkSettings.file should be(Some(new File("/xxx/peers.dat")))
     settings.walletSettings.file should be(Some(new File("/xxx/wallet/wallet.dat")))
   }
