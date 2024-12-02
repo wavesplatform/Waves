@@ -93,7 +93,7 @@ final case class EthABIConverter(script: Script) {
     }
   }
 
-  private[this] lazy val funcsWithTypes =
+  private lazy val funcsWithTypes =
     Global
       .dAppFuncTypes(script)
       .map { signatures =>
@@ -103,7 +103,7 @@ final case class EthABIConverter(script: Script) {
         signatures.copy(argsWithFuncName = filtered)
       }
 
-  private[this] def functionsWithArgs: Seq[(String, List[(String, Types.FINAL)])] = {
+  private def functionsWithArgs: Seq[(String, List[(String, Types.FINAL)])] = {
     funcsWithTypes match {
       case Right(signatures) => signatures.argsWithFuncName.toSeq
       case Left(_)           => Nil

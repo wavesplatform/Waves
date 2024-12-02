@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.transfer.*
 import scala.util.{Failure, Try}
 
 object TransactionParsers {
-  private[this] val old: Map[TxType, TransactionParser] = Seq[TransactionParser](
+  private val old: Map[TxType, TransactionParser] = Seq[TransactionParser](
     GenesisTransaction,
     PaymentTransaction,
     IssueTransaction,
@@ -23,7 +23,7 @@ object TransactionParsers {
     TransferTransaction
   ).map { x => x.typeId -> x }.toMap
 
-  private[this] val modern: Map[TxType, TransactionParser] = Seq[TransactionParser](
+  private val modern: Map[TxType, TransactionParser] = Seq[TransactionParser](
     DataTransaction,
     SetScriptTransaction,
     IssueTransaction,

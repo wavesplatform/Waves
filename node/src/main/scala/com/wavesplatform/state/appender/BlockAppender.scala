@@ -117,7 +117,7 @@ object BlockAppender extends ScorexLogging {
   }
 
   // noinspection TypeAnnotation,ScalaStyle
-  private[this] object metrics {
+  private object metrics {
     def createApplySpan(block: Block) = {
       Kamon
         .spanBuilder("block-appender")
@@ -133,7 +133,7 @@ object BlockAppender extends ScorexLogging {
       def finishNtp()(implicit time: Time): Unit =
         span.finish(ntpTime)
 
-      private[this] def ntpTime(implicit time: Time) =
+      private def ntpTime(implicit time: Time) =
         Instant.ofEpochMilli(time.correctedTime())
     }
   }

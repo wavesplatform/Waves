@@ -13,12 +13,12 @@ object DataRequest {
 case class DataRequest(
     version: Byte,
     sender: String,
-    data: List[DataEntry[_]],
+    data: List[DataEntry[?]],
     fee: Long,
     timestamp: Option[Long] = None
 )
 
-case class SignedDataRequest(version: Byte, senderPublicKey: String, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs) {
+case class SignedDataRequest(version: Byte, senderPublicKey: String, data: List[DataEntry[?]], fee: Long, timestamp: Long, proofs: Proofs) {
   def toTx: Either[ValidationError, DataTransaction] =
     for {
       _sender <- PublicKey.fromBase58String(senderPublicKey)

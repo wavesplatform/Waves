@@ -20,7 +20,7 @@ object SignedMassTransferRequest {
         (JsPath \ "timestamp").read[Long] and
         (JsPath \ "attachment").readWithDefault(ByteStr.empty) and
         (JsPath \ "proofs").read[Proofs]
-    )(SignedMassTransferRequest.apply _),
+    )(SignedMassTransferRequest.apply),
     Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
   )
 }

@@ -7,7 +7,7 @@ import com.wavesplatform.transaction.validation.TxValidator
 
 object PaymentTxValidator extends TxValidator[PaymentTransaction] {
   override def validate(transaction: PaymentTransaction): ValidatedNel[ValidationError, PaymentTransaction] = {
-    import transaction._
+    import transaction.*
     V.seq(transaction)(
       V.noOverflow(fee.value, amount.value),
       V.addressChainId(recipient, chainId)

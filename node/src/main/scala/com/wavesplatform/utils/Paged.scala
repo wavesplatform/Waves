@@ -1,6 +1,6 @@
 package com.wavesplatform.utils
 
-import play.api.libs.json._
+import play.api.libs.json.*
 
 final case class Paged[C, R](hasNext: Boolean, lastItem: Option[C], items: R)
 

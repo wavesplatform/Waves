@@ -322,7 +322,7 @@ object BlockDiffer {
       TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
   }
 
-  private[this] def apply(
+  private def apply(
       blockchain: Blockchain,
       initConstraint: MiningConstraint,
       prevBlockTimestamp: Option[Long],
@@ -340,7 +340,7 @@ object BlockDiffer {
     val blockGenerator  = blockchain.lastBlockHeader.get.header.generator.toAddress
     val rideV6Activated = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
 
-    val txDiffer = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
+    val txDiffer = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog)
 
     if (verify && txSignParCheck)
       ParSignatureChecker.checkTxSignatures(txs, rideV6Activated)
@@ -409,7 +409,7 @@ object BlockDiffer {
       }
   }
 
-  private[this] def apply(
+  private def apply(
       blockchain: Blockchain,
       prevStateHash: ByteStr,
       initSnapshot: StateSnapshot,

@@ -5,8 +5,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
-import play.api.libs.functional.syntax._
-import play.api.libs.json._
+import play.api.libs.functional.syntax.*
+import play.api.libs.json.*
 
 case class LeaseCancelRequest(
     version: Option[Byte],
@@ -43,7 +43,7 @@ object LeaseCancelRequest {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").readNullable[Long] and
       (JsPath \ "signature").readNullable[ByteStr] and
-      (JsPath \ "proofs").readNullable[Proofs])(LeaseCancelRequest.apply _),
+      (JsPath \ "proofs").readNullable[Proofs])(LeaseCancelRequest.apply),
     Json.writes[LeaseCancelRequest]
   )
 }

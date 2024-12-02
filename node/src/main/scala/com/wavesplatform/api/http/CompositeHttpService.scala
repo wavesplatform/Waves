@@ -80,7 +80,7 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
     }
   }
 
-  private[this] lazy val patchedSwaggerJson = {
+  private lazy val patchedSwaggerJson = {
     import com.wavesplatform.Version
     import com.wavesplatform.account.AddressScheme
 

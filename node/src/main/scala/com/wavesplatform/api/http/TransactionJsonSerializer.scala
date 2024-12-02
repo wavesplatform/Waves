@@ -443,10 +443,10 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
   def metaJson(m: TxMeta): JsObject =
     TransactionJsonSerializer.applicationStatus(isBlockV5(m.height), m.status) ++ Json.obj("spentComplexity" -> m.spentComplexity)
 
-  private[this] def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
+  private def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
 
   // Extended lease format. Overrides default
-  private[this] def leaseIdToLeaseRef(
+  private def leaseIdToLeaseRef(
       leaseId: ByteStr,
       recipientParamOpt: Option[AddressOrAlias] = None,
       amountOpt: Option[Long] = None

@@ -41,8 +41,8 @@ case class TransactionsApiRoute(
     with AuthRoute {
   import TransactionsApiRoute.*
 
-  private[this] val serializer                                               = TransactionJsonSerializer(blockchain)
-  private[this] implicit val transactionMetaWrites: OWrites[TransactionMeta] = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
+  private val serializer                                               = TransactionJsonSerializer(blockchain)
+  private implicit val transactionMetaWrites: OWrites[TransactionMeta] = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
 
   override lazy val route: Route =
     pathPrefix("transactions") {
@@ -64,7 +64,7 @@ case class TransactionsApiRoute(
     }
   }
 
-  private[this] def readTransactionMeta(id: String): Either[ApiError, TransactionMeta] =
+  private def readTransactionMeta(id: String): Either[ApiError, TransactionMeta] =
     for {
       id   <- ByteStr.decodeBase58(id).toEither.leftMap(err => CustomValidationError(err.toString))
       meta <- commonApi.transactionById(id).toRight(ApiError.TransactionDoesNotExist)
@@ -102,7 +102,7 @@ case class TransactionsApiRoute(
     single ~ multiple
   }
 
-  private[this] def loadTransactionStatus(id: ByteStr): JsObject = {
+  private def loadTransactionStatus(id: ByteStr): JsObject = {
     import Status.*
     val statusJson = blockchain.transactionInfo(id) match {
       case Some((tm, _)) =>

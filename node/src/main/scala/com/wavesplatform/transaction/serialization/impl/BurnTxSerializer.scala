@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.serialization._
+import com.wavesplatform.serialization.*
 import com.wavesplatform.transaction.assets.BurnTransaction
 import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxNonNegativeAmount, TxVersion}
 import monix.eval.Coeval
@@ -13,14 +13,14 @@ import scala.util.Try
 
 object BurnTxSerializer {
   def toJson(tx: BurnTransaction): Coeval[JsObject] = Coeval.evalOnce {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++
       Json.obj("assetId" -> asset.id.toString, "amount" -> quantity.value) ++
       (if (version == TxVersion.V2) Json.obj("chainId" -> chainId) else JsObject.empty)
   }
 
   def bodyBytes(tx: BurnTransaction): Coeval[Array[Byte]] = Coeval.evalOnce {
-    import tx._
+    import tx.*
     lazy val baseBytes = Bytes.concat(
       sender.arr,
       asset.id.arr,

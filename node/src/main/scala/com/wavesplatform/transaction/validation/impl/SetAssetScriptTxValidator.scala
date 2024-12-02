@@ -7,7 +7,7 @@ import com.wavesplatform.transaction.validation.{TxValidator, ValidatedV}
 
 object SetAssetScriptTxValidator extends TxValidator[SetAssetScriptTransaction] {
   override def validate(tx: SetAssetScriptTransaction): ValidatedV[SetAssetScriptTransaction] = {
-    import tx._
+    import tx.*
     V.seq(tx)(
       V.cond(
         script.forall(_.isInstanceOf[ExprScript]),

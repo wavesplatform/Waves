@@ -230,13 +230,13 @@ object UtilApp {
   }
 
   // noinspection TypeAnnotation
-  private[this] final class NodeState(c: Command) {
+  private final class NodeState(c: Command) {
     lazy val settings = Application.loadApplicationConfig(c.configFile.map(new File(_)))
     lazy val wallet   = Wallet(settings.walletSettings)
     lazy val time     = new NTP(settings.ntpServer)
   }
 
-  private[this] object Actions {
+  private object Actions {
     type ActionResult = Either[String, Array[Byte]]
 
     @nowarn("cat=deprecation")
@@ -339,7 +339,7 @@ object UtilApp {
     }
   }
 
-  private[this] object IO {
+  private object IO {
     def readInput(c: Command): Array[Byte] = {
       val inputStream = c.inputData match {
         case Input.StdIn =>
@@ -365,14 +365,14 @@ object UtilApp {
       outputStream.write(encodedBytes)
     }
 
-    private[this] def encode(v: Array[Byte], format: String) = format match {
+    private def encode(v: Array[Byte], format: String) = format match {
       case "plain"  => v
       case "base64" => Base64.encode(v).getBytes(StandardCharsets.US_ASCII)
       case "base58" => Base58.encode(v).getBytes(StandardCharsets.US_ASCII)
       case _        => sys.error(s"Invalid format $format")
     }
 
-    private[this] def toPlainBytes(inFormat: String, encodedBytes: Array[Byte]) = {
+    private def toPlainBytes(inFormat: String, encodedBytes: Array[Byte]) = {
       lazy val strWithoutSpaces = new String(encodedBytes).replaceAll("\\s+", "")
       inFormat match {
         case "plain"  => encodedBytes

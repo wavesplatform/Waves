@@ -8,9 +8,9 @@ object Dependencies {
   private[this] val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.5.2" classifier "protobuf-src" intransitive ()
 
-  private def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.6.21"
+  private def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.10.0"
 
-  private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.10"
+  private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.7.0"
 
   private def kamonModule(module: String) = ("io.kamon" %% s"kamon-$module" % "2.7.5").cross(CrossVersion.for3Use2_13)
 
@@ -22,7 +22,7 @@ object Dependencies {
 
   private def grpcModule(module: String) = "io.grpc" % module % "1.68.0"
 
-  val akkaHttp        = akkaHttpModule("akka-http").cross(CrossVersion.for3Use2_13)
+  val akkaHttp        = akkaHttpModule("akka-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.3.1-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
@@ -127,7 +127,7 @@ object Dependencies {
 
   lazy val nodeTests = Seq(
     akkaModule("testkit")               % Test,
-    akkaHttpModule("akka-http-testkit").cross(CrossVersion.for3Use2_13) % Test
+    akkaHttpModule("akka-http-testkit") % Test
   ) ++ test
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.5" // grpc 1.64.0 still requires 3.25
@@ -162,7 +162,7 @@ object Dependencies {
       sttp3,
       sttp3Monix,
       "org.scala-lang.modules"           %% "scala-xml"              % "2.3.0", // JUnit reports
-      (akkaHttpModule("akka-http-testkit") % Test).cross(CrossVersion.for3Use2_13),
+      akkaHttpModule("akka-http-testkit") % Test,
       "com.softwaremill.diffx"           %% "diffx-core"             % "0.9.0" % Test,
       "com.softwaremill.diffx"           %% "diffx-scalatest-should" % "0.9.0" % Test,
       grpcModule("grpc-inprocess")        % Test

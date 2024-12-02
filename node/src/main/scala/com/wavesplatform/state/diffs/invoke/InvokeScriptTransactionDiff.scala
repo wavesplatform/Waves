@@ -41,11 +41,10 @@ import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, Trac
 import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
-import shapeless.Coproduct
 
 object InvokeScriptTransactionDiff {
 
-  private[this] def allIssues(r: InvokeScriptResult): Seq[Issue] = {
+  private def allIssues(r: InvokeScriptResult): Seq[Issue] = {
     r.issues ++ r.invokes.flatMap(s => allIssues(s.stateChanges))
   }
 
@@ -221,8 +220,8 @@ object InvokeScriptTransactionDiff {
           _ <- TracedResult(checkCall(funcCall, blockchain).leftMap(GenericError(_)))
           (directives, tthis, input) <- TracedResult(for {
             directives <- DirectiveSet(version, Account, DAppType)
-            tthis = Coproduct[Environment.Tthis](RideRecipient.Address(ByteStr(dAppAddress.bytes)))
-            input <- buildThisValue(Coproduct[TxOrd](tx: TransactionBase), blockchain, directives, tthis)
+            tthis = RideRecipient.Address(ByteStr(dAppAddress.bytes))
+            input <- buildThisValue(tx: TransactionBase, blockchain, directives, tthis)
           } yield (directives, tthis, input)).leftMap(GenericError(_))
 
           paymentsPart <- TracedResult(

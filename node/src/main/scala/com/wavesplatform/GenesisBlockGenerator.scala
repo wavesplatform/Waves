@@ -260,8 +260,8 @@ object GenesisBlockGenerator {
             minerShares,
             { case (miner, balance) =>
               val (hit, newHitSource) = getHitWithSource(miner.account, currentHitSource)
-              val delay               = posCalculator.calculateDelay(hit, baseTargets.head, balance)
-              (delay, newHitSource)
+              val delay1              = posCalculator.calculateDelay(hit, baseTargets.head, balance)
+              (delay1, newHitSource)
             },
             _._1
           )

@@ -39,7 +39,6 @@ import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, Tra
 import com.wavesplatform.transaction.validation.impl.{DataTxValidator, LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
 import com.wavesplatform.transaction.{Asset, AssetIdLength, ERC20Address, PBSince, TransactionType}
 import com.wavesplatform.utils.*
-import shapeless.Coproduct
 
 import scala.collection.immutable.VectorMap
 import scala.util.{Failure, Right, Success, Try}

@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.repl.node.http.response
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.repl.node.http.response.model._
+import com.wavesplatform.lang.v1.repl.node.http.response.model.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo, Tx}
 

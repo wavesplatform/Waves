@@ -67,7 +67,7 @@ class MessageCodecL1(peerDatabase: PeerDatabase) extends MessageToMessageCodec[R
     peerDatabase.blacklistAndClose(ctx.channel(), s"Invalid message. ${e.getMessage}")
   }
 
-  private[this] def isNewMsgsSupported(ctx: ChannelHandlerContext): Boolean = {
+  private def isNewMsgsSupported(ctx: ChannelHandlerContext): Boolean = {
     val (v1, v2, _) = ctx.channel().attr(HandshakeHandler.NodeVersionAttributeKey).get()
     v1 > 1 || (v1 == 1 && v2 >= 2) // >= 1.2.0
   }

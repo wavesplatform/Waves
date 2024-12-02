@@ -98,5 +98,5 @@ package object utils {
       case FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
     }
 
-    implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => UnsignedBytes.lexicographicalComparator().compare(x.arr, y.arr)
+  implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => UnsignedBytes.lexicographicalComparator().compare(x.arr, y.arr)
 }

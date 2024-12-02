@@ -1,6 +1,6 @@
 package com.wavesplatform.wallet
 
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 
 object PasswordProvider extends ScorexLogging {
 

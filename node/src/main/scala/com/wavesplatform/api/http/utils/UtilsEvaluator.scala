@@ -37,7 +37,6 @@ import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.*
-import shapeless.*
 
 object UtilsEvaluator {
   object ConflictingRequestStructure        extends ValidationError
@@ -118,7 +117,7 @@ object UtilsEvaluator {
           Coeval.raiseError(new IllegalStateException("No input entity available")),
           Coeval.evalOnce(blockchain.height),
           blockchain,
-          Coproduct[Tthis](Recipient.Address(ByteStr(dAppAddress.bytes))),
+          Recipient.Address(ByteStr(dAppAddress.bytes)),
           ds,
           script.stdLibVersion,
           invoke,

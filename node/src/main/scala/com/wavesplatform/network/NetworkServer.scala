@@ -30,8 +30,8 @@ trait NetworkServer {
 
 object NetworkServer extends ScorexLogging {
   val MaxFrameLength: Int                  = 100 * 1024 * 1024
-  private[this] val AverageHandshakePeriod = 1.second
-  private[this] val LengthFieldSize        = 4
+  private val AverageHandshakePeriod = 1.second
+  private val LengthFieldSize        = 4
 
   def apply(
       applicationName: String,

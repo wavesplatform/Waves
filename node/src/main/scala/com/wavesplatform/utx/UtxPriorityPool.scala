@@ -17,10 +17,10 @@ import scala.annotation.tailrec
 final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging with OptimisticLockable {
   import UtxPriorityPool.*
 
-  private[this] case class PriorityData(diff: StateSnapshot, isValid: Boolean = true)
+  private case class PriorityData(diff: StateSnapshot, isValid: Boolean = true)
 
-  @volatile private[this] var priorityDiffs         = Seq.empty[PriorityData]
-  @volatile private[this] var priorityDiffsCombined = StateSnapshot.empty
+  @volatile private var priorityDiffs         = Seq.empty[PriorityData]
+  @volatile private var priorityDiffsCombined = StateSnapshot.empty
 
   def validPriorityDiffs: Seq[StateSnapshot] = priorityDiffs.takeWhile(_.isValid).map(_.diff)
   def priorityTransactions: Seq[Transaction] = priorityDiffs.flatMap(_.diff.transactionsValues)
@@ -106,7 +106,7 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
     txs
   }
 
-  private[this] def updateDiffs(f: Seq[PriorityData] => Seq[PriorityData]): Set[Transaction] = {
+  private def updateDiffs(f: Seq[PriorityData] => Seq[PriorityData]): Set[Transaction] = {
     val oldTxs = priorityTransactions.toSet
 
     priorityDiffs = f(priorityDiffs).filterNot(_.diff.transactions.isEmpty)
@@ -124,11 +124,11 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
   }
 
   // noinspection TypeAnnotation
-  private[this] object PoolMetrics {
-    private[this] val SampleInterval: Duration = Duration.of(500, ChronoUnit.MILLIS)
+  private object PoolMetrics {
+    private val SampleInterval: Duration = Duration.of(500, ChronoUnit.MILLIS)
 
-    private[this] val prioritySizeStats = Kamon.rangeSampler("utx.priority-pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
-    private[this] val priorityBytesStats =
+    private val prioritySizeStats = Kamon.rangeSampler("utx.priority-pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
+    private val priorityBytesStats =
       Kamon.rangeSampler("utx.priority-pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
 
     def addTransactionPriority(tx: Transaction): Unit = {

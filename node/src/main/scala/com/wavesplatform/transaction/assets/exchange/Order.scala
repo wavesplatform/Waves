@@ -121,10 +121,10 @@ object Order {
 
   implicit lazy val jsonFormat: Format[Order] = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
 
-  val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
-  val PriceConstant     = 100000000L
-  val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
-  val MaxAttachmentSize = 1024
+  val MaxLiveTime: Long   = 30L * 24L * 60L * 60L * 1000L
+  final val PriceConstant = 100000000L
+  final val MaxAmount     = 100 * PriceConstant * PriceConstant
+  val MaxAttachmentSize   = 1024
 
   val V1: Version = 1.toByte
   val V2: Version = 2.toByte

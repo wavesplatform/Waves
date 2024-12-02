@@ -54,13 +54,13 @@ case class UtxPoolImpl(
   import com.wavesplatform.utx.UtxPoolImpl.*
 
   // Context
-  private[this] val cleanupScheduler: SchedulerService =
+  private val cleanupScheduler: SchedulerService =
     Schedulers.singleThread("utx-pool-cleanup", executionModel = ExecutionModel.AlwaysAsyncExecution)
-  private[this] val inUTXPoolOrdering = TransactionsOrdering.InUTXPool(utxSettings.fastLaneAddresses)
+  private val inUTXPoolOrdering = TransactionsOrdering.InUTXPool(utxSettings.fastLaneAddresses)
 
   // State
   val priorityPool               = new UtxPriorityPool(blockchain)
-  private[this] val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
+  private val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
 
   override def getPriorityPool: Option[UtxPriorityPool] = Some(priorityPool)
 
@@ -179,14 +179,14 @@ case class UtxPoolImpl(
   def resetPriorityPool(): Unit =
     priorityPool.setPriorityDiffs(Seq.empty)
 
-  private[this] def removeFromOrdPool(txId: ByteStr): Option[Transaction] = {
+  private def removeFromOrdPool(txId: ByteStr): Option[Transaction] = {
     for (tx <- Option(transactions.remove(txId))) yield {
       PoolMetrics.removeTransaction(tx)
       tx
     }
   }
 
-  private[this] def removeIds(removed: Set[ByteStr]): Unit = {
+  private def removeIds(removed: Set[ByteStr]): Unit = {
     val priorityRemoved = priorityPool.removeIds(removed)
     val factRemoved     = priorityRemoved ++ removed.flatMap(id => removeFromOrdPool(id))
     factRemoved.foreach(TxStateActions.removeMined(_))
@@ -253,9 +253,9 @@ case class UtxPoolImpl(
     case _                                                                => Set.empty
   }
 
-  private[this] case class TxEntry(tx: Transaction, priority: Boolean)
+  private case class TxEntry(tx: Transaction, priority: Boolean)
 
-  private[this] def createTxEntrySeq(): Seq[TxEntry] =
+  private def createTxEntrySeq(): Seq[TxEntry] =
     priorityPool.priorityTransactions.map(TxEntry(_, priority = true)) ++ nonPriorityTransactions.map(
       TxEntry(_, priority = false)
     )
@@ -488,7 +488,7 @@ case class UtxPoolImpl(
     (packResult.transactions.map(_.reverse), packResult.constraint, packResult.stateHash)
   }
 
-  private[this] val traceLogger = LoggerFacade(LoggerFactory.getLogger(this.getClass.getCanonicalName + ".trace"))
+  private val traceLogger = LoggerFacade(LoggerFactory.getLogger(this.getClass.getCanonicalName + ".trace"))
   traceLogger.trace("Validation trace reporting is enabled")
 
   @scala.annotation.tailrec
@@ -505,7 +505,7 @@ case class UtxPoolImpl(
     case other                                              => other.toString
   }
 
-  private[this] object TxStateActions {
+  private object TxStateActions {
     def addReceived(tx: Transaction, snapshot: Option[StateSnapshot]): Unit =
       if (transactions.putIfAbsent(tx.id(), tx) == null) {
         snapshot.foreach(s => onEvent(UtxEvent.TxAdded(tx, s)))
@@ -538,8 +538,8 @@ case class UtxPoolImpl(
   }
 
   // noinspection ScalaStyle
-  private[this] object TxCheck {
-    private[this] val ExpirationTime = blockchain.settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis
+  private object TxCheck {
+    private val ExpirationTime = blockchain.settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis
 
     def isExpired(transaction: Transaction): Boolean =
       (time.correctedTime() - transaction.timestamp) > ExpirationTime
@@ -554,8 +554,8 @@ case class UtxPoolImpl(
   }
 
   // noinspection NameBooleanParameters
-  private[this] object TxCleanup {
-    private[this] val scheduled = AtomicBoolean(false)
+  private object TxCleanup {
+    private val scheduled = AtomicBoolean(false)
 
     def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
       cleanupLoop()
@@ -587,12 +587,12 @@ case class UtxPoolImpl(
   }
 
   // noinspection TypeAnnotation
-  private[this] object PoolMetrics {
-    private[this] val SampleInterval: Duration = Duration.of(500, ChronoUnit.MILLIS)
+  private object PoolMetrics {
+    private val SampleInterval: Duration = Duration.of(500, ChronoUnit.MILLIS)
 
-    private[this] val sizeStats         = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
-    private[this] val neutrinoSizeStats = Kamon.rangeSampler("neutrino.utx-pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
-    private[this] val bytesStats        = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
+    private val sizeStats         = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
+    private val neutrinoSizeStats = Kamon.rangeSampler("neutrino.utx-pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
+    private val bytesStats        = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
 
     val putTimeStats    = Kamon.timer("utx.put-if-new").withoutTags()
     val putRequestStats = Kamon.counter("utx.put-if-new.requests").withoutTags()

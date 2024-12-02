@@ -49,28 +49,28 @@ object Wallet {
   def apply(settings: WalletSettings): Wallet =
     new WalletImpl(settings.file, settings.password, settings.seed)
 
-  private[this] final case class WalletData(seed: ByteStr, accountSeeds: Set[ByteStr], nonce: Int)
+  private final case class WalletData(seed: ByteStr, accountSeeds: Set[ByteStr], nonce: Int)
 
-  private[this] object WalletData {
+  private object WalletData {
     implicit val walletFormat: Format[WalletData] = Json.format
   }
 
-  private[this] final class WalletImpl(maybeFile: Option[File], passwordOpt: Option[String], maybeSeedFromConfig: Option[ByteStr])
+  private final class WalletImpl(maybeFile: Option[File], passwordOpt: Option[String], maybeSeedFromConfig: Option[ByteStr])
       extends ScorexLogging
       with Wallet {
 
-    private[this] lazy val encryptionKey = {
+    private lazy val encryptionKey = {
       val password = passwordOpt.getOrElse(PasswordProvider.askPassword())
       JsonFileStorage.prepareKey(password)
     }
 
-    private[this] lazy val actualSeed = maybeSeedFromConfig.getOrElse {
+    private lazy val actualSeed = maybeSeedFromConfig.getOrElse {
       val randomSeed = ByteStr(randomBytes(64))
       log.info(s"Your randomly generated seed is ${randomSeed.toString}")
       randomSeed
     }
 
-    private[this] var walletData: WalletData = {
+    private var walletData: WalletData = {
       if (maybeFile.isEmpty)
         WalletData(actualSeed, Set.empty, 0)
       else {
@@ -95,12 +95,12 @@ object Wallet {
       }
     }
 
-    private[this] object WalletLock {
-      private[this] val lockObject = new Object
+    private object WalletLock {
+      private val lockObject = new Object
       def write[T](f: => T): T     = lockObject.synchronized(f)
     }
 
-    private[this] val accountsCache: TrieMap[String, SeedKeyPair] = {
+    private val accountsCache: TrieMap[String, SeedKeyPair] = {
       val accounts = walletData.accountSeeds.map(KeyPair(_))
       TrieMap(accounts.map(acc => acc.toAddress.toString -> acc).toSeq*)
     }
@@ -141,14 +141,14 @@ object Wallet {
     override def nonce: Int =
       walletData.nonce
 
-    private[this] def saveWalletFile(): Unit =
+    private def saveWalletFile(): Unit =
       maybeFile.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Some(encryptionKey)))
 
-    private[this] def generateNewAccountWithoutSave(): Option[SeedKeyPair] = WalletLock.write {
+    private def generateNewAccountWithoutSave(): Option[SeedKeyPair] = WalletLock.write {
       generateNewAccountWithoutSave(getAndIncrementNonce())
     }
 
-    private[this] def generateNewAccountWithoutSave(nonce: Int): Option[SeedKeyPair] = WalletLock.write {
+    private def generateNewAccountWithoutSave(nonce: Int): Option[SeedKeyPair] = WalletLock.write {
       val account = Wallet.generateNewAccount(seed, nonce)
 
       val address = account.toAddress.toString
@@ -160,7 +160,7 @@ object Wallet {
       } else None
     }
 
-    private[this] def getAndIncrementNonce(): Int = WalletLock.write {
+    private def getAndIncrementNonce(): Int = WalletLock.write {
       val oldNonce = walletData.nonce
       walletData = walletData.copy(nonce = walletData.nonce + 1)
       oldNonce

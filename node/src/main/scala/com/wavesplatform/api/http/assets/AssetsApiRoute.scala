@@ -55,7 +55,7 @@ case class AssetsApiRoute(
 ) extends ApiRoute
     with AuthRoute {
 
-  private[this] val distributionTaskScheduler = Scheduler(
+  private val distributionTaskScheduler = Scheduler(
     new ThreadPoolExecutor(
       1,
       1,

@@ -30,7 +30,7 @@ case class LeaseApiRoute(
     active ~ leaseInfo
   }
 
-  private[this] def active: Route = (pathPrefix("active") & get) {
+  private def active: Route = (pathPrefix("active") & get) {
     path(AddrSegment) { address =>
       routeTimeout.executeToFuture(
         commonAccountApi.activeLeases(address).map(Json.toJson(_)).toListL
@@ -38,7 +38,7 @@ case class LeaseApiRoute(
     }
   }
 
-  private[this] def leaseInfo: Route = pathPrefix("info") {
+  private def leaseInfo: Route = pathPrefix("info") {
     (get & path(TransactionId)) { leaseId =>
       val result = commonAccountApi
         .leaseInfo(leaseId)
@@ -55,7 +55,7 @@ case class LeaseApiRoute(
     }
   }
 
-  private[this] def leasingInfosMap(ids: Iterable[String]): Either[InvalidIds, Map[String, LeaseInfo]] = {
+  private def leasingInfosMap(ids: Iterable[String]): Either[InvalidIds, Map[String, LeaseInfo]] = {
     val infos = ids.map(id =>
       (for {
         id <- Base58.tryDecodeWithLimit(id).toOption

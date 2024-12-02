@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.lang.ValidationError
 import eu.timepit.refined.api.RefinedType
 

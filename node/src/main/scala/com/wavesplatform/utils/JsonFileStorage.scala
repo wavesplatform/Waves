@@ -11,12 +11,12 @@ import scala.io.Source
 import scala.util.control.NonFatal
 
 object JsonFileStorage {
-  private[this] val KeySalt           = "0495c728-1614-41f6-8ac3-966c22b4a62d"
-  private[this] val AES               = "AES"
-  private[this] val Algorithm         = AES + "/ECB/PKCS5Padding"
-  private[this] val HashingAlgorithm  = "PBKDF2WithHmacSHA512"
-  private[this] val HashingIterations = 999999
-  private[this] val KeySizeBits       = 128
+  private val KeySalt           = "0495c728-1614-41f6-8ac3-966c22b4a62d"
+  private val AES               = "AES"
+  private val Algorithm         = AES + "/ECB/PKCS5Padding"
+  private val HashingAlgorithm  = "PBKDF2WithHmacSHA512"
+  private val HashingIterations = 999999
+  private val KeySizeBits       = 128
 
   def prepareKey(key: String): SecretKeySpec = {
     import java.security.NoSuchAlgorithmException
@@ -65,7 +65,7 @@ object JsonFileStorage {
   def load[T](path: String)(implicit r: Reads[T]): T =
     load(path, Option.empty[SecretKeySpec])(r)
 
-  private[this] def encrypt(key: SecretKeySpec, value: String): String = {
+  private def encrypt(key: SecretKeySpec, value: String): String = {
     try {
       val cipher: Cipher = Cipher.getInstance(Algorithm)
       cipher.init(Cipher.ENCRYPT_MODE, key)
@@ -76,7 +76,7 @@ object JsonFileStorage {
     }
   }
 
-  private[this] def decrypt(key: SecretKeySpec, encryptedValue: String): String = {
+  private def decrypt(key: SecretKeySpec, encryptedValue: String): String = {
     try {
       val cipher: Cipher = Cipher.getInstance(Algorithm)
       cipher.init(Cipher.DECRYPT_MODE, key)

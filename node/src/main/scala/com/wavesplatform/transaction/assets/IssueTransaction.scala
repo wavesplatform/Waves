@@ -7,7 +7,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.IssueTxValidator
@@ -48,7 +48,7 @@ object IssueTransaction extends TransactionParser {
   val MinAssetNameLength        = 4
   val MaxAssetNameLength        = 16
   val MaxAssetDescriptionLength = 1000
-  val MaxAssetDecimals          = 8
+  final val MaxAssetDecimals    = 8
 
   override val typeId: TxType = 3: Byte
 

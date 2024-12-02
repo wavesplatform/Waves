@@ -4,7 +4,7 @@ import java.nio.channels.ClosedChannelException
 
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
-import io.netty.channel._
+import io.netty.channel.*
 
 @Sharable
 class WriteErrorHandler extends ChannelOutboundHandlerAdapter with ScorexLogging {

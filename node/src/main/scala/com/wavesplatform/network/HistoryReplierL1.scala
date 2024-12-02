@@ -2,7 +2,6 @@ package com.wavesplatform.network
 
 import com.wavesplatform.block.Block
 import com.wavesplatform.history.History
-import com.wavesplatform.network.HistoryReplierL1.*
 import com.wavesplatform.settings.SynchronizationSettings
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
@@ -75,7 +74,7 @@ class HistoryReplierL1(score: => BigInt, history: History, settings: Synchroniza
     case _ => super.channelRead(ctx, msg)
   }
 
-  def cacheSizes: CacheSizes = CacheSizes(0, 0)
+  def cacheSizes: HistoryReplierL1.CacheSizes = HistoryReplierL1.CacheSizes(0, 0)
 }
 
 object HistoryReplierL1 {

@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl
 
-import cats.implicits._
+import cats.implicits.*
 import cats.{Eval, Monad, StackSafeMonad}
 import com.wavesplatform.lang.{CoevalF, EvalF}
 import monix.eval.Coeval

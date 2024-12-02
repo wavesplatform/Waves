@@ -10,7 +10,7 @@ import play.api.libs.json.*
 
 import scala.concurrent.Future
 
-trait BroadcastRoute { _: ApiRoute =>
+trait BroadcastRoute { apiRoute: ApiRoute =>
   def transactionPublisher: TransactionPublisher
 
   private def broadcastTransaction(tx: Transaction, includeTrace: Boolean): Future[ToResponseMarshallable] = {

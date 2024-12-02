@@ -8,9 +8,9 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.Channel
-import play.api.libs.json._
+import play.api.libs.json.*
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 case class PeersApiRoute(
     settings: RestAPISettings,
@@ -20,7 +20,7 @@ case class PeersApiRoute(
 ) extends ApiRoute
     with AuthRoute {
 
-  import PeersApiRoute._
+  import PeersApiRoute.*
 
   override lazy val route: Route =
     pathPrefix("peers") {

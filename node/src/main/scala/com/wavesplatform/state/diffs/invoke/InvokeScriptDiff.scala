@@ -39,7 +39,6 @@ import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import com.wavesplatform.transaction.{TransactionType, TxValidationError}
 import monix.eval.Coeval
-import shapeless.Coproduct
 
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
@@ -140,11 +139,11 @@ object InvokeScriptDiff {
                 )
               }
               val (log, evaluatedComplexity, result) = ScriptRunner(
-                Coproduct[TxOrd](pseudoTx: PseudoTx),
+                pseudoTx: PseudoTx,
                 blockchain,
                 script.script,
                 isAssetScript = true,
-                scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)),
+                scriptContainerAddress = Environment.AssetId(assetId.arr),
                 enableExecutionLog = enableExecutionLog,
                 nextRemainingComplexity
               )
@@ -167,8 +166,8 @@ object InvokeScriptDiff {
           complexityAfterPayments <- CoevalR(Coeval.now(complexityAfterPaymentsTraced))
           paymentsComplexity = checkedPayments.map(_._1.complexity).sum.toInt
 
-          tthis = Coproduct[Environment.Tthis](RideRecipient.Address(ByteStr(dAppAddress.bytes)))
-          input <- traced(buildThisValue(Coproduct[TxOrd](tx.root), blockchain, directives, tthis).leftMap(GenericError(_)))
+          tthis = RideRecipient.Address(ByteStr(dAppAddress.bytes))
+          input <- traced(buildThisValue(tx.root, blockchain, directives, tthis).leftMap(GenericError(_)))
 
           result <- for {
             paymentsPart <- traced(InvokeDiffsCommon.paymentsPart(blockchain, tx, tx.dApp, Map()))

@@ -1,11 +1,11 @@
 package com.wavesplatform
 
 import scala.util.Try
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.block.Block.{TransactionProof, TransactionsMerkleTree}
-import com.wavesplatform.block.validation.Validators._
-import com.wavesplatform.common.merkle.Merkle._
+import com.wavesplatform.block.validation.Validators.*
+import com.wavesplatform.common.merkle.Merkle.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings

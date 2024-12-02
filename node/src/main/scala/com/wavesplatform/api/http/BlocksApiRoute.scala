@@ -108,7 +108,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
   }
 
   @throws[IllegalStateException]("if the state is altered while executing")
-  private[this] def heightByTimestamp(target: Long): Int = {
+  private def heightByTimestamp(target: Long): Int = {
     def timestampOf(height: Int, default: => Long = throw new IllegalStateException("State was altered")): Long =
       commonApi.metaAtHeight(height).fold(default)(_.header.timestamp)
 

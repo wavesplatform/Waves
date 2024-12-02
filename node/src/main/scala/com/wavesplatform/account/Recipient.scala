@@ -66,13 +66,13 @@ object Address {
   val AddressLength: Int       = 1 + 1 + HashLength + ChecksumLength
   val AddressStringLength: Int = base58Length(AddressLength)
 
-  private[this] val publicKeyBytesCache: Cache[(ByteStr, Byte), Address] = CacheBuilder
+  private val publicKeyBytesCache: Cache[(ByteStr, Byte), Address] = CacheBuilder
     .newBuilder()
     .softValues()
     .maximumSize(200000)
     .build()
 
-  private[this] val bytesCache: Cache[ByteStr, Either[InvalidAddress, Address]] = CacheBuilder
+  private val bytesCache: Cache[ByteStr, Either[InvalidAddress, Address]] = CacheBuilder
     .newBuilder()
     .softValues()
     .maximumSize(200000)
@@ -163,10 +163,10 @@ object Address {
   )
 
   @inline
-  private[this] def scheme: AddressScheme = AddressScheme.current
+  private def scheme: AddressScheme = AddressScheme.current
 
   // Optimization, should not be used externally
-  private[this] def createUnsafe(addressBytes: Array[Byte]): Address =
+  private def createUnsafe(addressBytes: Array[Byte]): Address =
     new Address(addressBytes(1), addressBytes.drop(2).dropRight(4), addressBytes.takeRight(4))
 }
 
@@ -210,7 +210,7 @@ object Alias {
     }
   }
 
-  private[this] def isValidAliasChar(c: Char): Boolean =
+  private def isValidAliasChar(c: Char): Boolean =
     ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
   private[wavesplatform] def createWithChainId(

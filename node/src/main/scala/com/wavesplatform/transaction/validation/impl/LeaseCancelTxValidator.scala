@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.validation.impl
 
 import cats.data.ValidatedNel
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.validation.TxValidator
 
 object LeaseCancelTxValidator extends TxValidator[LeaseCancelTransaction] {
   override def validate(tx: LeaseCancelTransaction): ValidatedNel[ValidationError, LeaseCancelTransaction] = {
-    import tx._
+    import tx.*
     V.seq(tx)(
       checkLeaseId(leaseId).toValidatedNel
     )

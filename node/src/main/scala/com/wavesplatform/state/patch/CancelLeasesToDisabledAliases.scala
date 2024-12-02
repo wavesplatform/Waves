@@ -9,7 +9,7 @@ import com.wavesplatform.state.{Blockchain, LeaseBalance, LeaseDetails, Portfoli
 import play.api.libs.json.{Json, Reads}
 
 case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatures.SynchronousCalls, Set('W')) {
-  private[this] case class CancelDetails(
+  private case class CancelDetails(
       id: String,
       amount: Long,
       senderPublicKey: String,

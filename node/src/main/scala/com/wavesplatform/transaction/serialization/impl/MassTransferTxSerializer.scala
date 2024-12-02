@@ -18,7 +18,7 @@ object MassTransferTxSerializer {
     Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.toString, amount.value) })
 
   def toJson(tx: MassTransferTransaction): JsObject = {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"       -> assetId.maybeBase58Repr,
       "attachment"    -> attachment,
@@ -29,7 +29,7 @@ object MassTransferTxSerializer {
   }
 
   def bodyBytes(tx: MassTransferTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
     version match {
       case TxVersion.V1 =>
         val transferBytes = transfers.map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount.value)) }

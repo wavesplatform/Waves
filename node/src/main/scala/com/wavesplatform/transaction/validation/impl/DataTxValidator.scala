@@ -24,7 +24,7 @@ object DataTxValidator extends TxValidator[DataTransaction] {
     )
   }
 
-  private[this] def entrySizeIsValidStatic(entry: DataEntry[?]): Boolean = {
+  private def entrySizeIsValidStatic(entry: DataEntry[?]): Boolean = {
     import DataEntry.{MaxPBKeySize, MaxValueSize}
 
     val keyIsValid = entry.key.utf8Bytes.length <= MaxPBKeySize
@@ -38,7 +38,7 @@ object DataTxValidator extends TxValidator[DataTransaction] {
     keyIsValid && valueIsValid
   }
 
-  private[this] def entrySizeIsValid(blockchain: Blockchain, version: TxVersion)(entry: DataEntry[?]): Boolean = {
+  private def entrySizeIsValid(blockchain: Blockchain, version: TxVersion)(entry: DataEntry[?]): Boolean = {
     import DataEntry.{MaxKeySize, MaxPBKeySize}
 
     def keyIsValid(key: String): Boolean = version match {
