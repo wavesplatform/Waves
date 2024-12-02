@@ -86,9 +86,9 @@ trait ApiMarshallers extends JsonFormats {
 
   implicit def playJsonMarshaller[A](implicit
       writes: Writes[A]
-  ): ToEntityMarshaller[A] = playJsonMarshaller(writes, Json.stringify)
+  ): ToEntityMarshaller[A] = playJsonMarshaller2(writes, Json.stringify)
 
-  implicit def playJsonMarshaller[A](implicit
+  implicit def playJsonMarshaller2[A](implicit
       writes: Writes[A],
       jsValueToString: JsValue => String
   ): ToEntityMarshaller[A] = Marshaller.oneOf(
