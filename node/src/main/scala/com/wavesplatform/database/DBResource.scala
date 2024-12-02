@@ -6,9 +6,9 @@ import scala.collection.View
 import scala.collection.mutable.ArrayBuffer
 
 class DBResource(db: RocksDB, iteratorCfHandle: Option[ColumnFamilyHandle] = None) extends AutoCloseable {
-  private[this] val snapshot = db.getSnapshot
+  private val snapshot = db.getSnapshot
   // checksum verification is **very** expensive, so it's explicitly disabled
-  private[this] val readOptions = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
+  private val readOptions = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
 
   def get[V](key: Key[V]): V = key.parse(db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), readOptions, key.keyBytes))
 
