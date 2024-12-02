@@ -402,10 +402,20 @@ object Caches {
 
   def toSignedHeader(m: PBBlockMeta): SignedBlockHeader = SignedBlockHeader(PBBlocks.vanilla(m.getHeader), m.signature.toByteStr)
 
+  def cache[K <: AnyRef, V <: AnyRef](maximumSize: Int, loader: K => V): LoadingCache[K, V] =
+    CacheBuilder
+      .newBuilder()
+      .maximumSize(maximumSize)
+      .recordStats()
+      .build(new CacheLoader[K, V] {
+        override def load(key: K): V                                      = loader(key)
+        override def loadAll(keys: lang.Iterable[? <: K]): util.Map[K, V] = new util.HashMap[K, V]()
+      })
+
   def cache[K <: AnyRef, V <: AnyRef](
       maximumSize: Int,
       loader: K => V,
-      batchLoader: lang.Iterable[? <: K] => util.Map[K, V] = { (_: lang.Iterable[? <: K]) => new util.HashMap[K, V]() }
+      batchLoader: lang.Iterable[? <: K] => util.Map[K, V]
   ): LoadingCache[K, V] =
     CacheBuilder
       .newBuilder()
