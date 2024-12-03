@@ -1,5 +1,8 @@
 package com.wavesplatform.settings
 
+import pureconfig.*
+import pureconfig.generic.derivation.default.*
+
 case class RestAPISettings(
     enable: Boolean,
     bindAddress: String,
@@ -16,4 +19,4 @@ case class RestAPISettings(
     limitedPoolThreads: Int,
     heavyRequestProcessorPoolThreads: Option[Int],
     minimumPeers: Int
-)
+) derives ConfigReader 

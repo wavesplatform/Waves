@@ -22,7 +22,6 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
 import monix.reactive.subjects.ConcurrentSubject
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 import play.api.libs.json.Json
 import scopt.OParser
 
@@ -139,7 +138,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
     }
 
     val wallet: Wallet = new Wallet {
-      private[this] val map                                            = miners.map(kp => kp.toAddress -> kp).toMap
+      private val map                                            = miners.map(kp => kp.toAddress -> kp).toMap
       override def seed: Array[Byte]                                   = Array.emptyByteArray
       override def nonce: Int                                          = miners.length
       override def privateKeyAccounts: Seq[SeedKeyPair]                = miners
@@ -169,8 +168,8 @@ object BlockchainGeneratorApp extends ScorexLogging {
     val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, scheduler, verify = false)(_, None)
 
     object Output {
-      private[this] var first = true
-      private[this] val output = options.outputFile.map { f =>
+      private var first = true
+      private val output = options.outputFile.map { f =>
         log.info(s"Blocks json will be written to $f")
         val fs = new FileOutputStream(f)
         new PrintWriter(fs)

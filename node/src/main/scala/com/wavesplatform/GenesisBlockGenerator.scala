@@ -13,8 +13,7 @@ import com.wavesplatform.settings.*
 import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import com.wavesplatform.utils.*
 import com.wavesplatform.wallet.Wallet
-import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
+import pureconfig.*
 
 import java.io.{File, FileNotFoundException}
 import java.nio.file.Files
@@ -59,6 +58,8 @@ object GenesisBlockGenerator {
 
     def preActivated(feature: BlockchainFeature): Boolean = features.contains(feature.id)
   }
+
+  implicit val genesisBlockGeneratorSettingsConfigReader: ConfigReader[Settings] = ??? // TODO: [scala3] Remove.
 
   case class FullAddressInfo(
       seedText: SeedText,

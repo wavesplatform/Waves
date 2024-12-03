@@ -6,7 +6,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import pureconfig.*
-import pureconfig.generic.auto.*
+import pureconfig.generic.derivation.default.*
 
 import scala.concurrent.duration.*
 
@@ -16,7 +16,7 @@ case class RewardsSettings(
     initial: Long,
     minIncrement: Long,
     votingInterval: Int
-) {
+) derives ConfigReader {
   require(initial >= 0, "initial must be greater than or equal to 0")
   require(minIncrement > 0, "minIncrement must be greater than 0")
   require(term > 0, "term must be greater than 0")
@@ -79,7 +79,7 @@ case class FunctionalitySettings(
     lightNodeBlockFieldsAbsenceInterval: Int = 1000,
     blockRewardBoostPeriod: Int = 1000,
     paymentsCheckHeight: Int = 0
-) {
+) derives ConfigReader {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
   val minimalGeneratingBalanceAfter: Long                     = lastTimeBasedForkParameter
@@ -179,6 +179,8 @@ case class GenesisSettings(
     initialBaseTarget: Long,
     averageBlockDelay: FiniteDuration
 )
+
+implicit val genesisSettingsConfigReader: ConfigReader[GenesisSettings] = ??? // TODO: [scala3] Remove.
 
 object GenesisSettings { // TODO: Move to network-defaults.conf
   val MAINNET: GenesisSettings = GenesisSettings(

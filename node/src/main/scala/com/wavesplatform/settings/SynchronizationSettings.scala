@@ -1,7 +1,8 @@
 package com.wavesplatform.settings
 
 import com.wavesplatform.network.InvalidBlockStorageImpl.InvalidBlockStorageSettings
-import com.wavesplatform.settings.SynchronizationSettings.*
+import pureconfig.*
+import pureconfig.generic.derivation.default.*
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -12,10 +13,10 @@ case class SynchronizationSettings(
     scoreTTL: FiniteDuration,
     maxBaseTarget: Option[Long],
     invalidBlocksStorage: InvalidBlockStorageSettings,
-    microBlockSynchronizer: MicroblockSynchronizerSettings,
-    historyReplier: HistoryReplierSettings,
-    utxSynchronizer: UtxSynchronizerSettings
-)
+    microBlockSynchronizer: SynchronizationSettings.MicroblockSynchronizerSettings,
+    historyReplier: SynchronizationSettings.HistoryReplierSettings,
+    utxSynchronizer: SynchronizationSettings.UtxSynchronizerSettings
+) derives ConfigReader 
 
 object SynchronizationSettings {
   case class MicroblockSynchronizerSettings(

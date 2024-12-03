@@ -4,7 +4,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.metrics.Metrics
 import scala.concurrent.duration.FiniteDuration
 import pureconfig.*
-import pureconfig.generic.auto.*
 
 case class WavesSettings(
     directory: String,

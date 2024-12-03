@@ -1,3 +1,6 @@
 package com.wavesplatform.settings
 
-case class FeaturesSettings(autoShutdownOnUnsupportedFeature: Boolean, supported: List[Short] = List.empty)
+import pureconfig.*
+import pureconfig.generic.derivation.default.*
+
+case class FeaturesSettings(autoShutdownOnUnsupportedFeature: Boolean, supported: List[Short] = List.empty) derives ConfigReader

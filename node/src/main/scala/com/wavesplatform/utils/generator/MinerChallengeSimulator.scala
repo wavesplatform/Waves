@@ -26,7 +26,6 @@ import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.ConcurrentSubject
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 import org.apache.commons.io.FileUtils
 
 import java.io.{File, FileNotFoundException}

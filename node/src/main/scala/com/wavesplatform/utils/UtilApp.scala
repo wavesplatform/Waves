@@ -97,7 +97,7 @@ object UtilApp {
     }
   }
 
-  private[this] lazy val commandParser = {
+  private lazy val commandParser = {
     import scopt.OParser
 
     val builder = OParser.builder[Command]

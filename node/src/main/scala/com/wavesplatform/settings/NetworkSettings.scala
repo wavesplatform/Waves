@@ -6,6 +6,7 @@ import java.io.File
 import java.net.{InetSocketAddress, URI}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
+import pureconfig.*
 
 case class UPnPSettings(enable: Boolean, gatewayTimeout: FiniteDuration, discoverTimeout: FiniteDuration)
 
@@ -58,6 +59,8 @@ case class NetworkSettings(
 
   val uPnPSettings: UPnPSettings = upnp
 }
+
+implicit val networkSettingsConfigReader: ConfigReader[NetworkSettings] = ??? // TODO: [scala3] Remove.
 
 object NetworkSettings {
   val MaxNodeNameBytesLength = 127
