@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import com.wavesplatform.utils.*
 import com.wavesplatform.wallet.Wallet
 import pureconfig.*
+import pureconfig.generic.derivation.default.*
 
 import java.io.{File, FileNotFoundException}
 import java.nio.file.Files
@@ -27,7 +28,7 @@ object GenesisBlockGenerator {
   private type SeedText = String
   private type Share    = Long
 
-  case class DistributionItem(seedText: String, nonce: Int, amount: Share, miner: Boolean = true)
+  case class DistributionItem(seedText: String, nonce: Int, amount: Share, miner: Boolean = true) derives ConfigReader
 
   case class Settings(
       networkType: String,
@@ -38,7 +39,7 @@ object GenesisBlockGenerator {
       preActivatedFeatures: Option[List[Int]],
       minBlockTime: Option[FiniteDuration],
       delayDelta: Option[Int]
-  ) {
+  ) derives ConfigReader {
 
     val initialBalance: Share = distributions.map(_.amount).sum
 
@@ -58,8 +59,6 @@ object GenesisBlockGenerator {
 
     def preActivated(feature: BlockchainFeature): Boolean = features.contains(feature.id)
   }
-
-  implicit val genesisBlockGeneratorSettingsConfigReader: ConfigReader[Settings] = ??? // TODO: [scala3] Remove.
 
   case class FullAddressInfo(
       seedText: SeedText,

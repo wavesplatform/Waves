@@ -8,6 +8,8 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
+import pureconfig.*
+import pureconfig.generic.derivation.default.*
 
 abstract class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandler with ScorexLogging {
   protected def codeOf(msg: AnyRef): Option[Byte]
@@ -58,6 +60,6 @@ class TrafficLoggerL1(settings: TrafficLogger.Settings) extends TrafficLogger(se
 
 object TrafficLogger {
 
-  case class Settings(ignoreTxMessages: Set[ScorexMessage.MessageCode], ignoreRxMessages: Set[ScorexMessage.MessageCode])
+  case class Settings(ignoreTxMessages: Set[ScorexMessage.MessageCode], ignoreRxMessages: Set[ScorexMessage.MessageCode]) derives ConfigReader
 
 }

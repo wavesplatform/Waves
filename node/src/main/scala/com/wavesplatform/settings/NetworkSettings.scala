@@ -7,8 +7,9 @@ import java.net.{InetSocketAddress, URI}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 import pureconfig.*
+import pureconfig.generic.derivation.default.*
 
-case class UPnPSettings(enable: Boolean, gatewayTimeout: FiniteDuration, discoverTimeout: FiniteDuration)
+case class UPnPSettings(enable: Boolean, gatewayTimeout: FiniteDuration, discoverTimeout: FiniteDuration) derives ConfigReader
 
 case class NetworkSettings(
     file: Option[File],
@@ -35,7 +36,7 @@ case class NetworkSettings(
     receivedTxsCacheTimeout: FiniteDuration,
     upnp: UPnPSettings,
     trafficLogger: TrafficLogger.Settings
-) {
+) derives ConfigReader {
 
   val derivedDeclaredAddress: Option[InetSocketAddress] = declaredAddress.map { address =>
     val uri = new URI(s"my://$address")
@@ -59,8 +60,6 @@ case class NetworkSettings(
 
   val uPnPSettings: UPnPSettings = upnp
 }
-
-implicit val networkSettingsConfigReader: ConfigReader[NetworkSettings] = ??? // TODO: [scala3] Remove.
 
 object NetworkSettings {
   val MaxNodeNameBytesLength = 127

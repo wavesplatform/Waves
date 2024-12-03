@@ -168,7 +168,7 @@ object FunctionalitySettings {
   )
 }
 
-case class GenesisTransactionSettings(recipient: String, amount: Long)
+case class GenesisTransactionSettings(recipient: String, amount: Long) derives ConfigReader
 
 case class GenesisSettings(
     blockTimestamp: Long,
@@ -178,9 +178,7 @@ case class GenesisSettings(
     transactions: Seq[GenesisTransactionSettings],
     initialBaseTarget: Long,
     averageBlockDelay: FiniteDuration
-)
-
-implicit val genesisSettingsConfigReader: ConfigReader[GenesisSettings] = ??? // TODO: [scala3] Remove.
+) derives ConfigReader
 
 object GenesisSettings { // TODO: Move to network-defaults.conf
   val MAINNET: GenesisSettings = GenesisSettings(
