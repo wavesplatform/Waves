@@ -172,7 +172,7 @@ object OrderJson {
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
       (JsPath \ "version").readNullable[Byte]
-    r(readOrderV1V2 _)
+    r(readOrderV1V2)
   }
 
   private val orderV3V4Reads: Reads[Order] = {
@@ -204,7 +204,7 @@ object OrderJson {
       (JsPath \ "priceMode")
         .readWithDefault[OrderPriceMode](OrderPriceMode.Default) and
       (JsPath \ "attachment").readNullable[ByteStr]
-    r(readOrderV3V4 _)
+    r(readOrderV3V4)
   }
 
   implicit val orderReads: Reads[Order] = {
