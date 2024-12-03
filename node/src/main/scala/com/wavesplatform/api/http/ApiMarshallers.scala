@@ -103,9 +103,9 @@ trait ApiMarshallers extends JsonFormats {
   implicit def jacksonMarshaller[A](implicit ser: Boolean => JsonSerializer[A]): ToEntityMarshaller[A] =
     Marshaller.oneOf(
       jsonByteStringMarshaller
-        .compose(v => ByteString.fromArrayUnsafe(writeToBytes[A](v)(ser(false)))),
+        .compose((v: A) => ByteString.fromArrayUnsafe(writeToBytes[A](v)(ser(false)))),
       customJsonByteStringMarshaller
-        .compose(v => ByteString.fromArrayUnsafe(writeToBytes[A](v)(ser(true))))
+        .compose((v: A) => ByteString.fromArrayUnsafe(writeToBytes[A](v)(ser(true))))
     )
 
   // preserve support for using plain strings as request entities
