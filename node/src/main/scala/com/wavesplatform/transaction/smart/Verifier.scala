@@ -30,8 +30,6 @@ import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.Asset
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
-import shapeless.Coproduct
-
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
@@ -183,12 +181,10 @@ object Verifier extends ScorexLogging {
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
     val resultE = Try {
-      val containerAddress = assetIdOpt.fold(Coproduct[Environment.Tthis](Recipient.Address(ByteStr(senderAddress.bytes))))(v =>
-        Coproduct[Environment.Tthis](Environment.AssetId(v.arr))
-      )
+      val containerAddress = assetIdOpt.fold(Recipient.Address(ByteStr(senderAddress.bytes)))(v => Environment.AssetId(v.arr))
       val (log, evaluatedComplexity, result) =
         ScriptRunner(
-          Coproduct[TxOrd](transaction),
+          transaction,
           blockchain,
           script,
           isAsset,
@@ -235,11 +231,11 @@ object Verifier extends ScorexLogging {
   ): ValidationResult[Int] =
     Try(
       ScriptRunner(
-        Coproduct[ScriptRunner.TxOrd](order),
+        order,
         blockchain,
         script.script,
         isAssetScript = false,
-        Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.sender.toAddress.bytes))),
+        Recipient.Address(ByteStr(order.sender.toAddress.bytes)),
         enableExecutionLog,
         complexityLimit
       )

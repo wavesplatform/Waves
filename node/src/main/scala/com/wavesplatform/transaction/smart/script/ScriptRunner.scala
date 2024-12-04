@@ -6,6 +6,7 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.features.EstimatorProvider.*
+import com.wavesplatform.transaction.TransactionBase
 import com.wavesplatform.features.EvaluatorFixProvider.*
 import com.wavesplatform.lang.*
 import com.wavesplatform.lang.contract.DApp
@@ -19,8 +20,10 @@ import com.wavesplatform.lang.v1.evaluator.*
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
+import com.wavesplatform.lang.v1.traits.domain.PseudoTx
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state.*
+import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.{Authorized, Proven}
 import monix.eval.Coeval
@@ -81,7 +84,11 @@ object ScriptRunner {
         isContract: Boolean,
         partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => (Log[Id], Int, Either[ExecutionError, EVALUATED])
     ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
-      val txId = in.eliminate(_.id(), _ => ByteStr.empty)
+      val txId = in match {
+        case tb: TransactionBase => tb.id()
+        case _: Order            => ByteStr.empty
+        case _: PseudoTx         => ByteStr.empty
+      }
       val ctxE =
         for {
           ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
@@ -153,30 +160,29 @@ object ScriptRunner {
           (directives, ctx) =>
             val verify          = ContractEvaluator.verify(decls, vf, evaluate(ctx, _, _, v), _)
             val bindingsVersion = if (useCorrectScriptVersion) directives.stdLibVersion else V3
-            in.eliminate(
-              t =>
+            in match {
+              case t: TransactionBase =>
                 RealTransactionWrapper(t, blockchain, directives.stdLibVersion, DAppTarget)
                   .fold(
                     e => (Nil, 0, Left(e)),
                     tx => verify(Bindings.transactionObject(tx, proofsEnabled = true, bindingsVersion, fixBigScriptField))
-                  ),
-              _.eliminate(
-                t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true, bindingsVersion)),
-                _ => ???
-              )
-            )
+                  )
+              case o: Order => verify(Bindings.orderObject(RealTransactionWrapper.ord(o), proofsEnabled = true, bindingsVersion))
+              // TODO: [scala3] `???` was there in the Scala 2 code. Consider rewriting it to be a total function.
+              case _: PseudoTx => ???
+            }
         }
         evalVerifier(isContract = true, partialEvaluate)
 
       case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None)) =>
         val proven: Proven & Authorized =
-          in.eliminate(
-            _.asInstanceOf[Proven & Authorized],
-            _.eliminate(
-              _.asInstanceOf[Proven & Authorized],
-              _ => ???
-            )
-          )
+          in match {
+            case t: TransactionBase => t.asInstanceOf[Proven & Authorized]
+            case o: Order           => o.asInstanceOf[Proven & Authorized]
+            // TODO: [scala3] `???` was there in the Scala 2 code. Consider rewriting it to be a total function.
+            case _: PseudoTx => ???
+          }
+
         (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven, checkWeakPk).bimap(_.err, _ => TRUE))
 
       case other =>

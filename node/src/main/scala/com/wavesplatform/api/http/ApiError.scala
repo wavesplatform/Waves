@@ -18,7 +18,7 @@ object ApiErrorResponse {
 
 trait ApiError {
   val id: Int
-  val message: String
+  def message: String
   val code: StatusCode
 
   lazy val json: JsObject = Json.obj("error" -> id, "message" -> message)

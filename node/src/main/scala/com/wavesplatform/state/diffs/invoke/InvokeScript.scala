@@ -14,7 +14,7 @@ trait InvokeScriptLike {
   def payments: Seq[Payment]
   def root: InvokeScriptTransactionLike
   def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
-  val sender: PublicKey
+  def sender: PublicKey
 }
 
 trait InvokeScriptTransactionLike extends TransactionBase with InvokeScriptLike with Authorized
