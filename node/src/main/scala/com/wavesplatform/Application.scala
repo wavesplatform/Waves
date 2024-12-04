@@ -340,7 +340,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         .mapEval(processMicroBlock.tupled),
       newBlocksWithSnapshot
         .mapEval(processBlock.tupled)
-    ).merge
+    ).mergeMap(identity)
       .onErrorHandle(stopOnAppendError.reportFailure)
       .subscribe()
 
