@@ -334,7 +334,7 @@ object RxExtensionLoader extends ScorexLogging {
         stateValue = onNewSyncWithChannelClosed(stateValue, ch)
       },
       appliedExtensions.map { case (_, extensionBlocks, ar) => stateValue = onExtensionApplied(stateValue, extensionBlocks, ar) }
-    ).merge
+    ).mergeMap(identity)
       .map { _ =>
         log.trace(s"Current state: $stateValue")
       }
