@@ -323,13 +323,16 @@ object DebugApiRoute {
     })
   }
 
-  implicit val portfolioJsonWrites: Writes[Portfolio] = Writes { pf =>
-    JsObject(
-      Map(
-        "balance" -> JsNumber(pf.balance),
-        "lease"   -> Json.toJson(pf.lease),
-        "assets"  -> Json.toJson(pf.assets)
+  implicit val portfolioJsonWrites: Writes[Portfolio] = {
+    implicit val assetWrites: Writes[IssuedAsset] = Asset.assetWrites
+    Writes { pf =>
+      JsObject(
+        Map(
+          "balance" -> JsNumber(pf.balance),
+          "lease"   -> Json.toJson(pf.lease),
+          "assets"  -> Json.toJson(pf.assets)
+        )
       )
-    )
+    }
   }
 }
