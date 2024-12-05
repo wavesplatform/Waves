@@ -99,8 +99,8 @@ object FeeValidation {
             (baseFee * multiplier).toLong
           case et: EthereumTransaction =>
             et.payload match {
-              case _: EthereumTransaction.Transfer   => 1
-              case _: EthereumTransaction.Invocation => 5
+              case _: EthereumTransaction.Transfer   => 1L
+              case _: EthereumTransaction.Invocation => 5L
             }
 
           case ss: SetScriptTransaction if blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
@@ -108,7 +108,7 @@ object FeeValidation {
               val scriptSize = script.bytes().size
               val kbs        = scriptSize / 1024
               if (scriptSize > 0 && scriptSize % 1024 == 0) kbs else kbs + 1
-            }
+            }.toLong
 
           case _ => baseFee
         }
@@ -180,7 +180,7 @@ object FeeValidation {
   private def feeAfterSmartAccounts(blockchain: Blockchain, tx: Transaction)(inputFee: FeeInfo): FeeInfo = {
     val smartAccountScriptsCount: Int = tx match {
       case _: EthereumTransaction          => 0
-      case tx: Transaction with Authorized => if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
+      case tx: (Transaction & Authorized) => if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
       case _                               => 0
     }
 
