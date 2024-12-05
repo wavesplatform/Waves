@@ -148,7 +148,12 @@ object CommonValidation {
         case V1 | V2 | V3 if sc.containsArray => barrierByVersion(V4)
         case V1 | V2 if sc.containsBlockV2()  => barrierByVersion(V3)
         case V1 | V2                          => Right(tx)
-        case v                                => barrierByVersion(v)
+        case V3                               => barrierByVersion(V3)
+        case V4                               => barrierByVersion(V4)
+        case V5                               => barrierByVersion(V5)
+        case V6                               => barrierByVersion(V6)
+        case V7                               => barrierByVersion(V7)
+        case V8                               => barrierByVersion(V8)
       }
 
       def oldScriptVersionDeactivation(sc: Script): Either[ActivationError, Unit] = sc.stdLibVersion match {
@@ -184,7 +189,7 @@ object CommonValidation {
       case v: Versioned if !versionIsCorrect(v) && blockchain.isFeatureActivated(LightNode) =>
         Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
-      case p: PBSince with Versioned if PBSince.affects(p) =>
+      case p: (PBSince & Versioned) if PBSince.affects(p) =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
       case v: Versioned if !versionIsCorrect(v) =>
