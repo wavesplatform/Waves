@@ -29,6 +29,14 @@ import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.*
 import scala.language.reflectiveCalls
 
+class FakeTime(val startTime: Long) extends Time {
+  @volatile
+  var time: Long = startTime
+
+  override def correctedTime(): Long = time
+  override def getTimestamp(): Long  = time
+}
+
 object BlockchainGeneratorApp extends ScorexLogging {
   final case class BlockchainGeneratorAppSettings(
       genesisConfigFile: File = null,
@@ -108,15 +116,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       settings.copy(blockchainSettings = blockchainSettings, minerSettings = settings.minerSettings.copy(quorum = 0))
     }
 
-    val fakeTime = new Time {
-      val startTime: Long = genSettings.timestamp.getOrElse(System.currentTimeMillis())
-
-      @volatile
-      var time: Long = startTime
-
-      override def correctedTime(): Long = time
-      override def getTimestamp(): Long  = time
-    }
+    val fakeTime = new FakeTime(genSettings.timestamp.getOrElse(System.currentTimeMillis()))
 
     val blockchain = {
       val rdb = RDB.open(wavesSettings.dbSettings)

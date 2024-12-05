@@ -125,7 +125,7 @@ object MinerChallengeSimulator {
       rdb: RDB,
       miner: MinerImpl,
       blockAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]],
-      fakeTime: Time & Object { var time: Long },
+      fakeTime: FakeTime,
       isChallenging: Boolean
   ) {
     def forgeAndAppendBlock(miners: List[SeedKeyPair], challengingMiner: SeedKeyPair, maliciousMiner: SeedKeyPair): Option[BigInt] = {
@@ -252,19 +252,13 @@ object MinerChallengeSimulator {
         scheduler,
         utxEvents.collect { case _: UtxEvent.TxAdded => () }
       )
-      val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, scheduler, verify = false) _
+      val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, scheduler, verify = false)
 
       miner -> blockAppender
     }
 
     private def createFakeTime(startTime: Long) =
-      new Time {
-        @volatile
-        var time: Long = startTime
-
-        override def correctedTime(): Long = time
-        override def getTimestamp(): Long  = time
-      }
+      new FakeTime(startTime)
   }
 
   private def readConfFile(f: File) = ConfigFactory.parseFile(f, ConfigParseOptions.defaults().setAllowMissing(false))
