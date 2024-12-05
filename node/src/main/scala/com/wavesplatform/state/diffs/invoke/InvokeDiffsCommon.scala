@@ -726,17 +726,17 @@ object InvokeDiffsCommon {
   ): Either[FailedTransactionError, StateSnapshot] =
     Try {
       val (log, evaluatedComplexity, result) = ScriptRunner(
-        Coproduct[TxOrd](pseudoTx),
+        pseudoTx,
         blockchain,
         script,
         isAssetScript = true,
         scriptContainerAddress =
-          if (blockchain.passCorrectAssetId) Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr))
-          else Coproduct[Environment.Tthis](Environment.AssetId(tx.dApp.bytes)),
+          if (blockchain.passCorrectAssetId) Environment.AssetId(assetId.arr)
+          else Environment.AssetId(tx.dApp.bytes),
         enableExecutionLog = enableExecutionLog,
         complexityLimit
       )
-      val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else estimatedComplexity
+      val complexity: Long = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else estimatedComplexity
       result match {
         case Left(error)  => Left(FailedTransactionError.assetExecutionInAction(error.message, complexity, log, assetId))
         case Right(FALSE) => Left(FailedTransactionError.notAllowedByAssetInAction(complexity, log, assetId))
