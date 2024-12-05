@@ -31,8 +31,7 @@ object BlockAppender extends ScorexLogging {
       utxStorage: UtxPool,
       pos: PoSSelector,
       scheduler: Scheduler,
-      verify: Boolean = true,
-      txSignParCheck: Boolean = true
+      verify: Boolean = true
   )(newBlock: Block, snapshot: Option[BlockSnapshotResponse]): Task[Either[ValidationError, BlockApplyResult]] =
     Task {
       if (
@@ -40,9 +39,9 @@ object BlockAppender extends ScorexLogging {
         blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
       ) {
         if (newBlock.header.challengedHeader.isDefined) {
-          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
+          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, log, verify)(newBlock, snapshot)
         } else {
-          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
+          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, log, verify)(newBlock, snapshot)
         }
       } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(Ignored)

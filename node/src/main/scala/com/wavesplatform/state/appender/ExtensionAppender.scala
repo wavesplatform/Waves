@@ -63,7 +63,7 @@ object ExtensionAppender extends ScorexLogging {
                   val forkApplicationResultEi = {
                     newBlocks.view
                       .map { b =>
-                        b -> appendExtensionBlock(blockchainUpdater, pos, time, verify = true, txSignParCheck = false)(
+                        b -> appendExtensionBlock(blockchainUpdater, pos, time, verify = true)(
                           b,
                           extension.snapshots.get(b.id())
                         )

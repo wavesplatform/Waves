@@ -398,6 +398,16 @@ object Caches {
     lazy val hitSource: Option[ByteStr]              = meta.map(toHitSource)
   }
 
+  case class BlockData(
+      snapshot: StateSnapshot,
+      carryFee: Long,
+      totalFee: Long,
+      reward: Option[Long],
+      hitSource: ByteStr,
+      computedBlockStateHash: ByteStr,
+      block: Block
+  )
+
   def toHitSource(m: PBBlockMeta): ByteStr = (if (m.vrf.isEmpty) m.getHeader.generationSignature else m.vrf).toByteStr
 
   def toSignedHeader(m: PBBlockMeta): SignedBlockHeader = SignedBlockHeader(PBBlocks.vanilla(m.getHeader), m.signature.toByteStr)
