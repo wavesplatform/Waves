@@ -259,6 +259,11 @@ object TransactionsApiRoute {
     def apply(bool: Boolean): LeaseStatus = if (bool) active else canceled
   }
 
+  implicit val leaseStatusWrites: Writes[LeaseStatus] = Writes { 
+    case LeaseStatus.active   => JsString("active")
+    case LeaseStatus.canceled => JsString("canceled")
+  }
+
   object Status {
     val Confirmed   = "confirmed"
     val Unconfirmed = "unconfirmed"
