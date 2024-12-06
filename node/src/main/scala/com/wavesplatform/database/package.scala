@@ -29,7 +29,6 @@ import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.*
 import sun.nio.ch.Util
-import supertagged.TaggedType
 
 import java.nio.ByteBuffer
 import java.util.Map as JMap
@@ -749,14 +748,17 @@ package object database {
     leaseIds.toSet
   }
 
-  object AddressId extends TaggedType[Long] {
-    def fromByteArray(bs: Array[Byte]): Type = AddressId(Longs.fromByteArray(bs))
-  }
+  opaque type AddressId = Long
 
-  type AddressId = AddressId.Type
+  object AddressId {
+    def apply(l: Long): AddressId = l
+    def raw(x: AddressId): Long   = x
+    def fromByteArray(bs: Array[Byte]): AddressId = Longs.fromByteArray(bs)
 
-  implicit final class Ops(private val value: AddressId) extends AnyVal {
-    def toByteArray: Array[Byte] = Longs.toByteArray(AddressId.raw(value))
+    extension (x: AddressId) {
+      def toByteArray: Array[Byte] = Longs.toByteArray(x)
+      def toLong: Long = x
+    }
   }
 
   implicit class LongExt(val l: Long) extends AnyVal {

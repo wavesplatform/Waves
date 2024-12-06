@@ -804,7 +804,7 @@ class RocksDBWriter(
       val continue   = currHeight < toExclusive
       if (continue)
         changedFromKey.parse(e.getValue).foreach { addressId =>
-          lastUpdateAt.updateWith(addressId) { orig =>
+          lastUpdateAt.updateWith(addressId.toLong) { orig =>
             if (orig.isEmpty) {
               updateAt.addOne(addressId -> currHeight)
               updateAtKeys.addOne(Keys.wavesBalanceAt(addressId, currHeight))
@@ -831,7 +831,7 @@ class RocksDBWriter(
           else x.prevHeight
         }
 
-        val lastDeleteHeight = lastUpdateAt(addressId)
+        val lastDeleteHeight = lastUpdateAt(addressId.toLong)
         if (firstDeleteHeight != lastDeleteHeight)
           rw.deleteRange(
             Keys.wavesBalanceAt(addressId, firstDeleteHeight),
