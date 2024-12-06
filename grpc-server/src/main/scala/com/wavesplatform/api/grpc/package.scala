@@ -73,7 +73,7 @@ package object grpc {
     }
   }
 
-  private[this] def wrapObservable[A](source: Observable[A], dest: StreamObserver[A])(implicit s: Scheduler): Unit = dest match {
+  private def wrapObservable[A](source: Observable[A], dest: StreamObserver[A])(implicit s: Scheduler): Unit = dest match {
     case cso: ServerCallStreamObserver[A] @unchecked =>
       val nextItem = AtomicAny(Option.empty[(Promise[Ack], A)])
 

@@ -455,7 +455,7 @@ object StateUpdate {
     StateUpdate(balances.toVector, leaseBalanceUpdates, dataEntries, assets, updatedLeases.toSeq, updatedScripts, Seq.empty)
   }
 
-  private[this] def transactionsMetadata(blockchain: Blockchain, snapshot: StateSnapshot): Seq[TransactionMetadata] = {
+  private def transactionsMetadata(blockchain: Blockchain, snapshot: StateSnapshot): Seq[TransactionMetadata] = {
     implicit class AddressResolver(addr: AddressOrAlias) {
       def resolve: Address = blockchain.resolveAlias(addr).explicitGet()
     }

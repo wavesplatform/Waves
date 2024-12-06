@@ -9,7 +9,6 @@ import io.grpc.netty.NettyServerBuilder
 import io.grpc.protobuf.services.ProtoReflectionService
 import monix.execution.Scheduler
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 
 import java.net.InetSocketAddress
 import java.util.concurrent.Executors

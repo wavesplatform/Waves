@@ -32,9 +32,9 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
     extends BlockchainUpdatesApi
     with BlockchainUpdateTriggers
     with ScorexLogging {
-  private[this] val monitor     = new Object
-  private[this] var liquidState = Option.empty[LiquidState]
-  private[this] val handlers    = ConcurrentHashMap.newKeySet[Handler]()
+  private val monitor     = new Object
+  private var liquidState = Option.empty[LiquidState]
+  private val handlers    = ConcurrentHashMap.newKeySet[Handler]()
 
   def newHandler(id: String, maybeLiquidState: Option[LiquidState], subject: PublishToOneSubject[BlockchainUpdated], maxQueueSize: Int): Handler =
     new Handler(id, maybeLiquidState, subject, maxQueueSize)

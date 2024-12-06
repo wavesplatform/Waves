@@ -11,10 +11,10 @@ class Handler(id: String, maybeLiquidState: Option[LiquidState], subject: Publis
     implicit s: Scheduler
 ) extends ScorexLogging {
 
-  private[this] val queue = maybeLiquidState.fold(ArrayBuffer.empty[BlockchainUpdated])(ls => ArrayBuffer.from(ls.keyBlock +: ls.microBlocks))
+  private val queue = maybeLiquidState.fold(ArrayBuffer.empty[BlockchainUpdated])(ls => ArrayBuffer.from(ls.keyBlock +: ls.microBlocks))
 
   @volatile
-  private[this] var cancelled = false
+  private var cancelled = false
 
   subject.subscription.onComplete {
     case Success(Ack.Continue) => sendUpdate()
