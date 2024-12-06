@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.{NTPTime, TestHelpers}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
-trait SharedDomain extends BeforeAndAfterAll with NTPTime with DBCacheSettings { _: Suite =>
+trait SharedDomain extends BeforeAndAfterAll with NTPTime with DBCacheSettings { suite: Suite =>
   private val path       = Files.createTempDirectory(s"rocks-temp-${getClass.getSimpleName}").toAbsolutePath
   private val rdb        = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
   private val (bui, ldb) = TestStorageFactory(settings, rdb, ntpTime, BlockchainUpdateTriggers.noop)

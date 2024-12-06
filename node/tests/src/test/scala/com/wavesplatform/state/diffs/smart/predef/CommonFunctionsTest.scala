@@ -12,7 +12,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import org.scalatest.Assertions
-import shapeless.Coproduct
 
 import scala.util.Try
 

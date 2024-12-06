@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 import scala.concurrent.duration.*
 
 class NetworkSettingsSpecification extends FlatSpec {

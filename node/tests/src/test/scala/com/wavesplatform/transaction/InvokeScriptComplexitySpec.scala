@@ -13,7 +13,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 
 class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
-  private[this] val dApp1 =
+  private val dApp1 =
     TestCompiler(V5).compileContract("""
                                        |{-# STDLIB_VERSION 5 #-}
                                        |{-# CONTENT_TYPE DAPP #-}
@@ -32,7 +32,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
                                        |}
                                        |""".stripMargin)
 
-  private[this] val dApp0 = TestCompiler(V5).compileContract("""
+  private val dApp0 = TestCompiler(V5).compileContract("""
                                                                |{-# STDLIB_VERSION 5 #-}
                                                                |{-# CONTENT_TYPE DAPP #-}
                                                                |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -48,7 +48,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
                                                                |}
                                                                |""".stripMargin)
 
-  private[this] val smartAssetScript =
+  private val smartAssetScript =
     TestCompiler(V4).compileAsset(
       s"""{-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
@@ -62,7 +62,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
          |""".stripMargin
     )
 
-  private[this] val settings = domainSettingsWithFS(
+  private val settings = domainSettingsWithFS(
     SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures =
       BlockchainFeatures.implemented
         .excl(BlockchainFeatures.LightNode.id)

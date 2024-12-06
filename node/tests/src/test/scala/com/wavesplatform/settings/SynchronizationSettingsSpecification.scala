@@ -5,7 +5,6 @@ import com.wavesplatform.network.InvalidBlockStorageImpl.InvalidBlockStorageSett
 import com.wavesplatform.settings.SynchronizationSettings.{HistoryReplierSettings, MicroblockSynchronizerSettings, UtxSynchronizerSettings}
 import com.wavesplatform.test.FlatSpec
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 
 import scala.concurrent.duration.*
 

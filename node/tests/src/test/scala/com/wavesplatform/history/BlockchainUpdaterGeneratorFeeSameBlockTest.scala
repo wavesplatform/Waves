@@ -3,10 +3,10 @@ package com.wavesplatform.history
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.state.diffs._
-import com.wavesplatform.test._
+import com.wavesplatform.state.diffs.*
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import org.scalacheck.Gen
 
 class BlockchainUpdaterGeneratorFeeSameBlockTest extends PropSpec with DomainScenarioDrivenPropertyCheck {

@@ -298,7 +298,7 @@ class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
     checkFieldsEquality(recovered, order)
   }
 
-  private[this] def checkFieldsEquality(left: Order, right: Order): Assertion = {
+  private def checkFieldsEquality(left: Order, right: Order): Assertion = {
     if (left.version == Order.V4) {
       left.bodyBytes() shouldEqual right.bodyBytes()
     } else {

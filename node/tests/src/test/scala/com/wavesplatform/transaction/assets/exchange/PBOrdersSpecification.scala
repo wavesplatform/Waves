@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.Verifier
 
 class PBOrdersSpecification extends FlatSpec {
-  private[this] val protoOrder = PBOrder(
+  private val protoOrder = PBOrder(
     AddressScheme.current.chainId.toInt,
     ByteString.copyFrom(TestValues.keyPair.publicKey.arr),
     Some(PBAssetPair(PBAmounts.toPBAssetId(TestValues.asset), PBAmounts.toPBAssetId(Waves))),
@@ -94,7 +94,7 @@ class PBOrdersSpecification extends FlatSpec {
     reserializedProtoOrder shouldBe protoOrder
   }
 
-  private[this] def validate(protoOrder: PBOrder): Validation = {
+  private def validate(protoOrder: PBOrder): Validation = {
     val order = PBOrders.vanilla(protoOrder).explicitGet()
     order.isValid(order.timestamp)
   }

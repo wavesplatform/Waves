@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.crypto
 import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
-import play.api.libs.json._
+import play.api.libs.json.*
 
 abstract class GenericTransactionSpecification[T <: Transaction] extends PropSpec {
 

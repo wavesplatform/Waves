@@ -3,10 +3,10 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import play.api.libs.json.Json
 
 class TransferTransactionV1Specification extends PropSpec {

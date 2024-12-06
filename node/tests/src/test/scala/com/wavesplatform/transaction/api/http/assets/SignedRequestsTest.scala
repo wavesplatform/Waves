@@ -164,7 +164,7 @@ class SignedRequestsTest extends FunSuite {
   }
 
   test("SponsorFeeRequest json parsing works") {
-    import com.wavesplatform.api.http.requests.SponsorFeeRequest._
+    import com.wavesplatform.api.http.requests.SponsorFeeRequest.*
 
     val One = 100000000L
     val js1 = s"""{

@@ -9,7 +9,6 @@ import com.wavesplatform.ride.runner.requests.DefaultRequestService
 import com.wavesplatform.settings.*
 import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 import pureconfig.*
-import pureconfig.generic.auto.*
 
 import scala.concurrent.duration.DurationInt
 

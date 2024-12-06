@@ -7,7 +7,7 @@ import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 
 import scala.util.Random
 

@@ -13,7 +13,6 @@ import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, TxNonNegativeAmount, TxValidationError}
 import pureconfig.*
-import pureconfig.generic.auto.*
 import play.api.libs.json.*
 import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 

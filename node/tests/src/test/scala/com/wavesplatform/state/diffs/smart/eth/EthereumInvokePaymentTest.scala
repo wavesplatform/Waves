@@ -66,7 +66,7 @@ class EthereumInvokePaymentTest extends PropSpec with WithDomain with EthHelpers
 
         val invoke1 = invoke
         d.appendAndAssertSucceed(invoke1)
-        invoke1.payload.asInstanceOf[Invocation].toInvokeScriptLike(invoke, d.blockchain) shouldBe a[Right[_, _]]
+        invoke1.payload.asInstanceOf[Invocation].toInvokeScriptLike(invoke, d.blockchain) shouldBe a[Right[?, ?]]
 
         val invoke2 = invoke
         d.appendBlockE(invoke2) should produce("NonPositiveAmount")

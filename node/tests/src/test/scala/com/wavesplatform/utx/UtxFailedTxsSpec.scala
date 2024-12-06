@@ -279,7 +279,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     d.blockchain.transactionMeta(invoke.id()) shouldBe Some(TxMeta(Height(3), Status.Failed, 1614))
   })
 
-  private[this] def genExpr(targetComplexity: Int, result: Boolean): String = {
+  private def genExpr(targetComplexity: Int, result: Boolean): String = {
     s"""
        |if ($result) then
        |  ${"sigVerify(base58'', base58'', base58'') ||" * ((targetComplexity / 200) - 1)} true
@@ -287,7 +287,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
        |  ${"sigVerify(base58'', base58'', base58'') ||" * ((targetComplexity / 200) - 1)} false""".stripMargin
   }
 
-  private[this] def genScript(targetComplexity: Int, result: Boolean = false): Script = {
+  private def genScript(targetComplexity: Int, result: Boolean = false): Script = {
     val expr = genExpr(targetComplexity, result) // ((1 to (targetComplexity / 2) - 2).map(_ => "true") :+ result.toString).mkString("&&")
 
     val scriptText = s"""
@@ -303,7 +303,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     TxHelpers.script(scriptText.stripMargin)
   }
 
-  private[this] def genAssetScript(targetComplexity: Int, result: Boolean = false): Script = {
+  private def genAssetScript(targetComplexity: Int, result: Boolean = false): Script = {
     val expr = genExpr(targetComplexity, result) // ((1 to (targetComplexity / 2) - 2).map(_ => "true") :+ result.toString).mkString("&&")
 
     val scriptText =
@@ -318,7 +318,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     script
   }
 
-  private[this] var settings = domainSettingsWithFS(
+  private var settings = domainSettingsWithFS(
     TestFunctionalitySettings.withFeatures(
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.SmartAccounts,
@@ -329,14 +329,14 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     )
   )
 
-  private[this] def withFS(fs: FunctionalitySettings)(f: => Unit): Unit = {
+  private def withFS(fs: FunctionalitySettings)(f: => Unit): Unit = {
     val oldSettings = settings
     settings = domainSettingsWithFS(fs)
     try f
     finally settings = oldSettings
   }
 
-  private[this] def utxTest(f: (Domain, UtxPoolImpl) => Unit): Unit = {
+  private def utxTest(f: (Domain, UtxPoolImpl) => Unit): Unit = {
     val balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner, dApp)
 
     withDomain(settings, balances) { d =>

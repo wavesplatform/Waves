@@ -30,9 +30,9 @@ class ChainIdSpecification extends PropSpec {
       addressOrAlias <- addressOrAlias
       version        <- Gen.oneOf(1, 2, 3)
       sender         <- accountGen
-      amount         <- Gen.choose(1, 10000000L)
+      amount         <- Gen.choose(1L, 10000000L)
       fee            <- Gen.choose(1000000L, 10000000L)
-      ts             <- Gen.choose(1, 1000000L)
+      ts             <- Gen.choose(1L, 1000000L)
     } yield (addressOrAlias, version.toByte, sender, TxPositiveAmount.unsafeFrom(amount), TxPositiveAmount.unsafeFrom(fee), ts)
 
   private def validateFromOtherNetwork(tx: Transaction): Unit = {

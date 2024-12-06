@@ -3,7 +3,7 @@ package com.wavesplatform.utils
 import monix.execution.schedulers.SchedulerService
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
-trait SharedSchedulerMixin extends BeforeAndAfterAll { _: Suite =>
+trait SharedSchedulerMixin extends BeforeAndAfterAll { suite: Suite =>
   lazy val sharedScheduler: SchedulerService = Schedulers.fixedPool(1, schedulerName)
 
   protected def schedulerName: String = "heavy-request-processor"

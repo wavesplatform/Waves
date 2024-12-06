@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.requests
 
-import cats.instances.list._
-import cats.syntax.traverse._
+import cats.instances.list.*
+import cats.syntax.traverse.*
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs

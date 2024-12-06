@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.Transaction
 import org.scalacheck.Gen
 import org.scalatest.Suite
 
-trait BlockGen extends TransactionGen { _: Suite =>
+trait BlockGen extends TransactionGen { suite: Suite =>
 
   import BlockGen.*
 

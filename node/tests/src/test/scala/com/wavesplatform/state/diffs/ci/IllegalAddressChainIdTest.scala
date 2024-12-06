@@ -14,10 +14,10 @@ import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 class IllegalAddressChainIdTest extends PropSpec with WithDomain {
   import DomainPresets.*
 
-  private[this] def sigVerify(c: Boolean): String =
+  private def sigVerify(c: Boolean): String =
     s""" strict c = ${if (c) (1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ") else "true"} """
 
-  private[this] def contract(bigComplexity: Boolean) = TestCompiler(V5).compileContract(
+  private def contract(bigComplexity: Boolean) = TestCompiler(V5).compileContract(
     s"""
        |  @Callable(i)
        |  func default() = {
@@ -28,7 +28,7 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
      """.stripMargin
   )
 
-  private[this] def scenario(fail: Boolean, bigComplexity: Boolean = false) = {
+  private def scenario(fail: Boolean, bigComplexity: Boolean = false) = {
     val master   = RandomKeyPair()
     val invoker  = RandomKeyPair()
     val gTx1     = TxHelpers.genesis(master.toAddress, ENOUGH_AMT, TxHelpers.timestamp)

@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import play.api.libs.json.Json
 
 class TransferTransactionV2Specification extends PropSpec {

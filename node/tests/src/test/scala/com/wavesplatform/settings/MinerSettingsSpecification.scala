@@ -4,7 +4,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 
 import scala.concurrent.duration.*
 

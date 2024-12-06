@@ -3,7 +3,6 @@ package com.wavesplatform.settings
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 
 class UtxSettingsSpecification extends FlatSpec {
   "UTXSettings" should "read values" in {

@@ -328,7 +328,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
     }
   }
 
-  private[this] def checkAsset(
+  private def checkAsset(
       invoke: InvokeExpressionTransaction,
       static: AssetStaticInfo,
       info: AssetInfo,

@@ -4,14 +4,14 @@ import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import org.scalacheck.Gen
-import play.api.libs.json._
-import com.wavesplatform.test._
+import play.api.libs.json.*
+import com.wavesplatform.test.*
 
 class SetAssetScriptTransactionSpecification extends GenericTransactionSpecification[SetAssetScriptTransaction] {
   property("issuer can`t make SetAssetScript tx when Script is Contract") {

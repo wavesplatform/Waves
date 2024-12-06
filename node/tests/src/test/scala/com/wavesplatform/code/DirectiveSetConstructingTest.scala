@@ -1,8 +1,8 @@
 package com.wavesplatform.code
 
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.test._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.test.*
 
 class DirectiveSetConstructingTest extends PropSpec {
   property("DirectiveSet should be successfully constructed with (V3, Account, Contract) params") {

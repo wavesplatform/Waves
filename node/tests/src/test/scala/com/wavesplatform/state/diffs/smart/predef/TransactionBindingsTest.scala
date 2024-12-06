@@ -38,7 +38,6 @@ import monix.eval.Coeval
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.EitherValues
 import play.api.libs.json.Json
-import shapeless.Coproduct
 
 import scala.util.Random
 

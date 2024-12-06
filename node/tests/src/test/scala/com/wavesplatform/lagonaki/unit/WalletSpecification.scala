@@ -3,7 +3,7 @@ package com.wavesplatform.lagonaki.unit
 import java.io.File
 import java.nio.file.Files
 
-import cats.syntax.option._
+import cats.syntax.option.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.test.FunSuite

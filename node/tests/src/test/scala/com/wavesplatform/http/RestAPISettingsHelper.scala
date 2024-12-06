@@ -6,7 +6,6 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.*
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 
 trait RestAPISettingsHelper {
   private val apiKey: String = "test_api_key"

@@ -81,7 +81,7 @@ class RideV5LimitsChangeTest extends FlatSpec with WithDomain {
     }
   }
 
-  private[this] val contract: Script =
+  private val contract: Script =
     TestCompiler(V4).compileContract(
       s"""
          | {-#STDLIB_VERSION 4 #-}

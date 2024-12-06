@@ -11,7 +11,7 @@ trait WithNewDBForEachTest extends BeforeAndAfterEach with DBCacheSettings {
   this: Suite =>
 
   private val path                   = Files.createTempDirectory(s"rocks-${getClass.getSimpleName}").toAbsolutePath
-  private var currentDBInstance: RDB = _
+  private var currentDBInstance: RDB = compiletime.uninitialized
 
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
 

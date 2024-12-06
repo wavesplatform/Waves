@@ -35,7 +35,7 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
     )
   )
 
-  def appendBlock(block: Block, blockchainUpdater: BlockchainUpdater with Blockchain): Unit = {
+  def appendBlock(block: Block, blockchainUpdater: BlockchainUpdater & Blockchain): Unit = {
     blockchainUpdater.processBlock(block)
   }
 

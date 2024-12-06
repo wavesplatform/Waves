@@ -6,8 +6,8 @@ case class LeaseCancelV1Request(sender: String, txId: String, fee: Long, timesta
 
 object LeaseCancelV1Request {
   implicit val leaseCancelRequestReads: Reads[LeaseCancelV1Request] = {
-    import play.api.libs.functional.syntax._
-    import play.api.libs.json._
+    import play.api.libs.functional.syntax.*
+    import play.api.libs.json.*
 
     ((JsPath \ "sender").read[String] ~
       ((JsPath \ "txId").read[String] | (JsPath \ "leaseId").read[String]) ~

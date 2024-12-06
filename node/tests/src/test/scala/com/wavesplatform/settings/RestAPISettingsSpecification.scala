@@ -4,7 +4,6 @@ import akka.http.scaladsl.model.HttpMethods.*
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 
 class RestAPISettingsSpecification extends FlatSpec {
   "RestAPISettings" should "read values" in {

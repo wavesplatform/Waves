@@ -10,6 +10,6 @@ class PartialUnificationTests extends FlatSpec {
       x * 2
     }
 
-    assert(result contains "Lambda")
+    assert(result `contains` "Lambda")
   }
 }

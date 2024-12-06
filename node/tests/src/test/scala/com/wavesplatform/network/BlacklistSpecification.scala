@@ -6,7 +6,6 @@ import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.test.FeatureSpec
 import org.scalatest.GivenWhenThen
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 
 import java.net.{InetAddress, InetSocketAddress}
 

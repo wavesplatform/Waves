@@ -5,7 +5,6 @@ import com.wavesplatform.settings.{NetworkSettings, loadConfig}
 import com.wavesplatform.test.FeatureSpec
 import org.scalatest.{GivenWhenThen, ParallelTestExecution}
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 
 import java.net.{InetAddress, InetSocketAddress}
 

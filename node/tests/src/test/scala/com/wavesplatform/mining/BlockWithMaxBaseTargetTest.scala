@@ -176,7 +176,7 @@ object BlockWithMaxBaseTargetTest {
   final case class Env(
       settings: WavesSettings,
       pos: PoSSelector,
-      bcu: Blockchain with BlockchainUpdater with NG,
+      bcu: Blockchain & BlockchainUpdater & NG,
       utxPool: UtxPoolImpl,
       schedulerService: SchedulerService,
       miner: KeyPair,

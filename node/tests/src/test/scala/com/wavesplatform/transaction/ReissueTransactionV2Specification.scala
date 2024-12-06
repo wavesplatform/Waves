@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import org.scalacheck.Gen
-import play.api.libs.json._
+import play.api.libs.json.*
 
 class ReissueTransactionV2Specification extends GenericTransactionSpecification[ReissueTransaction] {
   def transactionParser: TransactionParser = ReissueTransaction

@@ -102,7 +102,7 @@ class BlockchainUpdaterNFTTest extends PropSpec with DomainScenarioDrivenPropert
     }
   }
 
-  private[this] object Preconditions {
+  private object Preconditions {
     import UnsafeBlocks.*
 
     val nftTransfer: Gen[(IssueTransaction, (Address, Address), (Block, Block, Block, Block), Seq[MicroBlock])] = {

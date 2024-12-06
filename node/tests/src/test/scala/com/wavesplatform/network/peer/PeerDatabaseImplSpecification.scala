@@ -6,7 +6,6 @@ import com.wavesplatform.network.{PeerDatabase, PeerDatabaseImpl}
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.test.FreeSpec
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 
 import java.net.InetSocketAddress
 import scala.concurrent.duration.*

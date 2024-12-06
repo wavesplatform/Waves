@@ -3,7 +3,6 @@ package com.wavesplatform.settings
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 import com.typesafe.config.ConfigException.BadValue
 
 class DbSettingsSpecification extends FlatSpec {

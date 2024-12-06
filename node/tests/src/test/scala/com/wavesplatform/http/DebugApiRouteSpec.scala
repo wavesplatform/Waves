@@ -3269,7 +3269,7 @@ class DebugApiRouteSpec
     }
   }
 
-  private[this] def jsonPost(path: String, json: JsValue) = {
+  private def jsonPost(path: String, json: JsValue) = {
     Post(path, HttpEntity(ContentTypes.`application/json`, json.toString()))
   }
 }

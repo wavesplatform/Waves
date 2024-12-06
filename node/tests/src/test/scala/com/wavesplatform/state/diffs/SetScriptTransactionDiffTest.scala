@@ -59,7 +59,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
     (genesis, setScript)
   }
-  private[this] def exactSizeContract(version: StdLibVersion, size: Int): ContractScriptImpl =
+  private def exactSizeContract(version: StdLibVersion, size: Int): ContractScriptImpl =
     new ContractScriptImpl(
       version,
       TxHelpers
@@ -73,7 +73,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       override val bytes: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(new Array[Byte](size)))
     }
 
-  private[this] def exactSizeExpr(version: StdLibVersion, size: Int): ExprScript = new ExprScript {
+  private def exactSizeExpr(version: StdLibVersion, size: Int): ExprScript = new ExprScript {
     val stdLibVersion: StdLibVersion     = version
     val isFreeCall: Boolean              = false
     val expr: EXPR                       = TxHelpers.exprScript(V6)("true").expr

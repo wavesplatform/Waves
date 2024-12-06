@@ -4,7 +4,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.FlatSpec
 import pureconfig.ConfigSource
-import pureconfig.generic.auto.*
 
 class WalletSettingsSpecification extends FlatSpec {
   "WalletSettings" should "read values from config" in {
