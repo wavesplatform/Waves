@@ -2,7 +2,7 @@ package com.wavesplatform.test
 
 import com.wavesplatform.{EitherMatchers, TransactionGen}
 import org.scalacheck.ShrinkLowPriority
-import org.scalatest._
+import org.scalatest.*
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 trait BaseSuite extends matchers.should.Matchers with ScalaCheckPropertyChecks with ShrinkLowPriority with TransactionGen with EitherMatchers {
