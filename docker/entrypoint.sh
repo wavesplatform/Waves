@@ -3,6 +3,7 @@
 JAVA_OPTS="-XX:+ExitOnOutOfMemoryError
   -Xmx${WAVES_HEAP_SIZE}
   --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED
+  --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
   -Dlogback.stdout.level=${WAVES_LOG_LEVEL}
   -Dlogback.file.directory=${WVLOG}
   -Dwaves.config.directory=/etc/waves

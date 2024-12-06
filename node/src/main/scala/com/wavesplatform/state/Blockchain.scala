@@ -61,9 +61,9 @@ trait Blockchain {
 
   def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
 
-  /**
-    * Retrieves Waves balance snapshot in the [from, to] range (inclusive)
-    * @return Balance snapshots from most recent to oldest.
+  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive)
+    * @return
+    *   Balance snapshots from most recent to oldest.
     */
   def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
 
@@ -225,13 +225,17 @@ object Blockchain {
       blockchain.effectiveBalanceBanHeights(address).contains(height)
 
     def supportsLightNodeBlockFields(height: Int = blockchain.height): Boolean =
-      blockchain.featureActivationHeight(LightNode.id).exists(height >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
+      blockchain
+        .featureActivationHeight(LightNode.id)
+        .exists(height >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
 
     def blockRewardBoost(height: Int): Int =
       blockchain
         .featureActivationHeight(BlockchainFeatures.BoostBlockReward.id)
         .filter { boostHeight =>
           boostHeight <= height && height < boostHeight + blockchain.settings.functionalitySettings.blockRewardBoostPeriod
-        }.fold(1)(_ => BlockRewardCalculator.RewardBoost)
+        }
+        .fold(1)(_ => BlockRewardCalculator.RewardBoost)
+
   }
 }
