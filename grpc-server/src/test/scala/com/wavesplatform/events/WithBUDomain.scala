@@ -17,7 +17,7 @@ import monix.reactive.subjects.PublishToOneSubject
 import org.scalatest.Suite
 import org.scalatest.concurrent.ScalaFutures.convertScalaFuture
 
-trait WithBUDomain extends WithDomain { _: Suite =>
+trait WithBUDomain extends WithDomain { suite: Suite =>
   def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: RocksDB => RocksDB = identity): Unit = {
     withDomain(settings) { d =>
       tempDb { rdb =>

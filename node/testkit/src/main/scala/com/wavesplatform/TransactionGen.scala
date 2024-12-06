@@ -30,7 +30,7 @@ import org.web3j.crypto.ECKeyPair
 import scala.concurrent.duration.*
 import scala.util.Random
 
-trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _: Suite =>
+trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { suite: Suite =>
 
   val ScriptExtraFee                  = 400000L
   protected def waves(n: Float): Long = (n * 100000000L).toLong
@@ -240,7 +240,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   def transferGeneratorP(timestamp: Long, sender: KeyPair, recipient: AddressOrAlias, maxAmount: Long): Gen[TransferTransaction] =
     for {
-      amount                                    <- Gen.choose(1, maxAmount)
+      amount                                    <- Gen.choose(1L, maxAmount)
       (_, _, _, _, _, _, feeAmount, attachment) <- transferParamGen
     } yield TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, feeAmount, attachment, timestamp).explicitGet()
 
@@ -624,7 +624,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   def genesisGeneratorP(recipient: Address): Gen[GenesisTransaction] =
     for {
-      amt <- Gen.choose(1, 100000000L * 100000000L)
+      amt <- Gen.choose(1L, 100000000L * 100000000L)
       ts  <- positiveIntGen
     } yield GenesisTransaction.create(recipient, amt, ts).explicitGet()
 
@@ -721,4 +721,4 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     InvokeExpressionTransaction.selfSigned(1, sender, script, feeAmount, Waves, ntpTime.getTimestamp()).explicitGet()
 }
 
-trait TransactionGen extends TransactionGenBase { _: Suite => }
+trait TransactionGen extends TransactionGenBase { suite: Suite => }

@@ -55,7 +55,7 @@ object TxHelpers {
 
   val matcher: SeedKeyPair = defaultSigner
 
-  private[this] val lastTimestamp = AtomicLong(System.currentTimeMillis())
+  private val lastTimestamp = AtomicLong(System.currentTimeMillis())
   def timestamp: Long             = lastTimestamp.getAndIncrement()
 
   @throws[IllegalArgumentException]
