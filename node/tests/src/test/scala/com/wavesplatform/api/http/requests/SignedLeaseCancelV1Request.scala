@@ -30,7 +30,7 @@ object SignedLeaseCancelV1Request {
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "signature").read[String] and
       (JsPath \ "fee").read[Long]
-  )(SignedLeaseCancelV1Request.apply _)
+  )(SignedLeaseCancelV1Request.apply)
 
   implicit val writes: Writes[SignedLeaseCancelV1Request] = Json.writes[SignedLeaseCancelV1Request]
 }

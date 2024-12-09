@@ -206,7 +206,7 @@ package object predef {
   def letProof(p: Proofs, prefix: String)(i: Int): String =
     s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"
 
-  def provenPart(t: Transaction with Authorized, emptyBodyBytes: Boolean = false, checkProofs: Boolean = true): String = {
+  def provenPart(t: Transaction & Authorized, emptyBodyBytes: Boolean = false, checkProofs: Boolean = true): String = {
     val version = t match {
       case _: EthereumTransaction  => 0
       case v: Versioned => v.version

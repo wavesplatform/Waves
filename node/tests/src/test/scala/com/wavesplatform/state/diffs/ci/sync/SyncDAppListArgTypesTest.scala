@@ -60,7 +60,7 @@ class SyncDAppListArgTypesTest extends PropSpec with WithDomain with Transaction
   private def assert(forbidAfterActivation: Boolean, args: String) = {
     withDomain(domainSettingsWithFS(settings)) { d =>
       val (preparingTxs, invoke) = scenario(args)
-      d.appendBlock(preparingTxs: _*)
+      d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)

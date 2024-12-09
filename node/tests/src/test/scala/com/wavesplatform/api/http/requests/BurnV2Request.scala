@@ -13,7 +13,7 @@ object BurnV2Request {
       (JsPath \ "assetId").read[String] ~
       (JsPath \ "amount").read[Long] ~
       (JsPath \ "fee").read[Long] ~
-      (JsPath \ "timestamp").readNullable[Long])(BurnV2Request.apply _)
+      (JsPath \ "timestamp").readNullable[Long])(BurnV2Request.apply)
   }
 
   implicit val burnV2Writes: Writes[BurnV2Request] =

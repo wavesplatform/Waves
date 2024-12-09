@@ -163,7 +163,7 @@ object FairPoSCalculatorTest {
       (JsPath \ "time").read[Long] and
       (JsPath \ "vrf").read[String].map(value => ByteStr(Base58.decode(value))) and
       (JsPath \ "genSig").read[String].map(value => ByteStr(Base58.decode(value)))
-  )(Input.apply _)
+  )(Input.apply)
 
   implicit val privateKeyWrites: Writes[PrivateKey] = Writes(k => JsString(Base58.encode(k.arr)))
   implicit val publicKeyWrites: Writes[PublicKey]   = Writes(k => JsString(Base58.encode(k.arr)))

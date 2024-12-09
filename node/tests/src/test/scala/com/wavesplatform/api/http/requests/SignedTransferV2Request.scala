@@ -24,7 +24,7 @@ object SignedTransferV2Request {
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "attachment").readNullable[String] and
       (JsPath \ "proofs").read[List[ProofStr]]
-  )(SignedTransferV2Request.apply _)
+  )(SignedTransferV2Request.apply)
 }
 
 case class SignedTransferV2Request(

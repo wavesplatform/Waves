@@ -15,7 +15,7 @@ object SignedBurnV1Request {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "signature").read[String]
-  )(SignedBurnV1Request.apply _)
+  )(SignedBurnV1Request.apply)
 
   implicit val writes: Writes[SignedBurnV1Request] = Json.writes[SignedBurnV1Request]
 }

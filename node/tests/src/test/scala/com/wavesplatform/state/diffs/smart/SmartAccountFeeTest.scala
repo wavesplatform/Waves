@@ -128,7 +128,7 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
       d.appendBlock(preparingTxs*)
 
       (notEnoughPaidVerifierTxs ::: freeVerifierTxs).foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
-      d.appendBlock(enoughPaidVerifierTxs: _*)
+      d.appendBlock(enoughPaidVerifierTxs*)
 
       d.appendBlock()
       d.blockchain.height shouldBe activationHeight

@@ -21,7 +21,7 @@ object SignedExchangeRequestV2 {
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "version").read[Byte] and
       (JsPath \ "proofs").read[List[ProofStr]]
-  )(SignedExchangeRequestV2.apply _)
+  )(SignedExchangeRequestV2.apply)
 }
 
 case class SignedExchangeRequestV2(

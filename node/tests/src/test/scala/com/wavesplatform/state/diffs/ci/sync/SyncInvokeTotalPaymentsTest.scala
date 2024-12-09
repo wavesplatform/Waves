@@ -68,8 +68,8 @@ class SyncInvokeTotalPaymentsTest extends PropSpec with WithDomain {
         error: Boolean,
         fail: Boolean = false
     ): Unit =
-      withDomain(settings, AddrWithBalance.enoughBalances((1 to 101).map(signer): _*)) { d =>
-        d.appendBlock(setScripts(syncCalls, syncPayments): _*)
+      withDomain(settings, AddrWithBalance.enoughBalances((1 to 101).map(signer)*)) { d =>
+        d.appendBlock(setScripts(syncCalls, syncPayments)*)
         val payments = Seq.fill(txPayments)(Payment(1, Waves))
         val tx       = invoke(signer(1).toAddress, payments = payments)
         if (error)
@@ -86,7 +86,7 @@ class SyncInvokeTotalPaymentsTest extends PropSpec with WithDomain {
     assert(RideV5, setDAppsCallingFromParent, syncCalls = 45, syncPayments = 10, txPayments = 10, error = false)
     // reduced syncCalls to avoid exceeding size error ^^^
 
-    Seq(setDAppsCallingFromParent _, setDAppsCallingEachOther _)
+    Seq(setDAppsCallingFromParent, setDAppsCallingEachOther)
       .foreach { setDApps =>
         assert(RideV6, setDApps, syncCalls = 9, syncPayments = 10, txPayments = 10, error = false)
         assert(RideV6, setDApps, syncCalls = 10, syncPayments = 10, txPayments = 0, error = false)

@@ -34,7 +34,7 @@ object SignedLeaseCancelV2Request {
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "proofs").read[List[String]] and
       (JsPath \ "fee").read[Long]
-  )(SignedLeaseCancelV2Request.apply _)
+  )(SignedLeaseCancelV2Request.apply)
 
   implicit val writes: OWrites[SignedLeaseCancelV2Request] =
     Json.writes[SignedLeaseCancelV2Request].transform((request: JsObject) => request + ("version" -> JsNumber(2)))

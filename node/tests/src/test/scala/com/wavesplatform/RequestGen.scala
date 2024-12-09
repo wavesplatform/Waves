@@ -10,7 +10,7 @@ import org.scalacheck.{Arbitrary, Gen as G}
 import org.scalatest.Suite
 
 trait RequestGen extends TransactionGen { suite: Suite =>
-  val nonPositiveLong: G[Long] = choose(Long.MinValue, 0).label("non-positive value")
+  val nonPositiveLong: G[Long] = choose(Long.MinValue, 0L).label("non-positive value")
   val invalidDecimals: G[Byte] = oneOf(
     choose[Byte](Byte.MinValue, -1),
     choose((IssueTransaction.MaxAssetDecimals + 1).toByte, Byte.MaxValue)

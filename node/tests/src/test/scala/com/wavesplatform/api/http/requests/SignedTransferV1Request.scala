@@ -18,7 +18,7 @@ object SignedTransferV1Request {
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "attachment").readNullable[String] and
       (JsPath \ "signature").read[String]
-  )(SignedTransferV1Request.apply _)
+  )(SignedTransferV1Request.apply)
 
   implicit val writes: Writes[SignedTransferV1Request] = Json.writes[SignedTransferV1Request]
 }

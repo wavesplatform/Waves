@@ -528,7 +528,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))
           ) { d =>
             val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
-            val append                             = appendBlock(d, invoker, dApp, setScriptToConvert) _
+            val append                             = appendBlock(d, invoker, dApp, setScriptToConvert)
 
             d.appendBlock(setScript)
 
@@ -563,7 +563,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoker.toAddress))
           ) { d =>
             val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
-            val append                             = appendBlock(d, invoker, dApp, setScriptToConvert) _
+            val append                             = appendBlock(d, invoker, dApp, setScriptToConvert)
 
             d.appendBlock(setScript)
 
@@ -605,7 +605,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             AddrWithBalance.enoughBalances(dApp, invoker)
           ) { d =>
             val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
-            val append                             = appendBlock(d, invoker, dApp, setScriptToConvert) _
+            val append                             = appendBlock(d, invoker, dApp, setScriptToConvert)
             d.appendBlock(setScript)
 
             val startBlockId = d.lastBlockId
@@ -646,7 +646,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             AddrWithBalance.enoughBalances(dApp, invoker)
           ) { d =>
             val setScriptToConvert = if (useInvokeExpression) Some(setScript) else None
-            val append             = appendBlock(d, invoker, dApp, setScriptToConvert) _
+            val append             = appendBlock(d, invoker, dApp, setScriptToConvert)
 
             d.appendBlock(setScript)
 
@@ -688,7 +688,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
           ) { d =>
             val (setScriptToConvert, checkAddress, checkPk) =
               if (useInvokeExpression) (Some(setScript), invoker.toAddress, invoker.publicKey) else (None, dApp.toAddress, dApp.publicKey)
-            val append = appendBlock(d, invoker, dApp, setScriptToConvert) _
+            val append = appendBlock(d, invoker, dApp, setScriptToConvert)
 
             d.appendBlock(setScript)
             val beforeInvoke1 = d.lastBlockId
@@ -757,7 +757,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
           checkPk: PublicKey,
           leaseRecipientAddress: Address
       ): Assertion = {
-        val append        = appendBlock(d, invoker, dApp, setScriptToConvert) _
+        val append        = appendBlock(d, invoker, dApp, setScriptToConvert)
         val beforeInvoke1 = d.lastBlockId
 
         val call = leaseCancelFunctionCall(leaseId)

@@ -12,7 +12,7 @@ object LeaseCancelV1Request {
     ((JsPath \ "sender").read[String] ~
       ((JsPath \ "txId").read[String] | (JsPath \ "leaseId").read[String]) ~
       (JsPath \ "fee").read[Long] ~
-      (JsPath \ "timestamp").readNullable[Long])(LeaseCancelV1Request.apply _)
+      (JsPath \ "timestamp").readNullable[Long])(LeaseCancelV1Request.apply)
   }
 
   implicit val leaseCancelRequestWrites: Writes[LeaseCancelV1Request] = Json.writes[LeaseCancelV1Request]

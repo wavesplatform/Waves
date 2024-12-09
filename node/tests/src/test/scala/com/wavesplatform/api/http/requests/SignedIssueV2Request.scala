@@ -23,7 +23,7 @@ object SignedIssueV2Request {
         (JsPath \ "timestamp").read[Long] and
         (JsPath \ "proofs").read[List[ProofStr]] and
         (JsPath \ "script").readNullable[String]
-    )(SignedIssueV2Request.apply _)
+    )(SignedIssueV2Request.apply)
   }
   implicit val writes: Writes[SignedIssueV2Request] =
     Json

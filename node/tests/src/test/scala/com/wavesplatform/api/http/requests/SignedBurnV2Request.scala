@@ -35,7 +35,7 @@ object SignedBurnV2Request {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "proofs").read[List[ProofStr]]
-  )(SignedBurnV2Request.apply _)
+  )(SignedBurnV2Request.apply)
 
   implicit val writes: Writes[SignedBurnV2Request] =
     Json.writes[SignedBurnV2Request].transform((request: JsObject) => request + ("version" -> JsNumber(2)))

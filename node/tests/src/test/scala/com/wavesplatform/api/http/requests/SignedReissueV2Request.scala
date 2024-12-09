@@ -37,5 +37,5 @@ object SignedReissueV2Request {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "proofs").read[List[ProofStr]]
-  )(SignedReissueV2Request.apply _)
+  )(SignedReissueV2Request.apply)
 }
