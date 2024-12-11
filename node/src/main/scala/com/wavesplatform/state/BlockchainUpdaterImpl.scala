@@ -47,7 +47,7 @@ class BlockchainUpdaterImpl(
   import wavesSettings.blockchainSettings.functionalitySettings
 
   private def inLock[R](l: Lock, f: => R): R = {
-    l.lockInterruptibly()
+    l.lock()
     try f
     finally l.unlock()
   }
