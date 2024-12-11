@@ -1,5 +1,8 @@
 package com.wavesplatform.settings
 
+import pureconfig.*
+import pureconfig.generic.derivation.default.*
+
 case class RocksDBSettings(
     mainCacheSize: SizeInBytes,
     txCacheSize: SizeInBytes,
@@ -11,4 +14,4 @@ case class RocksDBSettings(
     allowMmapReads: Boolean,
     parallelism: Int,
     maxOpenFiles: Int
-)
+) derives ConfigReader

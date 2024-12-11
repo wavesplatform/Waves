@@ -28,7 +28,23 @@ object GenesisBlockGenerator {
   private type SeedText = String
   private type Share    = Long
 
-  case class DistributionItem(seedText: String, nonce: Int, amount: Share, miner: Boolean = true) derives ConfigReader
+  case class DistributionItem(seedText: String, nonce: Int, amount: Share, miner: Boolean = defaultMiner)
+
+  object DistributionItem {
+    // Note: This setup (default values + manual ConfigReader instance) 
+    // is a workaround for `pureconfig-generic-scala3` (it doesn't support default values from case classes yet)
+    val defaultMiner: Boolean = true
+
+    given ConfigReader[DistributionItem] = ConfigReader.fromCursor(cur =>
+      for {
+        objCur <- cur.asObjectCursor
+        seedText <- objCur.required[String]("seed-text")
+        nonce <- objCur.required[Int]("nonce")
+        amount <- objCur.required[Share]("amount")
+        miner <- objCur.optionalWithDefault("miner", defaultMiner)
+      } yield DistributionItem(seedText, nonce, amount, miner)
+    )
+  }
 
   case class Settings(
       networkType: String,

@@ -121,7 +121,8 @@ case class FunctionalitySettings(
 }
 
 object FunctionalitySettings {
- // Note: This is a workaround for `pureconfig-generic-scala3` (it doesn't support default values from case classes yet)
+  // Note: This setup (default values + manual ConfigReader instance) 
+  // is a workaround for `pureconfig-generic-scala3` (it doesn't support default values from case classes yet)
   val defaultFeatureCheckBlocksPeriod: Int = 1000
   val defaultBlocksForFeatureActivation: Int = 800
   val defaultGenerationBalanceDepthFrom50To1000AfterHeight: Int = 0
