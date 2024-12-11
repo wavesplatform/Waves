@@ -148,7 +148,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "3.5.2",
+    scalaVersion         := "3.6.2",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
