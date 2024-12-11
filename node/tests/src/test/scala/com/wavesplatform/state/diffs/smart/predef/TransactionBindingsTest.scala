@@ -9,6 +9,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Testing.evaluated
+import com.wavesplatform.lang.ThrownError
 import com.wavesplatform.lang.directives.values.{Asset as AssetType, *}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -71,10 +72,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
            | case _ => throw()
            | }
            |""".stripMargin,
-        Coproduct(tx),
+        tx,
         T
       )
-      result shouldBe evaluated(true)
+      result.left.map(ThrownError) shouldBe evaluated(true)
     }
   }
 
@@ -99,10 +100,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
     val result = runScript(
       s,
-      Coproduct(tx),
+      tx,
       T
     )
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("BurnTransaction binding") {
@@ -118,10 +119,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | case _ => throw()
          | }
          |""".stripMargin,
-      Coproduct(tx),
+      tx,
       T
     )
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("ReissueTransaction binding") {
@@ -138,10 +139,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | case _ => throw()
          | }
          |""".stripMargin,
-      Coproduct(tx),
+      tx,
       T
     )
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("CreateAliasTransaction binding") {
@@ -156,10 +157,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | case _ => throw()
          | }
          |""".stripMargin,
-      Coproduct(tx),
+      tx,
       T
     )
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("LeaseTransaction binding") {
@@ -178,10 +179,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | case _ => throw()
          | }
          |""".stripMargin,
-      Coproduct(tx),
+      tx,
       T
     )
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("LeaseCancelTransaction binding") {
@@ -196,10 +197,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | case _ => throw()
          | }
          |""".stripMargin,
-      Coproduct(tx),
+      tx,
       T
     )
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("SponsorFeeTransaction binding (+ cancel sponsorship transaction)") {
@@ -219,10 +220,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
            | case _ => throw()
            | }
            |""".stripMargin,
-        Coproduct(tx),
+        tx,
         T
       )
-      result shouldBe evaluated(true)
+      result.left.map(ThrownError) shouldBe evaluated(true)
     }
   }
 
@@ -240,10 +241,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | case _ => throw()
          | }
          |""".stripMargin,
-      Coproduct(tx),
+      tx,
       T
     )
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("UpdateAssetInfoTransaction binding") {
@@ -261,7 +262,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | }
          |""".stripMargin
 
-    runScript(scriptSource, Coproduct(tx), V4, T) shouldBe evaluated(true)
+    runScript(scriptSource, tx, V4, T).left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("InvokeScriptTransaction binding") {
@@ -315,7 +316,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | }
          |""".stripMargin
     val result = runScriptWithCustomContext(script, tx, V3)
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("InvokeScriptTransaction V4 context multiple payments") {
@@ -455,8 +456,8 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val tx1     = InvokeExpressionTransaction.selfSigned(TxVersion.V1, account, expression, fee, Waves, Random.nextLong()).explicitGet()
     val tx2     = InvokeExpressionTransaction.selfSigned(TxVersion.V1, account, expression, fee, asset, Random.nextLong()).explicitGet()
 
-    runScriptWithCustomContext(script(tx1), tx1, V6) shouldBe evaluated(true)
-    runScriptWithCustomContext(script(tx2), tx2, V6) shouldBe evaluated(true)
+    runScriptWithCustomContext(script(tx1), tx1, V6).left.map(ThrownError) shouldBe evaluated(true)
+    runScriptWithCustomContext(script(tx2), tx2, V6).left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("SetAssetScriptTransaction binding") {
@@ -474,10 +475,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | case _ => throw()
          | }
          |""".stripMargin,
-      Coproduct(tx),
+      tx,
       T
     )
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("DataTransaction binding") {
@@ -550,14 +551,14 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
            | }
           """.stripMargin
 
-      val result = runScript(script, Coproduct(tx), ctxV = version, chainId = T)
+      val result = runScript(script, tx, ctxV = version, chainId = T)
 
       if (useV4Check && version < V4 && tx.data.nonEmpty)
         result should produce("Compilation failed: Undefined type")
       else if (!useV4Check && version >= V4 && tx.data.exists(!_.isInstanceOf[EmptyDataEntry]))
         result should produce("Undefined field `value` of variable")
       else
-        result shouldBe evaluated(true)
+        result.left.map(ThrownError) shouldBe evaluated(true)
     }
   }
 
@@ -598,10 +599,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
     val result = runScript(
       script,
-      Coproduct(tx),
+      tx,
       T
     )
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("ExchangeTransaction binding") {
@@ -672,10 +673,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
     val result = runScript(
       s,
-      Coproduct(tx),
+      tx,
       T
     )
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("Order binding") {
@@ -712,10 +713,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
     val result = runScript(
       s,
-      Coproduct[In](order),
+      order,
       T
     )
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("Order type bindings") {
@@ -773,8 +774,8 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
       runForAsset(src2).left.value
 
-      runScript[EVALUATED](src1, Coproduct[In](order)) shouldBe Right(CONST_BOOLEAN(true))
-      runScript[EVALUATED](src2, Coproduct[In](order)) shouldBe Right(CONST_LONG(1))
+      runScript[EVALUATED](src1, order) shouldBe Right(CONST_BOOLEAN(true))
+      runScript[EVALUATED](src2, order) shouldBe Right(CONST_LONG(1))
     }
   }
 
@@ -876,14 +877,14 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       Coeval(???),
       null,
       EmptyBlockchain,
-      Coproduct[Environment.Tthis](Environment.AssetId(Array())),
+      Environment.AssetId(Array()),
       directives,
       ByteStr.empty
     )
     for {
       compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, V3, expr)
       (typedExpr, _) = compileResult
-      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(environment), typedExpr).leftMap(_.message)
+      r <- EvaluatorV1.apply().apply[EVALUATED](ctx.evaluationContext(environment), typedExpr).leftMap(_.message)
     } yield r
   }
 
