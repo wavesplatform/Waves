@@ -3,10 +3,11 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.{ExecutionError, ThrownError}
 import com.wavesplatform.lang.Testing.*
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.test.*
@@ -23,7 +24,7 @@ class AddressTest extends PropSpec {
          | let address = addressFromPublicKey(pk)
          | address.bytes
       """.stripMargin
-    runScript(script) shouldBe evaluated(ByteStr(Address.fromPublicKey(acc.publicKey, chainId).bytes))
+    runScript(script).left.map(ThrownError) shouldBe evaluated(ByteStr(Address.fromPublicKey(acc.publicKey, chainId).bytes))
   }
 
   property("should calculate address from bytes") {
@@ -39,7 +40,7 @@ class AddressTest extends PropSpec {
            | let address = $extractFunction(maybeAddress)
            | address.bytes
         """.stripMargin
-      runScript(script, ctxV = version, chainId = predef.chainId) shouldBe evaluated(ByteStr(address.bytes))
+      runScript(script, ctxV = version, chainId = predef.chainId).left.map(ThrownError) shouldBe evaluated(ByteStr(address.bytes))
     }
   }
 
@@ -55,7 +56,7 @@ class AddressTest extends PropSpec {
            | let maybeAddress = addressFromString(addressString)
            | $extractFunction(maybeAddress).bytes
         """.stripMargin
-      runScript(script, ctxV = version, chainId = predef.chainId) shouldBe evaluated(ByteStr(address.bytes))
+      runScript(script, ctxV = version, chainId = predef.chainId).left.map(ThrownError) shouldBe evaluated(ByteStr(address.bytes))
     }
   }
 
@@ -81,7 +82,7 @@ class AddressTest extends PropSpec {
 
   property("RIDE addressFromString V4 success") {
     val base58 = """3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU"""
-    val result = runScript(s""" addressFromString("$base58") """, ctxV = V4, chainId = 'T')
+    val result = runScript(s""" addressFromString("$base58") """, ctxV = V4, chainId = 'T': Byte)
       .explicitGet()
       .asInstanceOf[CaseObj]
     result.caseType.name shouldBe "Address"

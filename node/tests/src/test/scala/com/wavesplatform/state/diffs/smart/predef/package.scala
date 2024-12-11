@@ -19,7 +19,6 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Authorized, DataTransaction, EthereumTransaction, Proofs, ProvenTransaction, Transaction, Versioned}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
-import shapeless.Coproduct
 
 package object predef {
   val chainId: Byte = 'u'
@@ -33,18 +32,18 @@ package object predef {
       evalContext <- BlockchainContext.build(
         version,
         chainId,
-        Coeval.evalOnce(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array())))).map(_.explicitGet()),
+        Coeval.evalOnce(buildThisValue(t, blockchain, directives, Environment.AssetId(Array()))).map(_.explicitGet()),
         Coeval.evalOnce(blockchain.height),
         blockchain,
         isTokenContext = false,
         isContract = false,
-        Coproduct[Environment.Tthis](Environment.AssetId(Array())),
+        Environment.AssetId(Array()),
         ByteStr.empty,
         fixUnicodeFunctions = true,
         useNewPowPrecision = true,
         fixBigScriptField = true
       )
-      r <- EvaluatorV1().apply[T](evalContext, typedExpr).leftMap(_.message)
+      r <- EvaluatorV1.apply().apply[T](evalContext, typedExpr).leftMap(_.message)
     } yield r
   }
 
@@ -55,15 +54,14 @@ package object predef {
     runScript[T](script, V1, t, EmptyBlockchain, chainId)
 
   def runScript[T <: EVALUATED](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] =
-    runScript[T](script, V1, Coproduct(tx), blockchain, chainId)
+    runScript[T](script, V1, tx, blockchain, chainId)
 
   def runScriptWithCustomContext[T <: EVALUATED](
       script: String,
       tx: Transaction,
       v: StdLibVersion = V1,
       blockchain: Blockchain = EmptyBlockchain
-  ): Either[String, T] =
-    runScript[T](script, v, Coproduct(tx), blockchain, 'T'.toByte)
+  ): Either[String, T] = runScript[T](script, v, tx, blockchain, 'T'.toByte)
 
   private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
 
