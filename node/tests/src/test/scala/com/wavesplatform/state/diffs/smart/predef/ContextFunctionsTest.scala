@@ -12,6 +12,7 @@ import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.*
+import com.wavesplatform.lang.ThrownError
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.ContractScript
@@ -33,7 +34,6 @@ import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.utils.*
 import org.scalatest.Assertion
 import org.scalatest.OptionValues.convertOptionToValuable
-import shapeless.Coproduct
 
 class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
   import DomainPresets.*
@@ -128,10 +128,10 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
              | case _ => throw()
              |}
              |""".stripMargin,
-          Coproduct(tx),
+          tx,
           version
         )
-        result shouldBe evaluated(true)
+        result.left.map(ThrownError) shouldBe evaluated(true)
       }
   }
 
@@ -171,9 +171,9 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
          | case _ => throw()
          |}
          |""".stripMargin,
-      Coproduct(tx)
+      tx
     )
-    ok shouldBe evaluated(true)
+    ok.left.map(ThrownError) shouldBe evaluated(true)
 
     val outOfBounds = runScript(
       s"""
@@ -182,7 +182,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
          | case _ => false
          |}
          |""".stripMargin,
-      Coproduct(tx)
+      tx
     )
     outOfBounds shouldBe Left(s"Index $badIndex out of bounds for length ${tx.data.size}")
   }
