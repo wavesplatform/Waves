@@ -3,7 +3,7 @@ package com.wavesplatform
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.state.ByteStr
-import pureconfig.ConfigReader
+import pureconfig.*
 import pureconfig.ConvertHelpers.catchReadError
 import pureconfig.configurable.genericMapReader
 import pureconfig.error.CannotConvert
@@ -12,6 +12,14 @@ import supertagged.TaggedType
 import scala.util.Try
 
 package object settings {
+  extension (objCur: ConfigObjectCursor) {
+    def required[T](key: String)(using reader: ConfigReader[T])=
+      objCur.atKey(key).flatMap(ConfigReader[T].from)
+      
+    def optionalWithDefault[T](key: String, default: T)(using reader: ConfigReader[T])=
+      ConfigReader[Option[T]].from(objCur.atKeyOrUndefined(key)).map(_.getOrElse(default))
+  }
+
   implicit val byteStrReader: ConfigReader[ByteStr] =
     ConfigReader.fromString(str => ByteStr.decodeBase58(str).toEither.left.map(e => CannotConvert(str, "ByteStr", e.getMessage)))
   implicit val preactivatedFeaturesReader: ConfigReader[Map[Short, Int]] = genericMapReader(catchReadError(_.toShort))
