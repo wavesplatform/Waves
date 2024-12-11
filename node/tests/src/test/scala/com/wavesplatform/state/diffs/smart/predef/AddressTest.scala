@@ -3,11 +3,11 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{ExecutionError, ThrownError}
+import com.wavesplatform.lang.ThrownError
 import com.wavesplatform.lang.Testing.*
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj, EVALUATED}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.test.*
