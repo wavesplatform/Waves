@@ -20,7 +20,6 @@ import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import org.scalamock.scalatest.MockFactory
-import shapeless.Coproduct
 
 class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
   property("ScriptRunner.applyGeneric() avoids Blockchain calls") {
@@ -89,11 +88,11 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
     scripts.foreach { script =>
       ScriptRunner
         .applyGeneric(
-          Coproduct(tx.explicitGet()),
+          tx.explicitGet(),
           blockchain,
           script,
           isAssetScript = false,
-          Coproduct(Recipient.Address(ByteStr.empty)),
+          Recipient.Address(ByteStr.empty),
           defaultLimit = 2000,
           default = null,
           useCorrectScriptVersion = true,
