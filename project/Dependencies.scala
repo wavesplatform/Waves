@@ -76,7 +76,7 @@ object Dependencies {
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
     "org.scalacheck"    %% "scalacheck"      % "1.18.1",
     "org.mockito"        % "mockito-all"     % "1.10.19",
-    ("org.scalamock"    %% "scalamock"       % "6.0.0").cross(CrossVersion.for3Use2_13) // https://github.com/paulbutcher/ScalaMock/pull/490
+    "org.scalamock"    %% "scalamock"       % "6.0.0"
   ).map(_ % Test)
 
   lazy val qaseReportDeps = Seq(
