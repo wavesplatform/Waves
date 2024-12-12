@@ -359,7 +359,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
 
     val result = runScriptWithCustomContext(script, tx, V4, blockchain)
-    result shouldBe evaluated(true)
+    result.left.map(ThrownError) shouldBe evaluated(true)
   }
 
   property("InvokeScriptTransaction binding in sync call") {
@@ -735,8 +735,8 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
            |}
        """.stripMargin
 
-      runScript(src, Coproduct[In](ord), T) shouldBe an[Left[?, ?]]
-      runWithSmartTradingActivated(src, Coproduct[In](ord), 'T') shouldBe evaluated(true)
+      runScript(src, ord, T) shouldBe an[Left[?, ?]]
+      runWithSmartTradingActivated(src, ord, 'T') shouldBe evaluated(true)
     }
   }
 
@@ -905,10 +905,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
     val env = WavesEnvironment(
       chainId,
-      Coeval(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array()))).explicitGet()),
+      Coeval(buildThisValue(t, blockchain, directives, Environment.AssetId(Array())).explicitGet()),
       null,
       EmptyBlockchain,
-      Coproduct[Environment.Tthis](Environment.AssetId(Array())),
+      Environment.AssetId(Array()),
       directives,
       ByteStr.empty
     )
@@ -916,7 +916,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     for {
       compileResult <- ExpressionCompiler(ctx.compilerContext, V2, expr)
       (typedExpr, _) = compileResult
-      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(env), typedExpr).leftMap(_.message)
+      r <- EvaluatorV1.apply().apply[EVALUATED](ctx.evaluationContext(env), typedExpr).leftMap(_.message)
     } yield r
   }
 }
