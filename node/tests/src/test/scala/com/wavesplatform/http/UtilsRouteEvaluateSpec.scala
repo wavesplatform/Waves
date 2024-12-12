@@ -260,7 +260,7 @@ class UtilsRouteEvaluateSpec
           .when()
           .returning(DefaultBlockchainSettings)
           .anyNumberOfTimes()
-        (utilsApi.blockchain.leaseBalance _)
+        (utilsApi.blockchain.leaseBalance)
           .when(*)
           .returning(LeaseBalance.empty)
           .anyNumberOfTimes()

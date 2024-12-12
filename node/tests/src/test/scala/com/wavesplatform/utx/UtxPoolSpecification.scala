@@ -110,7 +110,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
   private def transfer(sender: KeyPair, maxAmount: Long, time: Time) =
     (for {
-      amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
+      amount    <- chooseNum(1L, (maxAmount * 0.9).toLong)
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransaction
@@ -1044,19 +1044,19 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               WavesSettings.default().maxTxErrorLogSize,
               isMiningEnabled = true
             )
-          (blockchain.balance _).when(*, *).returning(ENOUGH_AMT).repeat((rest.length + 1) * 2)
+          (blockchain.balance).when(*, *).returning(ENOUGH_AMT).repeat((rest.length + 1) * 2)
 
-          (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
+          (blockchain.balance).when(*, *).returning(ENOUGH_AMT)
 
-          (blockchain.wavesBalances _).when(*).returning(Map(acc.toAddress -> ENOUGH_AMT, acc1.toAddress -> ENOUGH_AMT))
+          (blockchain.wavesBalances).when(*).returning(Map(acc.toAddress -> ENOUGH_AMT, acc1.toAddress -> ENOUGH_AMT))
 
-          (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
-          (blockchain.accountScript _).when(*).onCall { (_: Address) =>
+          (blockchain.leaseBalance).when(*).returning(LeaseBalance(0, 0))
+          (blockchain.accountScript).when(*).onCall { (_: Address) =>
             utx.removeAll(rest)
             None
           }
           val tb = TestBlock.create(Nil).block
-          (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
+          (blockchain.blockHeader).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
 
           utx.putIfNew(tx1).resultE should beRight
           rest.foreach(utx.putIfNew(_).resultE should beRight)

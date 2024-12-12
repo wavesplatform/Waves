@@ -35,11 +35,11 @@ class ScriptComplexityMiningConstraintSuite extends FlatSpec with PathMockFactor
         TransactionDiffer(Some(time - 1000), time)(blockchain, tx).resultE
           .explicitGet()
       }
-      (blockchain.balance _).when(*, *).returning(10000000)
-      (blockchain.wavesBalances _).when(*).returning(Map(acc1.toAddress -> 10000000, acc2.toAddress -> 10000000))
-      (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
-      (blockchain.accountScript _).when(tx1.sender.toAddress).returning(Some(AccountScriptInfo(acc1.publicKey, script, 1000, Map.empty)))
-      (blockchain.accountScript _).when(*).returning(None)
+      (blockchain.balance).when(*, *).returning(10000000)
+      (blockchain.wavesBalances).when(*).returning(Map(acc1.toAddress -> 10000000, acc2.toAddress -> 10000000))
+      (blockchain.leaseBalance).when(*).returning(LeaseBalance(0, 0))
+      (blockchain.accountScript).when(tx1.sender.toAddress).returning(Some(AccountScriptInfo(acc1.publicKey, script, 1000, Map.empty)))
+      (blockchain.accountScript).when(*).returning(None)
 
       val c1          = constraint.put(blockchain, tx1, txDiffer(tx1))
       val cOverfilled = c1.put(blockchain, tx1, txDiffer(tx1))
@@ -55,7 +55,7 @@ class ScriptComplexityMiningConstraintSuite extends FlatSpec with PathMockFactor
 
   }
 
-  private[this] def preconditions: Gen[(KeyPair, KeyPair, DataTransaction, DataTransaction, DataTransaction)] =
+  private def preconditions: Gen[(KeyPair, KeyPair, DataTransaction, DataTransaction, DataTransaction)] =
     for {
       acc1 <- accountGen
       acc2 <- accountGen

@@ -197,7 +197,7 @@ class TransactionBroadcastSpec
 
     "shows trace when trace is enabled" in withInvokeScriptTransaction { (sender, ist) =>
       val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
-      (transactionPublisher.validateAndBroadcast _)
+      (transactionPublisher.validateAndBroadcast)
         .when(*, None)
         .returning(
           Future.successful(TracedResult(Right(true), List(accountTrace)))
@@ -210,7 +210,7 @@ class TransactionBroadcastSpec
 
     "does not show trace when trace is disabled" in withInvokeScriptTransaction { (sender, ist) =>
       val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
-      (transactionPublisher.validateAndBroadcast _)
+      (transactionPublisher.validateAndBroadcast)
         .when(*, None)
         .returning(
           Future.successful(TracedResult(Right(true), List(accountTrace)))

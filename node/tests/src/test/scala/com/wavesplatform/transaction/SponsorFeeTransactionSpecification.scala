@@ -261,7 +261,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
       issue = IssueTransaction
         .selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
         .explicitGet()
-      minFee <- Gen.choose(1, issue.quantity.value / 11)
+      minFee <- Gen.choose(1L, issue.quantity.value / 11)
 
       sponsor1 = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
       transfer1 = TransferTransaction
@@ -293,7 +293,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
       issue = IssueTransaction
         .selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
         .explicitGet()
-      minSponsoredAssetFee <- Gen.choose(1, issue.quantity.value / 11)
+      minSponsoredAssetFee <- Gen.choose(1L, issue.quantity.value / 11)
       minFee               <- Gen.choose(One / 1000, One - 1)
       sponsor = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minSponsoredAssetFee), minFee, ts).explicitGet()
     } yield (genesis, issue, sponsor, minFee)

@@ -177,7 +177,7 @@ class LightNodeTest extends PropSpec with WithDomain {
       val challengingBlock = d.createChallengingBlock(challengingMiner, invalidBlock, strictTime = true)
       val txSnapshots      = getTxSnapshots(d, challengingBlock)
 
-      val appender = BlockAppender(d.blockchainUpdater, TestTime(challengingBlock.header.timestamp), d.utxPool, d.posSelector, Scheduler.global) _
+      val appender = BlockAppender(d.blockchainUpdater, TestTime(challengingBlock.header.timestamp), d.utxPool, d.posSelector, Scheduler.global)
 
       val sr = BlockSnapshotResponse(challengingBlock.id(), txSnapshots.map { case (s, m) => PBSnapshots.toProtobuf(s, m) })
       appender(challengingBlock, Some(sr)).runSyncUnsafe() shouldBe Right(

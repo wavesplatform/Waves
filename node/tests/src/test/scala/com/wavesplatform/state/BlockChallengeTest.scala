@@ -1635,7 +1635,7 @@ class BlockChallengeTest
           }
         )
       val appender =
-        BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, channels, PeerDatabase.NoOp, blockChallenger, appenderScheduler) _
+        BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, channels, PeerDatabase.NoOp, blockChallenger, appenderScheduler)
 
       val route = new TransactionsApiRoute(
         d.settings.restAPISettings,

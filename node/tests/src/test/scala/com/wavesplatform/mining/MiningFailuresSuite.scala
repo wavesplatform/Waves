@@ -75,17 +75,17 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
     }
 
     val genesis = TestBlock.create(System.currentTimeMillis(), Nil).block
-    (blockchainUpdater.isLastBlockId _).when(genesis.id()).returning(true)
-    (blockchainUpdater.heightOf _).when(genesis.id()).returning(Some(1)).anyNumberOfTimes()
-    (blockchainUpdater.heightOf _).when(genesis.header.reference).returning(Some(1)).anyNumberOfTimes()
+    (blockchainUpdater.isLastBlockId).when(genesis.id()).returning(true)
+    (blockchainUpdater.heightOf).when(genesis.id()).returning(Some(1)).anyNumberOfTimes()
+    (blockchainUpdater.heightOf).when(genesis.header.reference).returning(Some(1)).anyNumberOfTimes()
     (() => blockchainUpdater.height).when().returning(1)
     (() => blockchainUpdater.settings).when().returning(blockchainSettings)
-    (blockchainUpdater.blockHeader _).when(*).returns(Some(SignedBlockHeader(genesis.header, genesis.signature)))
+    (blockchainUpdater.blockHeader).when(*).returns(Some(SignedBlockHeader(genesis.header, genesis.signature)))
     (() => blockchainUpdater.activatedFeatures).when().returning(Map.empty)
     (() => blockchainUpdater.approvedFeatures).when().returning(Map.empty)
-    (blockchainUpdater.hitSource _).when(*).returns(Some(ByteStr(new Array[Byte](32))))
-    (blockchainUpdater.effectiveBalanceBanHeights _).when(*).returns(Seq.empty)
-    (blockchainUpdater.bestLastBlockInfo _)
+    (blockchainUpdater.hitSource).when(*).returns(Some(ByteStr(new Array[Byte](32))))
+    (blockchainUpdater.effectiveBalanceBanHeights).when(*).returns(Seq.empty)
+    (blockchainUpdater.bestLastBlockInfo)
       .when(*)
       .returning(
         Some(
@@ -99,15 +99,15 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
       )
 
     var minedBlock: Block = null
-    (blockchainUpdater.processBlock _).when(*, *, *, *, *, *).returning(Left(BlockFromFuture(100, 100))).repeated(10)
-    (blockchainUpdater.processBlock _)
+    (blockchainUpdater.processBlock).when(*, *, *, *, *, *).returning(Left(BlockFromFuture(100, 100))).repeated(10)
+    (blockchainUpdater.processBlock)
       .when(*, *, *, *, *, *)
       .onCall { (block, _, _, _, _, _) =>
         minedBlock = block
         Right(Applied(Nil, 0))
       }
       .once()
-    (blockchainUpdater.balanceSnapshots _).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0)))
+    (blockchainUpdater.balanceSnapshots).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0)))
 
     val account       = accountGen.sample.get
     val generateBlock = generateBlockTask(miner)(account)
@@ -116,6 +116,6 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
     appenderScheduler.shutdown()
   }
 
-  private[this] def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
+  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
     miner.generateBlockTask(account, None)
 }

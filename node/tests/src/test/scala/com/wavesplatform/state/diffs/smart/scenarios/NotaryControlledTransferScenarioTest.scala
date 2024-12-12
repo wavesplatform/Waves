@@ -89,7 +89,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
   private def eval(code: String) = {
     val untyped = Parser.parseExpr(code).get.value
     val typed   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untyped).map(_._1)
-    typed.flatMap(r => EvaluatorV1().apply[EVALUATED](dummyEvalContext, r).leftMap(_.message))
+    typed.flatMap(r => EvaluatorV1.apply().apply[EVALUATED](dummyEvalContext, r).leftMap(_.message))
   }
 
   property("Script toBase58String") {
