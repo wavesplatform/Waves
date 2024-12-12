@@ -162,7 +162,7 @@ inScope(Global)(
       "-language:implicitConversions",
       "-language:postfixOps",
       "-Ykind-projector",
-      "-source:future-migration", // TODO: [scala3] switch from `future-migration` to `future`
+      // "-source:future-migration", // TODO: [scala3] remove
       "-Ywarn-unused:-implicits",
       "-Xlint",
       "-rewrite", // TODO: [scala3] remove
