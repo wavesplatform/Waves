@@ -10,7 +10,7 @@ on:
       baseImage:
         description: 'Base image'
         required: true
-        default: 'eclipse-temurin:11-jre-noble'
+        default: 'eclipse-temurin:21-jre-noble'
         type: string
 
 env:
