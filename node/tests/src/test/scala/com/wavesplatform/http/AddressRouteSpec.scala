@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.*
 import akka.http.scaladsl.model.HttpEntity.{Chunk, LastChunk}
-import akka.http.scaladsl.model.headers.{Accept, `Content-Type`, `Transfer-Encoding`}
+import akka.http.scaladsl.model.headers.{Accept, RawHeader, `Transfer-Encoding`}
 import akka.stream.scaladsl.Source
 import com.google.common.primitives.Longs
 import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, TooBigArrayAllocation}
@@ -341,7 +341,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
     val requestBody = Json.obj("keys" -> Seq("test"))
 
     val headers: Seq[HttpHeader] =
-      Seq(`Transfer-Encoding`(TransferEncodings.chunked), `Content-Type`(ContentTypes.`application/json`), Accept(MediaTypes.`application/json`))
+      Seq(`Transfer-Encoding`(TransferEncodings.chunked), RawHeader("Content-Type", ContentTypes.`application/json`.value), Accept(MediaTypes.`application/json`))
 
     Post(
       routePath(s"/data/${account.toAddress}"),
