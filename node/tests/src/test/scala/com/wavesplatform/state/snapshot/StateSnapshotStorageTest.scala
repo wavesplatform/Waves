@@ -321,7 +321,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             dAppAssetId -> AssetInfo("name", "description", Height(height))
           ),
           newLeases = Map(
-            leaseId -> LeaseStaticInfo(dAppPk, senderAddress, TxPositiveAmount(123), invokeId, height)
+            leaseId -> LeaseStaticInfo(dAppPk, senderAddress, TxPositiveAmount.unsafeFrom(123), invokeId, height)
           ),
           accountData = Map(
             dAppPk.toAddress -> Map("key" -> StringDataEntry("key", "abc"))
