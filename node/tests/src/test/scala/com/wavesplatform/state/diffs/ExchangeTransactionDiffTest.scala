@@ -1924,8 +1924,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         defaultSigner.publicKey,
         AssetPair(issue.asset, Waves),
         OrderType.BUY,
-        TxExchangeAmount(1),
-        TxOrderPrice(1),
+        TxExchangeAmount.unsafeFrom(1),
+        TxOrderPrice.unsafeFrom(1),
         System.currentTimeMillis(),
         System.currentTimeMillis() + 10.hours.toMillis,
         TxMatcherFee.unsafeFrom(0.003.waves)
@@ -1990,8 +1990,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         defaultSigner.publicKey,
         AssetPair(issue.asset, Waves),
         OrderType.BUY,
-        TxExchangeAmount(1),
-        TxOrderPrice(1),
+        TxExchangeAmount.unsafeFrom(1),
+        TxOrderPrice.unsafeFrom(1),
         System.currentTimeMillis(),
         System.currentTimeMillis() + 10.hours.toMillis,
         TxMatcherFee.unsafeFrom(0.003.waves)
