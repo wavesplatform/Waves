@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.TxHelpers.signer
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.{Authorized, EthTxGenerator, Transaction, TxHelpers, TxPositiveAmount, TxValidationError, TxVersion}
+import com.wavesplatform.transaction.{Authorized, EthTxGenerator, Transaction, TxHelpers, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.SharedSchedulerMixin
 import org.scalactic.source.Position
 import org.scalatest.OptionValues
@@ -181,11 +181,9 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
           i.value
         }
         .value
-      val amount: Long = 10_000_00000000L
-      val positiveAmount = TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves")).explicitGet()
       val expectedDetails = Seq(
         leaseId -> LeaseDetails(
-          LeaseStaticInfo(dappAddress.publicKey, leaseRecipient, positiveAmount, invoke.id(), 1),
+          LeaseStaticInfo(dappAddress.publicKey, leaseRecipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), invoke.id(), 1),
           LeaseDetails.Status.Active
         )
       )
@@ -216,12 +214,10 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
           i.value
         }
         .get
-      val amount: Long = 10_000_00000000L
-      val positiveAmount = TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves")).explicitGet()
       val expectedDetails =
         Seq(
           leaseId -> LeaseDetails(
-            LeaseStaticInfo(dappAddress.publicKey, leaseRecipient, positiveAmount, invoke.id(), 1),
+            LeaseStaticInfo(dappAddress.publicKey, leaseRecipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), invoke.id(), 1),
             LeaseDetails.Status.Active
           )
         )
@@ -262,12 +258,10 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
           i.value
         }
         .get
-      val amount: Long = 10_000_00000000L
-      val positiveAmount = TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves")).explicitGet()
       val expectedDetails =
         Seq(
           leaseId -> LeaseDetails(
-            LeaseStaticInfo(sender.publicKey, recipient, positiveAmount, invoke.id(), 1),
+            LeaseStaticInfo(sender.publicKey, recipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), invoke.id(), 1),
             LeaseDetails.Status.Active
           )
         )
@@ -317,12 +311,10 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
           i.value
         }
         .get
-      val amount: Long = 10_000_00000000L
-      val positiveAmount = TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves")).explicitGet()
       val expectedDetails =
         Seq(
           leaseId -> LeaseDetails(
-            LeaseStaticInfo(dApp.publicKey, recipient, positiveAmount, invoke.id(), 1),
+            LeaseStaticInfo(dApp.publicKey, recipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), invoke.id(), 1),
             LeaseDetails.Status.Active
           )
         )
@@ -386,12 +378,10 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
         }
         .get
 
-      val amount: Long = 10_000_00000000L
-      val positiveAmount = TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves")).explicitGet()
       val expectedDetails =
         Seq(
           leaseId -> LeaseDetails(
-            LeaseStaticInfo(target.publicKey, recipient.toAddress, positiveAmount, ist.id(), 1),
+            LeaseStaticInfo(target.publicKey, recipient.toAddress, TxPositiveAmount.unsafeFrom(10_000_00000000L), ist.id(), 1),
             LeaseDetails.Status.Active
           )
         )
