@@ -567,9 +567,10 @@ class BlockchainUpdaterImpl(
               val transactionsRoot = ng.createTransactionsRoot(microBlock)
               blockchainUpdateTriggers.onProcessMicroBlock(microBlock, keyBlockSnapshot, this, blockId, transactionsRoot)
 
-              this.ngState = Some(ng.append(microBlock, snapshot, carry, totalFee, System.currentTimeMillis, computedStateHash, Some(blockId)))
+              val ts = System.currentTimeMillis
+              this.ngState = Some(ng.append(microBlock, snapshot, carry, totalFee, ts, computedStateHash, Some(blockId)))
 
-              log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${snapshot.hashString}")
+              log.info(s"${microBlock.stringRepr(blockId)} appended at $ts, diff=${snapshot.hashString}")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
 
               blockId
@@ -798,15 +799,17 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.resolveERC20Address(address)
   }
 
-  override def lastStateHash(refId: Option[ByteStr]): ByteStr =
+  override def lastStateHash(refId: Option[ByteStr]): ByteStr = readLock {
     ngState
       .map { ng =>
         refId.filter(ng.contains).fold(ng.bestLiquidComputedStateHash)(id => ng.snapshotFor(id)._4)
       }
       .getOrElse(rocksdb.lastStateHash(None))
+  }
 
-  def snapshotBlockchain: SnapshotBlockchain =
+  def snapshotBlockchain: SnapshotBlockchain = readLock {
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))
+  }
 
   // noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {

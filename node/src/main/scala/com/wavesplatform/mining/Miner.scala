@@ -168,14 +168,19 @@ class MinerImpl(
 
   def forgeBlock(account: KeyPair): Either[String, (Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added
-    val height          = blockchainUpdater.height
-    val version         = blockchainUpdater.nextBlockVersion
-    val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
-    val reference       = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get.blockId
+    val height  = blockchainUpdater.height
+    val version = blockchainUpdater.nextBlockVersion
 
     metrics.blockBuildTimeStats.measureSuccessful(for {
       _ <- checkQuorumAvailable()
-      balance = blockchainUpdater.generatingBalance(account.toAddress, Some(reference))
+      reference = {
+        val ts      = System.currentTimeMillis() - minMicroBlockDurationMills
+        val blockId = blockchainUpdater.bestLastBlockInfo(ts).get.blockId
+        log.debug(s"Getting a reference block at $ts: $blockId")
+        blockId
+      }
+      balance         = blockchainUpdater.generatingBalance(account.toAddress, Some(reference))
+      lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header // We'll need only baseTarget, timestamp and reference
       validBlockDelay <- pos
         .getValidBlockDelay(height, account, lastBlockHeader.baseTarget, balance)
         .leftMap(_.toString)
