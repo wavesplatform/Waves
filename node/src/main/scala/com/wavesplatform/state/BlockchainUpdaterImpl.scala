@@ -442,7 +442,7 @@ class BlockchainUpdaterImpl(
     } yield id -> StateSnapshot
       .build(
         rocksdb,
-        Map(
+        portfolios = Map(
           ld.sender.toAddress -> Portfolio(0, LeaseBalance(0, -ld.amount.value)),
           ld.recipientAddress -> Portfolio(0, LeaseBalance(-ld.amount.value, 0))
         ),

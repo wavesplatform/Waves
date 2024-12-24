@@ -151,7 +151,13 @@ class MinerImpl(
       BlockDiffer
         .createInitialBlockSnapshot(blockchainUpdater, reference, miner)
         .toOption
-        .map(initSnapshot => TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash))
+        .map { initSnapshot =>
+          val r1 = TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash)
+          val r2 = TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash)
+          log.debug(s"packTransactionsForKeyBlock: consistency check=$r1 vs $r2, initSnapshot=$initSnapshot")
+
+          r1
+        }
     }
 
     if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total, keyBlockStateHash)

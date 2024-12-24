@@ -13,6 +13,7 @@ import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 import scala.collection.immutable.VectorMap
 
+// HashMaps are okay, because we sort keys during a hash calculation
 case class StateSnapshot(
     transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap(),
     balances: VectorMap[(Address, Asset), Long] = VectorMap(), // VectorMap is used to preserve the order of NFTs for a given address
