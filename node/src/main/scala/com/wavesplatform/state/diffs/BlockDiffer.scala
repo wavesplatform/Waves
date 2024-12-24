@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits.{catsSyntaxOption, catsSyntaxSemigroup, toFoldableOps}
 import cats.syntax.either.*
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
@@ -21,10 +22,13 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, Authorized, BlockchainUpdater, GenesisTransaction, PaymentTransaction, Transaction}
+import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.VectorMap
 
 object BlockDiffer {
+  val logger: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
+
   final case class Result(
       snapshot: StateSnapshot,
       carry: Long,
@@ -113,6 +117,7 @@ object BlockDiffer {
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
+    logger.debug(s"BlockDiffer.fromBlockTraced(maybePrevBlock=${maybePrevBlock.map(_.id())}, block=${block.id()})")
     val stateHeight        = blockchain.height
     val heightWithNewBlock = stateHeight + 1
 
@@ -243,6 +248,8 @@ object BlockDiffer {
       verify: Boolean,
       enableExecutionLog: Boolean
   ): TracedResult[ValidationError, Result] = {
+    logger.debug(s"BlockDiffer.fromMicroBlockTraced: prevBlockTimestamp=$prevBlockTimestamp, snapshot.totalBlockId=${snapshot.map(_.totalBlockId)}, verify=$verify")
+
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- TracedResult(
@@ -339,6 +346,8 @@ object BlockDiffer {
     val timestamp       = blockchain.lastBlockTimestamp.get
     val blockGenerator  = blockchain.lastBlockHeader.get.header.generator.toAddress
     val rideV6Activated = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+
+    logger.debug(s"BlockDiffer.apply: blockchain.lastBlockTimestamp=$timestamp, lastBlockHeader.id=${blockchain.lastBlockHeader.map(_.id())}")
 
     val txDiffer = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
 
@@ -497,6 +506,6 @@ object BlockDiffer {
     Either.cond(
       !blockchain.supportsLightNodeBlockFields() || blockStateHash.contains(computedStateHash),
       (),
-      InvalidStateHash(blockStateHash)
+      InvalidStateHash(blockStateHash, Some(computedStateHash))
     )
 }

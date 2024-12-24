@@ -548,9 +548,11 @@ class BlockchainUpdaterImpl(
                   MicroBlockAppendError("Invalid total block signature", microBlock)
                 )
               blockDifferResult <- {
+                val lastBlockTimestamp = rocksdb.lastBlockTimestamp
+                log.debug(s"BlockchainUpdaterImpl.processMicroBlock: rocksdb.lastBlockTimestamp=$lastBlockTimestamp, referencedComputedStateHash=$referencedComputedStateHash")
                 BlockDiffer.fromMicroBlock(
                   this,
-                  rocksdb.lastBlockTimestamp,
+                  lastBlockTimestamp,
                   referencedComputedStateHash,
                   microBlock,
                   snapshot,

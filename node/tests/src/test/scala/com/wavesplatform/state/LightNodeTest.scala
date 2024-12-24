@@ -41,7 +41,7 @@ class LightNodeTest extends PropSpec with WithDomain {
       d.appendBlockE(
         invalidBlock,
         Some(BlockSnapshot(invalidBlock.id(), txSnapshots))
-      ) shouldBe Left(InvalidStateHash(Some(invalidStateHash)))
+      ) shouldBe Left(InvalidStateHash(Some(invalidStateHash), validBlock.header.stateHash))
       d.lastBlock shouldBe prevBlock
 
       d.appendBlockE(

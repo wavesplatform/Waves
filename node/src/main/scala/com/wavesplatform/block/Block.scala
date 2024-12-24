@@ -109,7 +109,7 @@ case class Block(
 
   override def toString: String =
     s"Block(${id()},${header.reference},${header.generator.toAddress}," +
-      s"${header.timestamp},${header.featureVotes.mkString("[", ",", "]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""})"
+      s"${header.timestamp},${header.featureVotes.mkString("[", ",", "]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""}, sh=${header.stateHash})"
 }
 
 object Block {

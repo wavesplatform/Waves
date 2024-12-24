@@ -27,8 +27,8 @@ import pureconfig.generic.auto.*
 import java.io.{FileOutputStream, IOException}
 import java.net.{InetAddress, InetSocketAddress, URL}
 import java.nio.file.{Files, Path, Paths}
-import java.time.{LocalDateTime, Duration as JDuration}
 import java.time.format.DateTimeFormatter
+import java.time.{LocalDateTime, Duration as JDuration}
 import java.util.Collections.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
@@ -572,10 +572,11 @@ object Docker {
 
   val configTemplate: Config = parseResources("template.conf")
   def genesisOverride(featuresConfig: Option[Config] = None): Config = {
+    val gap             = 6.seconds // To force node mining at start, otherwise it schedules
     val genesisTs: Long = System.currentTimeMillis()
 
     val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
-                                            |  timestamp = $genesisTs
+                                            |  timestamp = ${genesisTs - gap.toMillis}
                                             |  block-timestamp = $genesisTs
                                             |  signature = null # To calculate it in Block.genesis
                                             |}""".stripMargin)

@@ -2,6 +2,7 @@ package com.wavesplatform.state
 
 import cats.implicits.catsSyntaxSemigroup
 import com.google.common.cache.CacheBuilder
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
@@ -9,10 +10,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.NgState.{CachedMicroDiff, MicroBlockInfo, NgStateCaches}
 import com.wavesplatform.state.StateSnapshot.monoid
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
+import org.slf4j.LoggerFactory
 
 import java.util.concurrent.TimeUnit
 
 object NgState {
+  val logger: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
+
   case class MicroBlockInfo(totalBlockId: BlockId, microBlock: MicroBlock) {
     def idEquals(id: ByteStr): Boolean = totalBlockId == id
   }
@@ -115,6 +119,7 @@ case class NgState(
   def snapshotOf(id: BlockId): Option[(Block, StateSnapshot, Long, Long, ByteStr, DiscardedMicroBlocks)] =
     forgeBlock(id).map { case (block, discarded) =>
       val (snapshot, carry, totalFee, computedStateHash) = this.snapshotFor(id)
+      NgState.logger.debug(s"snapshotOf($id): block.header.stateHash=${block.header.stateHash}, computedStateHash=$computedStateHash")
       (block, snapshot, carry, totalFee, computedStateHash, discarded)
     }
 
@@ -199,19 +204,26 @@ case class NgState(
           )
         } else if (!microBlocksAsc.exists(_.idEquals(blockId))) None
         else {
+          var debugMessage = ""
+
           val (accumulatedTxs, maybeFound) =
             microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, Option[ByteStr], DiscardedMicroBlocks)])) {
               case ((accumulated, Some((sig, stateHash, discarded))), MicroBlockInfo(mbId, micro)) =>
                 val discDiff = microSnapshots(mbId).snapshot
+                debugMessage = s"Discarded($mbId), " + debugMessage
                 (accumulated, Some((sig, stateHash, discarded :+ (micro -> discDiff))))
 
               case ((accumulated, None), mb) if mb.idEquals(blockId) =>
                 val found = Some((mb.microBlock.totalResBlockSig, mb.microBlock.stateHash, Seq.empty[(MicroBlock, StateSnapshot)]))
+                debugMessage = s"Found($blockId, stateHash=${mb.microBlock.stateHash}), " + debugMessage
                 (accumulated ++ mb.microBlock.transactionData, found)
 
-              case ((accumulated, None), MicroBlockInfo(_, mb)) =>
+              case ((accumulated, None), MicroBlockInfo(totalBlockId, mb)) =>
+                debugMessage = s"NotFound($totalBlockId), " + debugMessage
                 (accumulated ++ mb.transactionData, None)
             }
+
+          NgState.logger.debug(s"NgState.forgeBlock($blockId): $debugMessage")
 
           maybeFound.map { case (sig, stateHash, discarded) =>
             (Block.create(base, base.transactionData ++ accumulatedTxs, sig, stateHash), discarded)

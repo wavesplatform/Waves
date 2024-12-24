@@ -180,7 +180,8 @@ class MinerImpl(
         blockId
       }
       balance         = blockchainUpdater.generatingBalance(account.toAddress, Some(reference))
-      lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header // We'll need only baseTarget, timestamp and reference
+      lastBlock       = blockchainUpdater.lastBlockHeader.get
+      lastBlockHeader = lastBlock.header // Here is a full block, we'll need only baseTarget, timestamp and reference
       validBlockDelay <- pos
         .getValidBlockDelay(height, account, lastBlockHeader.baseTarget, balance)
         .leftMap(_.toString)
@@ -192,7 +193,8 @@ class MinerImpl(
       _ <- Either.cond(
         blockTime <= currentTime + maxTimeDrift,
         log.debug(
-          s"Forging with ${account.toAddress}, balance $balance, prev block $reference at $height with target ${lastBlockHeader.baseTarget}"
+          s"Forging with ${account.toAddress}, balance $balance, prev block $reference at $height with target ${lastBlockHeader.baseTarget}, " +
+            s"lastBlock: id=${lastBlock.id()}, sh=${lastBlockHeader.stateHash}"
         ),
         s"Block time $blockTime is from the future: current time is $currentTime, MaxTimeDrift = $maxTimeDrift"
       )
@@ -202,21 +204,24 @@ class MinerImpl(
           Some(blockchainUpdater.lastStateHash(Some(reference)))
         else None
       (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(account.toAddress, reference, prevStateHash)
-      block <- Block
-        .buildAndSign(
-          version,
-          blockTime,
-          reference,
-          consensusData.baseTarget,
-          consensusData.generationSignature,
-          unconfirmed,
-          account,
-          blockFeatures(version),
-          blockRewardVote(version),
-          if (blockchainUpdater.supportsLightNodeBlockFields(height + 1)) stateHash else None,
-          None
-        )
-        .leftMap(_.err)
+      block <- {
+        log.debug(s"Forging data: prevStateHash=$prevStateHash, stateHash=$stateHash, unconfirmed=${unconfirmed.size}")
+        Block
+          .buildAndSign(
+            version,
+            blockTime,
+            reference,
+            consensusData.baseTarget,
+            consensusData.generationSignature,
+            unconfirmed,
+            account,
+            blockFeatures(version),
+            blockRewardVote(version),
+            if (blockchainUpdater.supportsLightNodeBlockFields(height + 1)) stateHash else None,
+            None
+          )
+          .leftMap(_.err)
+      }
     } yield (block, totalConstraint))
   }
 

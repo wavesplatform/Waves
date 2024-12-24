@@ -84,13 +84,14 @@ class BlockChallengeTest
     val challengingMiner = TxHelpers.signer(3)
     withDomain(settings, balances = AddrWithBalance.enoughBalances(sender)) { d =>
       d.appendBlock()
-      val txs             = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
-      val challengedBlock = d.createBlock(Block.ProtoBlockVersion, txs, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
-      val invalidHashChallengingBlock = d.createChallengingBlock(challengingMiner, challengedBlock, stateHash = Some(Some(invalidStateHash)))
-      val missedHashChallengingBlock  = d.createChallengingBlock(challengingMiner, challengedBlock, stateHash = Some(None))
+      val txs                    = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
+      val invalidChallengedBlock = d.createBlock(Block.ProtoBlockVersion, txs, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+      val invalidHashChallengingBlock = d.createChallengingBlock(challengingMiner, invalidChallengedBlock, stateHash = Some(Some(invalidStateHash)))
+      val missedHashChallengingBlock  = d.createChallengingBlock(challengingMiner, invalidChallengedBlock, stateHash = Some(None))
+      val validChallengingBlock       = d.createChallengingBlock(challengingMiner, invalidChallengedBlock)
 
-      d.appendBlockE(invalidHashChallengingBlock) shouldBe Left(InvalidStateHash(Some(invalidStateHash)))
-      d.appendBlockE(missedHashChallengingBlock) shouldBe Left(InvalidStateHash(None))
+      d.appendBlockE(invalidHashChallengingBlock) shouldBe Left(InvalidStateHash(Some(invalidStateHash), validChallengingBlock.header.stateHash))
+      d.appendBlockE(missedHashChallengingBlock) shouldBe Left(InvalidStateHash(None, validChallengingBlock.header.stateHash))
     }
   }
 
