@@ -119,7 +119,7 @@ object BlockDiffer {
       txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
     logger.debug(
-      s"BlockDiffer.fromBlockTraced(maybePrevBlock=${maybePrevBlock.map(_.id())}, block=${block.id()}, snapshot.isDefined=${snapshot.isDefined})"
+      s"fromBlockTraced(maybePrevBlock=${maybePrevBlock.map(_.id())}, block=${block.id()}, snapshot.isDefined=${snapshot.isDefined})"
     )
     val stateHeight        = blockchain.height
     val heightWithNewBlock = stateHeight + 1
@@ -252,7 +252,7 @@ object BlockDiffer {
       enableExecutionLog: Boolean
   ): TracedResult[ValidationError, Result] = {
     logger.debug(
-      s"BlockDiffer.fromMicroBlockTraced: prevBlockTimestamp=$prevBlockTimestamp, snapshot.totalBlockId=${snapshot.map(_.totalBlockId)}, verify=$verify"
+      s"fromMicroBlockTraced: prevBlockTimestamp=$prevBlockTimestamp, snapshot.totalBlockId=${snapshot.map(_.totalBlockId)}, verify=$verify"
     )
 
     for {
@@ -361,7 +361,7 @@ object BlockDiffer {
 
     val initStateHash = computeInitialStateHash(blockchain, initSnapshot, prevStateHash)
     logger.debug(
-      s"BlockDiffer.apply: blockchain.lastBlockTimestamp=$timestamp, prevBlockTimestamp=$prevBlockTimestamp, lastBlockHeader.id=${blockchain.lastBlockHeader
+      s"apply: blockchain.lastBlockTimestamp=$timestamp, prevBlockTimestamp=$prevBlockTimestamp, lastBlockHeader.id=${blockchain.lastBlockHeader
         .map(_.id())}, prevStateHash=$prevStateHash, initStateHash=$initStateHash, initSnapshot=$initSnapshot"
     )
 
@@ -412,7 +412,7 @@ object BlockDiffer {
                 )
 
                 logger.debug(
-                  s"BlockDiffer.apply after txSnapshot=$txSnapshot: computedStateHash=${r.computedStateHash}, snapshot=${r.snapshot}, c=${r.carry}, tf=${r.totalFee}"
+                  s"apply after txSnapshot=$txSnapshot: computedStateHash=${r.computedStateHash}, snapshot=${r.snapshot}, c=${r.carry}, tf=${r.totalFee}"
                 )
                 r
               }
@@ -432,7 +432,7 @@ object BlockDiffer {
       .tap { res =>
         res.map { res =>
           logger.debug(
-            s"BlockDiffer.apply res: computedStateHash=${res.computedStateHash}, keyBlockSnapshot=${res.keyBlockSnapshot}, snapshot=${res.snapshot}, c=${res.carry}, tf=${res.totalFee}"
+            s"apply res: computedStateHash=${res.computedStateHash}, keyBlockSnapshot=${res.keyBlockSnapshot}, snapshot=${res.snapshot}, c=${res.carry}, tf=${res.totalFee}"
           )
         }
       }

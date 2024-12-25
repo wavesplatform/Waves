@@ -298,6 +298,9 @@ class BlockchainUpdaterImpl(
                 metrics.forgeBlockTimeStats.measureOptional(ng.snapshotOf(block.header.reference)) match {
                   case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                   case Some((referencedForgedBlock, referencedLiquidSnapshot, carry, totalFee, referencedComputedStateHash, discarded)) =>
+                    log.debug(
+                      s"processBlock: ${block.header.reference}: rfb=${referencedForgedBlock.id}, rch=$referencedComputedStateHash, c=$carry, tf=$totalFee, s=$referencedLiquidSnapshot"
+                    )
                     if (!verify || referencedForgedBlock.signatureValid()) {
                       val height = rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
@@ -319,6 +322,11 @@ class BlockchainUpdaterImpl(
                         carry,
                         reward,
                         Some(referencedComputedStateHash)
+                      )
+
+                      log.debug(
+                        s"processBlock: referencedBlockchain: referencedForgedBlock=${referencedForgedBlock.id()}, " +
+                          s"reward: $reward, rdb.h=${rocksdb.height}, rdb.l=${rocksdb.lastBlockId}, lswcl=$liquidSnapshotWithCancelledLeases, block=$block, s=$snapshot"
                       )
 
                       for {
@@ -347,6 +355,7 @@ class BlockchainUpdaterImpl(
                         )
                         miner.scheduleMining(Some(tempBlockchain))
 
+                        // TODO: we don't have this
                         log.trace(
                           s"Persisting block ${referencedForgedBlock.id()}, discarded microblock refs: ${discarded.map(_._1.reference).mkString("[", ",", "]")}"
                         )
@@ -549,7 +558,7 @@ class BlockchainUpdaterImpl(
                 )
               blockDifferResult <- {
                 val lastBlockTimestamp = rocksdb.lastBlockTimestamp
-                log.debug(s"BlockchainUpdaterImpl.processMicroBlock: rocksdb.lastBlockTimestamp=$lastBlockTimestamp, referencedComputedStateHash=$referencedComputedStateHash")
+                log.debug(s"processMicroBlock: rocksdb.lastBlockTimestamp=$lastBlockTimestamp, referencedComputedStateHash=$referencedComputedStateHash")
                 BlockDiffer.fromMicroBlock(
                   this,
                   lastBlockTimestamp,

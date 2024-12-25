@@ -109,7 +109,8 @@ case class Block(
 
   override def toString: String =
     s"Block(${id()},${header.reference},${header.generator.toAddress}," +
-      s"${header.timestamp},${header.featureVotes.mkString("[", ",", "]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""}, sh=${header.stateHash})"
+      s"${header.timestamp},${header.featureVotes.mkString("[", ",", "]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""}, " +
+      s"sh=${header.stateHash}, txs(${transactionData.size})={${transactionData.map(_.id().take(5)).mkString(", ")}})"
 }
 
 object Block {

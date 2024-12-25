@@ -119,7 +119,6 @@ case class NgState(
   def snapshotOf(id: BlockId): Option[(Block, StateSnapshot, Long, Long, ByteStr, DiscardedMicroBlocks)] =
     forgeBlock(id).map { case (block, discarded) =>
       val (snapshot, carry, totalFee, computedStateHash) = this.snapshotFor(id)
-      NgState.logger.debug(s"snapshotOf($id): block.header.stateHash=${block.header.stateHash}, computedStateHash=$computedStateHash")
       (block, snapshot, carry, totalFee, computedStateHash, discarded)
     }
 
