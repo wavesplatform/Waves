@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import scala.util.chaining.*
 import cats.implicits.{catsSyntaxOption, catsSyntaxSemigroup, toFoldableOps}
 import cats.syntax.either.*
 import com.typesafe.scalalogging.Logger
@@ -117,7 +118,9 @@ object BlockDiffer {
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
-    logger.debug(s"BlockDiffer.fromBlockTraced(maybePrevBlock=${maybePrevBlock.map(_.id())}, block=${block.id()})")
+    logger.debug(
+      s"BlockDiffer.fromBlockTraced(maybePrevBlock=${maybePrevBlock.map(_.id())}, block=${block.id()}, snapshot.isDefined=${snapshot.isDefined})"
+    )
     val stateHeight        = blockchain.height
     val heightWithNewBlock = stateHeight + 1
 
@@ -248,7 +251,9 @@ object BlockDiffer {
       verify: Boolean,
       enableExecutionLog: Boolean
   ): TracedResult[ValidationError, Result] = {
-    logger.debug(s"BlockDiffer.fromMicroBlockTraced: prevBlockTimestamp=$prevBlockTimestamp, snapshot.totalBlockId=${snapshot.map(_.totalBlockId)}, verify=$verify")
+    logger.debug(
+      s"BlockDiffer.fromMicroBlockTraced: prevBlockTimestamp=$prevBlockTimestamp, snapshot.totalBlockId=${snapshot.map(_.totalBlockId)}, verify=$verify"
+    )
 
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
@@ -347,8 +352,6 @@ object BlockDiffer {
     val blockGenerator  = blockchain.lastBlockHeader.get.header.generator.toAddress
     val rideV6Activated = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
 
-    logger.debug(s"BlockDiffer.apply: blockchain.lastBlockTimestamp=$timestamp, lastBlockHeader.id=${blockchain.lastBlockHeader.map(_.id())}")
-
     val txDiffer = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
 
     if (verify && txSignParCheck)
@@ -357,6 +360,11 @@ object BlockDiffer {
     prepareCaches(blockGenerator, txs, loadCacheData)
 
     val initStateHash = computeInitialStateHash(blockchain, initSnapshot, prevStateHash)
+    logger.debug(
+      s"BlockDiffer.apply: blockchain.lastBlockTimestamp=$timestamp, prevBlockTimestamp=$prevBlockTimestamp, lastBlockHeader.id=${blockchain.lastBlockHeader
+        .map(_.id())}, prevStateHash=$prevStateHash, initStateHash=$initStateHash, initSnapshot=$initSnapshot"
+    )
+
     txs
       .foldLeft(TracedResult(Result(initSnapshot, 0L, 0L, initConstraint, initSnapshot, initStateHash).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
@@ -392,7 +400,7 @@ object BlockDiffer {
 
                 val newSnapshot = currSnapshot |+| resultTxSnapshot.withTransaction(txInfoWithFee)
 
-                Result(
+                val r = Result(
                   newSnapshot,
                   carryFee + txFeeInfo.carry,
                   currTotalFee + txFeeInfo.wavesFee,
@@ -402,6 +410,11 @@ object BlockDiffer {
                     .createHashFromSnapshot(resultTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
                     .createHash(prevStateHash)
                 )
+
+                logger.debug(
+                  s"BlockDiffer.apply after txSnapshot=$txSnapshot: computedStateHash=${r.computedStateHash}, snapshot=${r.snapshot}, c=${r.carry}, tf=${r.totalFee}"
+                )
+                r
               }
             }
           }
@@ -415,6 +428,13 @@ object BlockDiffer {
                   .createHash(result.computedStateHash)
               )
           })
+      }
+      .tap { res =>
+        res.map { res =>
+          logger.debug(
+            s"BlockDiffer.apply res: computedStateHash=${res.computedStateHash}, keyBlockSnapshot=${res.keyBlockSnapshot}, snapshot=${res.snapshot}, c=${res.carry}, tf=${res.totalFee}"
+          )
+        }
       }
   }
 

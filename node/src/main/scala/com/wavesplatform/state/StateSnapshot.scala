@@ -66,6 +66,38 @@ case class StateSnapshot(
 
   lazy val hashString: String =
     Integer.toHexString(hashCode())
+
+  override def toString: String = List(
+    if (transactions.isEmpty) None else Some(s"txn: {${transactions.keys.mkString(", ")}}"),
+    toStr("b", balances),
+    toStr("lb", leaseBalances),
+    toStr("ass", assetStatics),
+    toStr("av", assetVolumes),
+    toStr("a", assetNamesAndDescriptions),
+    toStr("as", assetScripts),
+    toStr("s", sponsorships),
+    toStr("nl", newLeases),
+    toStr("cl", cancelledLeases),
+    toStr("a", aliases),
+    toStr("o", orderFills),
+    toStr("acs", accountScripts),
+    toStr("ad", accountData),
+    toStr("sr", scriptResults),
+    toStr("et", ethereumTransactionMeta),
+    Some(s"sc: $scriptsComplexity"),
+    toStr("e", erc20Addresses)
+  ).flatten.mkString("StateSnapshot(", ", ", ")")
+
+  private def toStr[K, V](fieldName: String, value: Map[K, V]): Option[String] =
+    if (value.isEmpty) None
+    else
+      Some(
+        value
+          .map { case (k, v) =>
+            s"$k: $v"
+          }
+          .mkString(s"$fieldName={", ", ", "}")
+      )
 }
 
 object StateSnapshot {

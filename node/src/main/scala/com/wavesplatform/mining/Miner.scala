@@ -34,6 +34,7 @@ import java.time.LocalTime
 import scala.concurrent.duration.*
 
 trait Miner {
+  // None if mining from genesis or after rollback
   def scheduleMining(blockchain: Option[Blockchain] = None): Unit
 }
 
@@ -154,7 +155,7 @@ class MinerImpl(
         .map { initSnapshot =>
           val r1 = TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash)
           val r2 = TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash)
-          log.debug(s"packTransactionsForKeyBlock: consistency check=$r1 vs $r2, initSnapshot=$initSnapshot")
+          log.debug(s"packTransactionsForKeyBlock: consistency check=$r1 vs $r2, initSnapshot=$initSnapshot, prevHash=$prevHash")
 
           r1
         }
@@ -210,25 +211,25 @@ class MinerImpl(
           Some(blockchainUpdater.lastStateHash(Some(reference)))
         else None
       (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(account.toAddress, reference, prevStateHash)
-      block <- {
-        log.debug(s"Forging data: prevStateHash=$prevStateHash, stateHash=$stateHash, unconfirmed=${unconfirmed.size}")
-        Block
-          .buildAndSign(
-            version,
-            blockTime,
-            reference,
-            consensusData.baseTarget,
-            consensusData.generationSignature,
-            unconfirmed,
-            account,
-            blockFeatures(version),
-            blockRewardVote(version),
-            if (blockchainUpdater.supportsLightNodeBlockFields(height + 1)) stateHash else None,
-            None
-          )
-          .leftMap(_.err)
-      }
-    } yield (block, totalConstraint))
+      block <- Block
+        .buildAndSign(
+          version,
+          blockTime,
+          reference,
+          consensusData.baseTarget,
+          consensusData.generationSignature,
+          unconfirmed,
+          account,
+          blockFeatures(version),
+          blockRewardVote(version),
+          if (blockchainUpdater.supportsLightNodeBlockFields(height + 1)) stateHash else None,
+          None
+        )
+        .leftMap(_.err)
+    } yield {
+      log.debug(s"Forged block: stateHash=$stateHash, txs=${block.transactionData.size}, prevStateHash=$prevStateHash")
+      (block, totalConstraint)
+    })
   }
 
   private def checkQuorumAvailable(): Either[String, Int] =
@@ -297,7 +298,7 @@ class MinerImpl(
           case Some(value) =>
             def waitUntilBlockAppended(block: BlockId): Task[Unit] =
               if (blockchainUpdater.contains(block)) Task.unit
-              else Task.defer(waitUntilBlockAppended(block)).delayExecution(1 seconds)
+              else Task.defer(waitUntilBlockAppended(block)).delayExecution(1 seconds) // TODO 1 second?
 
             waitUntilBlockAppended(value.lastBlockId.get)
 
