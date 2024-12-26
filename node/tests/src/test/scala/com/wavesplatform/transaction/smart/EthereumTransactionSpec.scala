@@ -1,32 +1,27 @@
 package com.wavesplatform.transaction.smart
 
+import com.wavesplatform.TestValues
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
-import com.wavesplatform.test.{FlatSpec, TestTime, produce}
+import com.wavesplatform.state.TxMeta.Status
+import com.wavesplatform.test.{FlatSpec, produce}
+import com.wavesplatform.test.NumericExt
+import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.{ERC20Address, EthTxGenerator, EthereumTransaction, TxHelpers}
-import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
-import com.wavesplatform.{BlockchainStubHelpers, TestValues}
-import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{BeforeAndAfterAll, Inside}
+import com.wavesplatform.utils.{EthEncoding, EthHelpers, JsonMatchers}
+import org.scalatest.Inside
+import org.scalatest.ParallelTestExecution
 import org.web3j.crypto.*
-import play.api.libs.json.Json
+import play.api.libs.json.*
 
-class EthereumTransactionSpec
-    extends FlatSpec
-    with BeforeAndAfterAll
-    with PathMockFactory
-    with BlockchainStubHelpers
-    with EthHelpers
-    with DiffMatchers
-    with JsonMatchers
-    with Inside {
+class EthereumTransactionSpec extends FlatSpec with EthHelpers with JsonMatchers with WithDomain with ParallelTestExecution with Inside {
 
   val TestAsset: IssuedAsset = TestValues.asset
 
@@ -86,34 +81,58 @@ class EthereumTransactionSpec
     EthereumTransaction(legacyTransaction) should produce("Legacy transactions are not supported")
   }
 
-  it should "work with long.max" in {
-    val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
-    val senderAddress    = TxHelpers.defaultSigner.toEthWavesAddress
-    val recipientAddress = TxHelpers.secondSigner.toAddress
+  it should "work with Long.MaxValue when transferring waves" in {
+    val sender    = TxHelpers.signer(1).toEthKeyPair
+    val recipient = TxHelpers.signer(2)
+    val balances  = Seq(AddrWithBalance(sender.toWavesAddress, Long.MaxValue))
 
-    val blockchain = createBlockchainStub { b =>
-      b.stub.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6, BlockchainFeatures.Ride4DApps)
-      b.stub.issueAsset(TestAsset.id)
-      b.stub.creditBalance(senderAddress, Waves, Long.MaxValue)
-      b.stub.creditBalance(senderAddress, TestAsset, Long.MaxValue)
-      (b.wavesBalances _).when(*).returns(Map(senderAddress -> Long.MaxValue))
-      (b.resolveERC20Address _).when(ERC20Address(TestAsset.id.take(20))).returning(Some(TestAsset))
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      // Assert before transfer
+      d.blockchain.balance(sender.toWavesAddress) shouldEqual Long.MaxValue
+      d.blockchain.balance(recipient.toAddress) shouldEqual 0L
+
+      // Transfer
+      val ethTxFee        = 0.001.waves
+      val longMaxMinusFee = Long.MaxValue - ethTxFee
+      val transfer        = EthTxGenerator.generateEthTransfer(sender, recipient.toAddress, longMaxMinusFee, Waves)
+      d.appendBlock(transfer)
+
+      // Assert after transfer
+      d.blockchain.balance(sender.toWavesAddress) shouldEqual 0L
+      d.blockchain.balance(recipient.toAddress) shouldEqual longMaxMinusFee
     }
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis())).andThen(_.resultE.explicitGet())
+  }
 
-    val LongMaxMinusFee = Long.MaxValue - 200000
-    val transfer        = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, LongMaxMinusFee, Waves)
-    val assetTransfer   = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, Long.MaxValue, TestAsset)
+  it should "work with Long.MaxValue when transferring other assets" in {
+    val assetIssuer = TxHelpers.defaultSigner
+    val sender      = TxHelpers.signer(1).toEthKeyPair
+    val recipient   = TxHelpers.signer(2)
+    val balances    = Seq(AddrWithBalance(sender.toWavesAddress, 1.waves))
 
-    differ(assetTransfer).balances shouldBe Map(
-      (senderAddress, TestAsset)    -> 0L,
-      (senderAddress, Waves)        -> (LongMaxMinusFee + transfer.fee.longValue()),
-      (recipientAddress, TestAsset) -> Long.MaxValue
-    )
-    differ(transfer).balances shouldBe Map(
-      (senderAddress, Waves)    -> transfer.fee.longValue(),
-      (recipientAddress, Waves) -> LongMaxMinusFee
-    )
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      // Issue an asset
+      val issueTx   = TxHelpers.issue(assetIssuer, Long.MaxValue)
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
+
+      // Transfer asset to sender
+      // Note: In order to check eth transfer, we must perform waves transfer first.
+      // The reason is that ethereum-compatible account
+      // can not do waves transactions (including issue transaction) and vice versa.
+      d.appendBlock(TxHelpers.transfer(assetIssuer, sender.toWavesAddress, Long.MaxValue, testAsset))
+
+      // Assert before transfer
+      d.portfolio(sender.toWavesAddress) shouldEqual Seq((testAsset, Long.MaxValue))
+      d.portfolio(recipient.toAddress) shouldEqual Seq()
+
+      // Transfer
+      val transfer = EthTxGenerator.generateEthTransfer(sender, recipient.toAddress, Long.MaxValue, testAsset)
+      d.appendBlock(transfer)
+
+      // Assert after transfer
+      d.portfolio(sender.toWavesAddress) shouldEqual Seq()
+      d.portfolio(recipient.toAddress) shouldEqual Seq((testAsset, Long.MaxValue))
+    }
   }
 
   it should "fail with empty to field" in {
@@ -198,17 +217,20 @@ class EthereumTransactionSpec
   }
 
   it should "work with all types of arguments except unions" in {
-    val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
-    val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
+    val assetIssuer    = TxHelpers.defaultSigner
+    val invokerAccount = TxHelpers.signer(1).toEthKeyPair
+    val dAppAccount    = TxHelpers.signer(2)
+    val balances = Seq(
+      AddrWithBalance(assetIssuer.toAddress, 1.waves),
+      AddrWithBalance(invokerAccount.toWavesAddress, 1.waves),
+      AddrWithBalance(dAppAccount.toAddress, 1.waves)
+    )
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      val issueTx   = TxHelpers.issue(assetIssuer, 1000)
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
+
+      d.appendBlock(TxHelpers.transfer(assetIssuer, invokerAccount.toWavesAddress, 1000, testAsset))
 
       val script = TxHelpers.script(
         """{-# STDLIB_VERSION 4 #-}
@@ -223,54 +245,61 @@ class EthereumTransactionSpec
           |}
           |""".stripMargin
       )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+      d.appendBlock(TxHelpers.setScript(dAppAccount, script))
 
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
-    val transaction = EthTxGenerator.generateEthInvoke(
-      invokerAccount,
-      dAppAccount.toAddress,
-      "deposit",
-      Seq(
-        Arg.Integer(123),
-        Arg.Bytes(ByteStr.empty),
-        Arg.Str("123"),
-        Arg.Bool(true),
-        Arg.List(Arg.Integer(0), Seq(Arg.Integer(123)))
-      ),
-      Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
-    )
-    val snapshot = differ(transaction).resultE.explicitGet()
-    snapshot should containAppliedTx(transaction.id())
-    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
-                                                                       |  "data" : [ ],
-                                                                       |  "transfers" : [ {
-                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                       |    "asset" : null,
-                                                                       |    "amount" : 123
-                                                                       |  } ],
-                                                                       |  "issues" : [ ],
-                                                                       |  "reissues" : [ ],
-                                                                       |  "burns" : [ ],
-                                                                       |  "sponsorFees" : [ ],
-                                                                       |  "leases" : [ ],
-                                                                       |  "leaseCancels" : [ ],
-                                                                       |  "invokes" : [ ]
-                                                                       |}""".stripMargin)
+      val transaction = EthTxGenerator.generateEthInvoke(
+        invokerAccount,
+        dAppAccount.toAddress,
+        "deposit",
+        Seq(
+          Arg.Integer(123),
+          Arg.Bytes(ByteStr.empty),
+          Arg.Str("123"),
+          Arg.Bool(true),
+          Arg.List(Arg.Integer(0), Seq(Arg.Integer(123)))
+        ),
+        Seq(Payment(321, testAsset))
+      )
+
+      val snapshot = d.createDiff(transaction)
+      d.appendBlock(transaction)
+
+      val expectedScriptResults = """{
+                                    |  "data" : [ ],
+                                    |  "transfers" : [ {
+                                    |    "address" : "3MzPAf9BvP5kpV9A6yas2svwzLxBb3pHBHs",
+                                    |    "asset" : null,
+                                    |    "amount" : 123
+                                    |  } ],
+                                    |  "issues" : [ ],
+                                    |  "reissues" : [ ],
+                                    |  "burns" : [ ],
+                                    |  "sponsorFees" : [ ],
+                                    |  "leases" : [ ],
+                                    |  "leaseCancels" : [ ],
+                                    |  "invokes" : [ ]
+                                    |}""".stripMargin
+
+      d.blockchain.transactionMeta(transaction.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
+      Json.toJson(snapshot.scriptResults.values.head) should matchJson(expectedScriptResults)
+    }
   }
 
   it should "not work with union type" in {
-    val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
-    val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
+    val assetIssuer    = TxHelpers.defaultSigner
+    val invokerAccount = TxHelpers.signer(1).toEthKeyPair
+    val dAppAccount    = TxHelpers.signer(2)
+    val balances = Seq(
+      AddrWithBalance(assetIssuer.toAddress, 1.waves),
+      AddrWithBalance(invokerAccount.toWavesAddress, 1.waves),
+      AddrWithBalance(dAppAccount.toAddress, 1.waves)
+    )
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      val issueTx   = TxHelpers.issue(assetIssuer, 1000)
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
+
+      d.appendBlock(TxHelpers.transfer(assetIssuer, invokerAccount.toWavesAddress, 1000, testAsset))
 
       val script = TxHelpers.script(
         """{-# STDLIB_VERSION 4 #-}
@@ -281,36 +310,36 @@ class EthereumTransactionSpec
           |func test(union: String|Int) = []
           |""".stripMargin
       )
-      sh.setScript(dAppAccount.toAddress, script)
+      d.appendBlock(TxHelpers.setScript(dAppAccount, script))
+
+      val transaction = EthTxGenerator.generateEthInvoke(
+        invokerAccount,
+        dAppAccount.toAddress,
+        "test",
+        Seq(Arg.Integer(123)),
+        Seq(Payment(321, testAsset))
+      )
+
+      val snapshot = d.createDiffE(transaction)
+      snapshot should produce("Function not defined: 1f9773e9")
     }
-
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
-    val transaction = EthTxGenerator.generateEthInvoke(
-      invokerAccount,
-      dAppAccount.toAddress,
-      "test",
-      Seq(
-        Arg.Integer(123)
-      ),
-      Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
-    )
-
-    val snapshot = differ(transaction).resultE
-    snapshot should produce("Function not defined: 1f9773e9")
   }
 
   it should "work with no arguments" in {
-    val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
-    val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
+    val assetIssuer    = TxHelpers.defaultSigner
+    val invokerAccount = TxHelpers.signer(1).toEthKeyPair
+    val dAppAccount    = TxHelpers.signer(2)
+    val balances = Seq(
+      AddrWithBalance(assetIssuer.toAddress, 1.waves),
+      AddrWithBalance(invokerAccount.toWavesAddress, 1.waves),
+      AddrWithBalance(dAppAccount.toAddress, 1.waves)
+    )
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      val issueTx   = TxHelpers.issue(assetIssuer, 1000)
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
+
+      d.appendBlock(TxHelpers.transfer(assetIssuer, invokerAccount.toWavesAddress, 1000, testAsset))
 
       val script = TxHelpers.script(
         """{-# STDLIB_VERSION 4 #-}
@@ -325,48 +354,54 @@ class EthereumTransactionSpec
           |}
           |""".stripMargin
       )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+      d.appendBlock(TxHelpers.setScript(dAppAccount, script))
 
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
-    val transaction = EthTxGenerator.generateEthInvoke(
-      invokerAccount,
-      dAppAccount.toAddress,
-      "deposit",
-      Seq(),
-      Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
-    )
-    val snapshot = differ(transaction).resultE.explicitGet()
-    snapshot should containAppliedTx(transaction.id())
-    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
-                                                                       |  "data" : [ ],
-                                                                       |  "transfers" : [ {
-                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                       |    "asset" : null,
-                                                                       |    "amount" : 123
-                                                                       |  } ],
-                                                                       |  "issues" : [ ],
-                                                                       |  "reissues" : [ ],
-                                                                       |  "burns" : [ ],
-                                                                       |  "sponsorFees" : [ ],
-                                                                       |  "leases" : [ ],
-                                                                       |  "leaseCancels" : [ ],
-                                                                       |  "invokes" : [ ]
-                                                                       |}""".stripMargin)
+      val transaction = EthTxGenerator.generateEthInvoke(
+        invokerAccount,
+        dAppAccount.toAddress,
+        "deposit",
+        Seq(),
+        Seq(Payment(321, testAsset))
+      )
+      val snapshot = d.createDiff(transaction)
+      d.appendBlock(transaction)
+
+      val expectedScriptResults = """{
+                                    |  "data" : [ ],
+                                    |  "transfers" : [ {
+                                    |    "address" : "3MzPAf9BvP5kpV9A6yas2svwzLxBb3pHBHs",
+                                    |    "asset" : null,
+                                    |    "amount" : 123
+                                    |  } ],
+                                    |  "issues" : [ ],
+                                    |  "reissues" : [ ],
+                                    |  "burns" : [ ],
+                                    |  "sponsorFees" : [ ],
+                                    |  "leases" : [ ],
+                                    |  "leaseCancels" : [ ],
+                                    |  "invokes" : [ ]
+                                    |}""".stripMargin
+
+      d.blockchain.transactionMeta(transaction.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
+      Json.toJson(snapshot.scriptResults.values.head) should matchJson(expectedScriptResults)
+    }
   }
 
   it should "work with no payments" in {
-    val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
-    val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
+    val assetIssuer    = TxHelpers.defaultSigner
+    val invokerAccount = TxHelpers.signer(1).toEthKeyPair
+    val dAppAccount    = TxHelpers.signer(2)
+    val balances = Seq(
+      AddrWithBalance(assetIssuer.toAddress, 1.waves),
+      AddrWithBalance(invokerAccount.toWavesAddress, 1.waves),
+      AddrWithBalance(dAppAccount.toAddress, 1.waves)
+    )
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      val issueTx   = TxHelpers.issue(assetIssuer, 1000)
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
+
+      d.appendBlock(TxHelpers.transfer(assetIssuer, invokerAccount.toWavesAddress, 1000, testAsset))
 
       val script = TxHelpers.script(
         """{-# STDLIB_VERSION 4 #-}
@@ -381,43 +416,47 @@ class EthereumTransactionSpec
           |}
           |""".stripMargin
       )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+      d.appendBlock(TxHelpers.setScript(dAppAccount, script))
 
-    val differ      = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
-    val transaction = EthTxGenerator.generateEthInvoke(invokerAccount, dAppAccount.toAddress, "deposit", Seq(), Seq())
-    val snapshot    = differ(transaction).resultE.explicitGet()
-    snapshot should containAppliedTx(transaction.id())
-    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
-                                                                       |  "data" : [ ],
-                                                                       |  "transfers" : [ {
-                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                       |    "asset" : null,
-                                                                       |    "amount" : 123
-                                                                       |  } ],
-                                                                       |  "issues" : [ ],
-                                                                       |  "reissues" : [ ],
-                                                                       |  "burns" : [ ],
-                                                                       |  "sponsorFees" : [ ],
-                                                                       |  "leases" : [ ],
-                                                                       |  "leaseCancels" : [ ],
-                                                                       |  "invokes" : [ ]
-                                                                       |}""".stripMargin)
+      val transaction = EthTxGenerator.generateEthInvoke(
+        invokerAccount,
+        dAppAccount.toAddress,
+        "deposit",
+        Seq(),
+        Seq()
+      )
+      val snapshot = d.createDiff(transaction)
+      d.appendBlock(transaction)
+
+      val expectedScriptResults = """{
+                                    |  "data" : [ ],
+                                    |  "transfers" : [ {
+                                    |    "address" : "3MzPAf9BvP5kpV9A6yas2svwzLxBb3pHBHs",
+                                    |    "asset" : null,
+                                    |    "amount" : 123
+                                    |  } ],
+                                    |  "issues" : [ ],
+                                    |  "reissues" : [ ],
+                                    |  "burns" : [ ],
+                                    |  "sponsorFees" : [ ],
+                                    |  "leases" : [ ],
+                                    |  "leaseCancels" : [ ],
+                                    |  "invokes" : [ ]
+                                    |}""".stripMargin
+
+      d.blockchain.transactionMeta(transaction.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
+      Json.toJson(snapshot.scriptResults.values.head) should matchJson(expectedScriptResults)
+    }
   }
 
   it should "fail with max+1 payments" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
-
+    val balances = Seq(
+      AddrWithBalance(invokerAccount.toWavesAddress, 1.waves),
+      AddrWithBalance(dAppAccount.toAddress, 1.waves)
+    )
+    withDomain(DomainPresets.RideV6, balances) { d =>
       val script = TxHelpers.script(
         """{-# STDLIB_VERSION 5 #-}
           |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -431,32 +470,33 @@ class EthereumTransactionSpec
           |}
           |""".stripMargin
       )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+      d.appendBlock(TxHelpers.setScript(dAppAccount, script))
 
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
-    val transaction = EthTxGenerator.generateEthInvoke(
-      invokerAccount,
-      dAppAccount.toAddress,
-      "deposit",
-      Seq(),
-      (1 to com.wavesplatform.lang.v1.ContractLimits.MaxAttachedPaymentAmountV5 + 1).map(InvokeScriptTransaction.Payment(_, Waves))
-    )
-    differ(transaction).resultE should produceRejectOrFailedDiff("Script payment amount=11 should not exceed 10")
+      val transaction = EthTxGenerator.generateEthInvoke(
+        invokerAccount,
+        dAppAccount.toAddress,
+        "deposit",
+        Seq(),
+        (1 to com.wavesplatform.lang.v1.ContractLimits.MaxAttachedPaymentAmountV5 + 1).map(InvokeScriptTransaction.Payment(_, Waves))
+      )
+      d.createDiffE(transaction) should produceRejectOrFailedDiff("Script payment amount=11 should not exceed 10")
+    }
   }
 
   it should "work with default function" in {
+    val assetIssuer    = TxHelpers.defaultSigner
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
+    val balances = Seq(
+      AddrWithBalance(invokerAccount.toWavesAddress, 1.waves),
+      AddrWithBalance(dAppAccount.toAddress, 1.waves)
+    )
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      val issueTx   = TxHelpers.issue(assetIssuer, 1000)
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
+
+      d.appendBlock(TxHelpers.transfer(assetIssuer, invokerAccount.toWavesAddress, 1000, testAsset))
 
       val script = TxHelpers.script(
         """{-# STDLIB_VERSION 4 #-}
@@ -471,48 +511,52 @@ class EthereumTransactionSpec
           |}
           |""".stripMargin
       )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+      d.appendBlock(TxHelpers.setScript(dAppAccount, script))
 
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
-    val transaction = EthTxGenerator.generateEthInvoke(
-      invokerAccount,
-      dAppAccount.toAddress,
-      "default",
-      Seq(),
-      Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
-    )
-    val snapshot = differ(transaction).resultE.explicitGet()
-    snapshot should containAppliedTx(transaction.id())
-    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
-                                                                       |  "data" : [ ],
-                                                                       |  "transfers" : [ {
-                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                       |    "asset" : null,
-                                                                       |    "amount" : 123
-                                                                       |  } ],
-                                                                       |  "issues" : [ ],
-                                                                       |  "reissues" : [ ],
-                                                                       |  "burns" : [ ],
-                                                                       |  "sponsorFees" : [ ],
-                                                                       |  "leases" : [ ],
-                                                                       |  "leaseCancels" : [ ],
-                                                                       |  "invokes" : [ ]
-                                                                       |}""".stripMargin)
+      val transaction = EthTxGenerator.generateEthInvoke(
+        invokerAccount,
+        dAppAccount.toAddress,
+        "default",
+        Seq(),
+        Seq(Payment(321, testAsset))
+      )
+      val snapshot = d.createDiff(transaction)
+      d.appendBlock(transaction)
+
+      val expectedScriptResults = """{
+                                    |  "data" : [ ],
+                                    |  "transfers" : [ {
+                                    |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                    |    "asset" : null,
+                                    |    "amount" : 123
+                                    |  } ],
+                                    |  "issues" : [ ],
+                                    |  "reissues" : [ ],
+                                    |  "burns" : [ ],
+                                    |  "sponsorFees" : [ ],
+                                    |  "leases" : [ ],
+                                    |  "leaseCancels" : [ ],
+                                    |  "invokes" : [ ]
+                                    |}""".stripMargin
+      d.blockchain.transactionMeta(transaction.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
+      Json.toJson(snapshot.scriptResults.values.head) should matchJson(expectedScriptResults)
+    }
   }
 
   it should "return money in transfers asset+waves" in {
+    val assetIssuer    = TxHelpers.defaultSigner
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(TestAsset.id)
+    val balances = Seq(
+      AddrWithBalance(invokerAccount.toWavesAddress, 1.waves),
+      AddrWithBalance(dAppAccount.toAddress, 1.waves)
+    )
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      val issueTx   = TxHelpers.issue(assetIssuer, 1000)
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
+
+      d.appendBlock(TxHelpers.transfer(assetIssuer, dAppAccount.toAddress, 1000, testAsset))
 
       val script = TxHelpers.script(
         s"""{-# STDLIB_VERSION 4 #-}
@@ -523,59 +567,56 @@ class EthereumTransactionSpec
            |func default() = {
            |  [
            |    ScriptTransfer(i.caller, 123, unit),
-           |    ScriptTransfer(i.caller, 123, base58'$TestAsset')
+           |    ScriptTransfer(i.caller, 123, base58'$testAsset')
            |  ]
            |}
            |""".stripMargin
       )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+      d.appendBlock(TxHelpers.setScript(dAppAccount, script))
 
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
-    val transaction = EthTxGenerator.generateEthInvoke(
-      invokerAccount,
-      dAppAccount.toAddress,
-      "default",
-      Seq(),
-      Nil
-    )
-    val snapshot = differ(transaction).resultE.explicitGet()
-    snapshot should containAppliedTx(transaction.id())
-    Json.toJson(snapshot.scriptResults.values.head) should matchJson(s"""{
-                                                                        |  "data" : [ ],
-                                                                        |  "transfers" : [ {
-                                                                        |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                        |    "asset" : null,
-                                                                        |    "amount" : 123
-                                                                        |  },
-                                                                        |   {
-                                                                        |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                        |    "asset" : "$TestAsset",
-                                                                        |    "amount" : 123
-                                                                        |  }],
-                                                                        |  "issues" : [ ],
-                                                                        |  "reissues" : [ ],
-                                                                        |  "burns" : [ ],
-                                                                        |  "sponsorFees" : [ ],
-                                                                        |  "leases" : [ ],
-                                                                        |  "leaseCancels" : [ ],
-                                                                        |  "invokes" : [ ]
-                                                                        |}""".stripMargin)
+      val transaction = EthTxGenerator.generateEthInvoke(
+        invokerAccount,
+        dAppAccount.toAddress,
+        "default",
+        Seq(),
+        Nil
+      )
+      val snapshot = d.createDiff(transaction)
+      d.appendBlock(transaction)
+
+      val expectedScriptResults = s"""{
+                                     |  "data" : [ ],
+                                     |  "transfers" : [ {
+                                     |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                     |    "asset" : null,
+                                     |    "amount" : 123
+                                     |  },
+                                     |   {
+                                     |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                     |    "asset" : "$testAsset",
+                                     |    "amount" : 123
+                                     |  }],
+                                     |  "issues" : [ ],
+                                     |  "reissues" : [ ],
+                                     |  "burns" : [ ],
+                                     |  "sponsorFees" : [ ],
+                                     |  "leases" : [ ],
+                                     |  "leaseCancels" : [ ],
+                                     |  "invokes" : [ ]
+                                     |}""".stripMargin
+      d.blockchain.transactionMeta(transaction.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
+      Json.toJson(snapshot.scriptResults.values.head) should matchJson(expectedScriptResults)
+    }
   }
 
   it should "test minimum fee" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(TestAsset.id)
-
+    val balances = Seq(
+      AddrWithBalance(invokerAccount.toWavesAddress, 1.waves),
+      AddrWithBalance(dAppAccount.toAddress, 1.waves)
+    )
+    withDomain(DomainPresets.RideV6, balances) { d =>
       val script = TxHelpers.script(
         s"""{-# STDLIB_VERSION 4 #-}
            |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -587,21 +628,20 @@ class EthereumTransactionSpec
            |}
            |""".stripMargin
       )
-      sh.setScript(dAppAccount.toAddress, script)
+      d.appendBlock(TxHelpers.setScript(dAppAccount, script))
+
+      val transaction = EthTxGenerator.generateEthInvoke(
+        invokerAccount,
+        dAppAccount.toAddress,
+        "default",
+        Seq(),
+        Nil,
+        fee = 499999
+      )
+
+      val snapshot = d.createDiffE(transaction)
+
+      snapshot should produce("Fee for EthereumTransaction (499999 in WAVES) does not exceed minimal value of 500000 WAVES.")
     }
-
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
-    val transaction = EthTxGenerator.generateEthInvoke(
-      invokerAccount,
-      dAppAccount.toAddress,
-      "default",
-      Seq(),
-      Nil,
-      fee = 499999
-    )
-
-    intercept[RuntimeException](differ(transaction).resultE.explicitGet()).toString should include(
-      "Fee in WAVES for InvokeScriptTransaction (499999 in WAVES) does not exceed minimal value of 500000 WAVES"
-    )
   }
 }
