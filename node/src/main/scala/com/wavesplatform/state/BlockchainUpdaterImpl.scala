@@ -196,11 +196,17 @@ class BlockchainUpdaterImpl(
         .orElse(lastBlockReward)
   }
 
+  /** Referenced blockchain for mining.
+    * @return
+    *   SnapshotBlockchain with a reward for a next height
+    * @note
+    *   Do not use for other purposes
+    */
   def referencedBlockchain(reference: ByteStr): Blockchain =
     ngState
-      .flatMap(ng =>
+      .flatMap { ng =>
         if (ng.base.header.reference == reference)
-          Some(SnapshotBlockchain(rocksdb, ng.reward))
+          Some(SnapshotBlockchain(rocksdb, ng.reward)) // Same reward for a competitor's block, because same height
         else
           ng.snapshotOf(reference)
             .map { case (forgedBlock, liquidSnapshot, carry, _, stateHash, _) =>
@@ -214,8 +220,8 @@ class BlockchainUpdaterImpl(
                 Some(stateHash)
               )
             }
-      )
-      .getOrElse(SnapshotBlockchain(rocksdb, computeNextReward))
+      }
+      .getOrElse(SnapshotBlockchain(rocksdb, computeNextReward)) // WARN: This seems not happen
 
   override def processBlock(
       block: Block,
@@ -317,8 +323,7 @@ class BlockchainUpdaterImpl(
                   )
               } else
                 metrics.forgeBlockTimeStats.measureOptional(ng.snapshotOf(block.header.reference)) match {
-                  case None =>
-                    Left(BlockAppendError(s"References incorrect or non-existing block", block))
+                  case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                   case Some((referencedForgedBlock, referencedLiquidSnapshot, carry, totalFee, referencedComputedStateHash, discarded)) =>
                     if (!verify || referencedForgedBlock.signatureValid()) {
                       val height = rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
@@ -820,15 +825,17 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.resolveERC20Address(address)
   }
 
-  override def lastStateHash(refId: Option[ByteStr]): ByteStr =
+  override def lastStateHash(refId: Option[ByteStr]): ByteStr = readLock {
     ngState
       .map { ng =>
         refId.filter(ng.contains).fold(ng.bestLiquidComputedStateHash)(id => ng.snapshotFor(id)._4)
       }
       .getOrElse(rocksdb.lastStateHash(None))
+  }
 
-  def snapshotBlockchain: SnapshotBlockchain =
+  def snapshotBlockchain: SnapshotBlockchain = readLock {
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))
+  }
 
   // noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {

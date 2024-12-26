@@ -497,6 +497,6 @@ object BlockDiffer {
     Either.cond(
       !blockchain.supportsLightNodeBlockFields() || blockStateHash.contains(computedStateHash),
       (),
-      InvalidStateHash(blockStateHash)
+      InvalidStateHash(blockStateHash, Some(computedStateHash))
     )
 }
