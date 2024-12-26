@@ -53,7 +53,6 @@ object KeyTags extends Enumeration {
   AssetStaticInfo,
   NftCount,
   NftPossession,
-  BloomFilterChecksum,
   IssuedAssets,
   UpdatedAssets,
   SponsoredAssets,

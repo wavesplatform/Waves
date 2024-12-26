@@ -3,8 +3,8 @@ package com.wavesplatform.account
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.KeyLength
 import play.api.libs.json.{Format, Writes}
-import supertagged._
-import supertagged.postfix._
+import supertagged.*
+import supertagged.postfix.*
 
 object PrivateKey extends TaggedType[ByteStr] {
   def apply(privateKey: ByteStr): PrivateKey = {

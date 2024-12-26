@@ -3,6 +3,7 @@ package com.wavesplatform.database.rocksdb
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.database.AddressId
 import com.wavesplatform.state.TxNum
+import com.wavesplatform.database.*
 
 import java.nio.ByteBuffer
 

@@ -47,7 +47,7 @@ import kamon.Kamon
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
-import monix.execution.{Scheduler, UncaughtExceptionReporter}
+import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
@@ -103,11 +103,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private[this] val (blockchainUpdater, rocksDB) =
     StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
+  private[this] val messageObserver = new MessageObserverL1
+
   @volatile
   private[this] var maybeUtx: Option[UtxPool] = None
 
   @volatile
-  private[this] var maybeNetworkServer: Option[NS] = None
+  private[this] var maybeNetworkServer: Option[NetworkServer] = None
 
   @volatile
   private[this] var serverBinding: ServerBinding = _
@@ -201,7 +203,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       rdb
     )
 
-    val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
+    val historyReplier = new HistoryReplierL1(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
 
     val transactionPublisher =
       TransactionPublisher.timeBounded(
@@ -237,7 +239,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
         Await.result(transactionPublisher.validateAndBroadcast(tx, None), Duration.Inf) // TODO: Replace with async if possible
-      override def actorSystem: ActorSystem        = app.actorSystem
       override def utxEvents: Observable[UtxEvent] = app.utxEvents
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
@@ -272,17 +273,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // Network server should be started only after all extensions initialized
     val networkServer =
-      NetworkServer(
+      NetworkServerL1(
         settings,
         lastBlockInfo,
         historyReplier,
         peerDatabase,
+        messageObserver,
         allChannels,
         establishedConnections
       )
     maybeNetworkServer = Some(networkServer)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions, blockSnapshots, microblockSnapshots) =
-      networkServer.messages
+      messageObserver.messages
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 
@@ -371,7 +373,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       val heavyRequestScheduler = Scheduler(
         if (settings.config.getBoolean("kamon.enable"))
           ExecutorInstrumentation.instrument(heavyRequestExecutor, "heavy-request-executor")
-        else heavyRequestExecutor
+        else heavyRequestExecutor,
+        ExecutionModel.BatchedExecution(100)
       )
 
       val serverRequestTimeout = FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
@@ -432,7 +435,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           scoreStatsReporter,
           configRoot,
           rocksDB,
-          () => utxStorage.getPriorityPool.map(_.compositeBlockchain),
           routeTimeout,
           heavyRequestScheduler
         ),
@@ -478,7 +480,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
-    for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
+    for (addr <- settings.networkSettings.derivedDeclaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)
     }
 
@@ -498,7 +500,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Closing REST API")
       if (settings.restAPISettings.enable)
         Try(Await.ready(serverBinding.unbind(), 2.minutes)).failed.map(e => log.error("Failed to unbind REST API port", e))
-      for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) upnp.deletePort(addr.getPort)
+      for (addr <- settings.networkSettings.derivedDeclaredAddress if settings.networkSettings.uPnPSettings.enable) upnp.deletePort(addr.getPort)
 
       log.debug("Closing peer database")
       peerDatabase.close()
@@ -512,6 +514,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         log.info("Stopping network services")
         network.shutdown()
       }
+      messageObserver.shutdown()
 
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some)
 
@@ -563,7 +566,7 @@ object Application extends ScorexLogging {
           .map(_.toUpperCase)
           .getOrElse("TESTNET")
 
-        log.warn(s"Config file not defined, default $currentBlockchainType config will be used")
+        log.info(s"Config file not specified, default $currentBlockchainType config will be used")
       case Failure(exception) =>
         log.error(s"Couldn't read ${external.get.toPath.toAbsolutePath}", exception)
         forceStopApplication(Misconfiguration)
@@ -619,7 +622,10 @@ object Application extends ScorexLogging {
       .orElse(db.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb))
       .map { blockMeta =>
         val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height, blockMeta.header.generator.toAddress, blockchainUpdater)
-        blockMeta.copy(rewardShares = rewardShares)
+        blockMeta.copy(
+          rewardShares = rewardShares,
+          reward = blockMeta.reward.map(_ * blockchainUpdater.blockRewardBoost(height))
+        )
       }
 
   def main(args: Array[String]): Unit = {
@@ -636,8 +642,9 @@ object Application extends ScorexLogging {
       case "import"                 => Importer.main(args.tail)
       case "explore"                => Explorer.main(args.tail)
       case "util"                   => UtilApp.main(args.tail)
-      case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
-      case _                        => startNode(args.headOption) // TODO: Consider adding option to specify network-name
+      case "gengen"                 => GenesisBlockGenerator.main(args.tail)
+      case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util | gengen")
+      case _                        => startNode(args.headOption)
     }
   }
 

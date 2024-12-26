@@ -30,8 +30,7 @@ object MicroBlockMiner {
       settings: MinerSettings,
       minerScheduler: SchedulerService,
       appenderScheduler: SchedulerService,
-      transactionAdded: Observable[Unit],
-      nextMicroBlockSize: Int => Int = identity
+      transactionAdded: Observable[Unit]
   ): MicroBlockMiner =
     new MicroBlockMinerImpl(
       setDebugState,
@@ -41,7 +40,6 @@ object MicroBlockMiner {
       settings,
       minerScheduler,
       appenderScheduler,
-      transactionAdded,
-      nextMicroBlockSize
+      transactionAdded
     )
 }

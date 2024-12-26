@@ -69,7 +69,7 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
       case E_LONG   => Coeval.now(CONST_LONG(in.readInt64()))
       case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(in.readByteArray())).explicitGet())
       case E_STRING => Coeval.now(CONST_STRING(in.readString()).explicitGet())
-      case E_IF     => (desAuxR(in, allowObjects, acc), desAuxR(in, allowObjects, acc), desAuxR(in, allowObjects, acc)).mapN(IF)
+      case E_IF     => (desAuxR(in, allowObjects, acc), desAuxR(in, allowObjects, acc), desAuxR(in, allowObjects, acc)).mapN(IF.apply)
       case E_BLOCK =>
         for {
           name     <- Coeval.now(in.readString())

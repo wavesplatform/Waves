@@ -269,7 +269,7 @@ trait BaseGlobal {
     }
 
   def dAppFuncTypes(dApp: DApp): Either[ScriptParseError, FunctionSignatures] =
-    MetaMapper.dicFromProto(dApp).bimap(ScriptParseError, combineMetaWithDApp(_, dApp))
+    MetaMapper.dicFromProto(dApp).bimap(ScriptParseError.apply, combineMetaWithDApp(_, dApp))
 
   private def combineMetaWithDApp(meta: ParsedMeta, dApp: DApp): FunctionSignatures = {
     val argTypesWithFuncName =

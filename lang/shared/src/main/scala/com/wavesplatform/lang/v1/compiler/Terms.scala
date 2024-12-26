@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.ContractLimits.*
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
-import com.wavesplatform.lang.{CommonError, ExecutionError}
+import com.wavesplatform.lang.*
 import monix.eval.Coeval
 
 import java.nio.charset.StandardCharsets
@@ -165,7 +165,7 @@ object Terms {
     var body: EXPR
   }
 
-  @Deprecated
+  @deprecated("use BLOCK instead", "1.0")
   case class LET_BLOCK(let: LET, var body: EXPR) extends EXPR with BLOCK_DEF {
     def toStr: Coeval[String] =
       for {

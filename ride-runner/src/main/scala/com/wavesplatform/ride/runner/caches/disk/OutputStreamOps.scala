@@ -10,7 +10,7 @@ trait OutputStreamSyntax {
 }
 
 final class OutputStreamOps(private val self: OutputStream) extends AnyVal {
-  def writeOpt(xs: Option[Array[Byte]]): OutputStream = xs match {
+  def writeOpt(maybeXs: Option[Array[Byte]]): OutputStream = maybeXs match {
     case Some(xs) => writeBool(true).write(xs); self
     case None     => writeBool(false)
   }

@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.DataType
-import scodec.Codec
+import scodec.{Codec, ValueCodecEnrichedWithHListSupport, HListCodecEnrichedWithHListSupport, TransformSyntax}
 import scodec.bits.*
 import scodec.codecs.*
 

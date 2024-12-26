@@ -82,7 +82,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         "version"         -> version,
         "timestamp"       -> System.currentTimeMillis(),
         "proofs"          -> Json.arr(),
-        "script"          -> scriptOpt.fold[JsValue](JsNull)(JsString)
+        "script"          -> scriptOpt.fold[JsValue](JsNull)(JsString.apply)
       )
     )
 

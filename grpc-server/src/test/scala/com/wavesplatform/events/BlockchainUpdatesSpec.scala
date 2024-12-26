@@ -27,8 +27,8 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{DataEntry, InvokeScriptResult}
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation, Payment}
+import com.wavesplatform.protobuf.transaction.{DataEntry, InvokeScriptResult}
 import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.state.{AssetDescription, BlockRewardCalculator, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.test.*
@@ -1091,6 +1091,33 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
             RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward5)
           ).sortBy(_.address.toByteStr)
         )
+      }
+    }
+
+    "should return correct updated_waves_amount when reward boost is active" in {
+      val settings = ConsensusImprovements
+        .setFeaturesHeight(
+          BlockchainFeatures.BlockReward -> 0,
+          BlockchainFeatures.BlockRewardDistribution -> 0,
+          BlockchainFeatures.BoostBlockReward        -> 5
+        )
+        .configure(fs =>
+          fs.copy(blockRewardBoostPeriod = 10)
+        )
+
+      withDomainAndRepo(settings) { case (d, repo) =>
+        d.appendBlock()
+        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+
+        (1 to 15).foreach(_ => d.appendBlock())
+
+
+        subscription
+          .fetchAllEvents(d.blockchain)
+        .map(_.getUpdate.getAppend.getBlock.updatedWavesAmount) shouldBe
+          (2 to 16).scanLeft(100_000_000.waves) { (total, height) => total + 6.waves * d.blockchain.blockRewardBoost(height) }
+
+
       }
     }
   }

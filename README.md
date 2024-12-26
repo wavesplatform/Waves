@@ -27,7 +27,7 @@
   </a>
 </p>
 
-> Waves is an open source [blockchain protocol](https://waves.tech/waves-protocol). <br/> 
+> Waves is an open source [blockchain protocol](https://waves.tech). <br/> 
 You can use it to build your own decentralized applications. Waves provides full blockchain ecosystem including smart contracts language called RIDE.
 
 

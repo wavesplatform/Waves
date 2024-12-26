@@ -16,9 +16,9 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, TxPositiveAmount}
+import com.wavesplatform.transaction.*
 import org.scalatest.prop.TableDrivenPropertyChecks
-import play.api.libs.json.Json
+import play.api.libs.json.*
 
 class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
   override protected def nodeConfigs: Seq[Config] =

@@ -84,8 +84,7 @@ class MinerImpl(
     settings.minerSettings,
     minerScheduler,
     appenderScheduler,
-    transactionAdded,
-    utx.getPriorityPool.map(p => p.nextMicroBlockSize(_)).getOrElse(identity)
+    transactionAdded
   )
 
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =

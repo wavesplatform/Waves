@@ -28,7 +28,6 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.BalanceDiffValidation
 import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
-import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
@@ -217,6 +216,13 @@ object InvokeScriptDiff {
                   wrapDAppEnv
                 ))
                 for {
+                  _ <-
+                    if (
+                      blockchain.height >= blockchain.settings.functionalitySettings.paymentsCheckHeight && blockchain
+                        .isFeatureActivated(BlockchainFeatures.LightNode)
+                    )
+                      validateIntermediateBalances(blockchain, paymentsPartInsideDApp, 0, Nil)
+                    else traced(Right(()))
                   evaluated <- CoevalR(
                     evaluateV2(
                       version,

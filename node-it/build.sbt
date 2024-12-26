@@ -11,5 +11,5 @@ inTask(docker)(
   )
 )
 
-val packageAll = taskKey[Unit]("build all packages")
-docker := docker.dependsOn(LocalProject("waves-node") / packageAll).value
+val buildTarballsForDocker = taskKey[Unit]("build all packages")
+docker := docker.dependsOn(LocalProject("waves-node") / buildTarballsForDocker).value

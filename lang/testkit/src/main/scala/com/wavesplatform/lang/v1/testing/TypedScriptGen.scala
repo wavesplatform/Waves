@@ -86,7 +86,7 @@ trait TypedScriptGen {
   private def LONGgen(gas: Int): Gen[EXPR] =
     if (gas > 0) Gen.oneOf(CONST_LONGgen, BLOCK_LONGgen(gas - 1), IF_LONGgen(gas - 1), FUNCTION_CALLgen(LONG)) else CONST_LONGgen
 
-  private def CONST_LONGgen: Gen[EXPR] = Gen.choose(Long.MinValue, Long.MaxValue).map(CONST_LONG)
+  private def CONST_LONGgen: Gen[EXPR] = Gen.choose(Long.MinValue, Long.MaxValue).map(CONST_LONG.apply)
 
   private def BLOCK_LONGgen(gas: Int): Gen[EXPR] =
     for {

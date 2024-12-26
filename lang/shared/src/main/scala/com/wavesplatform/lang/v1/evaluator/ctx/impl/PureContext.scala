@@ -220,7 +220,7 @@ object PureContext {
             r => r >= BigIntMin && r <= BigIntMax,
             s"$a ${op.func} $b is out of range."
           )
-          .map(CONST_BIGINT)
+          .map(CONST_BIGINT.apply)
           .leftMap(CommonError(_))
       case args =>
         Left(s"Unexpected args $args for BigInt operator '${op.func}'")
@@ -1356,7 +1356,7 @@ object PureContext {
       body: (BigInt, BigInt) => Boolean
   ): BaseFunction[NoContext] =
     NativeFunction(opsToFunctions(op), Map(V5 -> 8L, V6 -> 8L, V7 -> 8L, V8 -> 1L), func, BOOLEAN, ("a", BIGINT), ("b", BIGINT)) {
-      case CONST_BIGINT(a) :: CONST_BIGINT(b) :: Nil => Try(body(a, b)).toEither.bimap(_.getMessage, CONST_BOOLEAN)
+      case CONST_BIGINT(a) :: CONST_BIGINT(b) :: Nil => Try(body(a, b)).toEither.bimap(_.getMessage, CONST_BOOLEAN.apply)
       case xs                                        => notImplemented[Id, EVALUATED](s"${opsToFunctions(op)}(a: BIGINT, b: BIGINT)", xs)
     }
 
@@ -1598,7 +1598,7 @@ object PureContext {
         ) {
           Left("pow: scale out of range 0-8")
         } else {
-          global.pow(b, bp.toInt, e, ep.toInt, rp.toInt, Rounding.byValue(round), useNewPrecision).map(CONST_LONG).leftMap(CommonError(_))
+          global.pow(b, bp.toInt, e, ep.toInt, rp.toInt, Rounding.byValue(round), useNewPrecision).map(CONST_LONG.apply).leftMap(CommonError(_))
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
@@ -1632,7 +1632,7 @@ object PureContext {
         ) {
           Left(CommonError("log: scale out of range 0-8"))
         } else {
-          global.log(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG).leftMap(CommonError(_))
+          global.log(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG.apply).leftMap(CommonError(_))
         }
       case xs => notImplemented[Id, EVALUATED]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
     }
@@ -1665,7 +1665,7 @@ object PureContext {
           global
             .powBigInt(b, bp, e, ep, rp, Rounding.byValue(round), useNewPrecision)
             .filterOrElse(v => v <= BigIntMax && v >= BigIntMin, "Result out of 512-bit range")
-            .bimap(e => s"$e on BigInt pow calculation", CONST_BIGINT)
+            .bimap(e => s"$e on BigInt pow calculation", CONST_BIGINT.apply)
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: BigInt, bp: Int, exponent:Big Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
@@ -1719,7 +1719,7 @@ object PureContext {
           ) {
             Left("Scale out of range 0-18")
           } else {
-            global.logBigInt(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_BIGINT)
+            global.logBigInt(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_BIGINT.apply)
           }
         r.leftMap(e => s"$e on BigInt log calculation")
       case xs => notImplemented[Id, EVALUATED]("log(exponent: BigInt, ep: Int, base:Big Int, bp: Int, rp: Int, round: Rounds)", xs)

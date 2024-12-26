@@ -9,12 +9,12 @@ import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
 import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator}
 import com.wavesplatform.crypto.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
+import com.wavesplatform.settings.*
 import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import com.wavesplatform.utils.*
 import com.wavesplatform.wallet.Wallet
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 
 import java.io.{File, FileNotFoundException}
 import java.nio.file.Files
@@ -96,14 +96,13 @@ object GenesisBlockGenerator {
       .headOption
       .map(new File(_).getAbsoluteFile.ensuring(f => !f.isDirectory && f.getParentFile.isDirectory || f.getParentFile.mkdirs()))
 
-    val settings = parseSettings(ConfigFactory.parseFile(inputConfFile))
+    val settings = parseSettings(ConfigFactory.parseFile(inputConfFile).resolve())
     val confBody = createConfig(settings)
     outputConfFile.foreach(ocf => Files.write(ocf.toPath, confBody.utf8Bytes))
   }
 
   def parseSettings(config: Config): Settings = {
-    import net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-    config.as[Settings]("genesis-generator")
+    ConfigSource.fromConfig(config).at("genesis-generator").loadOrThrow[Settings]
   }
 
   def createConfig(settings: Settings): String = {

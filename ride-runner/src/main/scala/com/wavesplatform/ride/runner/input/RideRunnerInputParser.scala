@@ -2,31 +2,25 @@ package com.wavesplatform.ride.runner.input
 
 import cats.syntax.either.*
 import cats.syntax.option.*
-import com.google.protobuf.{ByteString, UnsafeByteOperations}
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.*
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
-import com.wavesplatform.json.JsonManipulations
-import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.ride.ScriptUtil
-import com.wavesplatform.state.Height
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{TransactionFactory, TxNonNegativeAmount, TxValidationError}
-import com.wavesplatform.utils.byteArrayFromString
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.{ArbitraryTypeReader, ValueReader}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, TxNonNegativeAmount, TxValidationError}
+import pureconfig.*
+import pureconfig.generic.auto.*
 import play.api.libs.json.*
+import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 
 import java.nio.charset.StandardCharsets
-import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.util.Try
 
-object RideRunnerInputParser extends ArbitraryTypeReader {
+object RideRunnerInputParser {
   val Base58Prefix = "base58:"
 
   def prepare(config: Config): Config =
@@ -36,75 +30,143 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
 
   /** Use after "prepare"
     */
-  def from(config: Config): RideRunnerInput = config.as[RideRunnerInput]
+  def from(config: Config): RideRunnerInput = {
+    val address     = ConfigSource.fromConfig(config).at("address").loadOrThrow[Address]
+    val request     = ConfigSource.fromConfig(config).at("request").loadOrThrow[JsObject]
+    val chainId     = getChainId(config)
+    val intAsString = ConfigSource.fromConfig(config).at("intAsString").load[Boolean].getOrElse(false)
+    val trace       = ConfigSource.fromConfig(config).at("trace").load[Boolean].getOrElse(false)
+    val evaluateScriptComplexityLimit =
+      ConfigSource.fromConfig(config).at("evaluateScriptComplexityLimit").load[Int].getOrElse(Int.MaxValue)
+    val maxTxErrorLogSize = ConfigSource.fromConfig(config).at("maxTxErrorLogSize").load[Int].getOrElse(1024)
+    val state             = ConfigSource.fromConfig(config).at("state").loadOrThrow[RideRunnerBlockchainState]
+    val postProcessing    = ConfigSource.fromConfig(config).at("postProcessing").load[List[RideRunnerPostProcessingMethod]].getOrElse(List.empty)
+    val test              = ConfigSource.fromConfig(config).at("test.expected").load[JsValue].map(RideRunnerTest.apply).toOption
 
-  def getChainId(x: Config): Char = x.getAs[Char]("chainId").getOrElse(fail("chainId is not specified or wrong"))
-
-  implicit val shortMapKeyValueReader: MapKeyValueReader[Short] = { key =>
-    key.toShortOption.getOrElse(fail(s"Expected an integer value between ${Short.MinValue} and ${Short.MaxValue}"))
+    RideRunnerInput(
+      address = address,
+      request = request,
+      chainId = chainId,
+      intAsString = intAsString,
+      trace = trace,
+      evaluateScriptComplexityLimit = evaluateScriptComplexityLimit,
+      maxTxErrorLogSize = maxTxErrorLogSize,
+      state = state,
+      postProcessing = postProcessing,
+      test = test
+    )
   }
 
-  implicit val intMapKeyValueReader: MapKeyValueReader[Int] = { key =>
+  def getChainId(x: Config): Char = ConfigSource.fromConfig(x).at("chainId").load[Char].getOrElse(fail("chainId is not specified or wrong"))
+
+  implicit val intMapKeyConfigReader: MapKeyConfigReader[Int] = { key =>
     key.toIntOption.getOrElse(fail(s"Expected an integer value between ${Int.MinValue} and ${Int.MaxValue}"))
   }
 
-  implicit val byteStrMapKeyValueReader: MapKeyValueReader[ByteStr] = byteStrDefaultBase58FromString(_)
+  implicit val byteStrMapKeyConfigReader: MapKeyConfigReader[ByteStr] = byteStrDefaultBase58FromString(_)
 
-  implicit val addressMapKeyValueReader: MapKeyValueReader[Address] = Address.fromString(_).getOrFail
+  implicit val addressMapKeyConfigReader: MapKeyConfigReader[Address] = Address.fromString(_).getOrFail
 
-  implicit val issuedAssetMapKeyValueReader: MapKeyValueReader[IssuedAsset] = IssuedAsset.fromString(_, identity, fail(_))
+  implicit val issuedAssetMapKeyConfigReader: MapKeyConfigReader[IssuedAsset] = IssuedAsset.fromString(_, identity, fail(_))
 
-  implicit val optBlockIdMapKeyValueReader: MapKeyValueReader[Option[BlockId]] = { x =>
+  implicit val optBlockIdMapKeyConfigReader: MapKeyConfigReader[Option[BlockId]] = { x =>
     if (x.isEmpty) None else byteStrDefaultBase58FromString(x).some
   }
 
-  implicit val charValueReader: ValueReader[Char] = ValueReader[String].map { x =>
-    if (x.length == 1) x.head else fail(s"Expected one char, got: $x")
+  implicit val shortMapKeyConfigReader: MapKeyConfigReader[Short] = { key =>
+    key.toShortOption.getOrElse(fail(s"Expected an integer value between ${Short.MinValue} and ${Short.MaxValue}"))
   }
 
-  implicit val byteValueReader: ValueReader[Byte] = ValueReader[Int].map { x =>
-    if (x.isValidByte) x.toByte
-    else fail(s"Expected an integer value between ${Byte.MinValue} and ${Byte.MaxValue}")
-  }
+  implicit val txNonNegativeAmountConfigReader: ConfigReader[TxNonNegativeAmount] = ConfigReader[Long].map(TxNonNegativeAmount.unsafeFrom)
 
-  implicit val shortValueReader: ValueReader[Short] = ValueReader[Int].map { x =>
-    if (x.isValidShort) x.toShort
-    else fail(s"Expected a value between ${Short.MinValue} and ${Short.MaxValue}")
-  }
+  implicit val byteStrConfigReader: ConfigReader[ByteStr] = ConfigReader[String].map(byteStrDefaultBase58FromString)
 
-  implicit val heightValueReader: ValueReader[Height] = ValueReader[Int].map(Height(_))
-
-  implicit val stdLibVersionValueReader: ValueReader[StdLibVersion] = ValueReader[Int].map(StdLibVersion.VersionDic.idMap.apply)
-
-  implicit val jsValueValueReader: ValueReader[JsValue]   = jsValueReader
-  implicit val jsObjectValueReader: ValueReader[JsObject] = jsValueReader
-
-  implicit val txNonNegativeAmountValueReader: ValueReader[TxNonNegativeAmount] = ValueReader[Long].map(TxNonNegativeAmount.unsafeFrom)
-
-  implicit val byteArrayValueReader: ValueReader[Array[Byte]] = ValueReader[String].map(byteArrayFromString(_, identity, fail(_)))
-
-  implicit val byteStringValueReader: ValueReader[ByteString] = byteArrayValueReader.map(UnsafeByteOperations.unsafeWrap)
-
-  implicit val byteStrValueReader: ValueReader[ByteStr] = byteArrayValueReader.map(ByteStr(_))
-
-  implicit val stringOrBytesAsByteArratValueReader: ValueReader[StringOrBytesAsByteArray] = ValueReader[String].map { x =>
+  implicit val stringOrBytesAsByteArrayConfigReader: ConfigReader[StringOrBytesAsByteArray] = ConfigReader[String].map { x =>
     StringOrBytesAsByteArray(byteArrayDefaultUtf8FromString(x))
   }
 
-  implicit val scriptValueReader: ValueReader[Script] = ValueReader[String].map { x =>
+  implicit val scriptConfigReader: ConfigReader[Script] = ConfigReader[String].map { x =>
     if (x.startsWith(Base64.Prefix)) ScriptReader.fromBytes(Base64.decode(x)).getOrFail
     else ScriptUtil.from(x)
   }
 
   type SrcOrCompiledScript = Either[String, Script]
-  implicit val srcOrCompiledScriptValueReader: ValueReader[SrcOrCompiledScript] = ValueReader[String].map { x =>
+
+  implicit val srcOrCompiledScriptConfigReader: ConfigReader[SrcOrCompiledScript] = ConfigReader[String].map { x =>
     if (x.startsWith(Base64.Prefix)) ScriptReader.fromBytes(Base64.decode(x)).getOrFail.asRight
     else x.asLeft
   }
 
-  implicit val addressValueReader: ValueReader[Address] = ValueReader[String].map(Address.fromString(_).getOrFail)
+  implicit val accountConfigReader: ConfigReader[RideRunnerAccount] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur <- cur.asObjectCursor
+      assetBalances <- ConfigReader[Option[Map[IssuedAsset, TxNonNegativeAmount]]]
+        .from(objCur.atKeyOrUndefined("assetBalances"))
+        .map(_.getOrElse(Map.empty))
+      regularBalance    <- ConfigReader[Option[TxNonNegativeAmount]].from(objCur.atKeyOrUndefined("regularBalance"))
+      leasing           <- ConfigReader[Option[RideRunnerLeaseBalance]].from(objCur.atKeyOrUndefined("leasing"))
+      generatingBalance <- ConfigReader[Option[TxNonNegativeAmount]].from(objCur.atKeyOrUndefined("generatingBalance"))
+      data              <- ConfigReader[Option[Map[String, RideRunnerDataEntry]]].from(objCur.atKeyOrUndefined("data"))
+      aliases           <- ConfigReader[Option[List[Alias]]].from(objCur.atKeyOrUndefined("aliases")).map(_.getOrElse(Nil))
+      scriptInfo        <- ConfigReader[Option[RideRunnerScriptInfo]].from(objCur.atKeyOrUndefined("scriptInfo"))
+    } yield RideRunnerAccount(assetBalances, regularBalance, leasing, generatingBalance, data, aliases, scriptInfo)
+  }
 
-  implicit val aliasValueReader: ValueReader[Alias] = ValueReader[String].map { x =>
+  implicit val assetConfigReader: ConfigReader[RideRunnerAsset] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur          <- cur.asObjectCursor
+      issuerPublicKey <- ConfigReader[Option[PublicKey]].from(objCur.atKeyOrUndefined("issuerPublicKey")).map(_.getOrElse(EmptyPublicKey))
+      name <- ConfigReader[Option[StringOrBytesAsByteArray]].from(objCur.atKeyOrUndefined("name")).map(_.getOrElse(RideRunnerAsset.DefaultName))
+      description <- ConfigReader[Option[StringOrBytesAsByteArray]]
+        .from(objCur.atKeyOrUndefined("description"))
+        .map(_.getOrElse(RideRunnerAsset.DefaultDescription))
+      decimals             <- ConfigReader[Option[Int]].from(objCur.atKeyOrUndefined("decimals")).map(_.getOrElse(8))
+      reissuable           <- ConfigReader[Option[Boolean]].from(objCur.atKeyOrUndefined("reissuable")).map(_.getOrElse(false))
+      quantity             <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("quantity")).map(_.getOrElse(9007199254740991L))
+      script               <- ConfigReader[Option[Script]].from(objCur.atKeyOrUndefined("script"))
+      minSponsoredAssetFee <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("minSponsoredAssetFee")).map(_.getOrElse(0L))
+    } yield RideRunnerAsset(issuerPublicKey, name, description, decimals, reissuable, quantity, script, minSponsoredAssetFee)
+  }
+
+  implicit val blockConfigReader: ConfigReader[RideRunnerBlock] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur <- cur.asObjectCursor
+      // Note: `System.currentTimeMillis()` is a side effect, as well as the default value for the `timestamp` field in case class is.
+      // It would be a good idea not to use side effects in the default values of case class fields.
+      timestamp  <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("timestamp")).map(_.getOrElse(System.currentTimeMillis()))
+      baseTarget <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("baseTarget")).map(_.getOrElse(130L))
+      generationSignature <- ConfigReader[Option[ByteStr]]
+        .from(objCur.atKeyOrUndefined("generationSignature"))
+        .map(_.getOrElse(ByteStr(new Array[Byte](64))))
+      generatorPublicKey <- ConfigReader[Option[PublicKey]].from(objCur.atKeyOrUndefined("generatorPublicKey")).map(_.getOrElse(EmptyPublicKey))
+
+      vrf         <- ConfigReader[Option[ByteStr]].from(objCur.atKeyOrUndefined("VRF"))
+      blockReward <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("blockReward")).map(_.getOrElse(600_000_000L))
+    } yield RideRunnerBlock(timestamp, baseTarget, generationSignature, generatorPublicKey, vrf, blockReward)
+  }
+
+  implicit val transactionConfigReader: ConfigReader[RideRunnerTransaction] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur          <- cur.asObjectCursor
+      amount          <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("amount")).map(_.getOrElse(1L))
+      assetId         <- ConfigReader[Option[Asset]].from(objCur.atKeyOrUndefined("assetId")).map(_.getOrElse(Waves))
+      fee             <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("fee")).map(_.getOrElse(100_000L))
+      feeAssetId      <- ConfigReader[Option[Asset]].from(objCur.atKeyOrUndefined("feeAssetId")).map(_.getOrElse(Waves))
+      recipient       <- objCur.atKey("recipient").flatMap(ConfigReader[AddressOrAlias].from)
+      senderPublicKey <- ConfigReader[Option[PublicKey]].from(objCur.atKeyOrUndefined("senderPublicKey")).map(_.getOrElse(EmptyPublicKey))
+      height          <- ConfigReader[Option[Int]].from(objCur.atKeyOrUndefined("height"))
+      // Note: `System.currentTimeMillis()` is a side effect, as well as the default value for the `timestamp` field in case class is.
+      // It would be a good idea not to use side effects in the default values of case class fields.
+      timestamp <- ConfigReader[Option[Long]].from(objCur.atKeyOrUndefined("timestamp")).map(_.getOrElse(System.currentTimeMillis()))
+      proofs    <- ConfigReader[Option[List[StringOrBytesAsByteArray]]].from(objCur.atKeyOrUndefined("proofs")).map(_.getOrElse(Nil))
+      version   <- ConfigReader[Option[Byte]].from(objCur.atKeyOrUndefined("version")).map(_.getOrElse(3: Byte))
+      attachment <- ConfigReader[Option[StringOrBytesAsByteArray]]
+        .from(objCur.atKeyOrUndefined("attachment"))
+        .map(_.getOrElse(StringOrBytesAsByteArray(Array.empty[Byte])))
+    } yield RideRunnerTransaction(amount, assetId, fee, feeAssetId, recipient, senderPublicKey, height, timestamp, proofs, version, attachment)
+  }
+
+  implicit val aliasConfigReader: ConfigReader[Alias] = ConfigReader[String].map { x =>
     val chainId = AddressScheme.current.chainId
 
     val separatorNumber = x.count(_ == ':')
@@ -116,7 +178,7 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     alias.flatMap { x => Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId)) }.getOrFail
   }
 
-  implicit val addressOrAliasValueReader: ValueReader[AddressOrAlias] = ValueReader[String].map { x =>
+  implicit val addressOrAliasConfigReader: ConfigReader[AddressOrAlias] = ConfigReader[String].map { x =>
     val chainId = AddressScheme.current.chainId
 
     val separatorNumber = x.count(_ == ':')
@@ -128,55 +190,52 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     addressOrAlias.flatMap { x => Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId)) }.getOrFail
   }
 
-  implicit val publicKeyValueReader: ValueReader[PublicKey] = ValueReader[ByteStr].map(PublicKey(_))
+  implicit val publicKeyConfigReader: ConfigReader[PublicKey] = ConfigReader[ByteStr].map(PublicKey(_))
 
-  implicit val transferTransactionLikeValueReader: ValueReader[TransferTransactionLike] = jsObjectValueReader.map { js =>
-    TransactionFactory
-      .fromSignedRequest(js)
-      .flatMap {
-        case tx: TransferTransactionLike => Right(tx)
-        case _                           => Left(TxValidationError.UnsupportedTransactionType)
+  implicit val rideRunnerDataEntryConfigReader: ConfigReader[RideRunnerDataEntry] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur   <- cur.asObjectCursor
+      dataType <- objCur.atKey("type").flatMap(ConfigReader[String].from)
+      data <- dataType match {
+        case "integer" => objCur.atKey("value").flatMap(ConfigReader[Long].from).map(IntegerRideRunnerDataEntry.apply)
+        case "boolean" => objCur.atKey("value").flatMap(ConfigReader[Boolean].from).map(BooleanRideRunnerDataEntry.apply)
+        case "string"  => objCur.atKey("value").flatMap(ConfigReader[String].from).map(StringRideRunnerDataEntry.apply)
+        case "binary" =>
+          objCur.atKey("value").flatMap(ConfigReader[String].from).map(x => BinaryRideRunnerDataEntry(ByteStr(byteArrayDefaultUtf8FromString(x))))
+        case x => fail(s"Expected one of types: integer, boolean, string, binary. Got $x")
       }
-      .getOrFail
+    } yield data
   }
 
-  implicit val rideRunnerDataEntryValueReader: ValueReader[RideRunnerDataEntry] = ValueReader.relative[RideRunnerDataEntry] { config =>
-    config.getString("type") match {
-      case "integer" => IntegerRideRunnerDataEntry(config.getLong("value"))
-      case "boolean" => BooleanRideRunnerDataEntry(config.getBoolean("value"))
-      case "string"  => StringRideRunnerDataEntry(config.getString("value"))
-      case "binary"  => BinaryRideRunnerDataEntry(ByteStr(byteArrayDefaultUtf8FromString(config.getString("value"))))
-      case x         => fail(s"Expected one of types: integer, boolean, string, binary. Got $x")
-    }
-  }
-
-  implicit val rideRunnerPostProcessingMethodValueReader: ValueReader[RideRunnerPostProcessingMethod] =
-    ValueReader.relative[RideRunnerPostProcessingMethod] { config =>
-      config.getString("type") match {
-        case "pick"    => RideRunnerPostProcessingMethod.Pick(config.getString("path"))
-        case "pickAll" => RideRunnerPostProcessingMethod.PickAll(config.getStringList("paths").asScala.toList)
-        case "prune"   => RideRunnerPostProcessingMethod.Prune(config.getStringList("paths").asScala.toList)
+  implicit val rideRunnerPostProcessingMethodConfigReader: ConfigReader[RideRunnerPostProcessingMethod] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur <- cur.asObjectCursor
+      method <- objCur.atKey("type").flatMap(ConfigReader[String].from)
+      data <- method match {
+        case "pick"    => objCur.atKey("path").flatMap(ConfigReader[String].from).map(RideRunnerPostProcessingMethod.Pick.apply)
+        case "pickAll" => objCur.atKey("paths").flatMap(ConfigReader[List[String]].from).map(RideRunnerPostProcessingMethod.PickAll.apply)
+        case "prune"   => objCur.atKey("paths").flatMap(ConfigReader[List[String]].from).map(RideRunnerPostProcessingMethod.Prune.apply)
         case "regex" =>
-          RideRunnerPostProcessingMethod.Regex(
-            path = config.getString("path"),
-            find = config.getString("find"),
-            replace = config.getString("replace")
-          )
+          for {
+            path    <- objCur.atKey("path").flatMap(ConfigReader[String].from)
+            find    <- objCur.atKey("find").flatMap(ConfigReader[String].from)
+            replace <- objCur.atKey("replace").flatMap(ConfigReader[String].from)
+          } yield RideRunnerPostProcessingMethod.Regex(path, find, replace)
         case x => fail(s"Expected one of types: pick, pickAll, prune. Got $x")
       }
-    }
+    } yield data
+  }
 
-  implicit val rideRunnerScriptInfoValueReader: ValueReader[RideRunnerScriptInfo] = ValueReader.relative[RideRunnerScriptInfo] { config =>
-    val pk      = config.as[Option[PublicKey]]("publicKey")
-    val script  = config.as[SrcOrCompiledScript]("script")
-    val imports = config.as[Option[Map[String, String]]]("imports")
-
-    val compiledScript = script match {
-      case Right(x)  => x
-      case Left(src) => ScriptUtil.from(src, imports.getOrElse(Map.empty))
-    }
-
-    RideRunnerScriptInfo(pk.getOrElse(EmptyPublicKey), compiledScript)
+  implicit val rideRunnerScriptInfoConfigReader: ConfigReader[RideRunnerScriptInfo] = ConfigReader.fromCursor { cur =>
+    for {
+      objCur  <- cur.asObjectCursor
+      pk      <- ConfigReader[Option[PublicKey]].from(objCur.atKeyOrUndefined("publicKey")).map(_.getOrElse(EmptyPublicKey))
+      imports <- ConfigReader[Option[Map[String, String]]].from(objCur.atKeyOrUndefined("imports")).map(_.getOrElse(Map.empty))
+      compiledScript <- ConfigReader[SrcOrCompiledScript].from(objCur.atKeyOrUndefined("script")).map {
+        case Right(x)  => x
+        case Left(src) => ScriptUtil.from(src, imports)
+      }
+    } yield RideRunnerScriptInfo(pk, compiledScript)
   }
 
   private def byteArrayDefaultUtf8FromString(x: String): Array[Byte] = Try {
@@ -193,32 +252,18 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     else Base58.tryDecodeWithLimit(x).fold(e => fail(s"Error parsing base58: ${e.getMessage}"), identity)
   }
 
-  private def jsValueReader[T: Reads]: ValueReader[T] = { (config: Config, path: String) =>
-    // config.getObject(path) doesn't work for primitive values.
-    // atPath("x") allows a consistent rendering for all types of content at specified path.
-    val fixedPath = if (path == "") "x" else s"x.$path"
-    val jsonStr   = config.atPath("x").root().render(ConfigRenderOptions.concise())
-    JsonManipulations
-      .pick(Json.parse(jsonStr), fixedPath)
-      .getOrElse(fail(s"Expected a value at $path"))
-      .validate[T] match {
-      case JsSuccess(value, _) => value
-      case JsError(errors)     => fail(s"Can't parse: ${errors.mkString("\n")}")
-    }
-  }
-
   private implicit final class ValidationErrorOps[E, T](private val self: Either[E, T]) extends AnyVal {
     def getOrFail: T = self.fold(e => fail(e.toString), identity)
   }
 
   private def fail(message: String, cause: Throwable = null) = throw new IllegalArgumentException(message, cause)
 
-  implicit def arbitraryKeyMapValueReader[K, V: ValueReader](implicit kReader: MapKeyValueReader[K]): ValueReader[Map[K, V]] =
-    ValueReader[Map[String, V]].map { xs =>
+  implicit def arbitraryKeyMapConfigReader[K, V: ConfigReader](implicit kReader: MapKeyConfigReader[K]): ConfigReader[Map[K, V]] =
+    ConfigReader[Map[String, V]].map { xs =>
       xs.map { case (k, v) => kReader.readKey(k) -> v }
     }
 
-  trait MapKeyValueReader[T] {
+  trait MapKeyConfigReader[T] {
     def readKey(key: String): T
   }
 }

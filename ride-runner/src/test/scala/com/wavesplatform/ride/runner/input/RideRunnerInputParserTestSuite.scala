@@ -13,12 +13,13 @@ import com.wavesplatform.ride.{DiffXInstances, ScriptUtil}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxNonNegativeAmount
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
-import net.ceedubs.ficus.Ficus.toFicusConfig
-import net.ceedubs.ficus.readers.ValueReader
 import org.scalatest.prop.TableDrivenPropertyChecks
+import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 import play.api.libs.json.*
+import pureconfig.*
 
 import java.nio.charset.StandardCharsets
+import scala.reflect.ClassTag
 import scala.util.{Success, Try}
 
 class RideRunnerInputParserTestSuite extends BaseTestSuite with TableDrivenPropertyChecks with HasTestAccounts with DiffXInstances {
@@ -372,6 +373,8 @@ func bar () = {
     }
   }
 
-  private def parseQuotedStringAs[T: ValueReader](s: String): T = ConfigFactory.parseString(s"""x = \"\"\"$s\"\"\"""").as[T]("x")
-  private def parseAs[T: ValueReader](rawContent: String): T    = ConfigFactory.parseString(s"""x = $rawContent""").as[T]("x")
+  private def parseQuotedStringAs[T: ConfigReader: ClassTag](s: String): T =
+    ConfigSource.fromConfig(ConfigFactory.parseString(s"""x = \"\"\"$s\"\"\"""")).at("x").loadOrThrow[T]
+  private def parseAs[T: ConfigReader: ClassTag](rawContent: String): T =
+    ConfigSource.fromConfig(ConfigFactory.parseString(s"""x = $rawContent""")).at("x").loadOrThrow[T]
 }

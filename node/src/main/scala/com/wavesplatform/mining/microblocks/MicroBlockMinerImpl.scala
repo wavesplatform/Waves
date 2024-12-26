@@ -34,8 +34,7 @@ class MicroBlockMinerImpl(
     settings: MinerSettings,
     minerScheduler: SchedulerService,
     appenderScheduler: SchedulerService,
-    transactionAdded: Observable[Unit],
-    nextMicroBlockSize: Int => Int
+    transactionAdded: Observable[Unit]
 ) extends MicroBlockMiner
     with ScorexLogging {
 
@@ -73,7 +72,7 @@ class MicroBlockMinerImpl(
         val mdConstraint = MultiDimensionalMiningConstraint(
           restTotalConstraint,
           OneDimensionalMiningConstraint(
-            nextMicroBlockSize(settings.maxTransactionsInMicroBlock),
+            settings.maxTransactionsInMicroBlock,
             TxEstimators.one,
             "MaxTxsInMicroBlock"
           )
@@ -174,10 +173,10 @@ class MicroBlockMinerImpl(
             stateHash = if (blockchainUpdater.supportsLightNodeBlockFields()) stateHash else None,
             challengedHeader = None
           )
-          .leftMap(BlockBuildError)
+          .leftMap(BlockBuildError.apply)
         microBlock <- MicroBlock
           .buildAndSign(signedBlock.header.version, account, unconfirmed, accumulatedBlock.id(), signedBlock.signature, stateHash)
-          .leftMap(MicroBlockBuildError)
+          .leftMap(MicroBlockBuildError.apply)
       } yield (signedBlock, microBlock)
     }
 }

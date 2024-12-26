@@ -3,11 +3,11 @@ package com.wavesplatform.it.sync.smartcontract
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.Asset.Waves
@@ -30,7 +30,7 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
     super.beforeAll()
     smartAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(scriptBase64), waitForTx = true).id
 
-    val dAppScript = ScriptCompiler(
+    val dAppScript = ScriptCompiler.compile(
       s"""
          |{-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE DAPP #-}
@@ -48,7 +48,6 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
          |@Callable (i)
          |func transferAssetByAlias(r: String, a: ByteVector, q: Int) = [ScriptTransfer(Alias(r), q, a)]
          """.stripMargin,
-      isAssetScript = false,
       ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 
@@ -132,7 +131,7 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
   }
 
   private def smartAssetScript(invokeId: String): String =
-    ScriptCompiler(
+    TestCompiler.DefaultVersion.compileAsset(
       s"""
        |{-# STDLIB_VERSION 4 #-}
        |{-# CONTENT_TYPE EXPRESSION #-}
@@ -169,10 +168,8 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
        |     && b.quantity == 100000
        |    case _ => true
        |  }
-         """.stripMargin,
-      isAssetScript = true,
-      ScriptEstimatorV3.latest
-    ).explicitGet()._1.bytes().base64
+         """.stripMargin
+    ).bytes().base64
 
   private def invokeScriptTransaction(func: String, args: List[EXPR]): InvokeScriptTransaction =
     Signed.invokeScript(

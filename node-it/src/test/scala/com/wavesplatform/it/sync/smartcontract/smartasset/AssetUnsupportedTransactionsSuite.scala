@@ -1,11 +1,9 @@
 package com.wavesplatform.it.sync.smartcontract.smartasset
 
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{someAssetAmount, _}
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
@@ -34,15 +32,16 @@ class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableD
           issueFee,
           2,
           Some(
-            ScriptCompiler(
-              s"""
-                 |match tx {
-                 |  case _: $tx => true
-                 |  case _ => true
-                 |}""".stripMargin,
-              isAssetScript = true,
-              ScriptEstimatorV2
-            ).explicitGet()._1.bytes().base64
+            TestCompiler.DefaultVersion
+              .compileAsset(
+                s"""
+                   |match tx {
+                   |  case _: $tx => true
+                   |  case _ => true
+                   |}""".stripMargin
+              )
+              .bytes()
+              .base64
           ),
           waitForTx = true
         )

@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.db
 
 import com.google.common.primitives.Ints
-import com.wavesplatform.database.rocksdb.Key
+import com.wavesplatform.database.Key
 import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.caches.disk.KvHistoryPair
 import com.wavesplatform.ride.runner.db.Heights.{splitHeightsAt, splitHeightsAtRollback}

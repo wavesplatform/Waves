@@ -18,7 +18,7 @@ import org.openjdk.jmh.infra.Blackhole
 class CompilerBenchmark {
 
   @Benchmark
-  def serialize_test(st: St, bh: Blackhole): Unit = bh.consume(ScriptCompiler(st.scriptString, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1)
+  def serialize_test(st: St, bh: Blackhole): Unit = bh.consume(ScriptCompiler.compile(st.scriptString, ScriptEstimatorV2).explicitGet()._1)
 }
 
 object CompilerBenchmark {

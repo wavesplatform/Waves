@@ -32,7 +32,7 @@ class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections:
     case Some(address) =>
       val newTotal        = inboundConnectionCount.incrementAndGet()
       val newCountPerHost = perHostConnectionCount.compute(address, (_, cnt) => Option(cnt).fold(1)(_ + 1))
-      val isBlacklisted   = peerDatabase.blacklistedHosts.contains(address)
+      val isBlacklisted   = peerDatabase.isBlacklisted(address)
 
       val accepted = newTotal <= maxInboundConnections &&
         newCountPerHost <= maxConnectionsPerHost &&

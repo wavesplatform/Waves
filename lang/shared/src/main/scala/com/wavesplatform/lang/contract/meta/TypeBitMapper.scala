@@ -71,7 +71,7 @@ case class ListTypeMapper(bitMapper: TypeBitMapper) extends TypeBitMapper {
 
   override def fromIndex(i: Int): Either[String, FINAL] =
     if ((i >> bitMapper.length) % 2 == 1)
-      bitMapper.fromIndex(i ^ (1 << bitMapper.length)).map(LIST)
+      bitMapper.fromIndex(i ^ (1 << bitMapper.length)).map(LIST.apply)
     else
       bitMapper.fromIndex(i)
 

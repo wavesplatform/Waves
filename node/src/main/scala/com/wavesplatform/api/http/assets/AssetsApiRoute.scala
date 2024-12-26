@@ -18,13 +18,7 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.StreamSerializerUtils.*
-import com.wavesplatform.api.http.assets.AssetsApiRoute.{
-  AssetDetails,
-  AssetInfo,
-  DistributionParams,
-  assetDetailsSerializer,
-  assetDistributionSerializer
-}
+import com.wavesplatform.api.http.assets.AssetsApiRoute.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.RestAPISettings
@@ -38,6 +32,7 @@ import com.wavesplatform.transaction.{EthereumTransaction, TxTimestamp, TxVersio
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.concurrent.DefaultThreadFactory
+import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import play.api.libs.json.*
@@ -93,11 +88,10 @@ case class AssetsApiRoute(
         }
       } ~ pathPrefix("details") {
         (anyParam("id", limit = settings.assetDetailsLimit) & parameter("full".as[Boolean] ? false)) { (ids, full) =>
-          val result = Either
-            .cond(ids.nonEmpty, (), AssetIdNotSpecified)
-            .map(_ => multipleDetails(ids.toList, full))
-
-          complete(result)
+          if (ids.isEmpty) complete(AssetIdNotSpecified)
+          else {
+            routeTimeout.executeToFuture(Task(multipleDetails(ids.toList, full)))
+          }
         } ~ (get & path(AssetId) & parameter("full".as[Boolean] ? false)) { (assetId, full) =>
           singleDetails(assetId, full)
         }

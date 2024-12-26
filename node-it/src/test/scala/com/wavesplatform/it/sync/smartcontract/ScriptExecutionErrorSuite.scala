@@ -32,7 +32,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
         |}
       """.stripMargin
 
-    val compiled = ScriptCompiler(scriptSrc, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+    val compiled = ScriptCompiler.compile(scriptSrc, ScriptEstimatorV2).explicitGet()._1
 
     val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(1.toByte, thirdKeyPair, Some(compiled), setScriptFee, ts).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)

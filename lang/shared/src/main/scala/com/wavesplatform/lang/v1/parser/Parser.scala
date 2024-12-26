@@ -48,8 +48,9 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
   def unusedText[A: P] = comment ~ directive ~ comment
 
   def escapedUnicodeSymbolP[A: P]: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
+  def escapedUnicodeOrEndOfString[A: P]: P[Any] = escapedUnicodeSymbolP[A] | notEndOfString
   def stringP[A: P]: P[EXPR] =
-    P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~~ Index)
+    P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeOrEndOfString).!.repX ~~ "\"" ~~ Index)
       .map { case (start, xs, end) =>
         var errors         = Vector.empty[String]
         val consumedString = new StringBuilder
@@ -245,7 +246,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
         ContractLimits.MaxTupleSize
       )
       ~ comment ~/ ")")
-      .map(Tuple)
+      .map(Tuple.apply)
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
     def funcName       = anyVarName(check = true)
@@ -255,9 +256,9 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
     def funcBody       = singleBaseExpr
     def correctFunc    = Index ~~ funcKWAndName ~ comment ~/ args(min = 0) ~ ("=" ~ funcBody | "=" ~/ Fail.opaque("function body")) ~~ Index
     def noKeyword = {
-      def noArgs      = "(" ~ comment ~ ")" ~ comment
-      def validName   = NoCut(funcName).filter(_.isInstanceOf[VALID[?]])
-      def argsOrEqual = (NoCut(args(min = 1)) ~ "=".?) | (noArgs ~ "=" ~~ !"=")
+      def noArgs              = "(" ~ comment ~ ")" ~ comment
+      def validName           = NoCut(funcName).filter(_.isInstanceOf[VALID[?]])
+      def argsOrEqual: P[Any] = (NoCut(args(min = 1)) ~ "=".?) | (noArgs ~ "=" ~~ !"=")
       (validName ~ comment ~ argsOrEqual ~/ funcBody.? ~~ Fail)
         .asInstanceOf[P[Nothing]]
         .opaque(""""func" keyword""")
@@ -381,13 +382,13 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
     }
 
   def accessP[A: P]: P[(Int, Accessor, Int)] = P(
-    (("" ~ comment ~ Index ~ "." ~/ comment ~ getterOrOOPCall) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
+    (("" ~ comment ~ Index ~ "." ~/ comment ~ getterOrOOPCall) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex.apply) ~ "]" ~~ Index)
   )
 
   def getterOrOOPCall[A: P]: P[Accessor] =
     (genericMethodName ~~/ ("[" ~ unionTypeP ~/ "]")).map { case (name, tpe) =>
       GenericMethod(name, tpe)
-    } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs.opaque("""")"""") ~ comment ~/ ")").?).map {
+    } | (accessOrName.map(Getter.apply) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs.opaque("""")"""") ~ comment ~/ ")").?).map {
       case (g @ Getter(name), args) =>
         args.fold(g: Accessor)(Method(name, _))
     }

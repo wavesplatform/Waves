@@ -11,7 +11,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
-import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion, TransactionSignOps}
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
 

@@ -4,6 +4,7 @@ import java.io.IOException
 import java.net.{InetSocketAddress, URLEncoder}
 import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
+import java.time.{Duration as JDuration}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.DebugMessage.*
@@ -12,7 +13,7 @@ import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.{ConnectReq, DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.features.api.ActivationStatus
+import com.wavesplatform.features.api.{ActivationStatus, activationStatusFormat}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.util.*
@@ -41,7 +42,9 @@ import com.wavesplatform.transaction.{
   TxExchangePrice,
   TxNonNegativeAmount,
   TxPositiveAmount,
-  TxVersion
+  TxVersion,
+  TransactionSignOps,
+  TransactionValidationOps
 }
 import org.asynchttpclient.*
 import org.asynchttpclient.Dsl.{delete as _delete, get as _get, post as _post, put as _put}
@@ -181,8 +184,8 @@ object AsyncHttpApi extends Assertions {
 
       def request =
         _get(s"${n.nodeApiEndpoint}/blocks/height?${System.currentTimeMillis()}")
-          .setReadTimeout(timeout)
-          .setRequestTimeout(timeout)
+          .setReadTimeout(JDuration.ofMillis(timeout))
+          .setRequestTimeout(JDuration.ofMillis(timeout))
           .build()
 
       def send(): Future[Option[Response]] =
@@ -691,7 +694,7 @@ object AsyncHttpApi extends Assertions {
       )
 
     def removeData(sender: KeyPair, data: Seq[String], fee: Long, version: Byte = 2): Future[Transaction] =
-      broadcastData(sender, data.map[DataEntry[?]](EmptyDataEntry), fee, version)
+      broadcastData(sender, data.map[DataEntry[?]](EmptyDataEntry.apply), fee, version)
 
     def getData(address: String, amountsAsStrings: Boolean = false): Future[List[DataEntry[?]]] =
       get(s"/addresses/data/$address", amountsAsStrings).as[List[DataEntry[?]]](amountsAsStrings)

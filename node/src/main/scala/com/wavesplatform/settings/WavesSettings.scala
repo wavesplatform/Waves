@@ -2,10 +2,9 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.metrics.Metrics
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
-
 import scala.concurrent.duration.FiniteDuration
+import pureconfig.*
+import pureconfig.generic.auto.*
 
 case class WavesSettings(
     directory: String,
@@ -28,27 +27,28 @@ case class WavesSettings(
     config: Config
 )
 
-object WavesSettings extends CustomValueReaders {
+object WavesSettings {
   def fromRootConfig(rootConfig: Config): WavesSettings = {
-    val waves = rootConfig.getConfig("waves")
+    val waves             = rootConfig.getConfig("waves")
+    val wavesConfigSource = ConfigSource.fromConfig(waves)
 
-    val directory                 = waves.as[String]("directory")
-    val enableLightMode           = waves.as[Boolean]("enable-light-mode")
-    val ntpServer                 = waves.as[String]("ntp-server")
-    val maxTxErrorLogSize         = waves.as[Int]("max-tx-error-log-size")
-    val dbSettings                = waves.as[DBSettings]("db")
-    val extensions                = waves.as[Seq[String]]("extensions")
-    val extensionsShutdownTimeout = waves.as[FiniteDuration]("extensions-shutdown-timeout")
-    val networkSettings           = waves.as[NetworkSettings]("network")
-    val walletSettings            = waves.as[WalletSettings]("wallet")
-    val blockchainSettings        = waves.as[BlockchainSettings]("blockchain")
-    val minerSettings             = waves.as[MinerSettings]("miner")
-    val restAPISettings           = waves.as[RestAPISettings]("rest-api")
-    val synchronizationSettings   = waves.as[SynchronizationSettings]("synchronization")
-    val utxSettings               = waves.as[UtxSettings]("utx")
-    val featuresSettings          = waves.as[FeaturesSettings]("features")
-    val rewardsSettings           = waves.as[RewardsVotingSettings]("rewards")
-    val metrics                   = rootConfig.as[Metrics.Settings]("metrics") // TODO: Move to waves section
+    val directory                 = wavesConfigSource.at("directory").loadOrThrow[String]
+    val ntpServer                 = wavesConfigSource.at("ntp-server").loadOrThrow[String]
+    val maxTxErrorLogSize         = wavesConfigSource.at("max-tx-error-log-size").loadOrThrow[Int]
+    val dbSettings                = wavesConfigSource.at("db").loadOrThrow[DBSettings]
+    val extensions                = wavesConfigSource.at("extensions").loadOrThrow[Seq[String]]
+    val extensionsShutdownTimeout = wavesConfigSource.at("extensions-shutdown-timeout").loadOrThrow[FiniteDuration]
+    val networkSettings           = wavesConfigSource.at("network").loadOrThrow[NetworkSettings]
+    val walletSettings            = wavesConfigSource.at("wallet").loadOrThrow[WalletSettings]
+    val blockchainSettings        = wavesConfigSource.at("blockchain").loadOrThrow[BlockchainSettings]
+    val minerSettings             = wavesConfigSource.at("miner").loadOrThrow[MinerSettings]
+    val restAPISettings           = wavesConfigSource.at("rest-api").loadOrThrow[RestAPISettings]
+    val synchronizationSettings   = wavesConfigSource.at("synchronization").loadOrThrow[SynchronizationSettings]
+    val utxSettings               = wavesConfigSource.at("utx").loadOrThrow[UtxSettings]
+    val featuresSettings          = wavesConfigSource.at("features").loadOrThrow[FeaturesSettings]
+    val rewardsSettings           = wavesConfigSource.at("rewards").loadOrThrow[RewardsVotingSettings]
+    val metrics                   = ConfigSource.fromConfig(rootConfig).at("metrics").loadOrThrow[Metrics.Settings] // TODO: Move to waves section
+    val enableLightMode           = wavesConfigSource.at("enable-light-mode").loadOrThrow[Boolean]
 
     WavesSettings(
       directory,

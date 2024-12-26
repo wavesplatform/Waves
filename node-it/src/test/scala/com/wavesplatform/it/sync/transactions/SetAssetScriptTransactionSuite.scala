@@ -6,19 +6,20 @@ import com.wavesplatform.api.http.ApiError.{Mistiming, StateCheckFailed, WrongJs
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{script, someAssetAmount, _}
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Proofs, TxPositiveAmount}
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import play.api.libs.json._
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount}
+import play.api.libs.json.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Random
 
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
@@ -28,15 +29,13 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   var assetWScript     = ""
   var assetWScript2    = ""
   private def accountB = secondKeyPair
-  private val unchangeableScript = ScriptCompiler(
+  private val unchangeableScript = TestCompiler.DefaultVersion.compileAsset(
     s"""match tx {
        |  case _: SetAssetScriptTransaction => false
        |  case _ => true
        |}
-       |""".stripMargin,
-    isAssetScript = true,
-    estimator
-  ).explicitGet()._1
+       |""".stripMargin
+  )
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -117,7 +116,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         "sender"          -> issuer.toAddress,
         "senderPublicKey" -> issuer.publicKey,
         "fee"             -> fee,
-        "script"          -> script.fold[JsValue](JsNull)(JsString),
+        "script"          -> script.fold[JsValue](JsNull)(JsString.apply),
         "timestamp"       -> System.currentTimeMillis()
       )
     )
@@ -137,15 +136,16 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         issueFee,
         2.toByte,
         script = Some(
-          ScriptCompiler(
-            s"""match tx {
-               |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${secondKeyPair.publicKey}')
-               |case _ => false
-               |}
-               |""".stripMargin,
-            isAssetScript = true,
-            estimator
-          ).explicitGet()._1.bytes().base64
+          TestCompiler.DefaultVersion
+            .compileAsset(
+              s"""match tx {
+                 |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${secondKeyPair.publicKey}')
+                 |case _ => false
+                 |}
+                 |""".stripMargin
+            )
+            .bytes()
+            .base64
         )
       )
       .id
@@ -178,16 +178,17 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("sender's waves balance is decreased by fee") {
-    val script2 = ScriptCompiler(
-      s"""
-         |match tx {
-         |  case _: SetAssetScriptTransaction => true
-         |  case _ => false
-         |}
-         """.stripMargin,
-      isAssetScript = true,
-      estimator
-    ).explicitGet()._1.bytes().base64
+    val script2 = TestCompiler.DefaultVersion
+      .compileAsset(
+        s"""
+           |match tx {
+           |  case _: SetAssetScriptTransaction => true
+           |  case _ => false
+           |}
+         """.stripMargin
+      )
+      .bytes()
+      .base64
 
     val details = miner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
     assert(details.scriptComplexity == 1)
@@ -358,16 +359,18 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
           version = v,
           accountA,
           Some(
-            ScriptCompiler(
-              s"""|let pkB = base58'${accountB.publicKey}'
-                  |match tx {
-                  |  case s: SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
-                  |  case _ => true
-                  |}
+            ScriptCompiler
+              .compile(
+                s"""|let pkB = base58'${accountB.publicKey}'
+                    |match tx {
+                    |  case s: SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
+                    |  case _ => true
+                    |}
                 """.stripMargin,
-              isAssetScript = false,
-              estimator
-            ).explicitGet()._1
+                estimator
+              )
+              .explicitGet()
+              ._1
           ),
           setScriptFee + smartFee,
           System.currentTimeMillis()

@@ -1,17 +1,15 @@
 package com.wavesplatform.generator
 
 import java.io.File
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress, URI}
 import java.util.concurrent.Executors
-
-import scala.concurrent._
-import scala.concurrent.duration._
+import scala.concurrent.*
+import scala.concurrent.duration.*
 import scala.util.{Failure, Random, Success}
-
 import cats.implicits.showInterpolator
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.generator.GeneratorSettings.NodeAddress
 import com.wavesplatform.generator.Preconditions.{PGenSettings, UniverseHolder}
 import com.wavesplatform.generator.cli.ScoptImplicits
@@ -22,9 +20,9 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{LoggerFacade, NTP}
 import com.wavesplatform.Application
 import monix.execution.Scheduler
-import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper, ValueReader}
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Dsl.asyncHttpClient
 import org.slf4j.LoggerFactory
@@ -32,10 +30,14 @@ import scopt.OptionParser
 
 object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
 
+  implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
+    val uri = new URI(s"my://${config.getString(path)}")
+    new InetSocketAddress(uri.getHost, uri.getPort)
+  }
+
   // IDEA bugs
-  implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = com.wavesplatform.settings.inetSocketAddressReader
-  implicit val readConfigInHyphen: NameMapper                          = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-  implicit val httpClient: AsyncHttpClient                             = asyncHttpClient()
+  implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+  implicit val httpClient: AsyncHttpClient    = asyncHttpClient()
 
   val log = LoggerFacade(LoggerFactory.getLogger("generator"))
 
@@ -228,21 +230,20 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       log.info(s"Universe precondition tail transactions size: ${initialTailTransactions.size}")
       log.info(s"Generator precondition tail transactions size: ${initialGenTailTransactions.size}")
 
-      val workers = finalConfig.sendTo.map {
-        case NodeAddress(node, nodeRestUrl) =>
-          log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
-          // new Worker(finalConfig.worker, sender, node, generator, initialTransactions.map(RawBytes.from))
-          new Worker(
-            finalConfig.worker,
-            Iterator.continually(generator.next()).flatten,
-            sender,
-            node,
-            nodeRestUrl,
-            () => canContinue,
-            initialUniTransactions ++ initialGenTransactions,
-            finalConfig.privateKeyAccounts.map(_.toAddress.toString),
-            initialTailTransactions ++ initialGenTailTransactions
-          )
+      val workers = finalConfig.sendTo.map { case NodeAddress(node, nodeRestUrl) =>
+        log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
+        // new Worker(finalConfig.worker, sender, node, generator, initialTransactions.map(RawBytes.from))
+        new Worker(
+          finalConfig.worker,
+          Iterator.continually(generator.next()).flatten,
+          sender,
+          node,
+          nodeRestUrl,
+          () => canContinue,
+          initialUniTransactions ++ initialGenTransactions,
+          finalConfig.privateKeyAccounts.map(_.toAddress.toString),
+          initialTailTransactions ++ initialGenTailTransactions
+        )
       }
 
       def close(status: Int): Unit = {

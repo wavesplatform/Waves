@@ -38,7 +38,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         }
         """.stripMargin
 
-    val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     sender.setScript(acc0, Some(script), setScriptFee, waitForTx = true).id
 
     val unsignedLeasing =

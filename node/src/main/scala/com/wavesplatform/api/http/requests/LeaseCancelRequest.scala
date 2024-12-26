@@ -17,7 +17,7 @@ case class LeaseCancelRequest(
     timestamp: Option[Long],
     signature: Option[ByteStr],
     proofs: Option[Proofs]
-) extends TxBroadcastRequest {
+) extends TxBroadcastRequest[LeaseCancelTransaction] {
   def toTxFrom(sender: PublicKey): Either[ValidationError, LeaseCancelTransaction] =
     for {
       validProofs  <- toProofs(signature, proofs)

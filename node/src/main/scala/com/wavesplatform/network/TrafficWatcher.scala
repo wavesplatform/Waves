@@ -11,14 +11,12 @@ class TrafficWatcher extends ChannelDuplexHandler {
 
   import BasicMessagesRepo.specsByCodes
 
-  private val outgoing: Map[ScorexMessage.MessageCode, Histogram] = specsByCodes.map {
-    case (code, spec) =>
-      code -> createHistogram("outgoing", spec)
+  private val outgoing: Map[ScorexMessage.MessageCode, Histogram] = specsByCodes.map { case (code, spec) =>
+    code -> createHistogram("outgoing", spec)
   }
 
-  private val incoming: Map[ScorexMessage.MessageCode, Histogram] = specsByCodes.map {
-    case (code, spec) =>
-      code -> createHistogram("incoming", spec)
+  private val incoming: Map[ScorexMessage.MessageCode, Histogram] = specsByCodes.map { case (code, spec) =>
+    code -> createHistogram("incoming", spec)
   }
 
   private def createHistogram(dir: String, spec: BasicMessagesRepo.Spec): Histogram =

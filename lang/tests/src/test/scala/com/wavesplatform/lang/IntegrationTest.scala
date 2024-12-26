@@ -1459,12 +1459,12 @@ class IntegrationTest extends PropSpec with Inside {
        """.stripMargin
     val constructingTooBigBytes = constructingMaxBytes + "+ base58'a'"
 
-    inside(eval[EVALUATED](constructingMaxBytes, version = V3)) { case Right(CONST_BYTESTR(bytes)) =>
-      bytes.size shouldBe Terms.DataEntryValueMax
+    inside(eval[EVALUATED](constructingMaxBytes, version = V3)) { case Right(CONST_BYTESTR(bs)) =>
+      bs.size shouldBe Terms.DataEntryValueMax
     }
 
-    inside(eval[EVALUATED](constructingMaxBytes, version = V4)) { case Right(CONST_BYTESTR(bytes)) =>
-      bytes.size shouldBe Terms.DataEntryValueMax
+    inside(eval[EVALUATED](constructingMaxBytes, version = V4)) { case Right(CONST_BYTESTR(bs)) =>
+      bs.size shouldBe Terms.DataEntryValueMax
     }
 
     eval(constructingTooBigBytes, version = V3) should produce("ByteVector size = 32768 bytes exceeds 32767")

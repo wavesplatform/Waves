@@ -1,22 +1,25 @@
 package com.wavesplatform.utils
 
-import java.io.{ByteArrayInputStream, File, FileInputStream, FileOutputStream}
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths}
-
 import com.google.common.io.ByteStreams
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.script.{Script, ScriptReader}
-import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.transaction.TransactionFactory
+import com.wavesplatform.settings.{WalletSettings, WavesSettings}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{Transaction, TransactionFactory, TransactionSignOps, TransactionType}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, Version}
 import play.api.libs.json.{JsObject, Json}
 import scopt.OParser
+
+import java.io.{ByteArrayInputStream, File, FileInputStream, FileOutputStream}
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Paths}
+import scala.annotation.nowarn
 
 //noinspection ScalaStyle
 // TODO: Consider remove implemented methods from REST API
@@ -31,6 +34,7 @@ object UtilApp {
     case object Hash            extends Mode
     case object SerializeTx     extends Mode
     case object SignTx          extends Mode
+    case object SignTxWithSk    extends Mode
   }
 
   case class CompileOptions(assetScript: Boolean = false)
@@ -38,6 +42,7 @@ object UtilApp {
   case class VerifyOptions(publicKey: PublicKey = null, signature: ByteStr = ByteStr.empty, checkWeakPk: Boolean = false)
   case class HashOptions(mode: String = "fast")
   case class SignTxOptions(signerAddress: String = "")
+  case class KeyPairOptions(seedType: String = "account", nonce: Int = 0)
 
   sealed trait Input
   object Input {
@@ -45,6 +50,8 @@ object UtilApp {
     final case class File(file: String) extends Input
     final case class Str(str: String)   extends Input
   }
+
+  sealed trait SeedType
 
   case class Command(
       mode: Command.Mode = null,
@@ -57,24 +64,26 @@ object UtilApp {
       signOptions: SignOptions = SignOptions(),
       verifyOptions: VerifyOptions = VerifyOptions(),
       hashOptions: HashOptions = HashOptions(),
-      signTxOptions: SignTxOptions = SignTxOptions()
+      signTxOptions: SignTxOptions = SignTxOptions(),
+      keyPairOptions: KeyPairOptions = KeyPairOptions()
   )
 
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, Command()) match {
       case Some(cmd) =>
-        lazy val nodeState = new NodeState(cmd)
-        val inBytes        = IO.readInput(cmd)
+        val settings = Application.loadApplicationConfig(cmd.configFile.map(new File(_)))
+        val inBytes  = IO.readInput(cmd)
         val result = {
           val doAction = cmd.mode match {
-            case Command.CompileScript   => Actions.doCompile(nodeState.settings) _
+            case Command.CompileScript   => Actions.doCompile(settings) _
             case Command.DecompileScript => Actions.doDecompile _
             case Command.SignBytes       => Actions.doSign _
             case Command.VerifySignature => Actions.doVerify _
             case Command.CreateKeyPair   => Actions.doCreateKeyPair _
             case Command.Hash            => Actions.doHash _
             case Command.SerializeTx     => Actions.doSerializeTx _
-            case Command.SignTx          => Actions.doSignTx(nodeState) _
+            case Command.SignTx          => Actions.doSignTx(new NodeState(cmd)) _
+            case Command.SignTxWithSk    => Actions.doSignTxWithSK _
           }
           doAction(cmd, inBytes)
         }
@@ -178,6 +187,16 @@ object UtilApp {
         cmd("create-keys")
           .text("Generate key pair from seed")
           .action((_, c) => c.copy(mode = Command.CreateKeyPair))
+          .children(
+            opt[String]("seed-type")
+              .validate {
+                case "account" | "wallet" => success
+                case _                    => failure("Invalid seed format")
+              }
+              .action((t, c) => c.copy(keyPairOptions = c.keyPairOptions.copy(seedType = t))),
+            opt[Int]("nonce")
+              .action((n, c) => c.copy(keyPairOptions = c.keyPairOptions.copy(nonce = n)))
+          )
       ),
       cmd("transaction").children(
         cmd("serialize")
@@ -191,6 +210,15 @@ object UtilApp {
               .abbr("sa")
               .text("Signer address (requires corresponding key in wallet.dat)")
               .action((a, c) => c.copy(signTxOptions = c.signTxOptions.copy(signerAddress = a)))
+          ),
+        cmd("sign-with-sk")
+          .text("Sign JSON transaction with private key")
+          .action((_, c) => c.copy(mode = Command.SignTxWithSk))
+          .children(
+            opt[String]("private-key")
+              .abbr("sk")
+              .text("Private key")
+              .action((a, c) => c.copy(signOptions = c.signOptions.copy(privateKey = PrivateKey(Base58.decode(a)))))
           )
       ),
       help("help").hidden(),
@@ -211,7 +239,7 @@ object UtilApp {
   private[this] object Actions {
     type ActionResult = Either[String, Array[Byte]]
 
-    // noinspection ScalaDeprecation
+    @nowarn("cat=deprecation")
     def doCompile(settings: WavesSettings)(c: Command, str: Array[Byte]): ActionResult = {
       ScriptCompiler(new String(str), c.compileOptions.assetScript, settings.estimator)
         .map(_._1.bytes().arr)
@@ -237,12 +265,29 @@ object UtilApp {
         "Invalid signature"
       )
 
-    def doCreateKeyPair(c: Command, data: Array[Byte]): ActionResult =
-      KeyPair
-        .fromSeed(new String(data))
-        .left
+    def doCreateKeyPair(c: Command, data: Array[Byte]): ActionResult = {
+      import com.wavesplatform.utils.byteStrFormat
+      (c.keyPairOptions.seedType match {
+        case "account" =>
+          KeyPair.fromSeed(new String(data))
+        case "wallet" =>
+          Wallet(WalletSettings(None, Some("123"), Some(ByteStr(data))))
+            .generateNewAccount(c.keyPairOptions.nonce)
+            .toRight("Could not generate account")
+      }).left
         .map(_.toString)
-        .map(kp => Json.toBytes(Json.toJson(kp)))
+        .map(kp =>
+          Json.toBytes(
+            Json.obj(
+              "publicKey"  -> kp.publicKey,
+              "privateKey" -> kp.privateKey,
+              "address"    -> kp.publicKey.toAddress,
+              "walletSeed" -> ByteStr(data),
+              "nonce"      -> c.keyPairOptions.nonce
+            )
+          )
+        )
+    }
 
     def doHash(c: Command, data: Array[Byte]): ActionResult = c.hashOptions.mode match {
       case "fast"   => Right(com.wavesplatform.crypto.fastHash(data))
@@ -265,6 +310,33 @@ object UtilApp {
         .left
         .map(_.toString)
         .map(tx => Json.toBytes(tx.json()))
+
+    def doSignTxWithSK(c: Command, data: Array[Byte]): ActionResult = {
+      import cats.syntax.either.*
+      import com.wavesplatform.api.http.requests.InvokeScriptRequest.signedInvokeScriptRequestReads
+      import com.wavesplatform.api.http.requests.SponsorFeeRequest.signedSponsorRequestFormat
+      import com.wavesplatform.transaction.TransactionType.*
+
+      val json = Json.parse(data)
+      (TransactionType((json \ "type").as[Int]) match {
+        case Issue           => json.as[IssueRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Transfer        => json.as[TransferRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Reissue         => json.as[ReissueRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Burn            => json.as[BurnRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Exchange        => json.as[ExchangeRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Lease           => json.as[LeaseRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case LeaseCancel     => json.as[LeaseCancelRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case CreateAlias     => json.as[CreateAliasRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case MassTransfer    => json.as[SignedMassTransferRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Data            => json.as[SignedDataRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case SetScript       => json.as[SignedSetScriptRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case SponsorFee      => json.as[SignedSponsorFeeRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case SetAssetScript  => json.as[SignedSetAssetScriptRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case InvokeScript    => json.as[SignedInvokeScriptRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case UpdateAssetInfo => json.as[SignedUpdateAssetInfoRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case other           => GenericError(s"Signing $other is not supported").asLeft[Transaction]
+      }).leftMap(_.toString).map(_.json().toString().getBytes())
+    }
   }
 
   private[this] object IO {

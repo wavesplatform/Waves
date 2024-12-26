@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.state
 import com.wavesplatform.state.{Height, TxNum}
+import org.rocksdb.ColumnFamilyHandle
 
 import java.nio.ByteBuffer
 
@@ -32,8 +33,8 @@ object KeyHelpers {
       Ints.toByteArray
     )
 
-  def bytesSeqNr(keyTag: KeyTags.KeyTag, suffix: Array[Byte], default: Int = 0): Key[Int] =
-    Key(keyTag, suffix, v => if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else default, Ints.toByteArray)
+  def bytesSeqNr(keyTag: KeyTags.KeyTag, suffix: Array[Byte], default: Int = 0, cfh: Option[ColumnFamilyHandle] = None): Key[Int] =
+    Key(keyTag, suffix, v => if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else default, Ints.toByteArray, cfh)
 
   def unsupported[A](message: String): A => Array[Byte] = _ => throw new UnsupportedOperationException(message)
 }

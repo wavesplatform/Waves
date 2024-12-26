@@ -5,6 +5,8 @@ import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 
+import java.util.concurrent.Semaphore
+
 class ScriptEstimatorV2Test extends ScriptEstimatorTestBase(ScriptEstimatorV2) {
   property("transitive ref usage") {
     def estimateRefUsage(ref: String): Long = {
@@ -62,16 +64,18 @@ class ScriptEstimatorV2Test extends ScriptEstimatorTestBase(ScriptEstimatorV2) {
        """.stripMargin
 
     @volatile var r: Either[String, Long] = Right(0)
+    val s = new Semaphore(0)
     val run: Runnable = { () =>
+      s.release()
       r = estimate(functionCosts(V3), compile(hangingScript))
     }
     val t = new Thread(run)
     t.setDaemon(true)
 
     t.start()
-    Thread.sleep(5000)
+    s.acquire()
     t.interrupt()
-    Thread.sleep(500)
+    t.join()
 
     r shouldBe Left("Script estimation was interrupted")
     t.getState shouldBe Thread.State.TERMINATED

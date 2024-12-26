@@ -7,7 +7,6 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.{EstimationError, ScriptEstimator}
 import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.EvalM
-import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.Lenses._
 import com.wavesplatform.lang.v1.task.imports._
 import monix.eval.Coeval
 
@@ -45,7 +44,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     local {
       val letResult = (false, evalExpr(let.value))
       for {
-        _ <- update(lets.modify(_)(_.updated(let.name, letResult)))
+        _ <- update(ctx => ctx.copy(letDefs = ctx.letDefs.updated(let.name, letResult)))
         r <- evalExpr(inner)
       } yield r + 5
     }
@@ -61,7 +60,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     local {
       for {
         _ <- checkFuncCtx(func)
-        _ <- update(userFuncs.modify(_)(_ + (FunctionHeader.User(func.name) -> func)))
+        _ <- update(ctx => ctx.copy(userFuncs = ctx.userFuncs + (FunctionHeader.User(func.name) -> func)))
         r <- evalExpr(inner)
       } yield r + 5
     }
@@ -69,7 +68,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
   private def checkFuncCtx(func: FUNC): EvalM[Unit] =
     local {
       for {
-        _ <- update(lets.modify(_)(_ ++ func.args.map((_, (true, const(0)))).toMap))
+        _ <- update(ctx => ctx.copy(letDefs = ctx.letDefs ++ func.args.map((_, (true, const(0)))).toMap))
         _ <- evalExpr(func.body)
       } yield ()
     }
@@ -77,7 +76,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
   private def evalRef(key: String): EvalM[Long] =
     for {
       ctx <- get[Id, EstimatorContext, EstimationError]
-      r <- lets.get(ctx).get(key) match {
+      r <- ctx.letDefs.get(key) match {
         case Some((false, lzy)) => setRefEvaluated(key, lzy)
         case Some((true, _))    => const(0)
         case None               => raiseError[Id, EstimatorContext, EstimationError, Long](s"A definition of '$key' not found")
@@ -85,7 +84,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     } yield r + 2
 
   private def setRefEvaluated(key: String, lzy: EvalM[Long]): EvalM[Long] =
-    update(lets.modify(_)(_.updated(key, (true, lzy))))
+    update(ctx => ctx.copy(letDefs = ctx.letDefs.updated(key, (true, lzy))))
       .flatMap(_ => lzy)
 
   private def evalGetter(expr: EXPR): EvalM[Long] =
@@ -94,11 +93,10 @@ object ScriptEstimatorV2 extends ScriptEstimator {
   private def evalFuncCall(header: FunctionHeader, args: List[EXPR]): EvalM[Long] =
     for {
       ctx <- get[Id, EstimatorContext, EstimationError]
-      bodyComplexity <- predefFuncs
-        .get(ctx)
+      bodyComplexity <- ctx.predefFuncs
         .get(header)
         .map(bodyComplexity => evalFuncArgs(args).map(_ + bodyComplexity))
-        .orElse(userFuncs.get(ctx).get(header).map(evalUserFuncCall(_, args)))
+        .orElse(ctx.userFuncs.get(header).map(evalUserFuncCall(_, args)))
         .getOrElse(raiseError[Id, EstimatorContext, EstimationError, Long](s"function '$header' not found"))
     } yield bodyComplexity
 
@@ -106,14 +104,25 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     for {
       argsComplexity <- evalFuncArgs(args)
       ctx            <- get[Id, EstimatorContext, EstimationError]
-      _              <- update(lets.modify(_)(_ ++ ctx.overlappedRefs))
+      _              <- update(ctx1 => ctx1.copy(letDefs = ctx1.letDefs ++ ctx.overlappedRefs))
       overlapped = func.args.flatMap(arg => ctx.letDefs.get(arg).map((arg, _))).toMap
       ctxArgs    = func.args.map((_, (false, const(1)))).toMap
-      _              <- update((lets ~ overlappedRefs).modify(_) { case (l, or) => (l ++ ctxArgs, or ++ overlapped) })
+      _ <- update(ctx1 =>
+        ctx1.copy(
+          letDefs = ctx1.letDefs ++ ctxArgs,
+          overlappedRefs = ctx1.overlappedRefs ++ overlapped
+        )
+      )
+
       bodyComplexity <- evalExpr(func.body).map(_ + func.args.size * 5)
       evaluatedCtx   <- get[Id, EstimatorContext, EstimationError]
       overlappedChanges = overlapped.map { case ref @ (name, _) => evaluatedCtx.letDefs.get(name).map((name, _)).getOrElse(ref) }
-      _ <- update((lets ~ overlappedRefs).modify(_) { case (l, or) => (l -- ctxArgs.keys ++ overlapped, or ++ overlappedChanges) })
+      _ <- update(ctx1 =>
+        ctx1.copy(
+          letDefs = ctx1.letDefs -- ctxArgs.keys ++ overlapped,
+          overlappedRefs = ctx1.overlappedRefs ++ overlappedChanges
+        )
+      )
     } yield bodyComplexity + argsComplexity
 
   private def evalFuncArgs(args: List[EXPR]): EvalM[Long] =

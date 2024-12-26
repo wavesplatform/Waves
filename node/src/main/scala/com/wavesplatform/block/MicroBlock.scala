@@ -17,7 +17,7 @@ case class MicroBlock(
     sender: PublicKey,
     transactionData: Seq[Transaction],
     reference: BlockId,
-    totalResBlockSig: BlockId,
+    totalResBlockSig: ByteStr,
     signature: ByteStr,
     stateHash: Option[ByteStr]
 ) extends Signed {

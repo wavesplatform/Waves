@@ -25,8 +25,8 @@ import io.netty.channel.group.DefaultChannelGroup
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.ConcurrentSubject
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import pureconfig.ConfigSource
+import pureconfig.generic.auto.*
 import org.apache.commons.io.FileUtils
 
 import java.io.{File, FileNotFoundException}
@@ -56,7 +56,11 @@ object MinerChallengeSimulator {
 
     val config      = readConfFile(genesisConfFile)
     val genSettings = GenesisBlockGenerator.parseSettings(config)
-    val genesis     = ConfigFactory.parseString(GenesisBlockGenerator.createConfig(genSettings)).as[GenesisSettings]("genesis")
+    val genesis =
+      ConfigSource
+        .fromConfig(ConfigFactory.parseString(GenesisBlockGenerator.createConfig(genSettings)))
+        .at("genesis")
+        .loadOrThrow[GenesisSettings]
 
     val blockchainSettings = BlockchainSettings(
       genSettings.chainId.toChar,

@@ -167,7 +167,7 @@ object Keys {
       Some(cfHandle.handle)
     )
 
-  def transactionStateSnapshotAt(height: Height, n: TxNum, cfHandle: RDB.TxHandle): Key[Option[TransactionStateSnapshot]] =
+  def transactionStateSnapshotAt(height: Height, n: TxNum, cfHandle: RDB.TxSnapshotHandle): Key[Option[TransactionStateSnapshot]] =
     Key.opt[TransactionStateSnapshot](
       NthTransactionStateSnapshotAtHeight,
       hNum(height, n),
@@ -176,26 +176,28 @@ object Keys {
       Some(cfHandle.handle)
     )
 
-  def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
-    bytesSeqNr(AddressTransactionSeqNr, addressId.toByteArray)
+  def addressTransactionSeqNr(addressId: AddressId, cfh: RDB.ApiHandle): Key[Int] =
+    bytesSeqNr(AddressTransactionSeqNr, addressId.toByteArray, cfh = Some(cfh.handle))
 
-  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum, Int)])]] =
+  def addressTransactionHN(addressId: AddressId, seqNr: Int, cfh: RDB.ApiHandle): Key[Option[(Height, Seq[(Byte, TxNum, Int)])]] =
     Key.opt(
       AddressTransactionHeightTypeAndNums,
       hBytes(addressId.toByteArray, seqNr),
       readTransactionHNSeqAndType,
-      writeTransactionHNSeqAndType
+      writeTransactionHNSeqAndType,
+      Some(cfh.handle)
     )
 
-  def addressLeaseSeqNr(addressId: AddressId): Key[Int] =
-    bytesSeqNr(AddressLeaseInfoSeqNr, addressId.toByteArray)
+  def addressLeaseSeqNr(addressId: AddressId, cfh: RDB.ApiHandle): Key[Int] =
+    bytesSeqNr(AddressLeaseInfoSeqNr, addressId.toByteArray, cfh = Some(cfh.handle))
 
-  def addressLeaseSeq(addressId: AddressId, seqNr: Int): Key[Option[Seq[ByteStr]]] =
+  def addressLeaseSeq(addressId: AddressId, seqNr: Int, cfh: RDB.ApiHandle): Key[Option[Seq[ByteStr]]] =
     Key.opt(
       AddressLeaseInfoSeq,
       hBytes(addressId.toByteArray, seqNr),
       readLeaseIdSeq,
-      writeLeaseIdSeq
+      writeLeaseIdSeq,
+      Some(cfh.handle)
     )
 
   def transactionMetaById(txId: TransactionId, cfh: RDB.TxMetaHandle): Key[Option[TransactionMeta]] =
@@ -207,8 +209,8 @@ object Keys {
       Some(cfh.handle)
     )
 
-  def invokeScriptResult(height: Int, txNum: TxNum): Key[Option[InvokeScriptResult]] =
-    Key.opt(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
+  def invokeScriptResult(height: Int, txNum: TxNum, cfh: RDB.ApiHandle): Key[Option[InvokeScriptResult]] =
+    Key.opt(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes, Some(cfh.handle))
 
   val disabledAliases: Key[Set[Alias]] = Key(
     DisabledAliases,
@@ -223,11 +225,11 @@ object Keys {
   def assetStaticInfo(addr: ERC20Address): Key[Option[StaticAssetInfo]] =
     Key.opt(AssetStaticInfo, addr.arr, StaticAssetInfo.parseFrom, _.toByteArray)
 
-  def nftCount(addressId: AddressId): Key[Int] =
-    Key(NftCount, addressId.toByteArray, Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+  def nftCount(addressId: AddressId, cfh: RDB.ApiHandle): Key[Int] =
+    Key(NftCount, addressId.toByteArray, Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray, Some(cfh.handle))
 
-  def nftAt(addressId: AddressId, index: Int, assetId: IssuedAsset): Key[Option[Unit]] =
-    Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray)
+  def nftAt(addressId: AddressId, index: Int, assetId: IssuedAsset, cfh: RDB.ApiHandle): Key[Option[Unit]] =
+    Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray, Some(cfh.handle))
 
   def stateHash(height: Int): Key[Option[StateHash]] =
     Key.opt(StateHash, h(height), readStateHash, writeStateHash)
@@ -235,8 +237,8 @@ object Keys {
   def blockStateHash(height: Int): Key[ByteStr] =
     Key(BlockStateHash, h(height), Option(_).fold(TxStateSnapshotHashBuilder.InitStateHash)(ByteStr(_)), _.arr)
 
-  def ethereumTransactionMeta(height: Height, txNum: TxNum): Key[Option[EthereumTransactionMeta]] =
-    Key.opt(EthereumTransactionMetaTag, hNum(height, txNum), EthereumTransactionMeta.parseFrom, _.toByteArray)
+  def ethereumTransactionMeta(height: Height, txNum: TxNum, cfh: RDB.ApiHandle): Key[Option[EthereumTransactionMeta]] =
+    Key.opt(EthereumTransactionMetaTag, hNum(height, txNum), EthereumTransactionMeta.parseFrom, _.toByteArray, Some(cfh.handle))
 
   def maliciousMinerBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
     historyKey(MaliciousMinerBanHeights, addressBytes)

@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.transactions
 
-import scala.concurrent.duration.*
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
@@ -8,19 +7,21 @@ import com.wavesplatform.api.http.requests.UpdateAssetInfoRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs.{Miners, NotMiner}
-import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.directives.values.V4
+import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.assets.IssueTransaction.{MaxAssetDescriptionLength, MaxAssetNameLength, MinAssetNameLength}
-import com.wavesplatform.transaction.{TransactionType, TxVersion}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{TransactionType, TxVersion}
 import org.scalatest.CancelAfterFailure
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.{JsObject, Json}
+
+import scala.concurrent.duration.*
 
 class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with TableDrivenPropertyChecks {
   import UpdateAssetInfoTransactionSuite.*
@@ -330,7 +331,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
   test("asset script can read asset info") {
     val scriptTextT = s"""true""".stripMargin
-    val scriptT     = ScriptCompiler(scriptTextT, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    val scriptT     = TestCompiler.DefaultVersion.compileAsset(scriptTextT).bytes().base64
 
     val smartAssetId1 =
       sender.broadcastIssue(issuer, "smartAsset", "description", someAssetAmount, 8, reissuable = true, script = Some(scriptT), waitForTx = true).id
@@ -361,7 +362,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
                          | this.minSponsoredFee == unit
                          |case _ => false
                          |}""".stripMargin
-    val script1 = ScriptCompiler(scriptText1, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    val script1 = TestCompiler(V4).compileAsset(scriptText1).bytes().base64
     sender.setAssetScript(smartAssetId1, issuer, setAssetScriptFee, Some(script1), waitForTx = true)
 
     sender.burn(issuer, smartAssetId1, 1, minFee + 2 * smartFee, waitForTx = true)
@@ -369,7 +370,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
   test("check increased fee for smart sender/asset") {
     val scriptText = s"""true""".stripMargin
-    val script     = ScriptCompiler(scriptText, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    val script     = TestCompiler.DefaultVersion.compileAsset(scriptText).bytes().base64
     val smartAssetId =
       sender.broadcastIssue(issuer, "smartAsset", "description", someAssetAmount, 8, reissuable = true, script = Some(script), waitForTx = true).id
     sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)

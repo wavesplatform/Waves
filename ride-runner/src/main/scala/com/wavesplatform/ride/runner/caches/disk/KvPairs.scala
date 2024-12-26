@@ -9,8 +9,7 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{StaticAssetInfo, BlockMeta as PBBlockMeta}
-import com.wavesplatform.database.rocksdb.{Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readBlockMeta, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeBlockMeta}
-import com.wavesplatform.database.{AddressId, toVanillaTransaction, protobuf as pb}
+import com.wavesplatform.database.{protobuf as pb, *}
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
@@ -23,6 +22,7 @@ import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, 
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, AssetIdLength, Transaction}
 import org.rocksdb.ColumnFamilyHandle
+import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
 
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.nio.ByteBuffer
@@ -172,7 +172,7 @@ object KvPairs {
   }
 
   val weighedAssetDescriptionAsBytes: AsBytes[WeighedAssetDescription] =
-    AsBytes.tuple2(intAsBytes, assetDescriptionAsBytes).transform(Function.tupled(WeighedAssetDescription), x => (x.scriptWeight, x.assetDescription))
+    AsBytes.tuple2(intAsBytes, assetDescriptionAsBytes).transform(Function.tupled(WeighedAssetDescription.apply), x => (x.scriptWeight, x.assetDescription))
   object AssetDescriptions
       extends KvPair[(state.Height, Asset.IssuedAsset), Option[WeighedAssetDescription]](72)(
         implicitly,
@@ -212,7 +212,8 @@ object KvPairs {
   implicit val dataEntryAsBytes: AsBytes[DataEntry[?]] =
     AsBytes.mk[DataEntry[?]]((os, x) => os.write(DataTxSerializer.serializeEntry(x)), DataTxSerializer.parseEntry)
 
-  implicit val txStatusAsBytes: AsBytes[TxMeta.Status] = ???
+  implicit val txStatusAsBytes: AsBytes[TxMeta.Status] =
+    AsBytes.mk[TxMeta.Status]((os, st) => os.write(st.protobuf.value.toByte), r => TxMeta.Status.fromProtobuf(PBStatus.fromValue(r.get)))
 
   implicit val txMetaAsBytes: AsBytes[TxMeta] = AsBytes[(state.Height, TxMeta.Status, Long)].transform[TxMeta](
     Function.tupled(TxMeta.apply),

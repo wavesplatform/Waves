@@ -3,9 +3,10 @@ package com.wavesplatform.it.sync.smartcontract.smartasset
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{someAssetAmount, _}
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.{someAssetAmount, *}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Proofs, TxPositiveAmount}
@@ -13,7 +14,7 @@ import com.wavesplatform.transaction.assets.BurnTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class NoOrderProofsSuite extends BaseTransactionSuite {
   val estimator = ScriptEstimatorV2
@@ -29,15 +30,13 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         issueFee,
         2: Byte,
         script = Some(
-          ScriptCompiler(
+          TestCompiler.DefaultVersion.compileAsset(
             s"""
               |match tx {
               |  case _: Order => true
               |  case _ => false
               |}""".stripMargin,
-            isAssetScript = true,
-            estimator
-          ).explicitGet()._1.bytes().base64
+          ).bytes().base64
         )
       )
 
@@ -61,14 +60,13 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         issueFee,
         2: Byte,
         script = Some(
-          ScriptCompiler(
+          ScriptCompiler.compile(
             s"""
                 let proof = base58'assetWProofs'
                 match tx {
                   case _: SetAssetScriptTransaction | TransferTransaction | ReissueTransaction | BurnTransaction => tx.proofs[0] == proof
                   case _ => false
                 }""".stripMargin,
-            false,
             estimator
           ).explicitGet()._1.bytes().base64
         ),

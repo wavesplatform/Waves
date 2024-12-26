@@ -49,7 +49,7 @@ trait IntegrationSuiteWithThreeAddresses extends BaseSuite with ScalaFutures wit
   def setContract(contractText: Option[String], acc: KeyPair): String = {
     val script = contractText.map { x =>
       val scriptText = x.stripMargin
-      ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+      ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
     }
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(1.toByte, acc, script, 0.014.waves, System.currentTimeMillis())

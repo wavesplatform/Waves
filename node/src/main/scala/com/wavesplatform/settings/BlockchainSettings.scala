@@ -5,9 +5,8 @@ import cats.syntax.traverse.*
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
-import net.ceedubs.ficus.readers.ValueReader
+import pureconfig.*
+import pureconfig.generic.auto.*
 
 import scala.concurrent.duration.*
 
@@ -77,7 +76,10 @@ case class FunctionalitySettings(
     daoAddress: Option[String] = None,
     xtnBuybackAddress: Option[String] = None,
     xtnBuybackRewardPeriod: Int = Int.MaxValue,
-    lightNodeBlockFieldsAbsenceInterval: Int = 1000
+    lightNodeBlockFieldsAbsenceInterval: Int = 1000,
+    blockRewardBoostPeriod: Int = 1000,
+    paymentsCheckHeight: Int = 0,
+    unitsRegistryAddress: Option[String] = None
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -91,6 +93,8 @@ case class FunctionalitySettings(
     daoAddress.traverse(Address.fromString(_)).leftMap(_ => "Incorrect dao-address")
   lazy val xtnBuybackAddressParsed: Either[String, Option[Address]] =
     xtnBuybackAddress.traverse(Address.fromString(_)).leftMap(_ => "Incorrect xtn-buyback-address")
+  lazy val unitsRegistryAddressParsed: Either[String, Option[Address]] =
+    unitsRegistryAddress.traverse(Address.fromString(_)).leftMap(_ => "Incorrect units-registry-address")
 
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
   require(
@@ -130,7 +134,10 @@ object FunctionalitySettings {
     enforceTransferValidationAfter = 2959447,
     daoAddress = Some("3PEgG7eZHLFhcfsTSaYxgRhZsh4AxMvA4Ms"),
     xtnBuybackAddress = Some("3PFjHWuH6WXNJbwnfLHqNFBpwBS5dkYjTfv"),
-    xtnBuybackRewardPeriod = 100000
+    xtnBuybackRewardPeriod = 100000,
+    blockRewardBoostPeriod = 300_000,
+    paymentsCheckHeight = 4303300,
+    unitsRegistryAddress = Some("3P8LfPXcveST7WKkV3UACQNdr6J3shPYong")
   )
 
   val TESTNET: FunctionalitySettings = apply(
@@ -145,7 +152,9 @@ object FunctionalitySettings {
     enforceTransferValidationAfter = 1698800,
     daoAddress = Some("3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS"),
     xtnBuybackAddress = Some("3N13KQpdY3UU7JkWUBD9kN7t7xuUgeyYMTT"),
-    xtnBuybackRewardPeriod = 2000
+    xtnBuybackRewardPeriod = 2000,
+    blockRewardBoostPeriod = 2_000,
+    unitsRegistryAddress = Some("3N9fwNGJcUcAbhh7YPr6mrpuGJD4tApZFsT")
   )
 
   val STAGENET: FunctionalitySettings = apply(
@@ -159,7 +168,8 @@ object FunctionalitySettings {
     ethInvokePaymentsCheckHeight = 1311110,
     daoAddress = Some("3MaFVH1vTv18FjBRugSRebx259D7xtRh9ic"),
     xtnBuybackAddress = Some("3MbhiRiLFLJ1EVKNP9npRszcLLQDjwnFfZM"),
-    xtnBuybackRewardPeriod = 1000
+    xtnBuybackRewardPeriod = 1000,
+    paymentsCheckHeight = 2195900
   )
 }
 
@@ -239,35 +249,31 @@ private[settings] object BlockchainType {
 }
 
 object BlockchainSettings {
-  implicit val valueReader: ValueReader[BlockchainSettings] =
-    (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
+  def fromRootConfig(config: Config): BlockchainSettings =
+    ConfigSource.fromConfig(config).at("waves.blockchain").loadOrThrow[BlockchainSettings]
 
-  // @deprecated("Use config.as[BlockchainSettings]", "0.17.0")
-  def fromRootConfig(config: Config): BlockchainSettings = config.as[BlockchainSettings]("waves.blockchain")
+  implicit val configReader: ConfigReader[BlockchainSettings] = ConfigReader.fromCursor(cur =>
+    for {
+      objCur               <- cur.asObjectCursor
+      blockchainTypeString <- objCur.atKey("type").flatMap(_.asString).map(_.toUpperCase)
+      (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings) <- blockchainTypeString match {
+        case BlockchainType.STAGENET => Right(('S', FunctionalitySettings.STAGENET, GenesisSettings.STAGENET, RewardsSettings.STAGENET))
+        case BlockchainType.TESTNET  => Right(('T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
+        case BlockchainType.MAINNET  => Right(('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET, RewardsSettings.MAINNET))
+        case _                       =>
+          // Custom
+          for {
+            customObjCur  <- objCur.atKey("custom").flatMap(_.asObjectCursor)
+            networkId     <- customObjCur.atKey("address-scheme-character").flatMap(_.asString).map(_.charAt(0))
+            functionality <- customObjCur.atKey("functionality").flatMap(ConfigReader[FunctionalitySettings].from)
+            genesis       <- customObjCur.atKey("genesis").flatMap(ConfigReader[GenesisSettings].from)
+            rewards       <- customObjCur.atKey("rewards").flatMap(ConfigReader[RewardsSettings].from)
+          } yield {
+            require(functionality.minBlockTime <= genesis.averageBlockDelay, "minBlockTime should be <= averageBlockDelay")
+            (networkId, functionality, genesis, rewards)
+          }
+      }
 
-  private[this] def fromConfig(config: Config): BlockchainSettings = {
-    val blockchainType = config.as[String]("type").toUpperCase
-    val (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings) = blockchainType match {
-      case BlockchainType.STAGENET =>
-        ('S', FunctionalitySettings.STAGENET, GenesisSettings.STAGENET, RewardsSettings.STAGENET)
-      case BlockchainType.TESTNET =>
-        ('T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET, RewardsSettings.TESTNET)
-      case BlockchainType.MAINNET =>
-        ('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET, RewardsSettings.MAINNET)
-      case _ => // Custom
-        val networkId     = config.as[String](s"custom.address-scheme-character").charAt(0)
-        val functionality = config.as[FunctionalitySettings](s"custom.functionality")
-        val genesis       = config.as[GenesisSettings](s"custom.genesis")
-        val rewards       = config.as[RewardsSettings](s"custom.rewards")
-        require(functionality.minBlockTime <= genesis.averageBlockDelay, "minBlockTime should be <= averageBlockDelay")
-        (networkId, functionality, genesis, rewards)
-    }
-
-    BlockchainSettings(
-      addressSchemeCharacter = addressSchemeCharacter,
-      functionalitySettings = functionalitySettings,
-      genesisSettings = genesisSettings,
-      rewardsSettings = rewardsSettings
-    )
-  }
+    } yield BlockchainSettings(addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings)
+  )
 }

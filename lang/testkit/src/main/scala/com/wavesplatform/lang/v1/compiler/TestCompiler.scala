@@ -96,6 +96,7 @@ class TestCompiler(version: StdLibVersion) {
 
 object TestCompiler {
   private val compilerByVersion = mutable.HashMap.empty[StdLibVersion, TestCompiler]
+  lazy val DefaultVersion: TestCompiler = TestCompiler(StdLibVersion.VersionDic.default)
   def apply(version: StdLibVersion): TestCompiler =
     compilerByVersion.getOrElse(
       version,

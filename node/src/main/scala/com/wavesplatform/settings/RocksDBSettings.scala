@@ -5,6 +5,10 @@ case class RocksDBSettings(
     txCacheSize: SizeInBytes,
     txMetaCacheSize: SizeInBytes,
     txSnapshotCacheSize: SizeInBytes,
+    apiCacheSize: SizeInBytes,
     writeBufferSize: SizeInBytes,
-    enableStatistics: Boolean
+    enableStatistics: Boolean,
+    allowMmapReads: Boolean,
+    parallelism: Int,
+    maxOpenFiles: Int
 )

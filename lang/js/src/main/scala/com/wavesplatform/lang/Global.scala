@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import java.math.{BigInteger, BigDecimal as BD}
 import scala.collection.mutable
 import scala.scalajs.js.JSConverters.*
-import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
+import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array, TA2AB}
 import scala.util.Try
 
 object Global extends BaseGlobal {

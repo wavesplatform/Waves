@@ -89,20 +89,20 @@ object DataEntry {
       gen.writeStartObject()
       value match {
         case BinaryDataEntry(key, value) =>
-          gen.writeStringField("type", "binary")
           gen.writeStringField("key", key)
+          gen.writeStringField("type", "binary")
           gen.writeStringField("value", value.base64)
         case IntegerDataEntry(key, value) =>
-          gen.writeStringField("type", "integer")
           gen.writeStringField("key", key)
+          gen.writeStringField("type", "integer")
           gen.writeNumberField("value", value, numberAsString)
         case BooleanDataEntry(key, value) =>
-          gen.writeStringField("type", "boolean")
           gen.writeStringField("key", key)
+          gen.writeStringField("type", "boolean")
           gen.writeBooleanField("value", value)
         case StringDataEntry(key, value) =>
-          gen.writeStringField("type", "string")
           gen.writeStringField("key", key)
+          gen.writeStringField("type", "string")
           gen.writeStringField("value", value)
         case EmptyDataEntry(key) =>
           gen.writeStringField("key", key)

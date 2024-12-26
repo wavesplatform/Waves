@@ -2,14 +2,14 @@ package com.wavesplatform.network.client
 
 import java.io.IOException
 
-import com.wavesplatform.network._
+import com.wavesplatform.network.*
 import com.wavesplatform.utils.ScorexLogging
-import io.netty.channel._
+import io.netty.channel.*
 import io.netty.channel.socket.SocketChannel
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 
 import scala.concurrent.Promise
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class ClientHandshakeHandler(handshake: Handshake, promise: Promise[Channel]) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
@@ -43,7 +43,7 @@ class ClientHandshakeHandler(handshake: Handshake, promise: Promise[Channel]) ex
 
 // Used only in tests and Generator
 class LegacyChannelInitializer(trafficLoggerSettings: TrafficLogger.Settings, handshake: Handshake, promise: Promise[Channel])
-    extends ChannelInitializer[SocketChannel] {
+  extends ChannelInitializer[SocketChannel] {
   private val lengthFieldLength = 4
   private val maxFieldLength    = 1024 * 1024
 
@@ -55,7 +55,7 @@ class LegacyChannelInitializer(trafficLoggerSettings: TrafficLogger.Settings, ha
         new ClientHandshakeHandler(handshake, promise),
         new LengthFieldPrepender(lengthFieldLength),
         new LengthFieldBasedFrameDecoder(maxFieldLength, 0, lengthFieldLength, 0, lengthFieldLength),
-        new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes),
-        new TrafficLogger(trafficLoggerSettings)
+        new LegacyFrameCodecL1(PeerDatabase.NoOp, 3.minutes),
+        new TrafficLoggerL1(trafficLoggerSettings)
       )
 }
