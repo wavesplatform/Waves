@@ -11,6 +11,7 @@ import com.wavesplatform.mining.MultiDimensionalMiningConstraint.Unlimited
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.{PropSpec, produce}
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner, transfer}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import io.netty.channel.group.DefaultChannelGroup
@@ -111,13 +112,14 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
   }
 
   property("micro forks should not produce invalid state hash") {
-    val settings =
-      TransactionStateSnapshot
-        .configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0))
-        .copy(minerSettings = TransactionStateSnapshot.minerSettings.copy(quorum = 0, minMicroBlockAge = 0.seconds))
+    val settings = TransactionStateSnapshot
+      .configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0))
+      .copy(minerSettings = TransactionStateSnapshot.minerSettings.copy(quorum = 0, minMicroBlockAge = 0.seconds))
+
+    val signer = TxHelpers.signer(2) // Sends transfers, forges blocks
     withDomainAndMiner(
       settings,
-      AddrWithBalance.enoughBalances(defaultSigner, secondSigner),
+      AddrWithBalance.enoughBalances(signer),
       verify = false,
       timeDrift = Int.MaxValue
     ) { case (d, miner, append) =>
@@ -131,11 +133,10 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
         miner.appenderScheduler,
         Observable.empty
       )
-      def appendBlock(ref: Option[ByteStr]) = append(miner.forgeBlock(defaultSigner, ref).explicitGet()._1).explicitGet()
+      def appendBlock(ref: Option[ByteStr]) = append(miner.forgeBlock(signer, ref).explicitGet()._1).explicitGet()
       def appendMicro() = {
-        // A transfer sender and a block generator are same
-        d.utxPool.putIfNew(transfer(from = defaultSigner)).resultE.explicitGet()
-        microBlockMiner.generateOneMicroBlockTask(defaultSigner, d.lastBlock, Unlimited, 0).runSyncUnsafe()
+        d.utxPool.putIfNew(transfer(from = signer)).resultE.explicitGet()
+        microBlockMiner.generateOneMicroBlockTask(signer, d.lastBlock, Unlimited, 0).runSyncUnsafe()
       }
 
       withClue("Discard the latest micro block and referencing to a key block: ") {
