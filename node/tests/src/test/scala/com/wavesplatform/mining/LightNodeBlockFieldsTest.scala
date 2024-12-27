@@ -133,25 +133,30 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
       )
       def appendBlock(ref: Option[ByteStr]) = append(miner.forgeBlock(defaultSigner, ref).explicitGet()._1).explicitGet()
       def appendMicro() = {
-        d.utxPool.putIfNew(transfer()).resultE.explicitGet()
+        // A transfer sender and a block generator are same
+        d.utxPool.putIfNew(transfer(from = defaultSigner)).resultE.explicitGet()
         microBlockMiner.generateOneMicroBlockTask(defaultSigner, d.lastBlock, Unlimited, 0).runSyncUnsafe()
       }
 
-      appendBlock(None)
-      val blockId1 = d.lastBlockId
-      appendMicro()
+      withClue("Discard the latest micro block and referencing to a key block: ") {
+        appendBlock(None)
+        val keyBlockId = d.lastBlockId
 
-      // rollback to a key block before micro block
-      appendBlock(Some(blockId1))
-      d.lastBlock.header.reference shouldBe blockId1
+        appendMicro()
+        appendBlock(Some(keyBlockId))
 
-      appendMicro()
-      val blockId2 = d.lastBlockId
-      appendMicro()
+        d.lastBlock.header.reference shouldBe keyBlockId
+      }
 
-      // rollback to a micro block before another micro block
-      appendBlock(Some(blockId2))
-      d.lastBlock.header.reference shouldBe blockId2
+      withClue("Discard the latest micro block and referencing to a previous: ") {
+        appendMicro()
+        val previousMicroBlockId = d.lastBlockId
+
+        appendMicro()
+        appendBlock(Some(previousMicroBlockId))
+
+        d.lastBlock.header.reference shouldBe previousMicroBlockId
+      }
     }
   }
 
