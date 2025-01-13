@@ -8,7 +8,6 @@ import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.DigestLength
-import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{chainBaseAndMicro, defaultSigner}
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -28,7 +27,8 @@ import org.scalatest.enablers.Length
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.*
-class BlockV5Test extends FlatSpec with WithDomain with OptionValues with EitherValues with BlocksTransactionsHelpers {
+
+class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherValues with BlocksTransactionsHelpers {
   import BlockV5Test.*
 
   private val testTime = TestTime(1)

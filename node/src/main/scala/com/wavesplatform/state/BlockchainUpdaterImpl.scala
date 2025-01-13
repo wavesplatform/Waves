@@ -196,6 +196,33 @@ class BlockchainUpdaterImpl(
         .orElse(lastBlockReward)
   }
 
+  /** Referenced blockchain for mining.
+    * @return
+    *   SnapshotBlockchain with a reward for a next height
+    * @note
+    *   Do not use for other purposes
+    */
+  def referencedBlockchain(reference: ByteStr): Blockchain =
+    ngState
+      .flatMap { ng =>
+        if (ng.base.header.reference == reference)
+          Some(SnapshotBlockchain(rocksdb, ng.reward)) // Same reward for a competitor's block, because same height
+        else
+          ng.snapshotOf(reference)
+            .map { case (forgedBlock, liquidSnapshot, carry, _, stateHash, _) =>
+              SnapshotBlockchain(
+                rocksdb,
+                liquidSnapshot,
+                forgedBlock,
+                ng.hitSource,
+                carry,
+                computeNextReward,
+                Some(stateHash)
+              )
+            }
+      }
+      .getOrElse(SnapshotBlockchain(rocksdb, computeNextReward)) // WARN: This seems not happen
+
   override def processBlock(
       block: Block,
       hitSource: ByteStr,
@@ -798,15 +825,17 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.resolveERC20Address(address)
   }
 
-  override def lastStateHash(refId: Option[ByteStr]): ByteStr =
+  override def lastStateHash(refId: Option[ByteStr]): ByteStr = readLock {
     ngState
       .map { ng =>
         refId.filter(ng.contains).fold(ng.bestLiquidComputedStateHash)(id => ng.snapshotFor(id)._4)
       }
       .getOrElse(rocksdb.lastStateHash(None))
+  }
 
-  def snapshotBlockchain: SnapshotBlockchain =
+  def snapshotBlockchain: SnapshotBlockchain = readLock {
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))
+  }
 
   // noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {

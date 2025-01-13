@@ -53,7 +53,7 @@ class MicroBlockMinerImpl(
         case Retry =>
           Task
             .defer(generateMicroBlockSequence(account, accumulatedBlock, restTotalConstraint, lastMicroBlock))
-            .delayExecution(1 second)
+            .delayExecution((settings.microBlockInterval / 2).max(1.millis))
         case Stop =>
           setDebugState(MinerDebugInfo.MiningBlocks)
           Task(log.debug("MicroBlock mining completed, block is full"))
