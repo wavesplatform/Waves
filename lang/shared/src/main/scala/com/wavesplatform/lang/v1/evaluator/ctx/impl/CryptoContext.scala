@@ -4,6 +4,7 @@ import cats.implicits.*
 import cats.{Id, Monad}
 import com.wavesplatform.common.merkle.Merkle.createRoot
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
@@ -14,7 +15,6 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
-import com.wavesplatform.lang.*
 
 import scala.collection.mutable
 import scala.util.Try
@@ -50,7 +50,7 @@ object CryptoContext {
       }
     )
 
-  private val ctxCache = mutable.AnyRefMap.empty[(BaseGlobal, StdLibVersion), CTX[NoContext]]
+  private val ctxCache = mutable.HashMap.empty[(BaseGlobal, StdLibVersion), CTX[NoContext]]
 
   private def buildNew(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] = {
     def functionFamily(
@@ -373,8 +373,7 @@ object CryptoContext {
         case xs @ ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
           val sizeCheckedProofs = proof.collect { case bs @ CONST_BYTESTR(v) if v.size == 32 => bs }
           if (value.size == 32 && proof.length <= 16 && sizeCheckedProofs.size == proof.size) {
-            Try(createRoot(value.arr, Math.toIntExact(index), sizeCheckedProofs.reverse.map(_.bs.arr)))
-              .toEither
+            Try(createRoot(value.arr, Math.toIntExact(index), sizeCheckedProofs.reverse.map(_.bs.arr))).toEither
               .leftMap(e => ThrownError(if (e.getMessage != null) e.getMessage else "error"))
               .flatMap(r => CONST_BYTESTR(ByteStr(r)))
           } else {

@@ -25,26 +25,26 @@ object Dependencies {
   val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full)
 
   val akkaHttp        = akkaHttpModule("akka-http")
-  val googleGuava     = "com.google.guava"    % "guava"             % "33.3.1-jre"
+  val googleGuava     = "com.google.guava"    % "guava"             % "33.4.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.11"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.16"
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
-  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.0"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.1"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
-  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.110.Final"
+  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.116.Final"
 
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.12")
 
   val playJson = "com.typesafe.play" %% "play-json" % "2.10.6"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
-  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.4" % Test)
+  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.5" % Test)
 
-  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.10.1"
-  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.10.1"
+  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.10.2"
+  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.10.2"
 
-  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.78.1"
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.79"
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 
@@ -77,7 +77,7 @@ object Dependencies {
     logback,
     "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.23", // To support Apple ARM
     "com.spotify"                      % "docker-client"                 % "8.16.0",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.18.0",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.18.2",
     asyncHttpClient
   ).map(_ % Test)
 
@@ -86,7 +86,7 @@ object Dependencies {
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
     "org.scalacheck"    %% "scalacheck"      % "1.18.1",
     "org.mockito"        % "mockito-all"     % "1.10.19",
-    "org.scalamock"     %% "scalamock"       % "6.0.0"
+    "org.scalamock"     %% "scalamock"       % "6.1.1"
   ).map(_ % Test)
 
   lazy val qaseReportDeps = Seq(
@@ -100,15 +100,15 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "9.6.1"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "9.8.4"
 
   lazy val node = Def.setting(
     Seq(
       rocksdb,
       ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
       "commons-net"          % "commons-net"              % "3.11.1",
-      "commons-io"           % "commons-io"               % "2.17.0",
-      "com.github.pureconfig" %% "pureconfig" % "0.17.7",
+      "commons-io"           % "commons-io"               % "2.18.0",
+      "com.github.pureconfig" %% "pureconfig" % "0.17.8",
       "net.logstash.logback" % "logstash-logback-encoder" % "8.0" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),
@@ -127,8 +127,8 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
-      "eu.timepit"                 %% "refined"       % "0.11.2" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "12.3.1",
+      "eu.timepit"                 %% "refined"       % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "com.esaulpaugh"              % "headlong"      % "12.3.3",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
     ) ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value

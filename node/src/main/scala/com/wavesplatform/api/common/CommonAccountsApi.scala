@@ -1,6 +1,5 @@
 package com.wavesplatform.api.common
 
-import com.google.common.base.Charsets
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
@@ -15,6 +14,7 @@ import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.RocksIterator
 
+import java.nio.charset.StandardCharsets
 import java.util.regex.Pattern
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
@@ -178,7 +178,7 @@ object CommonAccountsApi {
               endOfData()
             }
           } else {
-            val dataKey = new String(iter.key().drop(prefix.length), Charsets.UTF_8)
+            val dataKey = new String(iter.key().drop(prefix.length), StandardCharsets.UTF_8)
             if (matches(dataKey)) {
               nextDbEntry = Option(iter.value()).map { arr =>
                 Keys.data(addressId, dataKey).parse(arr).entry

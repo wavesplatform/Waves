@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import com.google.common.base.Charsets.UTF_8
 import com.google.common.collect.{Interners, Maps}
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
@@ -32,6 +31,7 @@ import sun.nio.ch.Util
 import supertagged.TaggedType
 
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 import java.util.Map as JMap
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -97,7 +97,7 @@ package object database {
 
     while (i < data.length) {
       val len = ((data(i) << 8) | (data(i + 1) & 0xff)).toShort // Optimization
-      s += new String(data, i + 2, len, UTF_8)
+      s += new String(data, i + 2, len, StandardCharsets.UTF_8)
       i += (2 + len)
     }
     s.result()

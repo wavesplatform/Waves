@@ -1,10 +1,10 @@
 package com.wavesplatform.network
 
-import java.net.{InetAddress, InetSocketAddress}
-
-import com.google.common.base.Charsets
+import com.wavesplatform.utils.*
 import io.netty.buffer.ByteBuf
-import com.wavesplatform.utils._
+
+import java.net.{InetAddress, InetSocketAddress}
+import java.nio.charset.StandardCharsets
 
 case class Handshake(
     applicationName: String,
@@ -57,14 +57,14 @@ object Handshake {
     if (appNameSize < 0 || appNameSize > Byte.MaxValue) {
       throw new InvalidHandshakeException(s"An invalid application name's size: $appNameSize")
     }
-    val appName    = in.readSlice(appNameSize).toString(Charsets.UTF_8)
+    val appName    = in.readSlice(appNameSize).toString(StandardCharsets.UTF_8)
     val appVersion = (in.readInt(), in.readInt(), in.readInt())
 
     val nodeNameSize = in.readByte()
     if (nodeNameSize < 0 || nodeNameSize > Byte.MaxValue) {
       throw new InvalidHandshakeException(s"An invalid node name's size: $nodeNameSize")
     }
-    val nodeName = in.readSlice(nodeNameSize).toString(Charsets.UTF_8)
+    val nodeName = in.readSlice(nodeNameSize).toString(StandardCharsets.UTF_8)
 
     val nonce = in.readLong()
 
