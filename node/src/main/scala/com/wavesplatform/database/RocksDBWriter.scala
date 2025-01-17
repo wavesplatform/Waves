@@ -843,7 +843,7 @@ class RocksDBWriter(
   }
 
   private def batchCleanupAssetBalances(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
-    val lastUpdateAt = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), Height]
+    val lastUpdateAt = mutable.HashMap.empty[(AddressId, IssuedAsset), Height]
 
     val updateAt     = new ArrayBuffer[(AddressId, IssuedAsset, Height)]() // First height of update in this range
     val updateAtKeys = new ArrayBuffer[Key[BalanceNode]]()
@@ -890,7 +890,7 @@ class RocksDBWriter(
 
   private def batchCleanupAccountData(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
     val changedDataAddresses = mutable.Set.empty[AddressId]
-    val lastUpdateAt         = mutable.AnyRefMap.empty[(AddressId, String), Height]
+    val lastUpdateAt         = mutable.HashMap.empty[(AddressId, String), Height]
 
     val updateAt     = new ArrayBuffer[(AddressId, String, Height)]() // First height of update in this range
     val updateAtKeys = new ArrayBuffer[Key[DataNode]]()
