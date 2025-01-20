@@ -21,7 +21,7 @@ import org.scalatest.Suite
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration.Inf
 
-trait WithMiner extends WithDomain { _: Suite =>
+trait WithMiner extends WithDomain { suite: Suite =>
   def withMiner(
       blockchain: Blockchain & BlockchainUpdater & NG,
       time: Time,
