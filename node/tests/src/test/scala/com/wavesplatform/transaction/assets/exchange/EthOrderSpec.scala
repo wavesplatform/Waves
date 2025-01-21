@@ -6,12 +6,18 @@ import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.common.utils.*
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.TxMeta.Status
+import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.{TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
+import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{Assertion, BeforeAndAfterAll}
+import org.scalatest.{Assertion, BeforeAndAfterAll, ParallelTestExecution}
 import play.api.libs.json.{JsArray, JsObject, Json}
+import org.web3j.crypto.Bip32ECKeyPair
 
 class EthOrderSpec
     extends FlatSpec
@@ -20,8 +26,10 @@ class EthOrderSpec
     with BlockchainStubHelpers
     with EthHelpers
     with DiffMatchers
+    with WithDomain
+    with ParallelTestExecution 
     with JsonMatchers {
-  import EthOrderSpec.{ethBuyOrder, ethSellOrder}
+  import EthOrderSpec.{ethBuyOrder, ethSellOrder, ethBuyOrderSigned, ethSellOrderSigned}
 
   "ETH signed order" should "recover signer public key correctly" in {
     val testOrder = Order(
@@ -123,26 +131,33 @@ class EthOrderSpec
   }
 
   it should "work in exchange transaction" in {
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.creditBalance(ethBuyOrder.senderAddress, *)
-      sh.creditBalance(ethSellOrder.senderAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(
-          Map(
-            TxHelpers.matcher.toAddress -> Long.MaxValue / 3,
-            ethBuyOrder.senderAddress   -> Long.MaxValue / 3,
-            ethSellOrder.senderAddress  -> Long.MaxValue / 3
-          )
-        )
-      sh.issueAsset(ByteStr(EthStubBytes32))
-    }
+    val assetIssuer = TxHelpers.defaultSigner
 
-    val differ      = blockchain.stub.transactionDiffer(TestTime(100)) _
-    val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val snapshot    = differ(transaction).resultE.explicitGet()
-    snapshot should containAppliedTx(transaction.id())
+    val buyerEthAccount  = TxHelpers.signer(1).toEthKeyPair
+    val sellerEthAccount = TxHelpers.signer(2).toEthKeyPair
+    val balances = Seq(
+      AddrWithBalance(buyerEthAccount.toWavesAddress, 1000.waves),
+      AddrWithBalance(sellerEthAccount.toWavesAddress, 1000.waves),
+      AddrWithBalance(TxHelpers.matcher.toAddress, 1000.waves)
+    )
+
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      // Issue an asset
+      val issueTx   = TxHelpers.issue(assetIssuer, Long.MaxValue)
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
+
+      // Transfer asset to seller
+      d.appendBlock(TxHelpers.transfer(assetIssuer, sellerEthAccount.toWavesAddress, 1000L, testAsset))
+
+      val signedBuyOrder = ethBuyOrderSigned(testAsset, buyerEthAccount)
+      val signedSellOrder = ethSellOrderSigned(testAsset, sellerEthAccount)
+
+      val transaction = TxHelpers.exchange(signedBuyOrder, signedSellOrder, price = 100, version = TxVersion.V3)
+      d.appendBlock(transaction)
+
+      d.blockchain.transactionMeta(transaction.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
+    }
   }
 
   it should "work in exchange transaction with an old order" in {
@@ -474,6 +489,48 @@ class EthOrderSpec
 }
 
 object EthOrderSpec extends EthHelpers {
+  private val emptySignature = OrderAuthentication.Eip712Signature(ByteStr(new Array[Byte](64)))
+
+  def ethBuyOrderSigned(testAsset: IssuedAsset, buyerEthAccount: Bip32ECKeyPair): Order = {
+    val ethBuyOrderTemplate: Order = Order(
+      Order.V4,
+      emptySignature,
+      TxHelpers.matcher.publicKey,
+      AssetPair(testAsset, Waves),
+      OrderType.BUY,
+      TxExchangeAmount.unsafeFrom(1),
+      TxOrderPrice.unsafeFrom(100L),
+      TxHelpers.timestamp,
+      TxHelpers.timestamp + 100000,
+      TxMatcherFee.unsafeFrom(100000),
+      Waves
+    )
+
+    ethBuyOrderTemplate.copy(
+      orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(EthOrders.signOrder(ethBuyOrderTemplate, buyerEthAccount)))
+    )
+  }
+
+  def ethSellOrderSigned(testAsset: IssuedAsset, sellerEthAccount: Bip32ECKeyPair): Order = {
+    val ethSellOrderTemplate: Order = Order(
+      Order.V4,
+      emptySignature,
+      TxHelpers.matcher.publicKey,
+      AssetPair(testAsset, Waves),
+      OrderType.SELL,
+      TxExchangeAmount.unsafeFrom(1),
+      TxOrderPrice.unsafeFrom(100L),
+      TxHelpers.timestamp,
+      TxHelpers.timestamp + 100001,
+      TxMatcherFee.unsafeFrom(100000),
+      Waves
+    )
+
+    ethSellOrderTemplate.copy(
+      orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(EthOrders.signOrder(ethSellOrderTemplate, sellerEthAccount)))
+    )
+  }
+
 
   /** Use this method to create a hardcoded signature for a test order
     * @param order
