@@ -12,7 +12,7 @@ object Dependencies {
 
   private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.7.0"
 
-  private def kamonModule(module: String) = ("io.kamon" %% s"kamon-$module" % "2.7.5").cross(CrossVersion.for3Use2_13)
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.5"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.3"
 
