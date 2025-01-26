@@ -559,7 +559,7 @@ object WavesTxChecks extends Matchers with OptionValues {
     order.matcherPublicKey.toByteArray shouldBe expected.matcherPublicKey.arr
     order.assetPair.get.amountAssetId.toByteArray shouldBe expected.assetPair.amountAsset.compatId.get.arr
     order.assetPair.get.priceAssetId.toByteArray shouldBe expected.assetPair.priceAsset.compatId.get.arr
-    order.orderSide.toString() equalsIgnoreCase expected.orderType.toString
+    order.orderSide.toString() `equalsIgnoreCase` expected.orderType.toString
     order.amount shouldBe expected.amount.value
     order.price shouldBe expected.price.value
     order.timestamp shouldBe expected.timestamp
