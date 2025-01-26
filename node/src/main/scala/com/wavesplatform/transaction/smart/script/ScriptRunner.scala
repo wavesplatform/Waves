@@ -168,7 +168,6 @@ object ScriptRunner {
                     tx => verify(Bindings.transactionObject(tx, proofsEnabled = true, bindingsVersion, fixBigScriptField))
                   )
               case o: Order => verify(Bindings.orderObject(RealTransactionWrapper.ord(o), proofsEnabled = true, bindingsVersion))
-              // TODO: [scala3] `???` was there in the Scala 2 code. Consider rewriting it to be a total function.
               case _: PseudoTx => ???
             }
         }
@@ -179,7 +178,6 @@ object ScriptRunner {
           in match {
             case t: TransactionBase => t.asInstanceOf[Proven & Authorized]
             case o: Order           => o.asInstanceOf[Proven & Authorized]
-            // TODO: [scala3] `???` was there in the Scala 2 code. Consider rewriting it to be a total function.
             case _: PseudoTx => ???
           }
 
