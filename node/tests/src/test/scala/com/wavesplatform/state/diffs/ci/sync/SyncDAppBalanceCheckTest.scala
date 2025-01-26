@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.ci.sync
 
 import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V5

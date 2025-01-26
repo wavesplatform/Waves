@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.*

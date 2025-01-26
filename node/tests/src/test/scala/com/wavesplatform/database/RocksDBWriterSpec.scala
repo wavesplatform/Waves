@@ -4,7 +4,7 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.KeyTags.KeyTag
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance

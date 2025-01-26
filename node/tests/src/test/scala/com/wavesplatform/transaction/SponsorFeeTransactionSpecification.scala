@@ -3,7 +3,8 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures

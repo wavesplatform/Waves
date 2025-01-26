@@ -4,7 +4,8 @@ import cats.Id
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment

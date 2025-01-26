@@ -6,7 +6,7 @@ import com.wavesplatform.block.serialization.{BlockHeaderSerializer, BlockSerial
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{chainBaseAndMicro, defaultSigner}

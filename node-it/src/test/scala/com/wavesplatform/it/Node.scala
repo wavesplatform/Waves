@@ -4,7 +4,7 @@ import java.net.{InetSocketAddress, URL}
 import scala.concurrent.duration.FiniteDuration
 import com.typesafe.config.Config
 import com.wavesplatform.account.{KeyPair, PublicKey, SeedKeyPair}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.FeeValidation

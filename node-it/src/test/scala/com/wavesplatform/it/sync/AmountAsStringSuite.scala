@@ -1,7 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.it.sync.transactions.OverflowBlock

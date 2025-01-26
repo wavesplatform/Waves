@@ -3,7 +3,7 @@ package com.wavesplatform
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.history.DefaultBaseTarget
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL

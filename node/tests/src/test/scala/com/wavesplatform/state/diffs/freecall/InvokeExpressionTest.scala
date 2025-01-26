@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.freecall
 
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.DirectiveDictionary

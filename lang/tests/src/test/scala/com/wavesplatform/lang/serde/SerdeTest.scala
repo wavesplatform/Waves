@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.serde
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader

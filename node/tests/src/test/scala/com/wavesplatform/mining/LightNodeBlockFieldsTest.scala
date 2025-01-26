@@ -3,7 +3,7 @@ package com.wavesplatform.mining
 import com.wavesplatform.account.SeedKeyPair
 import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures.LightNode

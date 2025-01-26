@@ -3,7 +3,8 @@ package com.wavesplatform.lang.v1.repl.node.http
 import cats.implicits.*
 import cats.{Functor, Id}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED

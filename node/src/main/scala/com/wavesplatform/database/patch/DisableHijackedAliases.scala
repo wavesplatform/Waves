@@ -1,7 +1,7 @@
 package com.wavesplatform.database.patch
 
 import com.wavesplatform.account.{AddressScheme, Alias}
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.{Keys, RW}
 import com.wavesplatform.state.patch.PatchDataLoader
 

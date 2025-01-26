@@ -3,7 +3,7 @@ package com.wavesplatform.it.asset
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuiteLike
 import com.wavesplatform.it.sync.{issueFee, minFee, smartMinFee}

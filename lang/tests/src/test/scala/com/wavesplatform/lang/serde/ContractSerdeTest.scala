@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.serde
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.*
 import com.wavesplatform.lang.contract.serialization.{ContractSerDe, ContractSerDeV1, ContractSerDeV2}

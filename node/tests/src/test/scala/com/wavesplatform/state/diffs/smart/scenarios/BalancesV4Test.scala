@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import cats.syntax.semigroup.*
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock

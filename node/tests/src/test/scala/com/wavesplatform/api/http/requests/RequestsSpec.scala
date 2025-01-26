@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.test.FreeSpec
 import org.scalacheck.Gen
 import org.scalatest.OptionValues

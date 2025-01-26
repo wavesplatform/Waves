@@ -1,6 +1,6 @@
 package com.wavesplatform.account
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.test.PropSpec
 
 class AccountOrAliasSpecification extends PropSpec {

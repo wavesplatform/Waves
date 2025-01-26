@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{PutDataResponse, TransactionInfo}
 import com.wavesplatform.it.sync.{minFee, setScriptFee}

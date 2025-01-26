@@ -3,7 +3,7 @@ package com.wavesplatform.state
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.{InterferableDB, WithDomain}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock

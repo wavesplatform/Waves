@@ -3,7 +3,7 @@ package com.wavesplatform.state
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers

@@ -6,7 +6,7 @@ import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.features.EstimatorProvider.*

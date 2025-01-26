@@ -10,7 +10,7 @@ import com.wavesplatform.api.http.TransactionsApiRoute.{ApplicationStatus, Statu
 import com.wavesplatform.block.{Block, ChallengedHeader, MicroBlock}
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance

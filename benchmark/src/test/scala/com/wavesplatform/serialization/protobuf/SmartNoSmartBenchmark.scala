@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.serialization.protobuf.SmartNoSmartBenchmark.ExchangeTransactionSt
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.{Proofs, TxExchangeAmount, TxExchangePrice, TxMatcherFee, TxOrderPrice, TxPositiveAmount, TxVersion}

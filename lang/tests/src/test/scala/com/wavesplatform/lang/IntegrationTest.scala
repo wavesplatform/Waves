@@ -5,7 +5,7 @@ import cats.kernel.Monoid
 import cats.syntax.either.*
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.Keccak256
 import com.wavesplatform.lang.Common.*
 import com.wavesplatform.lang.Testing.*

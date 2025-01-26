@@ -6,7 +6,8 @@ import com.google.common.primitives.Ints
 import com.wavesplatform.common.merkle.*
 import com.wavesplatform.common.merkle.Merkle.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*

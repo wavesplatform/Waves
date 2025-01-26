@@ -1,7 +1,7 @@
 package com.wavesplatform.api.eth
 
 import com.wavesplatform.api.http.eth.EthRpcRoute
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{DefaultWavesSettings, Domain, settingsWithFeatures}

@@ -4,7 +4,8 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.*
 import com.wavesplatform.api.http.requests.{InvokeScriptRequest, SignedInvokeScriptRequest}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, *}
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BIGINT, CONST_BYTESTR, CONST_LONG, CONST_STRING, CaseObj}

@@ -2,7 +2,7 @@ package com.wavesplatform.history
 
 import com.wavesplatform.*
 import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.diffs.ENOUGH_AMT

@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ScriptResultV3

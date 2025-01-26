@@ -5,7 +5,7 @@ import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 
 package object smartcontract {
   val invokeScrTxSupportedVersions: List[Byte] = List(1, 2)

@@ -5,7 +5,7 @@ import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.account.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.features.BlockchainFeatures

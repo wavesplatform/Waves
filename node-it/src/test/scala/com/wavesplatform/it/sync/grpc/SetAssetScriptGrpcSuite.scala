@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler

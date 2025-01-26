@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.evaluator
 
 import cats.syntax.either.*
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*

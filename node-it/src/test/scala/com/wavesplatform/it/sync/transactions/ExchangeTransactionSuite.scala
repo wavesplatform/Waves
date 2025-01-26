@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*

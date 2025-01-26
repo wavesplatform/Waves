@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransferTransactionInfo
 import com.wavesplatform.it.sync.*

@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.api.http.ApiError.InvalidIds
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{TransactionInfo, TransactionStatus}

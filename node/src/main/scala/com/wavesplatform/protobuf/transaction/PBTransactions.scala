@@ -4,7 +4,7 @@ import cats.syntax.traverse.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -65,7 +65,7 @@ object PBTransactions {
     )
 
   def vanillaUnsafe(signedTx: PBSignedTransaction): VanillaTransaction = {
-    import com.wavesplatform.common.utils.*
+    import com.wavesplatform.common.utils.EitherExt2.*
     vanilla(signedTx, unsafe = true).explicitGet()
   }
 
@@ -361,7 +361,7 @@ object PBTransactions {
       proofs: Proofs,
       data: PBTransaction.Data
   ): VanillaTransaction = {
-    import com.wavesplatform.common.utils.*
+    import com.wavesplatform.common.utils.EitherExt2.*
 
     val signature = proofs.toSignature
     data match {
@@ -732,7 +732,7 @@ object PBTransactions {
   }
 
   def toVanillaScript(script: ByteString): Option[com.wavesplatform.lang.script.Script] = {
-    import com.wavesplatform.common.utils.*
+    import com.wavesplatform.common.utils.EitherExt2.*
     if (script.isEmpty) None else Some(ScriptReader.fromBytes(script.toByteArray).explicitGet())
   }
 

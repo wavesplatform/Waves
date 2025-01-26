@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.grpc.LeaseResponse
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}

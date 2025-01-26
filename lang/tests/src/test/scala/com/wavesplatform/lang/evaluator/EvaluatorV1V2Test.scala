@@ -7,7 +7,8 @@ import cats.kernel.Monoid
 import cats.syntax.bifunctor.*
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.*
 import com.wavesplatform.lang.Common.*
 import com.wavesplatform.lang.Testing.*

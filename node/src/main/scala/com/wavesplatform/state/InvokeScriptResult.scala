@@ -4,7 +4,7 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{Terms, Types}
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}

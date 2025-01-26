@@ -6,7 +6,7 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.{GenesisBlockVersion, GenesisGenerationSignature, GenesisGenerator, GenesisReference}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.{KeyTags, RDB, RocksDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers

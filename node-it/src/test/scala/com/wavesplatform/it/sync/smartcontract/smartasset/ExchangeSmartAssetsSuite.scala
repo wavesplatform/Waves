@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract.smartasset
 
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*

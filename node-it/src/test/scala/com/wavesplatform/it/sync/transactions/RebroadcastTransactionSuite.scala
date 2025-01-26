@@ -5,7 +5,7 @@ import com.typesafe.config.ConfigFactory.parseString
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.NodeConfigs.*
 import com.wavesplatform.it.api.SyncHttpApi.*

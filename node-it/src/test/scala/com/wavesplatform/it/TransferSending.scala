@@ -7,7 +7,8 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.*
 import com.wavesplatform.api.http.requests.TransferRequest
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.api.Transaction

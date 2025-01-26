@@ -3,7 +3,8 @@ package com.wavesplatform.events.fixtures
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.AssetScriptInfo
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate, ScriptUpdate}

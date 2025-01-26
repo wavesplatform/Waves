@@ -2,7 +2,7 @@ package com.wavesplatform.lang.doc
 
 import cats.syntax.semigroup.*
 import com.wavesplatform.DocSource
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*

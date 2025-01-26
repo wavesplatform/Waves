@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.*

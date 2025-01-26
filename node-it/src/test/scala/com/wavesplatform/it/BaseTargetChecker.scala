@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import com.typesafe.config.ConfigFactory.{defaultApplication, defaultReference}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.RDB
 import com.wavesplatform.events.BlockchainUpdateTriggers

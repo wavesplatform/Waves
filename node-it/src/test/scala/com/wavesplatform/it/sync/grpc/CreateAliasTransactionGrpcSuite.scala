@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.grpc
 import scala.util.{Random, Try}
 
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.{aliasTxSupportedVersions, minFee, transferAmount}

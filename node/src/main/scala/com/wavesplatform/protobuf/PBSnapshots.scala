@@ -3,7 +3,7 @@ package com.wavesplatform.protobuf
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.NewAsset

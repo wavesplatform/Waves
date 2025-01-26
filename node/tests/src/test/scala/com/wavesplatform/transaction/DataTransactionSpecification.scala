@@ -4,7 +4,8 @@ import com.google.common.primitives.Shorts
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.requests.SignedDataRequest
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry}
 import com.wavesplatform.state.DataEntry.*

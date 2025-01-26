@@ -3,7 +3,7 @@ package com.wavesplatform
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.*
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.Asset.Waves

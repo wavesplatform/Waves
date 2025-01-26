@@ -1,7 +1,7 @@
 package com.wavesplatform.state.patch
 
 import cats.implicits.catsSyntaxSemigroup
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.state.patch.CancelAllLeases.CancelledLeases
 import com.wavesplatform.state.{Blockchain, StateSnapshot}
 

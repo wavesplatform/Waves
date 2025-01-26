@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, AddressScheme, Alias}
 import com.wavesplatform.api.http.ApiError.WrongJson
 import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTransferRequest}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.MassTransferTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi.*

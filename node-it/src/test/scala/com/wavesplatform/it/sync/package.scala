@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.api.http.requests.IssueRequest
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.AssertiveApiError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2

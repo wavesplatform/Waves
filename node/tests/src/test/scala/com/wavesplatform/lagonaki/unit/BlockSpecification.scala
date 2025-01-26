@@ -3,7 +3,7 @@ package com.wavesplatform.lagonaki.unit
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.*

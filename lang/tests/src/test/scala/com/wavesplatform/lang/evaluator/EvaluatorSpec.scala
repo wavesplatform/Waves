@@ -2,7 +2,7 @@ package com.wavesplatform.lang.evaluator
 
 import cats.Id
 import cats.implicits.*
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.utils.lazyContexts

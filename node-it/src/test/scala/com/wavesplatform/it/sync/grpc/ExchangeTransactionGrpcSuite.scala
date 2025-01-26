@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.{matcherFee, minFee, someAssetAmount}

@@ -4,7 +4,7 @@ import cats.kernel.Monoid
 import cats.syntax.semigroup.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.*

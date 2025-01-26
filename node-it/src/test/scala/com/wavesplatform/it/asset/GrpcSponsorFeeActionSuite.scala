@@ -2,7 +2,7 @@ package com.wavesplatform.it.asset
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.api.{IssueInfoResponse, SponsorFeeResponse, StateChangesDetails}
 import com.wavesplatform.it.sync.*

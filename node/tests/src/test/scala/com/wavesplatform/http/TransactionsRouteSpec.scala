@@ -9,6 +9,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, *}
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.defaultSigner
 import com.wavesplatform.lang.directives.values.{V5, V7, V8}

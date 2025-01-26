@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair

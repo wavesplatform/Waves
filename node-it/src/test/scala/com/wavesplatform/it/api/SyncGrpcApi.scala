@@ -4,7 +4,8 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{TransactionStatus as PBTransactionStatus, *}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
 import com.wavesplatform.it.sync.*

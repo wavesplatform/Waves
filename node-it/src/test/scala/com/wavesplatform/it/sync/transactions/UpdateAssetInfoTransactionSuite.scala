@@ -5,7 +5,7 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.UpdateAssetInfoRequest
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NodeConfigs.{Miners, NotMiner}
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}

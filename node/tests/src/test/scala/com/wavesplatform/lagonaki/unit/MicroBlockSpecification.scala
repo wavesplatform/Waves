@@ -4,7 +4,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.test.*

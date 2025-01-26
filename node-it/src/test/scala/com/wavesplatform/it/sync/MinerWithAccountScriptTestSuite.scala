@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.{BaseFunSuite, NodeConfigs}
 import com.wavesplatform.it.api.SyncHttpApi.*

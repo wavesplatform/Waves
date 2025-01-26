@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V5, V6}
 import com.wavesplatform.lang.script.Script

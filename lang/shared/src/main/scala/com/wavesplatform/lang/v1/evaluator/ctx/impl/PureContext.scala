@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import cats.implicits.*
 import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.*

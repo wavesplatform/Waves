@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import cats.syntax.either.*
 import cats.Id
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*

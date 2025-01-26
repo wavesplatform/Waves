@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.v1.ExprScript

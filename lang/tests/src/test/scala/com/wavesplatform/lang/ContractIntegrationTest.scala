@@ -4,7 +4,7 @@ import cats.Id
 import cats.syntax.either.*
 import cats.syntax.semigroup.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Common.sampleTypes
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*

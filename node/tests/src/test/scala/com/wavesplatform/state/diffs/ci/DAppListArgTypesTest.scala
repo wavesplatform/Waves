@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, Ride4DApps, SynchronousCalls, RideV6 as RideV6F}
 import com.wavesplatform.lang.contract.DApp

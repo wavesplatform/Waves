@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.test.*
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.NoLimit
 
 class BytesDropTakeTest extends EvaluatorSpec {

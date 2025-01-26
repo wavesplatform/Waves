@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.WavesSettings

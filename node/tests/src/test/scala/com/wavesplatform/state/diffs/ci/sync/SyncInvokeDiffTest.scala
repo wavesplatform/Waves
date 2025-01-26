@@ -4,7 +4,7 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V5

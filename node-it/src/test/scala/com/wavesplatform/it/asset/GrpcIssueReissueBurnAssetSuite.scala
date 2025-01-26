@@ -3,7 +3,8 @@ package com.wavesplatform.it.asset
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.AssetInfoResponse
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.api.{BurnInfoResponse, IssueInfoResponse, ReissueInfoResponse, StateChangesDetails}
 import com.wavesplatform.it.sync.*

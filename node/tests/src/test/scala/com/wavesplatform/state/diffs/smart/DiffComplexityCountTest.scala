@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures

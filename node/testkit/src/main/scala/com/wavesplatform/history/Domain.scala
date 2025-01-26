@@ -8,7 +8,7 @@ import com.wavesplatform.api.common.*
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockSnapshot, ChallengedHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}

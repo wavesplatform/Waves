@@ -5,7 +5,8 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{AddressPortfolio, CommonAccountsApi}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.*
 import com.wavesplatform.database.protobuf.StaticAssetInfo
 import com.wavesplatform.lang.script.ContractScript

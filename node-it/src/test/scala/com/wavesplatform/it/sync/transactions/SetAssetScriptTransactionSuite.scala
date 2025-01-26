@@ -4,7 +4,8 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{Mistiming, StateCheckFailed, WrongJson}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*

@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V6}

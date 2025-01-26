@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.account.{KeyPair, SeedKeyPair}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2

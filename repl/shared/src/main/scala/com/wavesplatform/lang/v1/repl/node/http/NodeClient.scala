@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.repl.node.http
 
 import cats.Functor
 import cats.implicits.*
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.repl.node.http.NodeClient.ResponseWrapper
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 import com.wavesplatform.lang.v1.repl.node.http.WebEnvironment.executionContext

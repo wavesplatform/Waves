@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.AsyncNetworkApi.*
 import com.wavesplatform.it.api.SyncHttpApi.*

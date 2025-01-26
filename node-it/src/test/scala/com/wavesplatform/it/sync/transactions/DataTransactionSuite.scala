@@ -5,7 +5,8 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation, WrongJson}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{TransactionInfo, UnexpectedStatusCodeException}

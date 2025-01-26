@@ -7,7 +7,7 @@ import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.{V5, V6}

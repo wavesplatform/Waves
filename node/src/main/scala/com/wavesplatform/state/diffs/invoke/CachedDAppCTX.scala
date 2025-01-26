@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
 import cats.syntax.semigroup.*
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures.{ConsensusImprovements, SynchronousCalls}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.{Account, DApp, StdLibVersion, V3}

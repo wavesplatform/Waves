@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock

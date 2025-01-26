@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.transactions
 import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.*

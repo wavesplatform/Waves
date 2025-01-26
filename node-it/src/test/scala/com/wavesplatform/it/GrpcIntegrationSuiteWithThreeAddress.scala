@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
 import com.wavesplatform.test.NumericExt

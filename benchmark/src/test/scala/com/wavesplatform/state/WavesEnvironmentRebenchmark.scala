@@ -3,7 +3,7 @@ package com.wavesplatform.state
 import java.util.concurrent.TimeUnit
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.lang.v1.traits.DataType.{Boolean, ByteArray, Long}

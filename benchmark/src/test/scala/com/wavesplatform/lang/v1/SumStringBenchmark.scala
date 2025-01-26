@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.evalV5
 import com.wavesplatform.lang.v1.SumStringBenchmark.*

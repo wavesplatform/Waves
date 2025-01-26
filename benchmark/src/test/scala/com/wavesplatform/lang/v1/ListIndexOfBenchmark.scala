@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.ListIndexOfBenchmark.ListIndexOfSt
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext

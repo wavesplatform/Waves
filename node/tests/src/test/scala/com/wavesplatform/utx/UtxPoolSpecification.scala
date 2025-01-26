@@ -6,7 +6,7 @@ import com.wavesplatform.*
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.database.{RDB, RocksDBWriter, TestStorageFactory}
 import com.wavesplatform.db.WithDomain

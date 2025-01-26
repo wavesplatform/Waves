@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
 import cats.implicits.*
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.compiler.Types.*
 
 object TypeInferrer {

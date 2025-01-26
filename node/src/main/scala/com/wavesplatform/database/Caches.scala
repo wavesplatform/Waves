@@ -6,7 +6,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.protobuf.{BlockMeta as PBBlockMeta, BlockMetaExt}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks

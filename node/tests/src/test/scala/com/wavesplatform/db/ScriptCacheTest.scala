@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.WithNewDBForEachTest
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2

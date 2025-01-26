@@ -2,7 +2,8 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler

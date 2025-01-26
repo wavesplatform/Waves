@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lang.directives.values.{Expression, V3}
 import com.wavesplatform.lang.script.v1.ExprScript

@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 
 //noinspection ScalaStyle
 @OutputTimeUnit(TimeUnit.NANOSECONDS)

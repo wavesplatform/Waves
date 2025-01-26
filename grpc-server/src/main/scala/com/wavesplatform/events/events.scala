@@ -6,7 +6,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate, ScriptUpdate}
 import com.wavesplatform.events.protobuf.TransactionMetadata

@@ -5,7 +5,8 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import cats.Id
 import com.google.common.primitives.Longs
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.*

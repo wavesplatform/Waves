@@ -4,7 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
 import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator}
 import com.wavesplatform.crypto.*

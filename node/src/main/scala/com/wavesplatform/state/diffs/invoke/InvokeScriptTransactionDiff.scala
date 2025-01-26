@@ -6,7 +6,7 @@ import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{LightNode, RideV6}
 import com.wavesplatform.features.EstimatorProvider.*

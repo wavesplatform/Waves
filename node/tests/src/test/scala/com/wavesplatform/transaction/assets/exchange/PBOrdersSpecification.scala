@@ -3,7 +3,8 @@ package com.wavesplatform.transaction.assets.exchange
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.protobuf.order.AssetPair as PBAssetPair
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBOrder, PBOrders}
 import com.wavesplatform.test.FlatSpec

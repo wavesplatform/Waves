@@ -2,7 +2,7 @@ package com.wavesplatform.consensus.nxt
 
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset

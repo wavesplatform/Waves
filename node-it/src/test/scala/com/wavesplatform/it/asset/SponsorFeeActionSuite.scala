@@ -1,7 +1,7 @@
 package com.wavesplatform.it.asset
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{IssueInfoResponse, SponsorFeeResponse, StateChangesDetails}

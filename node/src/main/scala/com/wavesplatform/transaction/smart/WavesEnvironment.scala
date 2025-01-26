@@ -7,7 +7,7 @@ import com.wavesplatform.account
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.{FairPoSCalculator, PoSCalculator}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.LightNode

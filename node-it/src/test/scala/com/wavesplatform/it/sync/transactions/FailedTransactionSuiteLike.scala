@@ -8,7 +8,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, TransactionStatus as PBTransactionStatus}
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.{Node, NodeConfigs}
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3

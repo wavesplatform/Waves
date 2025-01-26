@@ -6,7 +6,7 @@ import cats.syntax.apply.*
 import cats.syntax.traverse.*
 import com.google.protobuf.{CodedInputStream, CodedOutputStream}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.serialization.Serde.*

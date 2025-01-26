@@ -1,7 +1,7 @@
 package com.wavesplatform.state.appender
 
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, PeerDatabase}

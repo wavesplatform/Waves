@@ -8,7 +8,7 @@ import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{ApiError, DebugMessage}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.*

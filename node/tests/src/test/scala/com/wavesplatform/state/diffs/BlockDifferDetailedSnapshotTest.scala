@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.{WithDomain, WithState}
 import com.wavesplatform.history.defaultSigner
 import com.wavesplatform.lagonaki.mocks.TestBlock

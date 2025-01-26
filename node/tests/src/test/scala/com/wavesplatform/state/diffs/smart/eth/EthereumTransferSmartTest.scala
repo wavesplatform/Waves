@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs.smart.eth
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.DirectiveDictionary

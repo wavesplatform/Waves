@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.evaluator.string
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4, V5, V6}
 import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.FunctionHeader.Native

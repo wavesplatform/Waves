@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{issueFee, smartMinFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite

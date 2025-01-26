@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.account.{AddressOrAlias, Alias}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}

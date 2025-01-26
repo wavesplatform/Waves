@@ -1,6 +1,6 @@
 package com.wavesplatform.state.appender
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError

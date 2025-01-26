@@ -4,7 +4,7 @@ import com.esaulpaugh.headlong.abi.{Function, Tuple}
 import com.esaulpaugh.headlong.util.FastHex
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.*

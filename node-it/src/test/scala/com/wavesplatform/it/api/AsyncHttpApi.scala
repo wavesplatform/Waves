@@ -12,7 +12,8 @@ import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.{ConnectReq, DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.api.{ActivationStatus, activationStatusFormat}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.invokeExpressionFee

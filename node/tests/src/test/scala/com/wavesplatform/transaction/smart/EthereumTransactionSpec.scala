@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.smart
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff

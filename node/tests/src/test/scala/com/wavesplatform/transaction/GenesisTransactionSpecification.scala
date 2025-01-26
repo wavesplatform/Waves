@@ -1,7 +1,8 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.test.PropSpec
 import org.scalacheck.{Arbitrary, Gen}

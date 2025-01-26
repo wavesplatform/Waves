@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.estimator.dapp
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler

@@ -5,7 +5,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{Portfolio, StateSnapshot}

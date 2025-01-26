@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.FairPoSCalculator
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi

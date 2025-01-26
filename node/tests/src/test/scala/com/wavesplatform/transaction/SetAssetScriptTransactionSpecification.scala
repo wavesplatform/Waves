@@ -2,7 +2,8 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.{ContractScript, Script}

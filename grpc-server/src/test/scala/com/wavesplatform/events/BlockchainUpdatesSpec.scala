@@ -6,7 +6,7 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.InterferableDB
 import com.wavesplatform.events.FakeObserver.*

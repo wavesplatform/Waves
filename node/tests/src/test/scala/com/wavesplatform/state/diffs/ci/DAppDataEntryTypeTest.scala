@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.features.BlockchainFeatures

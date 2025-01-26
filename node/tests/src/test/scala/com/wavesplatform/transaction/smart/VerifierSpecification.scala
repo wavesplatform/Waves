@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.*

@@ -5,7 +5,8 @@ import java.security.{KeyPair, KeyPairGenerator, SecureRandom, Signature}
 import cats.Id
 import cats.implicits.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.CTX

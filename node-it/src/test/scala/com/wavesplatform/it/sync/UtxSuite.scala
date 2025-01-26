@@ -4,7 +4,7 @@ import scala.util.{Random, Try}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.{BaseFunSuite, Node}
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{AsyncHttpApi, TransactionInfo}

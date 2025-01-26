@@ -5,7 +5,7 @@ import scala.concurrent.duration.*
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.{NodeConfigs, NTPTime}
 import com.wavesplatform.it.NodeConfigs.Default

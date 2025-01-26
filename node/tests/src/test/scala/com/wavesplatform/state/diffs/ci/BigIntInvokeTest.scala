@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.contract

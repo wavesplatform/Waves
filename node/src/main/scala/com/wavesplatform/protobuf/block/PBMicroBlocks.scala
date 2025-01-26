@@ -4,7 +4,7 @@ import scala.util.Try
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.network.MicroBlockResponse
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.PBTransactions

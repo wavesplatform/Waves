@@ -2,7 +2,7 @@ package com.wavesplatform.lang.evaluator
 
 import cats.Id
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.*

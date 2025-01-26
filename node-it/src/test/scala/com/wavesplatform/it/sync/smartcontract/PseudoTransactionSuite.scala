@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite

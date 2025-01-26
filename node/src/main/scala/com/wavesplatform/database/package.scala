@@ -9,7 +9,7 @@ import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.*
 import com.wavesplatform.database.protobuf as pb
 import com.wavesplatform.database.protobuf.DataEntry.Value

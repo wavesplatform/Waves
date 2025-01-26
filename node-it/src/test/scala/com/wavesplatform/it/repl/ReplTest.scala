@@ -3,6 +3,7 @@ package com.wavesplatform.it.repl
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.transactions.{FailedTransactionSuiteLike, OverflowBlock}

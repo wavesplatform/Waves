@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.testing
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.contract.DApp.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.serialization.ContractSerDeV1

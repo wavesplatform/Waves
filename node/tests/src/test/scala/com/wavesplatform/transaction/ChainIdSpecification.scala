@@ -3,7 +3,8 @@ package com.wavesplatform.transaction
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
 import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction as PBSignedTransaction}
 import com.wavesplatform.state.StringDataEntry

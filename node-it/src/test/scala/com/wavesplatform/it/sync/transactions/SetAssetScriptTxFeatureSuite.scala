@@ -6,7 +6,7 @@ import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{issueFee, scriptBase64, setAssetScriptFee, someAssetAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 

@@ -10,7 +10,7 @@ import com.typesafe.config.ConfigFactory.*
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.util.GlobalTimer.instance as timer

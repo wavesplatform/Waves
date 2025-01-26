@@ -3,7 +3,7 @@ package com.wavesplatform.utx
 import scala.concurrent.duration.*
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures

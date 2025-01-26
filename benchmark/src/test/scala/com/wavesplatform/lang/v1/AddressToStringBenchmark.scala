@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.Curve25519
 import com.wavesplatform.lang.v1.AddressToStringBenchmark.AddressToString
 import com.wavesplatform.lang.v1.FunctionHeader.Native

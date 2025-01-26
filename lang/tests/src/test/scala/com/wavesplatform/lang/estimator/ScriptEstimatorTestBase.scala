@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.estimator
 
 import cats.kernel.Monoid
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.functionCosts

@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.*
 import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.api.*

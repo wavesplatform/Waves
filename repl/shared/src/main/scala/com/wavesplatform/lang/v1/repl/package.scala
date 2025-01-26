@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import cats.implicits.*
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext

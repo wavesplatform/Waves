@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.v1.ExprScript

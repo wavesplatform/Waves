@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.{BaseFreeSpec, WaitForHeight2}

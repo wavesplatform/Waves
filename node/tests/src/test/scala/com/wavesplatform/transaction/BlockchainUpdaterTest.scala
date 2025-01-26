@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.history

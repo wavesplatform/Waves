@@ -2,7 +2,8 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalacheck.Gen
 import play.api.libs.json.*

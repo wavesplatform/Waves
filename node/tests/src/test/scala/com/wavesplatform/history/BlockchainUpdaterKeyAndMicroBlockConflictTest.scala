@@ -3,7 +3,7 @@ package com.wavesplatform.history
 import com.wavesplatform.*
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.test.PropSpec

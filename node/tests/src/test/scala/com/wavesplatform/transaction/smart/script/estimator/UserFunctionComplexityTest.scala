@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.smart.script.estimator
 
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.FunctionHeader.User

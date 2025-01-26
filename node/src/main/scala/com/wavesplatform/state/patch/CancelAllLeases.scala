@@ -3,7 +3,7 @@ package com.wavesplatform.state.patch
 import cats.implicits.catsSyntaxSemigroup
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.state.{Blockchain, LeaseBalance, LeaseDetails, StateSnapshot}
 import play.api.libs.json.{Json, OFormat}
 

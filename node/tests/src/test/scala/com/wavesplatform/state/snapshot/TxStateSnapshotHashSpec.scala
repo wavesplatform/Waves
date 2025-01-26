@@ -3,7 +3,8 @@ package com.wavesplatform.state.snapshot
 import com.google.common.primitives.Ints
 import com.google.protobuf.ByteString.copyFrom as bs
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.fastHash
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler

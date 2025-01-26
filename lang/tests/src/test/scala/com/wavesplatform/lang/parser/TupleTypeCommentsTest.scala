@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.parser
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.lang.v1.compiler.{Decompiler, TestCompiler}

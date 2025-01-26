@@ -5,7 +5,8 @@ import com.wavesplatform.account.*
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database
 import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}

@@ -4,7 +4,7 @@ import cats.implicits.catsSyntaxSemigroup
 import com.wavesplatform.TestValues.fee
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
