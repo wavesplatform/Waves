@@ -11,14 +11,14 @@ import com.wavesplatform.lang.v1.traits.Environment
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.concurrent.duration.{MICROSECONDS, SECONDS}
+import java.util.concurrent.TimeUnit
 
-@OutputTimeUnit(MICROSECONDS)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 10, time = 1, timeUnit = SECONDS)
-@Measurement(iterations = 10, time = 1, timeUnit = SECONDS)
+@Warmup(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 class ListReplaceByIndexBenchmark {
   @Benchmark
   def listReplaceFirstByIndex(st: ListReplaceByIndexSt, bh: Blackhole): Unit =

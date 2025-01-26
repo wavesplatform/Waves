@@ -1,12 +1,12 @@
 package com.wavesplatform.lang.v1
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.evalV5
-import com.wavesplatform.lang.v1.StringSplitBenchmark._
+import com.wavesplatform.lang.v1.StringSplitBenchmark.*
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 import scala.util.Random

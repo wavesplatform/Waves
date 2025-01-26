@@ -8,7 +8,7 @@ import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import org.openjdk.jmh.annotations.{State, _}
+import org.openjdk.jmh.annotations.{State, *}
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)

@@ -3,9 +3,9 @@ package com.wavesplatform.common
 import java.util.concurrent.TimeUnit
 
 import com.google.common.primitives.Ints
-import com.wavesplatform.common.merkle._
-import com.wavesplatform.common.merkle.Merkle._
-import org.openjdk.jmh.annotations.{Level => _, _}
+import com.wavesplatform.common.merkle.*
+import com.wavesplatform.common.merkle.Merkle.*
+import org.openjdk.jmh.annotations.{Level as _, *}
 import org.openjdk.jmh.infra.Blackhole
 
 import scala.util.Random

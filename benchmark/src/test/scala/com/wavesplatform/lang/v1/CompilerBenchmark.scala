@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.CompilerBenchmark.St
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)

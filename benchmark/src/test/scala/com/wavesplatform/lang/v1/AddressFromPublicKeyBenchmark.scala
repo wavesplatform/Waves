@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.curve25519
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.utils.EthHelpers
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)

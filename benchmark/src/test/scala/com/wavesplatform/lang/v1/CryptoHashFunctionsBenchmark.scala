@@ -3,9 +3,9 @@ package com.wavesplatform.lang.v1
 import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.crypto.{Blake2b256, Keccak256, Sha256}
-import com.wavesplatform.lang.v1.CryptoHashFunctionsBenchmark._
+import com.wavesplatform.lang.v1.CryptoHashFunctionsBenchmark.*
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.randomBytes
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)

@@ -4,7 +4,7 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import com.wavesplatform.common.Base58Benchmark.{Base58St, BytesSt}
 import com.wavesplatform.common.utils.{Base58, FastBase58, StdBase58}
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.SECONDS)

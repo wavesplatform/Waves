@@ -18,7 +18,6 @@ import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.SECONDS
 import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
@@ -33,8 +32,8 @@ object ScriptEvaluatorBenchmark {
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 10, time = 1, timeUnit = SECONDS)
-@Measurement(iterations = 10, time = 1, timeUnit = SECONDS)
+@Warmup(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 class ScriptEvaluatorBenchmark {
   @Benchmark
   def bigSum(st: BigSum, bh: Blackhole): Unit = bh.consume(eval(context, st.expr))

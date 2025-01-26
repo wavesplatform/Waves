@@ -2,10 +2,10 @@ package com.wavesplatform.common
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.common.SigVerifyBenchmark._
+import com.wavesplatform.common.SigVerifyBenchmark.*
 import com.wavesplatform.crypto.Curve25519
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
