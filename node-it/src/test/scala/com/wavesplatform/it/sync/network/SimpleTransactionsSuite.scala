@@ -7,15 +7,15 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.api.AsyncNetworkApi._
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.AsyncNetworkApi.*
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class SimpleTransactionsSuite extends BaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] =

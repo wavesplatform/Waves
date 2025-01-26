@@ -2,20 +2,20 @@ package com.wavesplatform.it.repl
 
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.transactions.{FailedTransactionSuiteLike, OverflowBlock}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 
 class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[String] with OverflowBlock {
@@ -101,7 +101,7 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
 
     miner.putData(
       issuer,
-      List[DataEntry[_]](
+      List[DataEntry[?]](
         IntegerDataEntry("int", 100500L),
         StringDataEntry("str", "text"),
         BinaryDataEntry("bin", ByteStr(Base58.decode("r1Mw3j9J"))),

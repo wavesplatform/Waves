@@ -10,7 +10,7 @@ import com.wavesplatform.consensus.FairPoSCalculator
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFunSuite, NodeConfigs, WaitForHeight2}
 import com.wavesplatform.network.RawBytes
 import play.api.libs.json.{JsSuccess, Json, Reads}

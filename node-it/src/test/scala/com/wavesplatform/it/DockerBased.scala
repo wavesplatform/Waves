@@ -5,7 +5,7 @@ import monix.eval.Coeval
 import org.scalatest.{Args, BeforeAndAfterAll, Status, Suite}
 
 trait DockerBased extends BeforeAndAfterAll {
-  this: Suite with Nodes =>
+  this: Suite & Nodes =>
 
   protected val dockerSingleton: Coeval[Docker] = Coeval.evalOnce(createDocker)
   final def docker: Docker                      = dockerSingleton()

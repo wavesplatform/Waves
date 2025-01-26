@@ -3,9 +3,9 @@ package com.wavesplatform.it.sync.network
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class DetectBrokenConnectionsTestSuite extends BaseFreeSpec {
 

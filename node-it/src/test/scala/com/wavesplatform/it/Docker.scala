@@ -640,6 +640,6 @@ object Docker {
     def getConfig: Config = config
   }
 
-  private[this] val debuggerPort      = new AtomicInteger(11000)
+  private val debuggerPort      = new AtomicInteger(11000)
   private def freeDebuggerPort(): Int = debuggerPort.getAndIncrement()
 }

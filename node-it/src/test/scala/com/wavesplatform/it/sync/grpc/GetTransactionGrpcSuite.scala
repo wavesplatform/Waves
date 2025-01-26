@@ -2,8 +2,8 @@ package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncGrpcApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
 
 class GetTransactionGrpcSuite extends GrpcBaseTransactionSuite {

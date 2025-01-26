@@ -8,7 +8,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.protobuf.transaction.{DataTransactionData, PBTransactions}
 import com.wavesplatform.state.DataEntry
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
@@ -36,7 +36,7 @@ package object sync {
   val smartMatcherFee: Long            = 0.007.waves
   val smartMinFee: Long                = minFee + smartFee
 
-  def calcDataFee(data: List[DataEntry[_]], txVersion: Byte): Long = {
+  def calcDataFee(data: List[DataEntry[?]], txVersion: Byte): Long = {
     if (txVersion < 2) {
       val dataSize = data.map(_.toBytes.length).sum + 128
       if (dataSize > 1024) {
@@ -78,7 +78,7 @@ package object sync {
     )
 
   def createIssueRequest(tx: IssueTransaction): IssueRequest = {
-    import tx._
+    import tx.*
     IssueRequest(
       Some(tx.version),
       None,

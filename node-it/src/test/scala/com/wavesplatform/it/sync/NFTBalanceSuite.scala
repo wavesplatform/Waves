@@ -127,7 +127,7 @@ class NFTBalanceSuite extends BaseFreeSpec {
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
         .recoverWith { case ex: Throwable =>
           Future.successful {
-            assert(ex.getMessage contains "Too big sequence requested")
+            assert(ex.getMessage `contains` "Too big sequence requested")
           }
         }
 
@@ -139,7 +139,7 @@ class NFTBalanceSuite extends BaseFreeSpec {
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
         .recoverWith { case ex: Throwable =>
           Future.successful {
-            assert(ex.getMessage contains "Invalid asset id")
+            assert(ex.getMessage `contains` "Invalid asset id")
           }
         }
 

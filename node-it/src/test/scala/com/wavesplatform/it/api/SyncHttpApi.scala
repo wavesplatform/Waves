@@ -753,7 +753,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
 
-    private[this] def withTxIdMessage[T](transactionId: String)(f: => T): T =
+    private def withTxIdMessage[T](transactionId: String)(f: => T): T =
       try f
       catch { case NonFatal(cause) => throw new RuntimeException(s"Error awaiting transaction: $transactionId", cause) }
 

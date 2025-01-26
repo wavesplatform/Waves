@@ -20,7 +20,7 @@ import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsObject
 
-trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
+trait FailedTransactionSuiteLike[T] extends ScorexLogging { matchers: Matchers =>
   protected def waitForHeightArise(): Unit
   protected def sender: Node
 

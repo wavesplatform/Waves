@@ -1,14 +1,14 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError._
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset
@@ -17,10 +17,10 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.{Assertion, CancelAfterFailure}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure {
-  import RideV4ActivationSuite._
+  import RideV4ActivationSuite.*
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
@@ -33,7 +33,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   private def callerAcc  = secondKeyPair
   private def smartAccV3 = thirdKeyPair
 
-  private var asset: Asset = _
+  private var asset: Asset = scala.compiletime.uninitialized
 
   private val dAppV4 =
     """{-# STDLIB_VERSION 4 #-}

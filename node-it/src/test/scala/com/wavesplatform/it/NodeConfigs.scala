@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
 object NodeConfigs {

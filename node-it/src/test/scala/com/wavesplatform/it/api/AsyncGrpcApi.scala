@@ -39,10 +39,10 @@ object AsyncGrpcApi {
     import com.wavesplatform.protobuf.transaction.{Transaction as PBTransaction, *}
     import monix.execution.Scheduler.Implicits.global
 
-    private[this] lazy val assets       = AssetsApiGrpc.stub(n.grpcChannel)
-    private[this] lazy val accounts     = AccountsApiGrpc.stub(n.grpcChannel)
-    private[this] lazy val blocks       = BlocksApiGrpc.stub(n.grpcChannel)
-    private[this] lazy val transactions = TransactionsApiGrpc.stub(n.grpcChannel)
+    private lazy val assets       = AssetsApiGrpc.stub(n.grpcChannel)
+    private lazy val accounts     = AccountsApiGrpc.stub(n.grpcChannel)
+    private lazy val blocks       = BlocksApiGrpc.stub(n.grpcChannel)
+    private lazy val transactions = TransactionsApiGrpc.stub(n.grpcChannel)
 
     val chainId: Byte = AddressScheme.current.chainId
 

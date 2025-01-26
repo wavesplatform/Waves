@@ -59,10 +59,10 @@ object SyncGrpcApi extends Assertions {
     import com.wavesplatform.account.Address as Addr
     import com.wavesplatform.it.api.AsyncGrpcApi.NodeAsyncGrpcApi as async
 
-    private[this] lazy val accounts     = AccountsApiGrpc.blockingStub(n.grpcChannel)
-    private[this] lazy val assets       = AssetsApiGrpc.blockingStub(n.grpcChannel)
-    private[this] lazy val transactions = TransactionsApiGrpc.blockingStub(n.grpcChannel)
-    private[this] lazy val blocks       = BlocksApiGrpc.blockingStub(n.grpcChannel)
+    private lazy val accounts     = AccountsApiGrpc.blockingStub(n.grpcChannel)
+    private lazy val assets       = AssetsApiGrpc.blockingStub(n.grpcChannel)
+    private lazy val transactions = TransactionsApiGrpc.blockingStub(n.grpcChannel)
+    private lazy val blocks       = BlocksApiGrpc.blockingStub(n.grpcChannel)
 
     def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
       try Await.result(awaitable, atMost)

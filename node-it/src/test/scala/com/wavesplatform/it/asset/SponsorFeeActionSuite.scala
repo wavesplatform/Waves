@@ -17,7 +17,7 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
 
   private var sponsoredAssetId: String  = ""
   private var globalDAppAddress: String = ""
-  private var dApp: KeyPair             = _
+  private var dApp: KeyPair             = scala.compiletime.uninitialized
   private val minSponsoredAssetFee      = 100
 
   override def beforeAll(): Unit = {

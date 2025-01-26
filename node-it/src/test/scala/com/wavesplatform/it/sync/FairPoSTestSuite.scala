@@ -2,12 +2,12 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.BaseFunSuite
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class FairPoSTestSuite extends BaseFunSuite {
-  import FairPoSTestSuite._
+  import FairPoSTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -24,7 +24,7 @@ class FairPoSTestSuite extends BaseFunSuite {
 }
 
 object FairPoSTestSuite {
-  import com.wavesplatform.it.NodeConfigs._
+  import com.wavesplatform.it.NodeConfigs.*
   private val microblockActivationHeight = 0
   private val fairPoSActivationHeight    = 10
   private val vrfActivationHeight        = 14

@@ -2,15 +2,15 @@ package com.wavesplatform.it.sync.block
 
 import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.api.*
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
 import org.scalactic.source.Position
-import org.scalatest._
+import org.scalatest.*
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class BlockHeadersTestSuite
     extends funsuite.AnyFunSuite

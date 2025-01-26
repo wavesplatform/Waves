@@ -23,6 +23,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
+import com.wavesplatform.utils.generator.FakeTime
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Exporter, checkGenesis, crypto}
@@ -96,16 +97,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
 
   private def generateBlockchain(genBlocks: Iterator[GenBlock], dbSettings: DBSettings, exportToFile: Block => Unit = _ => ()): Unit = {
     val scheduler = Schedulers.singleThread("appender")
-    val time = new Time {
-      val startTime: Long = settings.blockchainSettings.genesisSettings.timestamp
-
-      @volatile
-      var time: Long = startTime
-
-      override def correctedTime(): Long = time
-
-      override def getTimestamp(): Long = time
-    }
+    val time = new FakeTime(settings.blockchainSettings.genesisSettings.timestamp)
     Using.Manager { use =>
       val db = use(RDB.open(dbSettings))
       val (blockchain, rdbWriterRaw) = StorageFactory(settings, db, time, BlockchainUpdateTriggers.noop)

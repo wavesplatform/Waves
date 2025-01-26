@@ -18,7 +18,7 @@ import scala.concurrent.duration.*
 class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val estimator = ScriptEstimatorV2
 
-  import Ride4DAppsActivationTestSuite._
+  import Ride4DAppsActivationTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = configWithRide4DAppsFeature
 

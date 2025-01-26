@@ -5,14 +5,14 @@ import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import org.scalatest.OptionValues
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with OptionValues {
-  import RewardsTestSuite._
+  import RewardsTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
 

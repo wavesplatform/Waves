@@ -1,13 +1,13 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError._
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
-import com.wavesplatform.it.sync.smartcontract.RideV4ActivationSuite._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
+import com.wavesplatform.it.sync.smartcontract.RideV4ActivationSuite.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import org.scalatest.{Assertion, CancelAfterFailure}
 

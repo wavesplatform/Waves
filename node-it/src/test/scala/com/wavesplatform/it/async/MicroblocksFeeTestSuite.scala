@@ -3,11 +3,11 @@ package com.wavesplatform.it.async
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.test._
+import com.wavesplatform.it.api.AsyncHttpApi.*
+import com.wavesplatform.test.*
 
 import scala.concurrent.Future.traverse
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 

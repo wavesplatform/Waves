@@ -1,13 +1,13 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.it.api.AsyncGrpcApi._
+import com.wavesplatform.it.api.AsyncGrpcApi.*
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.Future.traverse
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 trait GrpcWaitForHeight extends BeforeAndAfterAll with ScorexLogging with ReportingTestName with Nodes {
   this: Suite =>
@@ -17,7 +17,7 @@ trait GrpcWaitForHeight extends BeforeAndAfterAll with ScorexLogging with Report
     Await.result(traverse(nodes)(_.waitForHeight(2)), 2.minute)
   }
 
-  def waitForTxsToReachAllNodes(nodes: Seq[Node] = nodes, txIds: Seq[String]): Future[_] = {
+  def waitForTxsToReachAllNodes(nodes: Seq[Node] = nodes, txIds: Seq[String]): Future[?] = {
     val txNodePairs = for {
       txId <- txIds
       node <- nodes

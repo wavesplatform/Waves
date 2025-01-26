@@ -2,15 +2,15 @@ package com.wavesplatform.it.sync.grpc
 
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.it.NTPTime
-import com.wavesplatform.it.api.SyncGrpcApi._
+import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.{matcherFee, minFee, someAssetAmount}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 import io.grpc.Status.Code
 
 import scala.collection.immutable

@@ -22,7 +22,7 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
   private val minSponsoredAssetFee          = 100
   private var sponsoredAssetId: String      = ""
   private var globalDAppAddress: ByteString = ""
-  private var dApp: KeyPair                 = _
+  private var dApp: KeyPair                 = scala.compiletime.uninitialized
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()

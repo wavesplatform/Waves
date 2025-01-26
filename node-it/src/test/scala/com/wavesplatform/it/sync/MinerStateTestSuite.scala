@@ -3,13 +3,13 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.BaseFunSuite
 import com.wavesplatform.it.api.State
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.test._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.test.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class MinerStateTestSuite extends BaseFunSuite {
-  import MinerStateTestSuite._
+  import MinerStateTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -63,7 +63,7 @@ class MinerStateTestSuite extends BaseFunSuite {
 }
 
 object MinerStateTestSuite {
-  import com.wavesplatform.it.NodeConfigs._
+  import com.wavesplatform.it.NodeConfigs.*
   private val minerConfig = ConfigFactory.parseString(s"""
     |waves {
     |  synchronization.synchronization-timeout = 10s

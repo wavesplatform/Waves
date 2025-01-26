@@ -6,12 +6,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.Blake2b256
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
-import org.scalatest._
+import org.scalatest.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class BlockV5TestSuite extends BaseFreeSpec with ActivationStatusRequest with OptionValues {
 

@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{FeatureActivationStatus, NodeFeatureStatus}
 import com.wavesplatform.it.api.BlockHeader
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 
 class NotActivateFeatureTestSuite extends BaseFreeSpec with ActivationStatusRequest {

@@ -49,7 +49,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val issuerAssetDis = assetDis.view.filterKeys(_ == issuer.toAddress).values
 
-    assetDis should be equals node.assetDistribution(issueTx)
+    assetDis should be `equals` node.assetDistribution(issueTx)
 
     issuerAssetDis.size shouldBe 1
     issuerAssetDis.head shouldBe (issueAmount - addresses.length * transferAmount)

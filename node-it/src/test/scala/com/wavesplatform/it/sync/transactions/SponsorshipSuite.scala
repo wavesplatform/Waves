@@ -4,18 +4,18 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.{BaseFreeSpec, IntegrationSuiteWithThreeAddresses, NodeConfigs}
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import org.scalatest.Assertion
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddresses {
 

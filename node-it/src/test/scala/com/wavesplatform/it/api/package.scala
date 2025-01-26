@@ -3,24 +3,24 @@ package com.wavesplatform.it
 import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.{Paged, ScorexLogging}
 import org.asynchttpclient.Response
-import play.api.libs.functional.syntax._
+import play.api.libs.functional.syntax.*
 import play.api.libs.json.Json.parse
-import play.api.libs.json.{JsError, JsString, JsSuccess, Reads, _}
+import play.api.libs.json.{JsError, JsString, JsSuccess, Reads, *}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 package object api {
   implicit class ResponseFutureExt(f: Future[Response]) extends ScorexLogging {
-    import cats.instances.either._
-    import cats.instances.list._
-    import cats.syntax.alternative._
-    import cats.syntax.either._
+    import cats.instances.either.*
+    import cats.instances.list.*
+    import cats.syntax.alternative.*
+    import cats.syntax.either.*
     def as[A: Reads](implicit ec: ExecutionContext): Future[A] =
       f.map { r =>
         val json = r.getResponseBody(StandardCharsets.UTF_8)
@@ -124,7 +124,7 @@ package object api {
       (JsPath \ "hasNext").read[Boolean] and
         (JsPath \ "lastItem").readNullable[C] and
         (JsPath \ "items").read[R]
-    )(Paged.apply[C, R] _)
+    )(Paged.apply[C, R])
 
   implicit val distributionPageReads: Reads[AssetDistributionPage] = Reads { json =>
     json.validate[Paged[com.wavesplatform.account.Address, AssetDistribution]].map(pg => AssetDistributionPage(pg))

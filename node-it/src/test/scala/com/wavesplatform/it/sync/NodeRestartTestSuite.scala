@@ -4,15 +4,15 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.{BaseFreeSpec, WaitForHeight2}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class NodeRestartTestSuite extends BaseFreeSpec with WaitForHeight2 {
-  import NodeRestartTestSuite._
+  import NodeRestartTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -69,7 +69,7 @@ class NodeRestartTestSuite extends BaseFreeSpec with WaitForHeight2 {
 }
 
 object NodeRestartTestSuite {
-  import com.wavesplatform.it.NodeConfigs._
+  import com.wavesplatform.it.NodeConfigs.*
   private val FirstNode = ConfigFactory.parseString(s"""
                                                          |waves {
                                                          |  synchronization.synchronization-timeout = 10s

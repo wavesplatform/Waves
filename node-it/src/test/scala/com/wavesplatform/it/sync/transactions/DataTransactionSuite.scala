@@ -74,7 +74,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   }
 
   test("put and remove keys") {
-    def dataEntries(i: Int): List[DataEntry[_]] =
+    def dataEntries(i: Int): List[DataEntry[?]] =
       List(
         BooleanDataEntry(s"bool-key-$i", i % 2 == 0),
         IntegerDataEntry(s"int-key-$i", i),
@@ -82,7 +82,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
         StringDataEntry(s"string-key-$i", s"$i-value")
       )
 
-    def updateDataEntry(de: DataEntry[_]): DataEntry[_] = de match {
+    def updateDataEntry(de: DataEntry[?]): DataEntry[?] = de match {
       case BooleanDataEntry(k, v) => BooleanDataEntry(k, !v)
       case IntegerDataEntry(k, v) => IntegerDataEntry(k, v + 100)
       case BinaryDataEntry(k, v)  => BinaryDataEntry(k, ByteStr(v.arr :+ v.arr.length.toByte))
@@ -382,7 +382,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     }
   }
 
-  private def postDataTxJson(source: KeyPair, data: Seq[DataEntry[_]], fee: Long, version: Byte) =
+  private def postDataTxJson(source: KeyPair, data: Seq[DataEntry[?]], fee: Long, version: Byte) =
     sender.signedBroadcast(
       Json.obj(
         "type"            -> DataTransaction.typeId,
@@ -471,7 +471,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   }
 
   def data(
-      entries: List[DataEntry[_]],
+      entries: List[DataEntry[?]],
       fee: Long = 100000,
       timestamp: Long = System.currentTimeMillis,
       version: TxVersion

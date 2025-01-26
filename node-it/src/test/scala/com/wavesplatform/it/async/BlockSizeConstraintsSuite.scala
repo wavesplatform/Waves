@@ -1,16 +1,16 @@
 package com.wavesplatform.it.async
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it._
-import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.*
+import com.wavesplatform.it.api.AsyncHttpApi.*
 
 import scala.concurrent.Await.result
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 @LoadTest
 class BlockSizeConstraintsSuite extends BaseFreeSpec with TransferSending {
-  import BlockSizeConstraintsSuite._
+  import BlockSizeConstraintsSuite.*
 
   override protected val nodeConfigs: Seq[Config] =
     Seq(ConfigOverrides.withFallback(NodeConfigs.randomMiner))

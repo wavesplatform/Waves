@@ -16,8 +16,8 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class UtxSuite extends BaseFunSuite {
-  private var whitelistedAccount: KeyPair     = _
-  private var whitelistedDAppAccount: KeyPair = _
+  private var whitelistedAccount: KeyPair     = scala.compiletime.uninitialized
+  private var whitelistedDAppAccount: KeyPair = scala.compiletime.uninitialized
 
   private val ENOUGH_FEE = 5000000
   private val AMOUNT     = ENOUGH_FEE * 10
@@ -174,8 +174,8 @@ class UtxSuite extends BaseFunSuite {
   }
 
   override protected def nodeConfigs: Seq[Config] = {
-    import UtxSuite._
-    import com.wavesplatform.it.NodeConfigs._
+    import UtxSuite.*
+    import com.wavesplatform.it.NodeConfigs.*
 
     whitelistedAccount = createAccount
     whitelistedDAppAccount = createAccount

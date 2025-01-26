@@ -1,15 +1,15 @@
 package com.wavesplatform.it.sync.network
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{issueAmount, issueFee, minFee}
 import com.wavesplatform.it.{BaseFreeSpec, Node, WaitForHeight2}
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class NetworkSeparationTestSuite extends BaseFreeSpec with WaitForHeight2 {
-  import NetworkSeparationTestSuite._
+  import NetworkSeparationTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -68,7 +68,7 @@ class NetworkSeparationTestSuite extends BaseFreeSpec with WaitForHeight2 {
 }
 
 object NetworkSeparationTestSuite {
-  import com.wavesplatform.it.NodeConfigs._
+  import com.wavesplatform.it.NodeConfigs.*
   private val woFeatureConfig = ConfigFactory.parseString(s"""
                                                             |waves {
                                                             |  synchronization.synchronization-timeout = 10s

@@ -1,14 +1,14 @@
 package com.wavesplatform.it.async
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs, TransferSending}
 
 import scala.concurrent.Await.result
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class MicroblocksGenerationSuite extends BaseFreeSpec with TransferSending {
-  import MicroblocksGenerationSuite._
+  import MicroblocksGenerationSuite.*
 
   override protected val nodeConfigs: Seq[Config] =
     Seq(ConfigOverrides.withFallback(NodeConfigs.randomMiner))

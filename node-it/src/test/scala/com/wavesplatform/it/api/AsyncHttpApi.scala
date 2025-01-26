@@ -55,7 +55,7 @@ import play.api.libs.json.*
 import play.api.libs.json.Json.{stringify, toJson}
 
 import scala.collection.immutable.VectorMap
-import scala.compat.java8.FutureConverters.*
+import scala.jdk.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Future.traverse
@@ -192,7 +192,7 @@ object AsyncHttpApi extends Assertions {
         n.client
           .executeRequest(request)
           .toCompletableFuture
-          .toScala
+          .asScala
           .map(Option(_))
           .recoverWith { case _: IOException | _: TimeoutException =>
             Future(None)
@@ -911,7 +911,7 @@ object AsyncHttpApi extends Assertions {
             }
           )
           .toCompletableFuture
-          .toScala
+          .asScala
           .recoverWith {
             case e: UnexpectedStatusCodeException if e.statusCode == 503 || waitForStatus =>
               n.log.debug(s"[$id] Failed to execute request '$r' with error: ${e.getMessage}")

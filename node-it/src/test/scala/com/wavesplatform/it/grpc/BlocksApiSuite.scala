@@ -5,9 +5,9 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.grpc.{BlockRangeRequest, BlockRequest, BlocksApiGrpc}
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.api.SyncGrpcApi._
+import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuite
-import com.wavesplatform.protobuf.block._
+import com.wavesplatform.protobuf.block.*
 import com.wavesplatform.protobuf.transaction.PBRecipients
 
 class BlocksApiSuite extends GrpcBaseTransactionSuite {
