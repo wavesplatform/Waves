@@ -82,13 +82,17 @@ lazy val `node-tests` = project
 
 lazy val `grpc-server` =
   project.dependsOn(node % "compile;runtime->provided", `node-testkit`, `node-tests` % "test->test")
-lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-tests` % "test->test")
+
+// TODO: [scala3] enable
+// lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-tests` % "test->test")
 lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `node-tests` % "test->test")
-lazy val `node-generator` = project
-  .dependsOn(node, `node-testkit`, `node-tests` % "compile->test")
-  .settings(
-    libraryDependencies += "com.iheart" %% "ficus" % "1.5.2"
-  )
+
+// TODO: [scala3] enable
+// lazy val `node-generator` = project
+//   .dependsOn(node, `node-testkit`, `node-tests` % "compile->test")
+//   .settings(
+//     libraryDependencies += "com.iheart" %% "ficus" % "1.5.2"
+//   )
 lazy val benchmark = project.dependsOn(node, `node-tests` % "test->test")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
@@ -139,10 +143,8 @@ lazy val `waves-node` = (project in file("."))
     `node-it`,
     `node-testkit`,
     `node-tests`,
-    `node-generator`,
-    // benchmark, // TODO: [scala3] enable
-    `repl-js`,
-    `repl-jvm`
+    // `node-generator`, // TODO: [scala3] enable
+    benchmark,
     // `ride-runner` // TODO: [scala3] enable
   )
 
@@ -162,11 +164,8 @@ inScope(Global)(
       "-language:implicitConversions",
       "-language:postfixOps",
       "-Ykind-projector",
-      // "-source:future-migration", // TODO: [scala3] remove
       "-Ywarn-unused:-implicits",
       "-Xlint",
-      "-rewrite", // TODO: [scala3] remove
-      "-explain",  // TODO: [scala3] remove
       "-nowarn",  // TODO: [scala3] remove
       "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
@@ -203,7 +202,7 @@ inScope(Global)(
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
   (node / assembly).value
-  (`ride-runner` / assembly).value
+  // (`ride-runner` / assembly).value // TODO: [scala3] enable
   buildDebPackages.value
   buildTarballsForDocker.value
 }
@@ -220,13 +219,14 @@ buildTarballsForDocker := {
   )
 }
 
-lazy val buildRIDERunnerForDocker = taskKey[Unit]("Package RIDE Runner tarball and copy it to docker/target")
-buildRIDERunnerForDocker := {
-  IO.copyFile(
-    (`ride-runner` / Universal / packageZipTarball).value,
-    (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
-  )
-}
+// TODO: [scala3] enable
+// lazy val buildRIDERunnerForDocker = taskKey[Unit]("Package RIDE Runner tarball and copy it to docker/target")
+// buildRIDERunnerForDocker := {
+//   IO.copyFile(
+//     (`ride-runner` / Universal / packageZipTarball).value,
+//     (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
+//   )
+// }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := Def
@@ -242,8 +242,8 @@ checkPRRaw := Def
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
-      (`node-generator` / Compile / compile).value
-      (`ride-runner` / Test / compile).value
+      // (`node-generator` / Compile / compile).value // TODO: [scala3] enable
+      // (`ride-runner` / Test / compile).value // TODO: [scala3] enable
     }
   )
   .value
