@@ -35,11 +35,11 @@ case class FunctionTypeSignature(result: TYPE, args: Seq[(String, TYPE)], header
 
 @JSExportTopLevel("NativeFunction")
 case class NativeFunction[C[_[_]]](
-                                    @(JSExport @field) name: String,
+                                    name: String,
                                     costByLibVersionMap: Map[StdLibVersion, Long],
-                                    @(JSExport @field) signature: FunctionTypeSignature,
+                                    signature: FunctionTypeSignature,
                                     ev: ContextfulNativeFunction[C],
-                                    @(JSExport @field) args: Seq[String]
+                                    args: Seq[String]
 ) extends BaseFunction[C]
 
 object NativeFunction {
@@ -82,12 +82,12 @@ object NativeFunction {
 
 @JSExportTopLevel("UserFunction")
 case class UserFunction[C[_[_]]](
-                                  @(JSExport@field) name: String,
-                                  @(JSExport@field) internalName: String,
-                                  costByLibVersionMap: Map[StdLibVersion, Long],
-                                  @(JSExport@field) signature: FunctionTypeSignature,
-                                  ev: ContextfulUserFunction[C],
-                                  @(JSExport@field) args: Seq[String]
+                                name: String,
+                                internalName: String,
+                                costByLibVersionMap: Map[StdLibVersion, Long],
+                                signature: FunctionTypeSignature,
+                                ev: ContextfulUserFunction[C],
+                                args: Seq[String]
 ) extends BaseFunction[C]
 
 object UserFunction {

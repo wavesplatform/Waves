@@ -31,9 +31,8 @@ object Global extends BaseGlobal {
   override def base16EncodeImpl(input: Array[Byte]): Either[String, String] = {
     val output = new StringBuilder(input.length * 2)
     for (b <- input) {
-      b.toHexString
-      output.append(hex((b >> 4) & 0xf))
-      output.append(hex(b & 0xf))
+      output.append(hex((b.toInt >> 4) & 0xf))
+      output.append(hex(b.toInt & 0xf))
     }
     Right(output.result())
   }
