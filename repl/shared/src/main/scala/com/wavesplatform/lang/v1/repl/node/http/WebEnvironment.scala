@@ -18,7 +18,6 @@ import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAsse
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import io.circe.{Decoder, HCursor}
 import monix.eval.Coeval
-import shapeless.Coproduct
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -30,7 +29,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
   import mappings.*
 
   override implicit def chainId: Byte   = settings.chainId
-  override def tthis: Environment.Tthis = Coproduct[Environment.Tthis](Address(ByteStr.decodeBase58(settings.address).get))
+  override def tthis: Environment.Tthis = Address(ByteStr.decodeBase58(settings.address).get)
 
   override def height: Future[Long] =
     getEntity[Id, HeightResponse, Long]("/blocks/height")

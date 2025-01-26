@@ -273,7 +273,7 @@ class ReplTest extends AnyPropSpec with Matchers {
   property("transactionHeightById for failed transaction") {
     val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, "")
     val client = new NodeClient {
-      override def get[F[_]: Functor: ResponseWrapper, R: Decoder](path: String): Future[F[R]] = {
+      def get[F[_]: Functor, R: Decoder](path: String)(using ResponseWrapper[F]): Future[F[R]] = {
         if (path == "/transactions/info/abcd")
           Future.successful(Some(HeightResponse(1, succeed = false)).asInstanceOf[F[R]])
         else

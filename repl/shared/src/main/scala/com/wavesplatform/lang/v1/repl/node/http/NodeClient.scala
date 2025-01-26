@@ -13,13 +13,13 @@ import com.wavesplatform.lang.v1.repl.Global
 import scala.concurrent.Future
 
 private[lang] trait NodeClient {
-  def get[F[_] : Functor : ResponseWrapper, R: Decoder](path: String): Future[F[R]]
+  def get[F[_]: Functor, R: Decoder](path: String)(using ResponseWrapper[F]): Future[F[R]]
 }
 
 private[lang] case class NodeClientImpl(baseUrl: String) extends NodeClient {
-  def get[F[_] : Functor : ResponseWrapper, R: Decoder](path: String): Future[F[R]] =
+  def get[F[_]: Functor, R: Decoder](path: String)(using ResponseWrapper[F]): Future[F[R]] =
     Global.requestNode(baseUrl + path)
-      .map(r => r: F[String])
+      .map(r => summon[ResponseWrapper[F]](r))
       .map(_.map(decode[R]).map(_.explicitGet()))
 }
 
