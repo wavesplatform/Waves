@@ -1,8 +1,8 @@
 package com.wavesplatform.curve25519.test
 
-import java.io._
+import java.io.*
 import java.util
-import java.util.concurrent._
+import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.io.{BaseEncoding, CountingOutputStream}
@@ -12,7 +12,7 @@ import monix.execution.Scheduler
 import org.whispersystems.curve25519.{Curve25519Provider, JavaCurve25519Provider, NativeCurve25519Provider}
 
 import scala.annotation.tailrec
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.reflect.ClassTag
 
 object App extends StrictLogging {
@@ -30,7 +30,7 @@ object App extends StrictLogging {
 
   class Dispatcher(startWith: Int, modulus: Int, itemCount: Option[Int] = None) {
     @volatile var maxSeedNr = startWith
-    private[this] val iterator =
+    private val iterator =
       Iterator
         .from(startWith)
         .flatMap { maxSeedNr =>
