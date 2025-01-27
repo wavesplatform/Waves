@@ -21,7 +21,7 @@ import scala.util.control.NonFatal
 
 abstract class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessageCodec[Any] with ScorexLogging {
 
-  protected def filterBySpecOrChecksum(spec: BasicMessagesRepo.Spec, checkSum: Array[Byte]): Boolean
+  protected def filterBySpecOrChecksum(spec: BasicMessagesRepo.Spec, checkSum: Array[Byte]): Boolean = true
   protected def specsByCodes: Map[Byte, BasicMessagesRepo.Spec]
   protected def messageToRawData(msg: Any): MessageRawData
   protected def rawDataToMessage(rawData: MessageRawData): AnyRef
@@ -92,7 +92,7 @@ class LegacyFrameCodecL1(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fi
 
   protected def specsByCodes: Map[MessageCode, Spec] = BasicMessagesRepo.specsByCodes
 
-  protected def filterBySpecOrChecksum(spec: BasicMessagesRepo.Spec, checkSum: Array[Byte]): Boolean = {
+  protected override def filterBySpecOrChecksum(spec: BasicMessagesRepo.Spec, checkSum: Array[Byte]): Boolean = {
     spec != TransactionSpec || {
       val actualChecksumStr = Base64.encode(checkSum)
       if (receivedTxsCache.getIfPresent(actualChecksumStr) == null) {
