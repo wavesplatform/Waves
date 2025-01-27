@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory
 
 abstract class Node(val config: Config) extends AutoCloseable {
   lazy val log: LoggerFacade =
-    LoggerFacade(LoggerFactory.getLogger(s"${getClass.getCanonicalName}.${this.name}"))
+    LoggerFacade(LoggerFactory.getLogger(this.name))
 
   val settings: WavesSettings = WavesSettings.fromRootConfig(config)
   val client: AsyncHttpClient = asyncHttpClient(

@@ -85,7 +85,7 @@ lazy val `grpc-server` =
 
 // TODO: [scala3] enable
 // lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-tests` % "test->test")
-lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `node-tests` % "test->test")
+lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `lang-testkit` % "test->test", `node-testkit`)
 
 // TODO: [scala3] enable
 // lazy val `node-generator` = project

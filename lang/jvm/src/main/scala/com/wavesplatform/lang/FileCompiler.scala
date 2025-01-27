@@ -6,10 +6,10 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import java.io.File
 import java.nio.charset.StandardCharsets
 
-object FileCompiler extends App {
+object FileCompiler {
   private val estimator = ScriptEstimatorV3.latest
 
-  args
+  def main(args: Array[String]): Unit = args
     .foreach { path =>
       val scriptFile = new File(path).getAbsoluteFile
       require(scriptFile.isFile, s"$path is not a file")

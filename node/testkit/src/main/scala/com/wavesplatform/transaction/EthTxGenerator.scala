@@ -2,7 +2,6 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.transaction.TransactionType.Transfer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -11,6 +10,7 @@ import org.web3j.abi.FunctionEncoder.{buildMethodId, buildMethodSignature}
 import org.web3j.abi.datatypes.{AbiTypes, StructType}
 import org.web3j.abi.{DefaultFunctionEncoder, FunctionEncoder, TypeEncoder}
 import org.web3j.crypto.*
+import com.wavesplatform.common.utils.EitherExt2.*
 
 import java.math.BigInteger
 import java.util
