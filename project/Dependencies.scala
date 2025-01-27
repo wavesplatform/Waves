@@ -8,9 +8,9 @@ object Dependencies {
   private[this] val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.5.2" classifier "protobuf-src" intransitive ()
 
-  private def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.10.0"
+  private def akkaModule(module: String) = ("com.typesafe.akka" %% s"akka-$module" % "2.6.21").cross(CrossVersion.for3Use2_13)
 
-  private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.7.0"
+  private def akkaHttpModule(module: String) = ("com.typesafe.akka" %% module % "10.2.10").cross(CrossVersion.for3Use2_13)
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.5"
 
