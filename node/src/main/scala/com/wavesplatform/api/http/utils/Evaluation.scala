@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.{Asset, TransactionType}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-sealed trait Evaluation extends Product with Serializable {
+sealed trait Evaluation {
   def blockchain: Blockchain
   def txLike: InvokeScriptTransactionLike
   def dAppToExpr(dApp: DApp): Either[ValidationError, EXPR]
@@ -61,6 +61,8 @@ object Evaluation {
       override def chainId: Byte                     = AddressScheme.current.chainId
       override def id: Coeval[ByteStr]               = Coeval.evalOnce(ByteStr.empty)
       override val tpe: TransactionType              = TransactionType.InvokeScript
+
+      override def checkedAssets: Seq[Asset.IssuedAsset] = Seq.empty
     }
 
   private def toInvokeScriptLike(invocation: Invocation, dAppAddress: Address) =
@@ -78,6 +80,8 @@ object Evaluation {
         invocation.payments.payments.map { case (amount, assetId) =>
           Payment(amount, Asset.fromCompatId(assetId))
         }
+
+      override def checkedAssets: Seq[Asset.IssuedAsset] = invocation.payments.payments.collect { case (_, Some(id)) => Asset.IssuedAsset(id) }
     }
 }
 

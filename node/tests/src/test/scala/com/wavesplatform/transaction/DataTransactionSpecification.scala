@@ -120,7 +120,6 @@ class DataTransactionSpecification extends PropSpec {
               v shouldEqual te.value
             case _: DataEntry[_] =>
               re shouldEqual te
-            case _ => fail()
           }
       }
     }

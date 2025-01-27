@@ -10,7 +10,6 @@ package object util {
       a match {
         case address: Address => Recipient.Address(ByteStr(address.bytes))
         case alias: Alias     => Recipient.Alias(alias.name)
-        case _                => ???
       }
   }
 }

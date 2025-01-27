@@ -111,8 +111,7 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
         d.blockchainUpdater.processBlock(b) should beRight
         val leasesToBeCancelled = b.transactionData.collect { case lt: LeaseTransaction => lt }
         leasesToBeCancelled.foreach {
-          case lt: LeaseTransaction => d.blockchainUpdater.leaseDetails(lt.id()).map(_.isActive) shouldBe Some(true)
-          case _                    =>
+          lt => d.blockchainUpdater.leaseDetails(lt.id()).map(_.isActive) shouldBe Some(true)
         }
         emptyBlocks.take(2).foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
         // activation height: leases should still be active
@@ -124,8 +123,7 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
         // once new block is appended, leases become cancelled
         d.blockchainUpdater.processBlock(emptyBlocks.last)
         leasesToBeCancelled.foreach {
-          case lt: LeaseTransaction => d.blockchainUpdater.leaseDetails(lt.id()).map(_.isActive) shouldBe Some(false)
-          case _                    =>
+          lt => d.blockchainUpdater.leaseDetails(lt.id()).map(_.isActive) shouldBe Some(false)
         }
       }
     }

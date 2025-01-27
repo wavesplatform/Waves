@@ -237,7 +237,6 @@ object JsApiUtils {
           "argList"  -> args.toJSArray.map(arg => serFuncArg(arg._1, arg._2)),
           "expr"     -> serExpr(expr)
         )
-      case t => jObj("[not_supported]stringRepr" -> t.toString)
     }
   }
 

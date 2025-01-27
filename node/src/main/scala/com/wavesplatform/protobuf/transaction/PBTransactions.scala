@@ -292,11 +292,6 @@ object PBTransactions {
             .left
             .map(e => GenericError(s"Invalid InvokeScript function call: $e"))
 
-          _ <- fcOpt match {
-            case None | Some(Terms.FUNCTION_CALL(_, _)) => Right(())
-            case Some(expr)                             => Left(GenericError(s"Not a function call: $expr"))
-          }
-
           tx <- vt.smart.InvokeScriptTransaction.create(
             version.toByte,
             sender,

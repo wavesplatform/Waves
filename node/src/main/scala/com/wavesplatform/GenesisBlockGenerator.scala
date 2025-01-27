@@ -14,7 +14,6 @@ import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import com.wavesplatform.utils.*
 import com.wavesplatform.wallet.Wallet
 import pureconfig.*
-import pureconfig.generic.derivation.default.*
 
 import java.io.{File, FileNotFoundException}
 import java.nio.file.Files

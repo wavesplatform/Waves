@@ -52,7 +52,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       TxHelpers.transfer(version = TxVersion.V1)
     ).foreach { tx =>
       // `version`  is not properly bound yet
-      val result = runScript(
+      val result = runScript[CONST_BOOLEAN](
         s"""
            |match tx {
            | case t : TransferTransaction  =>
@@ -76,7 +76,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
         tx,
         T
       )
-      result.left.map(ThrownError) shouldBe evaluated(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -99,17 +99,17 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | }
          |""".stripMargin
 
-    val result = runScript(
+    val result = runScript[CONST_BOOLEAN](
       s,
       tx,
       T
     )
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    result shouldBe evaluated(true)
   }
 
   property("BurnTransaction binding") {
     val tx = TxHelpers.burn(IssuedAsset(ByteStr.fromLong(1)))
-    val result = runScript(
+    val result = runScript[CONST_BOOLEAN](
       s"""
          |match tx {
          | case t : BurnTransaction =>
@@ -123,12 +123,12 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       tx,
       T
     )
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    result shouldBe evaluated(true)
   }
 
   property("ReissueTransaction binding") {
     val tx = TxHelpers.reissue(IssuedAsset(ByteStr.fromLong(1)))
-    val result = runScript(
+    val result = runScript[CONST_BOOLEAN](
       s"""
          |match tx {
          | case t : ReissueTransaction =>
@@ -143,12 +143,12 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       tx,
       T
     )
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    result shouldBe evaluated(true)
   }
 
   property("CreateAliasTransaction binding") {
     val tx = TxHelpers.createAlias("alias")
-    val result = runScript(
+    val result = runScript[CONST_BOOLEAN](
       s"""
          |match tx {
          | case t : CreateAliasTransaction =>
@@ -161,12 +161,12 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       tx,
       T
     )
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    result shouldBe evaluated(true)
   }
 
   property("LeaseTransaction binding") {
     val tx = TxHelpers.lease()
-    val result = runScript(
+    val result = runScript[CONST_BOOLEAN](
       s"""
          |match tx {
          | case t : LeaseTransaction =>
@@ -183,12 +183,12 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       tx,
       T
     )
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    result shouldBe evaluated(true)
   }
 
   property("LeaseCancelTransaction binding") {
     val tx = TxHelpers.leaseCancel(ByteStr.fill(32)(1))
-    val result = runScript(
+    val result = runScript[CONST_BOOLEAN](
       s"""
          |match tx {
          | case t : LeaseCancelTransaction =>
@@ -201,7 +201,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       tx,
       T
     )
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    result shouldBe evaluated(true)
   }
 
   property("SponsorFeeTransaction binding (+ cancel sponsorship transaction)") {
@@ -209,7 +209,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       TxHelpers.sponsor(IssuedAsset(ByteStr.fromLong(1))),
       TxHelpers.sponsor(IssuedAsset(ByteStr.fromLong(1)), None)
     ).foreach { tx =>
-      val result = runScript(
+      val result = runScript[CONST_BOOLEAN](
         s"""
            |match tx {
            | case t : SponsorFeeTransaction =>
@@ -224,13 +224,13 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
         tx,
         T
       )
-      result.left.map(ThrownError) shouldBe evaluated(true)
+      result shouldBe evaluated(true)
     }
   }
 
   property("SetScriptTransaction binding") {
     val tx = TxHelpers.setScript(TxHelpers.defaultSigner, ExprScript(CONST_BOOLEAN(true)).explicitGet())
-    val result = runScript(
+    val result = runScript[CONST_BOOLEAN](
       s"""
          |match tx {
          | case t : SetScriptTransaction =>
@@ -245,7 +245,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       tx,
       T
     )
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    result shouldBe evaluated(true)
   }
 
   property("UpdateAssetInfoTransaction binding") {
@@ -263,7 +263,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | }
          |""".stripMargin
 
-    runScript(scriptSource, tx, V4, T).left.map(ThrownError) shouldBe evaluated(true)
+    runScript[CONST_BOOLEAN](scriptSource, tx, V4, T) shouldBe evaluated(true)
   }
 
   property("InvokeScriptTransaction binding") {
@@ -316,8 +316,8 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | case _ => throw()
          | }
          |""".stripMargin
-    val result = runScriptWithCustomContext(script, tx, V3)
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    val result = runScriptWithCustomContext[CONST_BOOLEAN](script, tx, V3)
+    result shouldBe evaluated(true)
   }
 
   property("InvokeScriptTransaction V4 context multiple payments") {
@@ -359,8 +359,8 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
     (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
 
-    val result = runScriptWithCustomContext(script, tx, V4, blockchain)
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    val result = runScriptWithCustomContext[CONST_BOOLEAN](script, tx, V4, blockchain)
+    result shouldBe evaluated(true)
   }
 
   property("InvokeScriptTransaction binding in sync call") {
@@ -457,13 +457,13 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val tx1     = InvokeExpressionTransaction.selfSigned(TxVersion.V1, account, expression, fee, Waves, Random.nextLong()).explicitGet()
     val tx2     = InvokeExpressionTransaction.selfSigned(TxVersion.V1, account, expression, fee, asset, Random.nextLong()).explicitGet()
 
-    runScriptWithCustomContext(script(tx1), tx1, V6).left.map(ThrownError) shouldBe evaluated(true)
-    runScriptWithCustomContext(script(tx2), tx2, V6).left.map(ThrownError) shouldBe evaluated(true)
+    runScriptWithCustomContext[CONST_BOOLEAN](script(tx1), tx1, V6).left.map(ThrownError.apply) shouldBe evaluated(true)
+    runScriptWithCustomContext[CONST_BOOLEAN](script(tx2), tx2, V6).left.map(ThrownError.apply) shouldBe evaluated(true)
   }
 
   property("SetAssetScriptTransaction binding") {
     val tx = TxHelpers.setAssetScript(TxHelpers.defaultSigner, IssuedAsset(ByteStr.fill(32)(1)), ExprScript(CONST_BOOLEAN(true)).explicitGet())
-    val result = runScript(
+    val result = runScript[CONST_BOOLEAN](
       s"""
          |match tx {
          | case t : SetAssetScriptTransaction =>
@@ -479,7 +479,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       tx,
       T
     )
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    result shouldBe evaluated(true)
   }
 
   property("DataTransaction binding") {
@@ -552,14 +552,14 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
            | }
           """.stripMargin
 
-      val result = runScript(script, tx, ctxV = version, chainId = T)
+      val result = runScript[CONST_BOOLEAN](script, tx, ctxV = version, chainId = T)
 
       if (useV4Check && version < V4 && tx.data.nonEmpty)
         result should produce("Compilation failed: Undefined type")
       else if (!useV4Check && version >= V4 && tx.data.exists(!_.isInstanceOf[EmptyDataEntry]))
         result should produce("Undefined field `value` of variable")
       else
-        result.left.map(ThrownError) shouldBe evaluated(true)
+        result shouldBe evaluated(true)
     }
   }
 
@@ -598,12 +598,12 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
                     | }
                     |""".stripMargin
 
-    val result = runScript(
+    val result = runScript[CONST_BOOLEAN](
       script,
       tx,
       T
     )
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    result shouldBe evaluated(true)
   }
 
   property("ExchangeTransaction binding") {
@@ -672,12 +672,12 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
                 | }
                 |""".stripMargin
 
-    val result = runScript(
+    val result = runScript[CONST_BOOLEAN](
       s,
       tx,
       T
     )
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    result shouldBe evaluated(true)
   }
 
   property("Order binding") {
@@ -712,12 +712,12 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
                | }
                |""".stripMargin
 
-    val result = runScript(
+    val result = runScript[CONST_BOOLEAN](
       s,
       order,
       T
     )
-    result.left.map(ThrownError) shouldBe evaluated(true)
+    result shouldBe evaluated(true)
   }
 
   property("Order type bindings") {

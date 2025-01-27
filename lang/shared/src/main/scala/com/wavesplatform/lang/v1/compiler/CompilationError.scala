@@ -21,7 +21,7 @@ object CompilationError {
     s"${ce.message} in ${ce.start}-${ce.end}"
   }
 
-  final case object TooManyExpressions extends CompilationError {
+  case object TooManyExpressions extends CompilationError {
 
     override def start: Int = 0
 
@@ -29,7 +29,7 @@ object CompilationError {
 
     val message = "Too many expressions"
   }
-  final case object NoExpressions extends CompilationError {
+  case object NoExpressions extends CompilationError {
     override def start: Int = 0
 
     override def end: Int = 0

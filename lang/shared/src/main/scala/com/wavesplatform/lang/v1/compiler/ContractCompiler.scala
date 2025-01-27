@@ -232,7 +232,7 @@ class ContractCompiler(version: StdLibVersion) extends ExpressionCompiler(versio
     } yield result
   }
 
-  private def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {
+  private def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = (part: @unchecked) match {
     case x: PART.VALID[T]         => x.pure[CompileM]
     case PART.INVALID(p, message) => raiseError(Generic(p.start, p.end, message))
   }

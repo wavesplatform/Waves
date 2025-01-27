@@ -266,8 +266,7 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
         Json.parse(rawJson).validate[Order] match {
           case e: JsError =>
             fail("Error: " + JsError.toJson(e).toString())
-          case s: JsSuccess[Order] =>
-            val o = s.get
+          case JsSuccess(o, _) =>
             o.assetPair.amountAsset shouldBe Waves
             o.assetPair.priceAsset shouldBe Waves
         }

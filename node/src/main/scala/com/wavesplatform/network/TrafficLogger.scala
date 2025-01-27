@@ -9,7 +9,6 @@ import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
 import pureconfig.*
-import pureconfig.generic.derivation.default.*
 
 abstract class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandler with ScorexLogging {
   protected def codeOf(msg: AnyRef): Option[Byte]

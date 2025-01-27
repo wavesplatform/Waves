@@ -2,7 +2,6 @@ package com.wavesplatform.settings
 
 import com.wavesplatform.network.InvalidBlockStorageImpl.InvalidBlockStorageSettings
 import pureconfig.*
-import pureconfig.generic.derivation.default.*
 
 import scala.concurrent.duration.FiniteDuration
 

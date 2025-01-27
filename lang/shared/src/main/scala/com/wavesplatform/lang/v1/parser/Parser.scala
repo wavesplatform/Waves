@@ -670,8 +670,6 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
               .map { case (parsed, errorIndexes) => (parsed, baseErrorIndexes ++ errorIndexes) }
           else
             Right((defaultResult, baseErrorIndexes))
-        case _ =>
-          Left(("Unknown parsing error.", 0, 0))
       }
 
   @tailrec

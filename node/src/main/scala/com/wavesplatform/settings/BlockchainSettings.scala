@@ -6,7 +6,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import pureconfig.*
-import pureconfig.generic.derivation.default.*
 
 import scala.concurrent.duration.*
 

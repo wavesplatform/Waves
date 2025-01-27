@@ -1,7 +1,6 @@
 package com.wavesplatform.settings
 
 import pureconfig.*
-import pureconfig.generic.derivation.default.*
 import java.io.File
 
 import com.wavesplatform.common.state.ByteStr

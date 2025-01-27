@@ -80,7 +80,6 @@ object InvokeScriptResult {
     implicit val recipientWrites: Writes[AddressOrAlias] = Writes[AddressOrAlias] {
       case address: Address => implicitly[Writes[Address]].writes(address)
       case alias: Alias     => JsString(alias.toString)
-      case _                => JsNull
     }
     implicit val jsonWrites: OWrites[Lease] = Json.writes[Lease]
   }

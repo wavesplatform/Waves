@@ -1,7 +1,6 @@
 package com.wavesplatform.settings
 
 import pureconfig.*
-import pureconfig.generic.derivation.default.*
 
 final case class GRPCSettings(
     host: String,

@@ -13,7 +13,6 @@ trait InvokeScriptLike {
   def funcCall: FUNCTION_CALL
   def payments: Seq[Payment]
   def root: InvokeScriptTransactionLike
-  def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
   def sender: PublicKey
 }
 

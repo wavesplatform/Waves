@@ -4,7 +4,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Testing.*
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.test.*
@@ -54,18 +54,18 @@ class CommonFunctionsTest extends PropSpec {
   property("Some/None/extract/isDefined") {
     val some3 = "if true then 3 else unit"
     val none  = "if false then 3 else unit"
-    runScript(some3).left.map(ThrownError) shouldBe evaluated(3L)
-    runScript(none).left.map(ThrownError) shouldBe evaluated(unit)
-    runScript(s"isDefined($some3)").left.map(ThrownError) shouldBe evaluated(true)
-    runScript(s"isDefined($none)").left.map(ThrownError) shouldBe evaluated(false)
-    runScript(s"extract($some3)").left.map(ThrownError) shouldBe evaluated(3L)
-    runScript(s"extract($none)").left.map(ThrownError) should produce("extract() called on unit")
+    runScript(some3).left.map(ThrownError.apply) shouldBe evaluated(3L)
+    runScript(none).left.map(ThrownError.apply) shouldBe evaluated(unit)
+    runScript(s"isDefined($some3)").left.map(ThrownError.apply) shouldBe evaluated(true)
+    runScript(s"isDefined($none)").left.map(ThrownError.apply) shouldBe evaluated(false)
+    runScript(s"extract($some3)").left.map(ThrownError.apply) shouldBe evaluated(3L)
+    runScript(s"extract($none)").left.map(ThrownError.apply) should produce("extract() called on unit")
   }
 
   property("size()") {
     val arr = Array(1: Byte, 2: Byte, 3: Byte)
-    runScript("size(base58'')".stripMargin).left.map(ThrownError) shouldBe evaluated(0L)
-    runScript(s"size(base58'${ByteStr(arr).toString}')".stripMargin).left.map(ThrownError) shouldBe evaluated(3L)
+    runScript("size(base58'')".stripMargin).left.map(ThrownError.apply) shouldBe evaluated(0L)
+    runScript(s"size(base58'${ByteStr(arr).toString}')".stripMargin).left.map(ThrownError.apply) shouldBe evaluated(3L)
   }
 
   property("getTransfer should extract MassTransfer transfers") {
@@ -80,7 +80,7 @@ class CommonFunctionsTest extends PropSpec {
         |""".stripMargin,
       massTransfer
     )
-    resultAmount.left.map(ThrownError) shouldBe evaluated(massTransfer.transfers(0).amount.value)
+    resultAmount.left.map(ThrownError.apply) shouldBe evaluated(massTransfer.transfers(0).amount.value)
     val resultAddress = runScript(
       """
         |match tx {
@@ -94,7 +94,7 @@ class CommonFunctionsTest extends PropSpec {
         |""".stripMargin,
       massTransfer
     )
-    resultAddress.left.map(ThrownError) shouldBe evaluated(ByteStr(massTransfer.transfers(0).address.bytes))
+    resultAddress.left.map(ThrownError.apply) shouldBe evaluated(ByteStr(massTransfer.transfers(0).address.bytes))
     val resultLen = runScript(
       """
         |match tx {
@@ -104,11 +104,11 @@ class CommonFunctionsTest extends PropSpec {
         |""".stripMargin,
       massTransfer
     )
-    resultLen.left.map(ThrownError) shouldBe evaluated(massTransfer.transfers.size.toLong)
+    resultLen.left.map(ThrownError.apply) shouldBe evaluated(massTransfer.transfers.size.toLong)
   }
 
   property("+ should check overflow") {
-    runScript("2 + 3").left.map(ThrownError) shouldBe evaluated(5L)
+    runScript("2 + 3").left.map(ThrownError.apply) shouldBe evaluated(5L)
     runScript(s"1 + ${Long.MaxValue}") should produce("long overflow")
   }
 
@@ -119,7 +119,7 @@ class CommonFunctionsTest extends PropSpec {
       TxHelpers.issue(version = TxVersion.V1),
       createMassTransfer()
     ).foreach { tx =>
-      val result = runScript(
+      val result = runScript[CONST_BOOLEAN](
         s"""
            |match tx {
            | case tx : TransferTransaction  => tx.id == base58'${tx.id().toString}'
@@ -130,7 +130,7 @@ class CommonFunctionsTest extends PropSpec {
            |""".stripMargin,
         tx
       )
-      result.left.map(ThrownError) shouldBe evaluated(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -183,7 +183,7 @@ class CommonFunctionsTest extends PropSpec {
       TxHelpers.issue(version = TxVersion.V1)
     ).foreach { tx =>
       val result =
-        runScript(
+        runScript[CONST_BOOLEAN](
           s"""
              |match tx {
              | case tx: TransferTransaction | IssueTransaction => {
@@ -197,7 +197,7 @@ class CommonFunctionsTest extends PropSpec {
              |""".stripMargin,
           tx
         )
-      result.left.map(ThrownError) shouldBe evaluated(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -226,7 +226,7 @@ class CommonFunctionsTest extends PropSpec {
       case addr: Address => s"tx.recipient == Address(base58'${addr.toString}')"
       case alias: Alias  => s"""tx.recipient == Alias("${alias.name}")"""
     }
-    val transferResult = runScript(
+    val transferResult = runScript[CONST_BOOLEAN](
       s"""
          |match tx {
          |  case tx: TransferTransaction =>
@@ -241,10 +241,10 @@ class CommonFunctionsTest extends PropSpec {
          |""".stripMargin,
       transfer
     )
-    transferResult.left.map(ThrownError) shouldBe evaluated(true)
+    transferResult shouldBe evaluated(true)
 
     val dataTx = TxHelpers.data(sender, Seq(entry))
-    val dataResult = runScript(
+    val dataResult = runScript[CONST_BOOLEAN](
       s"""
          |match tx {
          |  case tx: DataTransaction =>
@@ -262,7 +262,7 @@ class CommonFunctionsTest extends PropSpec {
        """.stripMargin,
       dataTx
     )
-    dataResult.left.map(ThrownError) shouldBe evaluated(true)
+    dataResult shouldBe evaluated(true)
   }
 
   property("data constructors bad syntax") {

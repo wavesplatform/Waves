@@ -2174,7 +2174,6 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           } else true
 
         isBuyerReceiveAmountGreaterThanFee && isSellerReceiveAmountGreaterThanFee
-      case _ => true
     }
   }
 

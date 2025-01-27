@@ -7,7 +7,6 @@ import java.net.{InetSocketAddress, URI}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 import pureconfig.*
-import pureconfig.generic.derivation.default.*
 
 case class UPnPSettings(enable: Boolean, gatewayTimeout: FiniteDuration, discoverTimeout: FiniteDuration) derives ConfigReader
 

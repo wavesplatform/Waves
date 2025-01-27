@@ -24,7 +24,7 @@ import scala.concurrent.duration.*
 package object network {
   private val broadcastTimeStats = Kamon.timer("network-broadcast-time")
   private lazy val logger: Logger =
-    Logger(LoggerFactory.getLogger(getClass.getName))
+    Logger(LoggerFactory.getLogger(this.getClass.getName))
 
   implicit class EventExecutorGroupExt(val e: EventExecutorGroup) extends AnyVal {
     def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(f: => Unit): ScheduledFuture[?] =

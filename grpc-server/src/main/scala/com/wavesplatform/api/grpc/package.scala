@@ -31,7 +31,7 @@ package object grpc {
   }
 
   protected lazy val logger: Logger =
-    Logger(LoggerFactory.getLogger(getClass.getName))
+    Logger(LoggerFactory.getLogger(this.getClass.getName))
 
   implicit class StreamObserverMonixOps[T](val streamObserver: StreamObserver[T]) extends AnyVal {
     def id: String =

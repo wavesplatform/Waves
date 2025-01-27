@@ -332,8 +332,6 @@ trait BaseGlobal {
                } else {
                  division
                }) * sign)
-      case _ =>
-        Left(s"unsupported rounding $rounding")
     }
   }
 

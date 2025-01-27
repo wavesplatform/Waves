@@ -14,7 +14,6 @@ import monix.execution.schedulers.SchedulerService
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import org.influxdb.dto.Point
 import pureconfig.*
-import pureconfig.generic.derivation.default.*
 
 object Metrics extends ScorexLogging {
   case class InfluxDbSettings(

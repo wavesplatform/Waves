@@ -2,7 +2,6 @@ package com.wavesplatform.state
 
 import com.typesafe.config.Config
 import pureconfig.*
-import pureconfig.generic.derivation.default.*
 
 case class Settings(
     networkConfigFile: String,

@@ -162,7 +162,7 @@ package object http {
   def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
 
   private lazy val logger: Logger =
-    Logger(LoggerFactory.getLogger(getClass.getName))
+    Logger(LoggerFactory.getLogger(this.getClass.getName))
 
   val uncaughtExceptionHandler: ExceptionHandler = ExceptionHandler {
     case ApiException(error)   => complete(error)

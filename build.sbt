@@ -158,19 +158,18 @@ inScope(Global)(
     publish / skip       := true,
     scalacOptions ++= Seq(
       "-feature",
+      "-explain",
       "-deprecation",
       "-unchecked",
       "-language:higherKinds",
       "-language:implicitConversions",
       "-language:postfixOps",
-      "-Ykind-projector",
-      "-Ywarn-unused:-implicits",
-      "-Xlint",
-      "-nowarn",  // TODO: [scala3] remove
-      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
-      "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
-      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s",
-      "-Wconf:cat=deprecation&site=com\\.wavesplatform\\.(lang\\..*|JsApiUtils)&origin=com\\.wavesplatform\\.lang\\.v1\\.compiler\\.Terms\\.LET_BLOCK:s"
+      "-Xkind-projector",
+      "-Wconf:cat=deprecation&origin=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&origin=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
+      "-Wconf:cat=deprecation&origin=com.wavesplatform.state.InvokeScriptResult.*:s",
+      "-Wconf:cat=deprecation&origin=com\\.wavesplatform\\.(lang\\..*|JsApiUtils)&origin=com\\.wavesplatform\\.lang\\.v1\\.compiler\\.Terms\\.LET_BLOCK:s",
+      "-Wconf:src=src_managed/.*:s"
     ),
     crossPaths        := false,
     cancelable        := true,

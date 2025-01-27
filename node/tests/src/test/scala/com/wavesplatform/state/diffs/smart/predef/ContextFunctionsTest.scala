@@ -17,7 +17,7 @@ import com.wavesplatform.lang.ThrownError
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.ContractScript
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG}
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -89,7 +89,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
         val bool = tx.data(1)
         val bin  = tx.data(2)
         val str  = tx.data(3)
-        val result = runScript(
+        val result = runScript[CONST_BOOLEAN](
           s"""
              |match tx {
              | case tx: DataTransaction => {
@@ -132,7 +132,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
           tx,
           version
         )
-        result.left.map(ThrownError) shouldBe evaluated(true)
+        result shouldBe evaluated(true)
       }
   }
 
@@ -144,7 +144,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
     val bool = tx.data(1)
     val bin  = tx.data(2)
     val str  = tx.data(3)
-    val ok = runScript(
+    val ok = runScript[CONST_BOOLEAN](
       s"""
          |match tx {
          | case tx: DataTransaction => {
@@ -174,7 +174,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
          |""".stripMargin,
       tx
     )
-    ok.left.map(ThrownError) shouldBe evaluated(true)
+    ok shouldBe evaluated(true)
 
     val outOfBounds = runScript(
       s"""

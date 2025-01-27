@@ -1,7 +1,6 @@
 package com.wavesplatform.settings
 
 import pureconfig.*
-import pureconfig.generic.derivation.default.*
 
 case class RestAPISettings(
     enable: Boolean,
