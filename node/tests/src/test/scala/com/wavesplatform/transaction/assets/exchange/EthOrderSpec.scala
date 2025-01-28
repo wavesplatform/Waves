@@ -152,7 +152,7 @@ class EthOrderSpec
       val buyOrder = ethBuyOrderSigned(testAsset, buyerEthAccount, TxHelpers.timestamp)
       val sellOrder = ethSellOrderSigned(testAsset, sellerEthAccount, TxHelpers.timestamp)
 
-      val transaction = TxHelpers.exchange(buyOrder, sellOrder, price = 100, version = TxVersion.V3)
+      val transaction = TxHelpers.exchange(buyOrder, sellOrder, TxHelpers.matcher, price = 100, version = TxVersion.V3)
       d.appendBlock(transaction)
 
       d.blockchain.transactionMeta(transaction.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
@@ -189,7 +189,7 @@ class EthOrderSpec
           1,
           100L,
           TxHelpers.timestamp,
-          TxHelpers.timestamp + 100,
+          TxHelpers.timestamp + 10000,
           100000,
           Waves
         )
@@ -236,7 +236,7 @@ class EthOrderSpec
           1,
           100L,
           timestamp,
-          timestamp + 100,
+          timestamp + 10000,
           100000,
           Waves
         )
@@ -276,7 +276,7 @@ class EthOrderSpec
            |    "amount": 1,
            |    "price": 100,
            |    "timestamp": ${timestamp},
-           |    "expiration": ${timestamp + 100},
+           |    "expiration": ${timestamp + 10000},
            |    "matcherFee": 100000,
            |    "signature": "${buyOrder.signature.toString}",
            |    "proofs": [ "${buyOrder.proofs.base58.value().head}" ],
@@ -296,7 +296,7 @@ class EthOrderSpec
            |    "amount": 1,
            |    "price": 100,
            |    "timestamp": ${timestamp},
-           |    "expiration": ${timestamp + 100000},
+           |    "expiration": ${timestamp + 10000},
            |    "matcherFee": 100000,
            |    "signature": "",
            |    "proofs": [ ],
@@ -314,31 +314,42 @@ class EthOrderSpec
   }
 
   it should "not work in exchange transaction with changed signature" in {
-    // TODO: [scala3] rewrite
-    // val blockchain = createBlockchainStub { blockchain =>
-    //   val sh = StubHelpers(blockchain)
-    //   sh.creditBalance(TxHelpers.matcher.toAddress, *)
-    //   sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
-    //   (blockchain.wavesBalances)
-    //     .when(*)
-    //     .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, TestEthOrdersPublicKey.toAddress -> Long.MaxValue / 3))
-    //   sh.issueAsset(ByteStr(EthStubBytes32))
-    // }
+    val assetIssuer = TxHelpers.defaultSigner
+    val buyerEthAccount  = TxHelpers.signer(1).toEthKeyPair
+    val sellerEthAccount = TxHelpers.signer(2).toEthKeyPair
 
-    // val differ = TransactionDiffer(Some(1L), 100L)(blockchain, _)
-    // val transaction = TxHelpers
-    //   .exchange(ethBuyOrder, ethSellOrder, version = TxVersion.V3, timestamp = 100)
-    //   .copy(
-    //     order2 = ethSellOrder.copy(orderAuthentication =
-    //       EthSignature(
-    //         "0x1717804a1d60149988821546732442eabc69f46b2764e231eaeef48351d9f36577278c3f29fe3d61500932190dba8c045b19acda117a4690bfd3d2c28bb67bf91c"
-    //       )
-    //     )
-    //   )
+    val balances = Seq(
+      AddrWithBalance(buyerEthAccount.toWavesAddress, 1000.waves),
+      AddrWithBalance(sellerEthAccount.toWavesAddress, 1000.waves),
+      AddrWithBalance(TxHelpers.matcher.toAddress, 1000.waves)
+    )
 
-    // differ(transaction).resultE should matchPattern {
-    //   case Left(err) if err.toString.contains("negative waves balance") =>
-    // }
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      // Issue an asset
+      val issueTx   = TxHelpers.issue(assetIssuer, Long.MaxValue)
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
+
+      // Transfer asset to seller
+      d.appendBlock(TxHelpers.transfer(assetIssuer, sellerEthAccount.toWavesAddress, 1000L, testAsset))
+
+      val buyOrder = ethBuyOrderSigned(testAsset, buyerEthAccount, TxHelpers.timestamp)
+      val sellOrder = ethSellOrderSigned(testAsset, sellerEthAccount, TxHelpers.timestamp)
+
+      val transaction = TxHelpers
+        .exchange(buyOrder, sellOrder, price = 100, version = TxVersion.V3)      
+        .copy(
+          order2 = ethSellOrder.copy(orderAuthentication =
+            EthSignature(
+              "0x1717804a1d60149988821546732442eabc69f46b2764e231eaeef48351d9f36577278c3f29fe3d61500932190dba8c045b19acda117a4690bfd3d2c28bb67bf91c"
+            )
+          )
+        )
+
+      d.appendBlockE(transaction) should matchPattern {
+        case Left(err) if err.toString.contains("negative waves balance") =>
+      }
+    }
   }
 
   it should "work in exchange transaction with asset script" in {
@@ -513,7 +524,7 @@ object EthOrderSpec extends EthHelpers {
       TxExchangeAmount.unsafeFrom(1),
       TxOrderPrice.unsafeFrom(100L),
       timestamp,
-      timestamp + 100000,
+      timestamp + 10000,
       TxMatcherFee.unsafeFrom(100000),
       Waves
     )
@@ -533,7 +544,7 @@ object EthOrderSpec extends EthHelpers {
       TxExchangeAmount.unsafeFrom(1),
       TxOrderPrice.unsafeFrom(100L),
       timestamp,
-      timestamp + 100000,
+      timestamp + 10000,
       TxMatcherFee.unsafeFrom(100000),
       Waves
     )
