@@ -131,9 +131,9 @@ class EthOrderSpec
 
   it should "work in exchange transaction" in {
     val assetIssuer = TxHelpers.defaultSigner
-
     val buyerEthAccount  = TxHelpers.signer(1).toEthKeyPair
     val sellerEthAccount = TxHelpers.signer(2).toEthKeyPair
+
     val balances = Seq(
       AddrWithBalance(buyerEthAccount.toWavesAddress, 1000.waves),
       AddrWithBalance(sellerEthAccount.toWavesAddress, 1000.waves),
@@ -149,10 +149,10 @@ class EthOrderSpec
       // Transfer asset to seller
       d.appendBlock(TxHelpers.transfer(assetIssuer, sellerEthAccount.toWavesAddress, 1000L, testAsset))
 
-      val signedBuyOrder = ethBuyOrderSigned(testAsset, buyerEthAccount)
-      val signedSellOrder = ethSellOrderSigned(testAsset, sellerEthAccount)
+      val buyOrder = ethBuyOrderSigned(testAsset, buyerEthAccount)
+      val sellOrder = ethSellOrderSigned(testAsset, sellerEthAccount)
 
-      val transaction = TxHelpers.exchange(signedBuyOrder, signedSellOrder, price = 100, version = TxVersion.V3)
+      val transaction = TxHelpers.exchange(buyOrder, sellOrder, price = 100, version = TxVersion.V3)
       d.appendBlock(transaction)
 
       d.blockchain.transactionMeta(transaction.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
@@ -160,37 +160,48 @@ class EthOrderSpec
   }
 
   it should "work in exchange transaction with an old order" in {
-    // TODO: [scala3] rewrite
-    // val blockchain = createBlockchainStub { blockchain =>
-    //   val sh = StubHelpers(blockchain)
-    //   sh.creditBalance(TxHelpers.matcher.toAddress, *)
-    //   sh.creditBalance(ethSellOrder.senderAddress, *)
-    //   (blockchain.wavesBalances _)
-    //     .when(*)
-    //     .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, ethSellOrder.senderAddress -> Long.MaxValue / 3))
-    //   sh.issueAsset(ByteStr(EthStubBytes32))
-    // }
+    val assetIssuer = TxHelpers.defaultSigner
+    val buyerAccount  = TxHelpers.signer(1)
+    val sellerEthAccount = TxHelpers.signer(2).toEthKeyPair
 
-    // val buyOrder = Order
-    //   .selfSigned(
-    //     Order.V3,
-    //     TxHelpers.defaultSigner,
-    //     TxHelpers.matcher.publicKey,
-    //     AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-    //     OrderType.BUY,
-    //     1,
-    //     100L,
-    //     1,
-    //     123,
-    //     100000,
-    //     Waves
-    //   )
-    //   .explicitGet()
+    val balances = Seq(
+      AddrWithBalance(buyerAccount.toAddress, 1000.waves),
+      AddrWithBalance(sellerEthAccount.toWavesAddress, 1000.waves),
+      AddrWithBalance(TxHelpers.matcher.toAddress, 1000.waves)
+    )
 
-    // val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
-    // val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    // val snapshot    = differ(transaction).resultE.explicitGet()
-    // snapshot should containAppliedTx(transaction.id())
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      // Issue an asset
+      val issueTx   = TxHelpers.issue(assetIssuer, Long.MaxValue, 8)
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
+
+      // Transfer asset to seller
+      d.appendBlock(TxHelpers.transfer(assetIssuer, sellerEthAccount.toWavesAddress, 1000L, testAsset))
+
+      val buyOrder = Order
+        .selfSigned(
+          Order.V3,
+          buyerAccount,
+          TxHelpers.matcher.publicKey,
+          AssetPair(testAsset, Waves),
+          OrderType.BUY,
+          1,
+          100L,
+          TxHelpers.timestamp,
+          TxHelpers.timestamp + 100,
+          100000,
+          Waves
+        )
+        .explicitGet()
+
+      val sellOrder = ethSellOrderSigned(testAsset, sellerEthAccount)
+
+      val transaction = TxHelpers.exchange(buyOrder, sellOrder, TxHelpers.matcher, price = 100, version = TxVersion.V3)
+
+      d.appendBlock(transaction)
+      d.blockchain.transactionMeta(transaction.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
+    }
   }
 
   it should "recover valid ids of exchange tx" in {
