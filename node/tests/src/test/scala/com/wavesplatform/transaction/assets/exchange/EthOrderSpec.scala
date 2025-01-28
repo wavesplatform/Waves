@@ -252,62 +252,62 @@ class EthOrderSpec
       transaction.json() should matchJson(
         s"""
            |{
-           |  "type" : 7,
-           |  "id" : "${transaction.id().toString}",
-           |  "fee" : 1000000,
-           |  "feeAssetId" : null,
-           |  "timestamp" : ${transaction.timestamp},
-           |  "version" : 3,
-           |  "chainId" : 84,
-           |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-           |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-           |  "proofs" : [ "${transaction.proofs.base58.value().head}" ],
-           |  "order1" : {
-           |    "version" : 3,
-           |    "id" : "${buyOrder.id().toString}",
-           |    "sender" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-           |    "senderPublicKey" : "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr",
-           |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-           |    "assetPair" : {
-           |      "amountAsset" : "${testAsset.toString}",
-           |      "priceAsset" : null
+           |  "type": 7,
+           |  "id": "${transaction.id().toString}",
+           |  "fee": 1000000,
+           |  "feeAssetId": null,
+           |  "timestamp": ${transaction.timestamp},
+           |  "version": 3,
+           |  "chainId": 84,
+           |  "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+           |  "senderPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+           |  "proofs": [ "${transaction.proofs.base58.value().head}" ],
+           |  "order1": {
+           |    "version": 3,
+           |    "id": "${buyOrder.id().toString}",
+           |    "sender": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+           |    "senderPublicKey": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr",
+           |    "matcherPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+           |    "assetPair": {
+           |      "amountAsset": "${testAsset.toString}",
+           |      "priceAsset": null
            |    },
-           |    "orderType" : "buy",
-           |    "amount" : 1,
-           |    "price" : 100,
-           |    "timestamp" : ${timestamp},
-           |    "expiration" : ${timestamp + 100},
-           |    "matcherFee" : 100000,
-           |    "signature" : "${buyOrder.signature.toString}",
-           |    "proofs" : [ "${buyOrder.proofs.base58.value().head}" ],
-           |    "matcherFeeAssetId" : null
+           |    "orderType": "buy",
+           |    "amount": 1,
+           |    "price": 100,
+           |    "timestamp": ${timestamp},
+           |    "expiration": ${timestamp + 100},
+           |    "matcherFee": 100000,
+           |    "signature": "${buyOrder.signature.toString}",
+           |    "proofs": [ "${buyOrder.proofs.base58.value().head}" ],
+           |    "matcherFeeAssetId": null
            |  },
-           |  "order2" : {
-           |    "version" : 4,
-           |    "id" : "${sellOrder.id().toString}",
-           |    "sender" : "3N6Kr345mXL1NJGm7g4fd83BwLCb5wcfqiG",
-           |    "senderPublicKey" : "3bw8NgoV6fE6JnX1mBhggFZH12SyEw4rCfLG9ZVyLNRahwhC2qPW4xJwBawBB1n9gfDkg2bwr3wTtZ4vTjfiXgEv",
-           |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-           |    "assetPair" : {
-           |      "amountAsset" : "${testAsset.toString}",
-           |      "priceAsset" : null
+           |  "order2": {
+           |    "version": 4,
+           |    "id": "${sellOrder.id().toString}",
+           |    "sender": "3N6Kr345mXL1NJGm7g4fd83BwLCb5wcfqiG",
+           |    "senderPublicKey": "3bw8NgoV6fE6JnX1mBhggFZH12SyEw4rCfLG9ZVyLNRahwhC2qPW4xJwBawBB1n9gfDkg2bwr3wTtZ4vTjfiXgEv",
+           |    "matcherPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+           |    "assetPair": {
+           |      "amountAsset": "${testAsset.toString}",
+           |      "priceAsset": null
            |    },
-           |    "orderType" : "sell",
-           |    "amount" : 1,
-           |    "price" : 100,
-           |    "timestamp" : ${timestamp},
-           |    "expiration" : ${timestamp + 100000},
-           |    "matcherFee" : 100000,
-           |    "signature" : "",
-           |    "proofs" : [ ],
-           |    "matcherFeeAssetId" : null,
-           |    "eip712Signature" : "${EthEncoding.toHexString(sellOrder.eip712Signature.get.arr)}",
-           |    "priceMode" : null
+           |    "orderType": "sell",
+           |    "amount": 1,
+           |    "price": 100,
+           |    "timestamp": ${timestamp},
+           |    "expiration": ${timestamp + 100000},
+           |    "matcherFee": 100000,
+           |    "signature": "",
+           |    "proofs": [ ],
+           |    "matcherFeeAssetId": null,
+           |    "eip712Signature": "${EthEncoding.toHexString(sellOrder.eip712Signature.get.arr)}",
+           |    "priceMode": null
            |  },
-           |  "amount" : 1,
-           |  "price" : 100,
-           |  "buyMatcherFee" : 1,
-           |  "sellMatcherFee" : 1
+           |  "amount": 1,
+           |  "price": 100,
+           |  "buyMatcherFee": 1,
+           |  "sellMatcherFee": 1
            |}""".stripMargin
       )
     }
