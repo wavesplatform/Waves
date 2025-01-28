@@ -1,18 +1,24 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.network.TransactionPublisher
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, SnapshotBlockchain}
+import com.wavesplatform.test.NumericExt
 import com.wavesplatform.test.TestTime
+import com.wavesplatform.test.SharedDomain
+import com.wavesplatform.test.DomainPresets.TransactionStateSnapshot
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.OrderType
@@ -20,8 +26,8 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
-import com.wavesplatform.transaction.{Asset, AssetIdLength, Proofs, TxHelpers, TxPositiveAmount, TxVersion, TransactionSignOps}
-import com.wavesplatform.transaction.{TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
+import com.wavesplatform.transaction.utils.EthConverters.*
+import com.wavesplatform.transaction.{Asset, AssetIdLength, Proofs, TransactionSignOps, TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory
@@ -32,11 +38,151 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.util.Random
 
+class TransactionBroadcastSpec2
+    extends RouteSpec("/transactions")
+    with RestAPISettingsHelper
+    with SharedDomain
+    with EthHelpers
+    with SharedSchedulerMixin {
+
+  override def settings: WavesSettings = TransactionStateSnapshot
+
+  private val assetIssuer      = TxHelpers.defaultSigner
+  private val buyerEthAccount  = TxHelpers.signer(1).toEthKeyPair
+  private val sellerEthAccount = TxHelpers.signer(2).toEthKeyPair
+
+  override def genesisBalances: Seq[AddrWithBalance] = Seq(
+    AddrWithBalance(buyerEthAccount.toWavesAddress, 1000.waves),
+    AddrWithBalance(sellerEthAccount.toWavesAddress, 1000.waves),
+    AddrWithBalance(TxHelpers.matcher.toAddress, 1000.waves)
+  )
+
+  private val transactionsApiRoute = new TransactionsApiRoute(
+    settings.restAPISettings,
+    domain.transactionsApi,
+    domain.wallet,
+    domain.blockchain,
+    () => domain.blockchain,
+    () => domain.utxPool.size,
+    (tx, _) => Future.successful(domain.utxPool.putIfNew(tx, forceValidate = true)),
+    new TestTime,
+    new RouteTimeout(60.seconds)(sharedScheduler)
+  )
+  private val route = seal(transactionsApiRoute.route)
+
+  "exchange" - {
+    "accepted with ETH signed orders" in {
+      import TransactionBroadcastSpec.{ethBuyOrderSigned, ethSellOrderSigned}
+
+      // Issue an asset
+      val issueTx   = TxHelpers.issue(assetIssuer, Long.MaxValue)
+      val testAsset = issueTx.asset
+      domain.appendBlock(issueTx)
+
+      // Transfer asset to seller
+      domain.appendBlock(TxHelpers.transfer(assetIssuer, sellerEthAccount.toWavesAddress, 1000L, testAsset))
+
+      val timestamp = TxHelpers.timestamp
+
+      val ethBuyOrder  = ethBuyOrderSigned(testAsset, buyerEthAccount, timestamp)
+      val ethSellOrder = ethSellOrderSigned(testAsset, sellerEthAccount, timestamp)
+
+      val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, TxHelpers.matcher, price = 100, version = TxVersion.V3)
+
+      val validResponseJson =
+        s"""{
+           |  "type": 7,
+           |  "id": "${transaction.id()}",
+           |  "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+           |  "senderPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+           |  "fee": 1000000,
+           |  "feeAssetId": null,
+           |  "timestamp": ${transaction.timestamp},
+           |  "proofs": [ "${transaction.proofs.base58.value().head}" ],
+           |  "version": 3,
+           |  "chainId": 84,
+           |  "order1": {
+           |    "version": 4,
+           |    "id": "${ethBuyOrder.id()}",
+           |    "sender": "${ethBuyOrder.senderPublicKey.toAddress}",
+           |    "senderPublicKey": "${ethBuyOrder.senderPublicKey}",
+           |    "matcherPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+           |    "assetPair": {
+           |      "amountAsset": "${testAsset.toString}",
+           |      "priceAsset": null
+           |    },
+           |    "orderType": "buy",
+           |    "amount": 1,
+           |    "price": 100,
+           |    "timestamp": ${timestamp},
+           |    "expiration": ${timestamp + 10000},
+           |    "matcherFee": 100000,
+           |    "signature": "",
+           |    "proofs": [ ],
+           |    "matcherFeeAssetId": null,
+           |    "eip712Signature": "${EthEncoding.toHexString(ethBuyOrder.eip712Signature.get.arr)}",
+           |    "priceMode": null
+           |  },
+           |  "order2": {
+           |    "version": 4,
+           |    "id": "${ethSellOrder.id()}",
+           |    "sender": "${ethSellOrder.senderPublicKey.toAddress}",
+           |    "senderPublicKey": "${ethSellOrder.senderPublicKey}",
+           |    "matcherPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+           |    "assetPair": {
+           |      "amountAsset": "${testAsset.toString}",
+           |      "priceAsset": null
+           |    },
+           |    "orderType": "sell",
+           |    "amount": 1,
+           |    "price": 100,
+           |    "timestamp": ${timestamp},
+           |    "expiration": ${timestamp + 10000},
+           |    "matcherFee": 100000,
+           |    "signature": "",
+           |    "proofs": [ ],
+           |    "matcherFeeAssetId": null,
+           |    "eip712Signature": "${EthEncoding.toHexString(ethSellOrder.eip712Signature.get.arr)}",
+           |    "priceMode": null
+           |  },
+           |  "amount": 1,
+           |  "price": 100,
+           |  "buyMatcherFee": 1,
+           |  "sellMatcherFee": 1
+           |}
+           |""".stripMargin
+
+      Post(routePath("/broadcast"), transaction.json()) ~> route ~> check {
+        responseAs[JsObject] should matchJson(validResponseJson)
+      }
+
+      def removeFields(json: JsObject, fields: String*): JsObject = {
+        val order1 = (json \ "order1").as[JsObject]
+        val order2 = (json \ "order2").as[JsObject]
+        json + ("order1" -> fields.foldLeft(order1)(_ - _)) + ("order2" -> fields.foldLeft(order2)(_ - _))
+      }
+
+      Post(routePath("/broadcast"), removeFields(transaction.json(), "senderPublicKey")) ~> route ~> check {
+        responseAs[JsObject] should matchJson(validResponseJson)
+      }
+
+      Post(routePath("/broadcast"), removeFields(transaction.json(), "senderPublicKey", "eip712Signature")) ~> route ~> check {
+        responseAs[JsObject] should matchJson("""{
+                                                |  "error" : 199,
+                                                |  "message" : "Either senderPublicKey or eip712Signature should be provided"
+                                                |}""".stripMargin)
+      }
+    }
+  }
+}
+
+
 class TransactionBroadcastSpec
     extends RouteSpec("/transactions")
     with RestAPISettingsHelper
     with PathMockFactory
     with EthHelpers
+    with WithDomain
     with SharedSchedulerMixin {
   private val blockchain           = stub[Blockchain]
   private val transactionPublisher = stub[TransactionPublisher]
@@ -55,127 +201,6 @@ class TransactionBroadcastSpec
   )
 
   private val route = seal(transactionsApiRoute.route)
-
-  "exchange" - {
-    "accepted with ETH signed orders" in {
-      // import EthOrder.{ethBuyOrder, ethSellOrder}
-
-      // val blockchain = createBlockchainStub { blockchain =>
-      //   val sh = StubHelpers(blockchain)
-      //   sh.creditBalance(TxHelpers.matcher.toAddress, *)
-      //   sh.creditBalance(ethBuyOrder.senderAddress, *)
-      //   sh.creditBalance(ethSellOrder.senderAddress, *)
-      //   (blockchain.wavesBalances _)
-      //     .when(*)
-      //     .returns(
-      //       Map(
-      //         TxHelpers.matcher.toAddress -> Long.MaxValue / 3,
-      //         ethBuyOrder.senderAddress   -> Long.MaxValue / 3,
-      //         ethSellOrder.senderAddress  -> Long.MaxValue / 3
-      //       )
-      //     )
-      //   sh.issueAsset(ByteStr(EthStubBytes32))
-      // }
-
-      // val transactionPublisher = blockchain.stub.transactionPublisher(testTime)
-
-      // val route = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = transactionPublisher).route
-
-      // val transaction = TxHelpers.exchange(
-      //   ethBuyOrder,
-      //   ethSellOrder,
-      //   price = 100,
-      //   buyMatcherFee = ethBuyOrder.matcherFee.value,
-      //   sellMatcherFee = ethSellOrder.matcherFee.value,
-      //   version = TxVersion.V3,
-      //   timestamp = 100
-      // )
-      // testTime.setTime(100)
-      // val validResponseJson =
-      //   s"""{
-      //      |  "type" : 7,
-      //      |  "id" : "${transaction.id()}",
-      //      |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-      //      |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-      //      |  "fee" : 1000000,
-      //      |  "feeAssetId" : null,
-      //      |  "timestamp" : 100,
-      //      |  "proofs" : [ "${transaction.signature}" ],
-      //      |  "version" : 3,
-      //      |  "chainId" : 84,
-      //      |  "order1" : {
-      //      |    "version" : 4,
-      //      |    "id" : "${ethBuyOrder.id()}",
-      //      |    "sender" : "${ethBuyOrder.senderPublicKey.toAddress}",
-      //      |    "senderPublicKey" : "${ethBuyOrder.senderPublicKey}",
-      //      |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-      //      |    "assetPair" : {
-      //      |      "amountAsset" : "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
-      //      |      "priceAsset" : null
-      //      |    },
-      //      |    "orderType" : "buy",
-      //      |    "amount" : 1,
-      //      |    "price" : 100,
-      //      |    "timestamp" : 1,
-      //      |    "expiration" : 123,
-      //      |    "matcherFee" : 100000,
-      //      |    "signature" : "",
-      //      |    "proofs" : [ ],
-      //      |    "matcherFeeAssetId" : null,
-      //      |    "eip712Signature" : "${EthEncoding.toHexString(ethBuyOrder.eip712Signature.get.arr)}",
-      //      |    "priceMode" : null
-      //      |  },
-      //      |  "order2" : {
-      //      |    "version" : 4,
-      //      |    "id" : "${ethSellOrder.id()}",
-      //      |    "sender" : "${ethSellOrder.senderPublicKey.toAddress}",
-      //      |    "senderPublicKey" : "${ethSellOrder.senderPublicKey}",
-      //      |    "matcherPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-      //      |    "assetPair" : {
-      //      |      "amountAsset" : "5fQPsn8hoaVddFG26cWQ5QFdqxWtUPNaZ9zH2E6LYzFn",
-      //      |      "priceAsset" : null
-      //      |    },
-      //      |    "orderType" : "sell",
-      //      |    "amount" : 1,
-      //      |    "price" : 100,
-      //      |    "timestamp" : 1,
-      //      |    "expiration" : 123,
-      //      |    "matcherFee" : 100000,
-      //      |    "signature" : "",
-      //      |    "proofs" : [ ],
-      //      |    "matcherFeeAssetId" : null,
-      //      |    "eip712Signature" : "${EthEncoding.toHexString(ethSellOrder.eip712Signature.get.arr)}",
-      //      |    "priceMode" : null
-      //      |  },
-      //      |  "amount" : 1,
-      //      |  "price" : 100,
-      //      |  "buyMatcherFee" : 100000,
-      //      |  "sellMatcherFee" : 100000
-      //      |}
-      //      |""".stripMargin
-
-      // Post(routePath("/broadcast"), transaction.json()) ~> route ~> check {
-      //   responseAs[JsObject] should matchJson(validResponseJson)
-      // }
-
-      // def removeFields(json: JsObject, fields: String*): JsObject = {
-      //   val order1 = (json \ "order1").as[JsObject]
-      //   val order2 = (json \ "order2").as[JsObject]
-      //   json + ("order1" -> fields.foldLeft(order1)(_ - _)) + ("order2" -> fields.foldLeft(order2)(_ - _))
-      // }
-
-      // Post(routePath("/broadcast"), removeFields(transaction.json(), "senderPublicKey")) ~> route ~> check {
-      //   responseAs[JsObject] should matchJson(validResponseJson)
-      // }
-
-      // Post(routePath("/broadcast"), removeFields(transaction.json(), "senderPublicKey", "eip712Signature")) ~> route ~> check {
-      //   responseAs[JsObject] should matchJson("""{
-      //                                           |  "error" : 199,
-      //                                           |  "message" : "Either senderPublicKey or eip712Signature should be provided"
-      //                                           |}""".stripMargin)
-      // }
-    }
-  }
 
   "invoke script" - {
     def withInvokeScriptTransaction(f: (KeyPair, InvokeScriptTransaction) => Unit): Unit = {
@@ -699,37 +724,46 @@ class TransactionBroadcastSpec
   }
 }
 
+object TransactionBroadcastSpec extends EthHelpers {
+  private val emptySignature = OrderAuthentication.Eip712Signature(ByteStr(new Array[Byte](64)))
 
-object EthOrder extends EthHelpers {
-  val ethBuyOrder: Order = Order(
-    Order.V4,
-    EthSignature(
-      "0x0a897d382e4e4a066e1d98e5c3c1051864a557c488571ff71e036c0f5a2c7204274cb293cd4aa7ad40f8c2f650e1a2770ecca6aa14a1da883388fa3b5b9fa8b71c"
-    ),
-    TxHelpers.matcher.publicKey,
-    AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-    OrderType.BUY,
-    TxExchangeAmount.unsafeFrom(1),
-    TxOrderPrice.unsafeFrom(100L),
-    1,
-    123,
-    TxMatcherFee.unsafeFrom(100000),
-    Waves
-  )
+  def ethBuyOrderSigned(testAsset: IssuedAsset, buyerEthAccount: Bip32ECKeyPair, timestamp: Long): Order = {
+    val ethBuyOrderTemplate: Order = Order(
+      Order.V4,
+      emptySignature,
+      TxHelpers.matcher.publicKey,
+      AssetPair(testAsset, Waves),
+      OrderType.BUY,
+      TxExchangeAmount.unsafeFrom(1),
+      TxOrderPrice.unsafeFrom(100L),
+      timestamp,
+      timestamp + 10000,
+      TxMatcherFee.unsafeFrom(100000),
+      Waves
+    )
 
-  val ethSellOrder: Order = Order(
-    Order.V4,
-    EthSignature(
-      "0x6c4385dd5f6f1200b4d0630c9076104f34c801c16a211e505facfd743ba242db4429b966ffa8d2a9aff9037dafda78cfc8f7c5ef1c94493f5954bc7ebdb649281b"
-    ),
-    TxHelpers.matcher.publicKey,
-    AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-    OrderType.SELL,
-    TxExchangeAmount.unsafeFrom(1),
-    TxOrderPrice.unsafeFrom(100L),
-    1,
-    123,
-    TxMatcherFee.unsafeFrom(100000),
-    Waves
-  )
+    ethBuyOrderTemplate.copy(
+      orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(EthOrders.signOrder(ethBuyOrderTemplate, buyerEthAccount)))
+    )
+  }
+
+  def ethSellOrderSigned(testAsset: IssuedAsset, sellerEthAccount: Bip32ECKeyPair, timestamp: Long): Order = {
+    val ethSellOrderTemplate: Order = Order(
+      Order.V4,
+      emptySignature,
+      TxHelpers.matcher.publicKey,
+      AssetPair(testAsset, Waves),
+      OrderType.SELL,
+      TxExchangeAmount.unsafeFrom(1),
+      TxOrderPrice.unsafeFrom(100L),
+      timestamp,
+      timestamp + 10000,
+      TxMatcherFee.unsafeFrom(100000),
+      Waves
+    )
+
+    ethSellOrderTemplate.copy(
+      orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(EthOrders.signOrder(ethSellOrderTemplate, sellerEthAccount)))
+    )
+  }
 }
