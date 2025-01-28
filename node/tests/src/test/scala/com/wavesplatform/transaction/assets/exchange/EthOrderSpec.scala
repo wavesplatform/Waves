@@ -153,8 +153,8 @@ class EthOrderSpec
       val sellOrder = ethSellOrderSigned(testAsset, sellerEthAccount, TxHelpers.timestamp)
 
       val transaction = TxHelpers.exchange(buyOrder, sellOrder, TxHelpers.matcher, price = 100, version = TxVersion.V3)
-      d.appendBlock(transaction)
 
+      d.appendBlock(transaction)
       d.blockchain.transactionMeta(transaction.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
     }
   }
@@ -353,45 +353,40 @@ class EthOrderSpec
   }
 
   it should "work in exchange transaction with asset script" in {
-    // TODO: [scala3] rewrite
-    // val blockchain = createBlockchainStub { blockchain =>
-    //   val sh = StubHelpers(blockchain)
-    //   sh.creditBalance(TxHelpers.matcher.toAddress, *)
-    //   sh.creditBalance(ethSellOrder.senderAddress, *)
-    //   (blockchain.wavesBalances)
-    //     .when(*)
-    //     .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, ethSellOrder.senderAddress -> Long.MaxValue / 3))
+    val assetIssuer = TxHelpers.defaultSigner
+    val buyerEthAccount  = TxHelpers.signer(1).toEthKeyPair
+    val sellerEthAccount = TxHelpers.signer(2).toEthKeyPair
 
-    //   // TODO: something more smart ?
-    //   val script = TxHelpers.script("""
-    //                                   |match tx {
-    //                                   |  case e: ExchangeTransaction => true
-    //                                   |  case _ => false
-    //                                   |}""".stripMargin)
+    val balances = Seq(
+      AddrWithBalance(buyerEthAccount.toWavesAddress, 1000.waves),
+      AddrWithBalance(sellerEthAccount.toWavesAddress, 1000.waves),
+      AddrWithBalance(TxHelpers.matcher.toAddress, 1000.waves)
+    )
 
-    //   sh.issueAsset(ByteStr(EthStubBytes32), Some(script))
-    // }
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      // Issue an asset
+      // TODO: something more smart ?
+      val script = TxHelpers.script("""
+                                      |match tx {
+                                      |  case e: ExchangeTransaction => true
+                                      |  case e: TransferTransaction => true
+                                      |  case _ => false
+                                      |}""".stripMargin)
+      val issueTx   = TxHelpers.issue(assetIssuer, Long.MaxValue, script = Some(script))
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
 
-    // val buyOrder = Order
-    //   .selfSigned(
-    //     Order.V3,
-    //     TxHelpers.defaultSigner,
-    //     TxHelpers.matcher.publicKey,
-    //     AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
-    //     OrderType.BUY,
-    //     1,
-    //     100L,
-    //     1,
-    //     123,
-    //     100000,
-    //     Waves
-    //   )
-    //   .explicitGet()
+      // Transfer asset to seller
+      d.appendBlock(TxHelpers.transfer(assetIssuer, sellerEthAccount.toWavesAddress, 1000L, testAsset))
 
-    // val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
-    // val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    // val snapshot    = differ(transaction).resultE.explicitGet()
-    // snapshot should containAppliedTx(transaction.id())
+      val buyOrder = ethBuyOrderSigned(testAsset, buyerEthAccount, TxHelpers.timestamp)
+      val sellOrder = ethSellOrderSigned(testAsset, sellerEthAccount, TxHelpers.timestamp)
+
+      val transaction = TxHelpers.exchange(buyOrder, sellOrder, TxHelpers.matcher, price = 100, version = TxVersion.V3)
+
+      d.appendBlock(transaction)
+      d.blockchain.transactionMeta(transaction.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
+    }
   }
 
   it should "work in exchange transaction with matcher script" in {
