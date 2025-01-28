@@ -642,6 +642,9 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def blacklistedPeers: Seq[BlacklistedPeer] =
       sync(async(n).blacklistedPeers)
 
+    def allPeers: Seq[KnownPeer] =
+      sync(async(n).allPeers)
+
     def waitFor[A](desc: String)(f: Node => A, cond: A => Boolean, retryInterval: FiniteDuration): A =
       sync(async(n).waitFor[A](desc)(x => Future.successful(f(x.n)), cond, retryInterval), 5.minutes)
 

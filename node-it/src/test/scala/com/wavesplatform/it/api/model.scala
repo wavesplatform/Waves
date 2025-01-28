@@ -27,6 +27,12 @@ object Peer {
   implicit val peerFormat: Format[Peer] = Json.format
 }
 
+case class KnownPeer(address: String, lastSeen: Long)
+
+object KnownPeer {
+  implicit val peerFormat: Format[KnownPeer] = Json.format
+}
+
 case class Address(address: String)
 object Address {
   implicit val addressFormat: Format[Address] = Json.format

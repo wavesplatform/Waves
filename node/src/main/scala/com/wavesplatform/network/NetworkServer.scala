@@ -11,7 +11,7 @@ import io.netty.channel.group.ChannelGroup
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
-import io.netty.util.concurrent.DefaultThreadFactory
+import io.netty.util.concurrent.{DefaultThreadFactory, Future, GenericFutureListener}
 import monix.reactive.Observable
 import org.influxdb.dto.Point
 
@@ -150,7 +150,7 @@ object NetworkServer extends ScorexLogging {
     def handleConnectionAttempt(remoteAddress: InetSocketAddress)(thisConnFuture: ChannelFuture): Unit = {
       if (thisConnFuture.isSuccess) {
         log.trace(formatOutgoingChannelEvent(thisConnFuture.channel(), "Connection established"))
-        thisConnFuture.channel().closeFuture().addListener(f => handleOutgoingChannelClosed(remoteAddress)(f))
+        thisConnFuture.channel().closeFuture().addListener((f: ChannelFuture) => handleOutgoingChannelClosed(remoteAddress)(f))
       } else if (thisConnFuture.cause() != null) {
         peerDatabase.suspend(remoteAddress)
         outgoingChannels.remove(remoteAddress, thisConnFuture.channel())
@@ -176,7 +176,7 @@ object NetworkServer extends ScorexLogging {
           val newConnFuture = bootstrap.connect(remoteAddress)
 
           log.trace(s"${id(newConnFuture.channel())} Connecting to $remoteAddress")
-          newConnFuture.addListener(f => handleConnectionAttempt(remoteAddress)(f)).channel()
+          newConnFuture.addListener((f: ChannelFuture) => handleConnectionAttempt(remoteAddress)(f)).channel()
         }
       )
 

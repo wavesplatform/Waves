@@ -7,10 +7,9 @@ import com.wavesplatform.network.RxScoreObserver.ChannelClosedAndSyncWith
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.{BlockGen, RxScheduler}
-import io.netty.channel.Channel
+import io.netty.channel.{Channel, ChannelFuture}
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.local.LocalChannel
-import io.netty.util
 import monix.eval.{Coeval, Task}
 import monix.reactive.Observable
 import monix.reactive.subjects.PublishSubject as PS
@@ -180,7 +179,7 @@ object RxExtensionLoaderSpec {
   implicit class ChannelExt(val channel: Channel) extends AnyVal {
     def closeF(): Future[Unit] = {
       val closePromise = Promise[Unit]()
-      channel.closeFuture().addListener((future: util.concurrent.Future[? >: Void]) => closePromise.complete(Try(future.get())))
+      channel.closeFuture().addListener((future: ChannelFuture) => closePromise.complete(Try(future.get())))
       closePromise.future
     }
   }

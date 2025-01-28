@@ -177,6 +177,10 @@ object AsyncHttpApi extends Assertions {
       Json.parse(r.getResponseBody).as[Seq[BlacklistedPeer]]
     }
 
+    def allPeers: Future[Seq[KnownPeer]] = get("/peers/all").map { r =>
+      (Json.parse(r.getResponseBody) \ "peers").as[Seq[KnownPeer]]
+    }
+
     def connect(address: InetSocketAddress): Future[Unit] =
       postJson("/peers/connect", ConnectReq(address.getHostName, address.getPort)).map(_ => ())
 
