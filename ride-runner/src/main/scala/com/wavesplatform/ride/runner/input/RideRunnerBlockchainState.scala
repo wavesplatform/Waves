@@ -4,6 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import pureconfig.ConfigReader
 
 case class RideRunnerBlockchainState(
     height: Int = 3296626,
@@ -12,4 +13,4 @@ case class RideRunnerBlockchainState(
     assets: Map[IssuedAsset, RideRunnerAsset] = Map.empty,
     blocks: Map[Int, RideRunnerBlock] = Map.empty,
     transactions: Map[ByteStr, RideRunnerTransaction] = Map.empty
-)
+) derives ConfigReader

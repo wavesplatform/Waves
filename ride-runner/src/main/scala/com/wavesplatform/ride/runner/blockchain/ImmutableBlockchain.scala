@@ -21,6 +21,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxPositiveAmount}
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 
 import scala.util.chaining.scalaUtilChainingOps
 

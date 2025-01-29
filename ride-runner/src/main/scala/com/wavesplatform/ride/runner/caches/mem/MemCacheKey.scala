@@ -14,6 +14,7 @@ import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, He
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{account, state, transaction}
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 
 sealed trait MemCacheKey extends Product with Serializable {
   type ValueT

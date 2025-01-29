@@ -5,6 +5,7 @@ import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache.Settings
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
+import pureconfig.ConfigReader
 
 class MemBlockchainDataCache(settings: Settings) {
   private val backend = Caffeine
@@ -37,5 +38,5 @@ class MemBlockchainDataCache(settings: Settings) {
 }
 
 object MemBlockchainDataCache {
-  case class Settings(size: ConfigMemorySize)
+  case class Settings(size: ConfigMemorySize) derives ConfigReader
 }

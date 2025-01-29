@@ -142,7 +142,7 @@ lazy val `waves-node` = (project in file("."))
     `node-it`,
     `node-testkit`,
     `node-tests`,
-    // `node-generator`, // TODO: [scala3] enable
+    `node-generator`,
     benchmark,
     // `ride-runner` // TODO: [scala3] enable
   )
@@ -239,7 +239,7 @@ checkPRRaw := Def
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
-      // (`node-generator` / Compile / compile).value // TODO: [scala3] enable
+      (`node-generator` / Compile / compile).value // TODO: [scala3] enable
       // (`ride-runner` / Test / compile).value // TODO: [scala3] enable
     }
   )

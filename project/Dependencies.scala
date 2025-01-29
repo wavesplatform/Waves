@@ -32,15 +32,13 @@ object Dependencies {
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.116.Final"
 
-  val shapeless = Def.setting("org.typelevel" %% "shapeless3-deriving" % "3.4.3")
-
   val playJson = "org.playframework" %% "play-json" % "3.0.4"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.5" % Test)
 
-  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.10.2"
-  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.10.2"
+  val sttp3      = "com.softwaremill.sttp.client3" %% "core"  % "3.10.2"
+  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix" % "3.10.2"
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.79"
 
@@ -53,8 +51,8 @@ object Dependencies {
       monixModule("eval").value,
       "org.typelevel" %%% s"cats-core" % "2.12.0",
       "com.lihaoyi"   %%% "fastparse"  % "3.1.1",
-      "org.typelevel" %%% "cats-mtl" % "1.5.0",
-      "ch.obermuhlner"  % "big-math" % "2.3.2",
+      "org.typelevel" %%% "cats-mtl"   % "1.5.0",
+      "ch.obermuhlner"  % "big-math"   % "2.3.2",
       googleGuava, // BaseEncoding.base16()
       curve25519,
       bouncyCastleProvider,
@@ -98,12 +96,11 @@ object Dependencies {
       ("org.rudogma" %%% "supertagged" % "2.0-RC2")
         .exclude("org.scala-js", "scalajs-library_2.13")
         .cross(CrossVersion.for3Use2_13),
-      "commons-net"          % "commons-net"              % "3.11.1",
-      "commons-io"           % "commons-io"               % "2.18.0",
-      "com.github.pureconfig" %% "pureconfig-core" % "0.17.8",
+      "commons-net"            % "commons-net"               % "3.11.1",
+      "commons-io"             % "commons-io"                % "2.18.0",
+      "com.github.pureconfig" %% "pureconfig-core"           % "0.17.8",
       "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.8",
-
-      "net.logstash.logback" % "logstash-logback-encoder" % "8.0" % Runtime,
+      "net.logstash.logback"   % "logstash-logback-encoder"  % "8.0" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),
       kamonModule("influxdb"),

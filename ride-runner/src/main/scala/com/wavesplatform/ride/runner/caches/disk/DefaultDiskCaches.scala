@@ -23,7 +23,7 @@ import scala.util.chaining.scalaUtilChainingOps
 class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastHeight: Option[Height]) extends DiskCaches with ScorexLogging {
   override val addressIds: AddressIdDiskCache = new AddressIdDiskCache {
     private val lastAddressIdKey = KvPairs.LastAddressId.at(())
-    private val lastAddressId    = new AtomicLong(storage.directReadOnly(_.getOpt(lastAddressIdKey).getOrElse(-1L)))
+    private val lastAddressId    = new AtomicLong(storage.directReadOnly(_.getOpt(lastAddressIdKey).fold(-1L)(_.toLong)))
 
     private val addressIdCache: Cache[Address, java.lang.Long] =
       Caffeine
@@ -41,7 +41,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
         addressIdCache.get(
           address,
           { address =>
-            ctx.getOpt(KvPairs.AddressToId.at(address)).fold[JLong](null)(x => JLong.valueOf(x))
+            ctx.getOpt(KvPairs.AddressToId.at(address)).fold[JLong](null)(x => JLong.valueOf(x.toLong))
           }
         )
       ).map(x => AddressId(x.toLong))

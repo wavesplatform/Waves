@@ -23,6 +23,7 @@ import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, AssetIdLength, Transaction}
 import org.rocksdb.ColumnFamilyHandle
 import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.nio.ByteBuffer
@@ -196,7 +197,7 @@ object KvPairs {
       extends KvPair[state.Height, List[TransactionId]](109)(implicitly, AsBytes.listAsBytes.consumeAll(transactionIdWithLenAsBytes))
   object Transactions extends KvPair[TransactionId, Option[state.Height]](110)
 
-  implicit val addressId: AsBytes[AddressId] = AsBytes.longAsBytes.transform(AddressId(_), x => x)
+  implicit val addressId: AsBytes[AddressId] = AsBytes.longAsBytes.transform(AddressId(_), _.toLong)
 
   implicit val addressAsBytes: AsBytes[Address] =
     AsBytes.byteArrayAsBytes.fixed(Address.AddressLength).transform[Address](Address.fromBytes(_).explicitGet(), _.bytes)
