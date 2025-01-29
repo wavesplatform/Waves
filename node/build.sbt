@@ -5,7 +5,8 @@ enablePlugins(
   JDebPackaging,
   SystemdPlugin,
   VersionObject,
-  JavaAgent
+  JavaAgent,
+  PublishedModule
 )
 
 libraryDependencies ++= Dependencies.node.value
@@ -18,9 +19,7 @@ javaAgents ++= {
   }
 }
 
-publishTo      := sonatypePublishToBundle.value
-publish / skip := false
-homepage       := Some(url("https://waves.tech/"))
+homepage := Some(url("https://waves.tech/"))
 developers := List(
   Developer("ismagin", "Ilya Smagin", "ilya.smagin@gmail.com", url("https://github.com/ismagin")),
   Developer("asayadyan", "Artyom Sayadyan", "xrtm000@gmail.com", url("https://github.com/xrtm000")),
@@ -32,11 +31,6 @@ developers := List(
   Developer("vsuharnikov", "Vyatcheslav Suharnikov", "arz.freezy@gmail.com", url("https://github.com/vsuharnikov")),
   Developer("ivan-mashonskiy", "Ivan Mashonskii", "ivan.mashonsky@gmail.com", url("https://github.com/ivan-mashonskiy"))
 )
-versionScheme := Some("pvp")
-
-Compile / packageDoc / publishArtifact := true
-Test / packageDoc / publishArtifact    := false
-Compile / packageDoc / mappings        := Seq()
 
 inConfig(Compile)(
   Seq(

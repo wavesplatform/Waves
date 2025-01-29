@@ -36,6 +36,7 @@ lazy val lang =
     )
 
 lazy val `lang-jvm` = lang.jvm
+  .enablePlugins(PublishedModule)
   .settings(
     name                                  := "RIDE Compiler",
     normalizedName                        := "lang",
@@ -47,8 +48,9 @@ lazy val `lang-js` = lang.js
   .enablePlugins(VersionObject)
 
 lazy val `lang-testkit` = project
-  .dependsOn(`lang-jvm`)
   .in(file("lang/testkit"))
+  .dependsOn(`lang-jvm`)
+  .enablePlugins(PublishedModule)
   .settings(
     libraryDependencies ++=
       Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps ++ Dependencies.logDeps ++ Seq(
@@ -74,6 +76,7 @@ lazy val node = project.dependsOn(`lang-jvm`)
 lazy val `node-testkit` = project
   .in(file("node/testkit"))
   .dependsOn(`node`, `lang-testkit`)
+  .enablePlugins(PublishedModule)
 
 lazy val `node-tests` = project
   .in(file("node/tests"))
@@ -158,7 +161,6 @@ inScope(Global)(
     publish / skip       := true,
     scalacOptions ++= Seq(
       "-feature",
-      "-explain",
       "-deprecation",
       "-unchecked",
       "-language:higherKinds",

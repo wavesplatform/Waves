@@ -12,7 +12,7 @@ Seq(
   "com.eed3si9n"       % "sbt-assembly"             % "2.3.0",
   "com.github.sbt"     % "sbt-native-packager"      % "1.10.4",
   "se.marcuslonnberg"  % "sbt-docker"               % "1.11.0",
-  "org.scala-js"       % "sbt-scalajs"              % "1.17.0",
+  "org.scala-js"       % "sbt-scalajs"              % "1.18.2",
   "org.portable-scala" % "sbt-scalajs-crossproject" % "1.3.2",
   "pl.project13.scala" % "sbt-jmh"                  % "0.4.7",
   "com.github.sbt"     % "sbt-ci-release"           % "1.8.0",
