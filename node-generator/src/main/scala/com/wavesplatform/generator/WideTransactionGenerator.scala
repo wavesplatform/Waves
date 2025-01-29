@@ -5,6 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.generator.WideTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.transaction.Transaction
+import pureconfig.ConfigReader
 
 class WideTransactionGenerator(settings: Settings, accounts: Seq[KeyPair]) extends TransactionGenerator {
   require(accounts.nonEmpty)
@@ -19,14 +20,14 @@ class WideTransactionGenerator(settings: Settings, accounts: Seq[KeyPair]) exten
 
 object WideTransactionGenerator {
 
-  case class Settings(transactions: Int, limitDestAccounts: Option[Int], minFee: Long, maxFee: Long) {
+  case class Settings(transactions: Int, limitDestAccounts: Option[Int], minFee: Long, maxFee: Long)derives ConfigReader {
     require(transactions > 0)
     require(limitDestAccounts.forall(_ > 0))
   }
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
-      import x._
+      import x.*
       s"""transactions per iteration: $transactions
          |number of recipients is ${limitDestAccounts.map(x => s"limited by $x").getOrElse("not limited")}
          |min fee: $minFee

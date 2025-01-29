@@ -4,15 +4,18 @@ import cats.Show
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.generator.OracleTransactionGenerator.Settings
+import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
+import pureconfig.ConfigReader
 
 class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair], estimator: ScriptEstimator) extends TransactionGenerator {
   override def next(): Iterator[Transaction] = generate(settings).iterator
@@ -46,8 +49,8 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
   }
 }
 
-object OracleTransactionGenerator {
-  final case class Settings(transactions: Int, requiredData: Set[DataEntry[_]])
+object OracleTransactionGenerator extends FicusImplicits {
+  final case class Settings(transactions: Int, requiredData: Set[DataEntry[?]])derives ConfigReader
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>

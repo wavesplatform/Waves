@@ -1,21 +1,23 @@
 package com.wavesplatform.generator.utils
 
-import java.util.concurrent.ThreadLocalRandom
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.Curve25519.KeyLength
 import com.wavesplatform.generator.utils.Implicits.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Transaction, TxNonNegativeAmount}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.{Transaction, TxNonNegativeAmount}
 import com.wavesplatform.utils.LoggerFacade
 import org.slf4j.LoggerFactory
+
+import java.util.concurrent.ThreadLocalRandom
 
 object Gen {
   private def random = ThreadLocalRandom.current

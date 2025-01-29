@@ -6,17 +6,17 @@ import com.wavesplatform.common.state.ByteStr
 import pureconfig.*
 import pureconfig.ConvertHelpers.catchReadError
 import pureconfig.configurable.genericMapReader
-import pureconfig.error.CannotConvert
+import pureconfig.error.{CannotConvert, ConfigReaderFailures}
 import supertagged.TaggedType
 
 import scala.util.Try
 
 package object settings {
   extension (objCur: ConfigObjectCursor) {
-    def required[T](key: String)(using reader: ConfigReader[T])=
+    def required[T](key: String)(using reader: ConfigReader[T]): Either[ConfigReaderFailures, T] =
       objCur.atKey(key).flatMap(ConfigReader[T].from)
-      
-    def optionalWithDefault[T](key: String, default: T)(using reader: ConfigReader[T])=
+
+    def optionalWithDefault[T](key: String, default: T)(using reader: ConfigReader[T]): Either[ConfigReaderFailures, T] =
       ConfigReader[Option[T]].from(objCur.atKeyOrUndefined(key)).map(_.getOrElse(default))
   }
 

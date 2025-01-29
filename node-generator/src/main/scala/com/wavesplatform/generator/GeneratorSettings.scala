@@ -1,35 +1,50 @@
 package com.wavesplatform.generator
 
-import java.net.{InetSocketAddress, URL}
-import java.nio.charset.StandardCharsets
 import cats.Show
 import cats.implicits.showInterpolator
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.generator.GeneratorSettings.NodeAddress
+import com.wavesplatform.generator.config.FicusImplicits
+import com.wavesplatform.settings.*
+import pureconfig.ConfigReader
+import pureconfig.generic.derivation.*
+
+import java.net.{InetSocketAddress, URI, URL}
+import java.nio.charset.StandardCharsets
+import scala.util.Try
 
 case class GeneratorSettings(
     chainId: String,
     accounts: Seq[String],
     sendTo: Seq[NodeAddress],
     worker: Worker.Settings,
-    mode: Mode.Value,
+    mode: Mode,
     narrow: NarrowTransactionGenerator.Settings,
     wide: WideTransactionGenerator.Settings,
     dynWide: DynamicWideTransactionGenerator.Settings,
     multisig: MultisigTransactionGenerator.Settings,
     oracle: OracleTransactionGenerator.Settings,
     swarm: SmartGenerator.Settings
-) {
+                            )derives ConfigReader {
   val addressScheme: Char                  = chainId.head
   val privateKeyAccounts: Seq[SeedKeyPair] = accounts.map(s => GeneratorSettings.toKeyPair(s))
 }
 
-object GeneratorSettings {
-  case class NodeAddress(networkAddress: InetSocketAddress, apiAddress: URL)
+object GeneratorSettings extends FicusImplicits {
+  given ConfigReader[InetSocketAddress] = ConfigReader.fromStringTry(str =>
+    Try {
+      val url = new URI(s"my://$str")
+      new InetSocketAddress(url.getHost, url.getPort)
+    }
+  )
+
+  given ConfigReader[URL] = ConfigReader[String].map(str => new URL(str))
+
+  case class NodeAddress(networkAddress: InetSocketAddress, apiAddress: URL)derives ConfigReader
 
   implicit val toPrintable: Show[GeneratorSettings] = { x =>
-    import x._
+    import x.*
 
     val modeSettings: String = (mode: @unchecked) match {
       case Mode.NARROW   => show"$narrow"

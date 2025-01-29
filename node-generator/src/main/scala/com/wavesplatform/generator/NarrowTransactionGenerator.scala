@@ -1,12 +1,11 @@
 package com.wavesplatform.generator
 
-import java.nio.file.{Files, Paths}
-import java.util.UUID
-import java.util.concurrent.ThreadLocalRandom
 import cats.Show
 import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.{Gen, Universe}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -14,22 +13,27 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils.{LoggerFacade, NTP}
 import org.slf4j.LoggerFactory
 import org.web3j.crypto.Bip32ECKeyPair
+import pureconfig.ConfigReader
 
+import java.nio.file.{Files, Paths}
+import java.util.UUID
+import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.duration.*
+import scala.reflect.ClassTag
 import scala.util.Random
 import scala.util.Random.*
 
@@ -44,16 +48,16 @@ class NarrowTransactionGenerator(
 ) extends TransactionGenerator {
   import NarrowTransactionGenerator.*
 
-  private[this] val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
-  private[this] val typeGen = DistributedRandomGenerator(settings.probabilities)
+  private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
+  private val typeGen = DistributedRandomGenerator(settings.probabilities)
 
-  private[this] def correctVersion(v: TxVersion): TxVersion =
+  private def correctVersion(v: TxVersion): TxVersion =
     if (settings.protobuf) (v + 1).toByte
     else v
 
   override def next(): Iterator[Transaction] = generate(settings.transactions).iterator
 
-  private[this] def generate(n: Int): Seq[Transaction] = {
+  private def generate(n: Int): Seq[Transaction] = {
     val now = System.currentTimeMillis()
 
     val generated = (0 until (n * 1.2).toInt).foldLeft(
@@ -434,7 +438,7 @@ class NarrowTransactionGenerator(
     else ByteStr(Array.fill(random.nextInt(100))(random.nextInt().toByte))
   }
 
-  private[this] def logOption[T <: Transaction](txE: Either[ValidationError, T])(implicit m: Manifest[T]): Option[T] = {
+  private def logOption[T <: Transaction](txE: Either[ValidationError, T])(implicit m: ClassTag[T]): Option[T] = {
     txE match {
       case Left(e) =>
         log.warn(s"${m.runtimeClass.getName}: ${e.toString}")
@@ -443,12 +447,12 @@ class NarrowTransactionGenerator(
     }
   }
 
-  private[this] def accountByAddress(address: String): Option[KeyPair] =
+  private def accountByAddress(address: String): Option[KeyPair] =
     accounts
       .find(_.toAddress.toString == address)
       .orElse(Universe.Accounts.map(_.keyPair).find(_.toAddress.toString == address))
 
-  private[this] def randomSenderAndAsset(issueTxs: Seq[IssueTransaction]): Option[(KeyPair, Option[ByteStr])] =
+  private def randomSenderAndAsset(issueTxs: Seq[IssueTransaction]): Option[(KeyPair, Option[ByteStr])] =
     if (random.nextBoolean()) {
       (randomFrom(issueTxs) orElse randomFrom(Universe.IssuedAssets)).map { issue =>
         val pk = (accounts ++ Universe.Accounts.map(_.keyPair)).find(_.publicKey == issue.sender).get
@@ -467,21 +471,21 @@ class NarrowTransactionGenerator(
   }
 }
 
-object NarrowTransactionGenerator {
+object NarrowTransactionGenerator extends FicusImplicits {
 
   final case class ScriptSettings(
       dappAccount: String,
       paymentAssets: Set[String],
       functions: Seq[ScriptSettings.Function],
       scriptFile: Option[String]
-  ) {
+                                 )derives ConfigReader {
     def dappAccountKP = GeneratorSettings.toKeyPair(dappAccount)
     def dappAddress   = dappAccountKP.toAddress
   }
   object ScriptSettings {
-    final case class Function(name: String, args: Seq[Function.Arg])
+    final case class Function(name: String, args: Seq[Function.Arg])derives ConfigReader
     object Function {
-      final case class Arg(`type`: String, value: String)
+      final case class Arg(`type`: String, value: String)derives ConfigReader
     }
   }
 
@@ -489,11 +493,12 @@ object NarrowTransactionGenerator {
       richAccount: String,
       accounts: SetScriptSettings.Accounts,
       assets: SetScriptSettings.Assets
-  )
+                                    )derives ConfigReader
 
   object SetScriptSettings {
-    final case class Accounts(balance: Long, scriptFile: String, repeat: Int)
+    final case class Accounts(balance: Long, scriptFile: String, repeat: Int)derives ConfigReader
     final case class Assets(description: String, amount: Long, decimals: Int, reissuable: Boolean, scriptFile: String, repeat: Int)
+      derives ConfigReader
   }
 
   final case class Settings(
@@ -502,11 +507,11 @@ object NarrowTransactionGenerator {
       scripts: Seq[ScriptSettings],
       setScript: Option[SetScriptSettings],
       protobuf: Boolean
-  )
+                           )derives ConfigReader
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
-      import x._
+      import x.*
       s"""transactions per iteration: $transactions
          |probabilities:
          |  ${probabilities.mkString("\n  ")}""".stripMargin
@@ -556,7 +561,7 @@ object NarrowTransactionGenerator {
         val (accountInitTxs, accountTailInitTxs, accounts) =
           ((1 to accountsSettings.repeat) foldLeft ((Seq.empty[Transaction], Seq.empty[Transaction], Seq.empty[KeyPair]))) {
             case ((initTxs, tailInitTxs, accounts), _) =>
-              import accountsSettings._
+              import accountsSettings.*
 
               val account = GeneratorSettings.toKeyPair(s"${UUID.randomUUID().toString}")
 
@@ -573,7 +578,7 @@ object NarrowTransactionGenerator {
         val assetTailInitTxs =
           if (settings.probabilities.keySet.contains(TransactionType.SetAssetScript))
             ((1 to assetsSettings.repeat) foldLeft Seq.empty[IssueTransaction]) { case (txs, i) =>
-              import assetsSettings._
+              import assetsSettings.*
 
               val issuer = randomFrom(accounts).get
               val script = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator).explicitGet()._1

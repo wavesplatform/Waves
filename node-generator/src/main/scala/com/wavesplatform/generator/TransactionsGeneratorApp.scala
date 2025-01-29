@@ -1,13 +1,8 @@
 package com.wavesplatform.generator
 
-import java.io.File
-import java.net.{InetSocketAddress, URI}
-import java.util.concurrent.Executors
-import scala.concurrent.*
-import scala.concurrent.duration.*
-import scala.util.{Failure, Random, Success}
 import cats.implicits.showInterpolator
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.generator.GeneratorSettings.NodeAddress
@@ -18,26 +13,23 @@ import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{LoggerFacade, NTP}
-import com.wavesplatform.Application
 import monix.execution.Scheduler
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper, ValueReader}
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Dsl.asyncHttpClient
 import org.slf4j.LoggerFactory
+import pureconfig.*
+import pureconfig.generic.derivation.*
 import scopt.OptionParser
 
-object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
+import java.io.File
+import java.net.{InetSocketAddress, URI}
+import java.util.concurrent.Executors
+import scala.concurrent.*
+import scala.concurrent.duration.*
+import scala.util.{Failure, Random, Success}
 
-  implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
-    val uri = new URI(s"my://${config.getString(path)}")
-    new InetSocketAddress(uri.getHost, uri.getPort)
-  }
-
-  // IDEA bugs
-  implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-  implicit val httpClient: AsyncHttpClient    = asyncHttpClient()
+object TransactionsGeneratorApp extends App with ScoptImplicits {
+  implicit val httpClient: AsyncHttpClient = asyncHttpClient()
 
   val log = LoggerFacade(LoggerFactory.getLogger("generator"))
 
@@ -160,8 +152,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
   val wavesSettings = Application.loadApplicationConfig(if (externalConf.isFile) Some(externalConf) else None)
 
   val defaultConfig =
-    wavesSettings.config
-      .as[GeneratorSettings]("waves.generator")
+    ConfigSource.fromConfig(wavesSettings.config).at("waves.generator").loadOrThrow[GeneratorSettings]
 
   parser.parse(args, defaultConfig) match {
     case None => parser.failure("Failed to parse command line parameters")
@@ -175,9 +166,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       val time = new NTP("pool.ntp.org")
 
       val preconditions =
-        ConfigFactory
-          .load("preconditions.conf")
-          .as[Option[PGenSettings]]("preconditions")(optionValueReader(Preconditions.preconditionsReader))
+        ConfigSource.file("preconditions.conf").at("preconditions").loadOrThrow[Option[PGenSettings]]
 
       val estimator = wavesSettings.estimator
 
@@ -195,7 +184,6 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts, estimator)
         case Mode.ORACLE   => new OracleTransactionGenerator(finalConfig.oracle, finalConfig.privateKeyAccounts, estimator)
         case Mode.SWARM    => new SmartGenerator(finalConfig.swarm, finalConfig.privateKeyAccounts, estimator)
-        case _             => ???
       }
 
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))

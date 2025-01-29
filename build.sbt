@@ -90,12 +90,8 @@ lazy val `grpc-server` =
 // lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-tests` % "test->test")
 lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `lang-testkit` % "test->test", `node-testkit`)
 
-// TODO: [scala3] enable
-// lazy val `node-generator` = project
-//   .dependsOn(node, `node-testkit`, `node-tests` % "compile->test")
-//   .settings(
-//     libraryDependencies += "com.iheart" %% "ficus" % "1.5.2"
-//   )
+lazy val `node-generator` = project.dependsOn(node, `node-testkit`, `node-testkit`)
+
 lazy val benchmark = project.dependsOn(node, `node-tests` % "test->test")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)

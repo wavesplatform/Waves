@@ -1,12 +1,13 @@
 package com.wavesplatform.generator
 
-import java.util.concurrent.atomic.AtomicReference
-
 import cats.Show
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.generator.DynamicWideTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.transaction.Transaction
+import pureconfig.ConfigReader
+
+import java.util.concurrent.atomic.AtomicReference
 
 class DynamicWideTransactionGenerator(settings: Settings, accounts: Seq[KeyPair]) extends TransactionGenerator {
   require(accounts.nonEmpty)
@@ -28,13 +29,13 @@ class DynamicWideTransactionGenerator(settings: Settings, accounts: Seq[KeyPair]
 
 object DynamicWideTransactionGenerator {
 
-  case class Settings(start: Int, growAdder: Double, maxTxsPerRequest: Option[Int], limitDestAccounts: Option[Int], minFee: Long, maxFee: Long) {
+  case class Settings(start: Int, growAdder: Double, maxTxsPerRequest: Option[Int], limitDestAccounts: Option[Int], minFee: Long, maxFee: Long)derives ConfigReader {
     require(start >= 1)
   }
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
-      import x._
+      import x.*
       s"""txs at start: $start
          |grow adder: $growAdder
          |max txs: $maxTxsPerRequest

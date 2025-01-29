@@ -11,7 +11,7 @@ trait ScoptImplicits {
     case x      => Option(r.reads(x))
   }
 
-  implicit val modeRead: Read[Mode.Value] = Read.reads(Mode withName _.toUpperCase)
+  implicit val modeRead: Read[Mode] = Read.reads(s => Mode.valueOf(s.toUpperCase))
 
   implicit val finiteDurationRead: Read[FiniteDuration] = Read.durationRead.map { x =>
     if (x.isFinite) FiniteDuration(x.length, x.unit)

@@ -1,11 +1,10 @@
 package com.wavesplatform.generator
 
-import java.util.concurrent.ThreadLocalRandom
-
 import cats.Show
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.lang.script.Script
@@ -15,8 +14,10 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction, TxVersion}
+import pureconfig.ConfigReader
 
-import scala.concurrent.duration._
+import java.util.concurrent.ThreadLocalRandom
+import scala.concurrent.duration.*
 
 class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPair], estimator: ScriptEstimator) extends TransactionGenerator {
   private def r                                   = ThreadLocalRandom.current
@@ -67,7 +68,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
 }
 
 object SmartGenerator {
-  final case class Settings(scripts: Int, transfers: Int, complexity: Boolean, exchange: Int, assets: Set[String]) {
+  final case class Settings(scripts: Int, transfers: Int, complexity: Boolean, exchange: Int, assets: Set[String])derives ConfigReader {
     require(scripts >= 0)
     require(transfers >= 0)
     require(exchange >= 0)
@@ -75,7 +76,7 @@ object SmartGenerator {
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
-      import x._
+      import x.*
       s"""
          | set-scripts = $scripts
          | transfers = $transfers
