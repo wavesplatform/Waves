@@ -9,10 +9,9 @@ import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.{TransactionParser, TransactionParsers, TransactionType}
 import play.api.libs.json.*
 import pureconfig.*
-import pureconfig.error.{CannotParse, ConfigReaderFailures, ThrowableFailure}
+import pureconfig.error.ThrowableFailure
 
-import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
 trait FicusImplicits {
@@ -53,7 +52,7 @@ trait FicusImplicits {
       warmUpStart <- warmUpConfig.required[Int]("start")
       warmUpEnd <- warmUpConfig.optionalWithDefault[Int]("end", utxLimit)
       warmUpStep <- warmUpConfig.required[Int]("step")
-      warmUpDuration <- warmUpConfig.required[Option[FiniteDuration]](s"duration")
+      warmUpDuration <- warmUpConfig.optionalWithDefault[Option[FiniteDuration]]("duration", None)
       warmUpOnce <- warmUpConfig.optionalWithDefault[Boolean]("once", true)
     } yield Worker.WarmUp(warmUpStart, warmUpEnd, warmUpStep, warmUpDuration, warmUpOnce)
 
@@ -66,8 +65,10 @@ trait FicusImplicits {
       reconnectDelay <- obj.required[FiniteDuration]("reconnect-delay")
       warmUpObj <- obj.atKey("warm-up").flatMap(_.asObjectCursor)
       warmUp <- readWarmUp(warmUpObj, utxLimit)
-      initWarmUpObj <- obj.atKeyOrUndefined("init-warm-up").asObjectCursor
-      initWarmUp <- readWarmUp(initWarmUpObj, utxLimit).fold(_ => Right(None), v => Right(Some(v)))
+      initWarmUp <- obj
+        .atKeyOrUndefined("init-warm-up")
+        .asObjectCursor
+        .fold[ConfigReader.Result[Option[Worker.WarmUp]]](_ => Right(None), v => readWarmUp(v, utxLimit).map(v => Some(v)))
       initialDelay <- readInitialDelay(obj, "initial-delay", delay)
       tailInitialDelay <- readInitialDelay(obj, "tail-initial-delay", delay)
     } yield Worker.Settings(utxLimit, delay, tailInitialDelay, initialDelay, workingTime, autoReconnect, reconnectDelay, warmUp, initWarmUp)

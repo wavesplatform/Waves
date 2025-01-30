@@ -1,7 +1,6 @@
 package com.wavesplatform.generator
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -20,7 +19,6 @@ import pureconfig.ConfigReader
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
-import scala.collection.Factory
 import scala.util.Try
 
 object Preconditions {
