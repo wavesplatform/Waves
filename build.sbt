@@ -239,7 +239,7 @@ checkPRRaw := Def
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
-      (`node-generator` / Compile / compile).value // TODO: [scala3] enable
+      (`node-generator` / Compile / compile).value
       // (`ride-runner` / Test / compile).value // TODO: [scala3] enable
     }
   )
