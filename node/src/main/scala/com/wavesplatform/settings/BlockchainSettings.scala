@@ -336,7 +336,7 @@ object BlockchainSettings {
   def fromRootConfig(config: Config): BlockchainSettings =
     ConfigSource.fromConfig(config).at("waves.blockchain").loadOrThrow[BlockchainSettings]
 
-  implicit val configReader: ConfigReader[BlockchainSettings] = ConfigReader.fromCursor(cur =>
+  given ConfigReader[BlockchainSettings] = ConfigReader.fromCursor(cur =>
     for {
       objCur               <- cur.asObjectCursor
       blockchainTypeString <- objCur.atKey("type").flatMap(_.asString).map(_.toUpperCase)

@@ -7,19 +7,19 @@ import org.rocksdb.*
 import scala.util.Using
 
 trait RideDbAccess {
-  def batchedReadOnly[T](f: ReadOnly => T): T
-  def batchedReadWrite[T](f: ReadWrite => T): T
+  def batchedReadOnly[T](f: ReadOnly => T)(implicit ev: T <:!< Task[?]): T
+  def batchedReadWrite[T](f: ReadWrite => T)(implicit ev: T <:!< Task[?]): T
   def directReadOnly[T](f: ReadOnly => T): T
   def directReadWrite[T](f: ReadWrite => T): T
 }
 
 object RideDbAccess {
   def fromRocksDb(db: RocksDB): RideDbAccess = new RideDbAccess with ScorexLogging {
-    override def batchedReadOnly[T](f: ReadOnly => T): T = withReadOptions { ro =>
+    override def batchedReadOnly[T](f: ReadOnly => T)(implicit ev: T <:!< Task[?]): T = withReadOptions { ro =>
       f(new BatchedReadOnly(db, ro))
     }
 
-    override def batchedReadWrite[T](f: ReadWrite => T): T = withReadOptions { ro =>
+    override def batchedReadWrite[T](f: ReadWrite => T)(implicit ev: T <:!< Task[?]): T = withReadOptions { ro =>
       Using.resource(mkWriteOptions()) { wo =>
         Using.resource(SynchronizedWriteBatch()) { wb =>
           val r = f(new BatchedReadWrite(db, ro, wb))

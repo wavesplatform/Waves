@@ -37,7 +37,7 @@ trait ReadWrite extends ReadOnly {
       k: K,
       kvHistoryPair: KvHistoryPair[K, V],
       fromHeight: Height
-  ): RemoteData[V] =
+  )(implicit @unused ev: V =:!= Option[?]): RemoteData[V] =
     RemoteData.cachedOrUnknown(removeFromAndGetLatestExistedBase(k, kvHistoryPair, fromHeight))
 
   def removeFromAndGetLatestExisted[K, V](k: K, kvHistoryPair: KvHistoryPair[K, Option[V]], fromHeight: Height): RemoteData[V] =

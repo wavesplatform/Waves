@@ -3,6 +3,8 @@ package com.wavesplatform.ride.runner.input
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.ride.runner.input.RideRunnerInputParser.given
+import pureconfig.ConfigReader
 
 import java.nio.charset.StandardCharsets
 
@@ -15,7 +17,7 @@ case class RideRunnerAsset(
     quantity: Long = 9007199254740991L, // In JS: MAX_SAFE_INTEGER
     script: Option[Script] = None,
     minSponsoredAssetFee: Long = 0L
-)
+) derives ConfigReader
 
 object RideRunnerAsset {
   val DefaultName        = StringOrBytesAsByteArray("name".getBytes(StandardCharsets.UTF_8))

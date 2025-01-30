@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.*
 import monix.eval.Coeval
 
+import java.io.{PrintWriter, StringWriter}
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 
@@ -128,7 +129,9 @@ class EvaluatorV2(
                   case null => e.toString
                   case msg  => msg
                 }
-                Coeval(Left((CommonError(s"""An error during run ${function.ev}: ${e.getClass} $error"""), 0)))
+                val sw = new StringWriter()
+                e.printStackTrace(new PrintWriter(sw))
+                Coeval(Left((CommonError(s"""An error during run ${function.ev}: ${e.getClass} $error ${sw.toString}"""), 0)))
             }
         )
         _ <- update(result)

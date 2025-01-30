@@ -120,11 +120,11 @@ class ExpectedHeightCallsTestSuite extends BaseTestSuite with HasTestAccounts {
       height = DefaultHeight,
       accounts = Map(
         aliceAddr -> RideRunnerAccount(
-          regularBalance = Some(TxNonNegativeAmount(10_000_000))
+          regularBalance = Some(TxNonNegativeAmount.unsafeFrom(10_000_000))
         ),
         bobAddr -> RideRunnerAccount(
           data = Some(Map.empty),
-          regularBalance = Some(TxNonNegativeAmount(10_300_000))
+          regularBalance = Some(TxNonNegativeAmount.unsafeFrom(10_300_000))
         )
       ),
       blocks = Map(
