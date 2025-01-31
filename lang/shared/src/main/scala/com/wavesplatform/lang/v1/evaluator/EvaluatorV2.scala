@@ -4,6 +4,7 @@ import cats.Id
 import cats.instances.lazyList.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
+import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.*
@@ -12,13 +13,11 @@ import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, S
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.LogKeys.*
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.logFunc
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.*
 import monix.eval.Coeval
 
-import java.io.{PrintWriter, StringWriter}
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 
@@ -129,9 +128,7 @@ class EvaluatorV2(
                   case null => e.toString
                   case msg  => msg
                 }
-                val sw = new StringWriter()
-                e.printStackTrace(new PrintWriter(sw))
-                Coeval(Left((CommonError(s"""An error during run ${function.ev}: ${e.getClass} $error ${sw.toString}"""), 0)))
+                Coeval(Left((CommonError(s"""An error during run ${function.ev}: ${e.getClass} $error"""), 0)))
             }
         )
         _ <- update(result)
@@ -148,8 +145,7 @@ class EvaluatorV2(
             if (newMode) {
               val cost = f.costByLibVersion(stdLibVersion).toInt
               Some(limit - cost)
-            } else
-              None
+            } else None
           (func, precalculatedLimit, parentBlocks)
         }
         .orElse(findUserFunction(name, parentBlocks).map { case (func, blocks) => (func, None, blocks) })
@@ -273,8 +269,7 @@ class EvaluatorV2(
             if (argsEvaluated && unusedArgsComplexity > 0) {
               logFunc(fc, ctx, stdLibVersion, unusedArgsComplexity, enableExecutionLog)
               evaluateFunction(fc, startArgs, unusedArgsComplexity)
-            } else
-              EvaluationResult(unusedArgsComplexity)
+            } else EvaluationResult(unusedArgsComplexity)
           }
 
       case evaluated: EVALUATED =>
