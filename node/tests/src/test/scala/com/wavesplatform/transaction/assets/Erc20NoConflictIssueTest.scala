@@ -6,7 +6,8 @@ import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.test.FlatSpec
-import com.wavesplatform.transaction.{ERC20Address, TxHelpers}
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.{EthHelpers, JsonMatchers}
 import org.scalatest.ParallelTestExecution
 
@@ -40,7 +41,7 @@ class Erc20NoConflictIssueTest extends FlatSpec with EthHelpers with WithDomain 
       val conflictingAssetId   = ByteStr(calculatedAssetId.arr.take(20) ++ Array.fill[Byte](12)(0))
       val conflictingAssetInfo = StaticAssetInfo() // Note: Use default values for simplicity
       d.rdb.db.readWrite { rw =>
-        rw.put(Keys.assetStaticInfo(ERC20Address(conflictingAssetId.take(20))), Some(conflictingAssetInfo))
+        rw.put(Keys.assetStaticInfo(IssuedAsset(conflictingAssetId)), Some(conflictingAssetInfo))
       }
 
       d.appendBlockE(invokeTx) should matchPattern {
@@ -50,11 +51,20 @@ class Erc20NoConflictIssueTest extends FlatSpec with EthHelpers with WithDomain 
   }
 
   it should "in plain issue tx" in {
-//      val tx = TxHelpers.issue()
-//      val blockchain = createBlockchainStub { b =>
-//        (b.resolveERC20Address _).when(ERC20Address(tx.asset)).returns(Some(tx.asset)) // Only erc20 entry in the blockchain
-//      }
-//      val differ = blockchain.stub.transactionDiffer().andThen(_.resultE)
-//      differ(tx) should produceRejectOrFailedDiff(s"Asset ${tx.asset} is already issued")
+    withDomain(DomainPresets.RideV6, Seq.empty) { d =>
+      val issueTx         = TxHelpers.issue(issuer = TxHelpers.defaultSigner)
+      val assetToBeIssued = issueTx.asset
+
+      // Note: Because reproducing a conflicting assetId is too hard, we create a conflicting assetId manually
+      val conflictingAssetId   = ByteStr(assetToBeIssued.id.arr.take(20) ++ Array.fill[Byte](12)(0))
+      val conflictingAssetInfo = StaticAssetInfo() // Note: Use default values for simplicity
+      d.rdb.db.readWrite { rw =>
+        rw.put(Keys.assetStaticInfo(IssuedAsset(conflictingAssetId)), Some(conflictingAssetInfo))
+      }
+
+      d.appendBlockE(issueTx) should matchPattern {
+        case Left(err) if err.toString.contains(s"Asset ${assetToBeIssued} is already issued") =>
+      }
+    }
   }
 }
