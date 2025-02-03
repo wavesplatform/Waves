@@ -5,7 +5,7 @@ import cats.implicits.showInterpolator
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.generator.GeneratorSettings.NodeAddress
-import com.wavesplatform.generator.config.FicusImplicits
+import com.wavesplatform.generator.config.ConfigReaders
 import com.wavesplatform.settings.*
 import pureconfig.ConfigReader
 import pureconfig.generic.derivation.*
@@ -31,7 +31,7 @@ case class GeneratorSettings(
   val privateKeyAccounts: Seq[SeedKeyPair] = accounts.map(s => GeneratorSettings.toKeyPair(s))
 }
 
-object GeneratorSettings extends FicusImplicits {
+object GeneratorSettings extends ConfigReaders {
   given ConfigReader[InetSocketAddress] = ConfigReader.fromStringTry(str =>
     Try {
       val url = new URI(s"my://$str")

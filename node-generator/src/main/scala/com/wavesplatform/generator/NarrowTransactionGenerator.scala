@@ -5,7 +5,7 @@ import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.generator.config.FicusImplicits
+import com.wavesplatform.generator.config.ConfigReaders
 import com.wavesplatform.generator.utils.{Gen, Universe}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -471,7 +471,7 @@ class NarrowTransactionGenerator(
   }
 }
 
-object NarrowTransactionGenerator extends FicusImplicits {
+object NarrowTransactionGenerator extends ConfigReaders {
 
   final case class ScriptSettings(
       dappAccount: String,

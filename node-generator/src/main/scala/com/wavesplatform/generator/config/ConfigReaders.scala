@@ -14,7 +14,7 @@ import pureconfig.error.ThrowableFailure
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
-trait FicusImplicits {
+trait ConfigReaders {
 
   private val byName: Map[String, TransactionParser] = TransactionParsers.all.map { case (_, builder) =>
     builder.getClass.getSimpleName.replaceAll("\\$$", "") -> builder

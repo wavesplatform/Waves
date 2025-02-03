@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.generator.OracleTransactionGenerator.Settings
-import com.wavesplatform.generator.config.FicusImplicits
+import com.wavesplatform.generator.config.ConfigReaders
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -49,7 +49,7 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
   }
 }
 
-object OracleTransactionGenerator extends FicusImplicits {
+object OracleTransactionGenerator extends ConfigReaders {
   final case class Settings(transactions: Int, requiredData: Set[DataEntry[?]])derives ConfigReader
 
   object Settings {
