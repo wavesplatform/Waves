@@ -24,21 +24,13 @@ import scala.util.Try
 object Preconditions {
   private val Fee = 1500000L
 
-  sealed trait PAction {
-    def priority: Int
-  }
+  sealed trait PAction
 
-  final case class LeaseP(from: KeyPair, to: Address, amount: Long, repeat: Option[Int]) extends PAction derives ConfigReader {
-    override def priority: Int = 3
-  }
+  final case class LeaseP(from: KeyPair, to: Address, amount: Long, repeat: Option[Int]) extends PAction derives ConfigReader
   final case class IssueP(name: String, issuer: KeyPair, desc: String, amount: Long, decimals: Int, reissuable: Boolean, scriptFile: String)
-    extends PAction derives ConfigReader {
-    override def priority: Int = 2
-  }
+    extends PAction derives ConfigReader
 
-  final case class CreateAccountP(seed: String, balance: Long, scriptFile: Option[String]) extends PAction derives ConfigReader {
-    override def priority: Int = 1
-  }
+  final case class CreateAccountP(seed: String, balance: Long, scriptFile: Option[String]) extends PAction derives ConfigReader
 
   given ConfigReader[KeyPair] =
     ConfigReader[String].map(s => KeyPair(com.wavesplatform.crypto.secureHash(Bytes.concat(Ints.toByteArray(0), s.getBytes(StandardCharsets.UTF_8)))))
@@ -59,7 +51,6 @@ object Preconditions {
 
   def mk(settings: PGenSettings, time: Time, estimator: ScriptEstimator): (UniverseHolder, List[Transaction], List[Transaction]) = {
     val (holder, headTransactions) = settings.actions
-      .sortBy(_.priority)(Ordering[Int].reverse)
       .foldLeft((UniverseHolder(), List.empty[Transaction])) { case ((uni, txs), action) =>
         action match {
           case LeaseP(from, to, amount, repeat) =>
