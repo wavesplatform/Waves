@@ -11,9 +11,8 @@ Global / onChangedBuildSource := ReloadOnSourceChanges
 enablePlugins(GitVersioning)
 
 git.uncommittedSignifier       := Some("DIRTY")
-git.useGitDescribe             := true
 ThisBuild / git.useGitDescribe := true
-ThisBuild / PB.protocVersion   := "3.25.5" // https://protobuf.dev/support/version-support/#java
+ThisBuild / PB.protocVersion   := "3.25.6" // https://protobuf.dev/support/version-support/#java
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)

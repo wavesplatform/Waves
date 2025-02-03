@@ -40,7 +40,7 @@ object Dependencies {
   val sttp3      = "com.softwaremill.sttp.client3" %% "core"  % "3.10.2"
   val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix" % "3.10.2"
 
-  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.79"
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.80"
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 
@@ -49,7 +49,7 @@ object Dependencies {
       // defined here because %%% can only be used within a task or setting macro
       // explicit dependency can likely be removed when monix 3 is released
       monixModule("eval").value,
-      "org.typelevel" %%% s"cats-core" % "2.12.0",
+      "org.typelevel" %%% s"cats-core" % "2.13.0",
       "com.lihaoyi"   %%% "fastparse"  % "3.1.1",
       "org.typelevel" %%% "cats-mtl"   % "1.5.0",
       "ch.obermuhlner"  % "big-math"   % "2.3.2",
@@ -88,7 +88,7 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "9.8.4"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "9.10.0"
 
   lazy val node = Def.setting(
     Seq(
@@ -129,7 +129,7 @@ object Dependencies {
     akkaHttpModule("akka-http-testkit") % Test
   ) ++ test
 
-  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.5" // grpc 1.64.0 still requires 3.25
+  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.6" // grpc 1.64.0 still requires 3.25
 
   lazy val scalapbRuntime = Def.setting(
     Seq(
@@ -154,7 +154,7 @@ object Dependencies {
   lazy val rideRunner = Def.setting(
     Seq(
       rocksdb,
-      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.8",
+      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.2.0",
       "net.logstash.logback"          % "logstash-logback-encoder" % "8.0" % Runtime,
       kamonModule("caffeine"),
       kamonModule("prometheus"),
