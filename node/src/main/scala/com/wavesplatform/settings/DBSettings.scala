@@ -11,7 +11,7 @@ case class DBSettings(
     storeStateHashes: Boolean,
     maxCacheSize: Int,
     maxRollbackDepth: Int,
-    cleanupInterval: Option[Int],
+    cleanupInterval: Option[Int] = None,
     rocksdb: RocksDBSettings
 )
 
