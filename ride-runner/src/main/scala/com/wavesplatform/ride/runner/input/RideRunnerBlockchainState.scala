@@ -20,6 +20,8 @@ case class RideRunnerBlockchainState(
 )
 
 object RideRunnerBlockchainState {
-  // required for default args to work properly: https://github.com/pureconfig/pureconfig/issues/1673
-  given ConfigReader[RideRunnerBlockchainState] = deriveReader[RideRunnerBlockchainState]
+  // This given is required for default args to work.
+  // Details: https://github.com/pureconfig/pureconfig/issues/1673 
+  // Note: the proposed approach with `extension` doesn't work.
+  given ConfigReader[RideRunnerBlockchainState] = deriveReader
 }

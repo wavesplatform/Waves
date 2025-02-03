@@ -31,7 +31,10 @@ object GenesisBlockGenerator {
   case class DistributionItem(seedText: String, nonce: Int, amount: Share, miner: Boolean = true)
 
   object DistributionItem {
-    given ConfigReader[DistributionItem] = deriveReader[DistributionItem]
+    // This given is required for default args to work.
+    // Details: https://github.com/pureconfig/pureconfig/issues/1673 
+    // Note: the proposed approach with `extension` doesn't work.
+    given ConfigReader[DistributionItem] = deriveReader
   }
 
   case class Settings(

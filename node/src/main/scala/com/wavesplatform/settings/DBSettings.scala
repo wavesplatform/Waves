@@ -16,5 +16,8 @@ case class DBSettings(
 )
 
 object DBSettings {
-  given ConfigReader[DBSettings] = deriveReader[DBSettings]
+  // This given is required for default args to work.
+  // Details: https://github.com/pureconfig/pureconfig/issues/1673 
+  // Note: the proposed approach with `extension` doesn't work.
+  given ConfigReader[DBSettings] = deriveReader
 }

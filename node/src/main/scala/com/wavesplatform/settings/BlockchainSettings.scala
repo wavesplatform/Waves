@@ -121,7 +121,10 @@ case class FunctionalitySettings(
 }
 
 object FunctionalitySettings {
-  given ConfigReader[FunctionalitySettings] = deriveReader[FunctionalitySettings]
+  // This given is required for default args to work.
+  // Details: https://github.com/pureconfig/pureconfig/issues/1673 
+  // Note: the proposed approach with `extension` doesn't work.
+  given ConfigReader[FunctionalitySettings] = deriveReader
 
   val MAINNET: FunctionalitySettings = apply(
     featureCheckBlocksPeriod = 5000,
