@@ -24,7 +24,7 @@ class AddressTest extends PropSpec {
          | let address = addressFromPublicKey(pk)
          | address.bytes
       """.stripMargin
-    runScript(script).left.map(ThrownError.apply) shouldBe evaluated(ByteStr(Address.fromPublicKey(acc.publicKey, chainId).bytes))
+    runScript[CONST_BYTESTR](script) shouldBe evaluated(ByteStr(Address.fromPublicKey(acc.publicKey, chainId).bytes))
   }
 
   property("should calculate address from bytes") {
@@ -40,7 +40,7 @@ class AddressTest extends PropSpec {
            | let address = $extractFunction(maybeAddress)
            | address.bytes
         """.stripMargin
-      runScript(script, ctxV = version, chainId = predef.chainId).left.map(ThrownError.apply) shouldBe evaluated(ByteStr(address.bytes))
+      runScript[CONST_BYTESTR](script, ctxV = version, chainId = predef.chainId) shouldBe evaluated(ByteStr(address.bytes))
     }
   }
 
@@ -56,7 +56,7 @@ class AddressTest extends PropSpec {
            | let maybeAddress = addressFromString(addressString)
            | $extractFunction(maybeAddress).bytes
         """.stripMargin
-      runScript(script, ctxV = version, chainId = predef.chainId).left.map(ThrownError.apply) shouldBe evaluated(ByteStr(address.bytes))
+      runScript[CONST_BYTESTR](script, ctxV = version, chainId = predef.chainId) shouldBe evaluated(ByteStr(address.bytes))
     }
   }
 

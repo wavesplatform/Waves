@@ -1,8 +1,13 @@
 package com.wavesplatform.generator
 
+import java.io.File
+import java.net.{InetSocketAddress, URI}
+import java.util.concurrent.Executors
+import scala.concurrent.*
+import scala.concurrent.duration.*
+import scala.util.{Failure, Random, Success}
 import cats.implicits.showInterpolator
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.Application
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.generator.GeneratorSettings.NodeAddress
@@ -16,7 +21,6 @@ import monix.execution.Scheduler
 import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Dsl.asyncHttpClient
 import org.slf4j.LoggerFactory
-import pureconfig.*
 import scopt.OptionParser
 
 import java.io.File
@@ -25,23 +29,27 @@ import scala.concurrent.*
 import scala.concurrent.duration.*
 import scala.util.{Failure, Random, Success}
 
-object TransactionsGeneratorApp extends ScoptImplicits {
+  implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
+    val uri = new URI(s"my://${config.getString(path)}")
+    new InetSocketAddress(uri.getHost, uri.getPort)
+  }
 
+  // IDEA bugs
+  implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+  implicit val httpClient: AsyncHttpClient    = asyncHttpClient()
 
-  def main(args: Array[String]): Unit = {
-    implicit val httpClient: AsyncHttpClient = asyncHttpClient()
-    val log = LoggerFacade(LoggerFactory.getLogger("generator"))
+  val log = LoggerFacade(LoggerFactory.getLogger("generator"))
 
-    val parser = new OptionParser[GeneratorSettings]("generator") {
-      head("TransactionsGenerator - Waves load testing transactions generator")
-      opt[File]('c', "configuration").valueName("<file>").text("generator configuration path")
-      opt[FiniteDuration]('d', "delay").valueName("<delay>").text("delay between iterations").action { (v, c) =>
-        c.copy(worker = c.worker.copy(delay = v))
-      }
-      opt[Boolean]('r', "auto-reconnect").valueName("<true|false>").text("reconnect on errors").action { (v, c) =>
-        c.copy(worker = c.worker.copy(autoReconnect = v))
-      }
-      help("help").text("display this help message")
+  val parser = new OptionParser[GeneratorSettings]("generator") {
+    head("TransactionsGenerator - Waves load testing transactions generator")
+    opt[File]('c', "configuration").valueName("<file>").text("generator configuration path")
+    opt[FiniteDuration]('d', "delay").valueName("<delay>").text("delay between iterations").action { (v, c) =>
+      c.copy(worker = c.worker.copy(delay = v))
+    }
+    opt[Boolean]('r', "auto-reconnect").valueName("<true|false>").text("reconnect on errors").action { (v, c) =>
+      c.copy(worker = c.worker.copy(autoReconnect = v))
+    }
+    help("help").text("display this help message")
 
       cmd("narrow")
         .action { (_, c) =>
@@ -174,7 +182,7 @@ object TransactionsGeneratorApp extends ScoptImplicits {
         val (universe, initialUniTransactions, initialTailTransactions) = preconditions
           .fold((UniverseHolder(), List.empty[Transaction], List.empty[Transaction]))(Preconditions.mk(_, finalConfig.privateKeyAccounts, time, estimator))
 
-       
+
         Universe.IssuedAssets = universe.issuedAssets
         Universe.Leases = universe.leases
 

@@ -1,5 +1,9 @@
 package com.wavesplatform.generator
 
+import java.net.{InetSocketAddress, URL}
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
+
 import cats.Show
 import cats.effect.concurrent.Ref
 import cats.syntax.flatMap.*
@@ -12,13 +16,9 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import org.asynchttpclient.AsyncHttpClient
 import play.api.libs.json.Json
-import pureconfig.ConfigReader
 
-import java.net.{InetSocketAddress, URL}
-import java.time.LocalDateTime
-import java.time.temporal.ChronoUnit
 import scala.compat.java8.FutureConverters
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
 class Worker(
@@ -82,7 +82,7 @@ class Worker(
         balances <- balanceOfRichAccount
         _        <- if (balances.nonEmpty) logInfo(s"Balances: ${balances.mkString("(", ", ", ")")}") else Task.unit
       } yield ()
-  
+
   private def writeInitial(channel: Channel, state: Ref[Task, State], txs: Seq[Transaction] = initial): Task[Channel] =
     if (!canContinue())
       Task.now(channel)
@@ -212,7 +212,6 @@ object Worker {
           }
       }
   }
-
 
   final case class EmptyState(warmUp: WarmUp) extends State {
     val cnt: Int                  = 0

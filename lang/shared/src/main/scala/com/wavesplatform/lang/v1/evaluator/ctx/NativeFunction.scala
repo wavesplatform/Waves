@@ -83,7 +83,7 @@ object NativeFunction {
 @JSExportTopLevel("UserFunction")
 case class UserFunction[C[_[_]]](
                                 name: String,
-                                internalName: String,
+                                @(JSExport @field) internalName: String,
                                 costByLibVersionMap: Map[StdLibVersion, Long],
                                 signature: FunctionTypeSignature,
                                 ev: ContextfulUserFunction[C],

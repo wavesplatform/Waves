@@ -4,6 +4,7 @@ import cats.Id
 import cats.instances.lazyList.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
+import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.*
@@ -12,10 +13,9 @@ import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, S
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.LogKeys.*
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.logFunc
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.*
 import monix.eval.Coeval
 
 import scala.annotation.tailrec
@@ -145,8 +145,7 @@ class EvaluatorV2(
             if (newMode) {
               val cost = f.costByLibVersion(stdLibVersion).toInt
               Some(limit - cost)
-            } else
-              None
+            } else None
           (func, precalculatedLimit, parentBlocks)
         }
         .orElse(findUserFunction(name, parentBlocks).map { case (func, blocks) => (func, None, blocks) })
@@ -270,8 +269,7 @@ class EvaluatorV2(
             if (argsEvaluated && unusedArgsComplexity > 0) {
               logFunc(fc, ctx, stdLibVersion, unusedArgsComplexity, enableExecutionLog)
               evaluateFunction(fc, startArgs, unusedArgsComplexity)
-            } else
-              EvaluationResult(unusedArgsComplexity)
+            } else EvaluationResult(unusedArgsComplexity)
           }
 
       case evaluated: EVALUATED =>

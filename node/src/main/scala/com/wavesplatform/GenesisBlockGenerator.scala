@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import com.wavesplatform.utils.*
 import com.wavesplatform.wallet.Wallet
 import pureconfig.*
+import pureconfig.generic.semiauto.deriveReader
 
 import java.io.{File, FileNotFoundException}
 import java.nio.file.Files
@@ -27,22 +28,13 @@ object GenesisBlockGenerator {
   private type SeedText = String
   private type Share    = Long
 
-  case class DistributionItem(seedText: String, nonce: Int, amount: Share, miner: Boolean = defaultMiner)
+  case class DistributionItem(seedText: String, nonce: Int, amount: Share, miner: Boolean = true)
 
   object DistributionItem {
-    // Note: This setup (default values + manual ConfigReader instance) 
-    // is a workaround for `pureconfig-generic-scala3` (it doesn't support default values from case classes yet)
-    val defaultMiner: Boolean = true
-
-    given ConfigReader[DistributionItem] = ConfigReader.fromCursor(cur =>
-      for {
-        objCur <- cur.asObjectCursor
-        seedText <- objCur.required[String]("seed-text")
-        nonce <- objCur.required[Int]("nonce")
-        amount <- objCur.required[Share]("amount")
-        miner <- objCur.optionalWithDefault("miner", defaultMiner)
-      } yield DistributionItem(seedText, nonce, amount, miner)
-    )
+    // This given is required for default args to work.
+    // Details: https://github.com/pureconfig/pureconfig/issues/1673 
+    // Note: the proposed approach with `extension` doesn't work.
+    given ConfigReader[DistributionItem] = deriveReader
   }
 
   case class Settings(

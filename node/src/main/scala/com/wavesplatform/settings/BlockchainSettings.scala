@@ -6,6 +6,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import pureconfig.*
+import pureconfig.generic.semiauto.deriveReader
 
 import scala.concurrent.duration.*
 
@@ -54,31 +55,31 @@ object RewardsSettings {
 }
 
 case class FunctionalitySettings(
-    featureCheckBlocksPeriod: Int = defaultFeatureCheckBlocksPeriod,
-    blocksForFeatureActivation: Int = defaultBlocksForFeatureActivation,
-    generationBalanceDepthFrom50To1000AfterHeight: Int = defaultGenerationBalanceDepthFrom50To1000AfterHeight,
-    blockVersion3AfterHeight: Int = defaultBlockVersion3AfterHeight,
-    preActivatedFeatures: Map[Short, Int] = defaultPreActivatedFeatures,
-    doubleFeaturesPeriodsAfterHeight: Int = defaultDoubleFeaturesPeriodsAfterHeight,
-    maxTransactionTimeBackOffset: FiniteDuration = defaultMaxTransactionTimeBackOffset,
-    maxTransactionTimeForwardOffset: FiniteDuration = defaultMaxTransactionTimeForwardOffset,
-    lastTimeBasedForkParameter: Long = defaultLastTimeBasedForkParameter,
-    leaseExpiration: Int = defaultLeaseExpiration,
-    estimatorPreCheckHeight: Int = defaultEstimatorPreCheckHeight,
-    minAssetInfoUpdateInterval: Int = defaultMinAssetInfoUpdateInterval,
-    minBlockTime: FiniteDuration = defaultMinBlockTime,
-    delayDelta: Int = defaultDelayDelta,
-    estimationOverflowFixHeight: Int = defaultEstimationOverflowFixHeight,
-    estimatorSumOverflowFixHeight: Int = defaultEstimatorSumOverflowFixHeight,
-    enforceTransferValidationAfter: Int = defaultEnforceTransferValidationAfter,
-    ethInvokePaymentsCheckHeight: Int = defaultEthInvokePaymentsCheckHeight,
-    daoAddress: Option[String] = defaultDaoAddress,
-    xtnBuybackAddress: Option[String] = defaultXtnBuybackAddress,
-    xtnBuybackRewardPeriod: Int = defaultXtnBuybackRewardPeriod,
-    lightNodeBlockFieldsAbsenceInterval: Int = defaultLightNodeBlockFieldsAbsenceInterval,
-    blockRewardBoostPeriod: Int = defaultBlockRewardBoostPeriod,
-    paymentsCheckHeight: Int = defaultPaymentsCheckHeight,
-    unitsRegistryAddress: Option[String] = defaultUnitsRegistryAddress,
+    featureCheckBlocksPeriod: Int = 1000,
+    blocksForFeatureActivation: Int = 800,
+    generationBalanceDepthFrom50To1000AfterHeight: Int = 0,
+    blockVersion3AfterHeight: Int = 0,
+    preActivatedFeatures: Map[Short, Int] = Map.empty,
+    doubleFeaturesPeriodsAfterHeight: Int = Int.MaxValue,
+    maxTransactionTimeBackOffset: FiniteDuration = 120.minutes,
+    maxTransactionTimeForwardOffset: FiniteDuration = 90.minutes,
+    lastTimeBasedForkParameter: Long = 0L,
+    leaseExpiration: Int = 1000000,
+    estimatorPreCheckHeight: Int = 0,
+    minAssetInfoUpdateInterval: Int = 100000,
+    minBlockTime: FiniteDuration = 15.seconds,
+    delayDelta: Int = 8,
+    estimationOverflowFixHeight: Int = 0,
+    estimatorSumOverflowFixHeight: Int = 0,
+    enforceTransferValidationAfter: Int = 0,
+    ethInvokePaymentsCheckHeight: Int = 0,
+    daoAddress: Option[String] = None,
+    xtnBuybackAddress: Option[String] = None,
+    xtnBuybackRewardPeriod: Int = Int.MaxValue,
+    lightNodeBlockFieldsAbsenceInterval: Int = 1000,
+    blockRewardBoostPeriod: Int = 1000,
+    paymentsCheckHeight: Int = 0,
+    unitsRegistryAddress: Option[String] = None,
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -120,90 +121,10 @@ case class FunctionalitySettings(
 }
 
 object FunctionalitySettings {
-  // Note: This setup (default values + manual ConfigReader instance) 
-  // is a workaround for `pureconfig-generic-scala3` (it doesn't support default values from case classes yet)
-  val defaultFeatureCheckBlocksPeriod: Int = 1000
-  val defaultBlocksForFeatureActivation: Int = 800
-  val defaultGenerationBalanceDepthFrom50To1000AfterHeight: Int = 0
-  val defaultBlockVersion3AfterHeight: Int = 0
-  val defaultPreActivatedFeatures: Map[Short, Int] = Map.empty
-  val defaultDoubleFeaturesPeriodsAfterHeight: Int = Int.MaxValue
-  val defaultMaxTransactionTimeBackOffset: FiniteDuration = 120.minutes
-  val defaultMaxTransactionTimeForwardOffset: FiniteDuration = 90.minutes
-  val defaultLastTimeBasedForkParameter: Long = 0L
-  val defaultLeaseExpiration: Int = 1000000
-  val defaultEstimatorPreCheckHeight: Int = 0
-  val defaultMinAssetInfoUpdateInterval: Int = 100000
-  val defaultMinBlockTime: FiniteDuration = 15.seconds
-  val defaultDelayDelta: Int = 8
-  val defaultEstimationOverflowFixHeight: Int = 0
-  val defaultEstimatorSumOverflowFixHeight: Int = 0
-  val defaultEnforceTransferValidationAfter: Int = 0
-  val defaultEthInvokePaymentsCheckHeight: Int = 0
-  val defaultDaoAddress: Option[String] = None
-  val defaultXtnBuybackAddress: Option[String] = None
-  val defaultXtnBuybackRewardPeriod: Int = Int.MaxValue
-  val defaultLightNodeBlockFieldsAbsenceInterval: Int = 1000
-  val defaultBlockRewardBoostPeriod: Int = 1000
-  val defaultPaymentsCheckHeight: Int = 0
-  val defaultUnitsRegistryAddress: Option[String] = None
-
-  given ConfigReader[FunctionalitySettings] = ConfigReader.fromCursor(cur =>
-    for {
-      objCur <- cur.asObjectCursor
-      featureCheckBlocksPeriod <- objCur.optionalWithDefault("feature-check-blocks-period", defaultFeatureCheckBlocksPeriod)
-      blocksForFeatureActivation <- objCur.optionalWithDefault("blocks-for-feature-activation", defaultBlocksForFeatureActivation)
-      generationBalanceDepthFrom50To1000AfterHeight <- objCur.optionalWithDefault("generation-balance-depth-from-50-to-1000-after-height", defaultGenerationBalanceDepthFrom50To1000AfterHeight)
-      blockVersion3AfterHeight <- objCur.optionalWithDefault("block-version-3-after-height", defaultBlockVersion3AfterHeight)
-      preActivatedFeatures <- objCur.optionalWithDefault("pre-activated-features", defaultPreActivatedFeatures)
-      doubleFeaturesPeriodsAfterHeight <- objCur.optionalWithDefault("double-features-periods-after-height", defaultDoubleFeaturesPeriodsAfterHeight)
-      maxTransactionTimeBackOffset <- objCur.optionalWithDefault("max-transaction-time-back-offset", defaultMaxTransactionTimeBackOffset)
-      maxTransactionTimeForwardOffset <- objCur.optionalWithDefault("max-transaction-time-forward-offset", defaultMaxTransactionTimeForwardOffset)
-      lastTimeBasedForkParameter <- objCur.optionalWithDefault("last-time-based-fork-parameter", defaultLastTimeBasedForkParameter)
-      leaseExpiration <- objCur.optionalWithDefault("lease-expiration", defaultLeaseExpiration)
-      estimatorPreCheckHeight <- objCur.optionalWithDefault("estimator-pre-check-height", defaultEstimatorPreCheckHeight)
-      minAssetInfoUpdateInterval <- objCur.optionalWithDefault("min-asset-info-update-interval", defaultMinAssetInfoUpdateInterval)
-      minBlockTime <- objCur.optionalWithDefault("min-block-time", defaultMinBlockTime)
-      delayDelta <- objCur.optionalWithDefault("delay-delta", defaultDelayDelta)
-      estimationOverflowFixHeight <- objCur.optionalWithDefault("estimation-overflow-fix-height", defaultEstimationOverflowFixHeight)
-      estimatorSumOverflowFixHeight <- objCur.optionalWithDefault("estimator-sum-overflow-fix-height", defaultEstimatorSumOverflowFixHeight)
-      enforceTransferValidationAfter <- objCur.optionalWithDefault("enforce-transfer-validation-after", defaultEnforceTransferValidationAfter)
-      ethInvokePaymentsCheckHeight <- objCur.optionalWithDefault("eth-invoke-payments-check-height", defaultEthInvokePaymentsCheckHeight)
-      daoAddress <- objCur.optionalWithDefault("dao-address", defaultDaoAddress)
-      xtnBuybackAddress <- objCur.optionalWithDefault("xtn-buyback-address", defaultXtnBuybackAddress)
-      xtnBuybackRewardPeriod <- objCur.optionalWithDefault("xtn-buyback-reward-period", defaultXtnBuybackRewardPeriod)
-      lightNodeBlockFieldsAbsenceInterval <- objCur.optionalWithDefault("light-node-block-fields-absence-interval", defaultLightNodeBlockFieldsAbsenceInterval)
-      blockRewardBoostPeriod <- objCur.optionalWithDefault("block-reward-boost-period", defaultBlockRewardBoostPeriod)
-      paymentsCheckHeight <- objCur.optionalWithDefault("payments-check-height", defaultPaymentsCheckHeight)
-      unitsRegistryAddress <- objCur.optionalWithDefault("units-registry-address", defaultUnitsRegistryAddress)
-    } yield FunctionalitySettings(
-      featureCheckBlocksPeriod,
-      blocksForFeatureActivation,
-      generationBalanceDepthFrom50To1000AfterHeight,
-      blockVersion3AfterHeight,
-      preActivatedFeatures,
-      doubleFeaturesPeriodsAfterHeight,
-      maxTransactionTimeBackOffset,
-      maxTransactionTimeForwardOffset,
-      lastTimeBasedForkParameter,
-      leaseExpiration,
-      estimatorPreCheckHeight,
-      minAssetInfoUpdateInterval,
-      minBlockTime,
-      delayDelta,
-      estimationOverflowFixHeight,
-      estimatorSumOverflowFixHeight,
-      enforceTransferValidationAfter,
-      ethInvokePaymentsCheckHeight,
-      daoAddress,
-      xtnBuybackAddress,
-      xtnBuybackRewardPeriod,
-      lightNodeBlockFieldsAbsenceInterval,
-      blockRewardBoostPeriod,
-      paymentsCheckHeight,
-      unitsRegistryAddress
-    )
-  )
+  // This given is required for default args to work.
+  // Details: https://github.com/pureconfig/pureconfig/issues/1673 
+  // Note: the proposed approach with `extension` doesn't work.
+  given ConfigReader[FunctionalitySettings] = deriveReader
 
   val MAINNET: FunctionalitySettings = apply(
     featureCheckBlocksPeriod = 5000,
@@ -336,7 +257,7 @@ object BlockchainSettings {
   def fromRootConfig(config: Config): BlockchainSettings =
     ConfigSource.fromConfig(config).at("waves.blockchain").loadOrThrow[BlockchainSettings]
 
-  implicit val configReader: ConfigReader[BlockchainSettings] = ConfigReader.fromCursor(cur =>
+  given ConfigReader[BlockchainSettings] = ConfigReader.fromCursor(cur =>
     for {
       objCur               <- cur.asObjectCursor
       blockchainTypeString <- objCur.atKey("type").flatMap(_.asString).map(_.toUpperCase)

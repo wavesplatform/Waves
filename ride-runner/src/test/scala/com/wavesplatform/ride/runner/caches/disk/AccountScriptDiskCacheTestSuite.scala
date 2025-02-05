@@ -7,6 +7,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.runner.caches.WeighedAccountScriptInfo
 import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, ReadWrite}
 import com.wavesplatform.state.AccountScriptInfo
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 
 class AccountScriptDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite[Address, WeighedAccountScriptInfo] {
   private val defaultAddressId      = AddressId(0L) // There is only one addressId

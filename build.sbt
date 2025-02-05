@@ -11,9 +11,8 @@ Global / onChangedBuildSource := ReloadOnSourceChanges
 enablePlugins(GitVersioning)
 
 git.uncommittedSignifier       := Some("DIRTY")
-git.useGitDescribe             := true
 ThisBuild / git.useGitDescribe := true
-ThisBuild / PB.protocVersion   := "3.25.5" // https://protobuf.dev/support/version-support/#java
+ThisBuild / PB.protocVersion   := "3.25.6" // https://protobuf.dev/support/version-support/#java
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -86,8 +85,7 @@ lazy val `node-tests` = project
 lazy val `grpc-server` =
   project.dependsOn(node % "compile;runtime->provided", `node-testkit`, `node-tests` % "test->test")
 
-// TODO: [scala3] enable
-// lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-tests` % "test->test")
+lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-tests` % "test->test")
 lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `lang-testkit` % "test->test", `node-testkit`)
 
 lazy val `node-generator` = project.dependsOn(node, `node-testkit`, `node-testkit`)
@@ -144,7 +142,7 @@ lazy val `waves-node` = (project in file("."))
     `node-tests`,
     `node-generator`,
     benchmark,
-    // `ride-runner` // TODO: [scala3] enable
+    `ride-runner`
   )
 
 inScope(Global)(
@@ -199,7 +197,7 @@ inScope(Global)(
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
   (node / assembly).value
-  // (`ride-runner` / assembly).value // TODO: [scala3] enable
+  (`ride-runner` / assembly).value
   buildDebPackages.value
   buildTarballsForDocker.value
 }
@@ -216,14 +214,13 @@ buildTarballsForDocker := {
   )
 }
 
-// TODO: [scala3] enable
-// lazy val buildRIDERunnerForDocker = taskKey[Unit]("Package RIDE Runner tarball and copy it to docker/target")
-// buildRIDERunnerForDocker := {
-//   IO.copyFile(
-//     (`ride-runner` / Universal / packageZipTarball).value,
-//     (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
-//   )
-// }
+lazy val buildRIDERunnerForDocker = taskKey[Unit]("Package RIDE Runner tarball and copy it to docker/target")
+buildRIDERunnerForDocker := {
+  IO.copyFile(
+    (`ride-runner` / Universal / packageZipTarball).value,
+    (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
+  )
+}
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := Def
@@ -240,7 +237,7 @@ checkPRRaw := Def
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
       (`node-generator` / Compile / compile).value
-      // (`ride-runner` / Test / compile).value // TODO: [scala3] enable
+      (`ride-runner` / Test / test).value
     }
   )
   .value
