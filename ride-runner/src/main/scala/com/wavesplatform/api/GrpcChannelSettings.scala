@@ -4,7 +4,6 @@ import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.api.GrpcChannelSettings.ChannelOptionsSettings
 import io.grpc.netty.{InternalNettyChannelBuilder, NettyChannelBuilder}
 import io.netty.channel.ChannelOption
-import pureconfig.ConfigReader
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.chaining.*
@@ -19,7 +18,7 @@ final case class GrpcChannelSettings(
     maxInboundMessageSize: ConfigMemorySize,
     channelOptions: ChannelOptionsSettings,
     maxConcurrentCalls: Option[Int] = None
-) derives ConfigReader {
+) {
 
   def toNettyChannelBuilder(target: String): NettyChannelBuilder =
     NettyChannelBuilder
@@ -40,5 +39,5 @@ final case class GrpcChannelSettings(
 }
 
 object GrpcChannelSettings {
-  final case class ChannelOptionsSettings(connectTimeout: FiniteDuration) derives ConfigReader
+  final case class ChannelOptionsSettings(connectTimeout: FiniteDuration)
 }

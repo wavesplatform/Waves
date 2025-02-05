@@ -48,7 +48,7 @@ class NarrowTransactionGenerator(
 ) extends TransactionGenerator {
   import NarrowTransactionGenerator.*
 
-  private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
+  private val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
   private val typeGen = DistributedRandomGenerator(settings.probabilities)
 
   private def correctVersion(v: TxVersion): TxVersion =
@@ -308,10 +308,11 @@ class NarrowTransactionGenerator(
             ScriptSettings.Function.Arg(argType, value) <- function.args
           } yield argType.toLowerCase match {
             case "integer" => Terms.CONST_LONG(value.toLong)
-            case "string"  => if (value.equals("random")) {
-              Terms.CONST_STRING(random.nextString(20)).explicitGet()}
-            else
-              Terms.CONST_STRING(value).explicitGet()
+            case "string" =>
+              if (value.equals("random")) {
+                Terms.CONST_STRING(random.nextString(20)).explicitGet()
+              } else
+                Terms.CONST_STRING(value).explicitGet()
             case "boolean" => Terms.CONST_BOOLEAN(value.toBoolean)
             case "binary"  => Terms.CONST_BYTESTR(ByteStr.decodeBase58(value).get).explicitGet()
           }
@@ -330,7 +331,7 @@ class NarrowTransactionGenerator(
                 sender,
                 GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
                 maybeFunctionCall,
-                Seq(InvokeScriptTransaction.Payment(random.nextInt(100)+1, asset)),
+                Seq(InvokeScriptTransaction.Payment(random.nextInt(100) + 1, asset)),
                 5300000L,
                 Waves,
                 timestamp
@@ -461,14 +462,14 @@ object NarrowTransactionGenerator extends ConfigReaders {
       paymentAssets: Set[String],
       functions: Seq[ScriptSettings.Function],
       scriptFile: Option[String]
-                                 )derives ConfigReader {
+  ) derives ConfigReader {
     def dappAccountKP: SeedKeyPair = GeneratorSettings.toKeyPair(dappAccount)
-    def dappAddress: Address = dappAccountKP.toAddress
+    def dappAddress: Address       = dappAccountKP.toAddress
   }
   object ScriptSettings {
-    final case class Function(name: String, args: Seq[Function.Arg])derives ConfigReader
+    final case class Function(name: String, args: Seq[Function.Arg]) derives ConfigReader
     object Function {
-      final case class Arg(`type`: String, value: String)derives ConfigReader
+      final case class Arg(`type`: String, value: String) derives ConfigReader
     }
   }
 
@@ -476,12 +477,12 @@ object NarrowTransactionGenerator extends ConfigReaders {
       richAccount: String,
       accounts: SetScriptSettings.Accounts,
       assets: SetScriptSettings.Assets
-                                    )derives ConfigReader
+  ) derives ConfigReader
 
   object SetScriptSettings {
-    final case class Accounts(balance: Long, scriptFile: String, repeat: Int)derives ConfigReader
+    final case class Accounts(balance: Long, scriptFile: String, repeat: Int) derives ConfigReader
     final case class Assets(description: String, amount: Long, decimals: Int, reissuable: Boolean, scriptFile: String, repeat: Int)
-      derives ConfigReader
+        derives ConfigReader
   }
 
   final case class Settings(
@@ -490,7 +491,7 @@ object NarrowTransactionGenerator extends ConfigReaders {
       scripts: Seq[ScriptSettings],
       setScript: Option[SetScriptSettings],
       protobuf: Boolean
-                           )derives ConfigReader
+  ) derives ConfigReader
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>

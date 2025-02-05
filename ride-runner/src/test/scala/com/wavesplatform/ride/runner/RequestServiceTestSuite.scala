@@ -154,7 +154,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
     }
   }
 
-  case class TestDependencies(
+  private case class TestDependencies(
       requestServiceSettings: DefaultRequestService.Settings,
       requests: RequestService,
       processor: Processor,

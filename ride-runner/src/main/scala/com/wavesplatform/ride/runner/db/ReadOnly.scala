@@ -6,6 +6,7 @@ import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.caches.disk.{KvHistoryPair, KvPair}
 import com.wavesplatform.state.Height
 import org.rocksdb.ColumnFamilyHandle
+import shapeless.=:!=
 
 import scala.annotation.unused
 
@@ -63,7 +64,10 @@ trait ReadOnly {
     }
 
   def getRemoteDataOpt[T](key: Key[Option[T]]): RemoteData[T] = RemoteData(getOpt(key))
-  
+
+  def readFromDb[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], maxHeight: Height)(implicit @unused ev: V =:!= Option[?]): RemoteData[V] =
+    readFromDbRaw(k, kvHistoryPair, maxHeight).fold(RemoteData.unknown[V])(RemoteData.Cached(_))
+
   def readFromDb[K, V](k: K, kvHistoryPair: KvHistoryPair[K, Option[V]], maxHeight: Height): RemoteData[V] =
     readFromDbRaw(k, kvHistoryPair, maxHeight).fold(RemoteData.unknown[V])(RemoteData.loaded)
 

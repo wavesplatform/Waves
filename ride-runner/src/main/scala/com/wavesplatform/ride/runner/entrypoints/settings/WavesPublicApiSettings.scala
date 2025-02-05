@@ -1,7 +1,5 @@
 package com.wavesplatform.ride.runner.entrypoints.settings
 
-import pureconfig.ConfigReader
-
 import scala.concurrent.duration.FiniteDuration
 
 case class WavesPublicApiSettings(
@@ -9,4 +7,4 @@ case class WavesPublicApiSettings(
     grpcApi: String,
     grpcBlockchainUpdatesApi: String,
     noDataTimeout: FiniteDuration
-) derives ConfigReader
+)

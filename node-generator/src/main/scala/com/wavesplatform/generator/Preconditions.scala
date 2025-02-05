@@ -5,20 +5,16 @@ import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Transaction, TxVersion}
 import com.wavesplatform.utils.Time
 import pureconfig.ConfigReader
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths}
 import java.util.UUID
 import scala.util.{Random, Try}
 
@@ -31,7 +27,6 @@ object Preconditions {
   given ConfigReader[Address] = ConfigReader.fromStringTry(str => Try(Address.fromString(str).explicitGet()))
 
   final case class PGenSettings(faucet: KeyPair, balance: Long, leasesCount: Int, assetsCount: Int) derives ConfigReader
-
 
   final case class UniverseHolder(
       issuedAssets: List[IssueTransaction] = Nil,
@@ -85,9 +80,8 @@ object Preconditions {
         .explicitGet()
     }.toList
 
-
     val transferAssets = issuedAssets.flatMap(issuedAsset =>
-      val issuer = accounts.find(_.publicKey == issuedAsset.sender).get
+      val issuer  = accounts.find(_.publicKey == issuedAsset.sender).get
       val balance = issuedAsset.quantity.value / accounts.size
       accounts.map { acc =>
         TransferTransaction

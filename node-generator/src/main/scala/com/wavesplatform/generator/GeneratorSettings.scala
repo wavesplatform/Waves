@@ -1,7 +1,5 @@
 package com.wavesplatform.generator
 
-import java.net.{InetSocketAddress, URL}
-import java.nio.charset.StandardCharsets
 import cats.Show
 import cats.implicits.showInterpolator
 import com.google.common.primitives.{Bytes, Ints}
