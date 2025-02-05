@@ -107,7 +107,7 @@ class NarrowTransactionGenerator(
                     sender,
                     recipient,
                     Asset.fromCompatId(asset),
-                    500,
+                    Random.nextInt(100),
                     Waves,
                     500000L,
                     createAttachment(),
@@ -158,9 +158,9 @@ class NarrowTransactionGenerator(
         case TransactionType.Exchange =>
           (
             for {
-              matcher <- randomFrom(Universe.Accounts).map(_.keyPair)
-              seller  <- randomFrom(Universe.Accounts).map(_.keyPair)
-              buyer   <- randomFrom(Universe.Accounts).map(_.keyPair)
+              matcher <- randomFrom(accounts)
+              seller  <- randomFrom(accounts)
+              buyer   <- randomFrom(accounts)
               pair    <- preconditions.tradeAsset.map(a => AssetPair(Waves, IssuedAsset(a.id())))
               delta = random.nextLong(10000)
               sellOrder = Order
@@ -308,7 +308,10 @@ class NarrowTransactionGenerator(
             ScriptSettings.Function.Arg(argType, value) <- function.args
           } yield argType.toLowerCase match {
             case "integer" => Terms.CONST_LONG(value.toLong)
-            case "string"  => Terms.CONST_STRING(value).explicitGet()
+            case "string"  => if (value.equals("random")) {
+              Terms.CONST_STRING(random.nextString(20)).explicitGet()}
+            else
+              Terms.CONST_STRING(value).explicitGet()
             case "boolean" => Terms.CONST_BOOLEAN(value.toBoolean)
             case "binary"  => Terms.CONST_BYTESTR(ByteStr.decodeBase58(value).get).explicitGet()
           }
@@ -327,7 +330,7 @@ class NarrowTransactionGenerator(
                 sender,
                 GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
                 maybeFunctionCall,
-                Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)),
+                Seq(InvokeScriptTransaction.Payment(random.nextInt(100)+1, asset)),
                 5300000L,
                 Waves,
                 timestamp
@@ -381,25 +384,6 @@ class NarrowTransactionGenerator(
             )
           } yield tx
 
-        case TransactionType.SetAssetScript =>
-          (
-            for {
-              assetTx <- randomFrom(preconditions.setScriptAssets)
-              sender  <- preconditions.setScriptAccounts.find(_.publicKey == assetTx.sender)
-              script = Gen.script(complexity = false, estimator)
-              tx <- logOption(
-                SetAssetScriptTransaction.selfSigned(
-                  correctVersion(TxVersion.V1),
-                  sender,
-                  IssuedAsset(assetTx.id()),
-                  Some(script),
-                  100400000L,
-                  timestamp
-                )
-              )
-            } yield tx
-          ).logNone("There is no issued smart assets, may be you need to increase issue transaction's probability or pre-configure them")
-
         case _ => ???
       }
 
@@ -450,12 +434,11 @@ class NarrowTransactionGenerator(
   private def accountByAddress(address: String): Option[KeyPair] =
     accounts
       .find(_.toAddress.toString == address)
-      .orElse(Universe.Accounts.map(_.keyPair).find(_.toAddress.toString == address))
 
   private def randomSenderAndAsset(issueTxs: Seq[IssueTransaction]): Option[(KeyPair, Option[ByteStr])] =
     if (random.nextBoolean()) {
       (randomFrom(issueTxs) orElse randomFrom(Universe.IssuedAssets)).map { issue =>
-        val pk = (accounts ++ Universe.Accounts.map(_.keyPair)).find(_.publicKey == issue.sender).get
+        val pk = accounts.find(_.publicKey == issue.sender).get
         (pk, Some(issue.id()))
       }
     } else randomFrom(accounts).map((_, None))
@@ -581,18 +564,16 @@ object NarrowTransactionGenerator extends FicusImplicits {
               import assetsSettings.*
 
               val issuer = randomFrom(accounts).get
-              val script = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator).explicitGet()._1
-
               val tx = IssueTransaction
                 .selfSigned(
-                  TxVersion.V2,
+                  TxVersion.V3,
                   issuer,
                   UUID.randomUUID().toString.take(16),
                   s"$description #$i",
                   amount,
                   decimals.toByte,
                   reissuable,
-                  Some(script),
+                  None,
                   100000000 + fee,
                   time.correctedTime()
                 )
@@ -624,14 +605,14 @@ object NarrowTransactionGenerator extends FicusImplicits {
         .explicitGet()
 
       val tradeAssetDistribution: Seq[Transaction] = {
-        (Universe.Accounts.map(_.keyPair).toSet - trader).toSeq.map(acc => {
+        (accounts.toSet - trader).toSeq.map(acc => {
           TransferTransaction
             .selfSigned(
               TxVersion.V2,
               trader,
               acc.toAddress,
               IssuedAsset(tradeAsset.id()),
-              tradeAsset.quantity.value / Universe.Accounts.size,
+              tradeAsset.quantity.value / accounts.size,
               Waves,
               900000,
               ByteStr(Array.fill(random.nextInt(100))(random.nextInt().toByte)),

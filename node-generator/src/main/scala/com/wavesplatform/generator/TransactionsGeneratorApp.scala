@@ -172,9 +172,9 @@ object TransactionsGeneratorApp extends ScoptImplicits {
         val estimator = wavesSettings.estimator
 
         val (universe, initialUniTransactions, initialTailTransactions) = preconditions
-          .fold((UniverseHolder(), List.empty[Transaction], List.empty[Transaction]))(Preconditions.mk(_, time, estimator))
+          .fold((UniverseHolder(), List.empty[Transaction], List.empty[Transaction]))(Preconditions.mk(_, finalConfig.privateKeyAccounts, time, estimator))
 
-        Universe.Accounts = universe.accounts
+       
         Universe.IssuedAssets = universe.issuedAssets
         Universe.Leases = universe.leases
 

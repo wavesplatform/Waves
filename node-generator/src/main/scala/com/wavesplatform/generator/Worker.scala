@@ -82,7 +82,7 @@ class Worker(
         balances <- balanceOfRichAccount
         _        <- if (balances.nonEmpty) logInfo(s"Balances: ${balances.mkString("(", ", ", ")")}") else Task.unit
       } yield ()
-
+  
   private def writeInitial(channel: Channel, state: Ref[Task, State], txs: Seq[Transaction] = initial): Task[Channel] =
     if (!canContinue())
       Task.now(channel)
@@ -207,11 +207,12 @@ object Worker {
                 val mayBeNextCnt = math.min(cnt + warmUp.step, warmUp.end)
                 val nextCnt      = math.min(mayBeNextCnt, utxToSendCnt)
                 val nextRaised   = nextCnt == warmUp.end && warmUp.once
-                WorkState(nextCnt, nextRaised, endAfter, warmUp)
+                WorkState(nextCnt, false, endAfter, warmUp)
             }
           }
       }
   }
+
 
   final case class EmptyState(warmUp: WarmUp) extends State {
     val cnt: Int                  = 0
