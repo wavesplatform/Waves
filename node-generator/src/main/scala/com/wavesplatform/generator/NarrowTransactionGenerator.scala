@@ -1,11 +1,9 @@
 package com.wavesplatform.generator
 
-import java.nio.file.{Files, Paths}
-import java.util.UUID
-import java.util.concurrent.ThreadLocalRandom
 import cats.Show
-import com.wavesplatform.account.{KeyPair, SeedKeyPair}
+import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.generator.config.ConfigReaders
 import com.wavesplatform.generator.utils.{Gen, Universe}
@@ -18,20 +16,24 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEn
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils.{LoggerFacade, NTP}
 import org.slf4j.LoggerFactory
 import org.web3j.crypto.Bip32ECKeyPair
+import pureconfig.ConfigReader
 
+import java.nio.file.{Files, Paths}
+import java.util.UUID
+import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.duration.*
+import scala.reflect.ClassTag
 import scala.util.Random
 import scala.util.Random.*
 
@@ -460,8 +462,8 @@ object NarrowTransactionGenerator extends ConfigReaders {
       functions: Seq[ScriptSettings.Function],
       scriptFile: Option[String]
                                  )derives ConfigReader {
-    def dappAccountKP = GeneratorSettings.toKeyPair(dappAccount)
-    def dappAddress   = dappAccountKP.toAddress
+    def dappAccountKP: SeedKeyPair = GeneratorSettings.toKeyPair(dappAccount)
+    def dappAddress: Address = dappAccountKP.toAddress
   }
   object ScriptSettings {
     final case class Function(name: String, args: Seq[Function.Arg])derives ConfigReader

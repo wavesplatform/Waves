@@ -28,7 +28,7 @@ case class GeneratorSettings(
     multisig: MultisigTransactionGenerator.Settings,
     oracle: OracleTransactionGenerator.Settings,
     swarm: SmartGenerator.Settings
-) {
+                            )derives ConfigReader {
   val addressScheme: Char                  = chainId.head
   val privateKeyAccounts: Seq[SeedKeyPair] = accounts.map(s => GeneratorSettings.toKeyPair(s))
 }

@@ -1,7 +1,7 @@
 package com.wavesplatform.generator
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
@@ -19,7 +19,8 @@ import pureconfig.ConfigReader
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
-import scala.util.Try
+import java.util.UUID
+import scala.util.{Random, Try}
 
 object Preconditions {
   private val Fee = 1500000L
@@ -59,7 +60,7 @@ object Preconditions {
             UUID.randomUUID().toString.take(8),
             Random.nextString(100),
             10_000_000_000L,
-            (Random.nextLong(9)).toByte,
+            Random.nextLong(9).toByte,
             true,
             None,
             100000000,
