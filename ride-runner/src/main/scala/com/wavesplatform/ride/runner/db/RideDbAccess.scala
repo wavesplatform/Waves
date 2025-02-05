@@ -3,7 +3,6 @@ package com.wavesplatform.ride.runner.db
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import org.rocksdb.*
-import shapeless.<:!<
 
 import scala.util.Using
 

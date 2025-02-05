@@ -6,6 +6,7 @@ import com.wavesplatform.api.RideMulticastHttpApi.{AskResult, AskServerResponse,
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import play.api.libs.json.{JsObject, Json}
+import pureconfig.ConfigReader
 import sttp.client3.*
 
 import scala.concurrent.duration.{Duration, DurationLong, FiniteDuration}
@@ -38,7 +39,7 @@ class RideMulticastHttpApi(settings: Settings, httpBackend: SttpBackend[Identity
 }
 
 object RideMulticastHttpApi {
-  case class Settings(rideRunnerApiBaseUri: String, nodeApiBaseUri: String)
+  case class Settings(rideRunnerApiBaseUri: String, nodeApiBaseUri: String) derives ConfigReader
 
   case class AskResult(rideRunner: AskServerResponse, node: AskServerResponse) {
     def timeDiff: FiniteDuration = (node.time - rideRunner.time).toCoarsest

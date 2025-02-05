@@ -2,13 +2,15 @@ package com.wavesplatform.ride.runner.entrypoints
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import com.typesafe.config.Config
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.ride.runner.blockchain.LazyBlockchain
 import com.wavesplatform.ride.runner.caches.CacheKeyTags
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache
-import com.wavesplatform.ride.runner.db.RideRocksDb
+import com.wavesplatform.ride.runner.db.{<:!<, =:!=, RideRocksDb}
+import com.wavesplatform.ride.runner.entrypoints.settings.RideRunnerGlobalSettings
 import com.wavesplatform.ride.runner.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RideScriptRunRequest, SynchronizedJobScheduler}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
@@ -30,7 +32,7 @@ import scala.concurrent.duration.{Duration, DurationInt}
 
 object WavesRideRunnerWithBlockchainService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val (globalConfig, settings) = AppInitializer.init(externalConfig = args.headOption.map(new File(_).getAbsoluteFile))
+    val (globalConfig: Config, settings: RideRunnerGlobalSettings) = AppInitializer.init(externalConfig = args.headOption.map(new File(_).getAbsoluteFile))
 
     log.info("Starting...")
     // It has to be before other code: https://github.com/kamon-io/Kamon/issues/601#issuecomment-748995094

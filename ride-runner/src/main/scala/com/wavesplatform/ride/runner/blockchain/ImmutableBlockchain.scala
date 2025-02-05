@@ -21,6 +21,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxPositiveAmount}
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -86,12 +87,7 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   // Ride: blockInfoByHeight, lastBlock
   override def blockHeader(height: Int): Option[SignedBlockHeader] =
-    // Dirty, but we have a clear error instead of "None.get"
-    blockHeaders
-      .get(height)
-      .tap { r =>
-        if (r.isEmpty) throw new RuntimeException(s"blockHeader($height): can't find a block header, please specify or check your script")
-      }
+    blockHeaders.get(height)
 
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] = input.blocks.get(height).flatMap(_.VRF)
@@ -196,7 +192,7 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = ???
 
-  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = ???
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = Seq.empty
 
   override def lastStateHash(refId: Option[BlockId]): BlockId = ???
 

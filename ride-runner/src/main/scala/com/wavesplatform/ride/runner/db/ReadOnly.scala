@@ -6,7 +6,6 @@ import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.caches.disk.{KvHistoryPair, KvPair}
 import com.wavesplatform.state.Height
 import org.rocksdb.ColumnFamilyHandle
-import shapeless.=:!=
 
 import scala.annotation.unused
 

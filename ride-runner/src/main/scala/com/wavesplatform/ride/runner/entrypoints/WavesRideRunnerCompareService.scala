@@ -2,9 +2,13 @@ package com.wavesplatform.ride.runner.entrypoints
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import cats.syntax.traverse.*
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.RideMulticastHttpApi
 import com.wavesplatform.api.http.CompositeHttpService
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
+import com.wavesplatform.ride.runner.entrypoints.settings.RideRunnerGlobalSettings
 import com.wavesplatform.ride.runner.http.{HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.utils.ScorexLogging
@@ -15,12 +19,16 @@ import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.reactive.Observable
 import play.api.libs.json.{JsObject, Json}
+import pureconfig.ConfigReader
+import pureconfig.error.ThrowableFailure
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
 import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+import scala.util.Try
+import scala.util.control.NonFatal
 
 object WavesRideRunnerCompareService extends ScorexLogging {
   case class Settings(
@@ -29,10 +37,24 @@ object WavesRideRunnerCompareService extends ScorexLogging {
       maxChecks: Option[Long],
       rideApi: RideMulticastHttpApi.Settings,
       testRequests: List[(Address, JsObject)]
+  ) derives ConfigReader
+
+  given ConfigReader[JsObject] = ConfigReader.fromFunction { v =>
+    try Right(Json.parse(v.render(ConfigRenderOptions.concise())).as[JsObject])
+    catch { case NonFatal(e) => ConfigReader.Result.fail(ThrowableFailure(e, Some(v.origin()))) }
+  }
+  given ConfigReader[Address] = ConfigReader.fromStringTry(str => Try(Address.fromString(str).explicitGet()))
+  given ConfigReader[(Address, JsObject)] = ConfigReader.fromCursor(cur =>
+    for {
+      l    <- cur.asList
+      addr <- ConfigReader[Address].from(l(0))
+      jso  <- ConfigReader[JsObject].from(l(1))
+    } yield (addr, jso)
   )
 
   def main(args: Array[String]): Unit = {
-    val (globalConfig, settings) = AppInitializer.init(checkDb = false, externalConfig = args.headOption.map(new File(_).getAbsoluteFile))
+    val (globalConfig: Config, settings: RideRunnerGlobalSettings) =
+      AppInitializer.init(checkDb = false, externalConfig = args.headOption.map(new File(_).getAbsoluteFile))
     if (settings.rideCompareService.testRequests.isEmpty) throw new IllegalArgumentException("Specify waves.compare.test-requests in config")
 
     log.info("Starting...")

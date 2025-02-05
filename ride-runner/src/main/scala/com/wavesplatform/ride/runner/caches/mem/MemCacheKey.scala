@@ -4,76 +4,36 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.events.protobuf.StateUpdate
-import com.wavesplatform.protobuf.{ByteStringExt, transaction as pb}
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, Transaction}
+import com.wavesplatform.protobuf.{ByteStringExt, transaction as pb}
 import com.wavesplatform.ride.runner.caches.{WeighedAccountScriptInfo, WeighedAssetDescription}
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{account, state, transaction}
 
-sealed trait MemCacheKey extends Product with Serializable {
-  type ValueT
-  def keyWeight: Int
-  def valueWeight(value: ValueT): Int
-}
+sealed trait MemCacheKey[ValueT]
 
 object MemCacheKey {
-  case class AccountData(address: Address, dataKey: String) extends MemCacheKey {
-    override type ValueT = DataEntry[?]
-    // 24 = 12 (header) + 4 (ref) + 4 (ref) + 4 (align)
-    override def keyWeight: Int                        = 24 + MemCacheWeights.OfAddress + MemCacheWeights.ofAsciiString(dataKey)
-    override def valueWeight(value: DataEntry[?]): Int = MemCacheWeights.ofDataEntry(value)
-  }
+  case class AccountData(address: Address, dataKey: String) extends MemCacheKey[DataEntry[?]]
 
-  case class Transaction(id: TransactionId) extends MemCacheKey {
-    override type ValueT = state.Height
-    override def keyWeight: Int                  = 16 + MemCacheWeights.OfTransactionId // 16 = 12 (header) + 4 (ref) + id
-    override def valueWeight(value: Height): Int = 16                                   // 12 (header) + 4 (int value)
-  }
+  case class Transaction(id: TransactionId) extends MemCacheKey[state.Height]
 
-  case object Height extends MemCacheKey {
-    override type ValueT = state.Height
-    override def keyWeight: Int                  = 0
-    override def valueWeight(value: Height): Int = 16 // 12 (header) + 4 (int value)
-  }
+  case object Height extends MemCacheKey[state.Height]
 
-  case class Alias(alias: account.Alias) extends MemCacheKey {
-    override type ValueT = Address
-    override def keyWeight: Int                   = 16 + MemCacheWeights.ofAlias(alias) // 16 = 12 (header) + 4 (ref) + alias
-    override def valueWeight(value: Address): Int = MemCacheWeights.OfAddress
-  }
+  case class Alias(alias: account.Alias) extends MemCacheKey[Address]
 
-  case class Asset(asset: IssuedAsset) extends MemCacheKey {
-    override type ValueT = WeighedAssetDescription
-    override def keyWeight: Int                                   = MemCacheWeights.OfIssuedAsset
-    override def valueWeight(value: WeighedAssetDescription): Int = MemCacheWeights.ofWeighedAssetDescription(value)
-  }
+  case class Asset(asset: IssuedAsset) extends MemCacheKey[WeighedAssetDescription]
 
-  case class AccountBalance(address: Address, asset: transaction.Asset) extends MemCacheKey {
-    override type ValueT = Long
-    // 24 = 12 (header) + 4*2 (ref: address, asset) + 4 (align)
-    override def keyWeight: Int                = 24 + MemCacheWeights.OfAddress + MemCacheWeights.ofAsset(asset)
-    override def valueWeight(value: Long): Int = 8
-  }
+  case class AccountBalance(address: Address, asset: transaction.Asset) extends MemCacheKey[Long]
 
-  case class AccountLeaseBalance(address: Address) extends MemCacheKey {
-    override type ValueT = LeaseBalance
-    // 16 = 12 (header) + 4 (ref)
-    override def keyWeight: Int                        = 16 + MemCacheWeights.OfAddress
-    override def valueWeight(value: LeaseBalance): Int = MemCacheWeights.OfLeaseBalance
-  }
+  case class AccountLeaseBalance(address: Address) extends MemCacheKey[LeaseBalance]
 
-  case class AccountScript(address: Address) extends MemCacheKey {
-    override type ValueT = WeighedAccountScriptInfo
-    // 16 = 12 (header) + 4 (ref)
-    override def keyWeight: Int = 16 + MemCacheWeights.OfAddress
-    // 24 = 12 (header) + 4 (size) + 4 (ref: scriptInfo) + 4 (align)
-    override def valueWeight(value: WeighedAccountScriptInfo): Int = 24 + value.scriptInfoWeight
-  }
+  case class AccountScript(address: Address) extends MemCacheKey[WeighedAccountScriptInfo]
 }
 
 class GrpcCacheKeyConverters(chainId: Byte) {
@@ -82,10 +42,10 @@ class GrpcCacheKeyConverters(chainId: Byte) {
     MemCacheKey.AccountData(update.address.toAddress(chainId), dataKey)
   }
 
-  def accountDataValueBefore(update: StateUpdate.DataEntryUpdate): Option[MemCacheKey.AccountData#ValueT] =
+  def accountDataValueBefore(update: StateUpdate.DataEntryUpdate): Option[DataEntry[?]] =
     update.dataEntryBefore.map(accountDataValue)
-  def accountDataValueAfter(update: StateUpdate.DataEntryUpdate): Option[MemCacheKey.AccountData#ValueT] = update.dataEntry.map(accountDataValue)
-  def accountDataValue(dataEntry: pb.DataEntry): MemCacheKey.AccountData#ValueT         = toVanillaDataEntry(dataEntry)
+  def accountDataValueAfter(update: StateUpdate.DataEntryUpdate): Option[DataEntry[?]] = update.dataEntry.map(accountDataValue)
+  def accountDataValue(dataEntry: pb.DataEntry): DataEntry[?]                          = toVanillaDataEntry(dataEntry)
 
   def transactionIdKey(id: ByteString): MemCacheKey.Transaction = MemCacheKey.Transaction(TransactionId(ByteStr(id.toByteArray)))
 

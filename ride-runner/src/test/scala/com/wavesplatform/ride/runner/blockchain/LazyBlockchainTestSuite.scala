@@ -7,6 +7,7 @@ import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.api.{HasGrpc, TestBlockchainApi}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 import com.wavesplatform.history.DefaultBlockchainSettings
@@ -19,10 +20,10 @@ import com.wavesplatform.ride.runner.caches.*
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.mem.{MemBlockchainDataCache, MemCacheKey}
 import com.wavesplatform.ride.runner.db.HasTestDb
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Height, IntegerDataEntry, LeaseBalance, TransactionId}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, IntegerDataEntry, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.utils.StringBytes
-import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
+import com.wavesplatform.{BaseTestSuite, HasTestAccounts, state}
 
 class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc with HasTestAccounts {
   "LazyBlockchain" - {
@@ -488,7 +489,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
 
   private lazy val heightKey        = MemCacheKey.Height
   private lazy val accountScriptKey = MemCacheKey.AccountScript(aliceAddr)
-  private lazy val allDependencies: Map[MemCacheKey, Tag] = Map(
+  private lazy val allDependencies: Map[MemCacheKey[?], Tag] = Map(
     MemCacheKey.AccountData(aliceAddr, "x")                    -> 1,
     MemCacheKey.Transaction(transactionId)                     -> 2,
     heightKey                                                  -> 3,
@@ -503,7 +504,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
 
   private type Tag = Int
   private abstract class Test {
-    val dependencies: Map[MemCacheKey, Tag]         = Map.empty
+    val dependencies: Map[MemCacheKey[?], Tag]      = Map.empty
     val preEvents: Seq[BlockchainUpdated]           = Seq.empty
     val trackAffectedEvents: Seq[BlockchainUpdated] = Seq.empty
 
@@ -533,7 +534,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
   }
 
   private class Access(val blockchain: LazyBlockchain[Tag], memCache: MemBlockchainDataCache, val affectedTags: AffectedTags[Tag]) {
-    def get[T <: MemCacheKey](key: T): RemoteData[T#ValueT] = memCache.get(key)
+    def get[V, T <: MemCacheKey[V]](key: T): RemoteData[V] = memCache.get(key)
 
     def noTagsAffected(): this.type = withClue("affected tags (noTagsAreAffected)") {
       affectedTags shouldBe empty
@@ -542,7 +543,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
 
     def allTagsAffected(): this.type = allTagsAffectedExcept()
 
-    def allTagsAffectedExcept(keys: MemCacheKey*): this.type = {
+    def allTagsAffectedExcept(keys: MemCacheKey[?]*): this.type = {
       val expected   = allTags -- keys.map(allDependencies.apply)
       val sortedDiff = (expected -- affectedTags).toList.sorted
       withClue(s"affected tags, diff={${sortedDiff.mkString(", ")}}") {
@@ -572,7 +573,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
       aliceLeaseBalance = RemoteData.Cached(LeaseBalance(4L, 3L)),
       aliceAccountScript = RemoteData.Cached(
         WeighedAccountScriptInfo(
-          scriptInfoWeight = 480,
+          scriptInfoWeight = 528,
           accountScriptInfo = AccountScriptInfo(
             publicKey = alice.publicKey,
             script = accountScript.script,
@@ -584,13 +585,13 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
     )
 
     def dataIs(
-        aliceAccountData: RemoteData[MemCacheKey.AccountData#ValueT] = RemoteData.Unknown,
-        transaction: RemoteData[MemCacheKey.Transaction#ValueT] = RemoteData.Unknown,
-        assetInfo: RemoteData[MemCacheKey.Asset#ValueT] = RemoteData.Unknown,
-        aliceWavesBalance: RemoteData[MemCacheKey.AccountBalance#ValueT] = RemoteData.Unknown,
-        bobAssetBalance: RemoteData[MemCacheKey.AccountBalance#ValueT] = RemoteData.Unknown,
-        aliceLeaseBalance: RemoteData[MemCacheKey.AccountLeaseBalance#ValueT] = RemoteData.Unknown,
-        aliceAccountScript: RemoteData[MemCacheKey.AccountScript#ValueT] = RemoteData.Unknown
+        aliceAccountData: RemoteData[DataEntry[?]] = RemoteData.Unknown,
+        transaction: RemoteData[state.Height] = RemoteData.Unknown,
+        assetInfo: RemoteData[WeighedAssetDescription] = RemoteData.Unknown,
+        aliceWavesBalance: RemoteData[Long] = RemoteData.Unknown,
+        bobAssetBalance: RemoteData[Long] = RemoteData.Unknown,
+        aliceLeaseBalance: RemoteData[LeaseBalance] = RemoteData.Unknown,
+        aliceAccountScript: RemoteData[WeighedAccountScriptInfo] = RemoteData.Unknown
     ): this.type = {
       withClue("account data") {
         get(MemCacheKey.AccountData(aliceAddr, "x")) shouldBe aliceAccountData

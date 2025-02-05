@@ -281,19 +281,19 @@ class LazyBlockchain[TagT] private (
       affected
     }
 
-  private def updateCacheIfExists[CacheKeyT <: MemCacheKey](key: CacheKeyT)(v: RemoteData[CacheKeyT#ValueT]): AffectedTags[TagT] = {
+  private def updateCacheIfExists[V, K <: MemCacheKey[V]](key: K)(v: RemoteData[V]): AffectedTags[TagT] = {
     getAffectedTags(key).tap { tags =>
       if (tags.isEmpty) memCache.updateIfExists(key, v) // Not yet removed from memCache, but already removed from tags
       else memCache.set(key, v)
     }
   }
 
-  private def removeCache[CacheKeyT <: MemCacheKey](key: CacheKeyT): AffectedTags[TagT] = {
+  private def removeCache[K <: MemCacheKey[?]](key: K): AffectedTags[TagT] = {
     memCache.remove(key)
     getAffectedTags(key)
   }
 
-  private def getAffectedTags(key: MemCacheKey): AffectedTags[TagT] = allTags.get(key).getOrElse(AffectedTags.empty)
+  private def getAffectedTags(key: MemCacheKey[?]): AffectedTags[TagT] = allTags.get(key).getOrElse(AffectedTags.empty)
 
   private def append(atHeight: Height, evt: BlockchainUpdated.Append)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val (initialAffectedTags, txs, timer) = evt.body match {
