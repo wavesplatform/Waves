@@ -35,7 +35,7 @@ jobs:
           java-version: '11'
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
-      - run: sbt --mem 4096 --batch buildTarballsForDocker
+      - run: sbt --batch buildTarballsForDocker
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
