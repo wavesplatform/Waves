@@ -8,7 +8,7 @@ import com.wavesplatform.crypto.Curve25519
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark.*
+
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
@@ -21,7 +21,7 @@ import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
 import scala.util.Random
 
-object ScriptEvaluatorBenchmark {
+object SEvaluatorBenchmark {
   val lastVersion = StdLibVersion.VersionDic.all.max
   val context =
     (PureContext.build(lastVersion, useNewPowPrecision = true) |+| CryptoContext.build(Global, lastVersion))
@@ -36,6 +36,7 @@ object ScriptEvaluatorBenchmark {
 @Warmup(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 class ScriptEvaluatorBenchmark {
+  import com.wavesplatform.lang.v1.SEvaluatorBenchmark.*
   @Benchmark
   def bigSum(st: BigSum, bh: Blackhole): Unit = bh.consume(eval(context, st.expr))
 

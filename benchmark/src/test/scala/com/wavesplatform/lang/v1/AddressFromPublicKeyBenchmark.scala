@@ -1,16 +1,15 @@
 package com.wavesplatform.lang.v1
-import java.util.concurrent.TimeUnit
-
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, V6}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.curve25519
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.utils.EthHelpers
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
+
+import java.util.concurrent.TimeUnit
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -27,11 +26,11 @@ class AddressFromPublicKeyBenchmark {
 }
 
 @State(Scope.Benchmark)
-class PkSt extends EthHelpers {
+class PkSt {
   val ds  = DirectiveSet(V6, Account, Expression).fold(null, identity)
   val ctx = lazyContexts((ds, true, true)).value().evaluationContext(EnvironmentFunctionsBenchmark.environment)
 
   val wavesPk   = ByteStr(curve25519.generateKeypair._2)
-  val exprWaves = TestCompiler(V6).compileExpression(s"addressFromPublicKey(base58'$wavesPk')").expr.asInstanceOf[EXPR]
-  val exprEth   = TestCompiler(V6).compileExpression(s"addressFromPublicKey(base58'$TestEthOrdersPublicKey')").expr.asInstanceOf[EXPR]
+  val exprWaves = TestCompiler(V6).compileExpression(s"addressFromPublicKey(base58'$wavesPk')").expr
+  val exprEth   = TestCompiler(V6).compileExpression(s"addressFromPublicKey(base58'${PublicKey(wavesPk.arr ++ wavesPk.arr)}')").expr
 }
