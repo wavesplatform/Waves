@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.{EthTxGenerator, TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
-import com.wavesplatform.utils.EthHelpers
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.ParallelTestExecution
 import org.web3j.crypto.Bip32ECKeyPair
@@ -20,7 +19,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.*
 import scala.util.Try
 
-class GRPCBroadcastSpec extends FlatSpec with EthHelpers with WithDomain with ParallelTestExecution with GrpcApiHelpers {
+class GRPCBroadcastSpec extends FlatSpec with WithDomain with ParallelTestExecution with GrpcApiHelpers {
   import GRPCBroadcastSpec.{ethBuyOrderSigned, ethSellOrderSigned}
 
   "GRPC broadcast" should "accept Exchange with ETH orders" in {
@@ -69,7 +68,7 @@ class GRPCBroadcastSpec extends FlatSpec with EthHelpers with WithDomain with Pa
     new TransactionsApiGrpcImpl(d.blockchain, d.transactionsApi)
 }
 
-object GRPCBroadcastSpec extends EthHelpers {
+object GRPCBroadcastSpec {
   private val emptySignature = OrderAuthentication.Eip712Signature(ByteStr(new Array[Byte](64)))
 
   def ethBuyOrderSigned(testAsset: IssuedAsset, buyerEthAccount: Bip32ECKeyPair, timestamp: Long): Order = {

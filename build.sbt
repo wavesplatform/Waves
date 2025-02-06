@@ -76,11 +76,12 @@ lazy val `node-testkit` = project
   .in(file("node/testkit"))
   .dependsOn(`node`, `lang-testkit`)
   .enablePlugins(PublishedModule)
+  .settings(libraryDependencies ++= Dependencies.nodeTests)
 
 lazy val `node-tests` = project
   .in(file("node/tests"))
   .dependsOn(`node-testkit`)
-  .settings(libraryDependencies ++= Dependencies.nodeTests)
+  .settings(libraryDependencies ++= Dependencies.logDeps)
 
 lazy val `grpc-server` =
   project.dependsOn(node % "compile;runtime->provided", `node-testkit`)

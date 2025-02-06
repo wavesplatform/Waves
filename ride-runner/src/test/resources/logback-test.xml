@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%date %-5level [%.15thread] %logger{26} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="scorex.crypto.signatures.Curve25519$" level="INFO"/>
+
+    <root level="${logback.test.level:-OFF}">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>

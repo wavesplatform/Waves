@@ -80,7 +80,7 @@ object Dependencies {
   lazy val qaseReportDeps = Seq(
     playJson,
     ("io.qase" % "qase-api" % "3.2.1").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
-  ).map(_ % Test)
+  )
 
   lazy val logDeps = Seq(
     logback             % Runtime,
@@ -125,9 +125,9 @@ object Dependencies {
   )
 
   lazy val nodeTests = Seq(
-    akkaModule("testkit")               % Test,
-    akkaHttpModule("akka-http-testkit") % Test
-  ) ++ test
+    akkaModule("testkit"),
+    akkaHttpModule("akka-http-testkit")
+  ) ++ test ++ logDeps
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.6" // grpc 1.64.0 still requires 3.25
 

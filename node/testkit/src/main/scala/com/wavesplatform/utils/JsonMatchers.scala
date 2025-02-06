@@ -1,7 +1,7 @@
 package com.wavesplatform.utils
 
-import org.scalatest.matchers.{Matcher, MatchResult}
-import play.api.libs.json.{Json, JsValue}
+import org.scalatest.matchers.{MatchResult, Matcher}
+import play.api.libs.json.{JsValue, Json}
 
 trait JsonMatchers {
   def matchJson(value: JsValue): JsonWord = JsonWord(value)
