@@ -207,7 +207,7 @@ The code in this project is licensed under [MIT license](./LICENSE)
 
 ## 👏 Acknowledgements
 
-![YourKit Logo](https://www.yourkit.com/images/yklogo.png)
+[<img src="https://www.yourkit.com/images/yklogo.png">](https://www.yourkit.com)
 
 We use YourKit full-featured Java Profiler to make Waves node faster. YourKit, LLC is the creator of innovative and intelligent tools for profiling Java and .NET applications.
 
