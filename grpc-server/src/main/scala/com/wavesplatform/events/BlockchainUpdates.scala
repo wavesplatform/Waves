@@ -8,7 +8,7 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.grpc.netty.NettyServerBuilder
-import io.grpc.protobuf.services.ProtoReflectionService
+import io.grpc.protobuf.services.ProtoReflectionServiceV1
 import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
@@ -30,8 +30,8 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     ExecutionModel.Default,
     rejectedExecutionHandler = new akka.dispatch.SaneRejectedExecutionHandler
   )
-  private val rdb      = RocksDB.open(context.settings.directory + "/blockchain-updates")
-  private val repo     = new Repo(rdb, context.blocksApi)
+  private val rdb  = RocksDB.open(context.settings.directory + "/blockchain-updates")
+  private val repo = new Repo(rdb, context.blocksApi)
 
   private val grpcServer: Server = NettyServerBuilder
     .forAddress(new InetSocketAddress("0.0.0.0", settings.grpcPort))
@@ -51,7 +51,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       }
     )
     .addService(BlockchainUpdatesApiGrpc.bindService(repo, scheduler))
-    .addService(ProtoReflectionService.newInstance())
+    .addService(ProtoReflectionServiceV1.newInstance())
     .build()
 
   override def start(): Unit = {

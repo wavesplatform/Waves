@@ -14,6 +14,8 @@ git.uncommittedSignifier       := Some("DIRTY")
 ThisBuild / git.useGitDescribe := true
 ThisBuild / PB.protocVersion   := "3.25.6" // https://protobuf.dev/support/version-support/#java
 
+ThisBuild / dependencyOverrides ++= Dependencies.overrides
+
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)

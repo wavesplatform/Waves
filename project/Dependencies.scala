@@ -4,6 +4,20 @@ import scalapb.compiler.Version.scalapbVersion
 
 //noinspection TypeAnnotation
 object Dependencies {
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.117.Final"
+
+  val overrides = Seq(
+    "com.google.code.gson"      % "gson"       % "2.12.1",
+    "com.squareup.okio"         % "okio-jvm"   % "3.10.2",
+    "org.apache.httpcomponents" % "httpclient" % "4.5.14",
+    nettyModule("codec-http2"),
+    nettyModule("codec-http"),
+    nettyModule("handler-proxy"),
+    nettyModule("codec-socks"),
+    nettyModule("transport-native-unix-common"),
+    nettyModule("resolver-dns")
+  )
+
   // Node protobuf schemas
   private[this] val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.5.2" classifier "protobuf-src" intransitive ()
@@ -20,7 +34,7 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.68.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.70.0"
 
   val akkaHttp        = akkaHttpModule("akka-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.4.0-jre"
@@ -30,15 +44,15 @@ object Dependencies {
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.1"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
-  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.116.Final"
+  val nettyHandler    = nettyModule("handler")
 
   val playJson = "org.playframework" %% "play-json" % "3.0.4"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.5" % Test)
 
-  val sttp3      = "com.softwaremill.sttp.client3" %% "core"  % "3.10.2"
-  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix" % "3.10.2"
+  val sttp3      = "com.softwaremill.sttp.client3" %% "core"  % "3.10.3"
+  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix" % "3.10.3"
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.80"
 
@@ -74,7 +88,7 @@ object Dependencies {
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
     "org.scalacheck"    %% "scalacheck"      % "1.18.1",
     "org.mockito"        % "mockito-all"     % "1.10.19",
-    "org.scalamock"     %% "scalamock"       % "6.1.1"
+    "org.scalamock"     %% "scalamock"       % "6.2.0"
   ).map(_ % Test)
 
   lazy val qaseReportDeps = Seq(
