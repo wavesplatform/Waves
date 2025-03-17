@@ -4,7 +4,7 @@ import scalapb.compiler.Version.scalapbVersion
 
 //noinspection TypeAnnotation
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.117.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.119.Final"
 
   val overrides = Seq(
     "com.google.code.gson"      % "gson"       % "2.12.1",
@@ -34,13 +34,13 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.70.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.71.0"
 
   val akkaHttp        = akkaHttpModule("akka-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.4.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.16"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.17"
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.1"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
@@ -79,7 +79,7 @@ object Dependencies {
     logback,
     "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.23", // To support Apple ARM
     "com.spotify"                      % "docker-client"                 % "8.16.0",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.18.2",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.18.3",
     asyncHttpClient
   ).map(_ % Test)
 
@@ -183,7 +183,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.14.10"
+    val circeVersion = "0.14.12"
     Seq(
       "io.circe" %%% "circe-core",
       "io.circe" %%% "circe-generic",
