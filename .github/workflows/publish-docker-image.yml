@@ -1,4 +1,5 @@
 name: Publish Docker image
+run-name: Publish branch ${{ github.ref_name }} to tag ${{ inputs.dockerTag }}
 
 on:
   workflow_dispatch:
@@ -26,13 +27,15 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+      - uses: proudust/gh-describe@70f72d4f6304ea053cf5a3d71c36211d5acc0c73
+        id: ghd
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '11'
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
-      - run: sbt --batch buildTarballsForDocker
+      - run: sbt --batch -Dproject.version=$(echo ${{ steps.ghd.outputs.describe }} | cut -c 2-) buildTarballsForDocker
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -44,7 +47,9 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           flavor: latest=false
-          tags: type=raw,value=${{ inputs.dockerTag }}
+          tags: |
+            type=sha
+            type=raw,value=${{ inputs.dockerTag }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.licenses=MIT
