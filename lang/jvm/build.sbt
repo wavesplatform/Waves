@@ -13,7 +13,7 @@ inTask(assembly)(
     assemblyMergeStrategy := {
       case p if p.endsWith(".proto") || p.endsWith("module-info.class") || p.endsWith("io.netty.versions.properties") =>
         MergeStrategy.discard
-      case "scala-collection-compat.properties" =>
+      case "scala-collection-compat.properties" | "META-INF/versions/9/OSGI-INF/MANIFEST.MF" =>
         MergeStrategy.discard
       case p if Set("scala/util/control/compat", "scala/collection/compat").exists(p.replace('\\', '/').contains) =>
         MergeStrategy.last
