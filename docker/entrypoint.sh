@@ -6,6 +6,7 @@ JAVA_OPTS="-XX:+ExitOnOutOfMemoryError
   --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
   -Dlogback.stdout.level=${WAVES_LOG_LEVEL}
   -Dlogback.file.directory=${WVLOG}
+  -Dlogback.file.level=TRACE
   -Dwaves.config.directory=/etc/waves
   -Dwaves.defaults.blockchain.type=${WAVES_NETWORK}
   -Dwaves.directory=${WVDATA}
