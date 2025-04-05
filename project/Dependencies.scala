@@ -37,12 +37,12 @@ object Dependencies {
   private def grpcModule(module: String) = "io.grpc" % module % "1.71.0"
 
   val akkaHttp        = akkaHttpModule("akka-http")
-  val googleGuava     = "com.google.guava"    % "guava"             % "33.4.0-jre"
+  val googleGuava     = "com.google.guava"    % "guava"             % "33.4.6-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.17"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.18"
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
-  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.1"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.2"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
 
@@ -120,7 +120,7 @@ object Dependencies {
       kamonModule("influxdb"),
       kamonModule("akka-http"),
       kamonModule("executors"),
-      "org.influxdb" % "influxdb-java" % "2.24",
+      "org.influxdb" % "influxdb-java" % "2.25",
       googleGuava,
       "com.google.code.findbugs" % "jsr305" % "3.0.2" % Compile, // javax.annotation stubs
       playJson,
@@ -132,7 +132,7 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "12.3.3",
+      "com.esaulpaugh"              % "headlong"      % "13.1.1",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
     ) ++ console ++ logDeps ++ protobuf.value

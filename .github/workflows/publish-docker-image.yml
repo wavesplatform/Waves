@@ -26,9 +26,6 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 20
-          fetch-tags: true
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
