@@ -59,7 +59,8 @@ object BlockchainFeatures {
     CappedReward,
     CeaseXtnBuyback,
     LightNode,
-    BoostBlockReward
+    BoostBlockReward,
+    EcrecoverFix
   ).map(f => f.id -> f).toMap
 
   val implemented: Set[Short] = dict.keySet
