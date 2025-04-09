@@ -24,7 +24,7 @@ import scala.util.Random
 object SEvaluatorBenchmark {
   val lastVersion = StdLibVersion.VersionDic.all.max
   val context =
-    (PureContext.build(lastVersion, useNewPowPrecision = true) |+| CryptoContext.build(Global, lastVersion))
+    (PureContext.build(lastVersion, useNewPowPrecision = true) |+| CryptoContext.build(Global, lastVersion, true))
       .withEnvironment[Environment]
       .evaluationContext(Common.emptyBlockchainEnvironment())
 }

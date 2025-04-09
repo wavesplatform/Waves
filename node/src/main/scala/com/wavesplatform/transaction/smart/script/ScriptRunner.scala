@@ -58,7 +58,8 @@ object ScriptRunner {
       blockchain.isFeatureActivated(RideV6),
       enableExecutionLog,
       blockchain.isFeatureActivated(ConsensusImprovements),
-      blockchain.isFeatureActivated(LightNode)
+      blockchain.isFeatureActivated(LightNode),
+      blockchain.isFeatureActivated(EcrecoverFix)
     )
 
   def applyGeneric(
@@ -77,7 +78,8 @@ object ScriptRunner {
       checkWeakPk: Boolean,
       enableExecutionLog: Boolean,
       fixBigScriptField: Boolean,
-      fixedThrownError: Boolean
+      fixedThrownError: Boolean,
+      fixEcrecover: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -106,7 +108,8 @@ object ScriptRunner {
               txId,
               fixUnicodeFunctions,
               useNewPowPrecision,
-              fixBigScriptField
+              fixBigScriptField,
+              fixEcrecover
             )
         } yield (ds, ctx)
 

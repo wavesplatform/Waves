@@ -171,7 +171,7 @@ object Global extends BaseGlobal {
   override def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     Bn256Groth16.verify(verifyingKey, proof, inputs)
 
-  override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] = {
+  override def ecrecover(messageHash: Array[Byte], signature: Array[Byte], handleLeadingZerosInPublicKey: Boolean): Array[Byte] = {
     // https://github.com/web3j/web3j/blob/master/crypto/src/test/java/org/web3j/crypto/ECRecoverTest.java#L43
     val signatureData = {
       val vTemp = signature(64)
@@ -181,6 +181,10 @@ object Global extends BaseGlobal {
       new SignatureData(v, r, s)
     }
     val pk = Sign.signedMessageHashToKey(messageHash, signatureData)
-    base16Encoder.decode(pk.toString(16))
+    if (handleLeadingZerosInPublicKey) {
+      org.web3j.utils.Numeric.toBytesPadded(pk, 64)
+    } else {
+      base16Encoder.decode(pk.toString(16))
+    }
   }
 }

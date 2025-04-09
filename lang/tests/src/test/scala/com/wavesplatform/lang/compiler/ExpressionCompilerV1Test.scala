@@ -313,7 +313,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       .combineAll(
         Seq(
           PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, V4, fixEcrecover = true).withEnvironment[Environment],
           WavesContext.build(
             Global,
             DirectiveSet(V4, Account, Expression).explicitGet(),

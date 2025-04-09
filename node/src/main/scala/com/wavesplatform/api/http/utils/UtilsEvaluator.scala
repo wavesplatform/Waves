@@ -141,8 +141,15 @@ object UtilsEvaluator {
           wrapDAppEnv = wrapDAppEnv
         )
       environment = wrapDAppEnv(underlyingEnvironment)
-      ctx         = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true)
-      dApp        = ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp])
+      ctx = BlockchainContext.build(
+        ds,
+        environment,
+        fixUnicodeFunctions = true,
+        useNewPowPrecision = true,
+        fixBigScriptField = true,
+        fixEcrecover = true
+      )
+      dApp = ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp])
       expr <- dAppToExpr(dApp)
       limitedResult <- EvaluatorV2
         .applyLimitedCoeval(

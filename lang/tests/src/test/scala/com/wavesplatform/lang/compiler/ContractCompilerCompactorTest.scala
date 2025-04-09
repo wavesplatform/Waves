@@ -35,7 +35,7 @@ class ContractCompilerCompactorTest extends PropSpec {
     val transactionType = Types.buildTransferTransactionType(true)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     ctxForV(version) |+|
-      CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+      CryptoContext.build(Global, version, fixEcrecover = true).withEnvironment[Environment] |+|
       CTX[NoContext](
         Seq(transactionType),
         Map(("tx", (transactionType, ContextfulVal.pure[NoContext](tx)))),

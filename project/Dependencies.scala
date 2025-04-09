@@ -37,7 +37,7 @@ object Dependencies {
   private def grpcModule(module: String) = "io.grpc" % module % "1.71.0"
 
   val akkaHttp        = akkaHttpModule("akka-http")
-  val googleGuava     = "com.google.guava"    % "guava"             % "33.4.6-jre"
+  val googleGuava     = "com.google.guava"    % "guava"             % "33.4.7-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.18"
@@ -132,7 +132,7 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "13.1.1",
+      "com.esaulpaugh"              % "headlong"      % "13.2.0",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
     ) ++ console ++ logDeps ++ protobuf.value
@@ -169,7 +169,7 @@ object Dependencies {
     Seq(
       rocksdb,
       "com.github.ben-manes.caffeine" % "caffeine"                 % "3.2.0",
-      "net.logstash.logback"          % "logstash-logback-encoder" % "8.0" % Runtime,
+      "net.logstash.logback"          % "logstash-logback-encoder" % "8.1" % Runtime,
       kamonModule("caffeine"),
       kamonModule("prometheus"),
       sttp3,

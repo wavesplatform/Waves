@@ -19,11 +19,11 @@ class EcrecoverBenchmark {
 
   @Benchmark
   def ecrover1(st: EcrecoverSt1, bh: Blackhole): Unit =
-    bh.consume(Global.ecrecover(st.messageHash, st.signature))
+    bh.consume(Global.ecrecover(st.messageHash, st.signature, true))
 
   @Benchmark
   def ecrover2(st: EcrecoverSt2, bh: Blackhole): Unit =
-    bh.consume(Global.ecrecover(st.messageHash, st.signature))
+    bh.consume(Global.ecrecover(st.messageHash, st.signature, true))
 }
 
 object EcrecoverBenchmark {

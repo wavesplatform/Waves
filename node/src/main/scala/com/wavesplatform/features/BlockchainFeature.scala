@@ -27,10 +27,11 @@ object BlockchainFeatures {
   val CeaseXtnBuyback                 = BlockchainFeature(21, "Cease XTN buy-back")
   val LightNode                       = BlockchainFeature(22, "Light Node")
   val BoostBlockReward                = BlockchainFeature(23, "Boost Block Reward")
+  val EcrecoverFix                    = BlockchainFeature(24, "ecrecover fix")
 
   // Not exposed
-  val ContinuationTransaction = BlockchainFeature(24, "Continuation Transaction")
-  val LeaseExpiration         = BlockchainFeature(25, "Lease Expiration")
+  val ContinuationTransaction = BlockchainFeature(25, "Continuation Transaction")
+  val LeaseExpiration         = BlockchainFeature(26, "Lease Expiration")
 
   // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.
   val Dummy = BlockchainFeature(-1, "Non Votable!")

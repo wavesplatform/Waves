@@ -21,7 +21,7 @@ package object repl {
   val directives: DirectiveSet = DirectiveSet(version, Account, DApp).explicitGet()
 
   val initialCtx: CTX[Environment] =
-    CryptoContext.build(global, version).withEnvironment[Environment] |+|
+    CryptoContext.build(global, version, fixEcrecover = true).withEnvironment[Environment] |+|
       PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
       WavesContext.build(global, directives, fixBigScriptField = true)
 

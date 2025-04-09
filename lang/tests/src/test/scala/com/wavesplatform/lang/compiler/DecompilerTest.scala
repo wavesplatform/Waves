@@ -19,7 +19,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.PropSpec
 import org.scalatest.Assertion
@@ -816,6 +816,14 @@ class DecompilerTest extends PropSpec {
     res `shouldEq` script
   }
 
+  private def ctxFor(stdLibVersion: StdLibVersion): CTX[Environment] = Monoid.combineAll(
+    Seq(
+      PureContext.build(stdLibVersion, useNewPowPrecision = true).withEnvironment[Environment],
+      CryptoContext.build(Global, stdLibVersion, fixEcrecover = true).withEnvironment[Environment],
+      WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, DAppType).explicitGet(), fixBigScriptField = true)
+    )
+  )
+  
   property("V4 - new functions") {
     val sizes  = Seq(16, 32, 64, 128)
     val hashes = Seq("blake2b", "keccak", "sha")
@@ -865,14 +873,7 @@ class DecompilerTest extends PropSpec {
 
     val parsedExpr = Parser.parseContract(directives ++ script).get.value
 
-    val ctx =
-      Monoid.combineAll(
-        Seq(
-          PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V4).withEnvironment[Environment],
-          WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
-        )
-      )
+    val ctx = ctxFor(V4)
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
     val res  = Decompiler(dApp, ctx.decompilerContext, V4)
@@ -906,15 +907,7 @@ class DecompilerTest extends PropSpec {
 
     val parsedExpr = Parser.parseContract(directives ++ script(types)).get.value
 
-    val ctx =
-      Monoid.combineAll(
-        Seq(
-          PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V4).withEnvironment[Environment],
-          WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
-        )
-      )
-
+    val ctx = ctxFor(V4)
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
     val res  = Decompiler(dApp, ctx.decompilerContext, V4)
     res `shouldEq` script("")
@@ -938,14 +931,7 @@ class DecompilerTest extends PropSpec {
 
     val parsedExpr = Parser.parseContract(directives ++ script).get.value
 
-    val ctx =
-      Monoid.combineAll(
-        Seq(
-          PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V5).withEnvironment[Environment],
-          WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet(), fixBigScriptField = true)
-        )
-      )
+    val ctx = ctxFor(V5)
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5).explicitGet()
     val res  = Decompiler(dApp, ctx.decompilerContext, V5)
@@ -972,14 +958,7 @@ class DecompilerTest extends PropSpec {
 
     val parsedExpr = Parser.parseContract(directives ++ script(types)).get.value
 
-    val ctx =
-      Monoid.combineAll(
-        Seq(
-          PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V5).withEnvironment[Environment],
-          WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet(), fixBigScriptField = true)
-        )
-      )
+    val ctx = ctxFor(V5)
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5).explicitGet()
     val res  = Decompiler(dApp, ctx.decompilerContext, V5)
@@ -1021,7 +1000,7 @@ class DecompilerTest extends PropSpec {
       Monoid.combineAll(
         Seq(
           PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V5).withEnvironment[Environment],
+          CryptoContext.build(Global, V5, fixEcrecover = true).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet(), fixBigScriptField = true)
         )
       )

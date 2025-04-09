@@ -15,7 +15,7 @@ import com.wavesplatform.test.*
 class VarsDocTest extends PropSpec {
   def buildFullContext(ds: DirectiveSet): CTX[Environment] = {
     val wavesCtx  = WavesContext.build(Global, ds, fixBigScriptField = true)
-    val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
+    val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion, fixEcrecover = true).withEnvironment[Environment]
     val pureCtx   = PureContext.build(ds.stdLibVersion, useNewPowPrecision = true).withEnvironment[Environment]
     pureCtx |+| cryptoCtx |+| wavesCtx
   }

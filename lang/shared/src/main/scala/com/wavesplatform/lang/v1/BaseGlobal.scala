@@ -339,7 +339,7 @@ trait BaseGlobal {
 
   def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
 
-  def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
+  def ecrecover(messageHash: Array[Byte], signature: Array[Byte], handleLeadingZerosInPublicKey: Boolean): Array[Byte]
 
   def median[@specialized T](seq: Array[T])(implicit num: Integral[T]): T = {
     import num.*

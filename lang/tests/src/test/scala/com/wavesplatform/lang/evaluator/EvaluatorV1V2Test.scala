@@ -42,7 +42,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   private def pureContext(implicit version: StdLibVersion) = PureContext.build(version, useNewPowPrecision = true)
 
-  private def defaultCryptoContext(implicit version: StdLibVersion) = CryptoContext.build(Global, version)
+  private def defaultCryptoContext(implicit version: StdLibVersion) = CryptoContext.build(Global, version, true)
 
   val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) BLOCK.apply else LET_BLOCK.apply)
 

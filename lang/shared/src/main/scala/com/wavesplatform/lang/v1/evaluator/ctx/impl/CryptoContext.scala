@@ -21,7 +21,7 @@ import scala.util.Try
 
 object CryptoContext {
 
-  val rsaTypeNames = List("NoAlg", "Md5", "Sha1", "Sha224", "Sha256", "Sha384", "Sha512", "Sha3224", "Sha3256", "Sha3384", "Sha3512")
+  val rsaTypeNames: Seq[String] = List("NoAlg", "Md5", "Sha1", "Sha224", "Sha256", "Sha384", "Sha512", "Sha3224", "Sha3256", "Sha3384", "Sha3512")
 
   private def rsaHashAlgs(v: StdLibVersion) = {
     rsaTypeNames.map(CASETYPEREF(_, List.empty, v > V3))
@@ -42,17 +42,17 @@ object CryptoContext {
   private def digestAlgValue(tpe: CASETYPEREF): ContextfulVal[NoContext] =
     ContextfulVal.pure(CaseObj(tpe, Map.empty))
 
-  def build(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] =
+  def build(global: BaseGlobal, version: StdLibVersion, fixEcrecover: Boolean): CTX[NoContext] =
     ctxCache.getOrElse(
-      (global, version),
+      (global, version, fixEcrecover),
       ctxCache.synchronized {
-        ctxCache.getOrElseUpdate((global, version), buildNew(global, version))
+        ctxCache.getOrElseUpdate((global, version, fixEcrecover), buildNew(global, version, fixEcrecover))
       }
     )
 
-  private val ctxCache = mutable.HashMap.empty[(BaseGlobal, StdLibVersion), CTX[NoContext]]
+  private val ctxCache = mutable.HashMap.empty[(BaseGlobal, StdLibVersion, Boolean), CTX[NoContext]]
 
-  private def buildNew(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] = {
+  private def buildNew(global: BaseGlobal, version: StdLibVersion, fixEcrecover: Boolean): CTX[NoContext] = {
     def functionFamily(
         startId: Short,
         nameByLimit: Int => String,
@@ -509,7 +509,7 @@ object CryptoContext {
           else if (signature.size != 65)
             Left(s"Invalid signature size ${signature.size} bytes, must be equal to 65 bytes")
           else
-            CONST_BYTESTR(ByteStr(global.ecrecover(messageHash.arr, signature.arr)))
+            CONST_BYTESTR(ByteStr(global.ecrecover(messageHash.arr, signature.arr, fixEcrecover)))
         case xs => notImplemented[Id, EVALUATED]("ecrecover(messageHash:ByteVector, signature:ByteVector)", xs)
 
       }
@@ -573,9 +573,9 @@ object CryptoContext {
     }
   }
 
-  def evalContext[F[_]: Monad](global: BaseGlobal, version: StdLibVersion): EvaluationContext[NoContext, F] =
-    build(global, version).evaluationContext[F]
+  def evalContext[F[_]: Monad](global: BaseGlobal, version: StdLibVersion, fixEcrecover: Boolean): EvaluationContext[NoContext, F] =
+    build(global, version, fixEcrecover).evaluationContext[F]
 
-  def compilerContext(global: BaseGlobal, version: StdLibVersion): CompilerContext =
-    build(global, version).compilerContext
+  def compilerContext(global: BaseGlobal, version: StdLibVersion, fixEcrecover: Boolean): CompilerContext =
+    build(global, version, fixEcrecover).compilerContext
 }
