@@ -26,7 +26,10 @@ object Dependencies {
 
   private def akkaHttpModule(module: String) = ("com.typesafe.akka" %% module % "10.2.10").cross(CrossVersion.for3Use2_13)
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.5"
+  // https://github.com/kamon-io/Kamon/issues/1320#issuecomment-2061961920
+  private val kamonVersion = "2.7.5"
+  private def kamonModule(module: String) =
+    ("io.kamon" %% s"kamon-$module" % kamonVersion).cross(CrossVersion.for3Use2_13).exclude("io.kamon", "kamon-core_2.13")
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.3"
 
@@ -38,8 +41,8 @@ object Dependencies {
 
   val akkaHttp        = akkaHttpModule("akka-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.4.7-jre"
-  val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
+  val kamonCore       = ("io.kamon"          %% s"kamon-core"       % kamonVersion).cross(CrossVersion.for3Use2_13)
   val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.18"
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.2"
