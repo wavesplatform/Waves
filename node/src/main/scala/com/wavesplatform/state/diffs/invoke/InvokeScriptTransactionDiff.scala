@@ -170,6 +170,8 @@ object InvokeScriptTransactionDiff {
         process = (actions: List[CallableAction], unusedComplexity: Long) => {
           val storingComplexity = limit - unusedComplexity
 
+          println(f"[DAPP]\t\t${tx.id()}%s: ${storingComplexity}%5d")
+
           val dataEntries  = actions.collect { case d: DataOp => InvokeDiffsCommon.dataItemToEntry(d) }
           val dataCount    = dataEntries.length
           val dataSize     = DataTxValidator.invokeWriteSetSize(blockchain, dataEntries)
@@ -348,6 +350,7 @@ object InvokeScriptTransactionDiff {
             case CommonError(_, Some(fte: FailedTransactionError)) => fte.error.getOrElse(error.message)
             case _                                                 => error.message
           }
+          println(f"[DAPP]\t\t${invocation.transactionId}%s: ${usedComplexity}%5d")
           if (usedComplexity > failFreeLimit) {
             FailedTransactionError.dAppExecution(msg, usedComplexity + paymentsComplexity, log)
           } else
