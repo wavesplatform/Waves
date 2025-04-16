@@ -1304,7 +1304,8 @@ class EvaluatorV2Test extends PropSpec with Inside {
         ctx.evaluationContext(environment),
         V6,
         correctFunctionCallScope = true,
-        newMode = true
+        newMode = true,
+        fixedThrownError = false // set to false, this test has been written before this parameter was added
       )
       .value()
     r shouldBe Left(_: CommonError, 8, _: List[Any])
@@ -1331,7 +1332,8 @@ class EvaluatorV2Test extends PropSpec with Inside {
         ctx.evaluationContext(environment),
         V6,
         correctFunctionCallScope = true,
-        newMode = true
+        newMode = true,
+        fixedThrownError = false // set to false, this test has been written before this parameter was added
       )
       .value()
     r shouldBe Left(_: CommonError, 8, _: List[Any])
