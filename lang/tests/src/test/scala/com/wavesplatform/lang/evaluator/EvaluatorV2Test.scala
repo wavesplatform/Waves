@@ -1339,6 +1339,96 @@ class EvaluatorV2Test extends PropSpec with Inside {
     r shouldBe Left(_: CommonError, 8, _: List[Any])
   }
 
+  property("throw with and without message") {
+    val limit = 10
+
+    val scriptThrow =
+      """
+        |throw()
+      """.stripMargin
+    Seq(
+      // +1 complexity for 'throw'
+      (V1, 1, false),
+      (V2, 1, false),
+      (V3, 1, false),
+      (V4, 1, false),
+      (V5, 1, false),
+      (V6, 1, false),
+      (V7, 1, false),
+      (V8, 1, false),
+      // +(3 or 2) 'throw' complexity
+      (V1, 3, true),
+      (V2, 3, true),
+      (V3, 2, true),
+      (V4, 2, true),
+      (V5, 2, true),
+      (V6, 2, true),
+      (V7, 2, true),
+      (V8, 2, true)
+    ).foreach((v, spentComplexity, newMode) => {
+      val r = EvaluatorV2
+        .applyLimitedCoeval(
+          compile(scriptThrow),
+          LogExtraInfo(),
+          limit,
+          ctx.evaluationContext(environment),
+          v,
+          correctFunctionCallScope = true,
+          newMode = newMode,
+          fixedThrownError = true
+        )
+        .value()
+      r match {
+        case Left(_: CommonError, unusedComplexity, _: List[Any]) =>
+          unusedComplexity shouldBe (limit - spentComplexity)
+        case _ => fail("Expected a CommonError")
+      }
+    })
+    // --------------------------------------------------
+    val scriptThrowMsg =
+      """
+        |throw("foo-bar-baz")
+      """.stripMargin
+    Seq(
+      // zero complexity for constant string and +1 complexity for 'throw(msg)'
+      (V1, 1, false),
+      (V2, 1, false),
+      (V3, 1, false),
+      (V4, 1, false),
+      (V5, 1, false),
+      (V6, 1, false),
+      (V7, 1, false),
+      (V8, 1, false),
+      // zero complexity for constant string and +1 complexity for 'throw(msg)'
+      (V1, 1, true),
+      (V2, 1, true),
+      (V3, 1, true),
+      (V4, 1, true),
+      (V5, 1, true),
+      (V6, 1, true),
+      (V7, 1, true),
+      (V8, 1, true)
+    ).foreach((v, spentComplexity, newMode) => {
+      val r = EvaluatorV2
+        .applyLimitedCoeval(
+          compile(scriptThrowMsg),
+          LogExtraInfo(),
+          limit,
+          ctx.evaluationContext(environment),
+          v,
+          correctFunctionCallScope = true,
+          newMode = newMode,
+          fixedThrownError = true
+        )
+        .value()
+      r match {
+        case Left(_: CommonError, unusedComplexity, _: List[Any]) =>
+          unusedComplexity shouldBe (limit - spentComplexity)
+        case _ => fail("Expected a CommonError")
+      }
+    })
+  }
+
   property("if throw with and without message") {
     val limit = 10
 
