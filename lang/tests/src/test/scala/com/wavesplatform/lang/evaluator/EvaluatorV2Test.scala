@@ -2,7 +2,7 @@ package com.wavesplatform.lang.evaluator
 
 import cats.syntax.either.*
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{Common, CommonError}
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.lazyContexts
@@ -1265,7 +1265,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         |f()
       """.stripMargin
 
-    var r = EvaluatorV2
+    val r = EvaluatorV2
       .applyLimitedCoeval(
         compile(script),
         LogExtraInfo(),
@@ -1276,7 +1276,12 @@ class EvaluatorV2Test extends PropSpec with Inside {
         newMode = true
       )
       .value()
-    r shouldBe Left(_: CommonError, 8, _: List[Any])
+    r match {
+      case Left(t) =>
+        val unusedComplexity = t._2
+        unusedComplexity shouldBe 8
+      case _ => fail("Expected a CommonError")
+    }
   }
 
   property("throw without message complexity") {
@@ -1292,7 +1297,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         |f()
       """.stripMargin
 
-    var r = EvaluatorV2
+    val r = EvaluatorV2
       .applyLimitedCoeval(
         compile(script),
         LogExtraInfo(),
@@ -1303,7 +1308,12 @@ class EvaluatorV2Test extends PropSpec with Inside {
         newMode = true
       )
       .value()
-    r shouldBe Left(_: CommonError, 8, _: List[Any])
+    r match {
+      case Left(t) =>
+        val unusedComplexity = t._2
+        unusedComplexity shouldBe 8
+      case _ => fail("Expected a CommonError")
+    }
   }
 
   property("throw with and without message") {
