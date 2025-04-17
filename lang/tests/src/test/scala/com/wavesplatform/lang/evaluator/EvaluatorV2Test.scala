@@ -1321,18 +1321,17 @@ class EvaluatorV2Test extends PropSpec with Inside {
       (V4, 1, false),
       (V5, 1, false),
       (V6, 1, false),
-      (V7, 1, false),
-      (V8, 1, false),
       // +(3 or 2) 'throw' complexity
       (V1, 3, true),
       (V2, 3, true),
       (V3, 2, true),
       (V4, 2, true),
       (V5, 2, true),
-      (V6, 2, true),
-      (V7, 2, true),
-      (V8, 2, true)
-    ).foreach((v, spentComplexity, newMode) => {
+      (V6, 2, true)
+    ).foreach(t => {
+      val v = t._1
+      val spentComplexity = t._2
+      val newMode = t._3
       val r = EvaluatorV2
         .applyLimitedCoeval(
           compile(scriptThrow),
@@ -1341,12 +1340,12 @@ class EvaluatorV2Test extends PropSpec with Inside {
           ctx.evaluationContext(environment),
           v,
           correctFunctionCallScope = true,
-          newMode = newMode,
-          fixedThrownError = true
+          newMode = newMode
         )
         .value()
       r match {
-        case Left(_: CommonError, unusedComplexity, _: List[Any]) =>
+        case Left(t) =>
+          val unusedComplexity = t._2
           unusedComplexity shouldBe (limit - spentComplexity)
         case _ => fail("Expected a CommonError")
       }
@@ -1364,18 +1363,17 @@ class EvaluatorV2Test extends PropSpec with Inside {
       (V4, 1, false),
       (V5, 1, false),
       (V6, 1, false),
-      (V7, 1, false),
-      (V8, 1, false),
       // zero complexity for constant string and +1 complexity for 'throw(msg)'
       (V1, 1, true),
       (V2, 1, true),
       (V3, 1, true),
       (V4, 1, true),
       (V5, 1, true),
-      (V6, 1, true),
-      (V7, 1, true),
-      (V8, 1, true)
-    ).foreach((v, spentComplexity, newMode) => {
+      (V6, 1, true)
+    ).foreach(t => {
+      val v = t._1
+      val spentComplexity = t._2
+      val newMode = t._3
       val r = EvaluatorV2
         .applyLimitedCoeval(
           compile(scriptThrowMsg),
@@ -1384,12 +1382,12 @@ class EvaluatorV2Test extends PropSpec with Inside {
           ctx.evaluationContext(environment),
           v,
           correctFunctionCallScope = true,
-          newMode = newMode,
-          fixedThrownError = true
+          newMode = newMode
         )
         .value()
       r match {
-        case Left(_: CommonError, unusedComplexity, _: List[Any]) =>
+        case Left(t) =>
+          val unusedComplexity = t._2
           unusedComplexity shouldBe (limit - spentComplexity)
         case _ => fail("Expected a CommonError")
       }
@@ -1411,18 +1409,17 @@ class EvaluatorV2Test extends PropSpec with Inside {
       (V4, 2, false),
       (V5, 2, false),
       (V6, 2, false),
-      (V7, 2, false),
-      (V8, 2, false),
       // zero complexity for 'if' and +(3 or 2) 'throw' complexity
       (V1, 3, true),
       (V2, 3, true),
       (V3, 2, true),
       (V4, 2, true),
       (V5, 2, true),
-      (V6, 2, true),
-      (V7, 2, true),
-      (V8, 2, true)
-    ).foreach((v, spentComplexity, newMode) => {
+      (V6, 2, true)
+    ).foreach(t => {
+      val v = t._1
+      val spentComplexity = t._2
+      val newMode = t._3
       val r = EvaluatorV2
         .applyLimitedCoeval(
           compile(scriptThrow),
@@ -1431,12 +1428,12 @@ class EvaluatorV2Test extends PropSpec with Inside {
           ctx.evaluationContext(environment),
           v,
           correctFunctionCallScope = true,
-          newMode = newMode,
-          fixedThrownError = true
+          newMode = newMode
         )
         .value()
       r match {
-        case Left(_: CommonError, unusedComplexity, _: List[Any]) =>
+        case Left(t) =>
+          val unusedComplexity = t._2
           unusedComplexity shouldBe (limit - spentComplexity)
         case _ => fail("Expected a CommonError")
       }
@@ -1454,18 +1451,17 @@ class EvaluatorV2Test extends PropSpec with Inside {
       (V4, 2, false),
       (V5, 2, false),
       (V6, 2, false),
-      (V7, 2, false),
-      (V8, 2, false),
       // zero complexity for 'if' and zero complexity for constant string and +1 complexity for 'throw(msg)'
       (V1, 1, true),
       (V2, 1, true),
       (V3, 1, true),
       (V4, 1, true),
       (V5, 1, true),
-      (V6, 1, true),
-      (V7, 1, true),
-      (V8, 1, true)
-    ).foreach((v, spentComplexity, newMode) => {
+      (V6, 1, true)
+    ).foreach(t => {
+      val v = t._1
+      val spentComplexity = t._2
+      val newMode = t._3
       val r = EvaluatorV2
         .applyLimitedCoeval(
           compile(scriptThrowMsg),
@@ -1474,16 +1470,15 @@ class EvaluatorV2Test extends PropSpec with Inside {
           ctx.evaluationContext(environment),
           v,
           correctFunctionCallScope = true,
-          newMode = newMode,
-          fixedThrownError = true
+          newMode = newMode
         )
         .value()
       r match {
-        case Left(_: CommonError, unusedComplexity, _: List[Any]) =>
+        case Left(t) =>
+          val unusedComplexity = t._2
           unusedComplexity shouldBe (limit - spentComplexity)
         case _ => fail("Expected a CommonError")
       }
     })
   }
 }
-
