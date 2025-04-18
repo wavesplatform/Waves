@@ -6,7 +6,6 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.generator.GeneratorSettings.NodeAddress
 import com.wavesplatform.generator.config.ConfigReaders
-import com.wavesplatform.settings.*
 import pureconfig.ConfigReader
 import pureconfig.generic.derivation.*
 

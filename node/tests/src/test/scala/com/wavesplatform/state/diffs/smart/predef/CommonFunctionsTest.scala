@@ -8,7 +8,6 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, C
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.test.*
-import com.wavesplatform.lang.ThrownError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}

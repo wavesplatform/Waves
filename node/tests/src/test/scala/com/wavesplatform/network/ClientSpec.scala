@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentHashMap
 import com.wavesplatform.Version
 import com.wavesplatform.test.FreeSpec
 import io.netty.buffer.{ByteBuf, Unpooled}
-import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
 import io.netty.util.concurrent.GlobalEventExecutor

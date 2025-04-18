@@ -4,8 +4,7 @@ import com.wavesplatform.account.Alias
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser.given
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, TxNonNegativeAmount}
-import pureconfig.error.UserValidationFailed
-import pureconfig.{CollectionReaders, ConfigConvert, ConfigReader}
+import pureconfig.ConfigReader
 
 /** @param data
   *   Some(Map.empty) means the data was here

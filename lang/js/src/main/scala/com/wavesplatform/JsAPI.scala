@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import JsApiUtils.*
-import com.wavesplatform.DocSource
 import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.*

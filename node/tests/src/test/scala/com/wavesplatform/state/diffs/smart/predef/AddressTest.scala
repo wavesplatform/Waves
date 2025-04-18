@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.lang.ThrownError
 import com.wavesplatform.lang.Testing.*
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}

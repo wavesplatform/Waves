@@ -1,12 +1,11 @@
 package com.wavesplatform.lang.v1.testing
 
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.lang.contract.DApp.*
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.*
 import com.wavesplatform.lang.contract.serialization.ContractSerDeV1
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.*
-import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.dapp.DAppMeta
@@ -65,7 +64,7 @@ trait TypedScriptGen {
     } yield c
 
   def BOOLEANgen(gas: Int): Gen[EXPR] =
-    if (gas > 0) Gen.oneOf(CONST_BOOLEANgen, BLOCK_BOOLEANgen(gas - 1), IF_BOOLEANgen(gas - 1), FUNCTION_CALLgen(BOOLEAN))
+    if (gas > 0) Gen.oneOf(CONST_BOOLEANgen, BLOCK_BOOLEANgen(gas - 1), IF_BOOLEANgen(gas - 1), FUNCTION_CALLgen())
     else Gen.const(TRUE)
 
   private def CONST_BOOLEANgen: Gen[EXPR] = Gen.oneOf(FALSE, TRUE)
@@ -84,7 +83,7 @@ trait TypedScriptGen {
     } yield IF(cnd, t, f)
 
   private def LONGgen(gas: Int): Gen[EXPR] =
-    if (gas > 0) Gen.oneOf(CONST_LONGgen, BLOCK_LONGgen(gas - 1), IF_LONGgen(gas - 1), FUNCTION_CALLgen(LONG)) else CONST_LONGgen
+    if (gas > 0) Gen.oneOf(CONST_LONGgen, BLOCK_LONGgen(gas - 1), IF_LONGgen(gas - 1), FUNCTION_CALLgen()) else CONST_LONGgen
 
   private def CONST_LONGgen: Gen[EXPR] = Gen.choose(Long.MinValue, Long.MaxValue).map(CONST_LONG.apply)
 
@@ -101,7 +100,7 @@ trait TypedScriptGen {
       f   <- LONGgen((gas - 3) / 3)
     } yield IF(cnd, t, f)
 
-  private def FUNCTION_CALLgen(resultType: TYPE): Gen[EXPR] =
+  private def FUNCTION_CALLgen(): Gen[EXPR] =
     Gen.const(
       FUNCTION_CALL(
         function = FunctionHeader.Native(SUM_LONG),

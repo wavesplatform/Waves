@@ -3,7 +3,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
-import com.wavesplatform.transaction.{Asset, FastHashId, ProvenTransaction, Transaction, TxWithFee}
+import com.wavesplatform.transaction.{FastHashId, ProvenTransaction, Transaction, TxWithFee}
 
 trait InvokeTransaction extends Transaction with InvokeScriptTransactionLike with ProvenTransaction with TxWithFee.InCustomAsset with FastHashId
 

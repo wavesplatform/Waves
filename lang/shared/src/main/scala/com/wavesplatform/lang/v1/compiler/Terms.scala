@@ -12,7 +12,7 @@ import com.wavesplatform.lang.*
 import monix.eval.Coeval
 
 import java.nio.charset.StandardCharsets
-import scala.annotation.{nowarn, tailrec}
+import scala.annotation.tailrec
 import scala.util.hashing.MurmurHash3
 
 object Terms {
@@ -346,7 +346,6 @@ object Terms {
   lazy val TRUE: CONST_BOOLEAN  = CONST_BOOLEAN(true)
   lazy val FALSE: CONST_BOOLEAN = CONST_BOOLEAN(false)
 
-  @nowarn // do not warn about private constructor
   case class CaseObj private (caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
     // must be with fixArrIndentation = false, because of makeString behavior before RideV6 (NODE-2370)
     override def toString: String = TermPrinter().string(this)

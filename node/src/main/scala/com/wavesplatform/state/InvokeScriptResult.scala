@@ -15,7 +15,6 @@ import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument.V
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult as PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.protobuf.{Amount, *}
-import com.wavesplatform.state.InvokeScriptResult as R
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -23,16 +22,16 @@ import com.wavesplatform.utils.*
 import play.api.libs.json.*
 
 final case class InvokeScriptResult(
-    data: Seq[R.DataEntry] = Nil,
-    transfers: Seq[R.Payment] = Nil,
-    issues: Seq[R.Issue] = Nil,
-    reissues: Seq[R.Reissue] = Nil,
-    burns: Seq[R.Burn] = Nil,
-    sponsorFees: Seq[R.SponsorFee] = Nil,
-    leases: Seq[R.Lease] = Nil,
-    leaseCancels: Seq[R.LeaseCancel] = Nil,
-    invokes: Seq[R.Invocation] = Nil,
-    error: Option[R.ErrorMessage] = None
+    data: Seq[InvokeScriptResult.DataEntry] = Nil,
+    transfers: Seq[InvokeScriptResult.Payment] = Nil,
+    issues: Seq[InvokeScriptResult.Issue] = Nil,
+    reissues: Seq[InvokeScriptResult.Reissue] = Nil,
+    burns: Seq[InvokeScriptResult.Burn] = Nil,
+    sponsorFees: Seq[InvokeScriptResult.SponsorFee] = Nil,
+    leases: Seq[InvokeScriptResult.Lease] = Nil,
+    leaseCancels: Seq[InvokeScriptResult.LeaseCancel] = Nil,
+    invokes: Seq[InvokeScriptResult.Invocation] = Nil,
+    error: Option[InvokeScriptResult.ErrorMessage] = None
 )
 
 //noinspection TypeAnnotation

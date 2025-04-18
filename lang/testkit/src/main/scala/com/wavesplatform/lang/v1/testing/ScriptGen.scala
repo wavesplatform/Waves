@@ -4,12 +4,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.*
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Parser.{additionalV8Keywords, keywordsBeforeV8}
 import org.scalacheck.*
-
-import scala.reflect.ClassTag
 
 trait ScriptGen {
 
@@ -138,7 +136,7 @@ trait ScriptGen {
       post <- whitespaces
     } yield pred + expr + post
 
-  private def toString[T](part: PART[T])(implicit ct: ClassTag[T]): String = part match {
+  private def toString(part: PART[?]): String = part match {
     case PART.VALID(_, x: String)   => x
     case PART.VALID(_, xs: ByteStr) => Base58.encode(xs.arr)
     case _                          => throw new RuntimeException(s"Can't stringify $part")

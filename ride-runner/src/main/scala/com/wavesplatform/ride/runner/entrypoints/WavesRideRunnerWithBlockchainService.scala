@@ -9,7 +9,7 @@ import com.wavesplatform.ride.runner.blockchain.LazyBlockchain
 import com.wavesplatform.ride.runner.caches.CacheKeyTags
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache
-import com.wavesplatform.ride.runner.db.{<:!<, =:!=, RideRocksDb}
+import com.wavesplatform.ride.runner.db.RideRocksDb
 import com.wavesplatform.ride.runner.entrypoints.settings.RideRunnerGlobalSettings
 import com.wavesplatform.ride.runner.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RideScriptRunRequest, SynchronizedJobScheduler}

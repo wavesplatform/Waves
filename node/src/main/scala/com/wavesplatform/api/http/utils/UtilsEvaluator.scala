@@ -20,7 +20,6 @@ import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCo
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, Log, ScriptResult}
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
-import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.serialization.ScriptValuesJson

@@ -8,7 +8,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits.FailFreeInvokeComplexity
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.state.InvokeScriptResult
-import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
 import com.wavesplatform.transaction.assets.exchange.Order
 
 object TxValidationError {
@@ -58,7 +57,7 @@ object TxValidationError {
 
   /** Errors which can produce failed transaction */
   case class FailedTransactionError(
-      cause: Cause,
+      cause: FailedTransactionError.Cause,
       spentComplexity: Long,
       log: Log[Id],
       error: Option[String],

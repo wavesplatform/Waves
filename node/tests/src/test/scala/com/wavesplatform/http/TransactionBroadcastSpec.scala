@@ -18,7 +18,6 @@ import com.wavesplatform.test.SharedDomain
 import com.wavesplatform.test.DomainPresets.TransactionStateSnapshot
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}

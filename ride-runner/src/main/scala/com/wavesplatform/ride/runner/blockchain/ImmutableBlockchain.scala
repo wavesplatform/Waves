@@ -23,8 +23,6 @@ import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTran
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxPositiveAmount}
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 
-import scala.util.chaining.scalaUtilChainingOps
-
 class ImmutableBlockchain(override val settings: BlockchainSettings, input: RideRunnerBlockchainState) extends SupportedBlockchain { blockchain =>
   private val chainId: Byte = settings.addressSchemeCharacter.toByte
 

@@ -69,7 +69,7 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
     }
   }
 
-  private def test(f: (Address, Seq[Block], Domain) => Unit)(implicit pos: Position): Unit = {
+  private def test(f: (Address, Seq[Block], Domain) => Unit): Unit = {
     setup.foreach { case (sender, r1, r2, blocks) =>
       withDomain() { d =>
         for (b <- blocks) {

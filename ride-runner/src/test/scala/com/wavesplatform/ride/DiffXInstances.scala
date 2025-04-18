@@ -1,13 +1,11 @@
 package com.wavesplatform.ride
 
 import com.softwaremill.diffx.Diff
-import com.softwaremill.diffx.generic.AutoDerivation
 import com.softwaremill.diffx.generic.auto.*
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.runner.input.*
-import com.wavesplatform.state.LeaseBalance
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.{Asset, TxNonNegativeAmount}

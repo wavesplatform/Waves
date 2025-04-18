@@ -9,11 +9,10 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.test.*
-import com.wavesplatform.test.PropSpec
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{EitherValues, Inside}
 
-class ScriptReaderTest extends PropSpec with TypedScriptGen with Inside with EitherValues {
+class ScriptReaderTest extends PropSpec, TypedScriptGen, Inside, EitherValues {
   val checksumLength = 4
 
   property("should parse all bytes for V1") {

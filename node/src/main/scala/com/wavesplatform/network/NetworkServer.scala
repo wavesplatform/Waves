@@ -11,7 +11,7 @@ import io.netty.channel.group.ChannelGroup
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
-import io.netty.util.concurrent.{DefaultThreadFactory, Future, GenericFutureListener}
+import io.netty.util.concurrent.{DefaultThreadFactory, GenericFutureListener}
 import monix.reactive.Observable
 import org.influxdb.dto.Point
 

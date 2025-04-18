@@ -7,7 +7,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets.exchange.Order.Version
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import monix.eval.Coeval
@@ -26,7 +25,7 @@ object OrderAuthentication {
 /** Order to matcher service for asset exchange
   */
 case class Order(
-    version: Version,
+    version: Order.Version,
     orderAuthentication: OrderAuthentication,
     matcherPublicKey: PublicKey,
     assetPair: AssetPair,

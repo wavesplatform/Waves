@@ -1,23 +1,22 @@
 package com.wavesplatform.ride.runner.input
 
 import cats.syntax.option.*
-import com.softwaremill.diffx.generic.auto.*
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher.*
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser.*
 import com.wavesplatform.ride.{DiffXInstances, ScriptUtil}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxNonNegativeAmount
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import org.scalatest.prop.TableDrivenPropertyChecks
-import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 import play.api.libs.json.*
 import pureconfig.*
-import com.wavesplatform.common.utils.EitherExt2.explicitGet
 
 import java.nio.charset.StandardCharsets
 import scala.reflect.ClassTag

@@ -164,6 +164,7 @@ inScope(Global)(
       "-language:implicitConversions",
       "-language:postfixOps",
       "-Xkind-projector",
+      "-Wunused:all",
       "-Wconf:cat=deprecation&origin=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
       "-Wconf:cat=deprecation&origin=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&origin=com.wavesplatform.state.InvokeScriptResult.*:s",

@@ -5,8 +5,8 @@ import com.typesafe.config.*
 import com.wavesplatform.generator.Worker
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.DataEntry
+import com.wavesplatform.transaction.TransactionType
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.{TransactionParser, TransactionParsers, TransactionType}
 import play.api.libs.json.*
 import pureconfig.*
 import pureconfig.error.ThrowableFailure
@@ -15,12 +15,6 @@ import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
 trait ConfigReaders {
-
-  private val byName: Map[String, TransactionParser] = TransactionParsers.all.map { case (_, builder) =>
-    builder.getClass.getSimpleName.replaceAll("\\$$", "") -> builder
-  }
-
-  private def by(name: String): Option[TransactionParser] = byName.get(name)
 
   given ConfigReader[Map[TransactionType, Double]] = {
     val converter                              = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)

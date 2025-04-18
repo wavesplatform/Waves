@@ -274,7 +274,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       payment: Option[Payment] = None,
       sponsored: Option[SponsorFeeTransaction] = None,
       isCIDefaultFunc: Boolean = false,
-      version: StdLibVersion = V3,
       txVersion: TxVersion = TxVersion.V1,
       selfSend: Boolean = false,
       fee: Long = TestValues.invokeFee
@@ -606,8 +605,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           dAppWithTransfers(
             assets = List.fill(limit + 1)(Waves),
             version = version
-          ),
-          version = version
+          )
         )
 
       val errMsg =
@@ -629,7 +627,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       val (genesis, setScript, ci) = preconditionsAndSetContract(
         dAppWithTransfers(version = version),
         payment = Some(Payment(1, asset)),
-        version = version,
         fee = TestValues.invokeFee(1)
       )
       d.appendBlock(genesis*)
@@ -888,7 +885,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       .filter(_ >= V3)
       .foreach { version =>
         withDomain(settingsForRide(version), AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
-          val (_, setScript, ci) = preconditionsAndSetContract(writeSet(version, MaxWriteSetSize + 1), version = version)
+          val (_, setScript, ci) = preconditionsAndSetContract(writeSet(version, MaxWriteSetSize + 1))
           d.appendBlock(setScript)
           d.transactionDiffer(ci).resultE should produceRejectOrFailedDiff("Stored data count limit is exceeded")
         }
@@ -910,8 +907,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   property("can't write entry with key size greater than limit") {
     testDomain { (version, d) =>
       val (genesis, setScript, ci) = preconditionsAndSetContract(
-        writeSetWithKeyLength(ContractLimits.MaxKeySizeInBytesByVersion(version) + 1, version),
-        version = version
+        writeSetWithKeyLength(ContractLimits.MaxKeySizeInBytesByVersion(version) + 1, version)
       )
 
       d.appendBlock(genesis*)
@@ -935,8 +931,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     testDomain { (version, d) =>
       val (genesis, setScript, ci) =
         preconditionsAndSetContract(
-          writeSetWithKeyLength(ContractLimits.MaxKeySizeInBytesByVersion(version), version),
-          version = version
+          writeSetWithKeyLength(ContractLimits.MaxKeySizeInBytesByVersion(version), version)
         )
       d.appendBlock(genesis*)
       d.appendBlock(setScript)
@@ -948,8 +943,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   property("can't write entry with empty key from V4") {
     testDomain { (version, d) =>
       val (genesis, setScript, ci) = preconditionsAndSetContract(
-        writeSetWithKeyLength(length = 0, version = version),
-        version = version
+        writeSetWithKeyLength(length = 0, version = version)
       )
       d.appendBlock(genesis*)
       if (version == V3) {
@@ -1044,8 +1038,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       dAppWithTransfers(version = V3),
       dApp = invoker,
       payment = Some(Payment(1, Waves)),
-      fee = TestValues.invokeFee(1),
-      version = V3
+      fee = TestValues.invokeFee(1)
     )
     testDiff(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), to = V7) {
       _.explicitGet()
@@ -1058,7 +1051,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       dAppWithTransfers(version = V4),
       payment = Some(Payment(1, Waves)),
       dApp = invoker,
-      version = V4,
       fee = TestValues.invokeFee(1)
     )
     testDiff(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), from = V4) {
@@ -1071,7 +1063,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val (genesis, setScript, ci) = preconditionsAndSetContract(
       dAppWithTransfers(recipientAddress = invokerAddress, assets = List(Waves), version = V4),
       dApp = invoker,
-      version = V4,
       fee = TestValues.invokeFee(1)
     )
     testDiff(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), from = V4) {

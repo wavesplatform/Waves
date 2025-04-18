@@ -13,7 +13,6 @@ import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.*
-import com.wavesplatform.lang.ThrownError
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.ContractScript

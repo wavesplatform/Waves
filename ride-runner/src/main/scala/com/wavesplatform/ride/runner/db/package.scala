@@ -2,7 +2,6 @@ package com.wavesplatform.ride.runner
 
 import com.wavesplatform.state.Height
 
-import scala.annotation.targetName
 import scala.util.NotGiven
 
 package object db {

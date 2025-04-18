@@ -28,7 +28,7 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
      """.stripMargin
   )
 
-  private def scenario(fail: Boolean, bigComplexity: Boolean = false) = {
+  private def scenario(bigComplexity: Boolean = false) = {
     val master   = RandomKeyPair()
     val invoker  = RandomKeyPair()
     val gTx1     = TxHelpers.genesis(master.toAddress, ENOUGH_AMT, TxHelpers.timestamp)
@@ -42,7 +42,7 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
 
   property("no fail before fix") {
     withDomain(RideV5) { d =>
-      val (genesisTxs, invokeTx) = scenario(fail = true)
+      val (genesisTxs, invokeTx) = scenario()
       d.appendBlock(genesisTxs*)
       intercept[Exception](d.appendBlock(invokeTx)).getMessage should include(error)
     }
@@ -50,7 +50,7 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
 
   property("reject after fix") {
     withDomain(RideV6) { d =>
-      val (genesisTxs, invokeTx) = scenario(fail = true)
+      val (genesisTxs, invokeTx) = scenario()
       d.appendBlock(genesisTxs*)
       d.appendAndCatchError(invokeTx).toString should include(error)
     }
@@ -58,7 +58,7 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
 
   property("fail after fix and big complexity") {
     withDomain(RideV6) { d =>
-      val (genesisTxs, invokeTx) = scenario(fail = true, bigComplexity = true)
+      val (genesisTxs, invokeTx) = scenario(bigComplexity = true)
       d.appendBlock(genesisTxs*)
       d.appendAndAssertFailed(invokeTx)
     }

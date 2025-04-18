@@ -208,7 +208,6 @@ object Worker {
               case _ =>
                 val mayBeNextCnt = math.min(cnt + warmUp.step, warmUp.end)
                 val nextCnt      = math.min(mayBeNextCnt, utxToSendCnt)
-                val nextRaised   = nextCnt == warmUp.end && warmUp.once
                 WorkState(nextCnt, false, endAfter, warmUp)
             }
           }

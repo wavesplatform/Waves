@@ -10,7 +10,6 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Testing.evaluated
-import com.wavesplatform.lang.ThrownError
 import com.wavesplatform.lang.directives.values.{Asset as AssetType, *}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.v1.ExprScript

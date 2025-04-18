@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1
 import com.esaulpaugh.headlong.util.FastHex
 import com.sun.org.apache.xerces.internal.impl.dv.util.HexBin
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.DataFuncs.*
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.randomBytes
 import org.openjdk.jmh.annotations.*

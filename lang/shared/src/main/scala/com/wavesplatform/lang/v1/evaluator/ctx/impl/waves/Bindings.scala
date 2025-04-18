@@ -10,7 +10,6 @@ import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{converters, unit}
 import com.wavesplatform.lang.v1.traits.domain.Tx.*
 import com.wavesplatform.lang.v1.traits.domain.*
-import com.wavesplatform.common.utils.EitherExt2.*
 
 object Bindings {
 

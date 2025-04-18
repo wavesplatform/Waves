@@ -31,12 +31,10 @@ import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
-import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.TransactionBase
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.InvokeTransaction.DefaultCall
-import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
