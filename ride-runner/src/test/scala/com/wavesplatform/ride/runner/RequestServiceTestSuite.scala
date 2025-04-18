@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner
 
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import cats.syntax.option.*
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.BaseTestSuite

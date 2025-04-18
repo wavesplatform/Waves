@@ -1,8 +1,8 @@
 package com.wavesplatform.state
 
-import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.testkit.*
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.testkit.*
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.*

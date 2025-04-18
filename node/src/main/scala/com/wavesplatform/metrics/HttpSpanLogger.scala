@@ -1,7 +1,7 @@
 package com.wavesplatform.metrics
 
 import java.time.{Duration, Instant, LocalDateTime, ZoneId}
-import akka.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import kamon.instrumentation.tag.TagKeys
@@ -85,7 +85,7 @@ object HttpSpanLogger {
 
   def millisBetween(from: Instant, to: Instant): Long = Duration.between(from, to).toMillis
   implicit class FinishedSpanExt(val span: Span.Finished) extends AnyVal {
-    def isAkkaHttpServer: Boolean = span.metricTags.get(Lookups.option("component")).contains("akka.http.server")
+    def isAkkaHttpServer: Boolean = span.metricTags.get(Lookups.option("component")).contains("pekko.http.server")
     def method: String            = span.metricTags.get(Lookups.plain(TagKeys.HttpMethod))
     def statusCode: Int           = span.metricTags.get(Lookups.plainLong(TagKeys.HttpStatusCode)).toInt
     def operation: String         = span.metricTags.get(Lookups.plain("operation"))

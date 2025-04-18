@@ -2,7 +2,7 @@ package com.wavesplatform.api.http
 
 import scala.annotation.tailrec
 import scala.util.Try
-import akka.http.scaladsl.server.{Route, StandardRoute}
+import org.apache.pekko.http.scaladsl.server.{Route, StandardRoute}
 import cats.syntax.either.*
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi

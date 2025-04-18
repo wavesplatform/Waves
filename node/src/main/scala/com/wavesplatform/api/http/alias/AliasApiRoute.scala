@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.alias
 
-import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
+import org.apache.pekko.http.scaladsl.server.Route
 import cats.syntax.either.*
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi

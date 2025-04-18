@@ -1,10 +1,10 @@
 package com.wavesplatform.api.http
 
-import akka.NotUsed
-import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
-import akka.http.scaladsl.server.Directives.{complete, handleExceptions, withExecutionContext}
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
-import akka.stream.scaladsl.Source
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import org.apache.pekko.http.scaladsl.server.Directives.{complete, handleExceptions, withExecutionContext}
+import org.apache.pekko.http.scaladsl.server.{ExceptionHandler, Route}
+import org.apache.pekko.stream.scaladsl.Source
 import com.typesafe.scalalogging.LazyLogging
 import monix.eval.Task
 import monix.execution.Scheduler

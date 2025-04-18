@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.requests
 
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.api.http.utils.Evaluation
 
 final case class RideScriptRunResult(

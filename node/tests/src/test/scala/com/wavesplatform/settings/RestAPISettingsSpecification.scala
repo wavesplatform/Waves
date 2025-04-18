@@ -1,6 +1,6 @@
 package com.wavesplatform.settings
 
-import akka.http.scaladsl.model.HttpMethods.*
+import org.apache.pekko.http.scaladsl.model.HttpMethods.*
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
 import pureconfig.ConfigSource

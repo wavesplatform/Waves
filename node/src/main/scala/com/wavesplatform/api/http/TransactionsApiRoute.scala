@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
+import org.apache.pekko.http.scaladsl.server.Route
 import cats.instances.either.*
 import cats.instances.list.*
 import cats.syntax.alternative.*

@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.utils
 
-import akka.http.scaladsl.model.headers.Accept
-import akka.http.scaladsl.server.{PathMatcher1, Route}
+import org.apache.pekko.http.scaladsl.model.headers.Accept
+import org.apache.pekko.http.scaladsl.server.{PathMatcher1, Route}
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}

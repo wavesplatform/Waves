@@ -1,6 +1,6 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.testkit.RouteTest
+import org.apache.pekko.http.scaladsl.testkit.RouteTest
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiMarshallers.*
 import org.scalatest.matchers.should.Matchers

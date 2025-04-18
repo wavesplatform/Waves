@@ -1,12 +1,12 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.model.*
-import akka.http.scaladsl.model.HttpMethods.*
-import akka.http.scaladsl.model.headers.*
-import akka.http.scaladsl.server.*
-import akka.http.scaladsl.server.Directives.*
-import akka.http.scaladsl.server.RouteResult.Complete
-import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model.HttpMethods.*
+import org.apache.pekko.http.scaladsl.model.headers.*
+import org.apache.pekko.http.scaladsl.server.*
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.RouteResult.Complete
+import org.apache.pekko.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon

@@ -43,7 +43,7 @@ object BlockSizeConstraintsSuite {
   private val maxTxsGroup     = 500 // More, than 1mb of block
   private val maxGroups       = 9
   private val txsInMicroBlock = 500
-  private val ConfigOverrides = ConfigFactory.parseString(s"""akka.http.server {
+  private val ConfigOverrides = ConfigFactory.parseString(s"""pekko.http.server {
                                                              |  parsing.max-content-length = 3737439
                                                              |  request-timeout = 60s
                                                              |}

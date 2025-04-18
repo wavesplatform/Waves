@@ -1,9 +1,10 @@
 package com.wavesplatform.api
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.*
-import akka.http.scaladsl.server.Directives.*
+import org.apache.pekko
+import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.server.*
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import cats.syntax.either.*
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, PublicKey}

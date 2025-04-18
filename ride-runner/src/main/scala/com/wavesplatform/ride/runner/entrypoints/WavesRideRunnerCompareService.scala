@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.entrypoints
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
 import cats.syntax.traverse.*
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.account.Address

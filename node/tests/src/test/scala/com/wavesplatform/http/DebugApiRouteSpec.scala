@@ -1,6 +1,6 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.typesafe.config.ConfigObject
 import com.wavesplatform.*
 import com.wavesplatform.account.KeyPair

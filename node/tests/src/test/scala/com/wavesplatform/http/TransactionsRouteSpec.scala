@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.*
-import akka.http.scaladsl.model.headers.Accept
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model.headers.Accept
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{ScriptExecutionError as _, *}
 import com.wavesplatform.api.http.{CustomJson, RouteTimeout, TransactionsApiRoute}

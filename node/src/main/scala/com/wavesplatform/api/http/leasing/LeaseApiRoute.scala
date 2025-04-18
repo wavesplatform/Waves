@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http.leasing
 
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
 import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.{InvalidIds, TransactionDoesNotExist}

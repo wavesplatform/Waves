@@ -28,7 +28,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     "blockchain-updates",
     UncaughtExceptionReporter(err => log.error("Uncaught exception in BlockchainUpdates scheduler", err)),
     ExecutionModel.Default,
-    rejectedExecutionHandler = new akka.dispatch.SaneRejectedExecutionHandler
+    rejectedExecutionHandler = new org.apache.pekko.dispatch.SaneRejectedExecutionHandler
   )
   private val rdb  = RocksDB.open(context.settings.directory + "/blockchain-updates")
   private val repo = new Repo(rdb, context.blocksApi)

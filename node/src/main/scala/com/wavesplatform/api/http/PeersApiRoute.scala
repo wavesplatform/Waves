@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.ConcurrentMap
 import java.util.stream.Collectors
 
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.Channel

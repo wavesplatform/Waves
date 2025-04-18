@@ -1,8 +1,8 @@
 package com.wavesplatform.ride.runner.http
 
-import akka.http.scaladsl.model.headers.Accept
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.model.headers.Accept
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
+import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.api.http.*
 import com.wavesplatform.ride.runner.requests.{RideScriptRunRequest, RideScriptRunResult}
 import play.api.libs.json.*

@@ -1,10 +1,10 @@
 package com.wavesplatform.api.http
 
-import akka.NotUsed
-import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
-import akka.http.scaladsl.model.HttpMethods
-import akka.http.scaladsl.server.{Directive0, Route}
-import akka.stream.scaladsl.Source
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import org.apache.pekko.http.scaladsl.model.HttpMethods
+import org.apache.pekko.http.scaladsl.server.{Directive0, Route}
+import org.apache.pekko.stream.scaladsl.Source
 import cats.instances.option.*
 import cats.syntax.traverse.*
 import com.wavesplatform.account.Address

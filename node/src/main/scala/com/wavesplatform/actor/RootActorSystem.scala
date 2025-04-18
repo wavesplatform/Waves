@@ -1,6 +1,7 @@
 package com.wavesplatform.actor
 
-import akka.actor.{ActorSystem, AllForOneStrategy, SupervisorStrategy, SupervisorStrategyConfigurator}
+import org.apache.pekko
+import org.apache.pekko.actor.{ActorSystem, AllForOneStrategy, SupervisorStrategy, SupervisorStrategyConfigurator}
 import com.typesafe.config.Config
 import com.wavesplatform.utils.ScorexLogging
 

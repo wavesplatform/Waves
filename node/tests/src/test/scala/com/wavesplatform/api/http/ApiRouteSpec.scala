@@ -1,8 +1,8 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.settings.RestAPISettings
 import monix.eval.{Coeval, Task}
@@ -12,7 +12,7 @@ import play.api.libs.json.JsObject
 import scala.concurrent.Future
 
 class ApiRouteSpec extends RouteSpec("/test") with RestAPISettingsHelper with ApiMarshallers {
-  import akka.http.scaladsl.server.Directives.*
+  import org.apache.pekko.http.scaladsl.server.Directives.*
   implicit val scheduler: Scheduler = monix.execution.Scheduler.Implicits.global
 
   class ApiRouteWithSettings(prefix: String, action: => ToResponseMarshallable, val settings: RestAPISettings = restAPISettings)

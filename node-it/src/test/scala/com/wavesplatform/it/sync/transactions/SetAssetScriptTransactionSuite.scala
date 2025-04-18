@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
-import akka.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{Mistiming, StateCheckFailed, WrongJson}
 import com.wavesplatform.common.state.ByteStr

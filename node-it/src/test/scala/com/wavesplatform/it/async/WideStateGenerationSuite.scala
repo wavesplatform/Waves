@@ -15,7 +15,7 @@ class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with Tra
 
   override protected def createDocker: Docker = new Docker(
     suiteConfig = ConfigFactory.parseString(
-      """akka.http.server {
+      """pekko.http.server {
         |  parsing.max-content-length = 3737439
         |  request-timeout = 60s
         |}

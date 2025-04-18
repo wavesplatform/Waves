@@ -1,8 +1,8 @@
 package com.wavesplatform
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.Http.ServerBinding
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.Http.ServerBinding
 import cats.Eq
 import cats.instances.bigInt.*
 import cats.syntax.option.*
@@ -377,7 +377,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         ExecutionModel.BatchedExecution(100)
       )
 
-      val serverRequestTimeout = FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
+      val serverRequestTimeout = FiniteDuration(settings.config.getDuration("pekko.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
       val routeTimeout         = new RouteTimeout(serverRequestTimeout)(heavyRequestScheduler)
 
       val apiRoutes = Seq(

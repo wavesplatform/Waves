@@ -1,9 +1,9 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.*
-import akka.http.scaladsl.model.HttpEntity.{Chunk, LastChunk}
-import akka.http.scaladsl.model.headers.{Accept, RawHeader, `Transfer-Encoding`}
-import akka.stream.scaladsl.Source
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model.HttpEntity.{Chunk, LastChunk}
+import org.apache.pekko.http.scaladsl.model.headers.{Accept, RawHeader, `Transfer-Encoding`}
+import org.apache.pekko.stream.scaladsl.Source
 import com.google.common.primitives.Longs
 import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, TooBigArrayAllocation}
 import com.wavesplatform.api.http.{AddressApiRoute, RouteTimeout}
@@ -345,7 +345,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
 
     Post(
       routePath(s"/data/${account.toAddress}"),
-      HttpEntity.Chunked(ContentTypes.`application/json`, Source(Seq(Chunk(akka.util.ByteString.fromString(requestBody.toString)), LastChunk)))
+      HttpEntity.Chunked(ContentTypes.`application/json`, Source(Seq(Chunk(org.apache.pekko.util.ByteString.fromString(requestBody.toString)), LastChunk)))
     ).withHeaders(headers) ~> route ~> check {
       responseAs[JsValue] should matchJson("""[{"key":"test","type":"string","value":"test"}]""")
     }

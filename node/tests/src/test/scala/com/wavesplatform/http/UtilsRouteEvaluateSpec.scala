@@ -1,6 +1,6 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.headers.Accept
+import org.apache.pekko.http.scaladsl.model.headers.Accept
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.api.http.CustomJson

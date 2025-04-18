@@ -1,8 +1,8 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.headers.Accept
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.headers.Accept
+import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.TestWallet
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi

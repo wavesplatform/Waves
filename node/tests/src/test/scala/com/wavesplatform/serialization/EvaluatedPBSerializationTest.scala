@@ -1,7 +1,7 @@
 package com.wavesplatform.serialization
 
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.testkit.ScalatestRouteTest
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.{ApiMarshallers, RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.db.WithDomain

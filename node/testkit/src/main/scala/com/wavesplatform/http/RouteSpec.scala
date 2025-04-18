@@ -1,8 +1,8 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
-import akka.http.scaladsl.testkit.*
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
+import org.apache.pekko.http.scaladsl.server.{ExceptionHandler, Route}
+import org.apache.pekko.http.scaladsl.testkit.*
 import com.wavesplatform.api.http
 import com.wavesplatform.api.http.ApiMarshallers
 import com.wavesplatform.test.*

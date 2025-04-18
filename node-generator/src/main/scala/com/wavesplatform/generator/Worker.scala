@@ -17,7 +17,7 @@ import monix.execution.Scheduler
 import org.asynchttpclient.AsyncHttpClient
 import play.api.libs.json.Json
 
-import scala.compat.java8.FutureConverters
+import scala.jdk.javaapi.FutureConverters
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -56,7 +56,7 @@ class Worker(
     import org.asynchttpclient.Dsl.*
     val request = get(s"$nodeRestAddress/transactions/unconfirmed/size").build()
     Task
-      .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
+      .fromFuture(FutureConverters.asScala(httpClient.executeRequest(request).toCompletableFuture))
       .map(r => math.max(settings.utxLimit - (Json.parse(r.getResponseBody) \ "size").as[Int], 0))
   }
 
@@ -67,7 +67,7 @@ class Worker(
         val results = richAccountAddresses.map { address =>
           val request = get(s"$nodeRestAddress/addresses/balance/$address").build()
           Task
-            .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
+            .fromFuture(FutureConverters.asScala(httpClient.executeRequest(request).toCompletableFuture))
             .map(r => address -> (Json.parse(r.getResponseBody) \ "balance").as[Long])
         }
         Task.parSequence(results).map(_.toMap)

@@ -1,8 +1,8 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.ContentTypes.`application/json`
-import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
-import akka.http.scaladsl.model.{FormData, HttpEntity}
+import org.apache.pekko.http.scaladsl.model.ContentTypes.`application/json`
+import org.apache.pekko.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
+import org.apache.pekko.http.scaladsl.model.{FormData, HttpEntity}
 import com.wavesplatform.BlockGen
 import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.db.WithState.AddrWithBalance

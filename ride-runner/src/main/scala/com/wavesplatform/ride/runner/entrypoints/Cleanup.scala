@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.entrypoints
 
-import akka.Done
-import akka.actor.{ActorSystem, CoordinatedShutdown}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}

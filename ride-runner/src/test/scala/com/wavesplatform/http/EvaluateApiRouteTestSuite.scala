@@ -1,6 +1,6 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, StatusCodes}
 import com.wavesplatform.ride.runner.http.EvaluateApiRoute
 import com.wavesplatform.ride.runner.requests.RideScriptRunResult
 import com.wavesplatform.wallet.Wallet

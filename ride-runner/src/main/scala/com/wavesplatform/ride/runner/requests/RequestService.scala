@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.requests
 
-import akka.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 import cats.syntax.either.*
 import com.github.benmanes.caffeine.cache.{Caffeine, Expiry, RemovalCause, Scheduler as CaffeineScheduler}
 import com.typesafe.config.ConfigMemorySize

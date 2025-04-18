@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity, StatusCodes}
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, FormData, HttpEntity, StatusCodes}
+import org.apache.pekko.http.scaladsl.server.Route
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestWallet
 import com.wavesplatform.account.KeyPair

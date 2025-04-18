@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
+import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.RouteTimeout

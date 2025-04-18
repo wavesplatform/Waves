@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.server.*
+import org.apache.pekko.http.scaladsl.server.*
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto

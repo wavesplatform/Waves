@@ -1,10 +1,10 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.model.MediaTypes.`application/json`
-import akka.http.scaladsl.model.headers.Accept
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.testkit.ScalatestRouteTest
+import org.apache.pekko.http.scaladsl.model.HttpRequest
+import org.apache.pekko.http.scaladsl.model.MediaTypes.`application/json`
+import org.apache.pekko.http.scaladsl.model.headers.Accept
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.http.{ApiErrorMatchers, DummyTransactionPublisher, RestAPISettingsHelper}

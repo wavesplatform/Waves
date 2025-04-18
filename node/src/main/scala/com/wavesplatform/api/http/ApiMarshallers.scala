@@ -1,13 +1,14 @@
 package com.wavesplatform.api.http
 
-import akka.NotUsed
-import akka.http.scaladsl.marshalling.*
-import akka.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
-import akka.http.scaladsl.model.*
-import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
-import akka.http.scaladsl.util.FastFuture
-import akka.stream.scaladsl.{Flow, Source}
-import akka.util.ByteString
+import org.apache.pekko
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.marshalling.*
+import org.apache.pekko.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
+import org.apache.pekko.http.scaladsl.util.FastFuture
+import org.apache.pekko.stream.scaladsl.{Flow, Source}
+import org.apache.pekko.util.ByteString
 import com.fasterxml.jackson.core.util.ByteArrayBuilder
 import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.databind.JsonSerializer
@@ -29,7 +30,7 @@ case class PlayJsonException(
     with NoStackTrace
 
 trait ApiMarshallers extends JsonFormats {
-  import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers.*
+  import org.apache.pekko.http.scaladsl.marshalling.PredefinedToResponseMarshallers.*
 
   implicit lazy val ApiErrorMarshaller: ToResponseMarshaller[ApiError] =
     fromStatusCodeAndValue[StatusCode, JsValue].compose(ae => (ae.code, ae.json))
