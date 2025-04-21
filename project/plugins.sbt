@@ -16,7 +16,8 @@ Seq(
   "org.portable-scala" % "sbt-scalajs-crossproject" % "1.3.2",
   "pl.project13.scala" % "sbt-jmh"                  % "0.4.7",
   "com.github.sbt"     % "sbt-ci-release"           % "1.9.3",
-  "com.lightbend.sbt"  % "sbt-javaagent"            % "0.1.6"
+  "com.lightbend.sbt"  % "sbt-javaagent"            % "0.1.6",
+  "org.scalameta"      % "sbt-scalafmt"             % "2.5.4"
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(
