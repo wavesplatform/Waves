@@ -28,7 +28,8 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Exporter, checkGenesis, crypto}
 import io.netty.channel.group.DefaultChannelGroup
-import monix.execution.Scheduler.Implicits.global
+import monix.execution.ExecutionModel.SynchronousExecution
+import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
 import org.apache.commons.io.FileUtils
 import org.web3j.crypto.{ECKeyPair, RawTransaction}
@@ -62,7 +63,7 @@ import scala.util.{Failure, Success, Using}
  */
 // @formatter:on
 class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
-
+  private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
   private val settings: WavesSettings = wavesSettings.copy(minerSettings = wavesSettings.minerSettings.copy(quorum = 0))
 
   def generateDb(genBlocks: Iterator[GenBlock], dbDirPath: String = settings.dbSettings.directory): Unit =

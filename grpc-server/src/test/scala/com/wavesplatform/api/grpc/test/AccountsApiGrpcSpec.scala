@@ -16,15 +16,17 @@ import com.wavesplatform.state.{BlockRewardCalculator, EmptyDataEntry, IntegerDa
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utils.DiffMatchers
-import monix.execution.Scheduler.Implicits.global
+import com.wavesplatform.utils.{DiffMatchers, Schedulers}
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 import com.wavesplatform.test.DomainPresets.*
+import monix.execution.ExecutionModel.SynchronousExecution
+import monix.execution.Scheduler
 
 import scala.concurrent.Await
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatchers with WithDomain with GrpcApiHelpers {
+  private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
 
   val sender: KeyPair         = TxHelpers.signer(1)
   val recipient: KeyPair      = TxHelpers.signer(2)

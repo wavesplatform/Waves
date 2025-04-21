@@ -11,7 +11,9 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.{EthTxGenerator, TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
-import monix.execution.Scheduler.Implicits.global
+import com.wavesplatform.utils.Schedulers
+import monix.execution.ExecutionModel.SynchronousExecution
+import monix.execution.Scheduler
 import org.scalatest.ParallelTestExecution
 import org.web3j.crypto.Bip32ECKeyPair
 
@@ -21,6 +23,8 @@ import scala.util.Try
 
 class GRPCBroadcastSpec extends FlatSpec with WithDomain with ParallelTestExecution with GrpcApiHelpers {
   import GRPCBroadcastSpec.{ethBuyOrderSigned, ethSellOrderSigned}
+
+  private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
 
   "GRPC broadcast" should "accept Exchange with ETH orders" in {
     val assetIssuer      = TxHelpers.defaultSigner

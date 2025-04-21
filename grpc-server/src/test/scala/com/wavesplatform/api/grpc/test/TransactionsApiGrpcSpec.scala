@@ -2,7 +2,14 @@ package com.wavesplatform.api.grpc.test
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionResponse, TransactionSnapshotResponse, TransactionSnapshotsRequest, TransactionsApiGrpcImpl, TransactionsRequest}
+import com.wavesplatform.api.grpc.{
+  ApplicationStatus,
+  TransactionResponse,
+  TransactionSnapshotResponse,
+  TransactionSnapshotsRequest,
+  TransactionsApiGrpcImpl,
+  TransactionsRequest
+}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -20,13 +27,15 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
-import com.wavesplatform.utils.DiffMatchers
-import monix.execution.Scheduler.Implicits.global
+import com.wavesplatform.utils.{DiffMatchers, Schedulers}
+import monix.execution.ExecutionModel.SynchronousExecution
+import monix.execution.Scheduler
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import scala.collection.immutable.VectorMap
 
 class TransactionsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatchers with WithDomain with GrpcApiHelpers {
+  private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
 
   val sender: KeyPair    = TxHelpers.signer(1)
   val recipient: KeyPair = TxHelpers.signer(2)

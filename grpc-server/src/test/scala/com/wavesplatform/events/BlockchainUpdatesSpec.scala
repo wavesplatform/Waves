@@ -41,9 +41,10 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, GenesisTransaction, PaymentTransaction, TxHelpers}
-import com.wavesplatform.utils.byteStrOrdering
+import com.wavesplatform.utils.{Schedulers, byteStrOrdering}
 import io.grpc.StatusException
-import monix.execution.Scheduler.Implicits.global
+import monix.execution.ExecutionModel.SynchronousExecution
+import monix.execution.Scheduler
 import org.scalactic.source.Position
 import org.scalatest.Assertion
 import org.scalatest.concurrent.ScalaFutures
@@ -54,6 +55,8 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures {
+  private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
+  
   val currentSettings: WavesSettings = RideV5
 
   val transfer: TransferTransaction       = TxHelpers.transfer()

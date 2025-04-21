@@ -10,14 +10,16 @@ import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.utils.Schedulers
+import monix.execution.ExecutionModel.SynchronousExecution
 import monix.execution.Scheduler
-import monix.execution.Scheduler.Implicits.global
 import org.rocksdb.RocksDB
 import monix.reactive.subjects.PublishToOneSubject
 import org.scalatest.Suite
 import org.scalatest.concurrent.ScalaFutures.convertScalaFuture
 
 trait WithBUDomain extends WithDomain { suite: Suite =>
+  private given scheduler: Scheduler = Schedulers.singleThread("bu-domain", executionModel = SynchronousExecution)
   def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: RocksDB => RocksDB = identity): Unit = {
     withDomain(settings) { d =>
       tempDb { rdb =>

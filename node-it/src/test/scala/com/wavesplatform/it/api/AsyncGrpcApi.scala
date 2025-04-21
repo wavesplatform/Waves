@@ -25,8 +25,10 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.utils.Schedulers
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
+import monix.execution.ExecutionModel.SynchronousExecution
 import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
 import play.api.libs.json.Json
@@ -38,8 +40,9 @@ object AsyncGrpcApi {
   implicit class NodeAsyncGrpcApi(val n: Node) {
 
     import com.wavesplatform.protobuf.transaction.{Transaction as PBTransaction, *}
-    import monix.execution.Scheduler.Implicits.global
 
+    private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
+    
     private lazy val assets       = AssetsApiGrpc.stub(n.grpcChannel)
     private lazy val accounts     = AccountsApiGrpc.stub(n.grpcChannel)
     private lazy val blocks       = BlocksApiGrpc.stub(n.grpcChannel)

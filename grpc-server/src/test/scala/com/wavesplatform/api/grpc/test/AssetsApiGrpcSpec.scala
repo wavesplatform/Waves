@@ -11,12 +11,13 @@ import com.wavesplatform.history.Domain
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utils.DiffMatchers
-import monix.execution.Scheduler.Implicits.global
+import com.wavesplatform.utils.{DiffMatchers, Schedulers}
+import monix.execution.ExecutionModel.SynchronousExecution
+import monix.execution.Scheduler
 import org.scalatest.BeforeAndAfterAll
 
 class AssetsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatchers with WithDomain with GrpcApiHelpers {
-
+  private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
   val sender: KeyPair = TxHelpers.signer(1)
 
   "GetNFTList should work" in withDomain(RideV6.addFeatures(BlockchainFeatures.ReduceNFTFee), AddrWithBalance.enoughBalances(sender)) { d =>

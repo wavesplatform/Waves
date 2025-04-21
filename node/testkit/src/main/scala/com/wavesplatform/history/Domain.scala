@@ -29,15 +29,15 @@ import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.utils.{EthEncoding, SystemTime}
+import com.wavesplatform.utils.{EthEncoding, Schedulers, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, TestValues, crypto}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
+import monix.execution.ExecutionModel.SynchronousExecution
 import monix.execution.Scheduler
-import monix.execution.Scheduler.Implicits.global
 import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers.*
 import play.api.libs.json.{JsNull, JsValue, Json}
@@ -50,6 +50,7 @@ import scala.util.control.NonFatal
 
 case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWriter: RocksDBWriter, settings: WavesSettings) {
   import Domain.*
+  private given scheduler: Scheduler = Schedulers.singleThread("domain", executionModel = SynchronousExecution)
 
   val blockchain: BlockchainUpdaterImpl = blockchainUpdater
 
