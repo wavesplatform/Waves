@@ -231,9 +231,6 @@ checkPRRaw := Def
   .sequential(
     `waves-node` / clean,
     Def.task {
-      scalafmtCheckAll.value
-    },
-    Def.task {
       (`lang-tests` / Test / test).value
       (`repl-jvm` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value

@@ -17,7 +17,7 @@ jobs:
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
       - uses: sbt/setup-sbt@v1
       - name: Check PR
-        run: sbt -J-Xlog:gc*=debug:file=./gc.log --batch ";checkPR;completeQaseRun"
+        run: sbt -J-Xlog:gc*=debug:file=./gc.log --batch ";scalafmtCheck;checkPR;completeQaseRun"
         env:
           QASE_ENABLE: true
           QASE_RUN_NAME: checkPR
