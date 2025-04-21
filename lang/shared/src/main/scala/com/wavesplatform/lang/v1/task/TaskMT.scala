@@ -7,8 +7,7 @@ import cats.{Eval, Functor, Monad}
 import com.wavesplatform.lang.EvalF
 import monix.execution.atomic.{Atomic, AtomicBuilder}
 
-/**
-  * Monad with ability to handle errors and deal with stateful computations
+/** Monad with ability to handle errors and deal with stateful computations
   *
   * @tparam S - State type
   * @tparam E - Error type

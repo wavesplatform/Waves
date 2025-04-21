@@ -18,14 +18,14 @@ trait TransactionBase {
 
 object TransactionBase {
   implicit class TBExt(val t: TransactionBase) extends AnyVal {
-    def fee: Long = t.assetFee._2
-    def feeAssetId: Asset = t.assetFee._1
+    def fee: Long                                             = t.assetFee._2
+    def feeAssetId: Asset                                     = t.assetFee._1
     def smartAssets(blockchain: Blockchain): Seq[IssuedAsset] = t.checkedAssets.filter(blockchain.hasAssetScript)
   }
 }
 
 abstract class Transaction(val tpe: TransactionType.TransactionType, val checkedAssets: Seq[IssuedAsset] = Nil) extends TransactionBase {
-  def bytesSize: Int         = bytes().length
+  def bytesSize: Int              = bytes().length
   lazy val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
   val bodyBytes: Coeval[Array[Byte]]
   val bytes: Coeval[Array[Byte]]

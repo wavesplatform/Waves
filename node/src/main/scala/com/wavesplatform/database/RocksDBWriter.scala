@@ -238,7 +238,7 @@ class RocksDBWriter(
   override def hasData(address: Address): Boolean = {
     writableDB.readOnly { ro =>
       ro.get(Keys.addressId(address)).fold(false) { addressId =>
-        ro.prefixExists(KeyTags.Data.prefixBytes ++ addressId.toByteArray)
+        ro.prefixExists(KeyTag.Data.prefixBytes ++ addressId.toByteArray)
       }
     }
   }
@@ -441,7 +441,7 @@ class RocksDBWriter(
 
         while (
           iter.isValid &&
-          iter.key().startsWith(KeyTags.BlockInfoAtHeight.prefixBytes) &&
+          iter.key().startsWith(KeyTag.BlockInfoAtHeight.prefixBytes) &&
           (TxFilterResetTs - lastBlockTs) < settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis * 2
         ) {
           lastBlockTs = readBlockMeta(iter.value()).getHeader.timestamp
@@ -455,7 +455,7 @@ class RocksDBWriter(
         iter.seek(Keys.transactionAt(Height(fromHeight), TxNum(0.toShort), rdb.txHandle).keyBytes)
         while (
           iter.isValid &&
-          iter.key().startsWith(KeyTags.NthTransactionInfoAtHeight.prefixBytes) &&
+          iter.key().startsWith(KeyTag.NthTransactionInfoAtHeight.prefixBytes) &&
           Ints.fromByteArray(iter.key().slice(2, 6)) <= height
         ) {
           counter += 1
@@ -604,7 +604,7 @@ class RocksDBWriter(
 
       if (blockMeta.getHeader.timestamp - TxFilterResetTs > settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis * 2) {
         log.trace(s"Rotating filter at $height, prev ts = $TxFilterResetTs, new ts = ${blockMeta.getHeader.timestamp}, interval = ${Duration
-          .ofMillis(blockMeta.getHeader.timestamp - TxFilterResetTs)}")
+            .ofMillis(blockMeta.getHeader.timestamp - TxFilterResetTs)}")
         TxFilterResetTs = blockMeta.getHeader.timestamp
         prevTxFilter = currentTxFilter
         currentTxFilter = mkFilter()
@@ -797,7 +797,7 @@ class RocksDBWriter(
     val updateAt     = new ArrayBuffer[(AddressId, Height)]() // AddressId -> First height of update in this range
     val updateAtKeys = new ArrayBuffer[Key[BalanceNode]]()
 
-    val changedKeyPrefix = KeyTags.ChangedWavesBalances.prefixBytes
+    val changedKeyPrefix = KeyTag.ChangedWavesBalances.prefixBytes
     val changedFromKey   = Keys.changedWavesBalances(fromInclusive) // fromInclusive doesn't affect the parsing result
     rw.iterateOverWithSeek(changedKeyPrefix, changedFromKey.keyBytes) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedKeyPrefix.length)))
@@ -848,7 +848,7 @@ class RocksDBWriter(
     val updateAt     = new ArrayBuffer[(AddressId, IssuedAsset, Height)]() // First height of update in this range
     val updateAtKeys = new ArrayBuffer[Key[BalanceNode]]()
 
-    val changedKeyPrefix = KeyTags.ChangedAssetBalances.prefixBytes
+    val changedKeyPrefix = KeyTag.ChangedAssetBalances.prefixBytes
     val changedKey       = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
     rw.iterateOverWithSeek(changedKeyPrefix, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedKeyPrefix.length)))
@@ -895,7 +895,7 @@ class RocksDBWriter(
     val updateAt     = new ArrayBuffer[(AddressId, String, Height)]() // First height of update in this range
     val updateAtKeys = new ArrayBuffer[Key[DataNode]]()
 
-    val changedAddressesPrefix  = KeyTags.ChangedAddresses.prefixBytes
+    val changedAddressesPrefix  = KeyTag.ChangedAddresses.prefixBytes
     val changedAddressesFromKey = Keys.changedAddresses(fromInclusive)
     rw.iterateOverWithSeek(changedAddressesPrefix, changedAddressesFromKey.keyBytes) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedAddressesPrefix.length)))
@@ -982,7 +982,7 @@ class RocksDBWriter(
             addressId <- rw.get(Keys.changedAddresses(currentHeight))
           } yield addressId -> rw.get(Keys.idToAddress(addressId))
 
-          rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ KeyHelpers.h(currentHeight)) { e =>
+          rw.iterateOver(KeyTag.ChangedAssetBalances.prefixBytes ++ KeyHelpers.h(currentHeight)) { e =>
             val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
             for ((addressId, address) <- changedAddresses) {
               balancesToInvalidate += address -> assetId

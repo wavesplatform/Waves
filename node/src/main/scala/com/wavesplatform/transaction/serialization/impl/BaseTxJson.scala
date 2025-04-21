@@ -17,8 +17,8 @@ object BaseTxJson {
       case _                      => Json.obj()
     }) ++ (tx match {
       case pbs: (PBSince & Versioned) if PBSince.affects(pbs) => Json.obj("chainId" -> tx.chainId)
-      case e: EthereumTransaction                              => Json.obj("chainId" -> e.chainId)
-      case _                                                   => Json.obj()
+      case e: EthereumTransaction                             => Json.obj("chainId" -> e.chainId)
+      case _                                                  => Json.obj()
     }) ++ (tx match {
       case p: ProvenTransaction =>
         Json.obj(

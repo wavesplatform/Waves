@@ -18,7 +18,7 @@ object CachedDAppCTX {
       version            <- DirectiveDictionary[StdLibVersion].all.filter(_ >= V3)
       useNewPowPrecision <- Seq(true, false)
       fixBigScriptField  <- Seq(true, false)
-      fixEcrecover <- Seq(true, false)
+      fixEcrecover       <- Seq(true, false)
     } yield {
       val ctx = PureContext.build(version, useNewPowPrecision).withEnvironment[Environment] |+|
         CryptoContext.build(Global, version, fixEcrecover).withEnvironment[Environment] |+|

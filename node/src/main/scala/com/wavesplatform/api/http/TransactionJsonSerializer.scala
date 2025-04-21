@@ -12,10 +12,32 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING, CaseObj, EVALUATED, EXPR, FAIL, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{
+  ARR,
+  CONST_BOOLEAN,
+  CONST_BYTESTR,
+  CONST_LONG,
+  CONST_STRING,
+  CaseObj,
+  EVALUATED,
+  EXPR,
+  FAIL,
+  FUNCTION_CALL
+}
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.PBAmounts
-import com.wavesplatform.state.InvokeScriptResult.{AttachedPayment, Burn, Call, ErrorMessage, Invocation, Issue, Lease, LeaseCancel, Reissue, SponsorFee}
+import com.wavesplatform.state.InvokeScriptResult.{
+  AttachedPayment,
+  Burn,
+  Call,
+  ErrorMessage,
+  Invocation,
+  Issue,
+  Lease,
+  LeaseCancel,
+  Reissue,
+  SponsorFee
+}
 import com.wavesplatform.state.{Blockchain, DataEntry, InvokeScriptResult, LeaseDetails, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -260,7 +282,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
           gen.writeNumberField("fee", tx.assetFee._2, numbersAsString)
           tx.feeAssetId match {
             case IssuedAsset(id) => gen.writeStringField("feeAssetId", id.toString)
-            case Asset.Waves => gen.writeNullField("feeAssetId")
+            case Asset.Waves     => gen.writeNullField("feeAssetId")
           }
           gen.writeNumberField("timestamp", tx.timestamp, numbersAsString)
           gen.writeNumberField("version", tx.version, numbersAsString)

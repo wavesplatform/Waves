@@ -24,11 +24,11 @@ class DBResource(db: RocksDB, iteratorCfHandle: Option[ColumnFamilyHandle] = Non
     db.multiGet(readOptions, keys, valBufferSize)
 
   @volatile private var prefixIteratorWasOpened = false
-  /**
-   * Finds the exact key for iter.seek(key) if key.length < 10 and becomes invalid on iter.next().
-   * Works as intended if prefix(key).length >= 10.
-   * @see RDB.newColumnFamilyOptions
-   */
+
+  /** Finds the exact key for iter.seek(key) if key.length < 10 and becomes invalid on iter.next(). Works as intended if prefix(key).length >= 10.
+    * @see
+    *   RDB.newColumnFamilyOptions
+    */
   lazy val prefixIterator: RocksIterator = {
     prefixIteratorWasOpened = true
     db.newIterator(iteratorCfHandle.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))

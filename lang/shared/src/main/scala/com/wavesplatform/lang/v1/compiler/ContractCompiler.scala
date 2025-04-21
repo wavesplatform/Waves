@@ -332,7 +332,7 @@ class ContractCompiler(version: StdLibVersion) extends ExpressionCompiler(versio
 
   private def checkCallableUnions(
       func: Expressions.ANNOTATEDFUNC,
-      annotations: List[Annotation],
+      annotations: List[Annotation]
   ): CompileM[Seq[UnionNotAllowedForCallableArgs]] = {
     @tailrec
     def containsUnion(tpe: Type): Boolean =

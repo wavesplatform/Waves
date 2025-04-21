@@ -26,11 +26,11 @@ object TestValues {
   lazy val (script, scriptComplexity) = ScriptCompiler
     .compile(
       """
-      |{-# STDLIB_VERSION 2 #-}
-      |{-# CONTENT_TYPE EXPRESSION #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}
-      |true
-      |""".stripMargin,
+        |{-# STDLIB_VERSION 2 #-}
+        |{-# CONTENT_TYPE EXPRESSION #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |true
+        |""".stripMargin,
       ScriptEstimatorV1
     )
     .explicitGet()
@@ -38,11 +38,11 @@ object TestValues {
   lazy val (assetScript, assetScriptComplexity) = ScriptCompiler
     .compile(
       """
-      |{-# STDLIB_VERSION 2 #-}
-      |{-# CONTENT_TYPE EXPRESSION #-}
-      |{-# SCRIPT_TYPE ASSET #-}
-      |true
-      |""".stripMargin,
+        |{-# STDLIB_VERSION 2 #-}
+        |{-# CONTENT_TYPE EXPRESSION #-}
+        |{-# SCRIPT_TYPE ASSET #-}
+        |true
+        |""".stripMargin,
       ScriptEstimatorV1
     )
     .explicitGet()
@@ -50,11 +50,11 @@ object TestValues {
   lazy val (rejectAssetScript, rejectAssetScriptComplexity) = ScriptCompiler
     .compile(
       """
-      |{-# STDLIB_VERSION 2 #-}
-      |{-# CONTENT_TYPE EXPRESSION #-}
-      |{-# SCRIPT_TYPE ASSET #-}
-      |false
-      |""".stripMargin,
+        |{-# STDLIB_VERSION 2 #-}
+        |{-# CONTENT_TYPE EXPRESSION #-}
+        |{-# SCRIPT_TYPE ASSET #-}
+        |false
+        |""".stripMargin,
       ScriptEstimatorV1
     )
     .explicitGet()

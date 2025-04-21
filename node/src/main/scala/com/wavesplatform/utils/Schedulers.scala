@@ -81,7 +81,7 @@ object Schedulers {
 
   private class TimedWrapper[V](timer: Timer, timeout: FiniteDuration, delegate: RunnableScheduledFuture[V]) extends RunnableScheduledFuture[V] {
     @volatile
-    private var maybeScheduledTimeout     = Option.empty[Timeout]
+    private var maybeScheduledTimeout           = Option.empty[Timeout]
     override def isPeriodic: Boolean            = delegate.isPeriodic
     override def getDelay(unit: TimeUnit): Long = delegate.getDelay(unit)
     override def compareTo(o: Delayed): Int     = delegate.compareTo(o)

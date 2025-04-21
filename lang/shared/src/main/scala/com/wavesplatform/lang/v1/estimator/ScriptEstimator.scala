@@ -10,9 +10,9 @@ trait ScriptEstimator {
   val version: Int
 
   def apply(
-    declaredVals:  Set[String],
-    functionCosts: Map[FunctionHeader, Coeval[Long]],
-    expr:          EXPR
+      declaredVals: Set[String],
+      functionCosts: Map[FunctionHeader, Coeval[Long]],
+      expr: EXPR
   ): Either[String, Long]
 }
 

@@ -15,7 +15,7 @@ case class SynchronizationSettings(
     microBlockSynchronizer: SynchronizationSettings.MicroblockSynchronizerSettings,
     historyReplier: SynchronizationSettings.HistoryReplierSettings,
     utxSynchronizer: SynchronizationSettings.UtxSynchronizerSettings
-) derives ConfigReader 
+) derives ConfigReader
 
 object SynchronizationSettings {
   case class MicroblockSynchronizerSettings(

@@ -17,15 +17,15 @@ object KeyHelpers {
 
   def hNum(height: Int, num: TxNum): Array[Byte] = Bytes.concat(Ints.toByteArray(height), Shorts.toByteArray(num))
 
-  def historyKey(keyTag: KeyTags.KeyTag, suffix: Array[Byte]): Key[Seq[Int]] = Key(keyTag, suffix, readIntSeq, writeIntSeq)
+  def historyKey(keyTag: KeyTag, suffix: Array[Byte]): Key[Seq[Int]] = Key(keyTag, suffix, readIntSeq, writeIntSeq)
 
-  def intKey(keyTag: KeyTags.KeyTag, default: Int = 0): Key[Int] =
+  def intKey(keyTag: KeyTag, default: Int = 0): Key[Int] =
     Key(keyTag, Array.emptyByteArray, v => if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else default, Ints.toByteArray)
 
-  def longKey(keyTag: KeyTags.KeyTag, default: Long = 0): Key[Long] =
+  def longKey(keyTag: KeyTag, default: Long = 0): Key[Long] =
     Key(keyTag, Array.emptyByteArray, v => if (v != null && v.length >= Longs.BYTES) Longs.fromByteArray(v) else default, Longs.toByteArray)
 
-  def heightKey(keyTag: KeyTags.KeyTag, default: Int = 0): Key[Height] =
+  def heightKey(keyTag: KeyTag, default: Int = 0): Key[Height] =
     Key(
       keyTag,
       Array.emptyByteArray,
@@ -33,7 +33,7 @@ object KeyHelpers {
       Ints.toByteArray
     )
 
-  def bytesSeqNr(keyTag: KeyTags.KeyTag, suffix: Array[Byte], default: Int = 0, cfh: Option[ColumnFamilyHandle] = None): Key[Int] =
+  def bytesSeqNr(keyTag: KeyTag, suffix: Array[Byte], default: Int = 0, cfh: Option[ColumnFamilyHandle] = None): Key[Int] =
     Key(keyTag, suffix, v => if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else default, Ints.toByteArray, cfh)
 
   def unsupported[A](message: String): A => Array[Byte] = _ => throw new UnsupportedOperationException(message)

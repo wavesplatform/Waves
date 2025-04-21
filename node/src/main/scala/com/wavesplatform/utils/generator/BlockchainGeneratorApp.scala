@@ -138,7 +138,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
     }
 
     val wallet: Wallet = new Wallet {
-      private val map                                            = miners.map(kp => kp.toAddress -> kp).toMap
+      private val map                                                  = miners.map(kp => kp.toAddress -> kp).toMap
       override def seed: Array[Byte]                                   = Array.emptyByteArray
       override def nonce: Int                                          = miners.length
       override def privateKeyAccounts: Seq[SeedKeyPair]                = miners

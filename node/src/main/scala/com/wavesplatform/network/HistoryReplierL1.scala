@@ -12,7 +12,7 @@ import scala.util.{Failure, Success}
 
 @Sharable
 class HistoryReplierL1(score: => BigInt, history: History, settings: SynchronizationSettings)(implicit ec: ExecutionContext)
-  extends ChannelInboundHandlerAdapter
+    extends ChannelInboundHandlerAdapter
     with ScorexLogging {
 
   private def respondWith(ctx: ChannelHandlerContext, value: Future[Message]): Unit =

@@ -4,12 +4,11 @@ import monix.eval.Coeval
 
 case class CoevalR[+A](v: Coeval[TracedResult[ValidationError, A]]) extends AnyVal {
   def flatMap[B](f: A => CoevalR[B]): CoevalR[B] = {
-    val r = v.flatMap(
-      t =>
-        t.resultE match {
-          case Right(value)  => f(value).v
-          case l: Left[_, _] => Coeval.now(TracedResult(l.asInstanceOf[Either[ValidationError, B]]))
-        }
+    val r = v.flatMap(t =>
+      t.resultE match {
+        case Right(value)  => f(value).v
+        case l: Left[_, _] => Coeval.now(TracedResult(l.asInstanceOf[Either[ValidationError, B]]))
+      }
     )
     CoevalR(r)
   }

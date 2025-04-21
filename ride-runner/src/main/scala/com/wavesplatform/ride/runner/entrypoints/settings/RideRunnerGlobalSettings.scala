@@ -7,7 +7,7 @@ import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache
 import com.wavesplatform.ride.runner.entrypoints.{Heights, WavesRideRunnerCompareService}
 import com.wavesplatform.ride.runner.requests.DefaultRequestService
 import com.wavesplatform.settings.*
-import com.wavesplatform.settings.BlockchainSettings.given 
+import com.wavesplatform.settings.BlockchainSettings.given
 import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 import pureconfig.*
 

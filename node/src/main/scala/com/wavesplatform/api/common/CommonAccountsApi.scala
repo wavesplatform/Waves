@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.api.common.lease.AddressLeaseInfo
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{AddressId, DBExt, DBResource, KeyTags, Keys, RDB}
+import com.wavesplatform.database.{AddressId, DBExt, DBResource, KeyTag, Keys, RDB}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, SnapshotBlockchain}
@@ -137,7 +137,7 @@ object CommonAccountsApi {
       entriesFromDiff: Array[DataEntry[?]],
       pattern: Option[Pattern]
   ) extends AbstractIterator[DataEntry[?]] {
-    private val prefix: Array[Byte] = KeyTags.Data.prefixBytes ++ addressId.toByteArray
+    private val prefix: Array[Byte] = KeyTag.Data.prefixBytes ++ addressId.toByteArray
 
     private val length: Int = entriesFromDiff.length
 

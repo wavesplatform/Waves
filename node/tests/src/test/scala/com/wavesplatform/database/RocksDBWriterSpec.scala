@@ -5,7 +5,6 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.database.KeyTags.KeyTag
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -343,13 +342,13 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
   }
 
   private val HistoricalKeyTags = Seq(
-    KeyTags.ChangedAssetBalances,
-    KeyTags.ChangedWavesBalances,
-    KeyTags.WavesBalanceHistory,
-    KeyTags.AssetBalanceHistory,
-    KeyTags.ChangedDataKeys,
-    KeyTags.DataHistory,
-    KeyTags.ChangedAddresses
+    KeyTag.ChangedAssetBalances,
+    KeyTag.ChangedWavesBalances,
+    KeyTag.WavesBalanceHistory,
+    KeyTag.AssetBalanceHistory,
+    KeyTag.ChangedDataKeys,
+    KeyTag.DataHistory,
+    KeyTag.ChangedAddresses
   )
 
   private type CollectedKeys = Vector[(ByteStr, String)]
@@ -361,9 +360,9 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
         val k = iter.key()
         if (
           !(HistoricalKeyTags.exists(kt => k.startsWith(kt.prefixBytes)) || k
-            .startsWith(KeyTags.HeightOf.prefixBytes) || k.startsWith(KeyTags.LastCleanupHeight.prefixBytes))
+            .startsWith(KeyTag.HeightOf.prefixBytes) || k.startsWith(KeyTag.LastCleanupHeight.prefixBytes))
         ) {
-          val description = KeyTags(Shorts.fromByteArray(k)).toString
+          val description = KeyTag.fromOrdinal(Shorts.fromByteArray(k)).toString
           xs = xs.appended(ByteStr(k) -> description)
         }
         iter.next()
@@ -390,19 +389,19 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
 
   private def getHeightAndAddressIds(tag: KeyTag, bytes: DBEntry): (Int, Seq[AddressId]) = {
     val (heightBytes, addresses) = tag match {
-      case KeyTags.ChangedAddresses | KeyTags.ChangedAssetBalances | KeyTags.ChangedWavesBalances =>
+      case KeyTag.ChangedAddresses | KeyTag.ChangedAssetBalances | KeyTag.ChangedWavesBalances =>
         (
           bytes.getKey.drop(Shorts.BYTES),
           readAddressIds(bytes.getValue)
         )
 
-      case KeyTags.WavesBalanceHistory | KeyTags.AssetBalanceHistory | KeyTags.ChangedDataKeys =>
+      case KeyTag.WavesBalanceHistory | KeyTag.AssetBalanceHistory | KeyTag.ChangedDataKeys =>
         (
           bytes.getKey.takeRight(Ints.BYTES),
           Seq(AddressId.fromByteArray(bytes.getKey.dropRight(Ints.BYTES).takeRight(Longs.BYTES)))
         )
 
-      case KeyTags.DataHistory =>
+      case KeyTag.DataHistory =>
         (
           bytes.getKey.takeRight(Ints.BYTES),
           Seq(AddressId.fromByteArray(bytes.getKey.drop(Shorts.BYTES)))

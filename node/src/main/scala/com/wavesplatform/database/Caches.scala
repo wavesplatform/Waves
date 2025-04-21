@@ -326,14 +326,14 @@ abstract class Caches extends Blockchain with Storage {
       case asset: IssuedAsset => stateHash.addAssetBalance(address, asset, amount.balance)
     }
     for (((address, _), (entry, _)) <- updatedDataWithNodes) stateHash.addDataEntry(address, entry.entry)
-    for ((address, lease)           <- leaseBalances) stateHash.addLeaseBalance(address, lease.in, lease.out)
-    for ((address, script)          <- snapshot.accountScriptsByAddress) stateHash.addAccountScript(address, script.map(_.script))
-    for ((asset, script)            <- snapshot.assetScripts) stateHash.addAssetScript(asset, Some(script.script))
-    for ((asset, _)                 <- snapshot.assetStatics) if (!snapshot.assetScripts.contains(asset)) stateHash.addAssetScript(asset, None)
+    for ((address, lease) <- leaseBalances) stateHash.addLeaseBalance(address, lease.in, lease.out)
+    for ((address, script) <- snapshot.accountScriptsByAddress) stateHash.addAccountScript(address, script.map(_.script))
+    for ((asset, script) <- snapshot.assetScripts) stateHash.addAssetScript(asset, Some(script.script))
+    for ((asset, _) <- snapshot.assetStatics) if (!snapshot.assetScripts.contains(asset)) stateHash.addAssetScript(asset, None)
     for (leaseId <- snapshot.newLeases.keys) if (!snapshot.cancelledLeases.contains(leaseId)) stateHash.addLeaseStatus(leaseId, isActive = true)
     for (leaseId <- snapshot.cancelledLeases.keys) stateHash.addLeaseStatus(leaseId, isActive = false)
     for ((assetId, sponsorship) <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
-    for ((alias, address)       <- snapshot.aliases) stateHash.addAlias(address, alias.name)
+    for ((alias, address) <- snapshot.aliases) stateHash.addAlias(address, alias.name)
 
     doAppend(
       newMeta,
@@ -357,11 +357,11 @@ abstract class Caches extends Blockchain with Storage {
         snapshot.assetVolumes.keySet ++
         snapshot.sponsorships.keySet
 
-    for ((address, id)                       <- newAddressIds) addressIdCache.put(address, Some(id))
-    for ((orderId, (volumeAndFee, _))        <- orderFillsWithNodes) volumeAndFeeCache.put(orderId, volumeAndFee)
+    for ((address, id) <- newAddressIds) addressIdCache.put(address, Some(id))
+    for ((orderId, (volumeAndFee, _)) <- orderFillsWithNodes) volumeAndFeeCache.put(orderId, volumeAndFee)
     for (((address, asset), (newBalance, _)) <- updatedBalanceNodes) balancesCache.put((address, asset), newBalance)
-    for (id                                  <- assetsToInvalidate) assetDescriptionCache.invalidate(id)
-    for ((alias, address)                    <- snapshot.aliases) aliasCache.put(Alias.create(alias.name).explicitGet(), Some(address))
+    for (id <- assetsToInvalidate) assetDescriptionCache.invalidate(id)
+    for ((alias, address) <- snapshot.aliases) aliasCache.put(Alias.create(alias.name).explicitGet(), Some(address))
     leaseBalanceCache.putAll(leaseBalances.asJava)
     scriptCache.putAll(snapshot.accountScriptsByAddress.asJava)
     assetScriptCache.putAll(snapshot.assetScripts.view.mapValues(Some(_)).toMap.asJava)

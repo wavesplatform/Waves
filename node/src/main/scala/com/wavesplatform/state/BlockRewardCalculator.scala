@@ -67,7 +67,7 @@ object BlockRewardCalculator {
 
     import com.wavesplatform.utils.byteStrOrdering
 
-    (Seq(generator     -> rewardShares.miner) ++
+    (Seq(generator -> rewardShares.miner) ++
       daoAddress.map(_ -> rewardShares.daoAddress) ++
       xtnBuybackAddress.map(_ -> rewardShares.xtnBuybackAddress))
       .filter(_._2 > 0)

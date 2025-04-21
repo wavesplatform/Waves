@@ -9,7 +9,7 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonB
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{DBExt, KeyTags, RDB}
+import com.wavesplatform.database.{DBExt, KeyTag, RDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
@@ -121,7 +121,7 @@ object Importer extends ScorexLogging {
       appenderScheduler: Scheduler,
       extensionTime: Time,
       utxPool: UtxPool,
-      rdb: RDB,
+      rdb: RDB
   ): Seq[Extension] =
     if (wavesSettings.extensions.isEmpty) Seq.empty
     else {
@@ -308,7 +308,7 @@ object Importer extends ScorexLogging {
               case _ =>
                 counter = counter + 1
             }
-          } else if (!quit){
+          } else if (!quit) {
             log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
           }
         }
@@ -345,7 +345,7 @@ object Importer extends ScorexLogging {
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
 
-    val rdb         = RDB.open(settings.dbSettings)
+    val rdb = RDB.open(settings.dbSettings)
     val (blockchainUpdater, rdbWriter) =
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
@@ -360,7 +360,7 @@ object Importer extends ScorexLogging {
       importOptions.format match {
         case Formats.Binary =>
           var blocksOffset = 0L
-          rdb.db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
+          rdb.db.iterateOver(KeyTag.BlockInfoAtHeight) { e =>
             e.getKey match {
               case Array(_, _, 0, 0, 0, 1) => // Skip genesis
               case _ =>

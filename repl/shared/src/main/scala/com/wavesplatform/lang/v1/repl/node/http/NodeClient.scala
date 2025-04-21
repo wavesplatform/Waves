@@ -18,7 +18,8 @@ private[lang] trait NodeClient {
 
 private[lang] case class NodeClientImpl(baseUrl: String) extends NodeClient {
   def get[F[_]: Functor, R: Decoder](path: String)(using ResponseWrapper[F]): Future[F[R]] =
-    Global.requestNode(baseUrl + path)
+    Global
+      .requestNode(baseUrl + path)
       .map(r => summon[ResponseWrapper[F]](r))
       .map(_.map(decode[R]).map(_.explicitGet()))
 }
@@ -29,16 +30,16 @@ private[lang] object NodeClient {
   implicit val optionResponse: NodeResponse => Option[String] = {
     case NodeResponse(404, _)    => None
     case NodeResponse(200, body) => Some(body)
-    case NodeResponse(_,   body) => throw new RuntimeException(body)
+    case NodeResponse(_, body)   => throw new RuntimeException(body)
   }
 
   implicit val eitherResponse: NodeResponse => Either[String, String] = {
     case NodeResponse(200, body) => Right(body)
-    case NodeResponse(_,   body) => Left(body)
+    case NodeResponse(_, body)   => Left(body)
   }
 
   implicit val idResponse: NodeResponse => String = {
     case NodeResponse(200, body) => body
-    case NodeResponse(_,   body) => throw new RuntimeException(body)
+    case NodeResponse(_, body)   => throw new RuntimeException(body)
   }
 }

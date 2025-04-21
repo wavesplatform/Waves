@@ -62,7 +62,12 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
       gs <-
         if (vrfActivated(parentHeight + 1)) {
           crypto
-            .verifyVRF(header.generationSignature, parentHitSource.arr, header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, parentHeight))
+            .verifyVRF(
+              header.generationSignature,
+              parentHitSource.arr,
+              header.generator,
+              blockchain.isFeatureActivated(BlockchainFeatures.RideV6, parentHeight)
+            )
             .map(_.arr)
         } else {
           generationSignature(parentHitSource, header.generator).asRight[ValidationError]
@@ -83,8 +88,8 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
       if (vrfActivated(height + 1)) {
         getHitSource(height)
           .flatMap(hs =>
-        crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height))
-      )
+            crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height))
+          )
       } else {
         blockchain
           .blockHeader(height)

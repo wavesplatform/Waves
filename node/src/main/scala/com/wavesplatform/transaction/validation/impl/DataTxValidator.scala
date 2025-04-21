@@ -20,7 +20,7 @@ object DataTxValidator extends TxValidator[DataTransaction] {
       V.cond(tx.data.forall(entrySizeIsValidStatic), TxValidationError.TooBigArray),
       V.cond(data.forall(_.key.nonEmpty), TxValidationError.EmptyDataKey),
       V.cond(data.map(_.key) == data.map(_.key).distinct, TxValidationError.DuplicatedDataKeys),
-      V.cond(tx.version > TxVersion.V1 || tx.data.forall(!_.isEmpty), GenericError("Empty data is not allowed in V1")),
+      V.cond(tx.version > TxVersion.V1 || tx.data.forall(!_.isEmpty), GenericError("Empty data is not allowed in V1"))
     )
   }
 
@@ -85,18 +85,17 @@ object DataTxValidator extends TxValidator[DataTransaction] {
 
   def realUserPayloadSize(entries: Seq[DataEntry[?]]): Int = {
     entries
-      .flatMap(
-        e =>
-          Iterable(
-            e.key.utf8Bytes.length,
-            e match {
-              case EmptyDataEntry(_)         => 0 // Delete
-              case BooleanDataEntry(_, _)    => 1
-              case IntegerDataEntry(_, _)    => 8
-              case BinaryDataEntry(_, value) => value.size
-              case StringDataEntry(_, value) => value.utf8Bytes.length
-            }
-          )
+      .flatMap(e =>
+        Iterable(
+          e.key.utf8Bytes.length,
+          e match {
+            case EmptyDataEntry(_)         => 0 // Delete
+            case BooleanDataEntry(_, _)    => 1
+            case IntegerDataEntry(_, _)    => 8
+            case BinaryDataEntry(_, value) => value.size
+            case StringDataEntry(_, value) => value.utf8Bytes.length
+          }
+        )
       )
       .fold(0)(Math.addExact)
   }

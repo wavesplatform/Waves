@@ -13,10 +13,16 @@ object MassTransferTxValidator extends TxValidator[MassTransferTransaction] {
       V.noOverflow((fee.value +: transfers.map(_.amount.value))*),
       V.cond(transfers.length <= MaxTransferCount, GenericError(s"Number of transfers ${transfers.length} is greater than $MaxTransferCount")),
       V.transferAttachment(attachment),
-      V.chainIds(chainId, transfers.view.map(_.address).collect {
-        case wa: Address => wa.chainId
-        case wl: Alias        => wl.chainId
-      }.toSeq*)
+      V.chainIds(
+        chainId,
+        transfers.view
+          .map(_.address)
+          .collect {
+            case wa: Address => wa.chainId
+            case wl: Alias   => wl.chainId
+          }
+          .toSeq*
+      )
     )
   }
 }

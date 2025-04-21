@@ -96,8 +96,8 @@ object Wallet {
     }
 
     private object WalletLock {
-      private val lockObject = new Object
-      def write[T](f: => T): T     = lockObject.synchronized(f)
+      private val lockObject   = new Object
+      def write[T](f: => T): T = lockObject.synchronized(f)
     }
 
     private val accountsCache: TrieMap[String, SeedKeyPair] = {

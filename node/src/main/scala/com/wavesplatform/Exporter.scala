@@ -4,7 +4,7 @@ import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.database.protobuf.BlockMeta
-import com.wavesplatform.database.{KeyTags, RDB, createBlock, readBlockMeta, readTransaction}
+import com.wavesplatform.database.{KeyTag, RDB, createBlock, readBlockMeta, readTransaction}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.metrics.Metrics
@@ -116,12 +116,12 @@ object Exporter extends ScorexLogging {
       new DataIterator[BlockMeta](
         rdb.db,
         rdb.db.getDefaultColumnFamily,
-        KeyTags.BlockInfoAtHeight.prefixBytes,
+        KeyTag.BlockInfoAtHeight.prefixBytes,
         _.takeRight(Ints.BYTES),
         _ => readBlockMeta
       )
     val txIterator: DataIterator[Transaction] = {
-      val prefixBytes = KeyTags.NthTransactionInfoAtHeight.prefixBytes
+      val prefixBytes = KeyTag.NthTransactionInfoAtHeight.prefixBytes
       new DataIterator(
         rdb.db,
         rdb.txHandle.handle,
@@ -131,7 +131,7 @@ object Exporter extends ScorexLogging {
       )
     }
     val snapshotIterator: DataIterator[Array[Byte]] = {
-      val prefixBytes = KeyTags.NthTransactionStateSnapshotAtHeight.prefixBytes
+      val prefixBytes = KeyTag.NthTransactionStateSnapshotAtHeight.prefixBytes
       new DataIterator(
         rdb.db,
         rdb.txSnapshotHandle.handle,

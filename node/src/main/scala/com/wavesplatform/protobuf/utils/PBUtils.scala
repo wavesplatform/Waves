@@ -28,7 +28,7 @@ object PBUtils {
     cmp
       .validate(msg)
       .toEither
-      .adaptErr {
-        case err => new RuntimeException(s"Error deserializing PB message: $cmp (bytes = ${ByteStr(msg)})", err)
+      .adaptErr { case err =>
+        new RuntimeException(s"Error deserializing PB message: $cmp (bytes = ${ByteStr(msg)})", err)
       }
 }

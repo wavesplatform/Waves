@@ -38,8 +38,8 @@ final case class EthABIConverter(script: Script) {
         data: String,
         blockchain: Blockchain
     ): Either[ValidationError, (List[EVALUATED], Seq[InvokeScriptTransaction.Payment])] = {
-      val arr   = FastHex.decode(data)
-      val func  = new Function(ethSignature)
+      val arr          = FastHex.decode(data)
+      val func         = new Function(ethSignature)
       val tuple: Tuple = func.decodeCall(arr)
 
       (tuple: java.lang.Iterable[AnyRef]).asScala.toList

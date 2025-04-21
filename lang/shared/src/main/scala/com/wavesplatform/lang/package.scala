@@ -23,7 +23,7 @@ package object lang {
 
   implicit class StringOps(val s: String) extends AnyVal {
     def isWellFormed: Boolean = {
-      var i = 0
+      var i          = 0
       var wellFormed = true
       while (i < s.length && wellFormed) {
         val c = s.charAt(i)

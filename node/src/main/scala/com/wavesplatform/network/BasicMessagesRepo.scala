@@ -35,7 +35,7 @@ object GetPeersSpec extends MessageSpec[GetPeers.type] {
   override def serializeData(data: GetPeers.type): Array[Byte] = Array()
 }
 
-abstract class InetSocketAddressSeqSpec[A <: AnyRef : ClassTag] extends MessageSpec[A] {
+abstract class InetSocketAddressSeqSpec[A <: AnyRef: ClassTag] extends MessageSpec[A] {
   private val AddressLength = 4
   private val PortLength    = 4
   private val DataLength    = 4

@@ -54,7 +54,13 @@ object DataNode {
 
 object Keys {
   import KeyHelpers.*
-  import KeyTags.{AddressId as AddressIdTag, EthereumTransactionMeta as EthereumTransactionMetaTag, InvokeScriptResult as InvokeScriptResultTag, LeaseDetails as LeaseDetailsTag, *}
+  import KeyTag.{
+    AddressId as AddressIdTag,
+    EthereumTransactionMeta as EthereumTransactionMetaTag,
+    InvokeScriptResult as InvokeScriptResultTag,
+    LeaseDetails as LeaseDetailsTag,
+    *
+  }
 
   val version: Key[Int]   = intKey(Version, default = 1)
   val height: Key[Height] = heightKey(Height)
@@ -107,7 +113,7 @@ object Keys {
   def changedBalances(height: Int, asset: IssuedAsset): Key[Seq[AddressId]] =
     Key(ChangedAssetBalances, h(height) ++ asset.id.arr, readAddressIds, writeAddressIds)
 
-  def changedBalancesAtPrefix(height: Int): Array[Byte] = KeyTags.ChangedAssetBalances.prefixBytes ++ h(height)
+  def changedBalancesAtPrefix(height: Int): Array[Byte] = KeyTag.ChangedAssetBalances.prefixBytes ++ h(height)
 
   def addressIdOfAlias(alias: Alias): Key[Option[AddressId]] = Key.opt(AddressIdOfAlias, alias.bytes, AddressId.fromByteArray, _.toByteArray)
 

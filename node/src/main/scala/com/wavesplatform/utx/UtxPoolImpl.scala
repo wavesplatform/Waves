@@ -59,7 +59,7 @@ case class UtxPoolImpl(
   private val inUTXPoolOrdering = TransactionsOrdering.InUTXPool(utxSettings.fastLaneAddresses)
 
   // State
-  val priorityPool               = new UtxPriorityPool
+  val priorityPool         = new UtxPriorityPool
   private val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
 
   override def getPriorityPool: Option[UtxPriorityPool] = Some(priorityPool)

@@ -27,8 +27,8 @@ object Gen {
   def script(complexity: Boolean = true, estimator: ScriptEstimator): Script = {
     val s = if (complexity) s"""
                                |${(for (b <- 1 to 10) yield {
-      s"let a$b = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58'' && sigVerify(base58'333', base58'123', base58'567')"
-    }).mkString("\n")}
+                                s"let a$b = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58'' && sigVerify(base58'333', base58'123', base58'567')"
+                              }).mkString("\n")}
                                |
                                |${(for (b <- 1 to 10) yield { s"a$b" }).mkString("&&")} || true
        """.stripMargin
@@ -49,13 +49,15 @@ object Gen {
 
   def oracleScript(oracle: KeyPair, data: Set[DataEntry[?]], estimator: ScriptEstimator): Script = {
     val conditions =
-      data.map {
-        case IntegerDataEntry(key, value) => s"""(extract(getInteger(oracle, "$key")) == $value)"""
-        case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
-        case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
-        case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
-        case EmptyDataEntry(_)            => ???
-      }.reduce[String] { case (l, r) => s"$l && $r " }
+      data
+        .map {
+          case IntegerDataEntry(key, value) => s"""(extract(getInteger(oracle, "$key")) == $value)"""
+          case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
+          case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
+          case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
+          case EmptyDataEntry(_)            => ???
+        }
+        .reduce[String] { case (l, r) => s"$l && $r " }
 
     val src =
       s"""
@@ -103,7 +105,8 @@ object Gen {
          |$finalStatement
       """.stripMargin
 
-    val (script, _) = ScriptCompiler.compile(src, estimator)
+    val (script, _) = ScriptCompiler
+      .compile(src, estimator)
       .explicitGet()
 
     script

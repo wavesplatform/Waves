@@ -29,7 +29,8 @@ class DynamicWideTransactionGenerator(settings: Settings, accounts: Seq[KeyPair]
 
 object DynamicWideTransactionGenerator {
 
-  case class Settings(start: Int, growAdder: Double, maxTxsPerRequest: Option[Int], limitDestAccounts: Option[Int], minFee: Long, maxFee: Long)derives ConfigReader {
+  case class Settings(start: Int, growAdder: Double, maxTxsPerRequest: Option[Int], limitDestAccounts: Option[Int], minFee: Long, maxFee: Long)
+      derives ConfigReader {
     require(start >= 1)
   }
 

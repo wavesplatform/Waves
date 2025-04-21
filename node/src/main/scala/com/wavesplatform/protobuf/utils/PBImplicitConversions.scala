@@ -12,8 +12,8 @@ object PBImplicitConversions {
 
   implicit class AddressOrAliasToPBExt(val r: va.AddressOrAlias) extends AnyVal {
     def toPB: Recipient = r match {
-      case va.Alias(_, name)     => Recipient.of(Recipient.Recipient.Alias(name))
-      case w: va.Address    => Recipient.of(Recipient.Recipient.PublicKeyHash(PBByteString.copyFrom(w.publicKeyHash)))
+      case va.Alias(_, name) => Recipient.of(Recipient.Recipient.Alias(name))
+      case w: va.Address     => Recipient.of(Recipient.Recipient.PublicKeyHash(PBByteString.copyFrom(w.publicKeyHash)))
 
     }
   }

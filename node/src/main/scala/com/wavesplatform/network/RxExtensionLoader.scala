@@ -53,8 +53,7 @@ object RxExtensionLoader extends ScorexLogging {
     implicit val schdlr: SchedulerService = scheduler
 
     val extensions: ConcurrentSubject[(Channel, ExtensionBlocks), (Channel, ExtensionBlocks)] = ConcurrentSubject.publish[(Channel, ExtensionBlocks)]
-    val simpleBlocksWithSnapshot
-        : ConcurrentSubject[BlockWithSnapshot, BlockWithSnapshot] =
+    val simpleBlocksWithSnapshot: ConcurrentSubject[BlockWithSnapshot, BlockWithSnapshot] =
       ConcurrentSubject.publish[BlockWithSnapshot]
     @volatile var stateValue: State            = State(LoaderState.Idle, ApplierState.Idle)
     val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))
@@ -350,8 +349,10 @@ object RxExtensionLoader extends ScorexLogging {
       if (isLightMode)
         s", non-received snapshots: ${if (totalLeftSnapshots == 1) s"one=${requested.last.trim}" else s"total=$totalLeftSnapshots"}"
       else ""
-    s"Timeout loading one of requested blocks$snapshotShortMsg, non-received blocks: ${if (totalLeftBlocks == 1) s"one=${requested.last.trim}"
-    else s"total=$totalLeftBlocks"}$snapshotsInfo"
+    s"Timeout loading one of requested blocks$snapshotShortMsg, non-received blocks: ${
+        if (totalLeftBlocks == 1) s"one=${requested.last.trim}"
+        else s"total=$totalLeftBlocks"
+      }$snapshotsInfo"
   }
 
   private def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] =
@@ -385,8 +386,10 @@ object RxExtensionLoader extends ScorexLogging {
         timeout: CancelableFuture[Unit]
     ) extends WithPeer {
       override def toString: String =
-        s"ExpectingBlocks($channel,totalBlocks=${allBlocks.size},received=${receivedBlocks.size},expected=${if (expectedBlocks.size == 1) expectedBlocks.head.trim
-        else expectedBlocks.size})"
+        s"ExpectingBlocks($channel,totalBlocks=${allBlocks.size},received=${receivedBlocks.size},expected=${
+            if (expectedBlocks.size == 1) expectedBlocks.head.trim
+            else expectedBlocks.size
+          })"
     }
 
   }

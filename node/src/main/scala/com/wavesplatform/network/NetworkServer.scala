@@ -29,7 +29,7 @@ trait NetworkServer {
 }
 
 object NetworkServer extends ScorexLogging {
-  val MaxFrameLength: Int                  = 100 * 1024 * 1024
+  val MaxFrameLength: Int            = 100 * 1024 * 1024
   private val AverageHandshakePeriod = 1.second
   private val LengthFieldSize        = 4
 

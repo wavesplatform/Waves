@@ -6,7 +6,23 @@ import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.BlockchainApi.BlockchainUpdatesStream
 import com.wavesplatform.api.DefaultBlockchainApi.*
 import com.wavesplatform.api.grpc.BalanceResponse.Balance
-import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, ActivationStatusRequest, AssetRequest, AssetsApiGrpc, BalanceResponse, BalancesRequest, BlockRangeRequest, BlockRequest, BlockWithHeight, BlockchainApiGrpc, BlocksApiGrpc, DataRequest, TransactionsApiGrpc, TransactionsByIdRequest}
+import com.wavesplatform.api.grpc.{
+  AccountRequest,
+  AccountsApiGrpc,
+  ActivationStatusRequest,
+  AssetRequest,
+  AssetsApiGrpc,
+  BalanceResponse,
+  BalancesRequest,
+  BlockRangeRequest,
+  BlockRequest,
+  BlockWithHeight,
+  BlockchainApiGrpc,
+  BlocksApiGrpc,
+  DataRequest,
+  TransactionsApiGrpc,
+  TransactionsByIdRequest
+}
 import com.wavesplatform.api.observers.{ManualGrpcObserver, MonixWrappedDownstream}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf

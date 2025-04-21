@@ -516,7 +516,7 @@ package object database {
       key.parse(db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), readOptions, key.keyBytes))
     def has(key: Key[?]): Boolean = db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes) != null
 
-    def iterateOver(tag: KeyTags.KeyTag, cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Unit): Unit =
+    def iterateOver(tag: KeyTag, cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Unit): Unit =
       iterateOver(tag.prefixBytes, cfh)(f)
 
     def iterateOver(prefix: Array[Byte], cfh: Option[ColumnFamilyHandle])(f: DBEntry => Unit): Unit = {
@@ -655,15 +655,15 @@ package object database {
     val (m, tx) = v
     val ptx = tx match {
       case lps: (PBSince & Versioned) if PBSince.affects(lps) => TD.WavesTransaction(PBTransactions.protobuf(tx))
-      case et: EthereumTransaction                             => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
-      case _                                                   => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case et: EthereumTransaction                            => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+      case _                                                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
     }
     pb.TransactionData(ptx, m.status.protobuf, m.spentComplexity).toByteArray
   }
 
   def loadTransactions(height: Height, rdb: RDB): Seq[(TxMeta, Transaction)] = {
     val transactions = Seq.newBuilder[(TxMeta, Transaction)]
-    rdb.db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txHandle.handle)) { e =>
+    rdb.db.iterateOver(KeyTag.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txHandle.handle)) { e =>
       transactions += readTransaction(height)(e.getValue)
     }
     transactions.result()
@@ -671,7 +671,7 @@ package object database {
 
   def loadTxStateSnapshots(height: Height, rdb: RDB): Seq[TransactionStateSnapshot] = {
     val txSnapshots = Seq.newBuilder[TransactionStateSnapshot]
-    rdb.db.iterateOver(KeyTags.NthTransactionStateSnapshotAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txSnapshotHandle.handle)) { e =>
+    rdb.db.iterateOver(KeyTag.NthTransactionStateSnapshotAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txSnapshotHandle.handle)) { e =>
       txSnapshots += TransactionStateSnapshot.parseFrom(e.getValue)
     }
     txSnapshots.result()
@@ -731,10 +731,10 @@ package object database {
     @inline
     def keyInRange(): Boolean = {
       val actualKey = iterator.key()
-      actualKey.startsWith(KeyTags.LeaseDetails.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
+      actualKey.startsWith(KeyTag.LeaseDetails.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
     }
 
-    iterator.seek(KeyTags.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
+    iterator.seek(KeyTag.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
     while (iterator.isValid && keyInRange()) {
       val leaseId = ByteStr(iterator.key().drop(6))
       if (includeCancelled || readLeaseDetails(iterator.value()).isActive)
@@ -751,13 +751,13 @@ package object database {
   opaque type AddressId = Long
 
   object AddressId {
-    def apply(l: Long): AddressId = l
-    def raw(x: AddressId): Long   = x
+    def apply(l: Long): AddressId                 = l
+    def raw(x: AddressId): Long                   = x
     def fromByteArray(bs: Array[Byte]): AddressId = Longs.fromByteArray(bs)
 
     extension (x: AddressId) {
       def toByteArray: Array[Byte] = Longs.toByteArray(x)
-      def toLong: Long = x
+      def toLong: Long             = x
     }
   }
 

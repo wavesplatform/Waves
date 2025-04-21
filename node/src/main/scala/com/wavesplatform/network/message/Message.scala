@@ -25,7 +25,7 @@ case class Message[Content <: AnyRef](spec: MessageSpec[Content], input: Either[
     val dataWithChecksum = if (dataLength > 0) {
       val checksum = crypto.fastHash(dataBytes).take(ChecksumLength)
       Bytes.concat(checksum, dataBytes)
-    } else dataBytes //empty array
+    } else dataBytes // empty array
 
     Bytes.concat(MagicBytes, Array(spec.messageCode), Ints.toByteArray(dataLength), dataWithChecksum)
   }

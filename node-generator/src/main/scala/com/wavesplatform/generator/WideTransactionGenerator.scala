@@ -20,7 +20,7 @@ class WideTransactionGenerator(settings: Settings, accounts: Seq[KeyPair]) exten
 
 object WideTransactionGenerator {
 
-  case class Settings(transactions: Int, limitDestAccounts: Option[Int], minFee: Long, maxFee: Long)derives ConfigReader {
+  case class Settings(transactions: Int, limitDestAccounts: Option[Int], minFee: Long, maxFee: Long) derives ConfigReader {
     require(transactions > 0)
     require(limitDestAccounts.forall(_ > 0))
   }

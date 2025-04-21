@@ -5,10 +5,10 @@ import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 
 @JSExportTopLevel("NodeConnectionSettings")
 case class NodeConnectionSettings(
-  @(JSExport @field) url: String,
-  @(JSExport @field) chainId: Byte,
-  @(JSExport @field) address: String
+    @(JSExport @field) url: String,
+    @(JSExport @field) chainId: Byte,
+    @(JSExport @field) address: String
 ) {
-  private val endSlash = "(/*)$".r
+  private val endSlash      = "(/*)$".r
   def normalizedUrl: String = endSlash.replaceAllIn(url, "")
 }

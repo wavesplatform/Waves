@@ -50,7 +50,7 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
 }
 
 object OracleTransactionGenerator extends ConfigReaders {
-  final case class Settings(transactions: Int, requiredData: Set[DataEntry[?]])derives ConfigReader
+  final case class Settings(transactions: Int, requiredData: Set[DataEntry[?]]) derives ConfigReader
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>

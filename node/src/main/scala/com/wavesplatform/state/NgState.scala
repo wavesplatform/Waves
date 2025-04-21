@@ -157,7 +157,7 @@ case class NgState(
 
     val microSnapshots =
       this.microSnapshots + (blockId -> CachedMicroDiff(snapshot, microblockCarry, microblockTotalFee, computedStateHash, timestamp))
-    val microBlocks = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
+    val microBlocks    = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
     internalCaches.invalidate(blockId)
     this.copy(microSnapshots = microSnapshots, microBlocks = microBlocks)
   }

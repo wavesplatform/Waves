@@ -20,8 +20,8 @@ package object smart {
       scriptContainerAddress: Tthis
   ): Either[String, InputEntity] =
     in match {
-      case tx: TransactionBase => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, scriptContainerAddress))
-      case order: Order => RealTransactionWrapper.ord(order).asRight
+      case tx: TransactionBase      => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, scriptContainerAddress))
+      case order: Order             => RealTransactionWrapper.ord(order).asRight
       case scriptTransfer: PseudoTx => scriptTransfer.asRight
     }
 
@@ -32,10 +32,10 @@ package object smart {
     (ds.scriptType, ds.contentType) match {
       case (Account, DAppType)   => DAppTarget
       case (Account, Expression) => InvokerScript
-      case (AssetType, Expression) => 
+      case (AssetType, Expression) =>
         scriptContainerAddress match {
           case _: Recipient.Address => throw new Exception("Not a AssetId")
-          case a: AssetId => AssetScript(ByteStr(a.id))
+          case a: AssetId           => AssetScript(ByteStr(a.id))
         }
       case _ => ???
     }

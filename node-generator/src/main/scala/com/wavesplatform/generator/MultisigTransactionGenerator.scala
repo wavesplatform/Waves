@@ -69,7 +69,7 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
 }
 
 object MultisigTransactionGenerator {
-  final case class Settings(transactions: Int, firstRun: Boolean)derives ConfigReader
+  final case class Settings(transactions: Int, firstRun: Boolean) derives ConfigReader
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>

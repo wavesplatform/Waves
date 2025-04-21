@@ -71,10 +71,9 @@ object Deser {
       arraysCount <= (bytes.length - 2) / 2,
       s"Bytes with length = ${bytes.length - 2} can't contain $arraysCount array(s)"
     )
-    val r = (0 until arraysCount).foldLeft((Seq.empty[Array[Byte]], 2)) {
-      case ((acc, pos), _) =>
-        val (arr, nextPos) = parseArrayWithLength(bytes, pos)
-        (acc :+ arr, nextPos)
+    val r = (0 until arraysCount).foldLeft((Seq.empty[Array[Byte]], 2)) { case ((acc, pos), _) =>
+      val (arr, nextPos) = parseArrayWithLength(bytes, pos)
+      (acc :+ arr, nextPos)
     }
     r._1
   }

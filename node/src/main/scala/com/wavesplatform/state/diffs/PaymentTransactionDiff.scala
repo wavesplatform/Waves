@@ -14,10 +14,12 @@ object PaymentTransactionDiff {
       Left(GenericError(s"Payment transaction is deprecated after h=$blockVersion3AfterHeight"))
     else {
       for {
-        portfolios <- Portfolio.combine(
-          Map(tx.recipient        -> Portfolio(tx.amount.value)),
-          Map(tx.sender.toAddress -> Portfolio(-tx.amount.value - tx.fee.value))
-        ).leftMap(GenericError(_))
+        portfolios <- Portfolio
+          .combine(
+            Map(tx.recipient        -> Portfolio(tx.amount.value)),
+            Map(tx.sender.toAddress -> Portfolio(-tx.amount.value - tx.fee.value))
+          )
+          .leftMap(GenericError(_))
         snapshot <- StateSnapshot.build(blockchain, portfolios)
       } yield snapshot
     }

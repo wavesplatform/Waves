@@ -15,8 +15,8 @@ package object block {
 
   // Validation
   private[block] implicit class BlockValidationOps(val block: Block) extends AnyVal {
-    def validate: Validation[Block]                             = validateBlock(block)
-    def validateToTry: Try[Block]                               = toTry(validateBlock(block))
+    def validate: Validation[Block]                                                       = validateBlock(block)
+    def validateToTry: Try[Block]                                                         = toTry(validateBlock(block))
     def validateGenesis(gs: GenesisSettings, rideV6Activated: Boolean): Validation[Block] = validateGenesisBlock(block, gs, rideV6Activated)
   }
 

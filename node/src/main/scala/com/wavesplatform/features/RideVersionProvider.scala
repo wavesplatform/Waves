@@ -8,12 +8,12 @@ import com.wavesplatform.state.Blockchain
 object RideVersionProvider {
   val actualVersionByFeature =
     List(
-      LightNode -> V8,
-      BlockRewardDistribution  -> V7,
-      RideV6                   -> V6,
-      SynchronousCalls         -> V5,
-      BlockV5                  -> V4,
-      Ride4DApps               -> V3
+      LightNode               -> V8,
+      BlockRewardDistribution -> V7,
+      RideV6                  -> V6,
+      SynchronousCalls        -> V5,
+      BlockV5                 -> V4,
+      Ride4DApps              -> V3
     )
 
   DirectiveDictionary[StdLibVersion].all

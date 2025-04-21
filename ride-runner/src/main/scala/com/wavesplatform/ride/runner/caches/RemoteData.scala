@@ -12,12 +12,12 @@ object RemoteData {
   }
 
   case object Absence extends RemoteData[Nothing] {
-    override val loaded     = true
+    override val loaded                      = true
     override val mayBeValue: Option[Nothing] = None
   }
 
   case object Unknown extends RemoteData[Nothing] {
-    override val loaded     = false
+    override val loaded                      = false
     override val mayBeValue: Option[Nothing] = None
   }
 

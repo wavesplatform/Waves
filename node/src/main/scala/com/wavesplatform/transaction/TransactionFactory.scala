@@ -446,7 +446,7 @@ object TransactionFactory {
         val version = value getOrElse (1: Byte)
         val txJson  = jsv ++ Json.obj("version" -> version)
 
-        try
+        try {
           (TransactionType(typeId): @unchecked) match {
             case TransactionType.Transfer        => TransactionFactory.transferAsset(txJson.as[TransferRequest], wallet, signerAddress, time)
             case TransactionType.CreateAlias     => TransactionFactory.createAlias(txJson.as[CreateAliasRequest], wallet, signerAddress, time)
@@ -462,7 +462,8 @@ object TransactionFactory {
             case TransactionType.SetAssetScript  => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
             case TransactionType.SponsorFee      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
             case TransactionType.UpdateAssetInfo => TransactionFactory.updateAssetInfo(txJson.as[UpdateAssetInfoRequest], wallet, signerAddress, time)
-          } catch {
+          }
+        } catch {
           case _: NoSuchElementException => Left(UnsupportedTypeAndVersion(typeId, version))
           case _: MatchError             => Left(UnsupportedTransactionType)
         }

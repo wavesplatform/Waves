@@ -68,7 +68,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
 }
 
 object SmartGenerator {
-  final case class Settings(scripts: Int, transfers: Int, complexity: Boolean, exchange: Int, assets: Set[String])derives ConfigReader {
+  final case class Settings(scripts: Int, transfers: Int, complexity: Boolean, exchange: Int, assets: Set[String]) derives ConfigReader {
     require(scripts >= 0)
     require(transfers >= 0)
     require(exchange >= 0)

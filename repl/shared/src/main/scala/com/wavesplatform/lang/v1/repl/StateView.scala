@@ -9,12 +9,12 @@ case class StateView(ctx: CompilerContext) {
     declMap.values.mkString("\n")
 
   lazy val declMap: Map[String, String] =
-     (ListMap() ++ funcs ++ values ++ types).withDefault(s => s"$s not found in context")
+    (ListMap() ++ funcs ++ values ++ types).withDefault(s => s"$s not found in context")
 
   private lazy val funcs: Map[String, String] =
     ctx.functionDefs
       .filterNot(_._1.startsWith(internalFuncPrefix))
-      .map { case (name, info) => (name, DeclPrinter.overloadFuncStr(name, info.fSigList))}
+      .map { case (name, info) => (name, DeclPrinter.overloadFuncStr(name, info.fSigList)) }
 
   private lazy val values: Map[String, String] =
     ctx.varDefs

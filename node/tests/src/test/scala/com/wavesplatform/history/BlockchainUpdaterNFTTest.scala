@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.database.{KeyTags, Keys}
+import com.wavesplatform.database.{KeyTag, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -89,7 +89,7 @@ class BlockchainUpdaterNFTTest extends PropSpec with DomainScenarioDrivenPropert
         val persistedNfts = Seq.newBuilder[IssuedAsset]
         d.rdb.db.readOnly { ro =>
           val addressId = ro.get(Keys.addressId(firstAccount)).get
-          ro.iterateOver(KeyTags.NftPossession.prefixBytes ++ addressId.toByteArray, Some(d.rdb.apiHandle.handle)) { e =>
+          ro.iterateOver(KeyTag.NftPossession.prefixBytes ++ addressId.toByteArray, Some(d.rdb.apiHandle.handle)) { e =>
             persistedNfts += IssuedAsset(ByteStr(e.getKey.takeRight(32)))
           }
         }

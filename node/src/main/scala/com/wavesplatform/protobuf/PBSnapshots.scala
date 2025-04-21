@@ -33,9 +33,13 @@ object PBSnapshots {
       cancelledLeases = snapshot.cancelledLeases.view.map { case (id, _) =>
         S.CancelledLease(id.toByteString)
       }.toSeq,
-      assetStatics.map { case (id, (st, idx)) =>
-        (idx, NewAsset(id.id.toByteString, st.issuer.toByteString, st.decimals, st.nft))
-      }.toSeq.sortBy(_._1).map(_._2),
+      assetStatics
+        .map { case (id, (st, idx)) =>
+          (idx, NewAsset(id.id.toByteString, st.issuer.toByteString, st.decimals, st.nft))
+        }
+        .toSeq
+        .sortBy(_._1)
+        .map(_._2),
       assetVolumes.map { case (asset, info) =>
         S.AssetVolume(asset.id.toByteString, info.isReissuable, ByteString.copyFrom(info.volume.toByteArray))
       }.toSeq,
@@ -86,13 +90,16 @@ object PBSnapshots {
 
     val assetStatics: Map[IssuedAsset, (AssetStaticInfo, Int)] =
       pbSnapshot.assetStatics.zipWithIndex.map { case (info, idx) =>
-        info.assetId.toIssuedAssetId -> (AssetStaticInfo(
-          info.assetId.toByteStr,
-          TransactionId(txId),
-          PublicKey(info.issuerPublicKey.toByteStr),
-          info.decimals,
-          info.nft
-        ), idx + 1)
+        info.assetId.toIssuedAssetId -> (
+          AssetStaticInfo(
+            info.assetId.toByteStr,
+            TransactionId(txId),
+            PublicKey(info.issuerPublicKey.toByteStr),
+            info.decimals,
+            info.nft
+          ),
+          idx + 1
+        )
       }.toMap
 
     val assetVolumes: Map[IssuedAsset, AssetVolumeInfo] =

@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.database.{DBExt, KeyTags, Keys}
+import com.wavesplatform.database.{DBExt, KeyTag, Keys}
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.lang.v1.traits.DataType.{Boolean, ByteArray, Long}
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -138,7 +138,7 @@ object WavesEnvironmentRebenchmark {
   class St extends DBState {
     lazy val allAliases: Vector[Alias] = {
       val builder = Vector.newBuilder[Alias]
-      rdb.db.iterateOver(KeyTags.AddressIdOfAlias) { e =>
+      rdb.db.iterateOver(KeyTag.AddressIdOfAlias) { e =>
         builder += Alias.fromBytes(e.getKey.drop(2), None).explicitGet()
       }
       builder.result()
@@ -146,7 +146,7 @@ object WavesEnvironmentRebenchmark {
 
     lazy val allAssets: Vector[Array[Byte]] = {
       val builder = Vector.newBuilder[Array[Byte]]
-      rdb.db.iterateOver(KeyTags.AssetDetailsHistory) { e =>
+      rdb.db.iterateOver(KeyTag.AssetDetailsHistory) { e =>
         builder += e.getKey.drop(2)
       }
       builder.result()
@@ -154,7 +154,7 @@ object WavesEnvironmentRebenchmark {
 
     lazy val allAddresses: IndexedSeq[Recipient.Address] = {
       val builder = Vector.newBuilder[Recipient.Address]
-      rdb.db.iterateOver(KeyTags.AddressId) { entry =>
+      rdb.db.iterateOver(KeyTag.AddressId) { entry =>
         builder += Recipient.Address(ByteStr(entry.getKey.drop(2)))
       }
       builder.result()

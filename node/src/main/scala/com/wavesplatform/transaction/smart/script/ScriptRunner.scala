@@ -170,7 +170,7 @@ object ScriptRunner {
                     e => (Nil, 0, Left(e)),
                     tx => verify(Bindings.transactionObject(tx, proofsEnabled = true, bindingsVersion, fixBigScriptField))
                   )
-              case o: Order => verify(Bindings.orderObject(RealTransactionWrapper.ord(o), proofsEnabled = true, bindingsVersion))
+              case o: Order    => verify(Bindings.orderObject(RealTransactionWrapper.ord(o), proofsEnabled = true, bindingsVersion))
               case _: PseudoTx => ???
             }
         }
@@ -181,7 +181,7 @@ object ScriptRunner {
           in match {
             case t: TransactionBase => t.asInstanceOf[Proven & Authorized]
             case o: Order           => o.asInstanceOf[Proven & Authorized]
-            case _: PseudoTx => ???
+            case _: PseudoTx        => ???
           }
 
         (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven, checkWeakPk).bimap(_.err, _ => TRUE))

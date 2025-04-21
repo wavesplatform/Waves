@@ -18,9 +18,9 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
   private def serializeWithNumberAsStrings(value: JsValue, json: JsonGenerator, provider: SerializerProvider, insideStringifiedField: Boolean): Unit =
     value match {
       case JsNumber(v) if insideStringifiedField => json.writeString(v.bigDecimal.toPlainString)
-      case JsNumber(v) => json.writeNumber(v.bigDecimal)
-      case JsString(v) => json.writeString(v)
-      case v: JsBoolean => json.writeBoolean(v.value)
+      case JsNumber(v)                           => json.writeNumber(v.bigDecimal)
+      case JsString(v)                           => json.writeString(v)
+      case v: JsBoolean                          => json.writeBoolean(v.value)
 
       case JsArray(elements) =>
         json.writeStartArray()

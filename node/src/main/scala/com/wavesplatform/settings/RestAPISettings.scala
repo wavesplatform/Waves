@@ -18,4 +18,4 @@ case class RestAPISettings(
     limitedPoolThreads: Int,
     heavyRequestProcessorPoolThreads: Option[Int],
     minimumPeers: Int
-) derives ConfigReader 
+) derives ConfigReader

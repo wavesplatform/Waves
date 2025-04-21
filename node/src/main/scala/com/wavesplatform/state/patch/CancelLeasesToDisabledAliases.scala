@@ -26,13 +26,15 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
       val leaseId          = ByteStr(Base58.decode(cancelDetails.id))
       val sender           = PublicKey(Base58.decode(cancelDetails.senderPublicKey))
       val recipientAddress = Address.fromString(cancelDetails.recipientAddress).explicitGet()
-      leaseId -> (Portfolio
-        .combine(
-          Map(sender.toAddress -> Portfolio(lease = LeaseBalance(0, -cancelDetails.amount))),
-          Map(recipientAddress -> Portfolio(lease = LeaseBalance(-cancelDetails.amount, 0)))
-        )
-        .explicitGet(),
-      recipientAddress)
+      leaseId -> (
+        Portfolio
+          .combine(
+            Map(sender.toAddress -> Portfolio(lease = LeaseBalance(0, -cancelDetails.amount))),
+            Map(recipientAddress -> Portfolio(lease = LeaseBalance(-cancelDetails.amount, 0)))
+          )
+          .explicitGet(),
+        recipientAddress
+      )
     }.toMap
   }
 

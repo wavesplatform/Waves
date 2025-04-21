@@ -22,15 +22,27 @@ abstract class Key[V](prefix: Short, val name: String, val suffix: Array[Byte], 
 
 object Key {
   private val converter   = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_HYPHEN)
-  private val keyTagToStr = KeyTags.values.toArray.sortBy(_.id).map(v => converter.convert(v.toString))
+  private val keyTagToStr = KeyTag.values.sortBy(_.ordinal).map(v => converter.convert(v.toString))
 
-  def apply[V](keyTag: KeyTags.KeyTag, keySuffix: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte], cfh: Option[ColumnFamilyHandle] = None): Key[V] =
-    new Key[V](keyTag.id.toShort, keyTagToStr(keyTag.id), keySuffix, cfh) {
+  def apply[V](
+      keyTag: KeyTag,
+      keySuffix: Array[Byte],
+      parser: Array[Byte] => V,
+      encoder: V => Array[Byte],
+      cfh: Option[ColumnFamilyHandle] = None
+  ): Key[V] =
+    new Key[V](keyTag.ordinal.toShort, keyTagToStr(keyTag.ordinal), keySuffix, cfh) {
       override def parse(bytes: Array[Byte]): V = parser(bytes)
       override def encode(v: V): Array[Byte]    = encoder(v)
     }
 
-  def opt[V](keyTag: KeyTags.KeyTag, keySuffix: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte], cfh: Option[ColumnFamilyHandle] = None): Key[Option[V]] =
+  def opt[V](
+      keyTag: KeyTag,
+      keySuffix: Array[Byte],
+      parser: Array[Byte] => V,
+      encoder: V => Array[Byte],
+      cfh: Option[ColumnFamilyHandle] = None
+  ): Key[Option[V]] =
     apply[Option[V]](
       keyTag,
       keySuffix,

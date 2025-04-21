@@ -15,7 +15,7 @@ private final class OnErrorRetryWithObservable[A](source: Observable[A], p: Part
   private def loop(subscriber: Subscriber[A], task: OrderedCancelable, retryIdx: Long, firstMessage: Option[A]): Unit = {
     val cancelable = source.unsafeSubscribeFn(new Subscriber[A] {
       implicit val scheduler: Scheduler = subscriber.scheduler
-      private var isDone          = false
+      private var isDone                = false
 
       // This should be here, calling subscriber.onNext in onError doesn't work
       private var ack: Future[Ack] = firstMessage.fold[Future[Ack]](Continue)(subscriber.onNext)

@@ -307,7 +307,7 @@ object DAppEnvironment {
   final case class InvocationTreeTracker(root: DAppInvocation) {
     private var result: Either[ValidationError, ScriptResult] = Left(GenericError("No result"))
     private var log: Log[Id]                                  = Nil
-    private var invocations                             = Vector.empty[InvocationTreeTracker]
+    private var invocations                                   = Vector.empty[InvocationTreeTracker]
 
     def record(invocation: DAppInvocation): InvocationTreeTracker = {
       val tracker = InvocationTreeTracker(invocation)

@@ -40,7 +40,9 @@ trait ReadOnly {
   def iterateOverPrefix[KeyT, ValueT](
       kvPair: KvPair[KeyT, ValueT],
       seekKey: KeyT
-  )(f: DbPair[KeyT, ValueT] => Unit): Unit = iterateOverPrefixContinue(kvPair, seekKey) { p => f(p); true }
+  )(f: DbPair[KeyT, ValueT] => Unit): Unit = iterateOverPrefixContinue(kvPair, seekKey) { p =>
+    f(p); true
+  }
 
   def iterateOverPrefix[ValueT](seekKey: Key[ValueT])(f: DBEntry => Unit): Unit =
     iterateOverPrefixContinue(seekKey.keyBytes, seekKey.columnFamilyHandle) { p =>

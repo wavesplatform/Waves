@@ -56,7 +56,7 @@ object TxHelpers {
   val matcher: SeedKeyPair = defaultSigner
 
   private val lastTimestamp = AtomicLong(System.currentTimeMillis())
-  def timestamp: Long             = lastTimestamp.getAndIncrement()
+  def timestamp: Long       = lastTimestamp.getAndIncrement()
 
   @throws[IllegalArgumentException]
   def signature(sig: String): Proofs =
@@ -114,9 +114,18 @@ object TxHelpers {
       version: Byte = TxVersion.V2,
       chainId: Byte = AddressScheme.current.chainId
   ): MassTransferTransaction =
-    MassTransferTransaction.selfSigned(version, from, asset,
-      to.map { case (r, a) => MassTransferTransaction.ParsedTransfer(r, TxNonNegativeAmount.unsafeFrom(a)) },
-      fee, timestamp, ByteStr.empty, chainId).explicitGet()
+    MassTransferTransaction
+      .selfSigned(
+        version,
+        from,
+        asset,
+        to.map { case (r, a) => MassTransferTransaction.ParsedTransfer(r, TxNonNegativeAmount.unsafeFrom(a)) },
+        fee,
+        timestamp,
+        ByteStr.empty,
+        chainId
+      )
+      .explicitGet()
 
   def issue(
       issuer: KeyPair = defaultSigner,

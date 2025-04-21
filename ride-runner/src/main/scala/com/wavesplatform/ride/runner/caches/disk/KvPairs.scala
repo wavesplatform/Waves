@@ -173,7 +173,9 @@ object KvPairs {
   }
 
   val weighedAssetDescriptionAsBytes: AsBytes[WeighedAssetDescription] =
-    AsBytes.tuple2(intAsBytes, assetDescriptionAsBytes).transform(Function.tupled(WeighedAssetDescription.apply), x => (x.scriptWeight, x.assetDescription))
+    AsBytes
+      .tuple2(intAsBytes, assetDescriptionAsBytes)
+      .transform(Function.tupled(WeighedAssetDescription.apply), x => (x.scriptWeight, x.assetDescription))
   object AssetDescriptions
       extends KvPair[(state.Height, Asset.IssuedAsset), Option[WeighedAssetDescription]](72)(
         implicitly,

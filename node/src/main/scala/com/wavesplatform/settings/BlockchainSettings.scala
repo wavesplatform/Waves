@@ -79,7 +79,7 @@ case class FunctionalitySettings(
     lightNodeBlockFieldsAbsenceInterval: Int = 1000,
     blockRewardBoostPeriod: Int = 1000,
     paymentsCheckHeight: Int = 0,
-    unitsRegistryAddress: Option[String] = None,
+    unitsRegistryAddress: Option[String] = None
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -122,7 +122,7 @@ case class FunctionalitySettings(
 
 object FunctionalitySettings {
   // This given is required for default args to work.
-  // Details: https://github.com/pureconfig/pureconfig/issues/1673 
+  // Details: https://github.com/pureconfig/pureconfig/issues/1673
   // Note: the proposed approach with `extension` doesn't work.
   given ConfigReader[FunctionalitySettings] = deriveReader
 

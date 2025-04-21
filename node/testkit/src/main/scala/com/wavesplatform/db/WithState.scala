@@ -7,7 +7,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.{GenesisBlockVersion, GenesisGenerationSignature, GenesisGenerator, GenesisReference}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.database.{KeyTags, RDB, RocksDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.database.{KeyTag, RDB, RocksDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -42,7 +42,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
   private val path  = Files.createTempDirectory(s"rocks-temp-${getClass.getSimpleName}").toAbsolutePath
   protected val rdb = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
 
-  private val MaxKey = Shorts.toByteArray(KeyTags.maxId.toShort)
+  private val MaxKey = Shorts.toByteArray(KeyTag.values.length.toShort)
   private val MinKey = new Array[Byte](2)
 
   protected def tempDb[A](f: RDB => A): A = {
@@ -348,7 +348,8 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
              )
              .map(Some(_))
          }
-     } else TracedResult(Right(None))).flatMap { stateHash =>
+     } else TracedResult(Right(None)))
+    .flatMap { stateHash =>
       TracedResult(
         Block
           .buildAndSign(
