@@ -193,6 +193,9 @@ object Verifier extends ScorexLogging {
           complexityLimit
         )
       val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else estimatedComplexity
+
+      println(f"[VERIFIER]\t${transaction.id()}%s: $complexity%5d")
+
       val resultE = result match {
         case Left(execError) => Left(ScriptExecutionError(execError.message, log, assetIdOpt))
         case Right(FALSE)    => Left(TransactionNotAllowedByScript(log, assetIdOpt))
