@@ -1030,8 +1030,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         generatedSum: Int = 0,
         acc: List[Int] = Nil
     ): List[Int] =
-      if (acc.size + 1 == piecesNumber)
-        expectedSum - generatedSum :: acc
+      if (acc.size + 1 == piecesNumber) expectedSum - generatedSum :: acc
       else {
         val max                     = expectedSum - generatedSum - piecesNumber + acc.size + 1
         val distributionCoefficient = random.nextInt(Math.min(max, piecesNumber)) + 1
@@ -1337,6 +1336,100 @@ class EvaluatorV2Test extends PropSpec with Inside {
       )
       .value()
     r shouldBe Left(_: CommonError, 8, _: List[Any])
+  }
+
+  property("valueOrErrorMessage complexity correct expression") {
+    val limit = 42
+
+    val scriptThrow =
+      """
+        | let t = if (true) then unit else true
+        | let foo = valueOrErrorMessage(t, "foo-bar-baz")
+        | foo == foo
+      """.stripMargin
+    Seq(
+      //
+      (V1, 9, false),
+      (V2, 9, false),
+      (V3, 9, false),
+      (V4, 9, false),
+      (V5, 9, false),
+      (V6, 9, false),
+      (V7, 9, false),
+      (V8, 9, false),
+      //
+      (V1, 15, true),
+      (V2, 15, true),
+      (V3, 15, true),
+      (V4, 4, true),
+      (V5, 4, true),
+      (V6, 4, true),
+      (V7, 4, true),
+      (V8, 4, true)
+    ).foreach((v, spentComplexity, newMode) => {
+      val r = EvaluatorV2
+        .applyLimitedCoeval(
+          compile(scriptThrow),
+          LogExtraInfo(),
+          limit,
+          ctx.evaluationContext(environment),
+          v,
+          correctFunctionCallScope = true,
+          newMode = newMode,
+          fixedThrownError = true
+        )
+        .value()
+      r match {
+        case Left(_: CommonError, unusedComplexity, _: List[Any]) =>
+          unusedComplexity shouldBe (limit - spentComplexity)
+        case _ => fail("Expected a CommonError")
+      }
+    })
+    // --------------------------------------------------
+    val scriptNoThrow =
+      """
+        | let t = if (false) then unit else true
+        | let foo = valueOrErrorMessage(t, "foo-bar-baz")
+        | foo == foo
+      """.stripMargin
+    Seq(
+      //
+      (V1, 10, false),
+      (V2, 10, false),
+      (V3, 10, false),
+      (V4, 10, false),
+      (V5, 10, false),
+      (V6, 10, false),
+      (V7, 10, false),
+      (V8, 10, false),
+      //
+      (V1, 14, true),
+      (V2, 14, true),
+      (V3, 14, true),
+      (V4, 3, true),
+      (V5, 3, true),
+      (V6, 3, true),
+      (V7, 3, true),
+      (V8, 3, true)
+    ).foreach((v, spentComplexity, newMode) => {
+      val r = EvaluatorV2
+        .applyLimitedCoeval(
+          compile(scriptNoThrow),
+          LogExtraInfo(),
+          limit,
+          ctx.evaluationContext(environment),
+          v,
+          correctFunctionCallScope = true,
+          newMode = newMode,
+          fixedThrownError = true
+        )
+        .value()
+      r match {
+        case Right(_: CONST_BOOLEAN, unusedComplexity, _: List[Any]) =>
+          unusedComplexity shouldBe (limit - spentComplexity)
+        case _ => fail("Expected Right")
+      }
+    })
   }
 
   property("throw with and without message") {
