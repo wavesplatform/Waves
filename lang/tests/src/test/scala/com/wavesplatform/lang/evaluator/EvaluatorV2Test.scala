@@ -1338,6 +1338,96 @@ class EvaluatorV2Test extends PropSpec with Inside {
     r shouldBe Left(_: CommonError, 8, _: List[Any])
   }
 
+  property("valueOrErrorMessage complexity") {
+    val limit = 42
+
+    val scriptThrow =
+      """
+        | valueOrErrorMessage(if (true) then unit else true, "foo-bar-baz")
+      """.stripMargin
+    Seq(
+      //
+      (V1, 8, false),
+      (V2, 8, false),
+      (V3, 8, false),
+      (V4, 8, false),
+      (V5, 8, false),
+      (V6, 8, false),
+      (V7, 8, false),
+      (V8, 8, false),
+      //
+      (V1, 15, true),
+      (V2, 15, true),
+      (V3, 15, true),
+      (V4, 4, true),
+      (V5, 4, true),
+      (V6, 4, true),
+      (V7, 4, true),
+      (V8, 4, true)
+    ).foreach((v, spentComplexity, newMode) => {
+      val r = EvaluatorV2
+        .applyLimitedCoeval(
+          compile(scriptThrow),
+          LogExtraInfo(),
+          limit,
+          ctx.evaluationContext(environment),
+          v,
+          correctFunctionCallScope = true,
+          newMode = newMode,
+          fixedThrownError = true
+        )
+        .value()
+      r match {
+        case Left(_: CommonError, unusedComplexity, _: List[Any]) =>
+          unusedComplexity shouldBe (limit - spentComplexity)
+        case _ => fail("Expected a CommonError")
+      }
+    })
+    // --------------------------------------------------
+    val scriptNoThrow =
+      """
+        | valueOrErrorMessage(if (false) then unit else true, "foo-bar-baz")
+      """.stripMargin
+    Seq(
+      //
+      (V1, 6, false),
+      (V2, 6, false),
+      (V3, 6, false),
+      (V4, 6, false),
+      (V5, 6, false),
+      (V6, 6, false),
+      (V7, 6, false),
+      (V8, 6, false),
+      //
+      (V1, 13, true),
+      (V2, 13, true),
+      (V3, 13, true),
+      (V4, 2, true),
+      (V5, 2, true),
+      (V6, 2, true),
+      (V7, 2, true),
+      (V8, 2, true)
+    ).foreach((v, spentComplexity, newMode) => {
+      val r = EvaluatorV2
+        .applyLimitedCoeval(
+          compile(scriptNoThrow),
+          LogExtraInfo(),
+          limit,
+          ctx.evaluationContext(environment),
+          v,
+          correctFunctionCallScope = true,
+          newMode = newMode,
+          fixedThrownError = true
+        )
+        .value()
+      r match {
+        case Right(_: CONST_BOOLEAN, unusedComplexity, _: List[Any]) =>
+          unusedComplexity shouldBe (limit - spentComplexity)
+        case _ => fail("Expected Right")
+      }
+    })
+  }
+
   property("valueOrErrorMessage complexity correct expression") {
     val limit = 42
 
