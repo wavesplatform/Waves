@@ -70,7 +70,7 @@ case class Block(
 
   private[block] val transactionsMerkleTree: Coeval[TransactionsMerkleTree] = Coeval.evalOnce(mkMerkleTree(transactionData))
 
-  private[block] val originalHeader: Coeval[BlockHeader] =
+  val originalHeader: Coeval[BlockHeader] =
     Coeval.evalOnce(
       header.challengedHeader
         .map { ch =>

@@ -1,50 +1,40 @@
 package com.wavesplatform.state
 
-import cats.syntax.parallel.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
-import com.wavesplatform.utils.Schedulers
-import monix.eval.Task
-import monix.execution.schedulers.SchedulerService
+
+import java.util.concurrent.*
 
 object ParSignatureChecker {
-  implicit val sigverify: SchedulerService = Schedulers.fixedPool(4, "sigverify")
+
+  private val rejectedHandler: RejectedExecutionHandler = (r: Runnable, executor: ThreadPoolExecutor) =>
+    try executor.getQueue.put(r)
+    catch {
+      case ie: InterruptedException =>
+        Thread.currentThread().interrupt()
+        throw new RejectedExecutionException("Task submission interrupted", ie)
+    }
+
+  private val sigverify = new ThreadPoolExecutor(4, 8, 10, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable](100000), rejectedHandler)
 
   def checkTxSignatures(txs: Seq[Transaction], rideV6Activated: Boolean): Unit =
-    txs
-      .parUnorderedTraverse {
-        case tx: ProvenTransaction =>
-          Task {
-            if (rideV6Activated) {
-              tx.firstProofIsValidSignatureAfterV6
-            } else {
-              tx.firstProofIsValidSignatureBeforeV6
-            }
-          }.void
-        case _ => Task.unit
-      }
-      .executeOn(sigverify)
-      .runAsyncAndForget
+    txs.foreach {
+      case tx: ProvenTransaction =>
+        if (rideV6Activated) {
+          sigverify.execute(() => tx.firstProofIsValidSignatureAfterV6)
+        } else {
+          sigverify.execute(() => tx.firstProofIsValidSignatureBeforeV6)
+        }
+      case _ =>
+    }
 
-  def checkBlockAndTxSignatures(block: Block, checkTxSignatures: Boolean, rideV6Activated: Boolean): Unit = {
-    val verifiedObjects: Seq[Any] = (block +: block.transactionData)
-    verifiedObjects
-      .parTraverse {
-        case tx: ProvenTransaction if checkTxSignatures =>
-          Task {
-            if (rideV6Activated) {
-              tx.firstProofIsValidSignatureAfterV6
-            } else {
-              tx.firstProofIsValidSignatureBeforeV6
-            }
-          }.void
-        case b: Block => Task(b.signatureValid()).void
-        case _        => Task.unit
-      }
-      .executeOn(sigverify)
-      .runAsyncAndForget
+  def checkBlockAndTxSignatures(block: Block, checkTransactionSignatures: Boolean, rideV6Activated: Boolean): Unit = {
+    checkBlockSignature(block)
+    if (checkTransactionSignatures && block.transactionData.nonEmpty) {
+      checkTxSignatures(block.transactionData, rideV6Activated)
+    }
   }
 
   def checkBlockSignature(block: Block): Unit =
-    Task(block.signatureValid()).executeOn(sigverify).runAsyncAndForget
+    sigverify.execute(() => block.signatureValid())
 }

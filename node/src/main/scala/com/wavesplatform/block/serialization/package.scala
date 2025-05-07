@@ -11,7 +11,7 @@ import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction, TransactionParsers}
 
 package object serialization {
-  private[block] def writeTransactionData(version: Byte, txs: Seq[Transaction]): Array[Byte] = {
+  def writeTransactionData(version: Byte, txs: Seq[Transaction]): Array[Byte] = {
     val txsBytes = txs.map(tx =>
       if (version == ProtoBlockVersion) PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
       else tx.bytes().ensuring(!tx.isInstanceOf[EthereumTransaction])
