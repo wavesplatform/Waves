@@ -169,7 +169,8 @@ object NetworkServer extends ScorexLogging {
       logConnections()
     }
 
-    def doConnect(remoteAddress: InetSocketAddress): Unit =
+    def doConnect(remoteAddress: InetSocketAddress): Unit = {
+      log.trace(s"doConnect to $remoteAddress, current channel: ${id(outgoingChannels.get(remoteAddress))}")
       outgoingChannels.computeIfAbsent(
         remoteAddress,
         _ => {
@@ -179,6 +180,7 @@ object NetworkServer extends ScorexLogging {
           newConnFuture.addListener((f: ChannelFuture) => handleConnectionAttempt(remoteAddress)(f)).channel()
         }
       )
+    }
 
     def logConnections(): Unit = {
       def mkAddressString(addresses: IterableOnce[SocketAddress]) =
@@ -207,12 +209,16 @@ object NetworkServer extends ScorexLogging {
                    else 5.seconds) +
         (Random.nextInt(1000) - 500).millis // add some noise so that nodes don't attempt to connect to each other simultaneously
 
+      log.trace(s"Scheduling connection attempt in $delay")
       workerGroup.schedule(delay) {
+        log.trace(s"Outgoing connections: ${outgoingChannels.size()}, max: ${networkSettings.maxOutboundConnections}")
         if (outgoingChannels.size() < networkSettings.maxOutboundConnections) {
           val all = peerInfo.values().iterator().asScala.flatMap(_.remoteAddress.cast[InetSocketAddress])
-          peerDatabase
+
+          val nextCandidate = peerDatabase
             .nextCandidate(excluded = excludedAddresses ++ all)
-            .foreach(doConnect)
+          log.trace(s"All peers' remote addresses: ${all.mkString("[", ",", "]")}, excluded: ${excludedAddresses.mkString("[",",","]")}, candidate: $nextCandidate")
+          nextCandidate.foreach(doConnect)
         }
 
         scheduleConnectTask()
