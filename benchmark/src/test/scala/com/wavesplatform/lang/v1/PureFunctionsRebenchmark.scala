@@ -1,27 +1,22 @@
 package com.wavesplatform.lang.v1
 
-import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
-
-import cats.Id
 import com.google.common.primitives.Longs
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.*
-import com.wavesplatform.lang.utils.*
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.*
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.*
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.{FunctionIds, Log}
-import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{Common, ExecutionError, v1}
+import com.wavesplatform.lang.{Global, v1}
+import org.apache.commons.lang3.RandomStringUtils
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
+import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
+import scala.compiletime.uninitialized
 import scala.util.Random
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -32,24 +27,25 @@ import scala.util.Random
 @Measurement(iterations = 20, time = 1)
 class PureFunctionsRebenchmark {
   @Benchmark
-  def parseIntValue(st: ParseIntVal, bh: Blackhole): Unit =
-    bh.consume(eval(st.expr))
+  def parseIntValue(st: ParseIntVal, bh: Blackhole): Unit = bh.consume(eval(st.expr))
 
   @Benchmark
-  def toBase58(st: ToBase58, bh: Blackhole): Unit =
-    bh.consume(eval(st.expr))
+  def toBase58(st: ToBase58, bh: Blackhole): Unit = bh.consume(eval(st.expr))
 
   @Benchmark
-  def fromBase58(st: FromBase58, bh: Blackhole): Unit =
-    bh.consume(eval(st.expr))
+  def fromBase58(st: FromBase58, bh: Blackhole): Unit = bh.consume(eval(st.expr))
 
   @Benchmark
-  def toBase64(st: ToBase64, bh: Blackhole): Unit =
-    bh.consume(eval(st.expr))
+  def toBase64(st: ToBase64, bh: Blackhole): Unit = bh.consume(eval(st.expr))
 
   @Benchmark
-  def fromBase64(st: FromBase64, bh: Blackhole): Unit =
-    bh.consume(eval(st.expr))
+  def fromBase64(st: FromBase64, bh: Blackhole): Unit = bh.consume(eval(st.expr))
+
+  @Benchmark
+  def toBase16(st: ToBase16, bh: Blackhole): Unit = bh.consume(eval(st.expr))
+
+  @Benchmark
+  def fromBase16(st: FromBase16, bh: Blackhole): Unit = bh.consume(eval(st.expr))
 
   @Benchmark
   def sumByteString(st: SumByteString, bh: Blackhole): Unit =
@@ -68,7 +64,15 @@ class PureFunctionsRebenchmark {
     bh.consume(eval(st.expr))
 
   @Benchmark
+  def takeRightBytes(st: TakeRightBytes, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
   def dropBytes(st: DropBytes, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def dropRightBytes(st: DropRightBytes, bh: Blackhole): Unit =
     bh.consume(eval(st.expr))
 
   @Benchmark
@@ -76,7 +80,15 @@ class PureFunctionsRebenchmark {
     bh.consume(eval(st.expr))
 
   @Benchmark
+  def takeRightString(st: TakeRightString, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
   def dropString(st: DropString, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def dropRightString(st: DropString, bh: Blackhole): Unit =
     bh.consume(eval(st.expr))
 
   @Benchmark
@@ -88,15 +100,11 @@ class PureFunctionsRebenchmark {
     bh.consume(eval(st.expr))
 
   @Benchmark
-  def listConcat1(st: ListConcat1, bh: Blackhole): Unit =
+  def listConcat(st: ListConcat, bh: Blackhole): Unit =
     bh.consume(eval(st.expr))
 
   @Benchmark
-  def listConcat2(st: ListConcat2, bh: Blackhole): Unit =
-    bh.consume(eval(st.expr))
-
-  @Benchmark
-  def listConcat3(st: ListConcat3, bh: Blackhole): Unit =
+  def listGetSize(st: ListGetSize, bh: Blackhole): Unit =
     bh.consume(eval(st.expr))
 
   @Benchmark
@@ -112,122 +120,16 @@ class PureFunctionsRebenchmark {
     bh.consume(eval(st.expr))
 
   @Benchmark
-  def listGetElement1(st: ListGetElement1, bh: Blackhole): Unit =
+  def listGetElement(st: ListGetElement, bh: Blackhole): Unit =
     bh.consume(eval(st.expr))
 
+
   @Benchmark
-  def listGetElement2(st: ListGetElement2, bh: Blackhole): Unit =
+  def listIndexOf(st: ListIndexOf, bh: Blackhole): Unit =
     bh.consume(eval(st.expr))
-
-  @Benchmark
-  def listGetElement3(st: ListGetElement3, bh: Blackhole): Unit =
-    bh.consume(eval(st.expr))
-
-  // V5
-  @Benchmark
-  def parseIntValueV5(st: ParseIntVal, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def toBase58V5(st: ToBase58, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def fromBase58V5(st: FromBase58, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def toBase64V5(st: ToBase64, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def fromBase64V5(st: FromBase64, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def sumByteStringV5(st: SumByteString, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def longToBytesV5(st: LongToBytes, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def stringToBytesV5(st: StringToBytes, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def takeBytesV5(st: TakeBytes, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def dropBytesV5(st: DropBytes, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def takeStringV5(st: TakeString, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def dropStringV5(st: DropString, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def listAppendV5(st: ListAppend, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def listConstructorV5(st: ListConstructor, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def listConcat1V5(st: ListConcat1, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def listConcat2V5(st: ListConcat2, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def listConcat3V5(st: ListConcat3, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def toUtf8StringV5(st: ToUtf8String, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def bytesToLongV5(st: BytesToLong, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def stringIndexOfV5(st: StringIndexOf, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def listGetElement1V5(st: ListGetElement1, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def listGetElement2V5(st: ListGetElement2, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
-
-  @Benchmark
-  def listGetElement3V5(st: ListGetElement3, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
 }
 
 object PureFunctionsRebenchmark {
-  val context: EvaluationContext[Environment, Id] =
-    lazyContexts((DirectiveSet(V5, Account, Expression).explicitGet(), true, true, true))()
-      .evaluationContext(Common.emptyBlockchainEnvironment())
-
-  val eval: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    v1.eval(context, _, V4)
-
-  val evalV5: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    v1.eval(context, _, V5)
-
   def randomBytes(length: Int): Array[Byte] = {
     val bytes = new Array[Byte](length)
     ThreadLocalRandom.current().nextBytes(bytes)
@@ -236,76 +138,92 @@ object PureFunctionsRebenchmark {
 
   @State(Scope.Benchmark)
   class ParseIntVal {
-    val numStr = Long.MinValue.toString
     val expr: EXPR =
       FUNCTION_CALL(
         PureContext.parseIntVal,
         List(
-          CONST_STRING(numStr).explicitGet()
+          CONST_STRING(Long.MinValue.toString).explicitGet()
         )
       )
   }
 
-  @State(Scope.Benchmark)
-  class ToBase58 {
-    val bytes = randomBytes(64)
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.TOBASE58),
-        List(
-          CONST_BYTESTR(ByteStr(bytes)).explicitGet()
-        )
+  private def fromBaseStringExpr(string: String, functionId: Short) =
+    FUNCTION_CALL(
+      Native(functionId),
+      List(
+        CONST_STRING(string, reduceLimit = false).explicitGet()
       )
-  }
+    )
 
   @State(Scope.Benchmark)
   class FromBase58 {
-    val string = Base58.encode(randomBytes(75)) // approximately MaxBase58String
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.FROMBASE58),
-        List(
-          CONST_STRING(string).explicitGet()
-        )
-      )
-  }
-
-  @State(Scope.Benchmark)
-  class ToBase64 {
-    val bytes = randomBytes(32 * 1024 - 1)
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.TOBASE64),
-        List(
-          CONST_BYTESTR(ByteStr(bytes)).explicitGet()
-        )
-      )
+    val expr: EXPR = fromBaseStringExpr(Base58.encode(randomBytes(Global.MaxBase58Bytes)), FunctionIds.FROMBASE58)
   }
 
   @State(Scope.Benchmark)
   class FromBase64 {
-    val string = Base58.encode(randomBytes(32 * 1024)) // approximately MaxBase64String
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.FROMBASE64),
-        List(
-          CONST_STRING(string, reduceLimit = false).explicitGet()
-        )
-      )
+    @Param(Array("1024", "8192", "16383", "32766"))
+    var byteCount = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      expr = fromBaseStringExpr(Base64.encode(randomBytes(byteCount)), FunctionIds.FROMBASE64)
+    }
+  }
+
+  @State(Scope.Benchmark)
+  class FromBase16 {
+    @Param(Array("32", "64", "128", "1024", "8192", "16383"))
+    var byteCount  = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      expr = fromBaseStringExpr(Global.base16Encode(randomBytes(byteCount), false).explicitGet(), FunctionIds.FROMBASE16)
+    }
+  }
+
+  @State(Scope.Benchmark)
+  abstract class ToBaseStr(functionId: Short) {
+    def byteCount: Int
+    var expr: EXPR = uninitialized
+    @Setup def setup(): Unit = {
+      expr = FUNCTION_CALL(Native(functionId), List(CONST_BYTESTR(ByteStr(randomBytes(byteCount))).explicitGet()))
+    }
+  }
+
+  class ToBase58 extends ToBaseStr(FunctionIds.TOBASE58) {
+    @Param(Array("32", "64"))
+    var byteCount: Int = 0
+  }
+
+  class ToBase64 extends ToBaseStr(FunctionIds.TOBASE64) {
+    @Param(Array("512", "1024", "24572"))
+    var byteCount: Int = 0
+  }
+
+  class ToBase16 extends ToBaseStr(FunctionIds.TOBASE16) {
+    @Param(Array("128", "256", "512", "8192"))
+    var byteCount = 0
   }
 
   @State(Scope.Benchmark)
   class SumByteString {
-    val byteString1 = ByteStr.fromBytes(1)
-    val byteString2 = ByteStr(Array.fill[Byte](32766)(-127))
-    val expr: EXPR =
-      FUNCTION_CALL(
+    @Param(Array("1", "1024", "4096", "16384", "32766"))
+    var prefixLength = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      val byteString1 = ByteStr(Array.fill[Byte](prefixLength)(-127))
+      val byteString2 = ByteStr(Array.fill[Byte](32767 - prefixLength)(-127))
+      expr = FUNCTION_CALL(
         Native(FunctionIds.SUM_BYTES),
         List(
           CONST_BYTESTR(byteString1).explicitGet(),
           CONST_BYTESTR(byteString2).explicitGet()
         )
       )
+    }
+
   }
 
   @State(Scope.Benchmark)
@@ -333,56 +251,56 @@ object PureFunctionsRebenchmark {
   }
 
   @State(Scope.Benchmark)
-  class TakeBytes {
-    val bytes = ByteStr(Array.fill[Byte](32766)(-127))
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.TAKE_BYTES),
+  class BytesState(functionId: Short) {
+    @Param(Array("1024", "4096", "16384", "32766"))
+    var byteCount  = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      expr = FUNCTION_CALL(
+        Native(functionId),
         List(
-          CONST_BYTESTR(bytes).explicitGet(),
-          CONST_LONG(32765)
+          CONST_BYTESTR(ByteStr(Array.fill[Byte](32767)(-127))).explicitGet(),
+          CONST_LONG(byteCount)
         )
       )
+    }
   }
 
-  @State(Scope.Benchmark)
-  class DropBytes {
-    val bytes = ByteStr(Array.fill[Byte](Terms.DataTxMaxProtoBytes)(-127))
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.DROP_BYTES),
-        List(
-          CONST_BYTESTR(bytes, CONST_BYTESTR.NoLimit).explicitGet(),
-          CONST_LONG(1)
-        )
-      )
-  }
+  class TakeBytes extends BytesState(FunctionIds.TAKE_BYTES)
+
+  class TakeRightBytes extends BytesState(FunctionIds.TAKE_RIGHT_BYTES)
+
+  class DropBytes extends BytesState(FunctionIds.DROP_BYTES)
+
+  class DropRightBytes extends BytesState(FunctionIds.DROP_RIGHT_BYTES)
 
   @State(Scope.Benchmark)
-  class TakeString {
-    val string = Random.nextPrintableChar().toString * 32766
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.TAKE_STRING),
+  class StringState(functionId: Short) {
+    @Param(Array("1024", "4096", "16384", "32766"))
+    var prefixLength = 0
+    var expr: EXPR   = uninitialized
+
+    @Setup
+    def setup(): Unit = {
+      val string = Random.nextPrintableChar().toString * 32767
+      expr = FUNCTION_CALL(
+        Native(functionId),
         List(
           CONST_STRING(string).explicitGet(),
-          CONST_LONG(32765)
+          CONST_LONG(prefixLength)
         )
       )
+    }
   }
 
-  @State(Scope.Benchmark)
-  class DropString {
-    val string = Random.nextPrintableChar().toString * 32766
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.DROP_STRING),
-        List(
-          CONST_STRING(string).explicitGet(),
-          CONST_LONG(1)
-        )
-      )
-  }
+  class DropString extends StringState(FunctionIds.DROP_STRING)
+
+  class DropRightString extends StringState(FunctionIds.DROP_RIGHT_STRING)
+
+  class TakeString extends StringState(FunctionIds.TAKE_STRING)
+
+  class TakeRightString extends StringState(FunctionIds.TAKE_RIGHT_STRING)
 
   @State(Scope.Benchmark)
   class ListConstructor {
@@ -411,51 +329,26 @@ object PureFunctionsRebenchmark {
   }
 
   @State(Scope.Benchmark)
-  class ListConcat1 {
-    val list1 = Vector.fill(999)(CONST_LONG(1))
-    val list2 = Vector.fill(1)(CONST_LONG(1))
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.CONCAT_LIST),
-        List(
-          ARR(list1, limited = true).explicitGet(),
-          ARR(list2, limited = true).explicitGet()
-        )
-      )
-  }
+  class ListConcat {
+    @Param(value = Array("1", "100", "500", "999"))
+    var prefixLength = 0
+    var expr: EXPR   = uninitialized
 
-  @State(Scope.Benchmark)
-  class ListConcat2 {
-    val list1 = Vector.fill(1)(CONST_LONG(1))
-    val list2 = Vector.fill(999)(CONST_LONG(1))
-    val expr: EXPR =
-      FUNCTION_CALL(
+    @Setup
+    def setup(): Unit = {
+      expr = FUNCTION_CALL(
         Native(FunctionIds.CONCAT_LIST),
         List(
-          ARR(list1, limited = true).explicitGet(),
-          ARR(list2, limited = true).explicitGet()
+          ARR(Vector.fill(prefixLength)(CONST_LONG(1)), limited = true).explicitGet(),
+          ARR(Vector.fill(1000 - prefixLength)(CONST_LONG(1)), limited = true).explicitGet()
         )
       )
-  }
-
-  @State(Scope.Benchmark)
-  class ListConcat3 {
-    val list1 = Vector.fill(500)(CONST_LONG(1))
-    val list2 = Vector.fill(500)(CONST_LONG(1))
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.CONCAT_LIST),
-        List(
-          ARR(list1, limited = true).explicitGet(),
-          ARR(list2, limited = true).explicitGet()
-        )
-      )
+    }
   }
 
   @State(Scope.Benchmark)
   class ToUtf8String {
-    val bytes = new Array[Byte](Terms.DataTxMaxProtoBytes)
-    Random.nextBytes(bytes)
+    val bytes = RandomStringUtils.insecure().next(10000).getBytes("utf-8")
     val expr: EXPR =
       FUNCTION_CALL(
         Native(FunctionIds.UTF8STRING),
@@ -490,41 +383,52 @@ object PureFunctionsRebenchmark {
   }
 
   @State(Scope.Benchmark)
-  class ListGetElement1 {
-    val list = Vector.fill(1000)(CONST_LONG(1))
-    val expr: EXPR =
-      FUNCTION_CALL(
+  class ListGetElement {
+    @Param(Array("0", "500", "999"))
+    var index      = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      expr = FUNCTION_CALL(
         Native(FunctionIds.GET_LIST),
         List(
-          ARR(list, limited = true).explicitGet(),
-          CONST_LONG(1)
+          ARR(Vector.fill(1000)(CONST_LONG(1)), limited = true).explicitGet(),
+          CONST_LONG(index)
         )
       )
+    }
   }
 
   @State(Scope.Benchmark)
-  class ListGetElement2 {
-    val list = Vector.fill(1000)(CONST_LONG(1))
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.GET_LIST),
+  class ListIndexOf {
+    @Param(Array("500", "1000"))
+    var listSize = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      expr = FUNCTION_CALL(
+        Native(FunctionIds.INDEX_OF_LIST),
         List(
-          ARR(list, limited = true).explicitGet(),
-          CONST_LONG(500)
+          ARR(Vector.fill(listSize - 1)(CONST_LONG(1)) :+ CONST_LONG(2), limited = true).explicitGet(),
+          CONST_LONG(2)
         )
       )
+    }
   }
 
   @State(Scope.Benchmark)
-  class ListGetElement3 {
-    val list = Vector.fill(1000)(CONST_LONG(1))
-    val expr: EXPR =
-      FUNCTION_CALL(
-        Native(FunctionIds.GET_LIST),
+  class ListGetSize {
+    @Param(Array("1", "500", "1000"))
+    var listSize   = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      expr = FUNCTION_CALL(
+        Native(FunctionIds.SIZE_LIST),
         List(
-          ARR(list, limited = true).explicitGet(),
-          CONST_LONG(1000)
+          ARR(Vector.fill(listSize)(CONST_LONG(1)), limited = true).explicitGet()
         )
       )
+    }
   }
 }

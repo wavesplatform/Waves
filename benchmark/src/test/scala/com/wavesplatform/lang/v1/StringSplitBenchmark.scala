@@ -1,14 +1,12 @@
 package com.wavesplatform.lang.v1
-import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.evalV5
 import com.wavesplatform.lang.v1.StringSplitBenchmark.*
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
+import java.util.concurrent.TimeUnit
 import scala.util.Random
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -20,27 +18,27 @@ import scala.util.Random
 class StringSplitBenchmark {
   @Benchmark
   def splitString(st: SplitString, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def splitString200x30(st: SplitString200x30, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def splitString100x50(st: SplitString100x50, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def splitString100x60(st: SplitString100x60, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def splitString20x25(st: SplitString20x25, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def splitString20x10(st: SplitString20x10, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 }
 
 object StringSplitBenchmark {

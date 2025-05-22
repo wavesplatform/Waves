@@ -1,16 +1,14 @@
 package com.wavesplatform.lang.v1
 
-import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.MakeStringBenchmark.*
-import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.evalV5
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
+import java.util.concurrent.TimeUnit
 import scala.util.Random
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -22,35 +20,35 @@ import scala.util.Random
 class MakeStringBenchmark {
   @Benchmark
   def makeStringSep31x1000(st: MakeStringSep31x1000, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def makeString31x1000(st: MakeString31x1000, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def makeString31x100(st: MakeString31x100, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def makeString31x10(st: MakeString31x10, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def makeString310x100(st: MakeString310x100, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def makeString3100x10(st: MakeString3100x10, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def makeString1x70(st: MakeString1x70, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def makeString7x70(st: MakeString7x70, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 }
 
 object MakeStringBenchmark {

@@ -1,13 +1,9 @@
 package com.wavesplatform.lang.v1
 
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.lang.Common
-import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.REPLACE_BY_INDEX_OF_LIST
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.traits.Environment
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
@@ -22,24 +18,19 @@ import java.util.concurrent.TimeUnit
 class ListReplaceByIndexBenchmark {
   @Benchmark
   def listReplaceFirstByIndex(st: ListReplaceByIndexSt, bh: Blackhole): Unit =
-    bh.consume(eval(st.ctx, st.replaceFirst))
+    bh.consume(eval(st.replaceFirst))
 
   @Benchmark
   def listReplaceMiddleByIndex(st: ListReplaceByIndexSt, bh: Blackhole): Unit =
-    bh.consume(eval(st.ctx, st.replaceMiddle))
+    bh.consume(eval(st.replaceMiddle))
 
   @Benchmark
   def listReplaceLastByIndex(st: ListReplaceByIndexSt, bh: Blackhole): Unit =
-    bh.consume(eval(st.ctx, st.replaceLast))
+    bh.consume(eval(st.replaceLast))
 }
 
 @State(Scope.Benchmark)
 class ListReplaceByIndexSt {
-  val ctx =
-    PureContext
-      .build(StdLibVersion.VersionDic.all.max, useNewPowPrecision = true)
-      .withEnvironment[Environment]
-      .evaluationContext(Common.emptyBlockchainEnvironment())
 
   val list = ARR(Vector.fill(1000)(CONST_LONG(Long.MaxValue)), limited = true).explicitGet()
 

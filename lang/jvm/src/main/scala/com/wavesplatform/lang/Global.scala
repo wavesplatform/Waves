@@ -14,6 +14,7 @@ import com.wavesplatform.zwaves.bls12.Groth16 as Bls12Groth16
 import com.wavesplatform.zwaves.bn256.Groth16 as Bn256Groth16
 import org.web3j.crypto.Sign
 import org.web3j.crypto.Sign.SignatureData
+import org.web3j.utils
 
 import java.math.{BigInteger, MathContext, BigDecimal as BD}
 import java.security.spec.InvalidKeySpecException
@@ -38,13 +39,11 @@ object Global extends BaseGlobal {
       result <- Base64.tryDecode(input).toEither.left.map(_ => "can't parse Base64 string")
     } yield result
 
-  private val base16Encoder: BaseEncoding = BaseEncoding.base16().lowerCase()
-
   override def base16EncodeImpl(input: Array[Byte]): Either[String, String] =
-    tryEither(base16Encoder.encode(input))
+    tryEither(utils.Numeric.toHexString(input, 0, input.length, false))
 
   override def base16DecodeImpl(input: String): Either[String, Array[Byte]] =
-    tryEither(base16Encoder.decode(input.toLowerCase))
+    tryEither(utils.Numeric.hexStringToByteArray(input))
 
   private def tryEither[A](f: => A): Either[String, A] =
     Try(f).toEither
@@ -184,7 +183,7 @@ object Global extends BaseGlobal {
     if (handleLeadingZerosInPublicKey) {
       org.web3j.utils.Numeric.toBytesPadded(pk, 64)
     } else {
-      base16Encoder.decode(pk.toString(16))
+      utils.Numeric.hexStringToByteArray(pk.toString(16))
     }
   }
 }
