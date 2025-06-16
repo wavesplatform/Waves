@@ -2,11 +2,10 @@ package com.wavesplatform.common
 
 import java.security.{KeyPairGenerator, SecureRandom, Signature as JavaSignature}
 import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.common.RSAVerifyBenchmark.*
-import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.randomBytes
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.*
+import com.wavesplatform.utils.randomBytes
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole

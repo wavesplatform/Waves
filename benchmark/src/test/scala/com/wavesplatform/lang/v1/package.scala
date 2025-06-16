@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.Id
+import com.google.common.cache.CacheBuilder
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, StdLibVersion}
@@ -15,7 +16,15 @@ import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.traits.Environment
 
+import java.util.concurrent.{Callable, ThreadLocalRandom}
+
 package object v1 {
+  def randomBytes(length: Int): Array[Byte] = {
+    val bytes = new Array[Byte](length)
+    ThreadLocalRandom.current().nextBytes(bytes)
+    bytes
+  }
+
   def pow(base: BigInt, basePrecision: Int, exponent: BigInt, exponentPrecision: Int, resultPrecision: Int): EXPR =
     FUNCTION_CALL(
       Native(POW_BIGINT),
@@ -29,14 +38,22 @@ package object v1 {
       )
     )
 
+  private val evCtxCache = CacheBuilder
+    .newBuilder()
+    .build[StdLibVersion, EvaluationContext[Environment, Id]]()
+
   def eval(
       expr: EXPR,
       stdLibVersion: StdLibVersion = StdLibVersion.VersionDic.latest
   ): Terms.EVALUATED =
     EvaluatorV2
       .applyCompleted(
-        lazyContexts((DirectiveSet(stdLibVersion, Account, Expression).explicitGet(), true, true, true))()
-          .evaluationContext(Common.emptyBlockchainEnvironment()),
+        evCtxCache.get(
+          stdLibVersion,
+          () =>
+            lazyContexts((DirectiveSet(StdLibVersion.VersionDic.latest, Account, Expression).explicitGet(), true, true, true))()
+              .evaluationContext(Common.emptyBlockchainEnvironment())
+        ),
         expr,
         LogExtraInfo(),
         stdLibVersion,

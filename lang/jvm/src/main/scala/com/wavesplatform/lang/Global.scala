@@ -2,7 +2,6 @@ package com.wavesplatform.lang
 
 import cats.syntax.either.*
 import ch.obermuhlner.math.big.BigDecimalMath
-import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto.{Blake2b256, Curve25519, Keccak256, Sha256}

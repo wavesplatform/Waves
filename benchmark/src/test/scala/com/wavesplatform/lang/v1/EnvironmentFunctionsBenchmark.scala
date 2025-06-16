@@ -150,11 +150,7 @@ object EnvironmentFunctionsBenchmark {
 
   val bytes8Kb: Array[Byte] = ("FEDCBA9876543210" * (8 * 1024 / 16)).getBytes(StandardCharsets.UTF_8)
 
-  def randomBytes(length: Int): Array[Byte] = {
-    val bytes = Array.fill[Byte](length)(0)
-    ThreadLocalRandom.current().nextBytes(bytes)
-    bytes
-  }
+  
 
   def randomAddress: ByteStr = ByteStr(Common.addressFromPublicKey(ChainId, randomBytes(Curve25519.KeyLength)))
 

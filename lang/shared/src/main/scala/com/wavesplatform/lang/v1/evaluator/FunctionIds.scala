@@ -78,6 +78,7 @@ object FunctionIds {
   val LAST_INDEX_OF_LIST: Short       = 1104
   val REMOVE_BY_INDEX_OF_LIST: Short  = 1105
   val REPLACE_BY_INDEX_OF_LIST: Short = 1106
+  val FILL_LIST: Short                = 1107
 
   val UTF8STRING: Short   = 1200
   val BININT: Short       = 1201
@@ -94,6 +95,9 @@ object FunctionIds {
   val MAKESTRING11C: Short = 1211
   val SPLIT4C: Short       = 1212
   val SPLIT51C: Short      = 1213
+
+  val REPLACEFIRST: Short = 1214
+  val REPLACEALL: Short   = 1215
 
   val CREATE_TUPLE: Short = 1300 // Reserved 22 id for tuple constructors
   val SIZE_TUPLE: Short   = 1350

@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.CalculateAssetLeaseIdBenchmark.*
-import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{randomAddress, randomBytes}
+import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{randomAddress}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
 import org.openjdk.jmh.annotations.*

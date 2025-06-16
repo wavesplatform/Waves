@@ -1315,6 +1315,66 @@ object PureContext {
       )
     }
 
+  lazy val replaceFirst: BaseFunction[NoContext] =
+    NativeFunction(
+      "replaceFirst",
+      Map[StdLibVersion, Long](V9 -> 2L),
+      REPLACEFIRST,
+      STRING,
+      ("str", STRING),
+      ("target", STRING),
+      ("replacement", STRING)
+    ) {
+      case (src @ CONST_STRING(str)) :: CONST_STRING(target) :: CONST_STRING(replacement) :: Nil =>
+        val i = str.indexOf(target)
+        if (i >= 0) {
+//          val dst = new Array[Char](i + replacement.length + (str.length - target.length))
+//          str.getChars(0, i, dst, 0)
+//          replacement.getChars(0, replacement.length, dst, i)
+//          str.getChars(i + target.length, str.length, dst, i + replacement.length)
+//          CONST_STRING(new String(dst))
+          CONST_STRING(new StringBuilder(str.take(i)).append(replacement).append(str.drop(i + target.length)).toString())
+//          CONST_STRING(new StringBuilder(str).insert(i, replacement).append(str.drop(i + target.length)).toString())
+//          CONST_STRING(str.take(i).concat(replacement).concat(str.drop(i + target.length)))
+        } else Right(src)
+      case xs => notImplemented[Id, EVALUATED]("replaceFirst(str: String, target: String, replacement: String)", xs)
+    }
+
+  lazy val replaceAll: BaseFunction[NoContext] =
+    NativeFunction(
+      "replaceAll",
+      Map[StdLibVersion, Long](V9 -> 2L),
+      REPLACEALL,
+      STRING,
+      ("str", STRING),
+      ("target", STRING),
+      ("replacement", STRING)
+    ) {
+      case CONST_STRING(str) :: CONST_STRING(target) :: CONST_STRING(replacement) :: Nil =>
+        CONST_STRING(str.replace(target, replacement))
+      case xs =>
+        notImplemented[Id, EVALUATED]("replaceAll(str: String, target: String, replacement: String)", xs)
+    }
+
+  private final def fillListImpl(args: List[EVALUATED]): Either[ExecutionError, EVALUATED] = args match {
+    case CONST_LONG(length) :: (v: EVALUATED) :: Nil =>
+      val intLength = length.toInt
+      if (intLength <= 0 || length <= 0) Left("Invalid length")
+      else ARR(Vector.fill(intLength)(v), true)
+    case xs =>
+      notImplemented[Id, EVALUATED]("fill[T](length: Int, elem: T)", xs)
+  }
+
+  lazy val fillList: BaseFunction[NoContext] =
+    NativeFunction(
+      "fill",
+      Map[StdLibVersion, Long](V9 -> 2L),
+      FILL_LIST,
+      PARAMETERIZEDLIST(TYPEPARAM('T')),
+      ("length", LONG),
+      ("element", TYPEPARAM('T'))
+    )(fillListImpl)
+
   def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complexity: Int = 1)(
       body: (EVALUATED, EVALUATED) => Either[ExecutionError, EVALUATED]
   ): BaseFunction[NoContext] =
@@ -1400,7 +1460,7 @@ object PureContext {
       case ARR(list) :: Nil =>
         Either.cond(
           list.nonEmpty,
-          list.asInstanceOf[IndexedSeq[CONST_LONG]].min,
+          CONST_LONG(list.asInstanceOf[IndexedSeq[CONST_LONG]].view.map(_.t).max),
           "Can't find min for empty list"
         )
       case xs =>
@@ -2046,6 +2106,10 @@ object PureContext {
         _getType
       )
 
+  private val v8Functions = v6Functions :+ listReplaceByIndex
+
+  private val v9Functions = v8Functions ++ Array(replaceFirst, replaceAll, fillList)
+
   private def v1V2Ctx(fixUnicodeFunctions: Boolean) =
     CTX[NoContext](
       v1v2v3v4Types,
@@ -2085,7 +2149,14 @@ object PureContext {
     CTX[NoContext](
       v5Types,
       v5Vars,
-      v6Functions :+ listReplaceByIndex
+      v8Functions
+    )
+
+  private val v9Ctx =
+    CTX[NoContext](
+      v5Types,
+      v5Vars,
+      v9Functions
     )
 
   def build(version: StdLibVersion, useNewPowPrecision: Boolean): CTX[NoContext] =
@@ -2096,5 +2167,6 @@ object PureContext {
       case V5      => v5Ctx(useNewPowPrecision)
       case V6 | V7 => v6Ctx
       case V8      => v8Ctx
+      case V9      => v9Ctx
     }
 }

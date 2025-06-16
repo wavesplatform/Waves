@@ -9,6 +9,7 @@ import org.apache.pekko.http.scaladsl.model.headers.*
 import org.apache.pekko.http.scaladsl.server.*
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.RouteResult.Complete
+import org.apache.pekko.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import org.slf4j.event.Level
 
 import scala.io.Source

@@ -8,8 +8,10 @@ import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.*
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.NoLimit
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.lang.{Global, v1}
 import org.apache.commons.lang3.RandomStringUtils
 import org.openjdk.jmh.annotations.*
@@ -123,9 +125,52 @@ class PureFunctionsRebenchmark {
   def listGetElement(st: ListGetElement, bh: Blackhole): Unit =
     bh.consume(eval(st.expr))
 
-
   @Benchmark
   def listIndexOf(st: ListIndexOf, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def replaceFirst(st: ReplaceFirst, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def replaceAll(st: ReplaceAll, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def fill(st: Fill, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def listMin(st: ListMin, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def listMax(st: ListMax, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def dataEntryFromArrayByString1(st: DataEntryFromArrayByString1, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def dataEntryFromArrayByString2(st: DataEntryFromArrayByString2, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def dataEntryFromArrayByInt1(st: DataEntryFromArrayByInt1, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def dataEntryFromArrayByInt2(st: DataEntryFromArrayByInt2, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def listReplaceByIndex(st: ListReplaceByIndex, bh: Blackhole): Unit =
+    bh.consume(eval(st.expr))
+
+  @Benchmark
+  def listRemoveByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
     bh.consume(eval(st.expr))
 }
 
@@ -163,7 +208,7 @@ object PureFunctionsRebenchmark {
   @State(Scope.Benchmark)
   class FromBase64 {
     @Param(Array("1024", "8192", "16383", "32766"))
-    var byteCount = 0
+    var byteCount  = 0
     var expr: EXPR = uninitialized
 
     @Setup def setup(): Unit = {
@@ -210,7 +255,7 @@ object PureFunctionsRebenchmark {
   class SumByteString {
     @Param(Array("1", "1024", "4096", "16384", "32766"))
     var prefixLength = 0
-    var expr: EXPR = uninitialized
+    var expr: EXPR   = uninitialized
 
     @Setup def setup(): Unit = {
       val byteString1 = ByteStr(Array.fill[Byte](prefixLength)(-127))
@@ -240,7 +285,7 @@ object PureFunctionsRebenchmark {
 
   @State(Scope.Benchmark)
   class StringToBytes {
-    val string = Random.nextPrintableChar().toString * 32767
+    val string = "\uD834\uDD1E\uD833\uDD1E" * 4095
     val expr: EXPR =
       FUNCTION_CALL(
         Native(FunctionIds.STRING_TO_BYTES),
@@ -283,7 +328,7 @@ object PureFunctionsRebenchmark {
 
     @Setup
     def setup(): Unit = {
-      val string = Random.nextPrintableChar().toString * 32767
+      val string = "\uD834\uDD1E\uD833\uDD1E" * 8191
       expr = FUNCTION_CALL(
         Native(functionId),
         List(
@@ -401,16 +446,19 @@ object PureFunctionsRebenchmark {
 
   @State(Scope.Benchmark)
   class ListIndexOf {
-    @Param(Array("500", "1000"))
-    var listSize = 0
-    var expr: EXPR = uninitialized
+    @Param(Array("500,648", "1000,324")) // make list as heavy as possible
+    var listAndStringSize = ""
+    var expr: EXPR        = uninitialized
 
     @Setup def setup(): Unit = {
+      val Array(listSize, stringSize) = listAndStringSize.split(",").map(_.toInt)
+      val otherString                 = CONST_STRING("a" * (stringSize - 1) + "b").explicitGet()
+      val searchString                = CONST_STRING("a" * stringSize).explicitGet()
       expr = FUNCTION_CALL(
         Native(FunctionIds.INDEX_OF_LIST),
         List(
-          ARR(Vector.fill(listSize - 1)(CONST_LONG(1)) :+ CONST_LONG(2), limited = true).explicitGet(),
-          CONST_LONG(2)
+          ARR(IndexedSeq.fill(listSize - 1)(otherString) :+ searchString, limited = true).explicitGet(),
+          searchString
         )
       )
     }
@@ -427,6 +475,130 @@ object PureFunctionsRebenchmark {
         Native(FunctionIds.SIZE_LIST),
         List(
           ARR(Vector.fill(listSize)(CONST_LONG(1)), limited = true).explicitGet()
+        )
+      )
+    }
+  }
+
+  @State(Scope.Benchmark)
+  class ReplaceFirst {
+    @Param(Array("1", "1024", "2047", "4096", "16383"))
+    var prefixSize = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      expr = FUNCTION_CALL(
+        Native(FunctionIds.REPLACEFIRST),
+        List(
+          CONST_STRING("A" * (16384 - prefixSize) + "$" * prefixSize).explicitGet(),
+          CONST_STRING("$" * prefixSize).explicitGet(),
+          CONST_STRING("B" * prefixSize).explicitGet()
+        )
+      )
+    }
+  }
+
+  @State(Scope.Benchmark)
+  class ReplaceAll {
+    @Param(Array("1", "1024", "4096", "32765"))
+    var prefixSize = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      expr = FUNCTION_CALL(
+        Native(FunctionIds.REPLACEALL),
+        List(
+          CONST_STRING("$" * prefixSize + "A" * (32766 - prefixSize)).explicitGet(),
+          CONST_STRING("$").explicitGet(),
+          CONST_STRING("B").explicitGet()
+        )
+      )
+    }
+  }
+
+  @State(Scope.Benchmark)
+  class Fill {
+    @Param(Array("1", "1000"))
+    var length     = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      expr = FUNCTION_CALL(
+        Native(FunctionIds.FILL_LIST),
+        List(
+          CONST_LONG(length),
+          CONST_BYTESTR(ByteStr(new Array[Byte](312)), NoLimit).explicitGet()
+        )
+      )
+    }
+  }
+
+  @State(Scope.Benchmark)
+  class ListMinMax(functionId: Short) {
+    val expr = FUNCTION_CALL(
+      Native(functionId),
+      List(
+        ARR((1 to 1000).map(i => CONST_LONG(i)).toVector, limited = true).explicitGet()
+      )
+    )
+  }
+
+  class ListMin extends ListMinMax(FunctionIds.MIN_LIST)
+  class ListMax extends ListMinMax(FunctionIds.MAX_LIST)
+
+  @State(Scope.Benchmark)
+  class DataEntryFromArray(funcHeader: FunctionHeader, selector: CONST_LONG | CONST_STRING, keyLength: Int, listLength: Int) {
+    val expr: EXPR = FUNCTION_CALL(
+      funcHeader,
+      List(
+        ARR(
+          Vector.fill(listLength)(
+            CaseObj(Types.stringDataEntry, Map("key" -> CONST_STRING("a" * (keyLength - 1) + "b").explicitGet(), "value" -> CONST_LONG(1)))
+          ),
+          limited = true
+        ).explicitGet(),
+        selector
+      )
+    )
+  }
+
+  class DataEntryFromArrayByString1
+      extends DataEntryFromArray(Native(FunctionIds.DATA_LONG_FROM_ARRAY), CONST_STRING("a" * 400).explicitGet(), 399, 652)
+  class DataEntryFromArrayByString2
+      extends DataEntryFromArray(Native(FunctionIds.DATA_LONG_FROM_ARRAY), CONST_STRING("a" * 400).explicitGet(), 216, 1000)
+  class DataEntryFromArrayByInt1 extends DataEntryFromArray(FunctionHeader.User("getInteger"), CONST_LONG(651), 399, 652)
+  class DataEntryFromArrayByInt2 extends DataEntryFromArray(FunctionHeader.User("getInteger"), CONST_LONG(999), 216, 1000)
+
+  @State(Scope.Benchmark)
+  class ListReplaceByIndex {
+    @Param(Array("0", "500", "999"))
+    var index      = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      expr = FUNCTION_CALL(
+        Native(FunctionIds.REPLACE_BY_INDEX_OF_LIST),
+        List(
+          ARR(Vector.fill(1000)(CONST_LONG(1)), limited = true).explicitGet(),
+          CONST_LONG(index),
+          CONST_LONG(100)
+        )
+      )
+    }
+  }
+
+  @State(Scope.Benchmark)
+  class ListRemoveByIndex {
+    @Param(Array("0", "500", "999"))
+    var index      = 0
+    var expr: EXPR = uninitialized
+
+    @Setup def setup(): Unit = {
+      expr = FUNCTION_CALL(
+        Native(FunctionIds.REMOVE_BY_INDEX_OF_LIST),
+        List(
+          ARR(Vector.fill(1000)(CONST_LONG(1)), limited = true).explicitGet(),
+          CONST_LONG(index)
         )
       )
     }
