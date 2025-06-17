@@ -144,6 +144,7 @@ lazy val `waves-node` = (project in file("."))
     `node-testkit`,
     `node-tests`,
     `node-generator`,
+    `grpc-server`,
     benchmark,
     `ride-runner`
   )
