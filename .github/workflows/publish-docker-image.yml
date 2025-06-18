@@ -1,18 +1,16 @@
-name: Publish Docker image
-run-name: Publish branch ${{ github.ref_name }} to tag ${{ inputs.dockerTag }}
+name: Publish Docker image to GHCR
+run-name: Publish branch ${{ github.ref_name }} to tags ${{ inputs.dockerTags }}
 
 on:
   workflow_dispatch:
     inputs:
-      dockerTag:
-        description: 'Docker tag'
+      dockerTags:
+        description: 'Docker tags'
         required: true
-        type: string
       baseImage:
         description: 'Base image'
         required: true
         default: 'eclipse-temurin:21-jre-noble'
-        type: string
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
@@ -41,6 +39,24 @@ jobs:
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
       - run: sbt --batch -Dproject.version=${{ steps.versions.outputs.node-version }} buildTarballsForDocker
+      - run: |
+          {
+            echo 'tags<<EOF'
+            echo ${{ inputs.dockerTags }} | tr ',' '\n' | sed -e 's/^/type=raw,value=/'
+            echo type=sha
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo 'annotations<<EOF'
+            echo org.opencontainers.image.source=https://github.com/${{ github.repository }}/tree/${{ github.sha }}/docker
+            echo org.opencontainers.image.licenses=MIT
+            echo org.opencontainers.image.description=Unit Zero Node
+            echo org.opencontainers.image.base.name=${{ inputs.baseImage }}
+            echo org.opencontainers.image.base.digest=${{ steps.versions.outputs.base-image-digest }}
+            echo org.opencontainers.image.version=${{ steps.versions.outputs.node-version }}
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+        id: tag-list
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -53,34 +69,26 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: index,manifest-descriptor,index-descriptor
         with:
           images: ${{ env.IMAGE_NAME }}
-          flavor: latest=false
-          tags: |
-            type=sha
-            type=raw,value=${{ inputs.dockerTag }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}/tree/${{ github.sha }}/docker
-            org.opencontainers.image.licenses=MIT
-            org.opencontainers.image.description=Waves Node
-            org.opencontainers.image.base.name=${{ inputs.baseImage }}
-            org.opencontainers.image.base.digest=${{ steps.versions.outputs.base-image-digest }}
-            org.opencontainers.image.version=${{ steps.versions.outputs.node-version }}
-          annotations: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}/tree/${{ github.sha }}/docker
-            org.opencontainers.image.licenses=MIT
-            org.opencontainers.image.description=Waves Node
-            org.opencontainers.image.base.name=${{ inputs.baseImage }}
-            org.opencontainers.image.base.digest=${{ steps.versions.outputs.base-image-digest }}
-            org.opencontainers.image.version=${{ steps.versions.outputs.node-version }}
+          flavor: latest=${{ contains(inputs.dockerTags, 'latest') }}
+          tags: ${{ steps.tag-list.outputs.tags }}
+          labels: ${{ steps.tag-list.outputs.annotations }}
+          annotations: ${{ steps.tag-list.outputs.annotations }}
       - uses: docker/build-push-action@v6
         id: push
         with:
           context: ./docker
           platforms: linux/amd64,linux/arm64
           push: true
-          pull: true
           build-args: baseImage=${{ inputs.baseImage }}@${{ steps.versions.outputs.base-image-digest }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - run: |
+          {
+            echo '## Image Info'
+            echo '- This image: `${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}`'
+            echo '- Base image: `${{ inputs.baseImage }}@${{ steps.versions.outputs.base-image-digest }}`'
+            echo '- Version: `${{ steps.versions.outputs.node-version }}`'
+          } >> $GITHUB_STEP_SUMMARY

@@ -7,8 +7,8 @@ import monix.reactive.subjects.PublishToOneSubject
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success}
 
-class Handler(id: String, maybeLiquidState: Option[LiquidState], subject: PublishToOneSubject[BlockchainUpdated], maxQueueSize: Int)(
-    implicit s: Scheduler
+class Handler(id: String, maybeLiquidState: Option[LiquidState], subject: PublishToOneSubject[BlockchainUpdated], maxQueueSize: Int)(implicit
+    s: Scheduler
 ) extends ScorexLogging {
 
   private val queue = maybeLiquidState.fold(ArrayBuffer.empty[BlockchainUpdated])(ls => ArrayBuffer.from(ls.keyBlock +: ls.microBlocks))
