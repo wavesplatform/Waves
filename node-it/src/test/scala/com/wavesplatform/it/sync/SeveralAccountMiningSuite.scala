@@ -16,6 +16,7 @@ class SeveralAccountMiningSuite extends BaseFunSuite {
   override def nodeConfigs: Seq[Config] = Configs
 
   test("only private keys from config used for mining when specified") {
+    miner.waitForHeight(2, 1.minute)
     val minerBalance1 = miner.balance(MinerPk1.toAddress.toString).balance
     val fromHeight    = miner.height
     miner.waitForHeight(miner.height + 5, 2.minutes)
