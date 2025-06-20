@@ -68,8 +68,8 @@ package object grpc {
   }
 
   implicit class FutureExt[T](val f: Future[T]) extends AnyVal {
-    def wrapErrors(implicit ec: ExecutionContext): Future[T] = f.recoverWith {
-      case err => Future.failed(GRPCErrors.toStatusException(err))
+    def wrapErrors(implicit ec: ExecutionContext): Future[T] = f.recoverWith { case err =>
+      Future.failed(GRPCErrors.toStatusException(err))
     }
   }
 
@@ -102,7 +102,8 @@ package object grpc {
               p.future
             } else Future.failed(new IllegalStateException(s"An element ${nextItem()} is pending"))
           },
-        err => cso.onError(err), { () =>
+        err => cso.onError(err),
+        { () =>
           logger.debug("Source observer completed")
           cso.onCompleted()
         }
