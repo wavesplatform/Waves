@@ -12,7 +12,7 @@ enablePlugins(GitVersioning)
 
 git.uncommittedSignifier       := Some("DIRTY")
 ThisBuild / git.useGitDescribe := true
-ThisBuild / PB.protocVersion   := "3.25.6" // https://protobuf.dev/support/version-support/#java
+ThisBuild / PB.protocVersion   := "4.31.1"
 
 ThisBuild / dependencyOverrides ++= Dependencies.overrides
 
@@ -187,7 +187,7 @@ inScope(Global)(
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network         := Network.default(),
     instrumentation := false,
-    resolvers ++= Resolver.sonatypeOssRepos("releases") ++ Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
+    resolvers ++= Resolver.sonatypeCentralSnapshots +: Seq(Resolver.mavenLocal),
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
     excludeLintKeys ++= Set(

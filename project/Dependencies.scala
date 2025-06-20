@@ -4,29 +4,31 @@ import scalapb.compiler.Version.scalapbVersion
 
 //noinspection TypeAnnotation
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.119.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.122.Final"
 
+  val gProto = "com.google.protobuf" % "protobuf-java" % "4.31.1"
   val overrides = Seq(
-    "com.google.code.gson"      % "gson"       % "2.12.1",
-    "com.squareup.okio"         % "okio-jvm"   % "3.10.2",
+    "com.google.code.gson"      % "gson"       % "2.13.1",
+    "com.squareup.okio"         % "okio-jvm"   % "3.13.0",
     "org.apache.httpcomponents" % "httpclient" % "4.5.14",
     nettyModule("codec-http2"),
     nettyModule("codec-http"),
     nettyModule("handler-proxy"),
     nettyModule("codec-socks"),
     nettyModule("transport-native-unix-common"),
-    nettyModule("resolver-dns")
+    nettyModule("resolver-dns"),
+    gProto
   )
 
   // Node protobuf schemas
   private[this] val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.5.2" classifier "protobuf-src" intransitive ()
 
-  private def pekkoModule(module: String) = ("org.apache.pekko" %% s"pekko-$module" % "1.1.3")
+  private def pekkoModule(module: String) = ("org.apache.pekko" %% s"pekko-$module" % "1.1.4")
 
-  private def pekkoHttpModule(module: String) = ("org.apache.pekko" %% module % "1.1.0")
+  private def pekkoHttpModule(module: String, version: String = "1.2.0") = "org.apache.pekko" %% module % version
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.6"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.7"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.3"
 
@@ -34,7 +36,7 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.71.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.73.0"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.4.8-jre"
@@ -56,7 +58,7 @@ object Dependencies {
   val sttp3      = sttp3Module("core")
   val sttp3Monix = sttp3Module("monix")
 
-  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.80"
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.81"
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 
@@ -81,7 +83,7 @@ object Dependencies {
     logback,
     "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.23", // To support Apple ARM
     "com.spotify"                      % "docker-client"                 % "8.16.0",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.18.3",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.19.1",
     asyncHttpClient
   ).map(_ % Test)
 
@@ -104,7 +106,7 @@ object Dependencies {
     pekkoModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "10.0.1"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "10.2.1"
 
   lazy val node = Def.setting(
     Seq(
@@ -114,8 +116,8 @@ object Dependencies {
         .cross(CrossVersion.for3Use2_13),
       "commons-net"            % "commons-net"               % "3.11.1",
       "commons-io"             % "commons-io"                % "2.19.0",
-      "com.github.pureconfig" %% "pureconfig-core"           % "0.17.8",
-      "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.8",
+      "com.github.pureconfig" %% "pureconfig-core"           % "0.17.9",
+      "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.9",
       "net.logstash.logback"   % "logstash-logback-encoder"  % "8.1" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),
@@ -134,7 +136,7 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "13.2.1",
+      "com.esaulpaugh"              % "headlong"      % "13.3.0",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
     ) ++ console ++ logDeps ++ protobuf.value
@@ -144,8 +146,6 @@ object Dependencies {
     pekkoModule("testkit"),
     pekkoHttpModule("pekko-http-testkit")
   ) ++ test ++ logDeps
-
-  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.6" // grpc 1.64.0 still requires 3.25
 
   lazy val scalapbRuntime = Def.setting(
     Seq(
@@ -170,13 +170,13 @@ object Dependencies {
   lazy val rideRunner = Def.setting(
     Seq(
       rocksdb,
-      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.2.0",
+      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.2.1",
       "net.logstash.logback"          % "logstash-logback-encoder" % "8.1" % Runtime,
       kamonModule("caffeine"),
       kamonModule("prometheus"),
       sttp3,
       sttp3Monix,
-      "org.scala-lang.modules"             %% "scala-xml"              % "2.3.0", // JUnit reports
+      "org.scala-lang.modules"             %% "scala-xml"              % "2.4.0", // JUnit reports
       pekkoHttpModule("pekko-http-testkit") % Test,
       "com.softwaremill.diffx"             %% "diffx-core"             % "0.9.0" % Test,
       "com.softwaremill.diffx"             %% "diffx-scalatest-should" % "0.9.0" % Test,
@@ -185,7 +185,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.14.12"
+    val circeVersion = "0.14.14"
     Seq(
       "io.circe" %%% "circe-core",
       "io.circe" %%% "circe-generic",
