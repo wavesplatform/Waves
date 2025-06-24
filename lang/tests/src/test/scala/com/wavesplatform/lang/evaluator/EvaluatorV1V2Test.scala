@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.evaluator
 
 import java.nio.ByteBuffer
-import cats.Id
+import cats.{Eval, Id}
 import cats.data.EitherT
 import cats.kernel.Monoid
 import cats.syntax.bifunctor.*
@@ -31,7 +31,7 @@ import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, Evaluator
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
-import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global, toError}
+import com.wavesplatform.lang.{Common, ExecutionError, Global, toError}
 import com.wavesplatform.test.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.EitherValues
@@ -266,7 +266,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
         typeDefs = Map.empty,
         letDefs = Map(
           ("p", LazyVal.fromEvaluated[Id](pointInstance)),
-          ("badVal", LazyVal.apply[Id](EitherT.leftT[({ type L[A] = EvalF[Id, A] })#L, EVALUATED]("Error")))
+          ("badVal", LazyVal.apply[Id](EitherT.leftT[[A] =>> Eval[A], EVALUATED]("Error")))
         ),
         functions = Map.empty
       )

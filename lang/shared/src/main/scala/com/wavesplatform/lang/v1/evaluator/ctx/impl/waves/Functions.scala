@@ -613,7 +613,7 @@ object Functions {
             env: Environment[F],
             args: List[EVALUATED],
             availableComplexity: Int
-        )(implicit monad: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, (EVALUATED, Log[F])], Int)]] = {
+        )(implicit monad: Monad[CoevalF[F]]): Coeval[F[(Either[ExecutionError, (EVALUATED, Log[F])], Int)]] = {
           def thrown[R](message: String): F[Either[ExecutionError, R]] =
             (ThrownError(message): ExecutionError).asLeft[R].pure[F]
 

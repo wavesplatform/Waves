@@ -37,9 +37,9 @@ trait TaskMTFunctions {
   def inspect[F[_]: Monad, S, E, A](f: S => A): TaskMT[F, S, E, A] =
     get[F, S, E].map(f)
 
-  def inspectFlat[F[_]: Monad, S, E, A](f: S => TaskMT[F, S, E, A])(implicit m: Monad[EvalF[F, *]]): TaskMT[F, S, E, A] =
+  def inspectFlat[F[_]: Monad, S, E, A](f: S => TaskMT[F, S, E, A])(implicit m: Monad[EvalF[F]]): TaskMT[F, S, E, A] =
     get[F, S, E].flatMap(f)
 
-  def modify[F[_]: Monad, S, E](f: S => S)(implicit m: Monad[EvalF[F, *]]): TaskMT[F, S, E, Unit] =
+  def modify[F[_]: Monad, S, E](f: S => S)(implicit m: Monad[EvalF[F]]): TaskMT[F, S, E, Unit] =
     get[F, S, E].flatMap(f andThen set[F, S, E])
 }

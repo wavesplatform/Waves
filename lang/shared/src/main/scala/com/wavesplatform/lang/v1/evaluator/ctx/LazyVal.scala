@@ -36,7 +36,7 @@ object LazyVal {
     LazyValImpl(v, _ => Monad[F].unit)
 
   def fromEvaluated[F[_]: Monad](v: EVALUATED, lc: LogCallback[F]): LazyVal[F] =
-    LazyValImpl(v.pure[Either[ExecutionError, *]].pure[F].pure[Eval], lc)
+    LazyValImpl(v.pure[[X] =>> Either[ExecutionError, X]].pure[F].pure[Eval], lc)
 
   def fromEvaluated[F[_]: Monad](v: EVALUATED): LazyVal[F] =
     fromEvaluated(v, _ => Monad[F].unit)

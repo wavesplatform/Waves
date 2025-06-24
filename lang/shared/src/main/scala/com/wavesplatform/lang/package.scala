@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import cats.data.EitherT
-import cats.{Eval, Id, Monad, StackSafeMonad}
+import cats.{Eval, Monad, StackSafeMonad}
 import monix.eval.Coeval
 
 package object lang {
@@ -9,11 +9,11 @@ package object lang {
 
   type ExecutionLog = String
 
-  type CoevalF[F[_], A]               = Coeval[F[A]]
-  type EvalF[F[_], A]                 = Eval[F[A]]
-  type TrampolinedExecResult[F[_], T] = EitherT[EvalF[F, *], ExecutionError, T]
+  type CoevalF[F[_]]                  = [X] =>> Coeval[F[X]]
+  type EvalF[F[_]]                    = [X] =>> Eval[F[X]]
+  type TrampolinedExecResult[F[_], T] = EitherT[EvalF[F], ExecutionError, T]
 
-  implicit val idCoevalFMonad: Monad[CoevalF[Id, *]] = new StackSafeMonad[CoevalF[Id, *]] {
+  implicit val idCoevalFMonad: Monad[Coeval] = new StackSafeMonad[Coeval] {
     override def flatMap[A, B](fa: Coeval[A])(f: A => Coeval[B]): Coeval[B] =
       fa.flatMap(f).memoize
 

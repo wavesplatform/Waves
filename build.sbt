@@ -159,12 +159,12 @@ inScope(Global)(
     publish / skip       := true,
     scalacOptions ++= Seq(
       "-feature",
+      "-explain",
       "-deprecation",
       "-unchecked",
       "-language:higherKinds",
       "-language:implicitConversions",
       "-language:postfixOps",
-      "-Xkind-projector",
       "-Wunused:all",
       "-Wconf:cat=deprecation&origin=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
       "-Wconf:cat=deprecation&origin=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
