@@ -150,8 +150,8 @@ object UtilsEvaluator {
       )
       dApp = ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp])
       expr <- dAppToExpr(dApp)
-      limitedResult <- EvaluatorV2
-        .applyLimitedCoeval(
+      (log, comp, res) = EvaluatorV2
+        .applyLimited(
           expr,
           LogExtraInfo(),
           limit,
@@ -163,14 +163,12 @@ object UtilsEvaluator {
           enableExecutionLog = true,
           fixedThrownError = true
         )
-        .value()
-        .leftMap { case (err, _, log) => InvokeRejectError(err.message, log) }
-      (evaluated, usedComplexity, log) <- limitedResult match {
-        case (eval: EVALUATED, unusedComplexity, log) => Right((eval, limit - unusedComplexity, log))
-        case (_: EXPR, _, log)                        => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))
+      result <- res match {
+        case Right(eval) => Right((eval, comp, log))
+        case _           => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))
       }
       snapshot <- ScriptResult
-        .fromObj(ctx, invoke.id(), evaluated, ds.stdLibVersion, unusedComplexity = 0)
+        .fromObj(ctx, invoke.id(), result._1, ds.stdLibVersion, result._2)
         .bimap(
           _ => Right(StateSnapshot.empty),
           r =>
@@ -181,7 +179,7 @@ object UtilsEvaluator {
                 script.stdLibVersion,
                 dAppAddress,
                 dAppPk,
-                usedComplexity,
+                r.spentComplexity,
                 invoke,
                 SnapshotBlockchain(blockchain, environment.currentSnapshot),
                 System.currentTimeMillis(),
@@ -201,7 +199,7 @@ object UtilsEvaluator {
       _ <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalSnapshot, Int.MaxValue, enableExecutionLog = true).resultE
       rootScriptResult  = snapshot.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)
       innerScriptResult = environment.currentSnapshot.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _)
-    } yield ExecuteResult(evaluated, usedComplexity, log, innerScriptResult |+| rootScriptResult)
+    } yield ExecuteResult(result._1, result._2, log, innerScriptResult |+| rootScriptResult)
 
   private def addWavesToDefaultInvoker(snapshot: StateSnapshot, blockchain: Blockchain) =
     if (snapshot.balances.get((UtilsApiRoute.DefaultAddress, Waves)).exists(_ >= Long.MaxValue / 10))

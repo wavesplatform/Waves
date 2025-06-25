@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction.smart
 
-import cats.Id
-import cats.implicits.catsSyntaxSemigroup
 import cats.syntax.either.*
 import com.wavesplatform.account
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
@@ -15,27 +13,25 @@ import com.wavesplatform.features.MultiPaymentPolicyProvider.*
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.lang.v1.traits.*
+import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.*
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
-import com.wavesplatform.state.diffs.invoke.InvokeScriptDiff.validateIntermediateBalances
-import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, DiffToLogConverter, TransactionBase, TransactionType}
+import com.wavesplatform.transaction.{Asset, TransactionBase, TransactionType}
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -44,31 +40,29 @@ object WavesEnvironment {
   type In = TransactionBase | Order | PseudoTx
 
   def apply(
-      nByte: Byte,
-      in: Coeval[Environment.InputEntity],
-      h: Coeval[Int],
-      blockchain: Blockchain,
+      inputEntity: Environment.InputEntity,
       tthis: Environment.Tthis,
+      txId: ByteStr,
       ds: DirectiveSet,
-      txId: ByteStr
-  ): WavesEnvironment = new WavesEnvironment(nByte, in, h, blockchain, tthis, ds, txId, blockchain)
+      immutableBlockchain: Blockchain
+  ) = new WavesEnvironment(inputEntity, tthis, txId, ds) {
+    override def blockchain: Blockchain = immutableBlockchain
+  }
 }
 
-class WavesEnvironment(
-    nByte: Byte,
-    in: Coeval[Environment.InputEntity],
-    h: Coeval[Int],
-    blockchain: Blockchain,
-    val tthis: Environment.Tthis,
-    ds: DirectiveSet,
+abstract class WavesEnvironment(
+    override val inputEntity: Environment.InputEntity,
+    _tthis: Environment.Tthis,
     override val txId: ByteStr,
-    blockchainForRuntime: Blockchain
+    val ds: DirectiveSet
 ) extends Environment[Id] {
-  import com.wavesplatform.lang.v1.traits.Environment.*
 
-  def currentBlockchain(): Blockchain = blockchainForRuntime
+  def blockchain: Blockchain
 
-  override def height: Long = h()
+  override def tthis: Tthis = _tthis
+
+  override def chainId: Byte = blockchain.settings.addressSchemeCharacter.toByte
+  override def height: Long  = blockchain.height
 
   override def multiPaymentAllowed: Boolean = blockchainForRuntime.allowsMultiPayment
 
@@ -79,8 +73,6 @@ class WavesEnvironment(
       .filter(_._1.status == TxMeta.Status.Succeeded)
       .collect { case (_, tx) if tx.t.tpe != TransactionType.Ethereum => tx }
       .map(tx => RealTransactionWrapper(tx, blockchainForRuntime, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
-
-  override def inputEntity: InputEntity = in()
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer] =
     // There are no new transactions in currentBlockchain
@@ -105,7 +97,7 @@ class WavesEnvironment(
   override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
     for {
       address <- toAddress(recipient)
-      data <- currentBlockchain()
+      data <- blockchain
         .accountData(address, key)
         .map((_, dataType))
         .flatMap {
@@ -131,7 +123,7 @@ class WavesEnvironment(
             .flatMap(blockchain.resolveAlias)
             .toOption
       }
-    } yield currentBlockchain()
+    } yield blockchain
       .hasData(address)).getOrElse(false)
   }
 
@@ -143,8 +135,6 @@ class WavesEnvironment(
       .left
       .map(_.toString)
 
-  override def chainId: Byte = nByte
-
   override def accountBalanceOf(addressOrAlias: Recipient, maybeAssetId: Option[Array[Byte]]): Either[String, Long] = {
     (for {
       aoa <- addressOrAlias match {
@@ -152,7 +142,7 @@ class WavesEnvironment(
         case Alias(name)    => com.wavesplatform.account.Alias.create(name)
       }
       address <- blockchain.resolveAlias(aoa)
-      balance = currentBlockchain().balance(address, Asset.fromCompatId(maybeAssetId.map(ByteStr(_))))
+      balance = blockchain.balance(address, Asset.fromCompatId(maybeAssetId.map(ByteStr(_))))
     } yield balance).left.map(_.toString)
   }
 
@@ -163,8 +153,8 @@ class WavesEnvironment(
     }
     for {
       address <- addressE.leftMap(_.toString)
-      portfolio = currentBlockchain().wavesPortfolio(address)
-      isBanned  = currentBlockchain().hasBannedEffectiveBalance(address)
+      portfolio = blockchain.wavesPortfolio(address)
+      isBanned  = blockchain.hasBannedEffectiveBalance(address)
       effectiveBalance <- portfolio.effectiveBalance(isBanned)
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
@@ -183,7 +173,7 @@ class WavesEnvironment(
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
-      assetDesc <- currentBlockchain().assetDescription(IssuedAsset(ByteStr(id)))
+      assetDesc <- blockchain.assetDescription(IssuedAsset(ByteStr(id)))
     } yield {
       ScriptAssetInfo(
         id = ByteStr(id),
@@ -264,7 +254,10 @@ class WavesEnvironment(
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int,
       reentrant: Boolean
-  ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
+  ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = {
+    println("\n\tWavesEnvironment ???\n")
+    ???
+  }
 
   override def calculateDelay(generator: ByteStr, balance: Long): Long = {
     val baseTarget = blockchain.lastBlockHeader.map(_.header.baseTarget).getOrElse(0L)
@@ -398,7 +391,7 @@ class DAppEnvironment(
     nByte: Byte,
     in: Coeval[Environment.InputEntity],
     h: Coeval[Int],
-    blockchain: Blockchain,
+    blockchain_ : Blockchain,
     tthis: Environment.Tthis,
     val ds: DirectiveSet,
     rootVersion: StdLibVersion,
@@ -413,14 +406,12 @@ class DAppEnvironment(
     var availableActions: ActionLimits,
     var availablePayments: Int,
     var currentSnapshot: StateSnapshot,
-    val invocationRoot: DAppEnvironment.InvocationTreeTracker,
-    wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface = identity
-) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id(), blockchain)
-    with DAppEnvironmentInterface {
+    val invocationRoot: DAppEnvironment.InvocationTreeTracker
+) extends WavesEnvironment(in(), tthis, tx.id(), ds) {
 
   private var mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
 
-  override def currentBlockchain(): SnapshotBlockchain = this.mutableBlockchain
+  override def blockchain: SnapshotBlockchain = this.mutableBlockchain
 
   override def callScript(
       dApp: Address,
@@ -430,6 +421,9 @@ class DAppEnvironment(
       availableComplexity: Int,
       reentrant: Boolean
   ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = {
+    println(s"\n\tDAppEnvironment: ???\n")
+    ???
+  } /*{
 
     val r = for {
       address <- traced(
@@ -507,5 +501,5 @@ class DAppEnvironment(
         case Right((evaluated, complexity, diffLog)) => (Right((evaluated, diffLog)), complexity)
       }
     }
-  }
+  }*/
 }

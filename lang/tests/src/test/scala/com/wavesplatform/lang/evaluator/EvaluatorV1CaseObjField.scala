@@ -2,21 +2,26 @@ package com.wavesplatform.lang.evaluator
 
 import cats.Id
 import cats.kernel.Monoid
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common.*
 import com.wavesplatform.lang.Testing.*
 import com.wavesplatform.lang.directives.values.V1
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms.*
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.ctx.*
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
 import com.wavesplatform.test.PropSpec
 
 class EvaluatorV1CaseObjField extends PropSpec {
-
-  def context(p: CaseObj): EvaluationContext[NoContext, Id] =
-    Monoid.combine(PureContext.build(V1, useNewPowPrecision = true).evaluationContext, sampleUnionContext(p))
+  def context(p: CaseObj): EvaluationContext[Id] =
+    Monoid
+      .combine(
+        PureContext.build(V1, useNewPowPrecision = true),
+        CTX(Seq.empty, Map("p" -> (p.caseType, ContextfulVal.pure(p))), Array.empty)
+      )
+      .evaluationContext(Common.emptyBlockchainEnvironment())
 
   property("case custom type field access") {
     ev[CONST_LONG](

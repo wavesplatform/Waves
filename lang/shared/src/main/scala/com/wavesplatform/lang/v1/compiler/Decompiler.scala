@@ -43,7 +43,7 @@ object Decompiler {
         )
       case Terms.LET(name, value) =>
         expr(pure(value), ctx, BracesWhenNeccessary, DontIndentFirstLine).map(e => out("let " + name + " = " + e, ctx.ident))
-      case _: FAILED_DEC => Coeval.now("FAILED_DEC")
+      case FAILED_DEC => Coeval.now("FAILED_DEC")
     }
 
   private def extrTypes(Name: String, e: EXPR): Coeval[Option[List[String]]] = {

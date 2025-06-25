@@ -20,13 +20,11 @@ object BlockchainContext {
 
   type In = WavesEnvironment.In
 
-  private val cache = new util.HashMap[(StdLibVersion, Boolean, Boolean, Boolean, DirectiveSet), CTX[Environment]]()
+  private val cache = new util.HashMap[(StdLibVersion, Boolean, Boolean, Boolean, DirectiveSet), CTX]()
 
   def build(
       version: StdLibVersion,
-      nByte: Byte,
       in: Coeval[Environment.InputEntity],
-      h: Coeval[Int],
       blockchain: Blockchain,
       isTokenContext: Boolean,
       isContract: Boolean,
@@ -36,13 +34,13 @@ object BlockchainContext {
       useNewPowPrecision: Boolean,
       fixBigScriptField: Boolean,
       fixEcrecover: Boolean
-  ): Either[String, EvaluationContext[Environment, Id]] =
+  ): Either[String, EvaluationContext[Id]] =
     DirectiveSet(
       version,
       ScriptType.isAssetScript(isTokenContext),
       ContentType.isDApp(isContract)
     ).map { ds =>
-      val environment = WavesEnvironment(nByte, in, h, blockchain, address, ds, txId)
+      val environment = WavesEnvironment(in(), address, txId, ds, blockchain)
       build(ds, environment, fixUnicodeFunctions, useNewPowPrecision, fixBigScriptField, fixEcrecover)
     }
 
@@ -53,14 +51,14 @@ object BlockchainContext {
       useNewPowPrecision: Boolean,
       fixBigScriptField: Boolean,
       fixEcrecover: Boolean
-  ): EvaluationContext[Environment, Id] =
+  ): EvaluationContext[Id] =
     cache
       .synchronized(
         cache.computeIfAbsent(
           (ds.stdLibVersion, fixUnicodeFunctions, useNewPowPrecision, fixBigScriptField, ds),
           { _ =>
-            PureContext.build(ds.stdLibVersion, useNewPowPrecision).withEnvironment[Environment] |+|
-              CryptoContext.build(Global, ds.stdLibVersion, fixEcrecover).withEnvironment[Environment] |+|
+            PureContext.build(ds.stdLibVersion, useNewPowPrecision) |+|
+              CryptoContext.build(Global, ds.stdLibVersion, fixEcrecover) |+|
               WavesContext.build(Global, ds, fixBigScriptField)
           }
         )

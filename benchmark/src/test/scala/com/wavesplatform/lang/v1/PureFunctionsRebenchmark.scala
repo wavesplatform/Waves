@@ -17,7 +17,6 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.{FunctionIds, Log}
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Common, ExecutionError, v1}
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
@@ -218,7 +217,7 @@ class PureFunctionsRebenchmark {
 }
 
 object PureFunctionsRebenchmark {
-  val context: EvaluationContext[Environment, Id] =
+  val context: EvaluationContext[Id] =
     lazyContexts((DirectiveSet(V5, Account, Expression).explicitGet(), true, true, true))()
       .evaluationContext(Common.emptyBlockchainEnvironment())
 

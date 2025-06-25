@@ -108,6 +108,8 @@ object Dependencies {
 
   private val rocksdb = "org.rocksdb" % "rocksdbjni" % "10.2.1"
 
+  val scalaLogging: ModuleID = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
+
   lazy val node = Def.setting(
     Seq(
       rocksdb,
@@ -134,7 +136,7 @@ object Dependencies {
       "org.bitlet" % "weupnp" % "0.1.4",
       monixModule("reactive").value,
       nettyHandler,
-      "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
+      scalaLogging,
       "eu.timepit"                 %% "refined"       % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"              % "headlong"      % "13.3.0",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches

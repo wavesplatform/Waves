@@ -12,10 +12,9 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.lang.{Global, utils}
-import com.wavesplatform.state.diffs.smart.predef.{chainId, scriptWithAllV1Functions}
+import com.wavesplatform.state.diffs.smart.predef.scriptWithAllV1Functions
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
@@ -26,22 +25,22 @@ import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 
 class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
-  private val environment = WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
+  private val environment = WavesEnvironment(null, null, ByteStr.empty, DirectiveSet.contractDirectiveSet, EmptyBlockchain)
 
   private def estimate(
       expr: Terms.EXPR,
-      ctx: CTX[Environment],
+      ctx: CTX,
       funcCosts: Map[FunctionHeader, Coeval[Long]]
   ): Either[String, Long] =
     estimator(ctx.evaluationContext(environment).letDefs.keySet, funcCosts, expr)
 
-  private def ctx(version: StdLibVersion): CTX[Environment] = {
+  private def ctx(version: StdLibVersion): CTX = {
     utils.functionCosts(version)
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, version, fixEcrecover = true).withEnvironment[Environment],
+          PureContext.build(version, useNewPowPrecision = true),
+          CryptoContext.build(Global, version, fixEcrecover = true),
           WavesContext.build(
             Global,
             DirectiveSet(version, Account, Expression).explicitGet(),
