@@ -22,6 +22,7 @@ class MessageObserverL1 extends ChannelInboundHandlerAdapter {
   private val transactions        = ConcurrentSubject.publish[(Channel, Transaction)]
   private val blockSnapshots      = ConcurrentSubject.publish[(Channel, BlockSnapshotResponse)]
   private val microblockSnapshots = ConcurrentSubject.publish[(Channel, MicroBlockSnapshotResponse)]
+  private val endorsements        = ConcurrentSubject.publish[(Channel, EndorseBlock)]
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case b: Block                       => blocks.onNext((ctx.channel(), b))
@@ -32,8 +33,8 @@ class MessageObserverL1 extends ChannelInboundHandlerAdapter {
     case tx: Transaction                => transactions.onNext((ctx.channel(), tx))
     case sn: BlockSnapshotResponse      => blockSnapshots.onNext((ctx.channel(), sn))
     case sn: MicroBlockSnapshotResponse => microblockSnapshots.onNext((ctx.channel(), sn))
+    case e: EndorseBlock                => endorsements.onNext((ctx.channel(), e))
     case _                              => super.channelRead(ctx, msg)
-
   }
 
   def messages: Messages = {
@@ -45,7 +46,8 @@ class MessageObserverL1 extends ChannelInboundHandlerAdapter {
       microblockResponses,
       transactions,
       blockSnapshots,
-      microblockSnapshots
+      microblockSnapshots,
+      endorsements
     )
   }
 
@@ -58,6 +60,7 @@ class MessageObserverL1 extends ChannelInboundHandlerAdapter {
     transactions.onComplete()
     blockSnapshots.onComplete()
     microblockSnapshots.onComplete()
+    endorsements.onComplete()
   }
 }
 
@@ -70,6 +73,7 @@ object MessageObserverL1 {
       ChannelObservable[MicroBlockResponse],
       ChannelObservable[Transaction],
       ChannelObservable[BlockSnapshotResponse],
-      ChannelObservable[MicroBlockSnapshotResponse]
+      ChannelObservable[MicroBlockSnapshotResponse],
+      ChannelObservable[EndorseBlock]
   )
 }

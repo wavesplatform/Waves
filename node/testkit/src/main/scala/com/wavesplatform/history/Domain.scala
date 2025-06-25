@@ -337,11 +337,12 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       microblock <- MicroBlock
         .buildAndSign(
           lastBlock.header.version,
-          blockSigner,
-          txs,
-          ref.getOrElse(blockchainUpdater.lastBlockId.get),
-          block.signature,
-          block.header.stateHash
+          generator = blockSigner,
+          transactionData = txs,
+          reference = ref.getOrElse(blockchainUpdater.lastBlockId.get),
+          totalResBlockSig = block.signature,
+          stateHash = block.header.stateHash,
+          endorsements = Seq.empty // TODO: endorsements
         )
     } yield microblock
   }

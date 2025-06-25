@@ -187,6 +187,7 @@ inScope(Global)(
     network         := Network.default(),
     instrumentation := false,
     resolvers ++= Resolver.sonatypeOssRepos("releases") ++ Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
+    resolvers += "Central Snapshots Repository" at "https://central.sonatype.com/repository/maven-snapshots/", // TODO: remove
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
     excludeLintKeys ++= Set(

@@ -6,8 +6,10 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.network.message.MessageSpec
-import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
+import com.wavesplatform.protobuf.block.EndorseBlock as PBEndorseBlock
+import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.{Signed, Transaction}
 import monix.eval.Coeval
 
@@ -111,4 +113,16 @@ case class MicroBlockSnapshotResponse(totalBlockId: BlockId, snapshots: Seq[Tran
 object MicroBlockSnapshotResponse {
   def fromProtobuf(snapshot: PBMicroBlockSnapshot): MicroBlockSnapshotResponse =
     MicroBlockSnapshotResponse(snapshot.totalBlockId.toByteStr, snapshot.snapshots)
+}
+
+case class EndorseBlock(endorserPublicKey: PublicKey, blockId: BlockId, blockHeight: Height, signature: ByteStr) extends Message {
+  def toProtobuf: PBEndorseBlock =
+    PBEndorseBlock(endorserPublicKey.toByteString, blockId.toByteString, blockHeight, signature.toByteString)
+
+  override def toString: String = s"Endorse(e=$endorserPublicKey, b=$blockId, $blockHeight, s=$signature)"
+}
+
+object EndorseBlock {
+  def fromProtobuf(x: PBEndorseBlock): EndorseBlock =
+    EndorseBlock(x.endorserPublicKey.toPublicKey, x.blockId.toByteStr, Height(x.blockHeight), x.signature.toByteStr)
 }

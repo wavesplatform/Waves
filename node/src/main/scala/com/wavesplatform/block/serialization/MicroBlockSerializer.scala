@@ -9,6 +9,7 @@ import com.wavesplatform.serialization.ByteBufferOps
 
 import scala.util.Try
 
+// Legacy
 object MicroBlockSerializer {
   def toBytes(microBlock: MicroBlock): Array[Byte] = {
     val transactionDataBytes = writeTransactionData(microBlock.version, microBlock.transactionData)
@@ -39,6 +40,6 @@ object MicroBlockSerializer {
       val signature       = ByteStr(buf.getByteArray(SignatureLength))
       val stateHash       = buf.getByteArrayOpt(DigestLength).map(ByteStr(_))
 
-      MicroBlock(version, generator, transactionData, reference, totalResBlockSig, signature, stateHash)
+      MicroBlock(version, generator, transactionData, reference, totalResBlockSig, signature, stateHash, Seq.empty)
     }
 }

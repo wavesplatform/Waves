@@ -175,7 +175,15 @@ class MicroBlockMinerImpl(
           )
           .leftMap(BlockBuildError.apply)
         microBlock <- MicroBlock
-          .buildAndSign(signedBlock.header.version, account, unconfirmed, accumulatedBlock.id(), signedBlock.signature, stateHash)
+          .buildAndSign(
+            signedBlock.header.version,
+            account,
+            unconfirmed,
+            accumulatedBlock.id(),
+            signedBlock.signature,
+            stateHash,
+            Seq.empty // TODO: endorsements
+          )
           .leftMap(MicroBlockBuildError.apply)
       } yield (signedBlock, microBlock)
     }
