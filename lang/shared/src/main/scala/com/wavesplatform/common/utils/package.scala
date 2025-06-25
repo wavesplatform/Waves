@@ -6,6 +6,12 @@ package object utils {
   val Base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
   object EitherExt2 {
+    @inline
+    private def makeException(value: Any): Throwable = value match {
+      case err: Throwable => err
+      case _              => new RuntimeException(value.toString)
+    }
+
     extension [A, B](ei: Either[A, B]) {
       def explicitGet(): B = ei match {
         case Left(value)  => throw makeException(value)
@@ -20,13 +26,6 @@ package object utils {
         left => Failure(makeException(left)),
         right => Success(right)
       )
-
-      @inline
-      private def makeException(value: Any): Throwable = value match {
-        case err: Throwable => err
-        case _              => new RuntimeException(value.toString)
-      }
-
     }
   }
 }

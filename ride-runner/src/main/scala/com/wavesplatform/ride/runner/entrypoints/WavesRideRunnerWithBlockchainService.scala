@@ -134,7 +134,7 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
       settings.requestsService,
       sharedBlockchain,
       allTags,
-      new SynchronizedJobScheduler()(rideScheduler),
+      new SynchronizedJobScheduler()(using rideScheduler),
       rideScheduler
     )
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { requestService.close() }
@@ -171,13 +171,13 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
         }
       }
       .lastL
-      .runToFuture(blockchainEventsStreamScheduler)
+      .runToFuture(using blockchainEventsStreamScheduler)
 
     blockchainUpdatesStream.start(Height(heights.lastKnownHardened + 1))
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
-      EvaluateApiRoute(requestService.trackAndRun(_).runToFuture(rideScheduler)),
+      EvaluateApiRoute(requestService.trackAndRun(_).runToFuture(using rideScheduler)),
       ServiceApiRoute(
         { () =>
           val nowMs      = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)

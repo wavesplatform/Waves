@@ -11,5 +11,5 @@ object Global {
     impl.Global
       .httpGet(js.Dynamic.literal(url = url))
       .toFuture
-      .map(r => NodeResponse(r.status.asInstanceOf[Int], r.body.asInstanceOf[String]))(executionContext)
+      .map(r => NodeResponse(r.status.asInstanceOf[Int], r.body.asInstanceOf[String]))(using executionContext)
 }

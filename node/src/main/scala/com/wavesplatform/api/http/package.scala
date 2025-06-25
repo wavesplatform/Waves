@@ -61,7 +61,7 @@ package object http {
   ): ToResponseMarshallable = {
     val typeId = (jsv \ "type").as[Byte]
 
-    (jsv \ "version").validateOpt[Byte](versionReads) match {
+    (jsv \ "version").validateOpt[Byte](using versionReads) match {
       case JsError(errors) => WrongJson(None, errors)
       case JsSuccess(value, _) =>
         val version = value.getOrElse(1: Byte)
@@ -189,7 +189,7 @@ package object http {
   def handleAllExceptions: Directive0 =
     Directive { inner => ctx =>
       val handleExceptions = uncaughtExceptionHandler.andThen(_(ctx))
-      try inner(())(ctx).recoverWith(handleExceptions)(ctx.executionContext)
+      try inner(())(ctx).recoverWith(handleExceptions)(using ctx.executionContext)
       catch {
         case thr: Throwable => uncaughtExceptionHandler.andThen(_(ctx)).applyOrElse[Throwable, Future[RouteResult]](thr, throw _)
       }

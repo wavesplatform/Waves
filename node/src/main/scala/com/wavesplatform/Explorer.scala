@@ -300,7 +300,7 @@ object Explorer extends ScorexLogging {
             val asi = readAccountScriptInfo(e.getValue)
             val estimationResult = asi.script match {
               case ContractScript.ContractScriptImpl(stdLibVersion, expr) =>
-                SetScriptTransactionDiff.estimate(reader, stdLibVersion, expr, checkOverflow = true)
+                SetScriptTransactionDiff.estimate(reader, stdLibVersion, expr)
               case script: ExprScript =>
                 DiffsCommon.countVerifierComplexity(Some(script), reader, isAsset = false)
               case _ => ???
@@ -338,7 +338,7 @@ object Explorer extends ScorexLogging {
             CommonAccountsApi(() => SnapshotBlockchain(reader, StateSnapshot.empty), rdb, reader)
               .dataStream(Address.fromString("3PC9BfRwJWWiw9AREE2B3eWzCks3CYtg4yo").explicitGet(), None)
               .countL
-              .runToFuture(s)
+              .runToFuture(using s)
           }
 
           import scala.concurrent.ExecutionContext.Implicits.global

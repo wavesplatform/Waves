@@ -152,7 +152,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
 
     val utx = new UtxPoolImpl(fakeTime, blockchain, wavesSettings.utxSettings, wavesSettings.maxTxErrorLogSize, wavesSettings.minerSettings.enable)
     val posSelector = PoSSelector(blockchain, None)
-    val utxEvents   = ConcurrentSubject.publish[UtxEvent](scheduler)
+    val utxEvents   = ConcurrentSubject.publish[UtxEvent](using scheduler)
     val miner = new MinerImpl(
       new DefaultChannelGroup("", null),
       blockchain,

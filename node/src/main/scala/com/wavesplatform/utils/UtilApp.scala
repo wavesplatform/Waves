@@ -75,12 +75,12 @@ object UtilApp {
         val inBytes  = IO.readInput(cmd)
         val result = cmd.mode match {
           case Command.CompileScript   => Actions.doCompile(settings)(cmd, inBytes)
-          case Command.DecompileScript => Actions.doDecompile(cmd, inBytes)
+          case Command.DecompileScript => Actions.doDecompile(inBytes)
           case Command.SignBytes       => Actions.doSign(cmd, inBytes)
           case Command.VerifySignature => Actions.doVerify(cmd, inBytes)
           case Command.CreateKeyPair   => Actions.doCreateKeyPair(cmd, inBytes)
           case Command.Hash            => Actions.doHash(cmd, inBytes)
-          case Command.SerializeTx     => Actions.doSerializeTx(cmd, inBytes)
+          case Command.SerializeTx     => Actions.doSerializeTx(inBytes)
           case Command.SignTx          => Actions.doSignTx(new NodeState(cmd))(cmd, inBytes)
           case Command.SignTxWithSk    => Actions.doSignTxWithSK(cmd, inBytes)
         }
@@ -242,7 +242,7 @@ object UtilApp {
         .map(_._1.bytes().arr)
     }
 
-    def doDecompile(c: Command, data: Array[Byte]): ActionResult = {
+    def doDecompile(data: Array[Byte]): ActionResult = {
       ScriptReader.fromBytes(data) match {
         case Left(value) =>
           Left(value.m)
@@ -292,7 +292,7 @@ object UtilApp {
       case m        => Left(s"Invalid hashing mode: $m")
     }
 
-    def doSerializeTx(c: Command, data: Array[Byte]): ActionResult = {
+    def doSerializeTx(data: Array[Byte]): ActionResult = {
       val jsv = Json.parse(data)
       TransactionFactory
         .fromSignedRequest(jsv)

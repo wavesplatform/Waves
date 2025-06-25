@@ -468,7 +468,7 @@ object InvokeDiffsCommon {
   ): TracedResult[ValidationError, StateSnapshot] = {
     actions.foldLeft(TracedResult(initSnapshot.asRight[ValidationError])) {
       case (r @ TracedResult(Left(_), _, _), _) => r
-      case (TracedResult(Right(currentSnapshot), prevTrace, prevAttrs), action) =>
+      case (TracedResult(Right(currentSnapshot), prevTrace, _), action) =>
         val complexityLimit =
           if (remainingLimit < Int.MaxValue) remainingLimit - currentSnapshot.scriptsComplexity.toInt
           else remainingLimit

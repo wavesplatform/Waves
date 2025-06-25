@@ -239,7 +239,7 @@ case class DebugApiRoute(
         "valid"          -> error.isEmpty,
         "validationTime" -> (System.nanoTime() - startTime).nanos.toMillis,
         "trace" -> tracedSnapshot.trace.map {
-          case ist: InvokeScriptTrace => ist.maybeLoggedJson(logged = true)(serializer.invokeScriptResultWrites)
+          case ist: InvokeScriptTrace => ist.maybeLoggedJson(logged = true)(using serializer.invokeScriptResultWrites)
           case trace                  => trace.loggedJson
         },
         "height" -> blockchain.height

@@ -89,7 +89,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       scheduler.awaitTermination(10 seconds)
       repo.shutdown()
       rdb.close()
-    }(Scheduler.global)
+    }(using Scheduler.global)
 
   override def onProcessBlock(
       block: Block,

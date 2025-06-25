@@ -21,19 +21,19 @@ class RouteTimeout(timeout: FiniteDuration)(implicit sc: Scheduler) extends ApiM
   }
 
   def executeToFuture[T](task: Task[T])(implicit m: ToResponseMarshaller[T]): Route =
-    execute(task)(_.runToFuture(_))
+    execute(task)(_.runToFuture(using _))
 
   def executeStreamed[T, R](task: Task[Seq[T]])(f: T => R)(implicit m: ToResponseMarshaller[Source[R, NotUsed]]): Route =
     execute(task) { (task, sc) =>
       task
-        .runToFuture(sc)
-        .map(Source(_).map(f))(sc)
+        .runToFuture(using sc)
+        .map(Source(_).map(f))(using sc)
     }
 
   def executeFromObservable[T](observable: Observable[T])(implicit m: ToResponseMarshaller[Source[T, NotUsed]]): Route =
     withExecutionContext(ece) {
       handleExceptions(handler) &
-        complete(Source.fromPublisher(observable.toReactivePublisher(sc)).initialTimeout(timeout))
+        complete(Source.fromPublisher(observable.toReactivePublisher(using sc)).initialTimeout(timeout))
     }
 
   def execute[T](task: Task[T])(f: (Task[T], Scheduler) => ToResponseMarshallable): Route = {

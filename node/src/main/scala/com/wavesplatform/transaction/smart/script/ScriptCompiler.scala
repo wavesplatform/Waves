@@ -12,19 +12,17 @@ object ScriptCompiler {
   def apply(
       scriptText: String,
       isAssetScript: Boolean,
-      estimator: ScriptEstimator,
-      fixEstimateOfVerifier: Boolean = true
+      estimator: ScriptEstimator
   ): Either[String, (Script, Long)] = {
     val script = if (!isAssetScript || scriptText.contains("SCRIPT_TYPE")) scriptText else s"{-# SCRIPT_TYPE ASSET #-}\n$scriptText"
-    compile(script, estimator, fixEstimateOfVerifier = fixEstimateOfVerifier)
+    compile(script, estimator)
   }
 
   def compile(
       scriptText: String,
       estimator: ScriptEstimator,
       libraries: Map[String, String] = Map(),
-      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default,
-      fixEstimateOfVerifier: Boolean = true
+      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
   ): Either[String, (Script, Long)] =
     API.compile(scriptText, estimator, libraries = libraries, defaultStdLib = defaultStdLib).map {
       case CompileResult.Expression(v, _, complexity, expr, _, isFreeCall) => (ExprScriptImpl(v, isFreeCall, expr), complexity)

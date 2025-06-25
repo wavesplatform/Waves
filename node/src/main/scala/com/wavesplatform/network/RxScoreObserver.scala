@@ -111,7 +111,7 @@ object RxScoreObserver extends ScorexLogging {
       }
       .logErr
       .distinctUntilChanged
-      .share(scheduler)
+      .share(using scheduler)
 
     (observable, statsReporter)
   }

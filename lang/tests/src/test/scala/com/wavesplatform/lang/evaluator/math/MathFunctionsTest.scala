@@ -2,11 +2,11 @@ package com.wavesplatform.lang.evaluator.math
 
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5, V6}
 import com.wavesplatform.lang.evaluator.EvaluatorSpec
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, EVALUATED}
 import com.wavesplatform.test.produce
 
 class MathFunctionsTest extends EvaluatorSpec {
-  private implicit val startVersion: StdLibVersion = V3
+  private def eval(s: String): Either[String, EVALUATED] = super.eval(s)(V3)
 
   private val max = Long.MaxValue
 

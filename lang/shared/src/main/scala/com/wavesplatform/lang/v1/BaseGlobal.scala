@@ -361,10 +361,10 @@ trait BaseGlobal {
       (arr: ArrayView[T]) => arr(Random.nextInt(arr.size))
 
     if (seq.length % 2 == 1)
-      findKMedianInPlace(ArrayView[T](seq), (seq.size - 1) / 2)(pivot)
+      findKMedianInPlace(ArrayView[T](seq), (seq.size - 1) / 2)(using pivot)
     else {
-      val r1 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2 - 1)(pivot)
-      val r2 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2)(pivot)
+      val r1 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2 - 1)(using pivot)
+      val r2 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2)(using pivot)
       // save Math.floorDiv(r1 + r2, 2) semantic and avoid overflow
       if (num.sign(r1) == num.sign(r2)) {
         if (r1 < r2) {

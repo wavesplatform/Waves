@@ -107,8 +107,8 @@ object RocksDBWriterBenchmark {
       rawDB.close()
     }
 
-    protected def load[T](label: String, absolutePath: String)(f: String => T): Vector[T] = {
-      Using.resource(scala.io.Source.fromFile(absolutePath)(Codec.UTF8))(_.getLines().map(f).toVector)
+    protected def load[T](absolutePath: String)(f: String => T): Vector[T] = {
+      Using.resource(scala.io.Source.fromFile(absolutePath)(using Codec.UTF8))(_.getLines().map(f).toVector)
     }
   }
 

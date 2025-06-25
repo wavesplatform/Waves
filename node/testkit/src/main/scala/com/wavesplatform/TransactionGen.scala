@@ -271,7 +271,6 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { su
 
   val transferV2Gen: Gen[TransferTransaction] = (for {
     (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
-    proofs                                                                             <- proofsGen
   } yield TransferTransaction
     .selfSigned(2.toByte, sender, recipient, assetId, amount, feeAssetId, feeAmount, attachment, timestamp)
     .explicitGet(

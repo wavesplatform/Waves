@@ -403,7 +403,7 @@ object TransactionFactory {
     import InvokeScriptRequest.*
     val chainId = (jsv \ "chainId").asOpt[Byte]
     val typeId  = (jsv \ "type").as[Byte]
-    val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
+    val version = (jsv \ "version").asOpt[Byte](using versionReads).getOrElse(1.toByte)
 
     val pf: PartialFunction[TransactionType.TransactionType, Either[ValidationError, Transaction]] = {
       case TransactionType.Transfer         => jsv.as[TransferRequest].toTx
@@ -439,7 +439,7 @@ object TransactionFactory {
 
     val typeId = (jsv \ "type").as[Byte]
 
-    (jsv \ "version").validateOpt[Byte](versionReads) match {
+    (jsv \ "version").validateOpt[Byte](using versionReads) match {
       case JsError(errors) =>
         Left(GenericError(s"Wrong JSON: ${errors.mkString(", ")}"))
       case JsSuccess(value, _) =>

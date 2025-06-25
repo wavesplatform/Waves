@@ -174,7 +174,7 @@ case class AddressApiRoute(
   def getData: Route =
     pathPrefix("data" / AddrSegment) { address =>
       implicit val jsonStreamingSupport: ToResponseMarshaller[Source[DataEntry[?], NotUsed]] =
-        jacksonStreamMarshaller()(DataEntry.dataEntrySerializer)
+        jacksonStreamMarshaller()(using DataEntry.dataEntrySerializer)
 
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))

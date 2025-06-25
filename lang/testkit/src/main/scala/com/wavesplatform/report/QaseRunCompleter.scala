@@ -78,7 +78,7 @@ object QaseRunCompleter extends App with StrictLogging {
 
           runsApi.completeRun(projectCode, runId.toInt)
         }
-      }(_.foreach(f => Files.delete(f.toPath)))
+      }(using _.foreach(f => Files.delete(f.toPath)))
     }
   } catch {
     case e: QaseException =>

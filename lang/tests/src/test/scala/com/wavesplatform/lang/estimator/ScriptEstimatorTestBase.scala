@@ -55,7 +55,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
   protected val lets: Set[String] =
     ctx.evaluationContext(env).letDefs.keySet
 
-  protected def compile(code: String)(implicit version: StdLibVersion): EXPR = {
+  protected def compile(code: String)(version: StdLibVersion): EXPR = {
     val untyped = Parser.parseExpr(code).get.value
     ExpressionCompiler(ctx.compilerContext, version, untyped).map(_._1).explicitGet()
   }

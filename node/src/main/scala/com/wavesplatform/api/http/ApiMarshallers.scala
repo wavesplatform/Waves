@@ -87,7 +87,7 @@ trait ApiMarshallers extends JsonFormats {
 
   implicit def playJsonMarshaller[A](implicit
       writes: Writes[A]
-  ): ToEntityMarshaller[A] = playJsonMarshaller2(writes, Json.stringify)
+  ): ToEntityMarshaller[A] = playJsonMarshaller2(using writes, Json.stringify)
 
   implicit def playJsonMarshaller2[A](implicit
       writes: Writes[A],
@@ -104,9 +104,9 @@ trait ApiMarshallers extends JsonFormats {
   implicit def jacksonMarshaller[A](implicit ser: Boolean => JsonSerializer[A]): ToEntityMarshaller[A] =
     Marshaller.oneOf(
       jsonByteStringMarshaller
-        .compose((v: A) => ByteString.fromArrayUnsafe(writeToBytes[A](v)(ser(false)))),
+        .compose((v: A) => ByteString.fromArrayUnsafe(writeToBytes[A](v)(using ser(false)))),
       customJsonByteStringMarshaller
-        .compose((v: A) => ByteString.fromArrayUnsafe(writeToBytes[A](v)(ser(true))))
+        .compose((v: A) => ByteString.fromArrayUnsafe(writeToBytes[A](v)(using ser(true))))
     )
 
   // preserve support for using plain strings as request entities
@@ -145,7 +145,7 @@ trait ApiMarshallers extends JsonFormats {
     val framingRenderer = Flow[ByteString].intersperse(ByteString(prefix), ByteString(delimiter), ByteString(suffix))
     Marshaller[Source[A, NotUsed], HttpResponse] { implicit ec => source =>
       val availableMarshallingsPerElement = source.mapAsync(1) { t =>
-        bsm(t)(ec)
+        bsm(t)(using ec)
       }
       FastFuture.successful(List(`application/json`, CustomJson.jsonWithNumbersAsStrings).map { contentType =>
         Marshalling.WithFixedContentType(
@@ -182,6 +182,6 @@ object ApiMarshallers extends ApiMarshallers {
         gen.flush()
         bb.toByteArray
       }
-    }((bb: ByteArrayBuilder) => bb.release())
+    }(using (bb: ByteArrayBuilder) => bb.release())
   }
 }

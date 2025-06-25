@@ -58,7 +58,7 @@ sealed abstract class KvHistoryPair[KeyT, ValueT](
     prefix: Short,
     val kvPairAtHeight: KvPair[(state.Height, KeyT), ValueT]
 )(implicit keyAsBytes: AsBytes[KeyT])
-    extends KvPair[KeyT, Heights](prefix)(keyAsBytes, vecAsBytes.consumeAll)
+    extends KvPair[KeyT, Heights](prefix)(using keyAsBytes, vecAsBytes.consumeAll)
 
 object KvPairs {
   object LastAddressId extends KvPair[Unit, AddressId](0)
@@ -66,7 +66,7 @@ object KvPairs {
   object IdToAddress   extends KvPair[AddressId, Address](2)
 
   object AccountDataEntriesHistory
-      extends KvHistoryPair[(AddressId, String), Option[DataEntry[?]]](11, AccountDataEntries)(tuple(implicitly, utf8StringAsBytes.consumeAll))
+      extends KvHistoryPair[(AddressId, String), Option[DataEntry[?]]](11, AccountDataEntries)(using tuple(implicitly, utf8StringAsBytes.consumeAll))
 
   object AccountDataEntries
       extends KvPair[(state.Height, (AddressId, String)), Option[DataEntry[?]]](12)(
