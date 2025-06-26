@@ -77,7 +77,7 @@ class SpentComplexitySpec
         () => 0,
         DummyTransactionPublisher.accepting,
         ntpTime,
-        new RouteTimeout(60.seconds)(sharedScheduler)
+        new RouteTimeout(60.seconds)(using sharedScheduler)
       ).route
     )
 

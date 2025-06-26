@@ -83,7 +83,7 @@ class TransactionsOrderingSpecification extends PropSpec {
         .explicitGet()
     )
 
-    val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering.InBlock)
+    val sorted = Random.shuffle(correctSeq).sorted(using TransactionsOrdering.InBlock)
 
     sorted shouldBe correctSeq
   }
@@ -157,7 +157,7 @@ class TransactionsOrderingSpecification extends PropSpec {
         .explicitGet()
     )
 
-    val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool(Set.empty))
+    val sorted = Random.shuffle(correctSeq).sorted(using TransactionsOrdering.InUTXPool(Set.empty))
 
     sorted shouldBe correctSeq
   }
@@ -192,7 +192,7 @@ class TransactionsOrderingSpecification extends PropSpec {
         .explicitGet()
     )
 
-    Random.shuffle(correctSeq).sorted(TransactionsOrdering.InBlock) shouldBe correctSeq
+    Random.shuffle(correctSeq).sorted(using TransactionsOrdering.InBlock) shouldBe correctSeq
   }
 
   property("TransactionsOrdering.InUTXPool should sort txs by ascending block timestamp taking into consideration whitelisted senders") {
@@ -225,6 +225,6 @@ class TransactionsOrderingSpecification extends PropSpec {
         )
         .explicitGet()
     )
-    Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool(Set(whitelisted.toAddress.toString))) shouldBe correctSeq
+    Random.shuffle(correctSeq).sorted(using TransactionsOrdering.InUTXPool(Set(whitelisted.toAddress.toString))) shouldBe correctSeq
   }
 }

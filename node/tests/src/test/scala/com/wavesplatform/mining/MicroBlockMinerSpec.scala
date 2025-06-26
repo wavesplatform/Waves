@@ -171,7 +171,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
       val constraint = OneDimensionalMiningConstraint(5, TxEstimators.one, "limit")
       microBlockMiner
         .generateMicroBlockSequence(defaultSigner, block, constraint, 0)
-        .runToFuture(mbminer)
+        .runToFuture(using mbminer)
 
       utxPool.putIfNew(transfer(amount = 123))
 

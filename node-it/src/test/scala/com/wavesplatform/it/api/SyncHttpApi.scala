@@ -760,13 +760,13 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       try f
       catch { case NonFatal(cause) => throw new RuntimeException(s"Error awaiting transaction: $transactionId", cause) }
 
-    def height(implicit pos: Position): Seq[Int] =
+    def height: Seq[Int] =
       sync(async(nodes).height, TxInBlockchainAwaitTime)
 
-    def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
+    def waitForHeightAriseAndTxPresent(transactionId: String): Unit =
       withTxIdMessage(transactionId)(sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime))
 
-    def waitForTransaction(transactionId: String)(implicit pos: Position): TransactionInfo =
+    def waitForTransaction(transactionId: String): TransactionInfo =
       withTxIdMessage(transactionId)(sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime))
 
     def waitForHeightArise(): Int =
@@ -781,7 +781,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def waitFor[A](desc: String, retryInterval: FiniteDuration = 1.second)(request: Node => A)(cond: Iterable[A] => Boolean): Boolean =
       sync(
-        async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
+        async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(using scala.concurrent.ExecutionContext.Implicits.global), cond),
         ConditionAwaitTime
       )
 

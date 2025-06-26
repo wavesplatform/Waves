@@ -135,7 +135,7 @@ class DefaultRequestService(
       }
       .lastL
       .as(())
-      .runToFuture(runScriptScheduler)
+      .runToFuture(using runScriptScheduler)
   }
 
   override def close(): Unit = if (isWorking.compareAndSet(true, false)) {

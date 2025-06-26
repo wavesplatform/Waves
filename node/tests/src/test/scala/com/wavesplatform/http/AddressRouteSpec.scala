@@ -65,7 +65,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
       utxPoolSynchronizer,
       new TestTime,
       timeLimited,
-      new RouteTimeout(60.seconds)(sharedScheduler),
+      new RouteTimeout(60.seconds)(using sharedScheduler),
       domain.accountsApi,
       MaxBalanceDepth
     ).route

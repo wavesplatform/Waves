@@ -5,9 +5,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser.given
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import pureconfig.ConfigReader
 import pureconfig.ConfigReader.Result
 import pureconfig.generic.ProductHint
-import pureconfig.{ConfigCursor, ConfigReader, ReadsMissingKeys}
 import pureconfig.generic.semiauto.deriveReader
 
 case class RideRunnerBlockchainState(

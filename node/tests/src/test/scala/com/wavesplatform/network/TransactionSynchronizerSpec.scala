@@ -19,7 +19,7 @@ class TransactionSynchronizerSpec extends PropSpec with WithDomain {
       val blockIds =
         Observable
           .repeatEval(d.blockchain.lastBlockId.getOrElse(ByteStr.empty))
-          .distinctUntilChanged(Eq.fromUniversalEquals)
+          .distinctUntilChanged(using Eq.fromUniversalEquals)
 
       val tx  = transfer()
       val txs = Observable.repeatEval(tx)
@@ -32,7 +32,7 @@ class TransactionSynchronizerSpec extends PropSpec with WithDomain {
         blockIds,
         txs.map((null, _)),
         (_, _) => Future.successful { broadcastCount.increment(); TracedResult(Right(true)) }
-      )(scheduler)
+      )(using scheduler)
 
       val appends = 20
       (1 to appends).foreach { i =>

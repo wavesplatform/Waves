@@ -107,7 +107,7 @@ class PeerDatabaseImplSpecification extends FreeSpec {
       keys should contain(address1)
       keys should not contain address2
 
-      val set = (1 to 10).flatMap(i => database2.nextCandidate(Set())).toSet
+      val set = (1 to 10).flatMap(_ => database2.nextCandidate(Set())).toSet
 
       set should contain(address1)
       set should contain(address2)

@@ -1540,52 +1540,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     )
   }
 
-  def defaultPaymentContract(
-      senderBinding: String,
-      argName: String,
-      recipientAddress: AddressOrAlias,
-      recipientAmount: Long,
-      assets: List[Asset] = List(Waves)
-  ): DApp = {
-
-    val transfers: immutable.Seq[FUNCTION_CALL] = assets.map(a =>
-      FUNCTION_CALL(
-        User(FieldNames.ScriptTransfer),
-        List(
-          (recipientAddress: @unchecked) match {
-            case recipientAddress: Address => FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(ByteStr(recipientAddress.bytes)).explicitGet()))
-            case recipientAddress: Alias   => FUNCTION_CALL(User("Alias"), List(CONST_STRING(recipientAddress.name).explicitGet()))
-          },
-          CONST_LONG(recipientAmount),
-          a.fold(REF(GlobalValNames.Unit): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
-        )
-      )
-    )
-
-    val payments: EXPR = transfers.foldRight(REF(GlobalValNames.Nil): EXPR) { case (elem, tail) =>
-      FUNCTION_CALL(Native(CREATE_LIST), List(elem, tail))
-    }
-
-    DApp(
-      DAppMeta(),
-      List.empty,
-      List(
-        CallableFunction(
-          CallableAnnotation(senderBinding),
-          Terms.FUNC(
-            "default",
-            Nil,
-            FUNCTION_CALL(
-              User(FieldNames.TransferSet),
-              List(payments)
-            )
-          )
-        )
-      ),
-      None
-    )
-  }
-
   def writeSet(funcName: String, count: Int): Script = {
     val DataEntries = Array.tabulate(count)(i => s"""DataEntry("$i", $i)""").mkString(",")
 

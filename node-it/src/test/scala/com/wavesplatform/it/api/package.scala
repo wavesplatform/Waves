@@ -25,7 +25,7 @@ package object api {
       f.map { r =>
         val json = r.getResponseBody(StandardCharsets.UTF_8)
         Try(parse(json).as[A]).fold(err => throw new RuntimeException(s"Json parse failed: $json", err), identity)
-      }(ec)
+      }(using ec)
 
     def as[A: Reads](numberAsString: Boolean = false)(implicit ec: ExecutionContext): Future[A] = {
       def convert(jsv: JsValue): Either[RuntimeException, JsValue] = {

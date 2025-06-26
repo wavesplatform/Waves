@@ -36,7 +36,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with DomainScenarioDri
   }
 
   property("microblock: first micro doesn't reference base block(references nothing)") {
-    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, _)) =>
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment)))
       val block0 = blocks(0)
       val block1 = blocks(1)
@@ -86,7 +86,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with DomainScenarioDri
   }
 
   property("block: second 'genesis' block") {
-    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, _)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis, payment))
       val block1 = buildBlockOfTxs(randomSig, Seq(genesis, payment2))
       domain.blockchainUpdater.processBlock(block0) should beRight

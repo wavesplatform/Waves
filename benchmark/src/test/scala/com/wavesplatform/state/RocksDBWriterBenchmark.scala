@@ -52,22 +52,22 @@ object RocksDBWriterBenchmark {
 
   @State(Scope.Benchmark)
   class TransactionByIdSt extends BaseSt {
-    val allTxs: Vector[ByteStr] = load("transactionById", benchSettings.restTxsFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
+    val allTxs: Vector[ByteStr] = load(benchSettings.restTxsFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
   }
 
   @State(Scope.Benchmark)
   class TransactionByAddressSt extends BaseSt {
-    val txsAddresses: Vector[Address] = load("transactionByAddress", ???)(x => Address.fromString(x).explicitGet())
+    val txsAddresses: Vector[Address] = load(???)(x => Address.fromString(x).explicitGet())
   }
 
   @State(Scope.Benchmark)
   class BlocksByIdSt extends BaseSt {
-    val allBlocks: Vector[ByteStr] = load("blocksById", benchSettings.blocksFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
+    val allBlocks: Vector[ByteStr] = load(benchSettings.blocksFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
   }
 
   @State(Scope.Benchmark)
   class BlocksByHeightSt extends BaseSt {
-    val allBlocks: Vector[Int] = load("blocksByHeight", benchSettings.blocksFile)(_.toInt)
+    val allBlocks: Vector[Int] = load(benchSettings.blocksFile)(_.toInt)
   }
 
   @State(Scope.Benchmark)

@@ -194,7 +194,7 @@ class RewardApiRouteSpec extends RouteSpec("/blockchain") with WithDomain {
     withDomain(settings, Seq(AddrWithBalance(miner.toAddress, 100_000.waves))) { d =>
       val route = new RewardApiRoute(d.blockchain).route
 
-      def checkRewardAndShares(height: Int, expectedReward: Long, expectedMinerShare: Long, expectedDaoShare: Long, expectedXtnShare: Option[Long])(
+      def checkRewardAndShares(height: Int, expectedReward: Long)(
           implicit pos: Position
       ): Unit = {
 
@@ -212,24 +212,24 @@ class RewardApiRouteSpec extends RouteSpec("/blockchain") with WithDomain {
       (1 to 3).foreach(_ => d.appendKeyBlock(miner))
       d.blockchain.height shouldBe 4
       (1 to 3).foreach { h =>
-        checkRewardAndShares(h + 1, 6.waves, 2.waves, 2.waves, Some(2.waves))
+        checkRewardAndShares(h + 1, 6.waves)
       }
 
       // reward boost activation
       (1 to 5).foreach(_ => d.appendKeyBlock(miner))
       (1 to 5).foreach { h =>
-        checkRewardAndShares(h + 4, 60.waves, 20.waves, 20.waves, Some(20.waves))
+        checkRewardAndShares(h + 4, 60.waves)
       }
 
       // cease XTN buyback
       (1 to 5).foreach(_ => d.appendKeyBlock(miner))
       (1 to 5).foreach { h =>
-        checkRewardAndShares(h + 9, 60.waves, 40.waves, 20.waves, None)
+        checkRewardAndShares(h + 9, 60.waves)
       }
 
       d.appendKeyBlock(miner)
       d.blockchain.height shouldBe 15
-      checkRewardAndShares(15, 6.waves, 4.waves, 2.waves, None)
+      checkRewardAndShares(15, 6.waves)
     }
   }
 }

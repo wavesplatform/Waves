@@ -234,7 +234,6 @@ class MassTransferTransactionSpecification extends PropSpec {
   }
 
   property("empty transfers validation") {
-    import play.api.libs.json.*
     val transaction = TransactionFactory
       .fromSignedRequest(
         Json.parse(

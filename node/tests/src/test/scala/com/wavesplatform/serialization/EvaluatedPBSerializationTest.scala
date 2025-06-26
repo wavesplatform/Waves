@@ -120,6 +120,6 @@ class EvaluatedPBSerializationTest
     () => d.utxPool.size,
     (_, _) => Future.successful(TracedResult(Right(true))),
     ntpTime,
-    new RouteTimeout(60.seconds)(sharedScheduler)
+    new RouteTimeout(60.seconds)(using sharedScheduler)
   )
 }

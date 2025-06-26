@@ -17,7 +17,7 @@ package object state {
     Try(Math.addExact(x, y)).toEither.leftMap(_ => s"$source sum overflow")
 
   implicit val safeSummarizer: Summarizer[[X] =>> Either[String, X]] = safeSum(_, _, _)
-  implicit val unsafeSummarizer: Summarizer[Id]              = (x, y, _) => x + y
+  implicit val unsafeSummarizer: Summarizer[Id]                      = (x, y, _) => x + y
 
   implicit class Cast[A](a: A) {
     def cast[B: ClassTag]: Option[B] = {

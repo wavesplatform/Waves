@@ -14,7 +14,7 @@ git.uncommittedSignifier       := Some("DIRTY")
 ThisBuild / git.useGitDescribe := true
 ThisBuild / PB.protocVersion   := "4.31.1"
 
-ThisBuild / dependencyOverrides ++= Dependencies.overrides
+ThisBuild / dependencyOverrides ++= Dependencies.overrides.value
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -159,7 +159,6 @@ inScope(Global)(
     publish / skip       := true,
     scalacOptions ++= Seq(
       "-feature",
-      "-explain",
       "-deprecation",
       "-unchecked",
       "-language:higherKinds",

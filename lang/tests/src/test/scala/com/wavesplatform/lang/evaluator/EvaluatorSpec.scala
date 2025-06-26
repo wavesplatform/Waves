@@ -22,7 +22,7 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
 
   def eval(
       code: String
-  )(startVersion: StdLibVersion, checkNext: Boolean = true, checkOldPowVersion: Boolean = false): Either[String, EVALUATED] =
+  )(implicit startVersion: StdLibVersion = V1, checkNext: Boolean = true, checkOldPowVersion: Boolean = false): Either[String, EVALUATED] =
     evalVerRange(code, startVersion, if (checkNext) lastVersion else startVersion, checkOldPowVersion)
 
   def evalVerRange(
@@ -36,7 +36,7 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
   def evalExpr(expr: EXPR, startVersion: StdLibVersion, endVersion: StdLibVersion, checkOldPowVersion: Boolean = false): Either[String, EVALUATED] =
     evalInternal(_ => Right(expr), startVersion, endVersion, checkOldPowVersion).map(_._1)
 
-  def evalWithCost(code: String)(startVersion: StdLibVersion = V1): (EVALUATED, Int) = {
+  def evalWithCost(code: String)(implicit startVersion: StdLibVersion = V1): (EVALUATED, Int) = {
     val (result, unused) = evalInternal(compile(code, _), startVersion, lastVersion, checkOldPowVersion = false).explicitGet()
     (result, Int.MaxValue - unused)
   }

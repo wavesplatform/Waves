@@ -44,7 +44,7 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
         DummyTransactionPublisher.accepting,
         ntpTime,
         CommonAccountsApi(() => domain.blockchainUpdater.snapshotBlockchain, domain.rdb, domain.blockchain),
-        new RouteTimeout(60.seconds)(sharedScheduler)
+        new RouteTimeout(60.seconds)(using sharedScheduler)
       ).route
     )
 

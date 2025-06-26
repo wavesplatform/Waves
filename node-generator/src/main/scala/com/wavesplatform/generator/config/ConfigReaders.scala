@@ -36,9 +36,9 @@ trait ConfigReaders {
     )
 
   given ConfigReader[Worker.Settings] = ConfigReader.fromCursor { v =>
-    def readInitialDelay(obj: ConfigObjectCursor, delay: FiniteDuration): ConfigReader.Result[Either[FiniteDuration, FiniteDuration]] =
+    def readInitialDelay(obj: ConfigObjectCursor, path: String, delay: FiniteDuration): ConfigReader.Result[Either[FiniteDuration, FiniteDuration]] =
       for {
-        delayStr <- obj.optionalWithDefault[String]("initial-delay", "empty-utx")
+        delayStr <- obj.optionalWithDefault[String](path, "empty-utx")
         delay    <- if (delayStr == "empty-utx") Right(Right(delay)) else obj.required[FiniteDuration]("initial-delay").map(d => Left(d))
       } yield delay
 

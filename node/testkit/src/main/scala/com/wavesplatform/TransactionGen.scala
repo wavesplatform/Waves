@@ -519,7 +519,6 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { su
       amountAssetId: Asset,
       priceAssetId: Asset,
       fixedMatcherFee: Option[Long] = None,
-      chainId: Byte = AddressScheme.current.chainId,
       fixedMatcher: Option[KeyPair] = None
   ): Gen[ExchangeTransaction] =
     for {

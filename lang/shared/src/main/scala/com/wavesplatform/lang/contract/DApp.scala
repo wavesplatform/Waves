@@ -83,9 +83,9 @@ object DApp {
     def parse(name: String, args: List[String]): Either[CompilationError, Annotation] = {
       (name, args) match {
         case ("Verifier", s :: Nil) => Right(VerifierAnnotation(s))
-        case ("Verifier", _)  => Left(Generic(0, 0, "Incorrect amount of bound args in Verifier, should be one, e.g. @Verifier(tx)"))
+        case ("Verifier", _)        => Left(Generic(0, 0, "Incorrect amount of bound args in Verifier, should be one, e.g. @Verifier(tx)"))
         case ("Callable", s :: Nil) => Right(CallableAnnotation(s))
-        case ("Callable", _)  => Left(Generic(0, 0, "Incorrect amount of bound args in Callable, should be one, e.g. @Callable(inv)"))
+        case ("Callable", _)        => Left(Generic(0, 0, "Incorrect amount of bound args in Callable, should be one, e.g. @Callable(inv)"))
         case _                      => Left(Generic(0, 0, "Annotation not recognized"))
       }
     }

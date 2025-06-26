@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.BLS12_GROTH16_VERIFY
 class EstimatorGlobalVarTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = false)) {
   private val fixedEstimator                                      = ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = true)
   private def estimateFixed(expr: EXPR): Either[String, Long]     = fixedEstimator(lets, functionCosts(V6), expr)
-  private def estimateFixed(script: String): Either[String, Long] = estimateFixed(compile(script)(V6))
+  private def estimateFixed(script: String): Either[String, Long] = estimateFixed(compile(script)(using V6))
 
   property("global variable cost should not overlap function argument cost") {
     val script =

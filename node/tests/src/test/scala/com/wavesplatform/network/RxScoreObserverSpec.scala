@@ -22,7 +22,7 @@ class RxScoreObserverSpec extends FreeSpec with RxScheduler {
     val (syncWith, _) = RxScoreObserver(1.minute, 0.seconds, 0, localScores, remoteScores, channelClosed, timeout, testScheduler)
 
     try {
-      f(newItems(syncWith.map(_.syncWith))(implicitScheduler), localScores, remoteScores, channelClosed)
+      f(newItems(syncWith.map(_.syncWith))(using implicitScheduler), localScores, remoteScores, channelClosed)
     } finally {
       localScores.onComplete()
       remoteScores.onComplete()

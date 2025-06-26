@@ -15,7 +15,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
 
   "EvaluateApiRoute" - {
     "POST /utils/script/evaluate/{address}" - {
-      val okApi = EvaluateApiRoute { request =>
+      val okApi = EvaluateApiRoute { _ =>
         Future.successful(
           RideScriptRunResult(
             evaluation = None,
@@ -45,7 +45,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
         responseAs[JsObject].value should not be empty
       }
 
-      val failApi = EvaluateApiRoute { request =>
+      val failApi = EvaluateApiRoute { _ =>
         Future.successful(
           RideScriptRunResult(
             evaluation = None,

@@ -15,7 +15,7 @@ class MultiLineOperatorTest extends EvaluatorSpec {
          |  }
          |  a
       """.stripMargin
-    )(V6).explicitGet() shouldBe CONST_LONG(-1000)
+    )(using V6).explicitGet() shouldBe CONST_LONG(-1000)
   }
 
   property("number with '+' sign after number inside let definition") {
@@ -27,7 +27,7 @@ class MultiLineOperatorTest extends EvaluatorSpec {
          |  }
          |  a
       """.stripMargin
-    )(V6).explicitGet() shouldBe CONST_LONG(1000)
+    )(using V6).explicitGet() shouldBe CONST_LONG(1000)
   }
 
   property("multiline sub") {
@@ -41,7 +41,7 @@ class MultiLineOperatorTest extends EvaluatorSpec {
          |  }
          |  a
       """.stripMargin
-    )(V6).explicitGet() shouldBe CONST_LONG(-500)
+    )(using V6).explicitGet() shouldBe CONST_LONG(-500)
   }
 
   property("multiline sum") {
@@ -55,7 +55,7 @@ class MultiLineOperatorTest extends EvaluatorSpec {
          |  }
          |  a
       """.stripMargin
-    )(V6).explicitGet() shouldBe CONST_LONG(2500)
+    )(using V6).explicitGet() shouldBe CONST_LONG(2500)
   }
 
   property("'+' and '-' with whitespaces") {
@@ -68,7 +68,7 @@ class MultiLineOperatorTest extends EvaluatorSpec {
          |  }
          |  a
       """.stripMargin
-    )(V6).explicitGet() shouldBe CONST_LONG(2)
+    )(using V6).explicitGet() shouldBe CONST_LONG(2)
   }
 
   property("'+' and '-' without whitespaces") {
@@ -81,6 +81,6 @@ class MultiLineOperatorTest extends EvaluatorSpec {
          |  }
          |  a
       """.stripMargin
-    )(V6).explicitGet() shouldBe CONST_LONG(2)
+    )(using V6).explicitGet() shouldBe CONST_LONG(2)
   }
 }

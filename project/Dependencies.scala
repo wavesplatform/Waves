@@ -1,4 +1,5 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
+import sbt.Keys.scalaVersion
 import sbt.{Def, *}
 import scalapb.compiler.Version.scalapbVersion
 
@@ -7,10 +8,11 @@ object Dependencies {
   private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.122.Final"
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "4.31.1"
-  val overrides = Seq(
-    "com.google.code.gson"      % "gson"       % "2.13.1",
-    "com.squareup.okio"         % "okio-jvm"   % "3.13.0",
-    "org.apache.httpcomponents" % "httpclient" % "4.5.14",
+  val overrides = Def.setting(Seq(
+    "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
+    "com.google.code.gson"      % "gson"           % "2.13.1",
+    "com.squareup.okio"         % "okio-jvm"       % "3.13.0",
+    "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
     nettyModule("codec-http2"),
     nettyModule("codec-http"),
     nettyModule("handler-proxy"),
@@ -18,7 +20,7 @@ object Dependencies {
     nettyModule("transport-native-unix-common"),
     nettyModule("resolver-dns"),
     gProto
-  )
+  ))
 
   // Node protobuf schemas
   private[this] val protoSchemasLib =

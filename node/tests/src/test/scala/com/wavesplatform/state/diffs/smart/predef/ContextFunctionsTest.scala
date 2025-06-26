@@ -386,7 +386,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V3)
       .foreach { version =>
-        val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
+        val (masterAcc, _, genesis, _, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
         for {
           withVrf <- Seq(version >= V4, true).distinct
         } yield {
@@ -880,7 +880,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V5)
       .foreach { version =>
-        val (masterAcc, recipient, genesis, _, dataTransaction, transferTx, _) = preconditionsAndPayments
+        val (masterAcc, recipient, genesis, _, dataTransaction, _, _) = preconditionsAndPayments
         val fs                                                                 = settingsForRide(version).blockchainSettings.functionalitySettings
         assertDiffAndState(fs) { append =>
           val (intKey, intValue)         = dataTransaction.data.collectFirst { case IntegerDataEntry(key, value) => (key, value) }.get

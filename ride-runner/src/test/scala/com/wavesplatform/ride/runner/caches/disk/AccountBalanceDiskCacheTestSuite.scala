@@ -52,11 +52,11 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
       }
 
       "after removeFrom" - removeTests { (ctx, cache, h) =>
-        cache.removeFrom(h, defaultKey)(ctx)
+        cache.removeFrom(h, defaultKey)(using ctx)
       }
 
       "after removeAllFrom" - removeTests { (ctx, cache, h) =>
-        cache.removeAllFrom(h)(ctx)
+        cache.removeAllFrom(h)(using ctx)
       }
 
       "keeps a number of records limited by a maximum possible rollback" in test { cache => implicit ctx =>
