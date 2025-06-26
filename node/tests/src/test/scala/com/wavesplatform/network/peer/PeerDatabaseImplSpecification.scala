@@ -67,7 +67,7 @@ class PeerDatabaseImplSpecification extends FreeSpec {
       database.knownPeers.keys should contain(address1)
     }
 
-    "peer should should become obsolete after time" in withDatabase(settings1) { database =>
+    "peer should become obsolete after time" in withDatabase(settings1) { database =>
       database.touch(address1)
       database.knownPeers.keys should contain(address1)
       sleepLong()
