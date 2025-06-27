@@ -317,7 +317,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
     val genesisTx            = TxHelpers.genesis(from.toAddress, Long.MaxValue - 1)
     val features: Seq[Short] = Seq[Short](2)
 
-    val paymentTxs = (1 to numPayments).map { i =>
+    val paymentTxs = (1 to numPayments).map { _ =>
       TxHelpers.transfer(from, to.toAddress, 10000, fee = TransactionFee, version = TxVersion.V1)
     }
 

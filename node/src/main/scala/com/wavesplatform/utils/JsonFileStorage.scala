@@ -63,7 +63,7 @@ object JsonFileStorage {
   }
 
   def load[T](path: String)(implicit r: Reads[T]): T =
-    load(path, Option.empty[SecretKeySpec])(r)
+    load(path, Option.empty[SecretKeySpec])
 
   private def encrypt(key: SecretKeySpec, value: String): String = {
     try {

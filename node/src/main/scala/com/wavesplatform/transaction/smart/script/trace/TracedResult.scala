@@ -58,8 +58,8 @@ object TracedResult {
         a.trace |+| b.trace
       )
 
-  implicit def monadTracedResult[L]: Monad[TracedResult[L, *]] =
-    new StackSafeMonad[TracedResult[L, *]] {
+  implicit def monadTracedResult[L]: Monad[[X] =>> TracedResult[L, X]] =
+    new StackSafeMonad[[X] =>> TracedResult[L, X]] {
       override def flatMap[A, B](fa: TracedResult[L, A])(f: A => TracedResult[L, B]): TracedResult[L, B] = fa.flatMap(f)
       override def pure[A](x: A): TracedResult[L, A]                                                     = TracedResult.wrapValue(x)
     }

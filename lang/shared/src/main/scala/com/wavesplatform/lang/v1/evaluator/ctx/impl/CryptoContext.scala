@@ -257,7 +257,7 @@ object CryptoContext {
         ("sig", BYTESTR),
         ("pub", BYTESTR)
       ) {
-        case (digestAlg: CaseObj) :: CONST_BYTESTR(msg) :: CONST_BYTESTR(sig) :: CONST_BYTESTR(pub) :: Nil if version < V4 && msg.size > lim =>
+        case (_: CaseObj) :: CONST_BYTESTR(msg) :: CONST_BYTESTR(_) :: CONST_BYTESTR(_) :: Nil if version < V4 && msg.size > lim =>
           Left(s"Invalid message size = ${msg.size} bytes, must be not greater than ${lim / 1024} KB")
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg) :: CONST_BYTESTR(sig) :: CONST_BYTESTR(pub) :: Nil =>
           rsaVerify(digestAlg, msg, sig, pub)

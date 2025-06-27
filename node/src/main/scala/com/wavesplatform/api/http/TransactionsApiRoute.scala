@@ -60,7 +60,11 @@ case class TransactionsApiRoute(
 
       routeTimeout.executeFromObservable {
         transactionsByAddress(address, limit, after) // Double list - [ [tx1, tx2, ...] ]
-      }(jacksonStreamMarshaller("[[", ",", "]]")(improvedSerializer.txMetaJsonSerializer(address, h => blockV5Activation.exists(v5h => v5h <= h), _)))
+      }(using
+        jacksonStreamMarshaller("[[", ",", "]]")(using
+          improvedSerializer.txMetaJsonSerializer(address, h => blockV5Activation.exists(v5h => v5h <= h), _)
+        )
+      )
     }
   }
 

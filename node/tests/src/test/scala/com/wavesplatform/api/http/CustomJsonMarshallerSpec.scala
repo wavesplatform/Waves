@@ -56,7 +56,7 @@ class CustomJsonMarshallerSpec
       () => domain.utxPool.size,
       DummyTransactionPublisher.accepting,
       ntpTime,
-      new RouteTimeout(60.seconds)(sharedScheduler)
+      new RouteTimeout(60.seconds)(using sharedScheduler)
     ).route
 
   property("/transactions/info/{id}") {
@@ -91,7 +91,7 @@ class CustomJsonMarshallerSpec
     domain.accountsApi,
     domain.assetsApi,
     1000,
-    new RouteTimeout(60.seconds)(sharedScheduler)
+    new RouteTimeout(60.seconds)(using sharedScheduler)
   ).route
 
   property("/assets/{assetId}/distribution/{height}/limit/{limit}") {

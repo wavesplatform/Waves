@@ -41,7 +41,7 @@ trait WithBUDomain extends WithDomain { suite: Suite =>
               subject: PublishToOneSubject[BlockchainUpdated],
               maxQueueSize: Int
           ): Handler =
-            new Handler(id, maybeLiquidState, subject, maxQueueSize)(Scheduler(MoreExecutors.newDirectExecutorService())) {
+            new Handler(id, maybeLiquidState, subject, maxQueueSize)(using Scheduler(MoreExecutors.newDirectExecutorService())) {
               setSendUpdate(() => super.sendUpdate())
               override def sendUpdate(): Unit = ()
             }

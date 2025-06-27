@@ -7,10 +7,11 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.grpc.*
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.database.protobuf.{StaticAssetInfo, BlockMeta as PBBlockMeta}
 import com.wavesplatform.database.{protobuf as pb, *}
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.ride.runner.caches.disk.AsBytes.*
@@ -22,8 +23,6 @@ import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, 
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, AssetIdLength, Transaction}
 import org.rocksdb.ColumnFamilyHandle
-import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
-import com.wavesplatform.common.utils.EitherExt2.explicitGet
 
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.nio.ByteBuffer
@@ -58,7 +57,7 @@ sealed abstract class KvHistoryPair[KeyT, ValueT](
     prefix: Short,
     val kvPairAtHeight: KvPair[(state.Height, KeyT), ValueT]
 )(implicit keyAsBytes: AsBytes[KeyT])
-    extends KvPair[KeyT, Heights](prefix)(keyAsBytes, vecAsBytes.consumeAll)
+    extends KvPair[KeyT, Heights](prefix)(using keyAsBytes, vecAsBytes.consumeAll)
 
 object KvPairs {
   object LastAddressId extends KvPair[Unit, AddressId](0)
@@ -66,10 +65,10 @@ object KvPairs {
   object IdToAddress   extends KvPair[AddressId, Address](2)
 
   object AccountDataEntriesHistory
-      extends KvHistoryPair[(AddressId, String), Option[DataEntry[?]]](11, AccountDataEntries)(tuple(implicitly, utf8StringAsBytes.consumeAll))
+      extends KvHistoryPair[(AddressId, String), Option[DataEntry[?]]](11, AccountDataEntries)(using tuple(implicitly, utf8StringAsBytes.consumeAll))
 
   object AccountDataEntries
-      extends KvPair[(state.Height, (AddressId, String)), Option[DataEntry[?]]](12)(
+      extends KvPair[(state.Height, (AddressId, String)), Option[DataEntry[?]]](12)(using
         tuple(implicitly, tuple(implicitly, utf8StringAsBytes.consumeAll)),
         implicitly
       )
@@ -81,14 +80,17 @@ object KvPairs {
 
   val weighedAccountScriptInfoAsBytes: AsBytes[WeighedAccountScriptInfo] =
     AsBytes
-      .tuple2(intAsBytes, accountScriptInfoAsBytes)
+      .tuple2(using intAsBytes, accountScriptInfoAsBytes)
       .transform(
         Function.tupled(WeighedAccountScriptInfo.apply),
         x => (x.scriptInfoWeight, x.accountScriptInfo)
       )
 
   object AccountScripts
-      extends KvPair[(state.Height, AddressId), Option[WeighedAccountScriptInfo]](22)(implicitly, AsBytes.optional(weighedAccountScriptInfoAsBytes))
+      extends KvPair[(state.Height, AddressId), Option[WeighedAccountScriptInfo]](22)(using
+        implicitly,
+        AsBytes.optional(using weighedAccountScriptInfoAsBytes)
+      )
 
   val blockHeaderAsBytes: AsBytes[SignedBlockHeaderWithVrf] =
     AsBytes.byteArrayAsBytes.consumeAll.transform(
@@ -111,13 +113,13 @@ object KvPairs {
         )
     )
 
-  object SignedBlockHeadersWithVrf extends KvPair[state.Height, SignedBlockHeaderWithVrf](30)(implicitly, blockHeaderAsBytes)
+  object SignedBlockHeadersWithVrf extends KvPair[state.Height, SignedBlockHeaderWithVrf](30)(using implicitly, blockHeaderAsBytes)
 
   object Height extends KvPair[Unit, state.Height](40) {
     val Key = at(())
   }
 
-  object ActivatedFeatures extends KvPair[Unit, Map[Short, state.Height]](60)(implicitly, mapAsBytes.consumeAll)
+  object ActivatedFeatures extends KvPair[Unit, Map[Short, state.Height]](60)(using implicitly, mapAsBytes.consumeAll)
 
   object AssetDescriptionsHistory extends KvHistoryPair[Asset.IssuedAsset, Option[WeighedAssetDescription]](71, AssetDescriptions)
 
@@ -174,18 +176,18 @@ object KvPairs {
 
   val weighedAssetDescriptionAsBytes: AsBytes[WeighedAssetDescription] =
     AsBytes
-      .tuple2(intAsBytes, assetDescriptionAsBytes)
+      .tuple2(using intAsBytes, assetDescriptionAsBytes)
       .transform(Function.tupled(WeighedAssetDescription.apply), x => (x.scriptWeight, x.assetDescription))
   object AssetDescriptions
-      extends KvPair[(state.Height, Asset.IssuedAsset), Option[WeighedAssetDescription]](72)(
+      extends KvPair[(state.Height, Asset.IssuedAsset), Option[WeighedAssetDescription]](72)(using
         implicitly,
-        AsBytes.optional(weighedAssetDescriptionAsBytes)
+        AsBytes.optional(using weighedAssetDescriptionAsBytes)
       )
 
   val aliasAsBytes: AsBytes[Alias]                = AsBytes.byteArrayAsBytes.consumeAll.transform(Alias.fromBytes(_, None).explicitGet(), _.bytes)
   private val aliasWithLenAsBytes: AsBytes[Alias] = AsBytes.byteArrayAsBytes.withIntLen.transform(Alias.fromBytes(_, None).explicitGet(), _.bytes)
-  object AliasesByHeight extends KvPair[state.Height, List[Alias]](79)(implicitly, AsBytes.listAsBytes.consumeAll(aliasWithLenAsBytes))
-  object Aliases         extends KvPair[Alias, (state.Height, Option[AddressId])](80)(aliasAsBytes, implicitly)
+  object AliasesByHeight extends KvPair[state.Height, List[Alias]](79)(using implicitly, AsBytes.listAsBytes.consumeAll(using aliasWithLenAsBytes))
+  object Aliases         extends KvPair[Alias, (state.Height, Option[AddressId])](80)(using aliasAsBytes, implicitly)
 
   object AccountAssetsHistory extends KvHistoryPair[(AddressId, Asset), Long](91, AccountAssets)
   object AccountAssets        extends KvPair[(state.Height, (AddressId, Asset)), Long](92)
@@ -196,7 +198,7 @@ object KvPairs {
   implicit val transactionIdAsBytes: AsBytes[TransactionId]       = AsBytes.byteArrayAsBytes.consumeAll.toByteStr.transform(TransactionId(_), x => x)
   private val transactionIdWithLenAsBytes: AsBytes[TransactionId] = AsBytes.byteArrayAsBytes.withIntLen.toByteStr.transform(TransactionId(_), x => x)
   object TransactionsByHeight
-      extends KvPair[state.Height, List[TransactionId]](109)(implicitly, AsBytes.listAsBytes.consumeAll(transactionIdWithLenAsBytes))
+      extends KvPair[state.Height, List[TransactionId]](109)(using implicitly, AsBytes.listAsBytes.consumeAll(using transactionIdWithLenAsBytes))
   object Transactions extends KvPair[TransactionId, Option[state.Height]](110)
 
   implicit val addressId: AsBytes[AddressId] = AsBytes.longAsBytes.transform(AddressId(_), _.toLong)

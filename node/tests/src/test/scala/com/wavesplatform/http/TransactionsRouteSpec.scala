@@ -8,7 +8,7 @@ import com.wavesplatform.api.http.{CustomJson, RouteTimeout, TransactionsApiRout
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, *}
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.defaultSigner
@@ -31,7 +31,7 @@ import com.wavesplatform.transaction.smart.script.trace.AccountVerifierTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, AssetIdLength, EthTxGenerator, TxHelpers, TxVersion, TransactionSignOps}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, EthTxGenerator, TransactionSignOps, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.{BlockGen, TestValues, crypto}
 import org.scalacheck.Gen.*
@@ -71,7 +71,7 @@ class TransactionsRouteSpec
     () => domain.utxPool.size,
     (tx, _) => Future.successful(domain.utxPool.putIfNew(tx, forceValidate = true)),
     testTime,
-    new RouteTimeout(60.seconds)(sharedScheduler)
+    new RouteTimeout(60.seconds)(using sharedScheduler)
   )
 
   private val route = seal(transactionsApiRoute.route)

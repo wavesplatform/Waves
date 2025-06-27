@@ -2,7 +2,6 @@ package com.wavesplatform.actor
 
 import com.typesafe.config.Config
 import com.wavesplatform.utils.ScorexLogging
-import org.apache.pekko
 import org.apache.pekko.actor.{ActorSystem, AllForOneStrategy, SupervisorStrategy, SupervisorStrategyConfigurator}
 
 import scala.concurrent.Await

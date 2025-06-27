@@ -30,7 +30,7 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       sender.waitForTransaction(assetId)
 
       val massTransferTransactionFee = calcMassTransferFee(transfers.size)
-      sender.broadcastMassTransfer(firstAcc, Some(assetId), transfers, attachment, massTransferTransactionFee, waitForTx = true)
+      sender.broadcastMassTransfer(firstAcc, Some(assetId), transfers, attachment, massTransferTransactionFee, waitForTx = true, version = v)
 
       val firstBalanceAfter  = sender.wavesBalance(firstAddress)
       val secondBalanceAfter = sender.wavesBalance(secondAddress)

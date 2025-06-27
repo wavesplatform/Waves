@@ -1,8 +1,7 @@
 package com.wavesplatform.lang
 
-import cats.{Id, Monoid}
-import cats.syntax.traverse.*
 import cats.implicits.catsSyntaxSemigroup
+import cats.{Id, Monoid}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
@@ -12,10 +11,10 @@ import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
-import com.wavesplatform.lang.v1.evaluator.{FunctionIds, Log}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.{FunctionIds, Log}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
@@ -104,12 +103,7 @@ package object utils {
         (ds._1.stdLibVersion, ds._1.contentType)
       }
       .view
-      .mapValues(
-        _.toList
-          .map(_._2)
-          .sequence
-          .map(Monoid.combineAll[CTX[Environment]])()
-      )
+      .mapValues(x => Monoid.combineAll(x.values.map(_.value())))
       .toMap
 
   private val combinedFunctionCosts: Map[(StdLibVersion, ContentType), Map[FunctionHeader, Coeval[Long]]] =
@@ -119,10 +113,7 @@ package object utils {
       }
       .view
       .mapValues(
-        _.toList
-          .map(_._2)
-          .sequence
-          .map(_.foldLeft(Map.empty[FunctionHeader, Coeval[Long]])(_ ++ _))()
+        _.values.map(_.value()).foldLeft(Map.empty[FunctionHeader, Coeval[Long]])(_ ++ _)
       )
       .toMap
 

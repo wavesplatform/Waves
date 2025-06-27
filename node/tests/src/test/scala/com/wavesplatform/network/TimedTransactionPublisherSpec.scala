@@ -23,7 +23,7 @@ class TimedTransactionPublisherSpec extends FreeSpec with BeforeAndAfterAll {
     val latch   = new CountDownLatch(5)
     val counter = AtomicInt(10)
 
-    def countTransactions(tx: Transaction): TracedResult[ValidationError, Boolean] = {
+    def countTransactions(): TracedResult[ValidationError, Boolean] = {
       // the first 5 transactions will take too long to validate
       if (counter.getAndDecrement() > 5) {
         while (!Thread.currentThread().isInterrupted) {
@@ -36,7 +36,7 @@ class TimedTransactionPublisherSpec extends FreeSpec with BeforeAndAfterAll {
       TracedResult(Right(true))
     }
 
-    "accepts only those transactions from network which can be validated quickly" in withUPS(countTransactions) { ups =>
+    "accepts only those transactions from network which can be validated quickly" in withUPS(_ => countTransactions()) { ups =>
       1 to 10 foreach { i =>
         ups.validateAndBroadcast(
           GenesisTransaction.create(PublicKey(new Array[Byte](32)).toAddress, i * 10L, 0L).explicitGet(),

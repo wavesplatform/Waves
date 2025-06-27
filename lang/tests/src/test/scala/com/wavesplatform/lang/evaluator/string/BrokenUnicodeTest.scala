@@ -11,11 +11,11 @@ class BrokenUnicodeTest extends EvaluatorSpec {
 
   property("unicode indexOf") {
     eval(""" "x冬xqweqwe".indexOf("we") """) shouldBe Right(CONST_LONG(4L))
-    eval(""" "世界x冬x".take(4).indexOf("冬".take(1)) """)(V4) shouldBe Right(CONST_LONG(3L))
+    eval(""" "世界x冬x".take(4).indexOf("冬".take(1)) """)(using V4) shouldBe Right(CONST_LONG(3L))
   }
 
   property("unicode indexOf with zero offset") {
-    eval(""" "x冬xqweqwe".indexOf("x冬xqw", 0) """)(V4) shouldBe Right(CONST_LONG(0L))
+    eval(""" "x冬xqweqwe".indexOf("x冬xqw", 0) """)(using V4) shouldBe Right(CONST_LONG(0L))
   }
 
   property("unicode indexOf with start offset") {

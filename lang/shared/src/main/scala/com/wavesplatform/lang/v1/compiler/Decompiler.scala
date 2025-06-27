@@ -4,7 +4,6 @@ import cats.instances.vector.*
 import cats.syntax.traverse.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
-import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.*
@@ -261,7 +260,7 @@ object Decompiler {
     }
   }
 
-  def apply(e: DApp, ctx: DecompilerContext, stdLibVersion: StdLibVersion): String = {
+  def apply(e: DApp, ctx: DecompilerContext): String = {
 
     def intersperse(s: Seq[Coeval[String]]): Coeval[String] = s.toVector.sequence[Coeval, String].map(v => v.mkString(NEWLINE + NEWLINE))
 

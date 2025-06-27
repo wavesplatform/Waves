@@ -19,7 +19,7 @@ import scala.util.Try
 class RideRocksDb(db: RocksDB, stats: Option[RocksDbStatistics]) extends RideDb {
   override val access: RideDbAccess = RideDbAccess.fromRocksDb(db)
 
-  override def startCollectingStats(scheduler: Scheduler): Cancelable = stats.fold(Cancelable.empty) { stats =>
+  def startCollectingStats(scheduler: Scheduler): Cancelable = stats.fold(Cancelable.empty) { stats =>
     scheduler.scheduleAtFixedRate(30.seconds, 30.seconds) {
       stats.send()
     }
@@ -37,7 +37,7 @@ object RideRocksDb extends ScorexLogging {
     val version = 13
   }
 
-  def open(settings: Settings): RideDb = {
+  def open(settings: Settings): RideRocksDb = {
     log.debug(s"Open DB at ${settings.directory}")
     val file = new File(settings.directory)
 

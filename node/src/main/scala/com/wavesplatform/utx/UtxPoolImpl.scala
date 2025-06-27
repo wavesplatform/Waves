@@ -224,7 +224,7 @@ case class UtxPoolImpl(
 
   private[utx] def nonPriorityTransactions: Seq[Transaction] = {
     transactions.values.asScala.toVector
-      .sorted(inUTXPoolOrdering)
+      .sorted(using inUTXPoolOrdering)
   }
 
   override def all: Seq[Transaction] =

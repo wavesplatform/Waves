@@ -373,7 +373,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
       genesis = GenesisTransaction.create(acc.toAddress, diffs.ENOUGH_AMT, ts).explicitGet()
     } yield (acc, genesis)
 
-    forAll(preconditions) { case (acc, genesis) =>
+    forAll(preconditions) { case (_, genesis) =>
       val fs = TestFunctionalitySettings.Stub.copy(preActivatedFeatures =
         Map(
           BlockchainFeatures.NG.id            -> 0,

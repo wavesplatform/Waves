@@ -115,7 +115,7 @@ object ContractSerDeV2 extends ContractSerDe {
   private[lang] def deserializeList[A](in: CodedInputStream, df: CodedInputStream => Either[String, A]): Either[String, List[A]] = {
     val len = in.readUInt32()
     if (len <= in.getBytesUntilLimit && len >= 0) {
-      (1 to len).toList.traverse[Either[String, *], A](_ => df(in))
+      (1 to len).toList.traverse(_ => df(in))
     } else {
       Left(s"At position ${in.getTotalBytesRead()} array of arguments too big.")
     }

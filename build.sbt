@@ -12,9 +12,9 @@ enablePlugins(GitVersioning)
 
 git.uncommittedSignifier       := Some("DIRTY")
 ThisBuild / git.useGitDescribe := true
-ThisBuild / PB.protocVersion   := "3.25.6" // https://protobuf.dev/support/version-support/#java
+ThisBuild / PB.protocVersion   := "4.31.1"
 
-ThisBuild / dependencyOverrides ++= Dependencies.overrides
+ThisBuild / dependencyOverrides ++= Dependencies.overrides.value
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -144,13 +144,14 @@ lazy val `waves-node` = (project in file("."))
     `node-testkit`,
     `node-tests`,
     `node-generator`,
+    `grpc-server`,
     benchmark,
     `ride-runner`
   )
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "3.6.4",
+    scalaVersion         := "3.7.1",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -163,7 +164,6 @@ inScope(Global)(
       "-language:higherKinds",
       "-language:implicitConversions",
       "-language:postfixOps",
-      "-Xkind-projector",
       "-Wunused:all",
       "-Wconf:cat=deprecation&origin=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
       "-Wconf:cat=deprecation&origin=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
@@ -186,7 +186,7 @@ inScope(Global)(
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network         := Network.default(),
     instrumentation := false,
-    resolvers ++= Resolver.sonatypeOssRepos("releases") ++ Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
+    resolvers ++= Resolver.sonatypeCentralSnapshots +: Seq(Resolver.mavenLocal),
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
     excludeLintKeys ++= Set(

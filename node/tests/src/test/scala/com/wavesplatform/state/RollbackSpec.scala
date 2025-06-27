@@ -511,6 +511,8 @@ class RollbackSpec extends FreeSpec with WithDomain {
           parentBlockId: ByteStr,
           fc: Terms.FUNCTION_CALL
       ): ByteStr = {
+        d.rollbackTo(parentBlockId)
+        
         val fee = 150000000L
         val invoke =
           ss.fold[InvokeTransaction](

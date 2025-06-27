@@ -96,7 +96,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
     } yield AddressResponse(address)
 
   override def resolveAlias(name: String): Future[Either[String, Address]] =
-    getEntity[Either[String, *], AddressResponse, Address](s"/alias/by-alias/$name")
+    getEntity[[X] =>> Either[String, X], AddressResponse, Address](s"/alias/by-alias/$name")
 
   implicit val balanceResponseDecoder: Decoder[BalanceResponse] = (c: HCursor) =>
     for {
@@ -109,7 +109,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
   ): Future[Either[String, Long]] =
     for {
       address <- extractAddress(recipient)
-      entity <- getEntity[Either[String, *], BalanceResponse, Long](assetId match {
+      entity <- getEntity[[X] =>> Either[String, X], BalanceResponse, Long](assetId match {
         case Some(assetId) => s"/assets/balance/$address/${Base58.encode(assetId)}"
         case None          => s"/address/balance/$address"
       })
@@ -120,7 +120,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
   ): Future[Either[String, Environment.BalanceDetails]] =
     for {
       address <- extractAddress(recipient)
-      entity  <- client.get[Either[String, *], Environment.BalanceDetails](s"/addresses/balance/details/$address")
+      entity  <- client.get[[X] =>> Either[String, X], Environment.BalanceDetails](s"/addresses/balance/details/$address")
     } yield entity
 
   private def extractAddress(addressOrAlias: Recipient): Future[String] =
@@ -142,7 +142,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
 
   override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]] = ???
 
-  private def getEntity[F[_]: Functor: ResponseWrapper, A: Decoder, B](url: String)(implicit ev: A => B): Future[F[B]] =
+  private def getEntity[F[_]: {Functor, ResponseWrapper}, A: Decoder, B](url: String)(implicit ev: A => B): Future[F[B]] =
     client.get[F, A](url).map(_.map(ev))
 
   override def accountScript(addressOrAlias: Recipient): Future[Option[Script]] = ???

@@ -53,7 +53,7 @@ import play.api.libs.json.JsonConfiguration.Aux
 final case class TransactionJsonSerializer(blockchain: Blockchain) {
 
   val assetSerializer: JsonSerializer[Asset] =
-    (value: Asset, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (value: Asset, gen: JsonGenerator, _) => {
       value match {
         case Waves           => gen.writeNull()
         case IssuedAsset(id) => gen.writeString(id.toString)
@@ -137,12 +137,12 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
   }
 
   val leaseStatusSerializer: JsonSerializer[LeaseStatus] =
-    (status: LeaseStatus, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (status: LeaseStatus, gen: JsonGenerator, _) => {
       if (status == LeaseStatus.active) gen.writeString("active") else gen.writeString("canceled")
     }
 
   def leaseRefSerializer(numbersAsString: Boolean): JsonSerializer[LeaseRef] =
-    (l: LeaseRef, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (l: LeaseRef, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeStringField("id", l.id.toString)
       l.originTransactionId.fold(gen.writeNullField("originTransactionId"))(txId => gen.writeStringField("originTransactionId", txId.toString))
@@ -192,7 +192,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
     }
 
   def issueSerializer(numbersAsString: Boolean): JsonSerializer[Issue] =
-    (issue: Issue, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (issue: Issue, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeStringField("assetId", issue.id.toString)
       issue.compiledScript.foreach(sc => gen.writeStringField("compiledScript", sc.toString))
@@ -206,7 +206,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
     }
 
   def reissueSerializer(numbersAsString: Boolean): JsonSerializer[Reissue] =
-    (r: Reissue, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (r: Reissue, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeStringField("assetId", r.assetId.toString)
       gen.writeBooleanField("isReissuable", r.isReissuable)
@@ -215,7 +215,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
     }
 
   def burnSerializer(numbersAsString: Boolean): JsonSerializer[Burn] =
-    (b: Burn, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (b: Burn, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeStringField("assetId", b.assetId.toString)
       gen.writeNumberField("quantity", b.quantity, numbersAsString)
@@ -223,7 +223,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
     }
 
   def sponsorFeeSerializer(numbersAsString: Boolean): JsonSerializer[SponsorFee] =
-    (s: SponsorFee, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (s: SponsorFee, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeStringField("assetId", s.assetId.toString)
       s.minSponsoredAssetFee.foreach(fee => gen.writeNumberField("minSponsoredAssetFee", fee, numbersAsString))
@@ -249,7 +249,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
     }
 
   val errorMessageSerializer: JsonSerializer[ErrorMessage] =
-    (err: ErrorMessage, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (err: ErrorMessage, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeNumberField("code", err.code, false)
       gen.writeStringField("text", err.text)

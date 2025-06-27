@@ -2,7 +2,6 @@ package com.wavesplatform.ride.runner.entrypoints
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
-import cats.syntax.traverse.*
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.RideMulticastHttpApi
@@ -155,7 +154,7 @@ object WavesRideRunnerCompareService extends ScorexLogging {
       settings.rideCompareService.maxChecks
         .fold(s)(s.take)
         .lastL
-        .runToFuture(scheduler)
+        .runToFuture(using scheduler)
     }
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream)(loop.cancel())
 

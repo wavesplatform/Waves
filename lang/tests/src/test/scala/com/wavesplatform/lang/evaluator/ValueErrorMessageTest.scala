@@ -43,7 +43,7 @@ class ValueErrorMessageTest extends EvaluatorSpec {
         eval(s"""Address(base58'abc').$f("data")""") shouldBe Left(
           s"value by key 'data' not found for the address base58'abc' on function '$f' call"
         )
-        eval(s"""$f("data")""")(V5) shouldBe Left(s"value by key 'data' not found for the contract address on function '$f' call")
+        eval(s"""$f("data")""")(using V5) shouldBe Left(s"value by key 'data' not found for the contract address on function '$f' call")
         eval(s"""[].$f("data")""") shouldBe Left(s"value by key 'data' not found in the list on function '$f' call")
 
         val unsuitable = if (f == "getIntegerValue") """BooleanEntry("data", true)""" else """IntegerEntry("data", 1)"""

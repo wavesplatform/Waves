@@ -172,7 +172,7 @@ object TransactionsGeneratorApp extends ScoptImplicits {
 
         val (universe, initialUniTransactions, initialTailTransactions) = preconditions
           .fold((UniverseHolder(), List.empty[Transaction], List.empty[Transaction]))(
-            Preconditions.mk(_, finalConfig.privateKeyAccounts, time, estimator)
+            Preconditions.mk(_, finalConfig.privateKeyAccounts, time)
           )
 
         Universe.IssuedAssets = universe.issuedAssets

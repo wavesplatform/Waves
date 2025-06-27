@@ -163,7 +163,7 @@ object PureContext {
                      unit
                    }
                  } catch {
-                   case e: java.lang.NumberFormatException => unit
+                   case _: java.lang.NumberFormatException => unit
                  }
                } else {
                  unit
@@ -1371,7 +1371,7 @@ object PureContext {
     ) {
       case ARR(arr) :: CONST_LONG(pos) :: Nil =>
         Try(arr(pos.toInt)).toEither.left.map({
-          case e: java.lang.IndexOutOfBoundsException => s"Index $pos out of bounds for length ${arr.size}"
+          case _: java.lang.IndexOutOfBoundsException => s"Index $pos out of bounds for length ${arr.size}"
           case e: Throwable                           => e.toString
         })
       case xs => notImplemented[Id, EVALUATED](s"getElement(arr: Array, pos: Int)", xs)

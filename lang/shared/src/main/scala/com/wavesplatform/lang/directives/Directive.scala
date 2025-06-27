@@ -23,8 +23,8 @@ object Directive {
   ): Either[String, DirectiveSet] =
     DirectiveSet(
       directives.find(_.key == STDLIB_VERSION).fold(defaultStdLib)(_.value.asInstanceOf[STDLIB_VERSION.Value]),
-      extractValue(directives, SCRIPT_TYPE)(None),
-      extractValue(directives, CONTENT_TYPE)(None),
-      extractValue(directives, IMPORT)(None)
+      extractValue(directives, SCRIPT_TYPE)(using None),
+      extractValue(directives, CONTENT_TYPE)(using None),
+      extractValue(directives, IMPORT)(using None)
     )
 }

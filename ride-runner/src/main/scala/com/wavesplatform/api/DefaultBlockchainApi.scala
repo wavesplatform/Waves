@@ -60,7 +60,7 @@ class DefaultBlockchainApi(
 ) extends BlockchainApi
     with ScorexLogging {
   override def mkBlockchainUpdatesStream(scheduler: Scheduler): BlockchainUpdatesStream = {
-    val s = ConcurrentSubject[WrappedEvent[SubscribeEvent]](MulticastStrategy.publish)(scheduler)
+    val s = ConcurrentSubject[WrappedEvent[SubscribeEvent]](MulticastStrategy.publish)(using scheduler)
 
     new BlockchainUpdatesStream {
       private val working         = new AtomicBoolean(true)
@@ -84,7 +84,7 @@ class DefaultBlockchainApi(
         }
         // The only way this stream continues and propagates a Failed message
         .onErrorRestartWith { case e if working.get() => WrappedEvent.Failed(e) }
-        .publish(scheduler)
+        .publish(using scheduler)
 
       override val downstream: Observable[WrappedEvent[SubscribeEvent]] = connectableDownstream
 

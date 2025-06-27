@@ -67,7 +67,7 @@ trait ScorexLogging {
 
   implicit class TaskExt[A](t: Task[A]) {
     def runAsyncLogErr(implicit s: Scheduler): CancelableFuture[A] =
-      logErr.runToFuture(s)
+      logErr.runToFuture
 
     def logErr: Task[A] = {
       t.onErrorHandleWith(ex => {

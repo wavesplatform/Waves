@@ -2,7 +2,7 @@ package com.wavesplatform.lang.evaluator.math
 
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5, V6}
 import com.wavesplatform.lang.evaluator.EvaluatorSpec
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, EVALUATED}
 import com.wavesplatform.test.produce
 
 class MathFunctionsTest extends EvaluatorSpec {
@@ -12,8 +12,8 @@ class MathFunctionsTest extends EvaluatorSpec {
 
   property("math functions") {
     eval("pow(12, 1, 3456, 3, 2, DOWN)") shouldBe Right(CONST_LONG(187))
-    eval("pow(12, 1, 3456, 3, 2, UP)")(V3, checkNext = false) shouldBe Right(CONST_LONG(188))
-    eval("pow(0, 1, 3456, 3, 2, UP)")(V3, checkNext = false) shouldBe Right(CONST_LONG(0))
+    eval("pow(12, 1, 3456, 3, 2, UP)")(using V3, checkNext = false) shouldBe Right(CONST_LONG(188))
+    eval("pow(0, 1, 3456, 3, 2, UP)")(using V3, checkNext = false) shouldBe Right(CONST_LONG(0))
     eval("pow(20, 1, -1, 0, 4, DOWN)") shouldBe Right(CONST_LONG(5000))
     eval("pow(-20, 1, -1, 0, 4, DOWN)") shouldBe Right(CONST_LONG(-5000))
     eval("pow(0, 1, -1, 0, 4, DOWN)") shouldBe Left("Division by zero")
@@ -31,8 +31,8 @@ class MathFunctionsTest extends EvaluatorSpec {
 
   property("pow result size max") {
     eval("pow(2, 0, 62, 0, 0, DOWN)") shouldBe Right(CONST_LONG(Math.pow(2, 62).toLong))
-    eval("pow(2, 0, 63, 0, 0, DOWN)")(V3, checkNext = false) should produce("out of long range")
-    eval("pow(2, 0, 63, 0, 0, DOWN)")(V5) should produce("out of long range")
+    eval("pow(2, 0, 63, 0, 0, DOWN)")(using V3, checkNext = false) should produce("out of long range")
+    eval("pow(2, 0, 63, 0, 0, DOWN)")(using V5) should produce("out of long range")
   }
 
   property("pow result size abs min") {
@@ -55,7 +55,7 @@ class MathFunctionsTest extends EvaluatorSpec {
   }
 
   property("pow result close to max with the greatest digits count") {
-    eval("pow(198765432, 8, 6298765432, 8, 0, DOWN)")(V5) shouldBe Right(CONST_LONG(6191427136334512235L))
+    eval("pow(198765432, 8, 6298765432, 8, 0, DOWN)")(using V5) shouldBe Right(CONST_LONG(6191427136334512235L))
   }
 
   property("on the limit") {
@@ -73,7 +73,7 @@ class MathFunctionsTest extends EvaluatorSpec {
   property("sqrt") {
     eval(s"pow(${Long.MaxValue}, 0, 5, 1, 8, DOWN)") shouldBe Right(CONST_LONG(303700049997604969L))
     eval(s"pow(${Long.MaxValue}, 8, 5, 1, 8, DOWN)") shouldBe Right(CONST_LONG(30370004999760L))
-    eval(s"sqrt(${Long.MaxValue}, 0, 8, DOWN)")(V6) shouldBe Right(CONST_LONG(303700049997604969L))
-    eval(s"sqrt(${Long.MaxValue}, 8, 8, DOWN)")(V6) shouldBe Right(CONST_LONG(30370004999760L))
+    eval(s"sqrt(${Long.MaxValue}, 0, 8, DOWN)")(using V6) shouldBe Right(CONST_LONG(303700049997604969L))
+    eval(s"sqrt(${Long.MaxValue}, 8, 8, DOWN)")(using V6) shouldBe Right(CONST_LONG(30370004999760L))
   }
 }

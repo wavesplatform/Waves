@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.evaluator
 import cats.data.EitherT
 import cats.implicits.*
 import cats.{Eval, Id, Monad, StackSafeMonad}
+import com.wavesplatform.lang.*
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, NOTHING}
@@ -10,13 +11,12 @@ import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, S
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.*
 
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
 object EvaluatorV1 {
-  implicit val idEvalFMonad: Monad[EvalF[Id, *]] = new StackSafeMonad[EvalF[Id, *]] {
+  implicit val idEvalFMonad: Monad[Eval] = new StackSafeMonad[Eval] {
     override def flatMap[A, B](fa: Eval[A])(f: A => Eval[B]): Eval[B] =
       fa.flatMap(f).memoize
 
@@ -28,7 +28,7 @@ object EvaluatorV1 {
   def apply(): EvaluatorV1[Id, Environment] = evaluator
 }
 
-class EvaluatorV1[F[_]: Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Monad[CoevalF[F, *]]) {
+class EvaluatorV1[F[_]: Monad, C[_[_]]](implicit ev: Monad[EvalF[F]], ev2: Monad[CoevalF[F]]) {
 
   private def evalLetBlock(let: LET, inner: EXPR): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] =
     for {
@@ -71,15 +71,14 @@ class EvaluatorV1[F[_]: Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Mo
       case _     => ???
     }
 
-  private def evalGetter(expr: EXPR, field: String): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] = {
-    Monad[EvalM[F, C, *]].flatMap(evalExprWithCtx(expr)) { case (ctx, exprResult) =>
+  private def evalGetter(expr: EXPR, field: String): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] =
+    Monad[[X] =>> EvalM[F, C, X]].flatMap(evalExprWithCtx(expr)) { case (ctx, exprResult) =>
       val fields = exprResult.asInstanceOf[CaseObj].fields
       fields.get(field) match {
-        case Some(f) => (ctx, f).pure[EvalM[F, C, *]]
+        case Some(f) => (ctx, f).pure[[X] =>> EvalM[F, C, X]]
         case None    => raiseError(s"A definition of '$field' not found amongst ${fields.keys}")
       }
     }
-  }
 
   private def evalFunctionCall(header: FunctionHeader, args: List[EXPR]): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] =
     for {
@@ -88,18 +87,18 @@ class EvaluatorV1[F[_]: Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Mo
         .get(header)
         .map {
           case func: UserFunction[C] =>
-            Monad[EvalM[F, C, *]].flatMap(args.traverse(evalExpr)) { args =>
+            Monad[[X] =>> EvalM[F, C, X]].flatMap(args.traverse(evalExpr)) { args =>
               val letDefsWithArgs = args.zip(func.signature.args).foldLeft(ctx.ec.letDefs) { case (r, (argValue, (argName, _))) =>
                 r + (argName -> LazyVal.fromEvaluated(argValue, ctx.l(s"$argName")))
               }
               local {
                 val newState: EvalM[F, C, Unit] =
                   set[F, EnabledLogEvaluationContext[C, F], ExecutionError](ctx.copy(ec = ctx.ec.copy(letDefs = letDefsWithArgs))).map(_.pure[F])
-                Monad[EvalM[F, C, *]].flatMap(newState)(_ => evalExpr(func.ev(ctx.ec.environment, args)))
+                Monad[[X] =>> EvalM[F, C, X]].flatMap(newState)(_ => evalExpr(func.ev(ctx.ec.environment, args)))
               }
             }: EvalM[F, C, EVALUATED]
           case func: NativeFunction[C] =>
-            Monad[EvalM[F, C, *]].flatMap(args.traverse(evalExpr)) { args =>
+            Monad[[X] =>> EvalM[F, C, X]].flatMap(args.traverse(evalExpr)) { args =>
               val evaluated = func.ev match {
                 case f: Simple[C] =>
                   val r = Try(f.evaluate(ctx.ec.environment, args)).toEither
@@ -120,7 +119,7 @@ class EvaluatorV1[F[_]: Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Mo
             case FunctionHeader.User(typeName, _) =>
               ctx.ec.typeDefs.get(typeName).collect { case t @ CASETYPEREF(_, fields, _) =>
                 args
-                  .traverse[EvalM[F, C, *], EVALUATED](evalExpr)
+                  .traverse[[X] =>> EvalM[F, C, X], EVALUATED](evalExpr)
                   .map(values => CaseObj(t, fields.map(_._1).zip(values).toMap): EVALUATED)
               }
             case _ => None

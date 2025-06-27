@@ -26,7 +26,7 @@ class TypeCastTest extends EvaluatorSpec {
         | f(1) == unit           &&
         | f("") == unit
       """.stripMargin
-    )(V5) shouldBe Right(CONST_BOOLEAN(true))
+    )(using V5) shouldBe Right(CONST_BOOLEAN(true))
   }
 
   property("as with list type") {
@@ -38,7 +38,7 @@ class TypeCastTest extends EvaluatorSpec {
         | f([[]]) == [[]] &&
         | f([]) == []
       """.stripMargin
-    )(V3) shouldBe Right(CONST_BOOLEAN(true))
+    )(using V3) shouldBe Right(CONST_BOOLEAN(true))
   }
 
   property("exactAs") {
@@ -56,7 +56,7 @@ class TypeCastTest extends EvaluatorSpec {
         | func f(a: Any) = a.exactAs[(Int, String)]
         | f((1, "")) == (1, "")
       """.stripMargin
-    )(V5) shouldBe Right(CONST_BOOLEAN(true))
+    )(using V5) shouldBe Right(CONST_BOOLEAN(true))
   }
 
   property("exactAs with list type") {
@@ -68,7 +68,7 @@ class TypeCastTest extends EvaluatorSpec {
         | f([[]]) == [[]] &&
         | f([]) == []
       """.stripMargin
-    )(V3) shouldBe Right(CONST_BOOLEAN(true))
+    )(using V3) shouldBe Right(CONST_BOOLEAN(true))
   }
 
   property("exactAs error") {
@@ -77,14 +77,14 @@ class TypeCastTest extends EvaluatorSpec {
          | func f(a: Any) = a.exactAs[Int]
          | f("")
       """.stripMargin
-    )(V6) shouldBe Left("String couldn't be cast to Int")
+    )(using V6) shouldBe Left("String couldn't be cast to Int")
   }
 
   property("type cast to concrete list is not supported") {
-    eval("func f(a: Any) = a.as[List[Int]]; true")(V3) should produce(
+    eval("func f(a: Any) = a.as[List[Int]]; true")(using V3) should produce(
       "Type cast to List is allowed only if expecting type is List[Any] in 17-32"
     )
-    eval("func f(a: Any) = a.exactAs[List[Int]]; true")(V3) should produce(
+    eval("func f(a: Any) = a.exactAs[List[Int]]; true")(using V3) should produce(
       "Type cast to List is allowed only if expecting type is List[Any] in 17-37"
     )
   }

@@ -477,5 +477,5 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       timestamp: Long = System.currentTimeMillis,
       version: TxVersion
   ): DataTransaction =
-    DataTransaction.selfSigned(1.toByte, sender.keyPair, entries, fee, timestamp).explicitGet()
+    DataTransaction.selfSigned(version, sender.keyPair, entries, fee, timestamp).explicitGet()
 }

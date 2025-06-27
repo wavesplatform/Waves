@@ -1,15 +1,15 @@
 package com.wavesplatform.api.http
 
+import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.utils.ScorexLogging
+import kamon.Kamon
 import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.model.HttpMethods.*
 import org.apache.pekko.http.scaladsl.model.headers.*
 import org.apache.pekko.http.scaladsl.server.*
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.RouteResult.Complete
-import org.apache.pekko.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
-import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.utils.ScorexLogging
-import kamon.Kamon
+import org.slf4j.event.Level
 
 import scala.io.Source
 
@@ -24,25 +24,33 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
           getFromResourceDirectory("swagger-ui")
       }
 
-  val compositeRoute: Route = extractRequest { _ =>
+  private val requestTimestamp = AttributeKey[Long]("timestamp")
+
+  private def addTimestamp(req: HttpRequest): HttpRequest = req.addAttribute(requestTimestamp, System.nanoTime())
+
+  val compositeRoute: Route = mapRequest(addTimestamp) {
     Kamon
       .currentSpan()
       .mark("processing.start")
 
-    extendRoute(routes.map(_.route).reduce(_ ~ _)) ~ swaggerRoute ~ complete(
-      StatusCodes.NotFound
-    )
+    extractRequest { req =>
+      mapRouteResultPF(logRequestResponse(req)) {
+        extendRoute(routes.map(_.route).reduce(_ ~ _)) ~ swaggerRoute ~ complete(StatusCodes.NotFound)
+      }
+    }
   }
 
-  val loggingCompositeRoute: Route = Route.seal(DebuggingDirectives.logRequestResult(LoggingMagnet(_ => logRequestResponse))(compositeRoute))
+  val loggingCompositeRoute: Route = Route.seal(compositeRoute)
 
   private val CorsAllowAllOrigin = "origin-from-request"
 
-  private def logRequestResponse(req: HttpRequest)(res: RouteResult): Unit = res match {
-    case Complete(resp) =>
-      val msg = s"HTTP ${resp.status.value} from ${req.method.value} ${req.uri}"
-      if (resp.status == StatusCodes.OK) log.info(msg) else log.warn(msg)
-    case _ =>
+  private def logRequestResponse(req: HttpRequest): PartialFunction[RouteResult, RouteResult] = { case r @ Complete(resp) =>
+    log.logger
+      .atLevel(if (resp.status == StatusCodes.OK) Level.INFO else Level.WARN)
+      .log { () =>
+        s"HTTP ${resp.status.value} from ${req.method.value} ${req.uri}${req.attribute(requestTimestamp).fold("")(ts => f" in ${(System.nanoTime() - ts) * 1e-6}%.3f ms")}"
+      }
+    r
   }
 
   private def preflightCorsHeaders(requestOrigin: Option[Origin]): Seq[HttpHeader] =

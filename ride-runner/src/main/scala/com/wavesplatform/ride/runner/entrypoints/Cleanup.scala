@@ -16,7 +16,7 @@ class Cleanup(actorSystem: ActorSystem) {
       Future {
         f
         Done
-      }(actorSystem.dispatcher)
+      }(using actorSystem.dispatcher)
     }
 
   def forceStop(): Unit = Await.result(cs.run(ProgramFinishedReason), Duration.Inf)

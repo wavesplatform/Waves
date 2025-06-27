@@ -105,7 +105,7 @@ class MinerImpl(
       scheduledAttempts := CompositeCancelable.fromSet(hasAllowedForMiningScriptsAccounts.map { account =>
         generateBlockTask(account, tempBlockchain)
           .onErrorHandle(err => log.warn(s"Error mining Block", err))
-          .runAsyncLogErr(appenderScheduler)
+          .runAsyncLogErr(using appenderScheduler)
       }.toSet)
       microBlockAttempt := SerialCancelable()
 
@@ -342,7 +342,7 @@ class MinerImpl(
     Miner.microMiningStarted.increment()
     microBlockAttempt := microBlockMiner
       .generateMicroBlockSequence(account, lastBlock, restTotalConstraint, 0)
-      .runAsyncLogErr(minerScheduler)
+      .runAsyncLogErr(using minerScheduler)
     log.trace(s"MicroBlock mining scheduled for acc=${account.toAddress}")
   }
 

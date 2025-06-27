@@ -8,7 +8,6 @@ import com.wavesplatform.ride.runner.entrypoints.{Heights, WavesRideRunnerCompar
 import com.wavesplatform.ride.runner.requests.DefaultRequestService
 import com.wavesplatform.settings.*
 import com.wavesplatform.settings.BlockchainSettings.given
-import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 import pureconfig.*
 
 import scala.concurrent.duration.DurationInt

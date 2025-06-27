@@ -91,7 +91,7 @@ case class InvokeScriptTrace(
       "id"          -> dAppAddressOrAlias.toString,
       "function"    -> functionCall.function.funcName,
       "args"        -> functionCall.args.map(_.toString),
-      "invocations" -> invocations.map(_.maybeLoggedJson(logged)(invokeResultWrites))
+      "invocations" -> invocations.map(_.maybeLoggedJson(logged)(using invokeResultWrites))
     ) ++ (resultE match {
       case Right(value) => TraceStep.maybeErrorJson(None) ++ Json.obj("result" -> TraceStep.scriptResultJson(invokeId, value))
       case Left(e)      => TraceStep.maybeErrorJson(Some(e))

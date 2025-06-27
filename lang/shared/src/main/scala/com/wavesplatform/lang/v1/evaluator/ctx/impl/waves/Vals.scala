@@ -85,7 +85,7 @@ object Vals {
           env
             .assetInfoById(
               env.tthis match {
-                case a: Recipient.Address     => throw new Exception("In the account's script value 'this` must be Address")
+                case _: Recipient.Address     => throw new Exception("In the account's script value 'this` must be Address")
                 case aid: Environment.AssetId => aid.id
               }
             )

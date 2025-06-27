@@ -42,6 +42,6 @@ class TupleTypeCommentsTest extends PropSpec {
         """.stripMargin
       )
       .explicitGet()
-    Decompiler(expr, getDecompilerContext(V6, DApp), V6).trim shouldBe "func f (a) = nil"
+    Decompiler(expr, getDecompilerContext(V6, DApp)).trim shouldBe "func f (a) = nil"
   }
 }

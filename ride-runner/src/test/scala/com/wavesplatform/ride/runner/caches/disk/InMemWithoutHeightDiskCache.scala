@@ -23,5 +23,5 @@ class InMemWithoutHeightDiskCache[KeyT, ValueT] extends DiskCache[KeyT, ValueT] 
   }
 
   override def removeAllFrom(fromHeight: Height)(implicit ctx: ReadWrite): List[KeyT] =
-    entries.collect { case (k, (h, v)) if h >= fromHeight => entries.remove(k); k }.toList
+    entries.collect { case (k, (h, _)) if h >= fromHeight => entries.remove(k); k }.toList
 }

@@ -6,7 +6,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser.*

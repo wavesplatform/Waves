@@ -300,7 +300,7 @@ object Importer extends ScorexLogging {
         lock.synchronized {
           val (block, snapshot) = queue.dequeue()
           if (blockchain.lastBlockId.contains(block.header.reference)) {
-            Await.result(appendBlock(block, snapshot).runAsyncLogErr(appender), Duration.Inf) match {
+            Await.result(appendBlock(block, snapshot).runAsyncLogErr(using appender), Duration.Inf) match {
               case Left(ve) =>
                 log.error(s"Error appending block: $ve")
                 queue.clear()
