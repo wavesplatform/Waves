@@ -3,7 +3,7 @@ package com.wavesplatform.mining
 import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, SeedKeyPair}
-import com.wavesplatform.block.{Block, ChallengedHeader}
+import com.wavesplatform.block.{Block, BlockEndorsement, ChallengedHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.BlockchainFeatures
@@ -16,8 +16,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.MaxTimeDrift
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, Height, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -37,6 +36,7 @@ trait BlockChallenger {
   def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]]
   def getProcessingTx(id: ByteStr): Option[Transaction]
   def allProcessingTxs: Seq[Transaction]
+  def endorse(height: Height): Seq[BlockEndorsement.Full]
 }
 
 class BlockChallengerImpl(
@@ -53,7 +53,7 @@ class BlockChallengerImpl(
 
   private val processingTxs: ConcurrentHashMap[ByteStr, Transaction] = new ConcurrentHashMap()
 
-  def challengeBlock(block: Block, ch: Channel): Task[Unit] = {
+  override def challengeBlock(block: Block, ch: Channel): Task[Unit] = {
     log.debug(s"Challenging block $block")
 
     withProcessingTxs(block.transactionData) {
@@ -81,7 +81,7 @@ class BlockChallengerImpl(
     }
   }
 
-  def challengeMicroblock(md: MicroblockData, ch: Channel): Task[Unit] = {
+  override def challengeMicroblock(md: MicroblockData, ch: Channel): Task[Unit] = {
     val idStr = md.invOpt.map(_.totalBlockId.toString).getOrElse(s"(sig=${md.microBlock.totalResBlockSig})")
     log.debug(s"Challenging microblock $idStr")
 
@@ -120,10 +120,10 @@ class BlockChallengerImpl(
     )
   }
 
-  def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] =
+  override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] =
     accounts.minByOption(_._2).toRight(GenericError("No suitable account in wallet"))
 
-  def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] =
+  override def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] =
     wallet.privateKeyAccounts
       .map { pk =>
         pk -> blockchainUpdater.generatingBalance(pk.toAddress)
@@ -140,9 +140,17 @@ class BlockChallengerImpl(
           .map((acc, _))
       }
 
-  def getProcessingTx(id: ByteStr): Option[Transaction] = Option(processingTxs.get(id))
+  override def getProcessingTx(id: ByteStr): Option[Transaction] = Option(processingTxs.get(id))
 
-  def allProcessingTxs: Seq[Transaction] = processingTxs.values.asScala.toSeq
+  override def allProcessingTxs: Seq[Transaction] = processingTxs.values.asScala.toSeq
+
+  override def endorse(height: Height): Seq[BlockEndorsement.Full] =
+    for {
+      id <- blockchainUpdater.blockId(height).toSeq
+      active = blockchainUpdater.activeGenerators(Height(height + 1))
+      account <- wallet.privateKeyAccounts
+      if active.contains(account.publicKey)
+    } yield BlockEndorsement.full(account, id, height)
 
   private def withProcessingTxs[A](txs: Seq[Transaction])(body: Task[A]): Task[A] =
     Task(processingTxs.putAll(txs.map(tx => tx.id() -> tx).toMap.asJava))

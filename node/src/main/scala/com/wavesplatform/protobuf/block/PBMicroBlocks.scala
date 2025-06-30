@@ -3,7 +3,7 @@ package com.wavesplatform.protobuf.block
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockEndorsement
-import com.wavesplatform.block.BlockEndorsement.NetworkMessage
+import com.wavesplatform.block.BlockEndorsement.Full
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.network.MicroBlockResponse
@@ -20,8 +20,8 @@ object PBMicroBlocks {
     val transactions = microBlock.transactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
     val endorsements = microBlock.endorsements.zipWithIndex.map { (x, i) =>
       PBEndorseBlocks.vanilla(x) match {
-        case x: BlockEndorsement.NetworkMessage => x
-        case _                                  => throw new IllegalArgumentException(s"EndorseBlock $i is incomplete")
+        case x: BlockEndorsement.Full => x
+        case _                        => throw new IllegalArgumentException(s"EndorseBlock $i is incomplete")
       }
     }
 

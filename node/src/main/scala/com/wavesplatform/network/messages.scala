@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockEndorsement, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.network.message.MessageSpec
@@ -125,4 +125,6 @@ case class EndorseBlock(endorserPublicKey: PublicKey, blockId: BlockId, blockHei
 object EndorseBlock {
   def fromProtobuf(x: PBEndorseBlock): EndorseBlock =
     EndorseBlock(x.endorserPublicKey.toPublicKey, x.blockId.toByteStr, Height(x.blockHeight), x.signature.toByteStr)
+    
+  def from(x: BlockEndorsement.Full): EndorseBlock = EndorseBlock(x.endorser, x.blockId, x.blockHeight, x.signature)
 }

@@ -131,12 +131,12 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
   }
 
   "multiple features activation: one after another" - {
-    def appendBlocks(b: BlockchainUpdaterImpl, blocks: Int, votes: Short*): Unit = (1 to blocks).foreach { _ =>
+    def appendBlocks(b: CompleteBlockchainUpdater, blocks: Int, votes: Short*): Unit = (1 to blocks).foreach { _ =>
       b.processBlock(getNextTestBlockWithVotes(b, votes)) should beRight
     }
 
     def check(
-        b: BlockchainUpdaterImpl,
+        b: CompleteBlockchainUpdater,
         height: Int,
         approvedFeatures: Map[Int, Int] = Map.empty,
         activatedFeatures: Map[Int, Int] = Map.empty
@@ -264,7 +264,7 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
   }
 
   "features activation after rollback and appending blocks" - {
-    def appendAndRollback(b: BlockchainUpdaterImpl, rollbackToHeight: Int): Unit = {
+    def appendAndRollback(b: CompleteBlockchainUpdater, rollbackToHeight: Int): Unit = {
       b.processBlock(genesisBlock)
 
       markup("Approving the feature")

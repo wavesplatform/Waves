@@ -90,6 +90,10 @@ trait Blockchain {
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
   def lastStateHash(refId: Option[ByteStr]): ByteStr
+
+  def committedGenerators(at: Height): Seq[PublicKey]
+
+  def activeGenerators(at: Height): Seq[PublicKey]
 }
 
 object Blockchain {

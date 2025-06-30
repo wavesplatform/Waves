@@ -136,7 +136,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         ts: Long
     ): (Block, MicroBlock) = {
       val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
-      (newTotalBlock, MicroBlock.buildAndSign(version, signer, txs, prevTotal.id(), newTotalBlock.signature, None).explicitGet())
+      (newTotalBlock, MicroBlock.buildAndSign(version, signer, txs, prevTotal.id(), newTotalBlock.signature, None, Seq.empty).explicitGet())
     }
 
     def unsafeBlock(

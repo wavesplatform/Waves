@@ -5,6 +5,7 @@ import cats.implicits.*
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.utils.Paged
 import play.api.libs.json.*
 import supertagged.TaggedType
@@ -75,4 +76,6 @@ package object state {
     )
   }
   type TransactionId = TransactionId.Type
+
+  type CompleteBlockchainUpdater = Blockchain & BlockchainUpdater & NG
 }

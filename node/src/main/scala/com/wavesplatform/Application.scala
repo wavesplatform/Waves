@@ -1,8 +1,5 @@
 package com.wavesplatform
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.Http.ServerBinding
 import cats.Eq
 import cats.instances.bigInt.*
 import cats.syntax.option.*
@@ -31,7 +28,7 @@ import com.wavesplatform.mining.{BlockChallengerImpl, Miner, MinerDebugInfo, Min
 import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, BlockchainUpdaterImpl, Height, TxMeta}
+import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, CompleteBlockchainUpdater, Height, TxMeta}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -50,6 +47,9 @@ import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.Http.ServerBinding
 import org.influxdb.dto.Point
 import org.rocksdb.RocksDB
 import org.slf4j.LoggerFactory
@@ -602,12 +602,12 @@ object Application extends ScorexLogging {
     settings
   }
 
-  private[wavesplatform] def loadBlockAt(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl)(
+  private[wavesplatform] def loadBlockAt(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater)(
       height: Int
   ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
     loadBlockInfoAt(rdb, blockchainUpdater)(height)
 
-  private[wavesplatform] def loadBlockInfoAt(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl)(
+  private[wavesplatform] def loadBlockInfoAt(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater)(
       height: Int
   ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
     loadBlockMetaAt(rdb.db, blockchainUpdater)(height).map { meta =>
@@ -616,7 +616,7 @@ object Application extends ScorexLogging {
         .getOrElse(database.loadTransactions(Height(height), rdb))
     }
 
-  private[wavesplatform] def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
+  private[wavesplatform] def loadBlockMetaAt(db: RocksDB, blockchainUpdater: CompleteBlockchainUpdater)(height: Int): Option[BlockMeta] =
     blockchainUpdater.liquidBlockMeta
       .filter(_ => blockchainUpdater.height == height)
       .orElse(db.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb))

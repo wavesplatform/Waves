@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import cats.syntax.either.*
 import cats.syntax.option.*
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot, SignedBlockHeader}
@@ -76,22 +76,20 @@ class BlockchainUpdaterImpl(
 
   publishLastBlockInfo()
 
-  def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.snapshotOf(id).map(_._1)))
+  override def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.snapshotOf(id).map(_._1)))
 
-  def liquidBlockSnapshot(id: ByteStr): Option[StateSnapshot] = readLock(ngState.flatMap(_.snapshotOf(id).map(_._2)))
+  override def liquidBlockSnapshot(id: ByteStr): Option[StateSnapshot] = readLock(ngState.flatMap(_.snapshotOf(id).map(_._2)))
 
-  def microBlockSnapshot(totalBlockId: ByteStr): Option[StateSnapshot] = readLock(ngState.flatMap(_.microSnapshots.get(totalBlockId).map(_.snapshot)))
+  override def microBlockSnapshot(totalBlockId: ByteStr): Option[StateSnapshot] = readLock(
+    ngState.flatMap(_.microSnapshots.get(totalBlockId).map(_.snapshot))
+  )
 
-  def liquidTransactions(id: ByteStr): Option[Seq[(TxMeta, Transaction)]] =
-    readLock(
-      ngState
-        .flatMap(_.snapshotOf(id))
-        .map { case (_, snapshot, _, _, _, _) =>
-          snapshot.transactions.toSeq.map { case (_, info) => (TxMeta(Height(height), info.status, info.spentComplexity), info.transaction) }
-        }
-    )
+  override def liquidTransactions(id: ByteStr): Option[Seq[(TxMeta, Transaction)]] =
+    liquidBlockSnapshot(id).map { snapshot =>
+      snapshot.transactions.toSeq.map { case (_, info) => (TxMeta(Height(height), info.status, info.spentComplexity), info.transaction) }
+    }
 
-  def liquidBlockMeta: Option[BlockMeta] =
+  override def liquidBlockMeta: Option[BlockMeta] =
     readLock(ngState.map { ng =>
       val (_, _, totalFee) = ng.bestLiquidSnapshotAndFees
       val b                = ng.bestLiquidBlock
@@ -100,9 +98,9 @@ class BlockchainUpdaterImpl(
     })
 
   @noinline
-  def bestLiquidSnapshot: Option[StateSnapshot] = readLock(ngState.map(_.bestLiquidSnapshot))
+  override def bestLiquidSnapshot: Option[StateSnapshot] = readLock(ngState.map(_.bestLiquidSnapshot))
 
-  def bestLiquidSnapshotAndFees: Option[(StateSnapshot, Long, Long)] = readLock(ngState.map(_.bestLiquidSnapshotAndFees))
+  override def bestLiquidSnapshotAndFees: Option[(StateSnapshot, Long, Long)] = readLock(ngState.map(_.bestLiquidSnapshotAndFees))
 
   override val settings: BlockchainSettings = wavesSettings.blockchainSettings
 
@@ -833,7 +831,11 @@ class BlockchainUpdaterImpl(
       .getOrElse(rocksdb.lastStateHash(None))
   }
 
-  def snapshotBlockchain: SnapshotBlockchain = readLock {
+  override def committedGenerators(at: Height): Seq[PublicKey] = Seq.empty // TODO: Implement
+
+  override def activeGenerators(at: Height): Seq[PublicKey] = committedGenerators(at).filter(_ => true) // TODO: Implement filter
+
+  override def snapshotBlockchain: SnapshotBlockchain = readLock {
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))
   }
 

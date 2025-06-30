@@ -7,10 +7,10 @@ import com.wavesplatform.state.Height
 object PBEndorseBlocks {
   def vanilla(x: PBEndorseBlock): BlockEndorsement =
     if (x.blockId.isEmpty && x.blockHeight == 0) BlockEndorsement.Valid(x.endorserPublicKey.toPublicKey, x.signature.toByteStr)
-    else if (x.blockHeight == 0) BlockEndorsement.Alternative(x.endorserPublicKey.toPublicKey, x.signature.toByteStr, x.blockId.toByteStr)
-    else BlockEndorsement.NetworkMessage(x.endorserPublicKey.toPublicKey, x.blockId.toByteStr, Height(x.blockHeight), x.signature.toByteStr)
+    else if (x.blockHeight == 0) BlockEndorsement.Conflict(x.endorserPublicKey.toPublicKey, x.signature.toByteStr, x.blockId.toByteStr)
+    else BlockEndorsement.Full(x.endorserPublicKey.toPublicKey, x.blockId.toByteStr, Height(x.blockHeight), x.signature.toByteStr)
 
-  def protobuf(x: BlockEndorsement.NetworkMessage): PBEndorseBlock =
+  def protobuf(x: BlockEndorsement.Full): PBEndorseBlock =
     new PBEndorseBlock(
       endorserPublicKey = x.endorser.toByteString,
       blockId = x.blockId.toByteString,
