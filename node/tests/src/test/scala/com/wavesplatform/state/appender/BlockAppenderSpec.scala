@@ -155,13 +155,9 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
         appenderScheduler
       )(channel2, _, None)
 
-      val block1 = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
-      testTime.setTime(block1.header.timestamp)
-      appender(block1).runSyncUnsafe()
-
-      val block2 = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
-      testTime.setTime(block2.header.timestamp)
-      appender(block2).runSyncUnsafe()
+      val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
+      testTime.setTime(block.header.timestamp)
+      appender(block).runSyncUnsafe()
 
       val endorsements = channel1.outboundMessages().asScala.count {
         case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true

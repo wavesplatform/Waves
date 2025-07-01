@@ -85,12 +85,10 @@ object BlockAppender extends ScorexLogging {
           if (blockchainUpdater.isLastBlockId(newBlock.id()) && (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined)) {
             allChannels.broadcast(BlockForged(newBlock), Some(ch)) // Key block or challenging block
 
-            val endorseHeight = Height(blockchainUpdater.height - 1)
-            if (endorseHeight > 1)
-              for {
-                blockChallenger <- blockChallenger.toSeq
-                endorsement     <- blockChallenger.endorse(endorseHeight)
-              } allChannels.broadcast(EndorseBlock.from(endorsement))
+            for {
+              blockChallenger <- blockChallenger.toSeq
+              endorsement     <- blockChallenger.endorse(Height(blockchainUpdater.height - 1))
+            } allChannels.broadcast(EndorseBlock.from(endorsement))
           }
         }
       case Left(is: InvalidSignature) =>

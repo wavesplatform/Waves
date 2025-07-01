@@ -1,5 +1,6 @@
 package com.wavesplatform.state
 
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -64,6 +65,9 @@ class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) exten
     liquidBlockMeta,
     bestLiquidSnapshot,
     bestLiquidSnapshotAndFees,
-    snapshotBlockchain
+    snapshotBlockchain,
+    committedGenerators
   }
+
+  def activeGenerators(at: Height): Seq[PublicKey] = delegate.activeGenerators(at)
 }

@@ -1,7 +1,7 @@
 package com.wavesplatform.utils
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -91,6 +91,10 @@ trait EmptyBlockchain extends Blockchain {
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = None
 
   override def lastStateHash(refId: Option[ByteStr]): ByteStr = TxStateSnapshotHashBuilder.InitStateHash
+
+  override def committedGenerators(at: Height): Seq[PublicKey] = Seq.empty
+
+  override def activeGenerators(at: Height): Seq[PublicKey] = Seq.empty
 }
 
 object EmptyBlockchain extends EmptyBlockchain
