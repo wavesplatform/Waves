@@ -11,7 +11,6 @@ import com.wavesplatform.network.{EndorseBlockSpec, MessageCodecL1, PBBlockSpec,
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Ignored
 import com.wavesplatform.state.{CompleteBlockchainUpdater, ForwardingBlockchainUpdaterImpl, Height}
 import com.wavesplatform.test.{FlatSpec, TestTime}
-import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.embedded.EmbeddedChannel
@@ -24,13 +23,15 @@ import org.scalatest.BeforeAndAfterAll
 import scala.jdk.CollectionConverters.*
 
 class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll {
-  val appenderScheduler: SchedulerService = Schedulers.singleThread("appender")
-  val testTime: TestTime                  = TestTime()
+  private val appenderScheduler: SchedulerService = Schedulers.singleThread("appender")
+  private val testTime: TestTime                  = TestTime()
+
+  private val seed   = ByteStr("finality-test".getBytes())
+  private val sender = Wallet.generateNewAccount(seed.arr, nonce = 0)
 
   behavior of "BlockAppender"
 
   it should "not broadcast block that wasn't applied to state" in {
-    val sender = TxHelpers.signer(1)
     withDomain(DomainPresets.ConsensusImprovements, AddrWithBalance.enoughBalances(sender)) { d =>
       val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val channel1 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
@@ -71,8 +72,7 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
     }
   }
 
-  it should "not broadcast block endorsement before the feature activation" in {
-    val sender = TxHelpers.signer(1)
+  it should "not broadcast a block endorsement before the feature activation" in {
     withDomain(DomainPresets.TransactionStateSnapshot, AddrWithBalance.enoughBalances(sender)) { d =>
       val blockChallenger = new BlockChallengerImpl(
         d.blockchain,
@@ -114,10 +114,7 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
     }
   }
 
-  it should "broadcast block endorsement after the feature activation" in {
-    val seed   = ByteStr("finality-test".getBytes())
-    val sender = Wallet.generateNewAccount(seed.arr, nonce = 0)
-
+  it should "broadcast a block endorsement after the feature activation" in {
     def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
       override def activeGenerators(at: Height): Seq[PublicKey] = Seq(sender.publicKey)
     }

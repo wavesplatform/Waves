@@ -15,7 +15,9 @@ enum BlockEndorsement {
 
 object BlockEndorsement {
   def sign(privateKey: PrivateKey, id: BlockId, height: Height): ByteStr =
-    crypto.sign(privateKey, id.arr ++ Ints.toByteArray(height))
+    crypto.sign(privateKey, mkMessage(id, height))
+
+  def mkMessage(id: BlockId, height: Height): Array[Byte] = id.arr ++ Ints.toByteArray(height)
 
   def full(account: SeedKeyPair, id: BlockId, height: Height): BlockEndorsement.Full =
     BlockEndorsement.Full(

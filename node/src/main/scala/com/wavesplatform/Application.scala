@@ -308,6 +308,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       microblockSnapshots,
       microblockSynchronizerScheduler
     )
+    // EndorseBlockSynchronizer.start() // TODO:
     val (newBlocksWithSnapshot, extLoaderState, _) = RxExtensionLoader(
       settings.synchronizationSettings.synchronizationTimeout,
       settings.synchronizationSettings.processedBlocksCacheTimeout,
