@@ -69,5 +69,5 @@ class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) exten
     committedGenerators
   }
 
-  def activeGenerators(at: Height): Seq[PublicKey] = delegate.activeGenerators(at)
+  override def activeGenerators(at: Height): Set[PublicKey] = delegate.activeGenerators(at)
 }

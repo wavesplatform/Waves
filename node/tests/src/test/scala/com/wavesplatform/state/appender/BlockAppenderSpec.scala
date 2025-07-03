@@ -116,7 +116,7 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
 
   it should "broadcast a block endorsement after the feature activation" in {
     def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-      override def activeGenerators(at: Height): Seq[PublicKey] = Seq(sender.publicKey)
+      override def activeGenerators(at: Height): Set[PublicKey] = Set(sender.publicKey)
     }
 
     withDomain(

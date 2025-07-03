@@ -8,9 +8,9 @@ import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.TxHelpers
+import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.group.DefaultChannelGroup
-import io.netty.channel.{Channel, ChannelId}
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.execution.ExecutionModel
 import monix.execution.schedulers.TestScheduler
@@ -78,7 +78,7 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
 
     val last         = PS[EndorseBlockSynchronizer.EndorsersAt]()
     val endorsements = PS[(Channel, EndorseBlock)]()
-    val synchronizer = EndorseBlockSynchronizer.start(1, last, endorsements, allChannels)(testScheduler)
+    val synchronizer = EndorseBlockSynchronizer.start(1, last, endorsements, allChannels, testScheduler)
 
     def blockchainUpdated(height: Int, newEndorsers: PublicKey*): Unit = {
       last.onNext((Height(height), newEndorsers.toSet))

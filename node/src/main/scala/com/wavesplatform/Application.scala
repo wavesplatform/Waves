@@ -19,6 +19,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{DBExt, Keys, RDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
@@ -89,6 +90,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val extensionLoaderScheduler = singleThread("rx-extension-loader", reporter = log.error("Error in Extension Loader", _))
   private val microblockSynchronizerScheduler =
     singleThread("microblock-synchronizer", reporter = log.error("Error in Microblock Synchronizer", _))
+  private val endorseBlockSynchronizerScheduler =
+    singleThread("endorseblock-synchronizer", reporter = log.error("Error in EndorseBlock Synchronizer", _))
   private val scoreObserverScheduler  = singleThread("rx-score-observer", reporter = log.error("Error in Score Observer", _))
   private val historyRepliesScheduler = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
   private val minerScheduler          = singleThread("block-miner", reporter = log.error("Error in Miner", _))
@@ -283,9 +286,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         establishedConnections
       )
     maybeNetworkServer = Some(networkServer)
-    val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions, blockSnapshots, microblockSnapshots, endorsements) =
-      messageObserver.messages
-
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 
     val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(
@@ -293,7 +293,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       1.second,
       blockchainUpdater.score,
       lastScore,
-      blockchainScores,
+      messageObserver.blockchainScores,
       networkServer.closedChannels,
       timeoutSubject,
       scoreObserverScheduler
@@ -303,12 +303,24 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       settings.enableLightMode,
       peerDatabase,
       lastBlockInfo.map(_.id),
-      microblockInvs,
-      microblockResponses,
-      microblockSnapshots,
+      messageObserver.microblockInvs,
+      messageObserver.microblockResponses,
+      messageObserver.microblockSnapshots,
       microblockSynchronizerScheduler
     )
-    // EndorseBlockSynchronizer.start() // TODO:
+
+    EndorseBlockSynchronizer.start(
+      maxActiveEndorsers = settings.blockchainSettings.functionalitySettings.maxActiveGenerators,
+      lastEndorsers = blockchainUpdater.lastBlockInfo.collect {
+        case bi if blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, bi.height) =>
+          val h = Height(bi.height)
+          (h, blockchainUpdater.activeGenerators(h))
+      },
+      endorseBlocks = messageObserver.endorseBlocks,
+      allChannels = allChannels,
+      scheduler = endorseBlockSynchronizerScheduler
+    )
+
     val (newBlocksWithSnapshot, extLoaderState, _) = RxExtensionLoader(
       settings.synchronizationSettings.synchronizationTimeout,
       settings.synchronizationSettings.processedBlocksCacheTimeout,
@@ -316,9 +328,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       Coeval(blockchainUpdater.lastBlockIds(settings.synchronizationSettings.maxRollback)),
       peerDatabase,
       knownInvalidBlocks,
-      blocks,
-      signatures,
-      blockSnapshots,
+      messageObserver.blocks,
+      messageObserver.signatures,
+      messageObserver.blockSnapshots,
       syncWithChannelClosed,
       extensionLoaderScheduler,
       timeoutSubject
@@ -332,7 +344,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     TransactionSynchronizer(
       settings.synchronizationSettings.utxSynchronizer,
       lastBlockInfo.map(_.id).distinctUntilChanged(Eq.fromUniversalEquals),
-      transactions,
+      messageObserver.transactions,
       transactionPublisher
     )
 

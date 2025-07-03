@@ -92,9 +92,9 @@ trait EmptyBlockchain extends Blockchain {
 
   override def lastStateHash(refId: Option[ByteStr]): ByteStr = TxStateSnapshotHashBuilder.InitStateHash
 
-  override def committedGenerators(at: Height): Seq[PublicKey] = Seq.empty
+  override def committedGenerators(at: Height): Set[PublicKey] = Set.empty
 
-  override def activeGenerators(at: Height): Seq[PublicKey] = Seq.empty
+  override def activeGenerators(at: Height): Set[PublicKey] = Set.empty
 }
 
 object EmptyBlockchain extends EmptyBlockchain

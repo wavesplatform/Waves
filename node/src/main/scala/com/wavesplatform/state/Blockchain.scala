@@ -91,9 +91,9 @@ trait Blockchain {
 
   def lastStateHash(refId: Option[ByteStr]): ByteStr
 
-  def committedGenerators(at: Height): Seq[PublicKey]
+  def committedGenerators(at: Height): Set[PublicKey]
 
-  def activeGenerators(at: Height): Seq[PublicKey]
+  def activeGenerators(at: Height): Set[PublicKey]
 }
 
 object Blockchain {

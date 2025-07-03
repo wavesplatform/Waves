@@ -17,10 +17,11 @@ object EndorseBlockSynchronizer extends LazyLogging {
 
   def start(
       maxActiveEndorsers: Int,
-      last: Observable[EndorsersAt],
-      endorsements: Observable[(Channel, EndorseBlock)],
-      allChannels: DefaultChannelGroup
-  )(implicit scheduler: Scheduler): Cancelable = {
+      lastEndorsers: Observable[EndorsersAt],
+      endorseBlocks: Observable[(Channel, EndorseBlock)],
+      allChannels: DefaultChannelGroup,
+      scheduler: Scheduler
+  ): Cancelable = {
     val known = CacheBuilder
       .newBuilder()
       .maximumSize(maxActiveEndorsers * 2) // 2 for valid and invalid
@@ -32,18 +33,18 @@ object EndorseBlockSynchronizer extends LazyLogging {
     }
 
     val current: Atomic[EndorsersAt] = Atomic((Height(0), Set.empty))
-    last.foreach { e =>
+    lastEndorsers.foreach { e =>
       current.set(e)
 
       logger.trace(s"Invalidating known endorsements before ${e._1}")
       val stale = known.asMap().keySet().asScala.filterNot(fit(_, e))
       known.invalidateAll(stale.asJava)
-    }
+    }(scheduler)
 
     val dummy = new Object()
-    endorsements.foreach { case (ch, x) =>
+    endorseBlocks.foreach { case (ch, x) =>
       val suitableAndNew = x.verify() && fit(x, current.get()) && known.asMap().putIfAbsent(x, dummy) == null
       if (suitableAndNew) allChannels.broadcast(x, Some(ch))
-    }
+    }(scheduler)
   }
 }
