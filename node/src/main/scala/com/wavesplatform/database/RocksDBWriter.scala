@@ -1423,7 +1423,7 @@ class RocksDBWriter(
   def snapshotStateHash(height: Int): ByteStr =
     readOnly(_.get(Keys.blockStateHash(height)))
 
-  override def committedGenerators(at: Height): Set[PublicKey] = Set.empty // TODO: 
+  override def committedGenerators(at: Height): Set[PublicKey] = Set.empty // TODO:
 
   override def activeGenerators(at: Height): Set[PublicKey] = Set.empty // TODO:
 }
