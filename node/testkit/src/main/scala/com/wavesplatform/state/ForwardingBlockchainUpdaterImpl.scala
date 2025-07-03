@@ -1,10 +1,6 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.transaction.BlockchainUpdater
 
 class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) extends Blockchain with BlockchainUpdater with NG {

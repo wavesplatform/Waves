@@ -29,7 +29,7 @@ object EndorseBlockSynchronizer extends LazyLogging {
 
     def fit(x: EndorseBlock, cond: EndorsersAt): Boolean = {
       val (h, endorsers) = cond
-      x.blockHeight == h && endorsers.contains(x.endorserPublicKey)
+      x.blockHeight == h && x.blockId != x.finalizedBlockId && endorsers.contains(x.endorserPublicKey)
     }
 
     val current: Atomic[EndorsersAt] = Atomic((Height(0), Set.empty))
@@ -39,12 +39,12 @@ object EndorseBlockSynchronizer extends LazyLogging {
       logger.trace(s"Invalidating known endorsements before ${e._1}")
       val stale = known.asMap().keySet().asScala.filterNot(fit(_, e))
       known.invalidateAll(stale.asJava)
-    }(scheduler)
+    }(using scheduler)
 
     val dummy = new Object()
     endorseBlocks.foreach { case (ch, x) =>
       val suitableAndNew = x.verify() && fit(x, current.get()) && known.asMap().putIfAbsent(x, dummy) == null
       if (suitableAndNew) allChannels.broadcast(x, Some(ch))
-    }(scheduler)
+    }(using scheduler)
   }
 }

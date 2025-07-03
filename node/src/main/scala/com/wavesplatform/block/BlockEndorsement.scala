@@ -8,22 +8,17 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state.Height
 
 enum BlockEndorsement {
-  case Full(endorser: PublicKey, blockId: BlockId, blockHeight: Height, signature: ByteStr)
-  case Valid(endorser: PublicKey, signature: ByteStr)
-  case Conflict(endorser: PublicKey, signature: ByteStr, referenceHash: ByteStr)
+  case Full(endorser: PublicKey, finalizedBlockId: BlockId, blockId: BlockId, blockHeight: Height, signature: ByteStr)
+  case Conflict(endorser: PublicKey, finalizedBlockId: BlockId, blockId: BlockId, signature: ByteStr)
+  case Valid(endorser: PublicKey, finalizedBlockId: BlockId, signature: ByteStr)
 }
 
 object BlockEndorsement {
-  def sign(privateKey: PrivateKey, id: BlockId, height: Height): ByteStr =
-    crypto.sign(privateKey, mkMessage(id, height))
+  def sign(privateKey: PrivateKey, finalizedId: BlockId, id: BlockId, height: Height): ByteStr =
+    crypto.sign(privateKey, mkMessage(finalizedId, id, height))
 
-  def mkMessage(id: BlockId, height: Height): Array[Byte] = id.arr ++ Ints.toByteArray(height)
+  def mkMessage(finalizedId: BlockId, id: BlockId, height: Height): Array[Byte] = finalizedId.arr ++ id.arr ++ Ints.toByteArray(height)
 
-  def full(account: SeedKeyPair, id: BlockId, height: Height): BlockEndorsement.Full =
-    BlockEndorsement.Full(
-      endorser = account.publicKey,
-      blockId = id,
-      blockHeight = height,
-      signature = sign(account.privateKey, id, height)
-    )
+  def full(account: SeedKeyPair, finalizedId: BlockId, id: BlockId, height: Height): BlockEndorsement.Full =
+    BlockEndorsement.Full(account.publicKey, finalizedId, id, height, sign(account.privateKey, finalizedId, id, height))
 }

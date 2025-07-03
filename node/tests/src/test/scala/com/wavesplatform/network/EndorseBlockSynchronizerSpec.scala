@@ -24,6 +24,7 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
 
   private val activeGenerator    = TxHelpers.signer(0)
   private val committedGenerator = TxHelpers.signer(1)
+  private val finalizedId        = mkRandomBlockId
   private val blockId            = mkRandomBlockId
   private val blockHeight        = Height(10)
 
@@ -31,7 +32,7 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     "an already received endorsement" in withContext { c =>
       c.blockchainUpdated(blockHeight, activeGenerator.publicKey)
 
-      val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, blockId, blockHeight))
+      val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, blockId, blockHeight))
       c.receivedEndorseBlock(msg)
       c.outChannel.outboundMessages().poll() shouldBe msg
 
@@ -46,16 +47,17 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
         c.outChannel.outboundMessages() shouldBe empty
       }
 
-      "a wrong signature" in test(EndorseBlock(activeGenerator.publicKey, blockId, blockHeight, ByteStr.empty))
-      "an unexpected height" in test(EndorseBlock.from(BlockEndorsement.full(activeGenerator, blockId, Height(Int.MaxValue))))
-      "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, blockId, blockHeight)))
+      "a wrong signature" in test(EndorseBlock(activeGenerator.publicKey, finalizedId, blockId, blockHeight, ByteStr.empty))
+      "an unexpected height" in test(EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, blockId, Height(Int.MaxValue))))
+      "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, finalizedId, blockId, blockHeight)))
+      "an already finalized block" in test(EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, finalizedId, blockHeight)))
     }
   }
 
   "Should rebroadcast a valid endorsement on same height after a rollback" in withContext { c =>
     c.blockchainUpdated(blockHeight, activeGenerator.publicKey)
 
-    val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, blockId, blockHeight))
+    val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, blockId, blockHeight))
     c.receivedEndorseBlock(msg)
     c.outChannel.outboundMessages().poll()
 

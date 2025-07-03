@@ -2,7 +2,7 @@ package com.wavesplatform.ride.runner.blockchain
 
 import com.github.benmanes.caffeine.cache.{CacheLoader, Caffeine, LoadingCache}
 import com.google.protobuf.UnsafeByteOperations
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -202,6 +202,10 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = Seq.empty
 
   override def lastStateHash(refId: Option[BlockId]): BlockId = ???
+
+  override def committedGenerators(at: Height): Set[PublicKey] = ???
+
+  override def activeGenerators(at: Height): Set[PublicKey] = ???
 
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =

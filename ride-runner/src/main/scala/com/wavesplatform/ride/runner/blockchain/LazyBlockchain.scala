@@ -209,6 +209,10 @@ class LazyBlockchain[TagT] private (
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
     getTransactionHeight(TransactionId(id)).map(TxMeta(_, TxMeta.Status.Succeeded, 0)) // Other information not used
 
+  override def committedGenerators(at: Height): AffectedTags[PublicKey] = ???
+
+  override def activeGenerators(at: Height): AffectedTags[PublicKey] = ???
+
   private def getTransactionHeight(id: TransactionId): Option[Height] = db.directReadWrite { implicit ctx =>
     memCache.getOrLoad(MemCacheKey.Transaction(id)) { key =>
       val cached = diskCaches.transactions.getHeight(key.id)
