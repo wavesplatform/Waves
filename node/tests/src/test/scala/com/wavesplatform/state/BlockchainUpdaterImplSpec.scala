@@ -35,7 +35,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
   private val FEE_AMT = 1000000L
 
   def baseTest(setup: Time => (KeyPair, Seq[Block]), enableNg: Boolean = false, triggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop)(
-      f: (BlockchainUpdaterImpl, KeyPair) => Unit
+      f: (CompleteBlockchainUpdater, KeyPair) => Unit
   ): Unit = withDomain(if (enableNg) NG else SettingsFromDefaultConfig) { d =>
     d.triggers = d.triggers :+ triggers
 

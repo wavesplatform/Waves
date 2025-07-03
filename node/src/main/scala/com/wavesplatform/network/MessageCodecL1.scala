@@ -1,13 +1,12 @@
 package com.wavesplatform.network
 
-import java.util
-
 import com.wavesplatform.crypto
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.MessageToMessageCodec
 
+import java.util
 import scala.util.{Failure, Success}
 
 @Sharable
@@ -32,6 +31,7 @@ class MessageCodecL1(peerDatabase: PeerDatabase) extends MessageToMessageCodec[R
       case m: MicroSnapshotRequest       => RawBytes.from(MicroSnapshotRequestSpec, m)
       case s: BlockSnapshotResponse      => RawBytes.from(BlockSnapshotResponseSpec, s)
       case s: MicroBlockSnapshotResponse => RawBytes.from(MicroBlockSnapshotResponseSpec, s)
+      case e: EndorseBlock               => RawBytes.from(EndorseBlockSpec, e)
 
       // Version switch
       case gs: GetSignatures if isNewMsgsSupported(ctx) =>

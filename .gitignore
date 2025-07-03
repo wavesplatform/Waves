@@ -5,6 +5,7 @@
 .bsp
 .bloop
 .metals
+metals.sbt
 
 # scala build folders and files
 target

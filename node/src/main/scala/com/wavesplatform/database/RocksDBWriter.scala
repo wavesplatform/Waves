@@ -6,7 +6,7 @@ import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
 import com.google.common.util.concurrent.MoreExecutors
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockSnapshot
@@ -1422,4 +1422,8 @@ class RocksDBWriter(
 
   def snapshotStateHash(height: Int): ByteStr =
     readOnly(_.get(Keys.blockStateHash(height)))
+
+  override def committedGenerators(at: Height): Set[PublicKey] = Set.empty // TODO: 
+
+  override def activeGenerators(at: Height): Set[PublicKey] = Set.empty // TODO:
 }

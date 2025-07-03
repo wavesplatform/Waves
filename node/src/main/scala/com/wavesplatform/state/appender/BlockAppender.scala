@@ -8,9 +8,9 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.network.*
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature, InvalidStateHash}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -84,6 +84,11 @@ object BlockAppender extends ScorexLogging {
           BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
           if (blockchainUpdater.isLastBlockId(newBlock.id()) && (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined)) {
             allChannels.broadcast(BlockForged(newBlock), Some(ch)) // Key block or challenging block
+
+            for {
+              blockChallenger <- blockChallenger.toSeq
+              endorsement     <- blockChallenger.endorse(Height(blockchainUpdater.height - 1))
+            } allChannels.broadcast(EndorseBlock.from(endorsement))
           }
         }
       case Left(is: InvalidSignature) =>

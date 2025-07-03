@@ -79,7 +79,8 @@ case class FunctionalitySettings(
     lightNodeBlockFieldsAbsenceInterval: Int = 1000,
     blockRewardBoostPeriod: Int = 1000,
     paymentsCheckHeight: Int = 0,
-    unitsRegistryAddress: Option[String] = None
+    unitsRegistryAddress: Option[String] = None,
+    maxActiveGenerators: Int = 128 // BLS has much worse performance from 129
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter

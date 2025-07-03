@@ -48,11 +48,11 @@ import scala.concurrent.duration.*
 import scala.util.Try
 import scala.util.control.NonFatal
 
-case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWriter: RocksDBWriter, settings: WavesSettings) {
+case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksDBWriter: RocksDBWriter, settings: WavesSettings) {
   import Domain.*
   private given scheduler: Scheduler = Schedulers.singleThread("domain", executionModel = SynchronousExecution)
 
-  val blockchain: BlockchainUpdaterImpl = blockchainUpdater
+  val blockchain: CompleteBlockchainUpdater = blockchainUpdater
 
   @volatile
   var triggers: Seq[BlockchainUpdateTriggers] = Nil
@@ -337,11 +337,12 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       microblock <- MicroBlock
         .buildAndSign(
           lastBlock.header.version,
-          blockSigner,
-          txs,
-          ref.getOrElse(blockchainUpdater.lastBlockId.get),
-          block.signature,
-          block.header.stateHash
+          generator = blockSigner,
+          transactionData = txs,
+          reference = ref.getOrElse(blockchainUpdater.lastBlockId.get),
+          totalResBlockSig = block.signature,
+          stateHash = block.header.stateHash,
+          endorsements = Seq.empty // TODO: endorsements
         )
     } yield microblock
   }
@@ -525,10 +526,10 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   }
 
   val blocksApi: CommonBlocksApi = {
-    def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
+    def loadBlockMetaAt(db: RocksDB, blockchainUpdater: CompleteBlockchainUpdater)(height: Int): Option[BlockMeta] =
       Application.loadBlockMetaAt(db, blockchainUpdater)(height)
 
-    def loadBlockInfoAt(db: RDB, blockchainUpdater: BlockchainUpdaterImpl)(
+    def loadBlockInfoAt(db: RDB, blockchainUpdater: CompleteBlockchainUpdater)(
         height: Int
     ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       Application.loadBlockInfoAt(db, blockchainUpdater)(height)
@@ -626,7 +627,7 @@ object Domain {
     }
   }
 
-  def portfolio(address: Address, db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
+  def portfolio(address: Address, db: RocksDB, blockchainUpdater: CompleteBlockchainUpdater): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
     AddressPortfolio
       .assetBalanceIterator(
         resource,

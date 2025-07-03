@@ -1,7 +1,6 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.block.Block
-import com.wavesplatform.network.MessageObserverL1.Messages
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.Schedulers
 import io.netty.channel.ChannelHandler.Sharable
@@ -14,62 +13,55 @@ class MessageObserverL1 extends ChannelInboundHandlerAdapter {
 
   private implicit val scheduler: SchedulerService = Schedulers.fixedPool(2, "message-observer")
 
-  private val signatures          = ConcurrentSubject.publish[(Channel, Signatures)]
-  private val blocks              = ConcurrentSubject.publish[(Channel, Block)]
-  private val blockchainScores    = ConcurrentSubject.publish[(Channel, BigInt)]
-  private val microblockInvs      = ConcurrentSubject.publish[(Channel, MicroBlockInv)]
-  private val microblockResponses = ConcurrentSubject.publish[(Channel, MicroBlockResponse)]
-  private val transactions        = ConcurrentSubject.publish[(Channel, Transaction)]
-  private val blockSnapshots      = ConcurrentSubject.publish[(Channel, BlockSnapshotResponse)]
-  private val microblockSnapshots = ConcurrentSubject.publish[(Channel, MicroBlockSnapshotResponse)]
+  private val signaturesSubj                    = ConcurrentSubject.publish[(Channel, Signatures)]
+  val signatures: ChannelObservable[Signatures] = signaturesSubj
+
+  private val blocksSubj               = ConcurrentSubject.publish[(Channel, Block)]
+  val blocks: ChannelObservable[Block] = blocksSubj
+
+  private val blockchainScoresSubj                = ConcurrentSubject.publish[(Channel, BigInt)]
+  val blockchainScores: ChannelObservable[BigInt] = blockchainScoresSubj
+
+  private val microblockInvsSubj                       = ConcurrentSubject.publish[(Channel, MicroBlockInv)]
+  val microblockInvs: ChannelObservable[MicroBlockInv] = microblockInvsSubj
+
+  private val microblockResponsesSubj                            = ConcurrentSubject.publish[(Channel, MicroBlockResponse)]
+  val microblockResponses: ChannelObservable[MicroBlockResponse] = microblockResponsesSubj
+
+  private val transactionsSubj                     = ConcurrentSubject.publish[(Channel, Transaction)]
+  val transactions: ChannelObservable[Transaction] = transactionsSubj
+
+  private val blockSnapshotsSubj                               = ConcurrentSubject.publish[(Channel, BlockSnapshotResponse)]
+  val blockSnapshots: ChannelObservable[BlockSnapshotResponse] = blockSnapshotsSubj
+
+  private val microblockSnapshotsSubj                                    = ConcurrentSubject.publish[(Channel, MicroBlockSnapshotResponse)]
+  val microblockSnapshots: ChannelObservable[MicroBlockSnapshotResponse] = microblockSnapshotsSubj
+
+  private val endorseBlocksSubj                      = ConcurrentSubject.publish[(Channel, EndorseBlock)]
+  val endorseBlocks: ChannelObservable[EndorseBlock] = endorseBlocksSubj
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case b: Block                       => blocks.onNext((ctx.channel(), b))
-    case sc: BigInt                     => blockchainScores.onNext((ctx.channel(), sc))
-    case s: Signatures                  => signatures.onNext((ctx.channel(), s))
-    case mbInv: MicroBlockInv           => microblockInvs.onNext((ctx.channel(), mbInv))
-    case mb: MicroBlockResponse         => microblockResponses.onNext((ctx.channel(), mb))
-    case tx: Transaction                => transactions.onNext((ctx.channel(), tx))
-    case sn: BlockSnapshotResponse      => blockSnapshots.onNext((ctx.channel(), sn))
-    case sn: MicroBlockSnapshotResponse => microblockSnapshots.onNext((ctx.channel(), sn))
+    case b: Block                       => blocksSubj.onNext((ctx.channel(), b))
+    case sc: BigInt                     => blockchainScoresSubj.onNext((ctx.channel(), sc))
+    case s: Signatures                  => signaturesSubj.onNext((ctx.channel(), s))
+    case mbInv: MicroBlockInv           => microblockInvsSubj.onNext((ctx.channel(), mbInv))
+    case mb: MicroBlockResponse         => microblockResponsesSubj.onNext((ctx.channel(), mb))
+    case tx: Transaction                => transactionsSubj.onNext((ctx.channel(), tx))
+    case sn: BlockSnapshotResponse      => blockSnapshotsSubj.onNext((ctx.channel(), sn))
+    case sn: MicroBlockSnapshotResponse => microblockSnapshotsSubj.onNext((ctx.channel(), sn))
+    case e: EndorseBlock                => endorseBlocksSubj.onNext((ctx.channel(), e))
     case _                              => super.channelRead(ctx, msg)
-
-  }
-
-  def messages: Messages = {
-    (
-      signatures,
-      blocks,
-      blockchainScores,
-      microblockInvs,
-      microblockResponses,
-      transactions,
-      blockSnapshots,
-      microblockSnapshots
-    )
   }
 
   def shutdown(): Unit = {
-    signatures.onComplete()
-    blocks.onComplete()
-    blockchainScores.onComplete()
-    microblockInvs.onComplete()
-    microblockResponses.onComplete()
-    transactions.onComplete()
-    blockSnapshots.onComplete()
-    microblockSnapshots.onComplete()
+    signaturesSubj.onComplete()
+    blocksSubj.onComplete()
+    blockchainScoresSubj.onComplete()
+    microblockInvsSubj.onComplete()
+    microblockResponsesSubj.onComplete()
+    transactionsSubj.onComplete()
+    blockSnapshotsSubj.onComplete()
+    microblockSnapshotsSubj.onComplete()
+    endorseBlocksSubj.onComplete()
   }
-}
-
-object MessageObserverL1 {
-  type Messages = (
-      ChannelObservable[Signatures],
-      ChannelObservable[Block],
-      ChannelObservable[BigInt],
-      ChannelObservable[MicroBlockInv],
-      ChannelObservable[MicroBlockResponse],
-      ChannelObservable[Transaction],
-      ChannelObservable[BlockSnapshotResponse],
-      ChannelObservable[MicroBlockSnapshotResponse]
-  )
 }

@@ -21,7 +21,15 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.utils.TestRocksDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NgState, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{
+  Blockchain,
+  BlockchainUpdaterImpl,
+  CompleteBlockchainUpdater,
+  NgState,
+  SnapshotBlockchain,
+  StateSnapshot,
+  TxStateSnapshotHashBuilder
+}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.defaultAddress
@@ -381,16 +389,19 @@ trait WithDomain extends WithState { suite: Suite =>
       settings: WavesSettings =
         DomainPresets.SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
       balances: Seq[AddrWithBalance] = Seq.empty,
-      wrapDB: RocksDB => RocksDB = identity
+      wrapDB: RocksDB => RocksDB = identity,
+      wrapBU: CompleteBlockchainUpdater => CompleteBlockchainUpdater = identity
   )(test: Domain => A): A =
     withRocksDBWriter(settings) { blockchain =>
       var domain: Domain = null
-      val bcu = new BlockchainUpdaterImpl(
-        blockchain,
-        settings,
-        ntpTime,
-        BlockchainUpdateTriggers.combined(domain.triggers),
-        loadActiveLeases(rdb, _, _)
+      val bcu = wrapBU(
+        new BlockchainUpdaterImpl(
+          blockchain,
+          settings,
+          ntpTime,
+          BlockchainUpdateTriggers.combined(domain.triggers),
+          loadActiveLeases(rdb, _, _)
+        )
       )
 
       try {

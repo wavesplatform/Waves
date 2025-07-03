@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import cats.syntax.option.*
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -228,6 +228,10 @@ case class SnapshotBlockchain(
 
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
+
+  override def committedGenerators(at: Height): Set[PublicKey] = inner.committedGenerators(at)
+
+  override def activeGenerators(at: Height): Set[PublicKey] = inner.activeGenerators(at)
 }
 
 object SnapshotBlockchain {
