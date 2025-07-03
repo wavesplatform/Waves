@@ -35,7 +35,7 @@ class Worker(
     extends ScorexLogging {
 
   def run(): Future[Unit] =
-    task.runAsyncLogErr(Scheduler(ec))
+    task.runAsyncLogErr(using Scheduler(ec))
 
   private val task =
     for {

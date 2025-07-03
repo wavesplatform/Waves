@@ -241,7 +241,7 @@ object NFTBalanceSuite {
       .get(s"/assets/balance/$address")
       .as[JsObject]
       .map { json =>
-        (json \ "balances").as[List[String]](Reads.list(Reads { details =>
+        (json \ "balances").as[List[String]](using Reads.list(using Reads { details =>
           (details \ "issueTransaction" \ "assetId").validate[String]
         }))
       }

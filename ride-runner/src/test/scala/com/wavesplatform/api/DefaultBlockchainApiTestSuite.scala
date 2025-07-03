@@ -46,7 +46,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
               }.delayExecution(10.millis)
             } else Task.unit
 
-            tasks.runToFuture(testScheduler)
+            tasks.runToFuture(using testScheduler)
           }
 
           override def getBlockUpdatesRange(request: GetBlockUpdatesRangeRequest): Future[GetBlockUpdatesRangeResponse] = ???
@@ -75,14 +75,14 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
                 // 2. An upstream timeout during reconnecting doesn't affect whole behaviour
                 Task {
                   stream.start(Height(currentHeight.get() - 1))
-                }.delayExecution(upstreamTimeout - 50.millis).runToFuture(testScheduler)
+                }.delayExecution(upstreamTimeout - 50.millis).runToFuture(using testScheduler)
 
                 Task.unit // Otherwise the stream waits
 
               case x => fail(s"Unexpected message: $x")
             }
             .toListL
-            .runToFuture(testScheduler)
+            .runToFuture(using testScheduler)
 
           stream.start(Height(1))
 
@@ -122,7 +122,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
       }
 
       "restart on upstream completed" in {
-        implicit val testScheduler = TestScheduler(ExecutionModel.AlwaysAsyncExecution)
+        implicit val testScheduler: TestScheduler = TestScheduler(ExecutionModel.AlwaysAsyncExecution)
 
         val subscriptions = new AtomicInteger(0)
         val blockchainUpdatesGrpcService = new BlockchainUpdatesApiGrpc.BlockchainUpdatesApi {
@@ -145,7 +145,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
               }.delayExecution(10.millis)
             } else Task.unit
 
-            tasks.runToFuture(testScheduler)
+            tasks.runToFuture(using testScheduler)
           }
 
           override def getBlockUpdatesRange(request: GetBlockUpdatesRangeRequest): Future[GetBlockUpdatesRangeResponse] = ???
@@ -216,7 +216,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
       }
 
       "multiple restarts" in {
-        implicit val testScheduler = TestScheduler()
+        implicit val testScheduler: TestScheduler = TestScheduler()
         val subscriptions          = new AtomicInteger(0)
         val upstreamTimeout        = 1.second
 
@@ -237,7 +237,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
                   Task { responseObserver.onCompleted() }.delayExecution(10.millis)
               else Task.unit
 
-            tasks.runToFuture(testScheduler)
+            tasks.runToFuture(using testScheduler)
           }
 
           override def getBlockUpdatesRange(request: GetBlockUpdatesRangeRequest): Future[GetBlockUpdatesRangeResponse] = ???
@@ -265,7 +265,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
               case x                                                => fail(s"Unexpected message: $x")
             }
             .toListL
-            .runToFuture(testScheduler)
+            .runToFuture(using testScheduler)
 
           stream.start(Height(1))
 

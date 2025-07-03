@@ -37,7 +37,7 @@ object RideDbAccess {
       // Snapshot.close does nothing, see https://github.com/facebook/rocksdb/blob/601320164b41643e39851245ee90a90caa61d311/java/src/main/java/org/rocksdb/Snapshot.java#L31
       Using.resource(db.getSnapshot) { s =>
         Using.resource(mkReadOptions(s))(use)
-      }((resource: Snapshot) => db.releaseSnapshot(resource))
+      }(using (resource: Snapshot) => db.releaseSnapshot(resource))
 
     private def mkReadOptions(s: Snapshot): ReadOptions = new ReadOptions().setSnapshot(s).setVerifyChecksums(false)
     private def mkWriteOptions(): WriteOptions          = new WriteOptions().setSync(false).setDisableWAL(false)

@@ -79,12 +79,12 @@ object WavesEnvironmentBenchmark {
 
   @State(Scope.Benchmark)
   class ResolveAddressSt extends BaseSt {
-    val aliases: Vector[String] = load("resolveAddress", benchSettings.aliasesFile)(x => Alias.fromString(x).explicitGet().name)
+    val aliases: Vector[String] = load(benchSettings.aliasesFile)(x => Alias.fromString(x).explicitGet().name)
   }
 
   @State(Scope.Benchmark)
   class TransactionByIdSt extends BaseSt {
-    val allTxs: Vector[Array[Byte]] = load("transactionById", benchSettings.restTxsFile)(x => Base58.tryDecodeWithLimit(x).get)
+    val allTxs: Vector[Array[Byte]] = load(benchSettings.restTxsFile)(x => Base58.tryDecodeWithLimit(x).get)
   }
 
   @State(Scope.Benchmark)
@@ -92,17 +92,17 @@ object WavesEnvironmentBenchmark {
 
   @State(Scope.Benchmark)
   class AccountBalanceOfWavesSt extends BaseSt {
-    val accounts: Vector[Array[Byte]] = load("accounts", benchSettings.accountsFile)(x => AddressOrAlias.fromString(x).explicitGet().bytes)
+    val accounts: Vector[Array[Byte]] = load(benchSettings.accountsFile)(x => AddressOrAlias.fromString(x).explicitGet().bytes)
   }
 
   @State(Scope.Benchmark)
   class AccountBalanceOfAssetSt extends AccountBalanceOfWavesSt {
-    val assets: Vector[Array[Byte]] = load("assets", benchSettings.assetsFile)(x => Base58.tryDecodeWithLimit(x).get)
+    val assets: Vector[Array[Byte]] = load(benchSettings.assetsFile)(x => Base58.tryDecodeWithLimit(x).get)
   }
 
   @State(Scope.Benchmark)
   class DataSt extends BaseSt {
-    val data: Vector[DataTestData] = load("data", benchSettings.dataFile) { line =>
+    val data: Vector[DataTestData] = load(benchSettings.dataFile) { line =>
       DataTestData.codec.decode(BitVector.fromBase64(line).get).require.value
     }
   }
@@ -155,8 +155,8 @@ object WavesEnvironmentBenchmark {
       rdb.close()
     }
 
-    protected def load[T](label: String, absolutePath: String)(f: String => T): Vector[T] = {
-      Using.resource(scala.io.Source.fromFile(absolutePath)(Codec.UTF8))(_.getLines().map(f).toVector)
+    protected def load[T](absolutePath: String)(f: String => T): Vector[T] = {
+      Using.resource(scala.io.Source.fromFile(absolutePath)(using Codec.UTF8))(_.getLines().map(f).toVector)
     }
   }
 

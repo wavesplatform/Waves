@@ -1,6 +1,5 @@
 import sbt.*
 import sbt.Keys.*
-import xerial.sbt.Sonatype.autoImport.sonatypePublishToBundle
 
 object PublishedModule extends AutoPlugin {
   override def projectSettings: Seq[Def.Setting[?]] = inConfig(Compile)(
@@ -10,7 +9,6 @@ object PublishedModule extends AutoPlugin {
       packageDoc / mappings        := Seq(baseDirectory.value / "README.md" -> "README.md")
     )
   ) ++ Seq(
-    publishTo      := sonatypePublishToBundle.value,
     publish / skip := false,
     Test / packageDoc / publishArtifact := false,
     versionScheme := Some("pvp")

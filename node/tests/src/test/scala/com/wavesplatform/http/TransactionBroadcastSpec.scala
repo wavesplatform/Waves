@@ -61,7 +61,7 @@ class TransactionBroadcastSpec2
     () => domain.utxPool.size,
     (tx, _) => Future.successful(domain.utxPool.putIfNew(tx, forceValidate = true)),
     new TestTime,
-    new RouteTimeout(60.seconds)(sharedScheduler)
+    new RouteTimeout(60.seconds)(using sharedScheduler)
   )
   private val route = seal(transactionsApiRoute.route)
 
@@ -603,7 +603,7 @@ class TransactionBroadcastSpec
     mockFunction[Int],
     transactionPublisher,
     testTime,
-    new RouteTimeout(60.seconds)(sharedScheduler)
+    new RouteTimeout(60.seconds)(using sharedScheduler)
   )
 
   private val route = seal(transactionsApiRoute.route)

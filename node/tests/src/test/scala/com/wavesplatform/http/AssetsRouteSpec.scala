@@ -65,7 +65,7 @@ class AssetsRouteSpec
             d.accountsApi,
             d.assetsApi,
             MaxDistributionDepth,
-            new RouteTimeout(60.seconds)(sharedScheduler)
+            new RouteTimeout(60.seconds)(using sharedScheduler)
           ).route
         )
       )

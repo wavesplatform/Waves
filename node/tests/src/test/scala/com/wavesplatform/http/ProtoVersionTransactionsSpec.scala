@@ -65,7 +65,7 @@ class ProtoVersionTransactionsSpec
       () => utx.size,
       DummyTransactionPublisher.accepting,
       ntpTime,
-      new RouteTimeout(60.seconds)(sharedScheduler)
+      new RouteTimeout(60.seconds)(using sharedScheduler)
     ).route
 
   "Proto transactions should be able to broadcast " - {

@@ -181,7 +181,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain with Inside {
         val genesis  = Seq(dApp1, dApp2, dApp3).map(acc => TxHelpers.genesis(acc.toAddress))
         val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
         val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp3.toAddress))
-        val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp2.toAddress))
+        val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp2.toAddress, reentrant = reentrant))
         val invoke = TxHelpers.invoke(
           dApp2.toAddress,
           func = fc.map(_.function.funcName),

@@ -90,7 +90,7 @@ class DebugApiRouteSpec
       null,
       configObject,
       domain.rocksDBWriter,
-      new RouteTimeout(60.seconds)(sharedScheduler),
+      new RouteTimeout(60.seconds)(using sharedScheduler),
       sharedScheduler
     )
 

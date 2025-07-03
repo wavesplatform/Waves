@@ -3,7 +3,6 @@ package com.wavesplatform.generator
 import cats.Show
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto
 import com.wavesplatform.generator.utils.Gen

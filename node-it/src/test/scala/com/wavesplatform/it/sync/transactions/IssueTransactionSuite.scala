@@ -9,7 +9,6 @@ import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.TxVersion
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.{JsNull, JsString, JsValue, Json}
 
@@ -117,7 +116,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         val json = {
           val tx = IssueTransaction
             .selfSigned(
-              TxVersion.V1,
+              v,
               firstKeyPair,
               "1234",
               "",

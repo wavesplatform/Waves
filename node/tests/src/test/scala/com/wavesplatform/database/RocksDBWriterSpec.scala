@@ -92,7 +92,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
         genesisSettings = settingsWithGenesis.blockchainSettings.genesisSettings.copy(
           initialBalance = genesisBalance,
           signature = None,
-          transactions = (1 to 10).map(i => GenesisTransactionSettings(TxHelpers.address(1000 + 1).toString, 100.waves))
+          transactions = (1 to 10).map(_ => GenesisTransactionSettings(TxHelpers.address(1000 + 1).toString, 100.waves))
         )
       )
     )

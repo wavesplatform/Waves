@@ -757,7 +757,7 @@ class BlockChallengeTest
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
-        new RouteTimeout(60.seconds)(sharedScheduler)
+        new RouteTimeout(60.seconds)(using sharedScheduler)
       ).route
 
       d.liquidAndSolidAssert { () =>
@@ -1242,7 +1242,7 @@ class BlockChallengeTest
         d.settings.restAPISettings,
         d.blocksApi,
         testTime,
-        new RouteTimeout(60.seconds)(sharedScheduler)
+        new RouteTimeout(60.seconds)(using sharedScheduler)
       ).route
 
       Get("/blocks/last") ~> route ~> check {
@@ -1315,7 +1315,7 @@ class BlockChallengeTest
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
-        new RouteTimeout(60.seconds)(sharedScheduler)
+        new RouteTimeout(60.seconds)(using sharedScheduler)
       ).route
 
       d.liquidAndSolidAssert { () =>
@@ -1363,7 +1363,7 @@ class BlockChallengeTest
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
-        new RouteTimeout(60.seconds)(sharedScheduler)
+        new RouteTimeout(60.seconds)(using sharedScheduler)
       ).route
 
       val extraFields =
@@ -1450,7 +1450,7 @@ class BlockChallengeTest
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
-        new RouteTimeout(60.seconds)(sharedScheduler)
+        new RouteTimeout(60.seconds)(using sharedScheduler)
       ).route
 
       checkTxStatus(challengedBlockTx, 0, route)
@@ -1533,7 +1533,7 @@ class BlockChallengeTest
         DummyTransactionPublisher.accepting,
         testTime,
         Schedulers.timeBoundedFixedPool(new HashedWheelTimer(), 5.seconds, 1, "rest-time-limited"),
-        new RouteTimeout(60.seconds)(sharedScheduler),
+        new RouteTimeout(60.seconds)(using sharedScheduler),
         d.accountsApi,
         1000
       ).route
@@ -1647,14 +1647,14 @@ class BlockChallengeTest
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
-        new RouteTimeout(60.seconds)(sharedScheduler)
+        new RouteTimeout(60.seconds)(using sharedScheduler)
       ).route
 
       testTime.setTime(invalidBlock.header.timestamp)
       val challengeResult = appender(new EmbeddedChannel(), invalidBlock, None).runToFuture
 
       Await.ready(
-        promise.future.map(_ => checkTxsStatus(txs, TransactionsApiRoute.Status.Confirmed, route))(monix.execution.Scheduler.Implicits.global),
+        promise.future.map(_ => checkTxsStatus(txs, TransactionsApiRoute.Status.Confirmed, route))(using monix.execution.Scheduler.Implicits.global),
         1.minute
       )
 

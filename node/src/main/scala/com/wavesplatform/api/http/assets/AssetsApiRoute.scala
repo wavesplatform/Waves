@@ -66,7 +66,7 @@ case class AssetsApiRoute(
     )
   )
 
-  private val assetDistRouteTimeout = new RouteTimeout(serverRequestTimeout)(distributionTaskScheduler)
+  private val assetDistRouteTimeout = new RouteTimeout(serverRequestTimeout)(using distributionTaskScheduler)
 
   override lazy val route: Route =
     pathPrefix("assets") {
@@ -152,7 +152,7 @@ case class AssetsApiRoute(
     */
   def balances(address: Address, assets: Option[Seq[IssuedAsset]] = None): Route = {
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[AssetInfo, NotUsed]] =
-      jacksonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")(AssetsApiRoute.assetInfoSerializer)
+      jacksonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")(using AssetsApiRoute.assetInfoSerializer)
 
     routeTimeout.executeFromObservable(
       (assets match {
@@ -175,7 +175,7 @@ case class AssetsApiRoute(
           .take(limit)
           .toListL
           .map(f)
-          .runAsyncLogErr(distributionTaskScheduler)
+          .runAsyncLogErr(using distributionTaskScheduler)
       } catch {
         case _: RejectedExecutionException =>
           val errMsg = CustomValidationError("Asset distribution currently unavailable, try again later")
@@ -185,7 +185,7 @@ case class AssetsApiRoute(
 
   def balanceDistribution(assetId: IssuedAsset): Route = {
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[(Address, Long), NotUsed]] =
-      jacksonStreamMarshaller(prefix = "{", suffix = "}")(assetDistributionSerializer)
+      jacksonStreamMarshaller(prefix = "{", suffix = "}")(using assetDistributionSerializer)
 
     assetDistRouteTimeout.executeFromObservable(
       commonAssetsApi
@@ -224,7 +224,7 @@ case class AssetsApiRoute(
     if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation)
     else {
       import cats.syntax.either.*
-      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[AssetDetails, NotUsed]] = jacksonStreamMarshaller()(assetDetailsSerializer)
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[AssetDetails, NotUsed]] = jacksonStreamMarshaller()(using assetDetailsSerializer)
 
       val compBlockchain = compositeBlockchain()
       routeTimeout.executeStreamed {

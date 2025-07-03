@@ -6,7 +6,6 @@ import com.wavesplatform.account.Alias
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.api.{HasGrpc, TestBlockchainApi}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
@@ -481,7 +480,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
     )
   }
 
-  private val testBlockchainApi = new TestBlockchainApi()(monix.execution.schedulers.TestScheduler()) {
+  private val testBlockchainApi = new TestBlockchainApi()(using monix.execution.schedulers.TestScheduler()) {
     override def getCurrentBlockchainHeight(): Height = Height(1)
     override def getActivatedFeatures(height: Height): Map[Short, Height] =
       DefaultBlockchainSettings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_)).toMap

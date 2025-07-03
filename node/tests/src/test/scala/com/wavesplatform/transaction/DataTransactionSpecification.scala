@@ -150,7 +150,7 @@ class DataTransactionSpecification extends PropSpec {
   property("negative validation cases") {
     val gen = Arbitrary.arbBool.arbitrary.flatMap(proto => dataTransactionGen(DataTransaction.MaxEntryCount, withDeleteEntry = proto))
     forAll(gen) {
-      case tx @ DataTransaction(version, sender, data, fee, timestamp, proofs, _) =>
+      case DataTransaction(version, sender, data, fee, timestamp, proofs, _) =>
         val emptyKey   = List(IntegerDataEntry("", 2))
         val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee.value, timestamp, proofs)
         emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)

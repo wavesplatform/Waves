@@ -178,13 +178,13 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
     }
 
     def trackAndRun(request: RideScriptRunRequest): RideScriptRunResult = {
-      val task = requests.trackAndRun(request).runToFuture(scheduler)
+      val task = requests.trackAndRun(request).runToFuture(using scheduler)
       scheduler.tick()
       Await.result(task, 5.seconds)
     }
 
     def trackAndRunLastResult(request: RideScriptRunRequest): JsValue = {
-      val task = requests.trackAndRun(request).runToFuture(scheduler)
+      val task = requests.trackAndRun(request).runToFuture(using scheduler)
       scheduler.tick()
       Json.parse(Await.result(task, 5.seconds).lastResult)
     }

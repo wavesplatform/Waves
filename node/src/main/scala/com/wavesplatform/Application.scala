@@ -96,7 +96,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val historyRepliesScheduler = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
   private val minerScheduler          = singleThread("block-miner", reporter = log.error("Error in Miner", _))
 
-  private val utxEvents = ConcurrentSubject.publish[UtxEvent](scheduler)
+  private val utxEvents = ConcurrentSubject.publish[UtxEvent](using scheduler)
 
   private var extensions = Seq.empty[Extension]
 
@@ -189,13 +189,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val lastScore = lastBlockInfo
       .map(_.score)
       .distinctUntilChanged
-      .share(scheduler)
+      .share(using scheduler)
 
     lastScore
       .debounce(1.second)
       .foreach { x =>
         allChannels.broadcast(LocalScoreChanged(x))
-      }(scheduler)
+      }(using scheduler)
 
     val history = History(
       blockchainUpdater,
@@ -206,7 +206,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       rdb
     )
 
-    val historyReplier = new HistoryReplierL1(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
+    val historyReplier = new HistoryReplierL1(blockchainUpdater.score, history, settings.synchronizationSettings)(using historyRepliesScheduler)
 
     val transactionPublisher =
       TransactionPublisher.timeBounded(
@@ -343,7 +343,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     TransactionSynchronizer(
       settings.synchronizationSettings.utxSynchronizer,
-      lastBlockInfo.map(_.id).distinctUntilChanged(Eq.fromUniversalEquals),
+      lastBlockInfo.map(_.id).distinctUntilChanged(using Eq.fromUniversalEquals),
       messageObserver.transactions,
       transactionPublisher
     )
@@ -391,7 +391,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       )
 
       val serverRequestTimeout = FiniteDuration(settings.config.getDuration("pekko.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
-      val routeTimeout         = new RouteTimeout(serverRequestTimeout)(heavyRequestScheduler)
+      val routeTimeout         = new RouteTimeout(serverRequestTimeout)(using heavyRequestScheduler)
 
       val apiRoutes = Seq(
         new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi, time),

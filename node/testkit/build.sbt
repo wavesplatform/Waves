@@ -1,4 +1,3 @@
-publishTo      := sonatypePublishToBundle.value
 publish / skip := false
 homepage       := Some(url("https://waves.tech/"))
 developers := List(

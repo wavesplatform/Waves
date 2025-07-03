@@ -40,7 +40,7 @@ class BlocksApiRouteSpec
     with SharedSchedulerMixin {
   private val blocksApi = mock[CommonBlocksApi]
   private val blocksApiRoute: BlocksApiRoute =
-    BlocksApiRoute(restAPISettings, blocksApi, SystemTime, new RouteTimeout(60.seconds)(sharedScheduler))
+    BlocksApiRoute(restAPISettings, blocksApi, SystemTime, new RouteTimeout(60.seconds)(using sharedScheduler))
   private val route = blocksApiRoute.route
 
   private val testBlock1 = TestBlock.create(Nil).block
@@ -367,7 +367,7 @@ class BlocksApiRouteSpec
         d.settings.restAPISettings,
         d.blocksApi,
         SystemTime,
-        new RouteTimeout(60.seconds)(sharedScheduler)
+        new RouteTimeout(60.seconds)(using sharedScheduler)
       ).route
 
       Get("/blocks/last") ~> route ~> check {
@@ -414,7 +414,7 @@ class BlocksApiRouteSpec
       )
 
     withDomain(settingsWithFeatures) { d =>
-      val route = new BlocksApiRoute(d.settings.restAPISettings, d.blocksApi, SystemTime, new RouteTimeout(60.seconds)(sharedScheduler)).route
+      val route = new BlocksApiRoute(d.settings.restAPISettings, d.blocksApi, SystemTime, new RouteTimeout(60.seconds)(using sharedScheduler)).route
 
       val miner = d.appendBlock().sender.toAddress
 
@@ -528,7 +528,7 @@ class BlocksApiRouteSpec
       )
 
     withDomain(settings, Seq(AddrWithBalance(miner.toAddress, 100_000.waves))) { d =>
-      val route = new BlocksApiRoute(d.settings.restAPISettings, d.blocksApi, SystemTime, new RouteTimeout(60.seconds)(sharedScheduler)).route
+      val route = new BlocksApiRoute(d.settings.restAPISettings, d.blocksApi, SystemTime, new RouteTimeout(60.seconds)(using sharedScheduler)).route
 
       def checkRewardAndShares(height: Int, expectedReward: Long, expectedMinerShare: Long, expectedDaoShare: Long, expectedXtnShare: Option[Long])(
           implicit pos: Position

@@ -226,7 +226,7 @@ object Transaction {
         amount      <- (jsv \ "amount").validateOpt[Long]
         description <- (jsv \ "description").validateOpt[String]
         attachment <- version match {
-          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(_) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _                                    => JsSuccess(None)
         }
         price                <- (jsv \ "price").validateOpt[Long]
@@ -561,7 +561,7 @@ object TransferTransactionInfo {
       for {
         _type     <- (jsv \ "type").validate[Int]
         id        <- (jsv \ "id").validate[String]
-        chainId   <- (jsv \ "chainId").validateOpt[Byte]
+        _         <- (jsv \ "chainId").validateOpt[Byte]
         fee       <- (jsv \ "fee").validate[Long]
         timestamp <- (jsv \ "timestamp").validate[Long]
         sender    <- (jsv \ "sender").validateOpt[String]
@@ -571,7 +571,7 @@ object TransferTransactionInfo {
         version   <- (jsv \ "version").validateOpt[Byte]
         chainId   <- (jsv \ "chainId").validateOpt[Byte]
         attachment <- version match {
-          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(_) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _                                    => JsSuccess(None)
         }
         proofs <- (jsv \ "proofs").validateOpt[Seq[String]]
@@ -624,7 +624,7 @@ object MassTransferTransactionInfo {
         version   <- (jsv \ "version").validateOpt[Byte]
         chainId   <- (jsv \ "chainId").validateOpt[Byte]
         attachment <- version match {
-          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(_) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _                                    => JsSuccess(None)
         }
         transfers   <- (jsv \ "transfers").validateOpt[Seq[Transfer]]

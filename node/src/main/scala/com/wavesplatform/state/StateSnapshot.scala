@@ -145,7 +145,7 @@ object StateSnapshot {
   def ofLeaseBalances(balances: Map[Address, LeaseBalance], blockchain: Blockchain): Either[String, StateSnapshot] =
     balances.toSeq
       .traverse { case (address, leaseBalance) =>
-        leaseBalance.combineF[Either[String, *]](blockchain.leaseBalance(address)).map(address -> _)
+        leaseBalance.combineF[[X] =>> Either[String, X]](blockchain.leaseBalance(address)).map(address -> _)
       }
       .map(newBalances => StateSnapshot(leaseBalances = newBalances.toMap))
 

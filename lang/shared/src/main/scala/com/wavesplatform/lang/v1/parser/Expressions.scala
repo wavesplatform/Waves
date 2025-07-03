@@ -66,12 +66,12 @@ object Expressions {
 
     def toEither[T](part: PART[T]): Either[String, T] = part match {
       case Expressions.PART.VALID(_, x)         => Right(x)
-      case Expressions.PART.INVALID(p, message) => Left(message)
+      case Expressions.PART.INVALID(_, message) => Left(message)
     }
 
     def toOption[T](part: PART[T]): Option[T] = part match {
       case Expressions.PART.VALID(_, x)         => Some(x)
-      case Expressions.PART.INVALID(p, message) => None
+      case Expressions.PART.INVALID(_, message) => None
     }
   }
 

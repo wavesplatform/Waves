@@ -135,8 +135,8 @@ object OrderJson {
   val assetReads: Reads[Asset] = Asset.assetReads(true)
 
   implicit val assetPairReads: Reads[AssetPair] = {
-    val r = (JsPath \ "amountAsset").readWithDefault[Asset](Waves)(assetReads) and
-      (JsPath \ "priceAsset").readWithDefault[Asset](Waves)(assetReads)
+    val r = (JsPath \ "amountAsset").readWithDefault[Asset](Waves)(using assetReads) and
+      (JsPath \ "priceAsset").readWithDefault[Asset](Waves)(using assetReads)
     r(AssetPair(_, _))
   }
 
@@ -151,8 +151,8 @@ object OrderJson {
     }
 
   private val orderV1V2Reads: Reads[Order] = {
-    val r = (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
-      (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
+    val r = (JsPath \ "senderPublicKey").read[PublicKey](using accountPublicKeyReads) and
+      (JsPath \ "matcherPublicKey").read[PublicKey](using accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
       (JsPath \ "orderType").read[OrderType] and
       (JsPath \ "amount").read[Long].map(TxExchangeAmount.from).flatMapResult {
@@ -176,8 +176,8 @@ object OrderJson {
   }
 
   private val orderV3V4Reads: Reads[Order] = {
-    val r = (JsPath \ "senderPublicKey").readNullable[PublicKey](accountPublicKeyReads) and
-      (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
+    val r = (JsPath \ "senderPublicKey").readNullable[PublicKey](using accountPublicKeyReads) and
+      (JsPath \ "matcherPublicKey").read[PublicKey](using accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
       (JsPath \ "orderType").read[OrderType] and
       (JsPath \ "amount").read[Long].map(TxExchangeAmount.from).flatMapResult {

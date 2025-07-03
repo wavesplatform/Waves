@@ -52,22 +52,22 @@ object RocksDBWriterBenchmark {
 
   @State(Scope.Benchmark)
   class TransactionByIdSt extends BaseSt {
-    val allTxs: Vector[ByteStr] = load("transactionById", benchSettings.restTxsFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
+    val allTxs: Vector[ByteStr] = load(benchSettings.restTxsFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
   }
 
   @State(Scope.Benchmark)
   class TransactionByAddressSt extends BaseSt {
-    val txsAddresses: Vector[Address] = load("transactionByAddress", ???)(x => Address.fromString(x).explicitGet())
+    val txsAddresses: Vector[Address] = load(???)(x => Address.fromString(x).explicitGet())
   }
 
   @State(Scope.Benchmark)
   class BlocksByIdSt extends BaseSt {
-    val allBlocks: Vector[ByteStr] = load("blocksById", benchSettings.blocksFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
+    val allBlocks: Vector[ByteStr] = load(benchSettings.blocksFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
   }
 
   @State(Scope.Benchmark)
   class BlocksByHeightSt extends BaseSt {
-    val allBlocks: Vector[Int] = load("blocksByHeight", benchSettings.blocksFile)(_.toInt)
+    val allBlocks: Vector[Int] = load(benchSettings.blocksFile)(_.toInt)
   }
 
   @State(Scope.Benchmark)
@@ -107,8 +107,8 @@ object RocksDBWriterBenchmark {
       rawDB.close()
     }
 
-    protected def load[T](label: String, absolutePath: String)(f: String => T): Vector[T] = {
-      Using.resource(scala.io.Source.fromFile(absolutePath)(Codec.UTF8))(_.getLines().map(f).toVector)
+    protected def load[T](absolutePath: String)(f: String => T): Vector[T] = {
+      Using.resource(scala.io.Source.fromFile(absolutePath)(using Codec.UTF8))(_.getLines().map(f).toVector)
     }
   }
 

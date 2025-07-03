@@ -221,7 +221,7 @@ object Terms {
   case class FUNCTION_CALL(function: FunctionHeader, var args: List[EXPR]) extends EXPR {
     def toStr: Coeval[String] =
       for {
-        e <- args.map(_.toStr).sequence
+        e <- args.map(_.toStr).sequence[Coeval, String]
       } yield "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
 
     override def deepCopy: Eval[EXPR] =

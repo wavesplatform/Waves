@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, LIST, NOTHING, TYPE, UNION}
@@ -282,7 +281,7 @@ object JsApiUtils {
     r(ast)
   }
 
-  def toJs(c: DApp): js.Object = {
+  def toJs(): js.Object = {
     toJs(TRUE) // later
   }
 

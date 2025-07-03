@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.evaluator.string
 
-import com.wavesplatform.lang.directives.values.{V3, V4, V5, V6}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5, V6}
 import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
@@ -10,9 +10,10 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.test.produce
 
 class SplitFunctionTest extends EvaluatorSpec {
+  private implicit val version: StdLibVersion = V6
   private def assertSuccess(script: String => String): Unit =
     for ((f, v) <- Seq((PureContext.splitStrFixed, V3), (PureContext.splitStrV6, V6), (PureContext.splitStr4C, V6), (PureContext.splitStr51C, V6))) {
-      eval(script(f.name))(v) shouldBe Right(CONST_BOOLEAN(true))
+      eval(script(f.name))(using v) shouldBe Right(CONST_BOOLEAN(true))
     }
 
   property("split string containing separators") {
@@ -164,65 +165,65 @@ class SplitFunctionTest extends EvaluatorSpec {
   property("split function input limit") {
     Seq(V3, V4, V5).foreach { version =>
       val script = s""" ${PureContext.splitStrFixed.name}("${s"""${"a" * 1000}, """ * 32}${"a" * 704}", ",") """
-      eval(script)(version, checkNext = false) should produce("String size=32768 exceeds 32767 bytes")
+      eval(script)(using version, checkNext = false) should produce("String size=32768 exceeds 32767 bytes")
 
       val script2 = s""" ${PureContext.splitStrFixed.name}("${s"""${"a" * 1000}, """ * 32}${"a" * 703}", ",") """
-      eval(script2)(version, checkNext = false) shouldBe a[Right[?, ?]]
+      eval(script2)(using version, checkNext = false) shouldBe a[Right[?, ?]]
     }
 
     val script = s""" ${PureContext.splitStrV6.name}("${s"""${"a" * 25}, """ * 10}${"a" * 231}", ",") """
-    eval(script)(V6) should produce(s"Input string size = 501 bytes exceeds limit = 500 for ${PureContext.splitStrV6.name}")
+    eval(script) should produce(s"Input string size = 501 bytes exceeds limit = 500 for ${PureContext.splitStrV6.name}")
 
     val script2 = s""" ${PureContext.splitStrV6.name}("${s"""${"a" * 25}, """ * 10}${"a" * 230}", ",") """
-    eval(script2)(V6) shouldBe a[Right[?, ?]]
+    eval(script2) shouldBe a[Right[?, ?]]
   }
 
   property("split function output limit") {
     Seq(V3, V4, V5).foreach { version =>
       val script = s""" ${PureContext.splitStrFixed.name}("${"a," * MaxListLengthV4}a", ",") """
-      eval(script)(version, checkNext = false) should produce(s"Output list size = ${MaxListLengthV4 + 1} exceeds limit = $MaxListLengthV4 for split")
+      eval(script)(using version, checkNext = false) should produce(s"Output list size = ${MaxListLengthV4 + 1} exceeds limit = $MaxListLengthV4 for split")
 
       val script2 = s""" ${PureContext.splitStrFixed.name}("${"a," * (MaxListLengthV4 - 1)}a", ",") """
-      eval(script2)(version, checkNext = false) shouldBe a[Right[?, ?]]
+      eval(script2)(using version, checkNext = false) shouldBe a[Right[?, ?]]
     }
 
     val script = s""" ${PureContext.splitStrV6.name}("${"a," * 20}a", ",") """
-    eval(script)(V6) should produce(s"Output list size = 21 exceeds limit = 20 for ${PureContext.splitStrV6.name}")
+    eval(script) should produce(s"Output list size = 21 exceeds limit = 20 for ${PureContext.splitStrV6.name}")
 
     val script2 = s""" ${PureContext.splitStrV6.name}("${"a," * 19}a", ",") """
-    eval(script2)(V6) shouldBe a[Right[?, ?]]
+    eval(script2) shouldBe a[Right[?, ?]]
   }
 
   property("function family input limits") {
     val script = s""" ${PureContext.splitStr4C.name}("${s"""${"a" * 250}, """ * 20}${"a" * 961}", ",") """
-    eval(script)(V6) should produce(s"Input string size = 6001 bytes exceeds limit = 6000 for ${PureContext.splitStrV6.name}")
+    eval(script) should produce(s"Input string size = 6001 bytes exceeds limit = 6000 for ${PureContext.splitStrV6.name}")
 
     val script2 = s""" ${PureContext.splitStr4C.name}("${s"""${"a" * 250}, """ * 20}${"a" * 960}", ",") """
-    eval(script2)(V6) shouldBe a[Right[?, ?]]
+    eval(script2) shouldBe a[Right[?, ?]]
 
     val script3 = s""" ${PureContext.splitStr51C.name}("${s"""${"a" * 1000}, """ * 32}${"a" * 704}", ",") """
-    eval(script3)(V6) should produce(s"String size=32768 exceeds 32767 bytes")
+    eval(script3) should produce(s"String size=32768 exceeds 32767 bytes")
 
     val script4 = s""" ${PureContext.splitStr51C.name}("${s"""${"a" * 1000}, """ * 32}${"a" * 703}", ",") """
-    eval(script4)(V6) shouldBe a[Right[?, ?]]
+    eval(script4) shouldBe a[Right[?, ?]]
   }
 
   property("function family output limits") {
     val elem = "a"
     def str(f: BaseFunction[NoContext], n: Int) = s""" ${f.name}("${s"$elem," * (n - 1)}$elem", ",") """
     for ((f, limit) <- List((PureContext.splitStr4C, 100), (PureContext.splitStr51C, MaxListLengthV4))) {
-      eval(str(f, limit + 1))(V6) shouldBe Left(s"Output list size = ${limit + 1} exceeds limit = $limit for ${f.name}")
-      eval(str(f, limit))(V6) shouldBe a[Right[?, ?]]
+      eval(str(f, limit + 1)) shouldBe Left(s"Output list size = ${limit + 1} exceeds limit = $limit for ${f.name}")
+      eval(str(f, limit)) shouldBe a[Right[?, ?]]
     }
   }
 
   property("OOP style function family call") {
-    eval(""" "a.a.a.".split_4C(".") """)(V6).map(_.toString) shouldBe Right("""["a", "a", "a", ""]""")
+    eval(""" "a.a.a.".split_4C(".") """).map(_.toString) shouldBe Right("""["a", "a", "a", ""]""")
     eval(
       """
         | let str = "a.a.a."
         | str.split_4C(".")
       """.stripMargin
-    )(V6).map(_.toString) shouldBe Right("""["a", "a", "a", ""]""")
+    ).map(_.toString) shouldBe Right("""["a", "a", "a", ""]""")
   }
 }

@@ -72,7 +72,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
   }
 
   protected def estimate(script: String): Either[String, Long] = {
-    val expr = compile(script)(V6)
+    val expr = compile(script)(using V6)
     val results = estimators.map(_(lets, functionCosts(V6), expr))
     if (results.distinct.length == 1)
       results.head

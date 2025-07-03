@@ -659,7 +659,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
           }
           Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(t), allowShadowing), mc.expr).asRight[CompilationError]
         case p: CompositePattern =>
-          val newRef = p.caseType.fold(refTmp)(t => refTmp.copy(resultType = Some(caseType)))
+          val newRef = p.caseType.fold(refTmp)(_ => refTmp.copy(resultType = Some(caseType)))
           val exprE = p.subpatterns.foldRight(mc.expr.asRight[CompilationError]) { (pa, nextExprE) =>
             (nextExprE, pa) match {
               case (Right(nextExpr), (TypedVar(Some(nv), t), path)) =>
@@ -967,7 +967,7 @@ object ExpressionCompiler {
       version: StdLibVersion,
       saveExprContext: Boolean = true
   ): Either[(String, Int, Int), (EXPR, Expressions.SCRIPT, Iterable[CompilationError])] =
-    new Parser(version)(offset)
+    new Parser(version)(using offset)
       .parseExpressionWithErrorRecovery(input)
       .flatMap { case (parseResult, removedCharPosOpt) =>
         new ExpressionCompiler(version)
@@ -1001,7 +1001,7 @@ object ExpressionCompiler {
       version: StdLibVersion,
       allowIllFormedStrings: Boolean = false
   ): Either[String, (EXPR, FINAL)] = {
-    val parser = new Parser(version)(offset)
+    val parser = new Parser(version)(using offset)
     parser.parseExpr(input) match {
       case fastparse.Parsed.Success(expr, _) => apply(ctx, version, expr, allowIllFormedStrings)
       case f: fastparse.Parsed.Failure       => Left(parser.toString(input, f))

@@ -2,7 +2,6 @@ package com.wavesplatform.generator.utils
 
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.Curve25519.KeyLength
 import com.wavesplatform.generator.utils.Implicits.*

@@ -39,6 +39,6 @@ class GRPCServerExtension(context: ExtensionContext) extends Extension with Scor
   override def shutdown(): Future[Unit] = {
     log.debug("Shutting down gRPC server")
     server.shutdown()
-    Future(server.awaitTermination())(apiScheduler)
+    Future(server.awaitTermination())(using apiScheduler)
   }
 }

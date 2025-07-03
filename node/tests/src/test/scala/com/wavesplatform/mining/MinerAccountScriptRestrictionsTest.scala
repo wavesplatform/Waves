@@ -74,11 +74,11 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
             d.appendAndCatchError(TxHelpers.transfer(minerAcc, invoker.toAddress)).toString should include("TransactionNotAllowedByScript")
           }
           miner.getNextBlockGenerationOffset(minerAcc) should produce(errMsgBeforeRideV6)
-          forgeAndAppendBlock(d, miner, appender)(scheduler) should produce(errMsgBeforeRideV6)
+          forgeAndAppendBlock(d, miner, appender)(using scheduler) should produce(errMsgBeforeRideV6)
 
           d.appendBlock()
           miner.getNextBlockGenerationOffset(minerAcc) should beRight
-          forgeAndAppendBlock(d, miner, appender)(scheduler) should beRight
+          forgeAndAppendBlock(d, miner, appender)(using scheduler) should beRight
         }
       }
     }

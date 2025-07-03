@@ -171,7 +171,7 @@ object JsAPI {
 
             val resultFields: Seq[(String, Any)] = Seq(
               "result"               -> Global.toBuffer(di.bytes),
-              "ast"                  -> toJs(di.dApp),
+              "ast"                  -> toJs(),
               "meta"                 -> mappedMeta,
               "complexity"           -> di.maxComplexity._2.toDouble,
               "verifierComplexity"   -> di.verifierComplexity.toDouble,

@@ -19,13 +19,13 @@ class StringFunctionsTest extends EvaluatorSpec {
     eval(s""" take("abc", $limit) """) shouldBe CONST_STRING("abc")
 
     evalVerRange(s""" take("abc", $max) """, V1, V5) shouldBe CONST_STRING("abc")
-    eval(s""" take("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to take() exceeds String limit = $limit")
-    eval(s""" take("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to take() exceeds String limit = $limit")
+    eval(s""" take("abc", $max) """)(using V6) shouldBe Left(s"Number = $max passed to take() exceeds String limit = $limit")
+    eval(s""" take("abc", ${limit + 1}) """)(using V6) shouldBe Left(s"Number = ${limit + 1} passed to take() exceeds String limit = $limit")
 
     evalVerRange(""" take("abc", -1) """, V1, V5) shouldBe CONST_STRING("")
-    eval(""" take("abc", -1) """)(V6) shouldBe Left("Unexpected negative number = -1 passed to take()")
+    eval(""" take("abc", -1) """)(using V6) shouldBe Left("Unexpected negative number = -1 passed to take()")
     evalVerRange(s""" take("abc", $min) """, V1, V5) shouldBe CONST_STRING("")
-    eval(s""" take("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to take()")
+    eval(s""" take("abc", $min) """)(using V6) shouldBe Left(s"Unexpected negative number = $min passed to take()")
 
     eval(s"""take("$maxString", $limit) """) shouldBe CONST_STRING(maxString)
   }
@@ -36,13 +36,13 @@ class StringFunctionsTest extends EvaluatorSpec {
     eval(s""" takeRight("abc", $limit) """) shouldBe CONST_STRING("abc")
 
     evalVerRange(s""" takeRight("abc", $max) """, V1, V5) shouldBe CONST_STRING("abc")
-    eval(s""" takeRight("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to takeRight() exceeds String limit = $limit")
-    eval(s""" takeRight("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to takeRight() exceeds String limit = $limit")
+    eval(s""" takeRight("abc", $max) """)(using V6) shouldBe Left(s"Number = $max passed to takeRight() exceeds String limit = $limit")
+    eval(s""" takeRight("abc", ${limit + 1}) """)(using V6) shouldBe Left(s"Number = ${limit + 1} passed to takeRight() exceeds String limit = $limit")
 
     evalVerRange(""" takeRight("abc", -1) """, V1, V5) shouldBe CONST_STRING("")
-    eval(""" takeRight("abc", -1) """)(V6) shouldBe Left("Unexpected negative number = -1 passed to takeRight()")
+    eval(""" takeRight("abc", -1) """)(using V6) shouldBe Left("Unexpected negative number = -1 passed to takeRight()")
     evalVerRange(s""" takeRight("abc", $min) """, V1, V5) should produce("long overflow")
-    eval(s""" takeRight("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to takeRight()")
+    eval(s""" takeRight("abc", $min) """)(using V6) shouldBe Left(s"Unexpected negative number = $min passed to takeRight()")
 
     eval(s"""takeRight("$maxString", $limit) """) shouldBe CONST_STRING(maxString)
   }
@@ -53,13 +53,13 @@ class StringFunctionsTest extends EvaluatorSpec {
     eval(s""" drop("abc", $limit) """) shouldBe CONST_STRING("")
 
     evalVerRange(s""" drop("abc", $max) """, V1, V5) shouldBe CONST_STRING("")
-    eval(s""" drop("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to drop() exceeds String limit = $limit")
-    eval(s""" drop("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to drop() exceeds String limit = $limit")
+    eval(s""" drop("abc", $max) """)(using V6) shouldBe Left(s"Number = $max passed to drop() exceeds String limit = $limit")
+    eval(s""" drop("abc", ${limit + 1}) """)(using V6) shouldBe Left(s"Number = ${limit + 1} passed to drop() exceeds String limit = $limit")
 
     evalVerRange(""" drop("abc", -1) """, V1, V5) shouldBe CONST_STRING("abc")
-    eval(""" drop("abc", -1) """)(V6) shouldBe Left("Unexpected negative number = -1 passed to drop()")
+    eval(""" drop("abc", -1) """)(using V6) shouldBe Left("Unexpected negative number = -1 passed to drop()")
     evalVerRange(s""" drop("abc", $min) """, V1, V5) shouldBe CONST_STRING("abc")
-    eval(s""" drop("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to drop()")
+    eval(s""" drop("abc", $min) """)(using V6) shouldBe Left(s"Unexpected negative number = $min passed to drop()")
 
     eval(s"""drop("$maxString", $limit) """) shouldBe CONST_STRING("")
   }
@@ -70,13 +70,13 @@ class StringFunctionsTest extends EvaluatorSpec {
     eval(s""" dropRight("abc", $limit) """) shouldBe CONST_STRING("")
 
     evalVerRange(s""" dropRight("abc", $max) """, V1, V5) shouldBe CONST_STRING("")
-    eval(s""" dropRight("abc", $max) """)(V6) shouldBe Left(s"Number = $max passed to dropRight() exceeds String limit = $limit")
-    eval(s""" dropRight("abc", ${limit + 1}) """)(V6) shouldBe Left(s"Number = ${limit + 1} passed to dropRight() exceeds String limit = $limit")
+    eval(s""" dropRight("abc", $max) """)(using V6) shouldBe Left(s"Number = $max passed to dropRight() exceeds String limit = $limit")
+    eval(s""" dropRight("abc", ${limit + 1}) """)(using V6) shouldBe Left(s"Number = ${limit + 1} passed to dropRight() exceeds String limit = $limit")
 
     evalVerRange(""" dropRight("abc", -1) """, V1, V5) shouldBe CONST_STRING("abc")
-    eval(""" dropRight("abc", -1) """)(V6) shouldBe Left("Unexpected negative number = -1 passed to dropRight()")
+    eval(""" dropRight("abc", -1) """)(using V6) shouldBe Left("Unexpected negative number = -1 passed to dropRight()")
     evalVerRange(s""" dropRight("abc", $min) """, V1, V5) should produce("long overflow")
-    eval(s""" dropRight("abc", $min) """)(V6) shouldBe Left(s"Unexpected negative number = $min passed to dropRight()")
+    eval(s""" dropRight("abc", $min) """)(using V6) shouldBe Left(s"Unexpected negative number = $min passed to dropRight()")
 
     eval(s"""dropRight("$maxString", $limit) """) shouldBe CONST_STRING("")
   }
@@ -88,106 +88,106 @@ class StringFunctionsTest extends EvaluatorSpec {
   }
 
   property("indexOf") {
-    eval(""" "qweqwe".indexOf("we") """)(V3) shouldBe Right(CONST_LONG(1L))
+    eval(""" "qweqwe".indexOf("we") """)(using V3) shouldBe Right(CONST_LONG(1L))
   }
 
   property("indexOf with zero offset") {
-    eval(""" "qweqwe".indexOf("qw", 0) """)(V3) shouldBe Right(CONST_LONG(0L))
+    eval(""" "qweqwe".indexOf("qw", 0) """)(using V3) shouldBe Right(CONST_LONG(0L))
   }
 
   property("indexOf with start offset") {
-    eval(""" "qweqwe".indexOf("we", 2) """)(V3) shouldBe Right(CONST_LONG(4L))
+    eval(""" "qweqwe".indexOf("we", 2) """)(using V3) shouldBe Right(CONST_LONG(4L))
   }
 
   property("indexOf from end of max sized string") {
     val n = 32766
-    eval(s""" "${"a" * n}z".indexOf("z", $n) """)(V3) shouldBe Right(CONST_LONG(n))
+    eval(s""" "${"a" * n}z".indexOf("z", $n) """)(using V3) shouldBe Right(CONST_LONG(n))
   }
 
   property("indexOf (not present)") {
-    eval(""" "qweqwe".indexOf("ww") """)(V3) shouldBe Right(unit)
+    eval(""" "qweqwe".indexOf("ww") """)(using V3) shouldBe Right(unit)
   }
 
   property("indexOf from empty string") {
-    eval(""" "".indexOf("!") """)(V3) shouldBe Right(unit)
+    eval(""" "".indexOf("!") """)(using V3) shouldBe Right(unit)
   }
 
   property("indexOf from empty string with offset") {
-    eval(""" "".indexOf("!", 1) """)(V3) shouldBe Right(unit)
+    eval(""" "".indexOf("!", 1) """)(using V3) shouldBe Right(unit)
   }
 
   property("indexOf from string with Long.MaxValue offset") {
-    eval(s""" "abc".indexOf("c", ${Long.MaxValue}) """)(V3) shouldBe Right(unit)
+    eval(s""" "abc".indexOf("c", ${Long.MaxValue}) """)(using V3) shouldBe Right(unit)
   }
 
   property("indexOf from string with negative offset") {
-    eval(""" "abc".indexOf("a", -1) """)(V3) shouldBe Right(unit)
+    eval(""" "abc".indexOf("a", -1) """)(using V3) shouldBe Right(unit)
   }
 
   property("indexOf from string with negative Long.MinValue offset") {
-    eval(s""" "abc".indexOf("a", ${Long.MinValue}) """)(V3) shouldBe Right(unit)
+    eval(s""" "abc".indexOf("a", ${Long.MinValue}) """)(using V3) shouldBe Right(unit)
   }
 
   property("indexOf empty string from non-empty string") {
-    eval(""" "abc".indexOf("") """)(V3) shouldBe Right(CONST_LONG(0))
+    eval(""" "abc".indexOf("") """)(using V3) shouldBe Right(CONST_LONG(0))
   }
 
   property("indexOf empty string from empty string") {
-    eval(""" "".indexOf("") """)(V3) shouldBe Right(CONST_LONG(0))
+    eval(""" "".indexOf("") """)(using V3) shouldBe Right(CONST_LONG(0))
   }
 
   property("lastIndexOf") {
-    eval(""" "qweqwe".lastIndexOf("we") """)(V3) shouldBe Right(CONST_LONG(4))
+    eval(""" "qweqwe".lastIndexOf("we") """)(using V3) shouldBe Right(CONST_LONG(4))
   }
 
   property("lastIndexOf with zero offset") {
-    eval(""" "qweqwe".lastIndexOf("qw", 0) """)(V3) shouldBe Right(CONST_LONG(0))
+    eval(""" "qweqwe".lastIndexOf("qw", 0) """)(using V3) shouldBe Right(CONST_LONG(0))
   }
 
   property("lastIndexOf with start offset") {
-    eval(""" "qweqwe".lastIndexOf("we", 4) """)(V3) shouldBe Right(CONST_LONG(4L))
+    eval(""" "qweqwe".lastIndexOf("we", 4) """)(using V3) shouldBe Right(CONST_LONG(4L))
   }
 
   property("lastIndexOf from end of max sized string") {
     val n = 32766
-    eval(s""" "${"a" * n}z".lastIndexOf("z", $n) """)(V3) shouldBe Right(CONST_LONG(n))
+    eval(s""" "${"a" * n}z".lastIndexOf("z", $n) """)(using V3) shouldBe Right(CONST_LONG(n))
   }
 
   property("lastIndexOf (not present)") {
-    eval(""" "qweqwe".lastIndexOf("ww") """)(V3) shouldBe Right(unit)
+    eval(""" "qweqwe".lastIndexOf("ww") """)(using V3) shouldBe Right(unit)
   }
 
   property("lastIndexOf from empty string") {
-    eval(""" "".lastIndexOf("!") """)(V3) shouldBe Right(unit)
+    eval(""" "".lastIndexOf("!") """)(using V3) shouldBe Right(unit)
   }
 
   property("lastIndexOf from empty string with offset") {
-    eval(""" "".lastIndexOf("!", 1) """)(V3) shouldBe Right(unit)
+    eval(""" "".lastIndexOf("!", 1) """)(using V3) shouldBe Right(unit)
   }
 
   property("lastIndexOf from string with Int.MaxValue offset") {
-    eval(s""" "abc".lastIndexOf("c", $max) """)(V3) shouldBe Right(CONST_LONG(2))
+    eval(s""" "abc".lastIndexOf("c", $max) """)(using V3) shouldBe Right(CONST_LONG(2))
   }
 
   property("lastIndexOf from string with Long.MaxValue offset") {
-    eval(s""" "abc".lastIndexOf("c", ${Long.MaxValue}) """)(V3) shouldBe Right(CONST_LONG(2))
+    eval(s""" "abc".lastIndexOf("c", ${Long.MaxValue}) """)(using V3) shouldBe Right(CONST_LONG(2))
   }
 
   property("lastIndexOf from string with negative offset") {
-    eval(""" "abc".lastIndexOf("a", -1) """)(V3) shouldBe Right(unit)
+    eval(""" "abc".lastIndexOf("a", -1) """)(using V3) shouldBe Right(unit)
   }
 
   property("lastIndexOf from string with negative Long.MinValue offset") {
-    eval(s""" "abc".lastIndexOf("a", ${Long.MinValue}) """)(V3) shouldBe Right(unit)
+    eval(s""" "abc".lastIndexOf("a", ${Long.MinValue}) """)(using V3) shouldBe Right(unit)
   }
 
   property("lastIndexOf empty string from non-empty string") {
     val str = "abcde"
-    eval(s""" "$str".lastIndexOf("") """)(V3) shouldBe Right(CONST_LONG(str.length))
+    eval(s""" "$str".lastIndexOf("") """)(using V3) shouldBe Right(CONST_LONG(str.length))
   }
 
   property("lastIndexOf empty string from empty string") {
-    eval(""" "".lastIndexOf("") """)(V3) shouldBe Right(CONST_LONG(0))
+    eval(""" "".lastIndexOf("") """)(using V3) shouldBe Right(CONST_LONG(0))
   }
 
   property("string contains") {

@@ -255,7 +255,8 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { matchers: Matchers =
                 .map(_._1)
             }
           ),
-          fee = fee
+          fee = fee,
+          waitForTx = waitForTx
         )
     }
   }

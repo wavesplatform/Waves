@@ -6,8 +6,8 @@ import com.wavesplatform.lang.{CoevalF, EvalF}
 import monix.eval.Coeval
 
 object Implicits {
-  implicit def stackUnsafeMonad[F[_]: Monad]: Monad[EvalF[F, *]] =
-    new StackSafeMonad[EvalF[F, *]] {
+  implicit def stackUnsafeMonad[F[_]: Monad]: Monad[EvalF[F]] =
+    new StackSafeMonad[EvalF[F]] {
       override def flatMap[A, B](fa: Eval[F[A]])(f: A => Eval[F[B]]): Eval[F[B]] =
         fa.map(_.flatMap(f(_).value))
 
@@ -15,8 +15,8 @@ object Implicits {
         x.pure[F].pure[Eval]
     }
 
-  implicit def stackUnsafeMonadCoeval[F[_]: Monad]: Monad[CoevalF[F, *]] =
-    new StackSafeMonad[CoevalF[F, *]] {
+  implicit def stackUnsafeMonadCoeval[F[_]: Monad]: Monad[CoevalF[F]] =
+    new StackSafeMonad[CoevalF[F]] {
       override def flatMap[A, B](fa: Coeval[F[A]])(f: A => Coeval[F[B]]): Coeval[F[B]] =
         fa.map(_.flatMap(f(_).value()))
 
