@@ -148,7 +148,7 @@ class BlockChallengerImpl(
     for {
       id <- blockchainUpdater.blockId(height).toSeq
       finalizedId = id // TODO:
-      active = blockchainUpdater.activeGenerators(Height(height + 1))
+      active      = blockchainUpdater.activeGenerators(Height(height + 1))
       account <- wallet.privateKeyAccounts
       if active.contains(account.publicKey)
     } yield BlockEndorsement.full(account, finalizedId, id, height)

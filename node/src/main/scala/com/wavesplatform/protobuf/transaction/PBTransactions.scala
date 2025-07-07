@@ -25,6 +25,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{
+  CommitToGenerationTransaction,
   EthereumTransaction,
   Proofs,
   TxDecimals,
@@ -683,6 +684,10 @@ object PBTransactions {
       case tx @ InvokeExpressionTransaction(version, sender, _, fee, feeAssetId, timestamp, proofs, chainId) =>
         val data = Data.InvokeExpression(InvokeExpressionTransactionData(tx.expressionBytes.toByteString))
         PBTransactions.create(sender, chainId, fee.value, feeAssetId, timestamp, version, proofs, data)
+
+      case tx @ CommitToGenerationTransaction(sender, fee, timestamp, generationPeriodStart, endorsementPublicKey, proofs, chainId) =>
+        val data = Data.CommitToGeneration(CommitToGenerationTransactionData(generationPeriodStart, endorsementPublicKey.toByteStr.toByteString))
+        PBTransactions.create(sender, chainId, fee.value, Waves, timestamp, tx.version, proofs.proofs, data)
 
       case et: EthereumTransaction =>
         PBSignedTransaction(PBSignedTransaction.Transaction.EthereumTransaction(ByteString.copyFrom(et.bytes())))

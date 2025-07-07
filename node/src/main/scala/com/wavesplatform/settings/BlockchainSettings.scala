@@ -80,7 +80,8 @@ case class FunctionalitySettings(
     blockRewardBoostPeriod: Int = 1000,
     paymentsCheckHeight: Int = 0,
     unitsRegistryAddress: Option[String] = None,
-    maxActiveGenerators: Int = 128 // BLS has much worse performance from 129
+    maxActiveGenerators: Int = 5,
+    commitmentPeriod: Int = 1000
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -143,7 +144,9 @@ object FunctionalitySettings {
     xtnBuybackRewardPeriod = 100000,
     blockRewardBoostPeriod = 300_000,
     paymentsCheckHeight = 4303300,
-    unitsRegistryAddress = Some("3P8LfPXcveST7WKkV3UACQNdr6J3shPYong")
+    unitsRegistryAddress = Some("3P8LfPXcveST7WKkV3UACQNdr6J3shPYong"),
+    maxActiveGenerators = 128, // BLS has much worse performance from 129
+    commitmentPeriod = 10_000
   )
 
   val TESTNET: FunctionalitySettings = apply(
@@ -160,7 +163,9 @@ object FunctionalitySettings {
     xtnBuybackAddress = Some("3N13KQpdY3UU7JkWUBD9kN7t7xuUgeyYMTT"),
     xtnBuybackRewardPeriod = 2000,
     blockRewardBoostPeriod = 2_000,
-    unitsRegistryAddress = Some("3N9fwNGJcUcAbhh7YPr6mrpuGJD4tApZFsT")
+    unitsRegistryAddress = Some("3N9fwNGJcUcAbhh7YPr6mrpuGJD4tApZFsT"),
+    maxActiveGenerators = 10,
+    commitmentPeriod = 3000
   )
 
   val STAGENET: FunctionalitySettings = apply(
@@ -175,7 +180,9 @@ object FunctionalitySettings {
     daoAddress = Some("3MaFVH1vTv18FjBRugSRebx259D7xtRh9ic"),
     xtnBuybackAddress = Some("3MbhiRiLFLJ1EVKNP9npRszcLLQDjwnFfZM"),
     xtnBuybackRewardPeriod = 1000,
-    paymentsCheckHeight = 2195900
+    paymentsCheckHeight = 2195900,
+    maxActiveGenerators = 3,
+    commitmentPeriod = 100
   )
 }
 

@@ -250,6 +250,8 @@ object CommonValidation {
         if (iet.version == 1) activationBarrier(BlockchainFeatures.ContinuationTransaction)
         else Left(TxValidationError.ActivationError(s"Transaction version ${iet.version} has not been activated yet"))
 
+      case _: CommitToGenerationTransaction => activationBarrier(BlockchainFeatures.DeterministicFinality)
+
       case _: EthereumTransaction => activationBarrier(BlockchainFeatures.RideV6)
 
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
