@@ -9,9 +9,9 @@ import scala.util.Either.cond
 
 object CommitToGenerationTransactionDiffs {
   def apply(blockchain: Blockchain)(tx: CommitToGenerationTransaction): Either[ValidationError, StateSnapshot] = {
-    val commitmentPeriod                   = blockchain.settings.functionalitySettings.commitmentPeriod
-    val currentCommitmentPeriodStartHeight = (blockchain.height / commitmentPeriod) * commitmentPeriod
-    val nextCommitmentPeriodStartHeight    = currentCommitmentPeriodStartHeight + commitmentPeriod
+    val commitmentPeriod         = blockchain.settings.functionalitySettings.commitmentPeriod
+    val currentPeriodStartHeight = blockchain.currentGenerationPeriodStartHeight
+    val nextPeriodStartHeight    = currentPeriodStartHeight + commitmentPeriod
 
     // TODO: Check BLS PK?
     for {
@@ -20,20 +20,21 @@ object CommitToGenerationTransactionDiffs {
         (),
         GenericError(
           s"Generation period start ${tx.generationPeriodStart} must be a multiple of $commitmentPeriod. " +
-            s"Allowed height is $nextCommitmentPeriodStartHeight"
+            s"Allowed height is $nextPeriodStartHeight"
         )
       )
       _ <- cond(
-        tx.generationPeriodStart == nextCommitmentPeriodStartHeight,
+        tx.generationPeriodStart == nextPeriodStartHeight,
         (),
         GenericError(
           s"Generation period start ${tx.generationPeriodStart} must be on the next period. " +
-            s"Current height is ${blockchain.height}, allowed height is $nextCommitmentPeriodStartHeight"
+            s"Current height is ${blockchain.height}, allowed height is $nextPeriodStartHeight"
         )
       )
       snapshot <- StateSnapshot.build(
         blockchain,
-        portfolios = Map(tx.sender.toAddress -> Portfolio.build(Asset.Waves -> -tx.fee.value))
+        portfolios = Map(tx.sender.toAddress -> Portfolio.build(Asset.Waves -> -tx.fee.value)),
+        nextCommittedGenerators = Map(tx.sender -> tx.endorsementPublicKey)
       )
     } yield snapshot
   }

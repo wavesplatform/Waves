@@ -16,6 +16,7 @@ import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.{BlockMetaExt, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.finalization.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
@@ -727,6 +728,11 @@ class RocksDBWriter(
         val key   = Keys.ethereumTransactionMeta(Height(height), txNum, rdb.apiHandle)
         rw.put(key, Some(pbMeta))
       }
+      
+      for ((pks, i) <- snapshot.nextCommittedGenerators.zipWithIndex) {
+        val key = Keys.committedGenerators(Height(height), i)
+        rw.put(key, pks)
+      }
 
       expiredKeys.foreach(rw.delete)
 
@@ -1292,6 +1298,18 @@ class RocksDBWriter(
 
   override protected def loadBlockHeight(blockId: BlockId): Option[Int] = readOnly(_.get(Keys.heightOf(blockId)))
 
+  // TODO:
+  override protected def loadCommittedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = readOnly { ro =>
+    val key = Keys.committedGenerators(at, 0)
+
+    val r = Map.newBuilder[PublicKey, BlsPublicKey]
+    Using(ro.newIterator) { iter =>
+      iter.seek(key.keyBytes)
+      while (iter.isValid && iter.key().startsWith(key.keyBytes.dropRight(Ints.BYTES))) r += key.parse(iter.value())
+      r
+    }.get.result()
+  }
+
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     for {
       h       <- db.get(Keys.leaseDetailsHistory(leaseId)).headOption
@@ -1423,7 +1441,7 @@ class RocksDBWriter(
   def snapshotStateHash(height: Int): ByteStr =
     readOnly(_.get(Keys.blockStateHash(height)))
 
-  override def committedGenerators(at: Height): Set[PublicKey] = Set.empty // TODO:
+  override def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = Map.empty // TODO:
 
   override def activeGenerators(at: Height): Set[PublicKey] = Set.empty // TODO:
 }

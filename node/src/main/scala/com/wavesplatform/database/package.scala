@@ -14,6 +14,7 @@ import com.wavesplatform.crypto.*
 import com.wavesplatform.database.protobuf as pb
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.protobuf.TransactionData.Transaction as TD
+import com.wavesplatform.finalization.BlsPublicKey
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
@@ -357,6 +358,17 @@ package object database {
 
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
+
+  def readCommittedGenerator(data: Array[Byte]): (PublicKey, BlsPublicKey) = {
+    // require(data.length == KeyLength + 0) // TODO:
+    val (rawWavesPublicKey, rawBlsPublicKey) = data.splitAt(KeyLength)
+    (PublicKey(rawWavesPublicKey), BlsPublicKey(rawBlsPublicKey))
+  }
+
+  def writeCommittedGenerator(data: (PublicKey, BlsPublicKey)) = {
+    val (wavesPublicKey, blsPublicKey) = data
+    wavesPublicKey.arr ++ blsPublicKey.asByteStr.arr
+  }
 
   def getKeyBuffersFromKeys(keys: collection.IndexedSeq[Key[?]]): collection.IndexedSeq[ByteBuffer] =
     keys.map { k =>

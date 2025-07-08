@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.finalization.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.*
@@ -92,7 +93,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def lastStateHash(refId: Option[ByteStr]): ByteStr = TxStateSnapshotHashBuilder.InitStateHash
 
-  override def committedGenerators(at: Height): Set[PublicKey] = Set.empty
+  override def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = Map.empty
 
   override def activeGenerators(at: Height): Set[PublicKey] = Set.empty
 }

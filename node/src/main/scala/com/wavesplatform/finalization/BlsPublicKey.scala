@@ -9,6 +9,6 @@ object BlsPublicKey {
   def apply(x: Array[Byte]): BlsPublicKey = ByteStr(x)
 
   extension (x: BlsPublicKey) {
-    def toByteStr: ByteStr = x
+    def asByteStr: ByteStr = x
   }
 }

@@ -92,6 +92,7 @@ object NewTransactionInfo {
           case alias: Alias     => blockchain.resolveAlias(alias).toOption.toSet
           case address: Address => Set(address)
         })
-      case _ => Set.empty
+      case t: CommitToGenerationTransaction => Set(t.sender.toAddress)
+      case _                                => Set.empty
     }
 }

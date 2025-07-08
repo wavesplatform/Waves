@@ -6,6 +6,7 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.finalization.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
@@ -62,7 +63,7 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def effectiveBalanceBanHeights(address: Address): Seq[Int]                                   = ???
       override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset]                    = ???
       override def lastStateHash(refId: Option[ByteStr]): BlockId                                           = ???
-      override def committedGenerators(at: Height): Set[PublicKey]                                          = ???
+      override def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey]                            = ???
       override def activeGenerators(at: Height): Set[PublicKey]                                             = ???
     }
 

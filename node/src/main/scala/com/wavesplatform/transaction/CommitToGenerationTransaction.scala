@@ -31,7 +31,7 @@ final case class CommitToGenerationTransaction(
     Coeval.evalOnce(
       BaseTxJson.toJson(this) ++ Json.obj(
         "generationPeriodStart" -> generationPeriodStart,
-        "endorsementPublicKey"  -> endorsementPublicKey.toByteStr.toString
+        "endorsementPublicKey"  -> endorsementPublicKey.asByteStr.toString
       )
     )
 }

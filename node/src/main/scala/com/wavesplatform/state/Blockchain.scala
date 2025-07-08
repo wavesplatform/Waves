@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatureStatus, BlockchainFeatures}
+import com.wavesplatform.finalization.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.ContractLimits
@@ -87,13 +88,13 @@ trait Blockchain {
 
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
+  def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey]
+
+  def activeGenerators(at: Height): Set[PublicKey]
+
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
   def lastStateHash(refId: Option[ByteStr]): ByteStr
-
-  def committedGenerators(at: Height): Set[PublicKey]
-
-  def activeGenerators(at: Height): Set[PublicKey]
 }
 
 object Blockchain {
@@ -241,5 +242,9 @@ object Blockchain {
         }
         .fold(1)(_ => BlockRewardCalculator.RewardBoost)
 
+    def currentGenerationPeriodStartHeight: Height = {
+      val commitmentPeriod = blockchain.settings.functionalitySettings.commitmentPeriod
+      Height((blockchain.height / commitmentPeriod) * commitmentPeriod)
+    }
   }
 }

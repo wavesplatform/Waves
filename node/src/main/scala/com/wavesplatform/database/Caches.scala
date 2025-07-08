@@ -3,11 +3,12 @@ package com.wavesplatform.database
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.common.collect.ArrayListMultimap
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.database.protobuf.{BlockMeta as PBBlockMeta, BlockMetaExt}
+import com.wavesplatform.database.protobuf.{BlockMetaExt, BlockMeta as PBBlockMeta}
+import com.wavesplatform.finalization.BlsPublicKey
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
@@ -198,6 +199,11 @@ abstract class Caches extends Blockchain with Storage {
   protected def discardBlockHeight(blockId: ByteStr): Unit = blockHeightCache.invalidate(blockId)
 
   @volatile
+  protected var committedGeneratorsCache: Map[PublicKey, BlsPublicKey] = loadCommittedGenerators(this.currentGenerationPeriodStartHeight)
+  protected def loadCommittedGenerators(at: Height): Map[PublicKey, BlsPublicKey]
+  override def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = committedGeneratorsCache
+
+  @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
   protected def loadApprovedFeatures(): Map[Short, Int]
   override def approvedFeatures: Map[Short, Int] = approvedFeaturesCache
@@ -334,6 +340,7 @@ abstract class Caches extends Blockchain with Storage {
     for (leaseId <- snapshot.cancelledLeases.keys) stateHash.addLeaseStatus(leaseId, isActive = false)
     for ((assetId, sponsorship) <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
     for ((alias, address) <- snapshot.aliases) stateHash.addAlias(address, alias.name)
+    snapshot.nextCommittedGenerators.foreach(stateHash.addNextGenerator)
 
     doAppend(
       newMeta,
@@ -366,6 +373,8 @@ abstract class Caches extends Blockchain with Storage {
     scriptCache.putAll(snapshot.accountScriptsByAddress.asJava)
     assetScriptCache.putAll(snapshot.assetScripts.view.mapValues(Some(_)).toMap.asJava)
     accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
+    if (newHeight % settings.functionalitySettings.commitmentPeriod == 0)
+      committedGeneratorsCache = snapshot.nextCommittedGenerators
   }
 
   protected def doRollback(targetHeight: Int): DiscardedBlocks

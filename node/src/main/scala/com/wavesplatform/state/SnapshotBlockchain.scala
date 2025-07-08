@@ -6,6 +6,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures.RideV6
+import com.wavesplatform.finalization.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.TxMeta.Status
@@ -229,7 +230,7 @@ case class SnapshotBlockchain(
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
-  override def committedGenerators(at: Height): Set[PublicKey] = inner.committedGenerators(at)
+  override def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = inner.committedGenerators(at)
 
   override def activeGenerators(at: Height): Set[PublicKey] = inner.activeGenerators(at)
 }

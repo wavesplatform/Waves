@@ -686,7 +686,7 @@ object PBTransactions {
         PBTransactions.create(sender, chainId, fee.value, feeAssetId, timestamp, version, proofs, data)
 
       case tx @ CommitToGenerationTransaction(sender, fee, timestamp, generationPeriodStart, endorsementPublicKey, proofs, chainId) =>
-        val data = Data.CommitToGeneration(CommitToGenerationTransactionData(generationPeriodStart, endorsementPublicKey.toByteStr.toByteString))
+        val data = Data.CommitToGeneration(CommitToGenerationTransactionData(generationPeriodStart, endorsementPublicKey.asByteStr.toByteString))
         PBTransactions.create(sender, chainId, fee.value, Waves, timestamp, tx.version, proofs.proofs, data)
 
       case et: EthereumTransaction =>

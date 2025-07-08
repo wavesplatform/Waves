@@ -58,7 +58,8 @@ enum KeyTag {
     MaliciousMinerBanHeights,
     BlockStateHash,
     AddressLeaseInfoSeqNr,
-    AddressLeaseInfoSeq
+    AddressLeaseInfoSeq,
+    CommittedGenerators
 
   def prefixBytes: Array[Byte] = Shorts.toByteArray(ordinal.toShort)
 }

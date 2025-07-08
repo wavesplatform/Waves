@@ -1,17 +1,17 @@
 package com.wavesplatform.state
 
-import java.nio.charset.StandardCharsets
-
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.finalization.BlsPublicKey
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.StateHashBuilder.Result
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import org.bouncycastle.crypto.digests.Blake2bDigest
 
+import java.nio.charset.StandardCharsets
 import scala.collection.mutable
 
 object StateHashBuilder {
@@ -93,6 +93,12 @@ class StateHashBuilder {
   def addSponsorship(asset: IssuedAsset, minSponsoredFee: Long): Unit = {
     addEntry(SectionId.Sponsorship, asset.id.arr)(
       Longs.toByteArray(minSponsoredFee)
+    )
+  }
+
+  def addNextGenerator(wavesPublicKey: PublicKey, blsPublicKey: BlsPublicKey): Unit = {
+    addEntry(SectionId.NextGenerators, wavesPublicKey.arr)(
+      blsPublicKey.asByteStr.arr
     )
   }
 
