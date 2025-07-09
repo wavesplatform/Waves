@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.account.*
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.finalization.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.Height
-import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.CommitToGenerationTxValidator
@@ -15,8 +15,8 @@ final case class CommitToGenerationTransaction(
     sender: PublicKey,
     fee: TxPositiveAmount,
     timestamp: TxTimestamp,
-    generationPeriodStart: Height,
     endorsementPublicKey: BlsPublicKey,
+    endorsementKeySignature: ByteStr,
     proofs: Proofs,
     override val chainId: Byte
 ) extends Transaction(TransactionType.CommitToGeneration)
@@ -30,8 +30,8 @@ final case class CommitToGenerationTransaction(
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
       BaseTxJson.toJson(this) ++ Json.obj(
-        "generationPeriodStart" -> generationPeriodStart,
-        "endorsementPublicKey"  -> endorsementPublicKey.asByteStr.toString
+        "endorsementPublicKey"    -> endorsementPublicKey.asByteStr.toString,
+        "endorsementKeySignature" -> endorsementKeySignature.toString
       )
     )
 }
@@ -39,17 +39,28 @@ final case class CommitToGenerationTransaction(
 object CommitToGenerationTransaction {
   implicit val validator: TxValidator[CommitToGenerationTransaction] = CommitToGenerationTxValidator
 
+  implicit def sign(tx: CommitToGenerationTransaction, privateKey: PrivateKey): CommitToGenerationTransaction =
+    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+
   def create(
       sender: PublicKey,
       feeInWaves: Long,
       timestamp: TxTimestamp,
-      generationPeriodStart: Height,
       endorsementPublicKey: BlsPublicKey,
+      endorsementKeySignature: ByteStr,
       proofs: Proofs,
       chainId: Byte
   ): Either[ValidationError, CommitToGenerationTransaction] =
     for {
       feeInWaves <- TxPositiveAmount(feeInWaves)(TxValidationError.InsufficientFee)
-      tx <- CommitToGenerationTransaction(sender, feeInWaves, timestamp, generationPeriodStart, endorsementPublicKey, proofs, chainId).validatedEither
+      tx <- CommitToGenerationTransaction(
+        sender,
+        feeInWaves,
+        timestamp,
+        endorsementPublicKey,
+        endorsementKeySignature,
+        proofs,
+        chainId
+      ).validatedEither
     } yield tx
 }

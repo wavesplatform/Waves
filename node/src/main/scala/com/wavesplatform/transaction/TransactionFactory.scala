@@ -2,6 +2,7 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.*
 import com.wavesplatform.api.http.requests.*
+import com.wavesplatform.api.http.requests.CommitToGenerationRequest.given
 import com.wavesplatform.api.http.requests.DataRequest.*
 import com.wavesplatform.api.http.requests.InvokeExpressionRequest.*
 import com.wavesplatform.api.http.requests.SponsorFeeRequest.*
@@ -399,6 +400,23 @@ object TransactionFactory {
       tx.signWith(signer.privateKey)
     }
 
+  def commitToGeneration(
+      request: CommitToGenerationRequest,
+      wallet: Wallet,
+      signerAddress: String,
+      time: Time
+  ): Either[ValidationError, CommitToGenerationTransaction] =
+    for {
+      sender <- request.sender match {
+        case Some(sender) => wallet.findPrivateKey(sender)
+        case None         => Left(GenericError("invalid.sender"))
+      }
+      signer <- wallet.findPrivateKey(signerAddress)
+      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender.publicKey)
+    } yield {
+      tx.signWith(signer.privateKey)
+    }
+
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
     import InvokeScriptRequest.*
     val chainId = (jsv \ "chainId").asOpt[Byte]
@@ -406,22 +424,23 @@ object TransactionFactory {
     val version = (jsv \ "version").asOpt[Byte](using versionReads).getOrElse(1.toByte)
 
     val pf: PartialFunction[TransactionType.TransactionType, Either[ValidationError, Transaction]] = {
-      case TransactionType.Transfer         => jsv.as[TransferRequest].toTx
-      case TransactionType.CreateAlias      => jsv.as[CreateAliasRequest].toTx
-      case TransactionType.Lease            => jsv.as[LeaseRequest].toTx
-      case TransactionType.LeaseCancel      => jsv.as[LeaseCancelRequest].toTx
-      case TransactionType.Issue            => jsv.as[IssueRequest].toTx
-      case TransactionType.Reissue          => jsv.as[ReissueRequest].toTx
-      case TransactionType.Burn             => jsv.as[BurnRequest].toTx
-      case TransactionType.MassTransfer     => jsv.as[SignedMassTransferRequest].toTx
-      case TransactionType.Data             => jsv.as[SignedDataRequest].toTx
-      case TransactionType.InvokeScript     => jsv.as[SignedInvokeScriptRequest].toTx
-      case TransactionType.SetScript        => jsv.as[SignedSetScriptRequest].toTx
-      case TransactionType.SetAssetScript   => jsv.as[SignedSetAssetScriptRequest].toTx
-      case TransactionType.SponsorFee       => jsv.as[SignedSponsorFeeRequest].toTx
-      case TransactionType.Exchange         => jsv.as[ExchangeRequest].toTx
-      case TransactionType.UpdateAssetInfo  => jsv.as[SignedUpdateAssetInfoRequest].toTx
-      case TransactionType.InvokeExpression => jsv.as[SignedInvokeExpressionRequest].toTx
+      case TransactionType.Transfer           => jsv.as[TransferRequest].toTx
+      case TransactionType.CreateAlias        => jsv.as[CreateAliasRequest].toTx
+      case TransactionType.Lease              => jsv.as[LeaseRequest].toTx
+      case TransactionType.LeaseCancel        => jsv.as[LeaseCancelRequest].toTx
+      case TransactionType.Issue              => jsv.as[IssueRequest].toTx
+      case TransactionType.Reissue            => jsv.as[ReissueRequest].toTx
+      case TransactionType.Burn               => jsv.as[BurnRequest].toTx
+      case TransactionType.MassTransfer       => jsv.as[SignedMassTransferRequest].toTx
+      case TransactionType.Data               => jsv.as[SignedDataRequest].toTx
+      case TransactionType.InvokeScript       => jsv.as[SignedInvokeScriptRequest].toTx
+      case TransactionType.SetScript          => jsv.as[SignedSetScriptRequest].toTx
+      case TransactionType.SetAssetScript     => jsv.as[SignedSetAssetScriptRequest].toTx
+      case TransactionType.SponsorFee         => jsv.as[SignedSponsorFeeRequest].toTx
+      case TransactionType.Exchange           => jsv.as[ExchangeRequest].toTx
+      case TransactionType.UpdateAssetInfo    => jsv.as[SignedUpdateAssetInfoRequest].toTx
+      case TransactionType.InvokeExpression   => jsv.as[SignedInvokeExpressionRequest].toTx
+      case TransactionType.CommitToGeneration => jsv.as[SignedCommitToGenerationRequest].toTx
     }
 
     if (chainId.exists(_ != AddressScheme.current.chainId)) {
@@ -462,6 +481,8 @@ object TransactionFactory {
             case TransactionType.SetAssetScript  => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
             case TransactionType.SponsorFee      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
             case TransactionType.UpdateAssetInfo => TransactionFactory.updateAssetInfo(txJson.as[UpdateAssetInfoRequest], wallet, signerAddress, time)
+            case TransactionType.CommitToGeneration =>
+              TransactionFactory.commitToGeneration(txJson.as[CommitToGenerationRequest], wallet, signerAddress, time)
           }
         } catch {
           case _: NoSuchElementException => Left(UnsupportedTypeAndVersion(typeId, version))

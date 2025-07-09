@@ -5,6 +5,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.finalization.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -316,6 +317,17 @@ object PBTransactions {
           timestamp,
           feeAmount,
           feeAssetId,
+          proofs,
+          chainId
+        )
+
+      case Data.CommitToGeneration(CommitToGenerationTransactionData(endorsementPublicKey, endorsementKeySignature, `empty`)) =>
+        CommitToGenerationTransaction.create(
+          sender,
+          feeAmount,
+          timestamp,
+          BlsPublicKey(endorsementPublicKey.toByteStr),
+          endorsementKeySignature.toByteStr,
           proofs,
           chainId
         )
@@ -685,8 +697,10 @@ object PBTransactions {
         val data = Data.InvokeExpression(InvokeExpressionTransactionData(tx.expressionBytes.toByteString))
         PBTransactions.create(sender, chainId, fee.value, feeAssetId, timestamp, version, proofs, data)
 
-      case tx @ CommitToGenerationTransaction(sender, fee, timestamp, generationPeriodStart, endorsementPublicKey, proofs, chainId) =>
-        val data = Data.CommitToGeneration(CommitToGenerationTransactionData(generationPeriodStart, endorsementPublicKey.asByteStr.toByteString))
+      case tx @ CommitToGenerationTransaction(sender, fee, timestamp, endorsementPublicKey, endorsemenetKeySignature, proofs, chainId) =>
+        val data = Data.CommitToGeneration(
+          CommitToGenerationTransactionData(endorsementPublicKey.asByteStr.toByteString, endorsemenetKeySignature.toByteString)
+        )
         PBTransactions.create(sender, chainId, fee.value, Waves, timestamp, tx.version, proofs.proofs, data)
 
       case et: EthereumTransaction =>

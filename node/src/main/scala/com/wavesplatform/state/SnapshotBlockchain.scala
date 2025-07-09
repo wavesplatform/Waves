@@ -127,7 +127,7 @@ case class SnapshotBlockchain(
       .map(tx => (tx.snapshot, tx.status))
       .orElse(inner.transactionSnapshot(id))
 
-  override def height: Int = inner.height + blockMeta.fold(0)(_ => 1)
+  override def height: Int = inner.height + blockMeta.size
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
@@ -230,7 +230,9 @@ case class SnapshotBlockchain(
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
-  override def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = inner.committedGenerators(at)
+  override def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey] =
+    if (blockMeta.isDefined) snapshot.nextCommittedGenerators
+    else inner.committedGenerators(at)
 
   override def activeGenerators(at: Height): Set[PublicKey] = inner.activeGenerators(at)
 }
