@@ -17,7 +17,7 @@ Seq(
   "pl.project13.scala" % "sbt-jmh"                  % "0.4.7",
   "com.github.sbt"     % "sbt-ci-release"           % "1.11.1",
   "com.lightbend.sbt"  % "sbt-javaagent"            % "0.1.6",
-  "org.scalameta"      % "sbt-scalafmt"             % "2.5.4"
+  "org.scalameta"      % "sbt-scalafmt"             % "2.5.5"
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(

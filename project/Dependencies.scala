@@ -8,19 +8,26 @@ object Dependencies {
   private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.122.Final"
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "4.31.1"
-  val overrides = Def.setting(Seq(
-    "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
-    "com.google.code.gson"      % "gson"           % "2.13.1",
-    "com.squareup.okio"         % "okio-jvm"       % "3.13.0",
-    "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
-    nettyModule("codec-http2"),
-    nettyModule("codec-http"),
-    nettyModule("handler-proxy"),
-    nettyModule("codec-socks"),
-    nettyModule("transport-native-unix-common"),
-    nettyModule("resolver-dns"),
-    gProto
-  ))
+  val overrides = Def.setting(
+    Seq(
+      "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
+      "com.google.code.gson"      % "gson"           % "2.13.1",
+      "com.squareup.okio"         % "okio-jvm"       % "3.13.0",
+      "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
+      nettyModule("codec-http2"),
+      nettyModule("codec-http"),
+      nettyModule("handler-proxy"),
+      nettyModule("codec-socks"),
+      nettyModule("transport-native-unix-common"),
+      nettyModule("resolver-dns"),
+      jacksonModule("core", "annotations"),
+      jacksonModule("core", "core"),
+      jacksonModule("core", "databind"),
+      jacksonModule("datatype", "datatype-jdk8"),
+      jacksonModule("datatype", "datatype-jsr310"),
+      gProto
+    )
+  )
 
   // Node protobuf schemas
   private[this] val protoSchemasLib =
@@ -32,7 +39,7 @@ object Dependencies {
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.7"
 
-  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.3"
+  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.19.1"
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.9.8" // 4.10+ requires Java 17 https://github.com/web3j/web3j/issues/1907
 
@@ -50,7 +57,7 @@ object Dependencies {
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
 
-  val playJson = "org.playframework" %% "play-json" % "3.0.4"
+  val playJson = "org.playframework" %% "play-json" % "3.0.5"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.5" % Test)
