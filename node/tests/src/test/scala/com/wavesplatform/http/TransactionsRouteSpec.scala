@@ -1,11 +1,10 @@
 package com.wavesplatform.http
 
-import org.apache.pekko.http.scaladsl.model.*
-import org.apache.pekko.http.scaladsl.model.headers.Accept
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{ScriptExecutionError as _, *}
 import com.wavesplatform.api.http.{CustomJson, RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.block.Block
+import com.wavesplatform.bls.BlsKeyPair
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -34,6 +33,8 @@ import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Asset, AssetIdLength, EthTxGenerator, TransactionSignOps, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.{BlockGen, TestValues, crypto}
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model.headers.Accept
 import org.scalacheck.Gen.*
 import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.*
@@ -812,408 +813,431 @@ class TransactionsRouteSpec
         domain.utxPool.removeAll(Seq(tx))
       }
     }
+  }
 
-    routePath("/sign") - {
-      "function call without args" in {
-        val acc1 = domain.wallet.generateNewAccount().get
-        val acc2 = domain.wallet.generateNewAccount().get
+  routePath("/sign") - {
+    "function call without args" in {
+      val acc1 = domain.wallet.generateNewAccount().get
+      val acc2 = domain.wallet.generateNewAccount().get
 
-        val funcName          = "func"
-        val funcWithoutArgs   = Json.obj("function" -> funcName)
-        val funcWithEmptyArgs = Json.obj("function" -> funcName, "args" -> JsArray.empty)
-        val funcWithArgs = InvokeScriptTxSerializer.functionCallToJson(
-          FUNCTION_CALL(
-            FunctionHeader.User(funcName),
-            List(CONST_LONG(1), CONST_BOOLEAN(true))
-          )
+      val funcName          = "func"
+      val funcWithoutArgs   = Json.obj("function" -> funcName)
+      val funcWithEmptyArgs = Json.obj("function" -> funcName, "args" -> JsArray.empty)
+      val funcWithArgs = InvokeScriptTxSerializer.functionCallToJson(
+        FUNCTION_CALL(
+          FunctionHeader.User(funcName),
+          List(CONST_LONG(1), CONST_BOOLEAN(true))
         )
-
-        def invoke(func: JsObject, expectedArgsLength: Int): Unit = {
-          val ist = Json.obj(
-            "type"       -> InvokeScriptTransaction.typeId,
-            "version"    -> 3,
-            "sender"     -> acc1.toAddress,
-            "dApp"       -> acc2.toAddress,
-            "call"       -> func,
-            "payment"    -> Seq[Payment](),
-            "fee"        -> 500000,
-            "feeAssetId" -> JsNull
-          )
-          Post(routePath("/sign"), ist) ~> ApiKeyHeader ~> route ~> check {
-            status shouldEqual StatusCodes.OK
-            val jsObject = responseAs[JsObject]
-            (jsObject \ "senderPublicKey").as[String] shouldBe acc1.publicKey.toString
-            (jsObject \ "call" \ "function").as[String] shouldBe funcName
-            (jsObject \ "call" \ "args").as[JsArray].value.length shouldBe expectedArgsLength
-          }
-        }
-
-        invoke(funcWithoutArgs, 0)
-        invoke(funcWithEmptyArgs, 0)
-        invoke(funcWithArgs, 2)
-      }
-    }
-
-    routePath("/broadcast") - {
-      def withInvokeScriptTransaction(f: (KeyPair, InvokeScriptTransaction) => Unit): Unit = {
-        val seed = new Array[Byte](32)
-        Random.nextBytes(seed)
-        val sender: KeyPair = KeyPair(seed)
-        val ist = Signed.invokeScript(
-          TxVersion.V1,
-          sender,
-          sender.toAddress,
-          None,
-          Seq.empty,
-          500000L,
-          Asset.Waves,
-          testTime.getTimestamp()
-        )
-        f(sender, ist)
-      }
-
-      "shows trace when trace is enabled" in {
-        val sender = TxHelpers.signer(1201)
-        val ist    = TxHelpers.transfer(sender, defaultAddress, 1.waves)
-        domain.appendBlock(
-          TxHelpers.transfer(richAccount, sender.toAddress, 2.waves),
-          TxHelpers.setScript(sender, TestCompiler(V7).compileExpression("throw(\"error\")"))
-        )
-        Post(routePath("/broadcast?trace=true"), ist.json()) ~> route ~> check {
-          val result = responseAs[JsObject]
-          (result \ "trace").as[JsValue] shouldBe Json.arr(
-            AccountVerifierTrace(
-              sender.toAddress,
-              Some(
-                ScriptExecutionError(
-                  "error",
-                  List(
-                    "throw.@args"       -> Right(ARR(IndexedSeq(CONST_STRING("error").explicitGet()), false).explicitGet()),
-                    "throw.@complexity" -> Right(CONST_LONG(1)),
-                    "@complexityLimit"  -> Right(CONST_LONG(2147483646))
-                  ),
-                  None
-                )
-              )
-            ).json
-          )
-        }
-      }
-
-      "does not show trace when trace is disabled" in withInvokeScriptTransaction { (_, ist) =>
-        Post(routePath("/broadcast"), ist.json()) ~> route ~> check {
-          (responseAs[JsObject] \ "trace") shouldBe empty
-        }
-        Post(routePath("/broadcast?trace=false"), ist.json()) ~> route ~> check {
-          (responseAs[JsObject] \ "trace") shouldBe empty
-        }
-      }
-
-      "generates valid trace with vars" in {
-        val sender     = TxHelpers.signer(1030)
-        val aliasOwner = TxHelpers.signer(1031)
-        val recipient  = TxHelpers.address(1032)
-
-        val lease = TxHelpers.lease(sender, recipient, 50.waves)
-
-        domain.appendBlock(
-          TxHelpers.massTransfer(
-            richAccount,
-            Seq(
-              sender.toAddress     -> 100.waves,
-              aliasOwner.toAddress -> 1.waves
-            ),
-            fee = 0.002.waves
-          ),
-          TxHelpers.createAlias("test_alias", aliasOwner),
-          TxHelpers.setScript(
-            sender,
-            TestCompiler(V5).compileContract(s"""{-# STDLIB_VERSION 5 #-}
-                                                |{-# CONTENT_TYPE DAPP #-}
-                                                |{-# SCRIPT_TYPE ACCOUNT #-}
-                                                |
-                                                |@Callable(i)
-                                                |func default() = {
-                                                |  let leaseToAddress = Lease(Address(base58'${recipient}'), ${10.waves})
-                                                |  let leaseToAlias = Lease(Alias("test_alias"), ${20.waves})
-                                                |  strict leaseId = leaseToAddress.calculateLeaseId()
-                                                |
-                                                |  [
-                                                |    leaseToAddress,
-                                                |    leaseToAlias,
-                                                |    LeaseCancel(base58'${lease.id()}')
-                                                |  ]
-                                                |}
-                                                |""".stripMargin)
-          ),
-          lease
-        )
-
-        val invoke = Signed
-          .invokeScript(2.toByte, sender, sender.toAddress, None, Seq.empty, 0.005.waves, Asset.Waves, ntpTime.getTimestamp())
-
-        Post(routePath("/broadcast?trace=true"), invoke.json()) ~> route ~> check {
-          val dappTrace = (responseAs[JsObject] \ "trace").as[Seq[JsObject]].find(jsObject => (jsObject \ "type").as[String] == "dApp").get
-
-          (dappTrace \ "error").get shouldEqual JsNull
-          (dappTrace \ "vars" \\ "name").map(_.as[String]) should contain theSameElementsAs Seq(
-            "i",
-            "default.@args",
-            "Address.@args",
-            "Address.@complexity",
-            "@complexityLimit",
-            "Lease.@args",
-            "Lease.@complexity",
-            "@complexityLimit",
-            "leaseToAddress",
-            "calculateLeaseId.@args",
-            "calculateLeaseId.@complexity",
-            "@complexityLimit",
-            "leaseId",
-            "==.@args",
-            "==.@complexity",
-            "@complexityLimit",
-            "Alias.@args",
-            "Alias.@complexity",
-            "@complexityLimit",
-            "Lease.@args",
-            "Lease.@complexity",
-            "@complexityLimit",
-            "leaseToAlias",
-            "LeaseCancel.@args",
-            "LeaseCancel.@complexity",
-            "@complexityLimit",
-            "cons.@args",
-            "cons.@complexity",
-            "@complexityLimit",
-            "cons.@args",
-            "cons.@complexity",
-            "@complexityLimit",
-            "cons.@args",
-            "cons.@complexity",
-            "@complexityLimit"
-          )
-        }
-      }
-
-      "checks the length of base58 attachment in symbols" in {
-        val attachmentSizeInSymbols = TransferTransaction.MaxAttachmentStringSize + 1
-        val attachmentStr           = "1" * attachmentSizeInSymbols
-
-        val tx = TxHelpers
-          .transfer()
-          .copy(attachment = ByteStr(Base58.decode(attachmentStr))) // to bypass a validation
-          .signWith(defaultSigner.privateKey)
-
-        Post(routePath("/broadcast"), tx.json()) ~> route should produce(
-          WrongJson(
-            errors = Seq(
-              JsPath \ "attachment" -> Seq(
-                JsonValidationError(s"base58-encoded string length ($attachmentSizeInSymbols) exceeds maximum length of 192")
-              )
-            ),
-            msg = Some("json data validation error, see validationErrors for details")
-          )
-        )
-      }
-
-      "checks the length of base58 attachment in bytes" in {
-        val attachmentSizeInSymbols = TransferTransaction.MaxAttachmentSize + 1
-        val attachmentStr           = "1" * attachmentSizeInSymbols
-        val attachment              = ByteStr(Base58.decode(attachmentStr))
-
-        val tx = TxHelpers
-          .transfer()
-          .copy(attachment = attachment)
-          .signWith(defaultSigner.privateKey)
-
-        Post(routePath("/broadcast"), tx.json()) ~> route should produce(
-          TooBigInBytes(
-            s"Invalid attachment. Length ${attachment.size} bytes exceeds maximum of ${TransferTransaction.MaxAttachmentSize} bytes."
-          )
-        )
-      }
-    }
-
-    routePath("/merkleProof") - {
-      def validateSuccess(blockRoot: ByteStr, expected: Seq[(ByteStr, Array[Byte], Int)], response: HttpResponse): Unit = {
-        response.status shouldBe StatusCodes.OK
-
-        val proofs = responseAs[List[JsObject]]
-
-        proofs.size shouldBe expected.size
-
-        proofs.zip(expected).foreach { case (p, (id, hash, index)) =>
-          val transactionId    = (p \ "id").as[String]
-          val transactionIndex = (p \ "transactionIndex").as[Int]
-          val digests          = (p \ "merkleProof").as[List[String]].map(s => Base58.decode(s))
-
-          transactionId shouldEqual id.toString
-          transactionIndex shouldEqual index
-
-          assert(Merkle.verify(hash, transactionIndex, digests.reverse, blockRoot.arr))
-
-        }
-      }
-
-      def validateFailure(response: HttpResponse): Unit = {
-        response.status shouldEqual StatusCodes.BadRequest
-        (responseAs[JsObject] \ "message").as[String] shouldEqual s"transactions do not exist or block version < ${Block.ProtoBlockVersion}"
-      }
-
-      "returns merkle proofs" in {
-        val dapp   = TxHelpers.signer(1390)
-        val caller = TxHelpers.signer(1390)
-
-        val tx1 = TxHelpers.invoke(dapp.toAddress, Some("testCall"), Seq(CONST_BOOLEAN(true)), invoker = caller)
-        val tx2 = TxHelpers.invoke(dapp.toAddress, Some("testCall"), Seq(CONST_BOOLEAN(false)), invoker = caller)
-
-        domain.appendBlock(
-          TxHelpers.massTransfer(richAccount, Seq(dapp.toAddress -> 10.waves, caller.toAddress -> 10.waves), fee = 0.002.waves),
-          TxHelpers.setScript(dapp, failableContract),
-          tx1,
-          tx2
-        )
-
-        val transactions = Seq(tx1, tx2)
-        val proofs = Seq(
-          (tx1.id(), crypto.fastHash(PBTransactions.toByteArrayMerkle(tx1)), 2),
-          (tx2.id(), crypto.fastHash(PBTransactions.toByteArrayMerkle(tx2)), 3)
-        )
-
-        val queryParams = transactions.map(t => s"id=${t.id()}").mkString("?", "&", "")
-        val requestBody = Json.obj("ids" -> transactions.map(_.id().toString))
-
-        Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
-          validateSuccess(domain.blockchain.lastBlockHeader.value.header.transactionsRoot, proofs, response)
-        }
-
-        Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
-          validateSuccess(domain.blockchain.lastBlockHeader.value.header.transactionsRoot, proofs, response)
-        }
-      }
-
-      "returns error in case of all transactions are filtered" in {
-        val genesisTransactions = domain.blocksApi.blockAtHeight(1).value._2.collect { case (_, tx) => tx.id() }
-
-        val queryParams = genesisTransactions.map(id => s"id=$id").mkString("?", "&", "")
-        val requestBody = Json.obj("ids" -> genesisTransactions)
-
-        Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
-          validateFailure(response)
-        }
-
-        Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
-          validateFailure(response)
-        }
-      }
-
-      "handles invalid ids" in {
-        val invalidIds = Seq(
-          ByteStr.fill(AssetIdLength)(1),
-          ByteStr.fill(AssetIdLength)(2)
-        ).map(bs => s"${bs}0")
-
-        Get(routePath(s"/merkleProof?${invalidIds.map("id=" + _).mkString("&")}")) ~> route should produce(InvalidIds(invalidIds))
-
-        Post(routePath("/merkleProof"), FormData(invalidIds.map("id" -> _)*)) ~> route should produce(InvalidIds(invalidIds))
-
-        Post(routePath("/merkleProof"), Json.obj("ids" -> invalidIds)) ~> route should produce(InvalidIds(invalidIds))
-      }
-
-      "handles transactions ids limit" in {
-        val inputLimitErrMsg = TooBigArrayAllocation(transactionsApiRoute.settings.transactionsByAddressLimit).message
-        val emptyInputErrMsg = "Transaction ID was not specified"
-
-        def checkErrorResponse(errMsg: String): Unit = {
-          response.status shouldBe StatusCodes.BadRequest
-          (responseAs[JsObject] \ "message").as[String] shouldBe errMsg
-        }
-
-        def checkResponse(tx: TransferTransaction, idsCount: Int): Unit = {
-          response.status shouldBe StatusCodes.OK
-
-          val result = responseAs[JsArray].value
-          result.size shouldBe idsCount
-          (1 to idsCount).zip(responseAs[JsArray].value) foreach { case (_, json) =>
-            (json \ "id").as[String] shouldBe tx.id().toString
-            (json \ "transactionIndex").as[Int] shouldBe 1
-          }
-        }
-
-        val sender = TxHelpers.signer(1090)
-
-        val transferTx = TxHelpers.transfer(from = sender)
-        domain.appendBlock(TxHelpers.transfer(richAccount, sender.toAddress, 100.waves), transferTx)
-
-        val maxLimitIds      = Seq.fill(transactionsApiRoute.settings.transactionsByAddressLimit)(transferTx.id().toString)
-        val moreThanLimitIds = transferTx.id().toString +: maxLimitIds
-
-        Get(routePath(s"/merkleProof?${maxLimitIds.map("id=" + _).mkString("&")}")) ~> route ~> check(checkResponse(transferTx, maxLimitIds.size))
-        Get(routePath(s"/merkleProof?${moreThanLimitIds.map("id=" + _).mkString("&")}")) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
-        Get(routePath("/merkleProof")) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
-
-        Post(routePath("/merkleProof"), FormData(maxLimitIds.map("id" -> _)*)) ~> route ~> check(checkResponse(transferTx, maxLimitIds.size))
-        Post(routePath("/merkleProof"), FormData(moreThanLimitIds.map("id" -> _)*)) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
-        Post(routePath("/merkleProof"), FormData()) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
-
-        Post(
-          routePath(s"/merkleProof"),
-          HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(maxLimitIds.map(id => id: JsValueWrapper)*)).toString())
-        ) ~> route ~> check(checkResponse(transferTx, maxLimitIds.size))
-        Post(
-          routePath(s"/merkleProof"),
-          HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(moreThanLimitIds.map(id => id: JsValueWrapper)*)).toString())
-        ) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
-        Post(
-          routePath("/merkleProof"),
-          HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> JsArray.empty).toString())
-        ) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
-      }
-    }
-
-    "NODE-969. Transactions API should return correct data for orders with attachment" in {
-      def checkOrderAttachment(txInfo: JsObject, expectedAttachment: ByteStr): Assertion = {
-        implicit val byteStrFormat: Format[ByteStr] = com.wavesplatform.utils.byteStrFormat
-        (txInfo \ "order1" \ "attachment").asOpt[ByteStr] shouldBe Some(expectedAttachment)
-      }
-
-      val sender     = TxHelpers.signer(1100)
-      val issuer     = TxHelpers.signer(1101)
-      val attachment = ByteStr.fill(32)(1)
-      val issue      = TxHelpers.issue(issuer)
-      val exchange =
-        TxHelpers.exchangeFromOrders(
-          TxHelpers.order(OrderType.BUY, Waves, issue.asset, version = Order.V4, attachment = Some(attachment)),
-          TxHelpers.order(OrderType.SELL, Waves, issue.asset, version = Order.V4, sender = issuer),
-          version = TxVersion.V3
-        )
-
-      domain.appendBlock(
-        TxHelpers.massTransfer(richAccount, Seq(sender.toAddress -> 10.waves, issuer.toAddress -> 10.waves), fee = 0.002.waves),
-        issue,
-        exchange
       )
 
-      domain.liquidAndSolidAssert { () =>
-        Get(s"/transactions/info/${exchange.id()}") ~> route ~> check {
-          checkOrderAttachment(responseAs[JsObject], attachment)
+      def invoke(func: JsObject, expectedArgsLength: Int): Unit = {
+        val ist = Json.obj(
+          "type"       -> InvokeScriptTransaction.typeId,
+          "version"    -> 3,
+          "sender"     -> acc1.toAddress,
+          "dApp"       -> acc2.toAddress,
+          "call"       -> func,
+          "payment"    -> Seq[Payment](),
+          "fee"        -> 500000,
+          "feeAssetId" -> JsNull
+        )
+        Post(routePath("/sign"), ist) ~> ApiKeyHeader ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          val jsObject = responseAs[JsObject]
+          (jsObject \ "senderPublicKey").as[String] shouldBe acc1.publicKey.toString
+          (jsObject \ "call" \ "function").as[String] shouldBe funcName
+          (jsObject \ "call" \ "args").as[JsArray].value.length shouldBe expectedArgsLength
         }
+      }
 
-        Post("/transactions/info", FormData("id" -> exchange.id().toString)) ~> route ~> check {
-          checkOrderAttachment(responseAs[JsArray].value.head.as[JsObject], attachment)
-        }
+      invoke(funcWithoutArgs, 0)
+      invoke(funcWithEmptyArgs, 0)
+      invoke(funcWithArgs, 2)
+    }
 
-        Post(
-          "/transactions/info",
-          HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(exchange.id().toString)).toString())
-        ) ~> route ~> check {
-          checkOrderAttachment(responseAs[JsArray].value.head.as[JsObject], attachment)
-        }
+    "CommitToGenerationTransaction" in {
+      val sender = domain.wallet.generateNewAccount().get
+      val blsKP  = BlsKeyPair(sender.privateKey)
+      val unsignedTxnJson = Json.parse(
+        s"""{
+           |  "type": 20,
+           |  "fee": 100000000000,
+           |  "timestamp": 1752222163486,
+           |  "version": 1,
+           |  "chainId": 84,
+           |  "sender": "${sender.toAddress}"
+           |}""".stripMargin
+      )
 
-        Get(s"/transactions/address/${exchange.sender.toAddress}/limit/5") ~> route ~> check {
-          checkOrderAttachment(responseAs[JsArray].value.head.as[JsArray].value.head.as[JsObject], attachment)
+      Post(routePath("/sign"), unsignedTxnJson) ~> ApiKeyHeader ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        val jsObject = responseAs[JsObject]
+        (jsObject \ "senderPublicKey").as[String] shouldBe sender.publicKey.toString
+        (jsObject \ "endorsementPublicKey").as[String] shouldBe blsKP.publicKey.asByteStr.toString // TODO: Base58?
+        (jsObject \ "endorsementKeySignature").asOpt[String] should not be empty                   // TODO: Base58?
+      }
+    }
+  }
+
+  routePath("/broadcast") - {
+    def withInvokeScriptTransaction(f: (KeyPair, InvokeScriptTransaction) => Unit): Unit = {
+      val seed = new Array[Byte](32)
+      Random.nextBytes(seed)
+      val sender: KeyPair = KeyPair(seed)
+      val ist = Signed.invokeScript(
+        TxVersion.V1,
+        sender,
+        sender.toAddress,
+        None,
+        Seq.empty,
+        500000L,
+        Asset.Waves,
+        testTime.getTimestamp()
+      )
+      f(sender, ist)
+    }
+
+    "shows trace when trace is enabled" in {
+      val sender = TxHelpers.signer(1201)
+      val ist    = TxHelpers.transfer(sender, defaultAddress, 1.waves)
+      domain.appendBlock(
+        TxHelpers.transfer(richAccount, sender.toAddress, 2.waves),
+        TxHelpers.setScript(sender, TestCompiler(V7).compileExpression("throw(\"error\")"))
+      )
+      Post(routePath("/broadcast?trace=true"), ist.json()) ~> route ~> check {
+        val result = responseAs[JsObject]
+        (result \ "trace").as[JsValue] shouldBe Json.arr(
+          AccountVerifierTrace(
+            sender.toAddress,
+            Some(
+              ScriptExecutionError(
+                "error",
+                List(
+                  "throw.@args"       -> Right(ARR(IndexedSeq(CONST_STRING("error").explicitGet()), false).explicitGet()),
+                  "throw.@complexity" -> Right(CONST_LONG(1)),
+                  "@complexityLimit"  -> Right(CONST_LONG(2147483646))
+                ),
+                None
+              )
+            )
+          ).json
+        )
+      }
+    }
+
+    "does not show trace when trace is disabled" in withInvokeScriptTransaction { (_, ist) =>
+      Post(routePath("/broadcast"), ist.json()) ~> route ~> check {
+        (responseAs[JsObject] \ "trace") shouldBe empty
+      }
+      Post(routePath("/broadcast?trace=false"), ist.json()) ~> route ~> check {
+        (responseAs[JsObject] \ "trace") shouldBe empty
+      }
+    }
+
+    "generates valid trace with vars" in {
+      val sender     = TxHelpers.signer(1030)
+      val aliasOwner = TxHelpers.signer(1031)
+      val recipient  = TxHelpers.address(1032)
+
+      val lease = TxHelpers.lease(sender, recipient, 50.waves)
+
+      domain.appendBlock(
+        TxHelpers.massTransfer(
+          richAccount,
+          Seq(
+            sender.toAddress     -> 100.waves,
+            aliasOwner.toAddress -> 1.waves
+          ),
+          fee = 0.002.waves
+        ),
+        TxHelpers.createAlias("test_alias", aliasOwner),
+        TxHelpers.setScript(
+          sender,
+          TestCompiler(V5).compileContract(s"""{-# STDLIB_VERSION 5 #-}
+                                              |{-# CONTENT_TYPE DAPP #-}
+                                              |{-# SCRIPT_TYPE ACCOUNT #-}
+                                              |
+                                              |@Callable(i)
+                                              |func default() = {
+                                              |  let leaseToAddress = Lease(Address(base58'${recipient}'), ${10.waves})
+                                              |  let leaseToAlias = Lease(Alias("test_alias"), ${20.waves})
+                                              |  strict leaseId = leaseToAddress.calculateLeaseId()
+                                              |
+                                              |  [
+                                              |    leaseToAddress,
+                                              |    leaseToAlias,
+                                              |    LeaseCancel(base58'${lease.id()}')
+                                              |  ]
+                                              |}
+                                              |""".stripMargin)
+        ),
+        lease
+      )
+
+      val invoke = Signed
+        .invokeScript(2.toByte, sender, sender.toAddress, None, Seq.empty, 0.005.waves, Asset.Waves, ntpTime.getTimestamp())
+
+      Post(routePath("/broadcast?trace=true"), invoke.json()) ~> route ~> check {
+        val dappTrace = (responseAs[JsObject] \ "trace").as[Seq[JsObject]].find(jsObject => (jsObject \ "type").as[String] == "dApp").get
+
+        (dappTrace \ "error").get shouldEqual JsNull
+        (dappTrace \ "vars" \\ "name").map(_.as[String]) should contain theSameElementsAs Seq(
+          "i",
+          "default.@args",
+          "Address.@args",
+          "Address.@complexity",
+          "@complexityLimit",
+          "Lease.@args",
+          "Lease.@complexity",
+          "@complexityLimit",
+          "leaseToAddress",
+          "calculateLeaseId.@args",
+          "calculateLeaseId.@complexity",
+          "@complexityLimit",
+          "leaseId",
+          "==.@args",
+          "==.@complexity",
+          "@complexityLimit",
+          "Alias.@args",
+          "Alias.@complexity",
+          "@complexityLimit",
+          "Lease.@args",
+          "Lease.@complexity",
+          "@complexityLimit",
+          "leaseToAlias",
+          "LeaseCancel.@args",
+          "LeaseCancel.@complexity",
+          "@complexityLimit",
+          "cons.@args",
+          "cons.@complexity",
+          "@complexityLimit",
+          "cons.@args",
+          "cons.@complexity",
+          "@complexityLimit",
+          "cons.@args",
+          "cons.@complexity",
+          "@complexityLimit"
+        )
+      }
+    }
+
+    "checks the length of base58 attachment in symbols" in {
+      val attachmentSizeInSymbols = TransferTransaction.MaxAttachmentStringSize + 1
+      val attachmentStr           = "1" * attachmentSizeInSymbols
+
+      val tx = TxHelpers
+        .transfer()
+        .copy(attachment = ByteStr(Base58.decode(attachmentStr))) // to bypass a validation
+        .signWith(defaultSigner.privateKey)
+
+      Post(routePath("/broadcast"), tx.json()) ~> route should produce(
+        WrongJson(
+          errors = Seq(
+            JsPath \ "attachment" -> Seq(
+              JsonValidationError(s"base58-encoded string length ($attachmentSizeInSymbols) exceeds maximum length of 192")
+            )
+          ),
+          msg = Some("json data validation error, see validationErrors for details")
+        )
+      )
+    }
+
+    "checks the length of base58 attachment in bytes" in {
+      val attachmentSizeInSymbols = TransferTransaction.MaxAttachmentSize + 1
+      val attachmentStr           = "1" * attachmentSizeInSymbols
+      val attachment              = ByteStr(Base58.decode(attachmentStr))
+
+      val tx = TxHelpers
+        .transfer()
+        .copy(attachment = attachment)
+        .signWith(defaultSigner.privateKey)
+
+      Post(routePath("/broadcast"), tx.json()) ~> route should produce(
+        TooBigInBytes(
+          s"Invalid attachment. Length ${attachment.size} bytes exceeds maximum of ${TransferTransaction.MaxAttachmentSize} bytes."
+        )
+      )
+    }
+  }
+
+  routePath("/merkleProof") - {
+    def validateSuccess(blockRoot: ByteStr, expected: Seq[(ByteStr, Array[Byte], Int)], response: HttpResponse): Unit = {
+      response.status shouldBe StatusCodes.OK
+
+      val proofs = responseAs[List[JsObject]]
+
+      proofs.size shouldBe expected.size
+
+      proofs.zip(expected).foreach { case (p, (id, hash, index)) =>
+        val transactionId    = (p \ "id").as[String]
+        val transactionIndex = (p \ "transactionIndex").as[Int]
+        val digests          = (p \ "merkleProof").as[List[String]].map(s => Base58.decode(s))
+
+        transactionId shouldEqual id.toString
+        transactionIndex shouldEqual index
+
+        assert(Merkle.verify(hash, transactionIndex, digests.reverse, blockRoot.arr))
+
+      }
+    }
+
+    def validateFailure(response: HttpResponse): Unit = {
+      response.status shouldEqual StatusCodes.BadRequest
+      (responseAs[JsObject] \ "message").as[String] shouldEqual s"transactions do not exist or block version < ${Block.ProtoBlockVersion}"
+    }
+
+    "returns merkle proofs" in {
+      val dapp   = TxHelpers.signer(1390)
+      val caller = TxHelpers.signer(1390)
+
+      val tx1 = TxHelpers.invoke(dapp.toAddress, Some("testCall"), Seq(CONST_BOOLEAN(true)), invoker = caller)
+      val tx2 = TxHelpers.invoke(dapp.toAddress, Some("testCall"), Seq(CONST_BOOLEAN(false)), invoker = caller)
+
+      domain.appendBlock(
+        TxHelpers.massTransfer(richAccount, Seq(dapp.toAddress -> 10.waves, caller.toAddress -> 10.waves), fee = 0.002.waves),
+        TxHelpers.setScript(dapp, failableContract),
+        tx1,
+        tx2
+      )
+
+      val transactions = Seq(tx1, tx2)
+      val proofs = Seq(
+        (tx1.id(), crypto.fastHash(PBTransactions.toByteArrayMerkle(tx1)), 2),
+        (tx2.id(), crypto.fastHash(PBTransactions.toByteArrayMerkle(tx2)), 3)
+      )
+
+      val queryParams = transactions.map(t => s"id=${t.id()}").mkString("?", "&", "")
+      val requestBody = Json.obj("ids" -> transactions.map(_.id().toString))
+
+      Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
+        validateSuccess(domain.blockchain.lastBlockHeader.value.header.transactionsRoot, proofs, response)
+      }
+
+      Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
+        validateSuccess(domain.blockchain.lastBlockHeader.value.header.transactionsRoot, proofs, response)
+      }
+    }
+
+    "returns error in case of all transactions are filtered" in {
+      val genesisTransactions = domain.blocksApi.blockAtHeight(1).value._2.collect { case (_, tx) => tx.id() }
+
+      val queryParams = genesisTransactions.map(id => s"id=$id").mkString("?", "&", "")
+      val requestBody = Json.obj("ids" -> genesisTransactions)
+
+      Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
+        validateFailure(response)
+      }
+
+      Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
+        validateFailure(response)
+      }
+    }
+
+    "handles invalid ids" in {
+      val invalidIds = Seq(
+        ByteStr.fill(AssetIdLength)(1),
+        ByteStr.fill(AssetIdLength)(2)
+      ).map(bs => s"${bs}0")
+
+      Get(routePath(s"/merkleProof?${invalidIds.map("id=" + _).mkString("&")}")) ~> route should produce(InvalidIds(invalidIds))
+
+      Post(routePath("/merkleProof"), FormData(invalidIds.map("id" -> _)*)) ~> route should produce(InvalidIds(invalidIds))
+
+      Post(routePath("/merkleProof"), Json.obj("ids" -> invalidIds)) ~> route should produce(InvalidIds(invalidIds))
+    }
+
+    "handles transactions ids limit" in {
+      val inputLimitErrMsg = TooBigArrayAllocation(transactionsApiRoute.settings.transactionsByAddressLimit).message
+      val emptyInputErrMsg = "Transaction ID was not specified"
+
+      def checkErrorResponse(errMsg: String): Unit = {
+        response.status shouldBe StatusCodes.BadRequest
+        (responseAs[JsObject] \ "message").as[String] shouldBe errMsg
+      }
+
+      def checkResponse(tx: TransferTransaction, idsCount: Int): Unit = {
+        response.status shouldBe StatusCodes.OK
+
+        val result = responseAs[JsArray].value
+        result.size shouldBe idsCount
+        (1 to idsCount).zip(responseAs[JsArray].value) foreach { case (_, json) =>
+          (json \ "id").as[String] shouldBe tx.id().toString
+          (json \ "transactionIndex").as[Int] shouldBe 1
         }
+      }
+
+      val sender = TxHelpers.signer(1090)
+
+      val transferTx = TxHelpers.transfer(from = sender)
+      domain.appendBlock(TxHelpers.transfer(richAccount, sender.toAddress, 100.waves), transferTx)
+
+      val maxLimitIds      = Seq.fill(transactionsApiRoute.settings.transactionsByAddressLimit)(transferTx.id().toString)
+      val moreThanLimitIds = transferTx.id().toString +: maxLimitIds
+
+      Get(routePath(s"/merkleProof?${maxLimitIds.map("id=" + _).mkString("&")}")) ~> route ~> check(checkResponse(transferTx, maxLimitIds.size))
+      Get(routePath(s"/merkleProof?${moreThanLimitIds.map("id=" + _).mkString("&")}")) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
+      Get(routePath("/merkleProof")) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
+
+      Post(routePath("/merkleProof"), FormData(maxLimitIds.map("id" -> _)*)) ~> route ~> check(checkResponse(transferTx, maxLimitIds.size))
+      Post(routePath("/merkleProof"), FormData(moreThanLimitIds.map("id" -> _)*)) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
+      Post(routePath("/merkleProof"), FormData()) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
+
+      Post(
+        routePath(s"/merkleProof"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(maxLimitIds.map(id => id: JsValueWrapper)*)).toString())
+      ) ~> route ~> check(checkResponse(transferTx, maxLimitIds.size))
+      Post(
+        routePath(s"/merkleProof"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(moreThanLimitIds.map(id => id: JsValueWrapper)*)).toString())
+      ) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
+      Post(
+        routePath("/merkleProof"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> JsArray.empty).toString())
+      ) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
+    }
+  }
+
+  "NODE-969. Transactions API should return correct data for orders with attachment" in {
+    def checkOrderAttachment(txInfo: JsObject, expectedAttachment: ByteStr): Assertion = {
+      implicit val byteStrFormat: Format[ByteStr] = com.wavesplatform.utils.byteStrFormat
+      (txInfo \ "order1" \ "attachment").asOpt[ByteStr] shouldBe Some(expectedAttachment)
+    }
+
+    val sender     = TxHelpers.signer(1100)
+    val issuer     = TxHelpers.signer(1101)
+    val attachment = ByteStr.fill(32)(1)
+    val issue      = TxHelpers.issue(issuer)
+    val exchange =
+      TxHelpers.exchangeFromOrders(
+        TxHelpers.order(OrderType.BUY, Waves, issue.asset, version = Order.V4, attachment = Some(attachment)),
+        TxHelpers.order(OrderType.SELL, Waves, issue.asset, version = Order.V4, sender = issuer),
+        version = TxVersion.V3
+      )
+
+    domain.appendBlock(
+      TxHelpers.massTransfer(richAccount, Seq(sender.toAddress -> 10.waves, issuer.toAddress -> 10.waves), fee = 0.002.waves),
+      issue,
+      exchange
+    )
+
+    domain.liquidAndSolidAssert { () =>
+      Get(s"/transactions/info/${exchange.id()}") ~> route ~> check {
+        checkOrderAttachment(responseAs[JsObject], attachment)
+      }
+
+      Post("/transactions/info", FormData("id" -> exchange.id().toString)) ~> route ~> check {
+        checkOrderAttachment(responseAs[JsArray].value.head.as[JsObject], attachment)
+      }
+
+      Post(
+        "/transactions/info",
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(exchange.id().toString)).toString())
+      ) ~> route ~> check {
+        checkOrderAttachment(responseAs[JsArray].value.head.as[JsObject], attachment)
+      }
+
+      Get(s"/transactions/address/${exchange.sender.toAddress}/limit/5") ~> route ~> check {
+        checkOrderAttachment(responseAs[JsArray].value.head.as[JsArray].value.head.as[JsObject], attachment)
       }
     }
   }

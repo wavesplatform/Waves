@@ -16,9 +16,7 @@ case class CommitToGenerationRequest(
     chainId: Option[Byte],
     sender: Option[String],
     fee: Long,
-    timestamp: Option[Long],
-    endorsementPublicKey: ByteStr,
-    endorsementKeySignature: ByteStr
+    timestamp: Option[Long]
 ) {
   def toTxFrom(sender: PublicKey): Either[ValidationError, CommitToGenerationTransaction] =
     for {
@@ -26,8 +24,8 @@ case class CommitToGenerationRequest(
         sender,
         fee,
         timestamp.getOrElse(0L),
-        BlsPublicKey(endorsementPublicKey),
-        endorsementKeySignature,
+        BlsPublicKey(Array.emptyByteArray),
+        ByteStr.empty,
         Proofs.empty,
         chainId.getOrElse(AddressScheme.current.chainId)
       )
