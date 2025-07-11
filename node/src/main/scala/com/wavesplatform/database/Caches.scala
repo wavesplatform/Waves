@@ -8,7 +8,7 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.protobuf.{BlockMetaExt, BlockMeta as PBBlockMeta}
-import com.wavesplatform.finalization.BlsPublicKey
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings

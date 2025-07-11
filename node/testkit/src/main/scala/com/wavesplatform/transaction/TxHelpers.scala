@@ -3,6 +3,7 @@ package com.wavesplatform.transaction
 import com.google.common.primitives.Ints
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.*
+import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
@@ -459,6 +460,15 @@ object TxHelpers {
   ): CreateAliasTransaction = {
     CreateAliasTransaction.selfSigned(version, sender, name, fee, timestamp, chainId).explicitGet()
   }
+
+  def commitToGeneration(
+      endorsementKeyPair: BlsKeyPair, // TODO:
+      sender: KeyPair = defaultSigner,
+      fee: Long = FeeConstants(TransactionType.CommitToGeneration) * FeeUnit,
+      chainId: Byte = AddressScheme.current.chainId,
+      timestamp: TxTimestamp = timestamp
+  ): CommitToGenerationTransaction =
+    CommitToGenerationTransaction.selfSigned(sender, BlsPublicKey(ByteStr.empty), ByteStr.empty, fee, timestamp, chainId).explicitGet()
 
   def ciFee(sc: Int = 0, nonNftIssue: Int = 0, freeCall: Boolean = false): Long =
     invokeFee(freeCall) + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeConstants(TransactionType.Issue) * FeeUnit

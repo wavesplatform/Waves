@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
-import com.wavesplatform.finalization.BlsPublicKey
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.IssuedAsset

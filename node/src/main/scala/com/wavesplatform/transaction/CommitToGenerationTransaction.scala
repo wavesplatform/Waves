@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.finalization.BlsPublicKey
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
 import com.wavesplatform.transaction.validation.TxValidator
@@ -39,7 +39,7 @@ final case class CommitToGenerationTransaction(
 object CommitToGenerationTransaction {
   implicit val validator: TxValidator[CommitToGenerationTransaction] = CommitToGenerationTxValidator
 
-  implicit def sign(tx: CommitToGenerationTransaction, privateKey: PrivateKey): CommitToGenerationTransaction =
+  implicit def signed(tx: CommitToGenerationTransaction, privateKey: PrivateKey): CommitToGenerationTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   def create(
@@ -63,4 +63,16 @@ object CommitToGenerationTransaction {
         chainId
       ).validatedEither
     } yield tx
+
+  // TODO sign with bls private key
+  def selfSigned(
+      sender: KeyPair,
+      endorsementPublicKey: BlsPublicKey,
+      endorsementKeySignature: ByteStr,
+      feeInWaves: Long,
+      timestamp: TxTimestamp,
+      chainId: Byte = AddressScheme.current.chainId
+  ): Either[ValidationError, CommitToGenerationTransaction] =
+    create(sender.publicKey, feeInWaves, timestamp, endorsementPublicKey, endorsementKeySignature, Proofs.empty, chainId)
+      .map(signed(_, sender.privateKey))
 }

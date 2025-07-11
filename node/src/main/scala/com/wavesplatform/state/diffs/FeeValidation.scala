@@ -25,25 +25,26 @@ object FeeValidation {
   val BlockV5Multiplier = 0.001
 
   val FeeConstants: Map[TransactionType.TransactionType, Long] = Map(
-    TransactionType.Genesis          -> 0,
-    TransactionType.Payment          -> 1,
-    TransactionType.Issue            -> 1000,
-    TransactionType.Reissue          -> 1000,
-    TransactionType.Burn             -> 1,
-    TransactionType.Transfer         -> 1,
-    TransactionType.MassTransfer     -> 1,
-    TransactionType.Lease            -> 1,
-    TransactionType.LeaseCancel      -> 1,
-    TransactionType.Exchange         -> 3,
-    TransactionType.CreateAlias      -> 1,
-    TransactionType.Data             -> 1,
-    TransactionType.SetScript        -> 10,
-    TransactionType.SponsorFee       -> 1000,
-    TransactionType.SetAssetScript   -> (1000 - 4),
-    TransactionType.InvokeScript     -> 5,
-    TransactionType.UpdateAssetInfo  -> 1,
-    TransactionType.Ethereum         -> 1,
-    TransactionType.InvokeExpression -> 10
+    TransactionType.Genesis            -> 0,
+    TransactionType.Payment            -> 1,
+    TransactionType.Issue              -> 1000,
+    TransactionType.Reissue            -> 1000,
+    TransactionType.Burn               -> 1,
+    TransactionType.Transfer           -> 1,
+    TransactionType.MassTransfer       -> 1,
+    TransactionType.Lease              -> 1,
+    TransactionType.LeaseCancel        -> 1,
+    TransactionType.Exchange           -> 3,
+    TransactionType.CreateAlias        -> 1,
+    TransactionType.Data               -> 1,
+    TransactionType.SetScript          -> 10,
+    TransactionType.SponsorFee         -> 1000,
+    TransactionType.SetAssetScript     -> (1000 - 4),
+    TransactionType.InvokeScript       -> 5,
+    TransactionType.UpdateAssetInfo    -> 1,
+    TransactionType.Ethereum           -> 1,
+    TransactionType.InvokeExpression   -> 10,
+    TransactionType.CommitToGeneration -> 1_000_000
   )
 
   def apply(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {

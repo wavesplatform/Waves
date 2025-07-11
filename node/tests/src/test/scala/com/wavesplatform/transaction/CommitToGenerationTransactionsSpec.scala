@@ -1,16 +1,20 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.finalization.BlsPublicKey
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.{DeterministicFinality, WavesSettingsOps}
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import play.api.libs.json.Json
 
 import scala.util.{Failure, Success}
 
-class CommitToGenerationTransactionsSpec extends PropSpec {
+class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
   private val origTx = CommitToGenerationTransaction(
     sender = PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
     fee = TxPositiveAmount.unsafeFrom(100000000),
@@ -22,7 +26,7 @@ class CommitToGenerationTransactionsSpec extends PropSpec {
     chainId = AddressScheme.current.chainId
   )
 
-  property("JSON parsing") {
+  "JSON parsing" in {
     val js = Json.parse("""{
       "id": "DU3qmbWH6juRpNa6XePpqUWoE5jBfqE5DmhdnKFjyFH2",
       "type": 20,
@@ -43,13 +47,25 @@ class CommitToGenerationTransactionsSpec extends PropSpec {
     origTx.json() shouldEqual js
   }
 
-  property("PB roundtrip") {
+  "PB roundtrip" in {
     PBTransactionSerializer.parseBytes(PBTransactionSerializer.bytes(origTx)) match {
       case Success(tx: CommitToGenerationTransaction) =>
         tx shouldBe origTx
         tx.proofs shouldBe origTx.proofs
       case Success(tx)        => fail(s"Unexpected transaction type: ${tx.tpe.transactionName}")
       case Failure(exception) => fail(exception)
+    }
+  }
+
+  "Accepted after the feature activation" in {
+    val settings = DeterministicFinality.setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 3)
+    val sender   = TxHelpers.defaultSigner
+    val blsKP    = BlsKeyPair(sender.privateKey)
+    val tx       = TxHelpers.commitToGeneration(blsKP, sender = sender)
+    withDomain(settings, AddrWithBalance.enoughBalances(sender)) { d =>
+      d.appendBlockE(tx) should produce("Deterministic Finality feature has not been activated yet")
+      d.appendBlock()
+      d.appendBlock(tx)
     }
   }
 }

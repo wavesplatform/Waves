@@ -8,19 +8,21 @@ object Dependencies {
   private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.122.Final"
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "4.31.1"
-  val overrides = Def.setting(Seq(
-    "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
-    "com.google.code.gson"      % "gson"           % "2.13.1",
-    "com.squareup.okio"         % "okio-jvm"       % "3.13.0",
-    "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
-    nettyModule("codec-http2"),
-    nettyModule("codec-http"),
-    nettyModule("handler-proxy"),
-    nettyModule("codec-socks"),
-    nettyModule("transport-native-unix-common"),
-    nettyModule("resolver-dns"),
-    gProto
-  ))
+  val overrides = Def.setting(
+    Seq(
+      "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
+      "com.google.code.gson"      % "gson"           % "2.13.1",
+      "com.squareup.okio"         % "okio-jvm"       % "3.13.0",
+      "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
+      nettyModule("codec-http2"),
+      nettyModule("codec-http"),
+      nettyModule("handler-proxy"),
+      nettyModule("codec-socks"),
+      nettyModule("transport-native-unix-common"),
+      nettyModule("resolver-dns"),
+      gProto
+    )
+  )
 
   // Node protobuf schemas
   private[this] val protoSchemasLib =
@@ -140,7 +142,8 @@ object Dependencies {
       "eu.timepit"                 %% "refined"       % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"              % "headlong"      % "13.3.0",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
-      web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
+      web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
+      "com.wavesplatform" % "blst-java" % "0.3.15-SNAPSHOT"
     ) ++ console ++ logDeps ++ protobuf.value
   )
 

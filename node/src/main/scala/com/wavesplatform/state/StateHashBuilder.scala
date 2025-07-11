@@ -4,7 +4,7 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.finalization.BlsPublicKey
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.StateHashBuilder.Result

@@ -2,7 +2,7 @@ package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.finalization.BlsPublicKey
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, Proofs}
 import play.api.libs.json.*

@@ -225,7 +225,7 @@ object TransactionDiffer {
           case sstx: SetScriptTransaction        => SetScriptTransactionDiff(blockchain)(sstx).traced
           case sstx: SetAssetScriptTransaction   => AssetTransactionsDiffs.setAssetScript(blockchain)(sstx).traced
           case stx: SponsorFeeTransaction        => AssetTransactionsDiffs.sponsor(blockchain)(stx).traced
-          case cgtx: CommitToGenerationTransaction => CommitToGenerationTransactionDiffs(blockchain)(cgtx).traced
+          case cgtx: CommitToGenerationTransaction => CommitToGenerationTransactionDiff(blockchain)(cgtx).traced
           case et: EthereumTransaction             => EthereumTransactionDiff(blockchain, currentBlockTs, limitedExecution, enableExecutionLog)(et)
           case _                                   => UnsupportedTransactionType.asLeft.traced
         }
