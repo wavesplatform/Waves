@@ -1,12 +1,9 @@
 package com.wavesplatform.http
 
-import org.apache.pekko.http.scaladsl.model.*
-import org.apache.pekko.http.scaladsl.model.HttpEntity.{Chunk, LastChunk}
-import org.apache.pekko.http.scaladsl.model.headers.{Accept, RawHeader, `Transfer-Encoding`}
-import org.apache.pekko.stream.scaladsl.Source
 import com.google.common.primitives.Longs
 import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, TooBigArrayAllocation}
 import com.wavesplatform.api.http.{AddressApiRoute, RouteTimeout}
+import com.wavesplatform.bls.BlsKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.db.WithState
@@ -24,6 +21,10 @@ import com.wavesplatform.utils.{Schedulers, SharedSchedulerMixin}
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.HashedWheelTimer
 import monix.execution.schedulers.SchedulerService
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model.HttpEntity.{Chunk, LastChunk}
+import org.apache.pekko.http.scaladsl.model.headers.{Accept, RawHeader, `Transfer-Encoding`}
+import org.apache.pekko.stream.scaladsl.Source
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
@@ -156,6 +157,17 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
         (r \ "address").as[String] shouldEqual a.toString
         (r \ "valid").as[Boolean] shouldBe v
       }
+    }
+  }
+
+  routePath("/bls/{address}") in {
+    val kp                   = wallet.privateKeyAccounts.head
+    val address              = kp.toAddress
+    val expectedBlsPublicKey = BlsKeyPair(kp.privateKey).publicKey
+
+    Get(routePath(s"/bls/$address")) ~> route ~> check {
+      val r = responseAs[JsObject]
+      (r \ "blsPublicKey").as[String] shouldEqual expectedBlsPublicKey.toString
     }
   }
 
@@ -341,11 +353,18 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
     val requestBody = Json.obj("keys" -> Seq("test"))
 
     val headers: Seq[HttpHeader] =
-      Seq(`Transfer-Encoding`(TransferEncodings.chunked), RawHeader("Content-Type", ContentTypes.`application/json`.value), Accept(MediaTypes.`application/json`))
+      Seq(
+        `Transfer-Encoding`(TransferEncodings.chunked),
+        RawHeader("Content-Type", ContentTypes.`application/json`.value),
+        Accept(MediaTypes.`application/json`)
+      )
 
     Post(
       routePath(s"/data/${account.toAddress}"),
-      HttpEntity.Chunked(ContentTypes.`application/json`, Source(Seq(Chunk(org.apache.pekko.util.ByteString.fromString(requestBody.toString)), LastChunk)))
+      HttpEntity.Chunked(
+        ContentTypes.`application/json`,
+        Source(Seq(Chunk(org.apache.pekko.util.ByteString.fromString(requestBody.toString)), LastChunk))
+      )
     ).withHeaders(headers) ~> route ~> check {
       responseAs[JsValue] should matchJson("""[{"key":"test","type":"string","value":"test"}]""")
     }
