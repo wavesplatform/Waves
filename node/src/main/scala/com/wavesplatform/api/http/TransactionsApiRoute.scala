@@ -1,7 +1,5 @@
 package com.wavesplatform.api.http
 
-import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
-import org.apache.pekko.http.scaladsl.server.Route
 import cats.instances.either.*
 import cats.instances.list.*
 import cats.syntax.alternative.*
@@ -17,13 +15,15 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.reactive.Observable
+import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
+import org.apache.pekko.http.scaladsl.server.Route
 import play.api.libs.json.*
 
 case class TransactionsApiRoute(
@@ -187,12 +187,12 @@ case class TransactionsApiRoute(
 
   def sign: Route = (pathPrefix("sign") & withAuth) {
     pathEndOrSingleSlash(jsonPost[JsObject] { jsv =>
-      TransactionFactory.parseRequestAndSign(wallet, (jsv \ "sender").as[String], time, jsv)
+      mkTxFactory.parseRequestAndSign((jsv \ "sender").as[String], jsv)
     }) ~ signWithSigner
   }
 
   def signWithSigner: Route = path(AddrSegment) { address =>
-    jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.toString, time, _))
+    jsonPost[JsObject](mkTxFactory.parseRequestAndSign(address.toString, _))
   }
 
   def signedBroadcast: Route = path("broadcast") {
@@ -250,6 +250,8 @@ case class TransactionsApiRoute(
       .take(limitParam)
       .mapEval(txMetaEnriched(address, _))
   }
+
+  private def mkTxFactory = TransactionFactory(wallet, time, Height(blockchain.height), blockchain.settings.functionalitySettings)
 }
 
 object TransactionsApiRoute {

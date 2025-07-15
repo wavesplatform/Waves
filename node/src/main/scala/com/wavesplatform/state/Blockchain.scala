@@ -12,7 +12,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.Issue
-import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings}
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
@@ -242,9 +242,15 @@ object Blockchain {
         }
         .fold(1)(_ => BlockRewardCalculator.RewardBoost)
 
-    def currentGenerationPeriodStartHeight: Height = {
-      val commitmentPeriod = blockchain.settings.functionalitySettings.commitmentPeriod
-      Height((blockchain.height / commitmentPeriod) * commitmentPeriod)
-    }
+    def currentGenerationPeriodStartHeight: Height =
+      Blockchain.currentGenerationPeriodStartHeight(Height(blockchain.height), blockchain.settings.functionalitySettings)
   }
+
+  def currentGenerationPeriodStartHeight(height: Height, functionalitySettings: FunctionalitySettings): Height = {
+    val commitmentPeriod = functionalitySettings.commitmentPeriod
+    Height((height / commitmentPeriod) * commitmentPeriod)
+  }
+
+  def nextGenerationPeriodStartHeight(height: Height, functionalitySettings: FunctionalitySettings): Height =
+    Height(currentGenerationPeriodStartHeight(height, functionalitySettings) + functionalitySettings.commitmentPeriod)
 }

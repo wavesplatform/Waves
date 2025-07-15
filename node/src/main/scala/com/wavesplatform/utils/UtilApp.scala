@@ -8,6 +8,7 @@ import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.settings.{WalletSettings, WavesSettings}
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{Transaction, TransactionFactory, TransactionSignOps, TransactionType}
@@ -41,7 +42,7 @@ object UtilApp {
   case class SignOptions(privateKey: PrivateKey = null)
   case class VerifyOptions(publicKey: PublicKey = null, signature: ByteStr = ByteStr.empty, checkWeakPk: Boolean = false)
   case class HashOptions(mode: String = "fast")
-  case class SignTxOptions(signerAddress: String = "")
+  case class SignTxOptions(signerAddress: String = "", currentHeight: Height = Height(1))
   case class KeyPairOptions(seedType: String = "account", nonce: Int = 0)
 
   sealed trait Input
@@ -206,7 +207,11 @@ object UtilApp {
             opt[String]("signer-address")
               .abbr("sa")
               .text("Signer address (requires corresponding key in wallet.dat)")
-              .action((a, c) => c.copy(signTxOptions = c.signTxOptions.copy(signerAddress = a)))
+              .action((a, c) => c.copy(signTxOptions = c.signTxOptions.copy(signerAddress = a))),
+            opt[Int]('h', "current-height")
+              .text("Current height, required for signing CommitToGeneration transaction")
+              .optional()
+              .action((h, c) => c.copy(signTxOptions = c.signTxOptions.copy(currentHeight = Height(h))))
           ),
         cmd("sign-with-sk")
           .text("Sign JSON transaction with private key")
@@ -302,8 +307,8 @@ object UtilApp {
     }
 
     def doSignTx(ns: NodeState)(c: Command, data: Array[Byte]): ActionResult =
-      TransactionFactory
-        .parseRequestAndSign(ns.wallet, c.signTxOptions.signerAddress, ns.time, Json.parse(data).as[JsObject])
+      TransactionFactory(ns.wallet, ns.time, c.signTxOptions.currentHeight, ns.settings.blockchainSettings.functionalitySettings)
+        .parseRequestAndSign(c.signTxOptions.signerAddress, Json.parse(data).as[JsObject])
         .left
         .map(_.toString)
         .map(tx => Json.toBytes(tx.json()))

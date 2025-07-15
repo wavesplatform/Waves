@@ -1,10 +1,12 @@
 package com.wavesplatform.transaction
 
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.*
 import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.CommitToGenerationTxValidator
@@ -13,9 +15,10 @@ import play.api.libs.json.*
 
 final case class CommitToGenerationTransaction(
     sender: PublicKey,
-    fee: TxPositiveAmount,
-    timestamp: TxTimestamp,
     endorsementPublicKey: BlsPublicKey,
+    generationPeriodStart: Height,
+    timestamp: TxTimestamp,
+    fee: TxPositiveAmount,
     endorsementKeySignature: ByteStr,
     proofs: Proofs,
     override val chainId: Byte
@@ -31,7 +34,8 @@ final case class CommitToGenerationTransaction(
     Coeval.evalOnce(
       BaseTxJson.toJson(this) ++ Json.obj(
         "endorsementPublicKey"    -> endorsementPublicKey.asByteStr.toString,
-        "endorsementKeySignature" -> endorsementKeySignature.toString
+        "endorsementKeySignature" -> endorsementKeySignature.toString,
+        "generationPeriodStart"   -> generationPeriodStart
       )
     )
 }
@@ -41,22 +45,19 @@ object CommitToGenerationTransaction {
 
   implicit def signed(tx: CommitToGenerationTransaction, privateKey: PrivateKey): CommitToGenerationTransaction = {
     val blsKP      = BlsKeyPair(privateKey)
-    val blsMessage = blsKP.publicKey.asByteStr.arr // TODO: What else?
+    val blsMessage = blsKP.publicKey.asByteStr.arr ++ Ints.toByteArray(tx.generationPeriodStart)
     val blsSig     = blsKP.sign(blsMessage)
 
-    val txWithBlsSig = tx.copy(
-      endorsementPublicKey = blsKP.publicKey,
-      endorsementKeySignature = ByteStr(blsSig)
-    )
-
+    val txWithBlsSig = tx.copy(endorsementPublicKey = blsKP.publicKey, endorsementKeySignature = ByteStr(blsSig))
     txWithBlsSig.copy(proofs = Proofs(crypto.sign(privateKey, txWithBlsSig.bodyBytes())))
   }
 
   def create(
       sender: PublicKey,
-      feeInWaves: Long,
-      timestamp: TxTimestamp,
       endorsementPublicKey: BlsPublicKey,
+      generationPeriodStart: Height,
+      timestamp: TxTimestamp,
+      feeInWaves: Long,
       endorsementKeySignature: ByteStr,
       proofs: Proofs,
       chainId: Byte
@@ -65,9 +66,10 @@ object CommitToGenerationTransaction {
       feeInWaves <- TxPositiveAmount(feeInWaves)(TxValidationError.InsufficientFee)
       tx <- CommitToGenerationTransaction(
         sender,
-        feeInWaves,
-        timestamp,
         endorsementPublicKey,
+        generationPeriodStart,
+        timestamp,
+        feeInWaves,
         endorsementKeySignature,
         proofs,
         chainId
@@ -77,11 +79,19 @@ object CommitToGenerationTransaction {
   def selfSigned(
       sender: KeyPair,
       endorsementPublicKey: BlsPublicKey,
-      endorsementKeySignature: ByteStr,
-      feeInWaves: Long,
+      generationPeriodStart: Height,
       timestamp: TxTimestamp,
+      feeInWaves: Long,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, CommitToGenerationTransaction] =
-    create(sender.publicKey, feeInWaves, timestamp, endorsementPublicKey, endorsementKeySignature, Proofs.empty, chainId)
-      .map(signed(_, sender.privateKey))
+    create(
+      sender.publicKey,
+      endorsementPublicKey,
+      generationPeriodStart,
+      timestamp,
+      feeInWaves,
+      endorsementKeySignature = ByteStr.empty,
+      Proofs.empty,
+      chainId
+    ).map(signed(_, sender.privateKey))
 }

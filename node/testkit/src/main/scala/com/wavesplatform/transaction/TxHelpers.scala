@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.google.common.primitives.Ints
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.*
-import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey}
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit, ScriptExtraFee}
-import com.wavesplatform.state.{DataEntry, StringDataEntry}
+import com.wavesplatform.state.{DataEntry, Height, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.*
@@ -462,13 +462,21 @@ object TxHelpers {
   }
 
   def commitToGeneration(
-      endorsementKeyPair: BlsKeyPair, // TODO:
+      generationPeriodStart: Int,
       sender: KeyPair = defaultSigner,
+      timestamp: TxTimestamp = timestamp,
       fee: Long = FeeConstants(TransactionType.CommitToGeneration) * FeeUnit,
-      chainId: Byte = AddressScheme.current.chainId,
-      timestamp: TxTimestamp = timestamp
-  ): CommitToGenerationTransaction =
-    CommitToGenerationTransaction.selfSigned(sender, BlsPublicKey(ByteStr.empty), ByteStr.empty, fee, timestamp, chainId).explicitGet()
+      chainId: Byte = AddressScheme.current.chainId
+  ): CommitToGenerationTransaction = CommitToGenerationTransaction
+    .selfSigned(
+      sender,
+      BlsPublicKey(ByteStr.empty),
+      Height(generationPeriodStart),
+      timestamp,
+      fee,
+      chainId
+    )
+    .explicitGet()
 
   def ciFee(sc: Int = 0, nonNftIssue: Int = 0, freeCall: Boolean = false): Long =
     invokeFee(freeCall) + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeConstants(TransactionType.Issue) * FeeUnit

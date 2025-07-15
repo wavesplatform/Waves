@@ -1,10 +1,12 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.*
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.bls.BlsPublicKey
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.{CommitToGenerationTransaction, Proofs}
+import com.wavesplatform.state.Height
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
+import com.wavesplatform.transaction.{CommitToGenerationTransaction, Proofs, TransactionType}
 import play.api.libs.json.*
 
 object CommitToGenerationRequest {
@@ -13,19 +15,20 @@ object CommitToGenerationRequest {
 }
 
 case class CommitToGenerationRequest(
-    chainId: Option[Byte],
     sender: Option[String],
-    fee: Long,
-    timestamp: Option[Long]
+    generationPeriodStart: Option[Int],
+    timestamp: Option[Long],
+    chainId: Option[Byte]
 ) {
-  def toTxFrom(sender: PublicKey): Either[ValidationError, CommitToGenerationTransaction] =
+  def toTxFrom(sender: PublicKey, defaultGenerationPeriodStart: Height): Either[ValidationError, CommitToGenerationTransaction] =
     for {
       tx <- CommitToGenerationTransaction.create(
         sender,
-        fee,
-        timestamp.getOrElse(0L),
         BlsPublicKey(Array.emptyByteArray),
-        ByteStr.empty,
+        Height(generationPeriodStart.getOrElse(defaultGenerationPeriodStart)),
+        timestamp.getOrElse(0L),
+        FeeConstants(TransactionType.CommitToGeneration) * FeeUnit,
+        endorsementKeySignature = ByteStr.empty,
         Proofs.empty,
         chainId.getOrElse(AddressScheme.current.chainId)
       )
@@ -34,9 +37,10 @@ case class CommitToGenerationRequest(
 
 case class SignedCommitToGenerationRequest(
     sender: String,
-    fee: Long,
-    timestamp: Long,
     endorsementPublicKey: ByteStr,
+    generationPeriodStart: Int,
+    timestamp: Long,
+    fee: Long,
     endorsementKeySignature: ByteStr,
     proofs: Proofs
 ) {
@@ -45,9 +49,10 @@ case class SignedCommitToGenerationRequest(
       _sender <- PublicKey.fromBase58String(sender)
       t <- CommitToGenerationTransaction.create(
         _sender,
-        fee,
-        timestamp,
         BlsPublicKey(endorsementPublicKey),
+        Height(generationPeriodStart),
+        timestamp,
+        fee,
         endorsementKeySignature,
         proofs,
         AddressScheme.current.chainId

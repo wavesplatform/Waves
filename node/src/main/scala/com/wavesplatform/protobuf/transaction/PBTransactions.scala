@@ -3,9 +3,9 @@ package com.wavesplatform.protobuf.transaction
 import cats.syntax.traverse.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -15,7 +15,7 @@ import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.*
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntry, Height, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction as vt
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, NegativeAmount}
@@ -321,12 +321,15 @@ object PBTransactions {
           chainId
         )
 
-      case Data.CommitToGeneration(CommitToGenerationTransactionData(endorsementPublicKey, endorsementKeySignature, `empty`)) =>
+      case Data.CommitToGeneration(
+            CommitToGenerationTransactionData(generationPeriodStart, endorsementPublicKey, endorsementKeySignature, `empty`)
+          ) =>
         CommitToGenerationTransaction.create(
           sender,
-          feeAmount,
-          timestamp,
           BlsPublicKey(endorsementPublicKey.toByteStr),
+          Height(generationPeriodStart),
+          timestamp,
+          feeAmount,
           endorsementKeySignature.toByteStr,
           proofs,
           chainId
@@ -697,9 +700,10 @@ object PBTransactions {
         val data = Data.InvokeExpression(InvokeExpressionTransactionData(tx.expressionBytes.toByteString))
         PBTransactions.create(sender, chainId, fee.value, feeAssetId, timestamp, version, proofs, data)
 
-      case tx @ CommitToGenerationTransaction(sender, fee, timestamp, endorsementPublicKey, endorsemenetKeySignature, proofs, chainId) =>
+      case tx: CommitToGenerationTransaction =>
+        import tx.*
         val data = Data.CommitToGeneration(
-          CommitToGenerationTransactionData(endorsementPublicKey.asByteStr.toByteString, endorsemenetKeySignature.toByteString)
+          CommitToGenerationTransactionData(generationPeriodStart, endorsementPublicKey.asByteStr.toByteString, endorsementKeySignature.toByteString)
         )
         PBTransactions.create(sender, chainId, fee.value, Waves, timestamp, tx.version, proofs.proofs, data)
 
