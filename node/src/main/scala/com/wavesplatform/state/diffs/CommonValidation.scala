@@ -154,6 +154,7 @@ object CommonValidation {
         case V6                               => barrierByVersion(V6)
         case V7                               => barrierByVersion(V7)
         case V8                               => barrierByVersion(V8)
+        case V9                               => barrierByVersion(V9)
       }
 
       def oldScriptVersionDeactivation(sc: Script): Either[ActivationError, Unit] = sc.stdLibVersion match {

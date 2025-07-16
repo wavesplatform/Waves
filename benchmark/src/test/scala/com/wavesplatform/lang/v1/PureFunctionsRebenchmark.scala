@@ -6,7 +6,6 @@ import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.*
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.NoLimit
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
@@ -19,7 +18,6 @@ import org.openjdk.jmh.infra.Blackhole
 
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import scala.compiletime.uninitialized
-import scala.util.Random
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -223,7 +221,7 @@ object PureFunctionsRebenchmark {
     var expr: EXPR = uninitialized
 
     @Setup def setup(): Unit = {
-      expr = fromBaseStringExpr(Global.base16Encode(randomBytes(byteCount), false).explicitGet(), FunctionIds.FROMBASE16)
+      expr = fromBaseStringExpr(Global.base16Encode(randomBytes(byteCount), None).explicitGet(), FunctionIds.FROMBASE16)
     }
   }
 

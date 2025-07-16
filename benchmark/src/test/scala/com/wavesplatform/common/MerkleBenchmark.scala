@@ -1,7 +1,6 @@
 package com.wavesplatform.common
 
 import com.google.common.primitives.Ints
-import com.wavesplatform.common.merkle.*
 import com.wavesplatform.common.merkle.Merkle.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.explicitGet

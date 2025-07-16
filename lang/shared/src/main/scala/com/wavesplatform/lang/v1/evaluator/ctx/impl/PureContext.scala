@@ -228,15 +228,15 @@ object PureContext {
   }
 
   lazy val sumToBigInt: BaseFunction[NoContext] =
-    bigIntArithmeticOp(SUM_OP, SUM_BIGINT, Map[StdLibVersion, Long](V5 -> 8L, V6 -> 8L, V7 -> 8L, V8 -> 1L)) { _ + _ }
+    bigIntArithmeticOp(SUM_OP, SUM_BIGINT, Map(V5 -> 8L, V6 -> 8L, V7 -> 8L, V8 -> 1L)) { _ + _ }
   lazy val subToBigInt: BaseFunction[NoContext] =
-    bigIntArithmeticOp(SUB_OP, SUB_BIGINT, Map[StdLibVersion, Long](V5 -> 8L, V6 -> 8L, V7 -> 8L, V8 -> 1L)) { _ - _ }
+    bigIntArithmeticOp(SUB_OP, SUB_BIGINT, Map(V5 -> 8L, V6 -> 8L, V7 -> 8L, V8 -> 1L)) { _ - _ }
   lazy val mulToBigInt: BaseFunction[NoContext] =
-    bigIntArithmeticOp(MUL_OP, MUL_BIGINT, Map[StdLibVersion, Long](V5 -> 64L, V6 -> 64L, V7 -> 64L, V8 -> 1L)) { _ * _ }
+    bigIntArithmeticOp(MUL_OP, MUL_BIGINT, Map(V5 -> 64L, V6 -> 64L, V7 -> 64L, V8 -> 1L)) { _ * _ }
   lazy val divToBigInt: BaseFunction[NoContext] =
-    bigIntArithmeticOp(DIV_OP, DIV_BIGINT, Map[StdLibVersion, Long](V5 -> 64L, V6 -> 64L, V7 -> 64L, V8 -> 1L)) { _ / _ }
+    bigIntArithmeticOp(DIV_OP, DIV_BIGINT, Map(V5 -> 64L, V6 -> 64L, V7 -> 64L, V8 -> 1L)) { _ / _ }
   lazy val modToBigInt: BaseFunction[NoContext] =
-    bigIntArithmeticOp(MOD_OP, MOD_BIGINT, Map[StdLibVersion, Long](V5 -> 64L, V6 -> 64L, V7 -> 64L, V8 -> 1L)) { _ % _ }
+    bigIntArithmeticOp(MOD_OP, MOD_BIGINT, Map(V5 -> 64L, V6 -> 64L, V7 -> 64L, V8 -> 1L)) { _ % _ }
 
   lazy val negativeBigInt: BaseFunction[NoContext] =
     NativeFunction("-", Map(V5 -> 8L, V6 -> 8L, V7 -> 8L, V8 -> 1L), UMINUS_BIGINT, BIGINT, ("n", BIGINT)) {
@@ -251,7 +251,7 @@ object PureContext {
 
   lazy val throwNoMessage: BaseFunction[NoContext] = UserFunction(
     "throw",
-    Map[StdLibVersion, Long](V1 -> 2, V2 -> 2, V3 -> 1, V4 -> 1),
+    Map(V1 -> 2L, V2 -> 2L, V3 -> 1L, V4 -> 1L),
     NOTHING
   ) {
     FUNCTION_CALL(throwWithMessage, List(CONST_STRING(defaultThrowMessage).explicitGet()))
@@ -543,7 +543,7 @@ object PureContext {
   private def takeBytes(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "take",
-      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
+      Map(V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L, V9 -> 2L),
       TAKE_BYTES,
       BYTESTR,
       ("xs", BYTESTR),
@@ -567,7 +567,7 @@ object PureContext {
   private def dropBytes(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "drop",
-      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
+      Map(V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L, V9 -> 2L),
       DROP_BYTES,
       BYTESTR,
       ("xs", BYTESTR),
@@ -597,7 +597,7 @@ object PureContext {
     UserFunction(
       "dropRight",
       "dropRightBytes",
-      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 6L),
+      Map(V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 6L),
       BYTESTR,
       ("@xs", BYTESTR),
       ("@number", LONG)
@@ -644,7 +644,7 @@ object PureContext {
   private val takeRightBytesFromV6: BaseFunction[NoContext] =
     NativeFunction(
       "takeRight",
-      6,
+      Map(V6 -> 6L, V9 -> 2L),
       TAKE_RIGHT_BYTES,
       BYTESTR,
       ("xs", BYTESTR),
@@ -665,7 +665,7 @@ object PureContext {
   private val dropRightBytesFromV6: BaseFunction[NoContext] =
     NativeFunction(
       "dropRight",
-      6,
+      Map(V6 -> 6L, V9 -> 2L),
       DROP_RIGHT_BYTES,
       BYTESTR,
       ("xs", BYTESTR),
@@ -699,7 +699,7 @@ object PureContext {
   private def takeStringFixed(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "take",
-      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L, V5 -> 20L),
+      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L, V5 -> 20L, V9 -> 2),
       TAKE_STRING,
       STRING,
       ("xs", STRING),
@@ -782,7 +782,7 @@ object PureContext {
   private def dropStringFixed(checkLimits: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "drop",
-      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L, V5 -> 20L),
+      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L, V5 -> 20L, V9 -> 2L),
       DROP_STRING,
       STRING,
       ("xs", STRING),
@@ -859,7 +859,7 @@ object PureContext {
   private val takeRightStringFromV6: BaseFunction[NoContext] =
     NativeFunction(
       "takeRight",
-      20L,
+      Map(V6 -> 20L, V9 -> 2L),
       TAKE_RIGHT_STRING,
       STRING,
       ("xs", STRING),
@@ -882,7 +882,7 @@ object PureContext {
   private val dropRightStringBeforeV6: BaseFunction[NoContext] =
     UserFunction(
       "dropRight",
-      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L),
+      Map(V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L),
       STRING,
       ("@xs", STRING),
       ("@number", LONG)
@@ -905,7 +905,7 @@ object PureContext {
   private val dropRightStringFixedBeforeV6: BaseFunction[NoContext] =
     UserFunction(
       "dropRight",
-      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
+      Map(V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L, V5 -> 20L),
       STRING,
       ("@xs", STRING),
       ("@number", LONG)
@@ -928,7 +928,7 @@ object PureContext {
   private val dropRightStringFromV6: BaseFunction[NoContext] =
     NativeFunction(
       "dropRight",
-      20L,
+      Map(V6 -> 20L, V9 -> 2L),
       DROP_RIGHT_STRING,
       STRING,
       ("xs", STRING),
@@ -1423,7 +1423,7 @@ object PureContext {
   lazy val getElement: BaseFunction[NoContext] =
     NativeFunction(
       "getElement",
-      2,
+      Map(V1 -> 2L, V9 -> 1L),
       GET_LIST,
       TYPEPARAM('T'),
       ("arr", PARAMETERIZEDLIST(TYPEPARAM('T'))),
@@ -1438,7 +1438,7 @@ object PureContext {
     }
 
   lazy val getListSize: BaseFunction[NoContext] =
-    NativeFunction("size", 2, SIZE_LIST, LONG, ("arr", PARAMETERIZEDLIST(TYPEPARAM('T')))) {
+    NativeFunction("size", Map(V1 -> 2L, V9 -> 1L), SIZE_LIST, LONG, ("arr", PARAMETERIZEDLIST(TYPEPARAM('T')))) {
       case ARR(arr) :: Nil => Right(CONST_LONG(arr.size.toLong))
       case xs              => notImplemented[Id, EVALUATED](s"size(arr: Array)", xs)
     }
@@ -1460,7 +1460,7 @@ object PureContext {
       case ARR(list) :: Nil =>
         Either.cond(
           list.nonEmpty,
-          CONST_LONG(list.asInstanceOf[IndexedSeq[CONST_LONG]].view.map(_.t).max),
+          list.asInstanceOf[IndexedSeq[CONST_LONG]].min,
           "Can't find min for empty list"
         )
       case xs =>
@@ -1524,7 +1524,7 @@ object PureContext {
   lazy val listRemoveByIndex: BaseFunction[NoContext] =
     NativeFunction(
       "removeByIndex",
-      Map(V4 -> 7L, V5 -> 7L, V6 -> 7L, V7 -> 7L, V8 -> 4L),
+      Map(V4 -> 7L, V5 -> 7L, V6 -> 7L, V7 -> 7L, V8 -> 4L, V9 -> 1L),
       REMOVE_BY_INDEX_OF_LIST,
       PARAMETERIZEDLIST(TYPEPARAM('T')),
       ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
@@ -1546,7 +1546,7 @@ object PureContext {
   private val listReplaceByIndex: BaseFunction[NoContext] =
     NativeFunction(
       "replaceByIndex",
-      4,
+      Map(V8 -> 4L, V9 -> 1L),
       REPLACE_BY_INDEX_OF_LIST,
       PARAMETERIZEDLIST(TYPEPARAM('T')),
       ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),

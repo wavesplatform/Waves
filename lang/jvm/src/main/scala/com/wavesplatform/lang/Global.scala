@@ -29,8 +29,8 @@ object Global extends BaseGlobal {
     if (input.length > limit) Left(s"base58Decode input exceeds $limit")
     else Base58.tryDecodeWithLimit(input, limit).toEither.left.map(_ => "can't parse Base58 string")
 
-  def base64Encode(input: Array[Byte]): Either[String, String] =
-    Either.cond(input.length <= MaxBase64Bytes, Base64.encode(input), s"base64Encode input exceeds $MaxBase64Bytes")
+  def base64Encode(input: Array[Byte], limit: Int): Either[String, String] =
+    Either.cond(input.length <= limit, Base64.encode(input), s"base64Encode input exceeds $limit")
 
   def base64Decode(input: String, limit: Int): Either[String, Array[Byte]] =
     for {

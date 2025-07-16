@@ -116,6 +116,11 @@ object FunctionIds {
   val TOBASE16: Short   = 604
   val FROMBASE16: Short = 605
 
+  val TOBASE64_1C: Short   = 606
+  val FROMBASE64_1C: Short = 607
+  val TOBASE16_1C: Short   = 608
+  val FROMBASE16_1C: Short = 609
+
   val CHECK_MERKLE_PROOF: Short = 700
   val CREATE_MERKLE_ROOT: Short = 701
 

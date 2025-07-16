@@ -1,0 +1,60 @@
+{
+  funcs: [
+    {
+      name: "getBinary"
+      params: [ "String" ]
+      doc: "Gets an array of bytes by key from state of current account."
+      paramsDoc: [ "The key." ]
+      complexity: 10
+    }
+    {
+      name: "getBinaryValue"
+      params: [ "String" ]
+      doc: "Gets an array of bytes by key from state of current account. Throws an exception if there is no data."
+      paramsDoc: [ "The key." ]
+      complexity: 10
+    }
+    {
+      name: "getBoolean"
+      params: [ "String" ]
+      doc: "Gets a boolean value by key from state of current account."
+      paramsDoc: [ "The key." ]
+      complexity: 10
+    }
+    {
+      name: "getBooleanValue"
+      params: [ "String" ]
+      doc: "Gets a boolean value by key from state of current account. Throws an exception if there is no data."
+      paramsDoc: [ "The key." ]
+      complexity: 10
+    }
+    {
+      name: "getInteger"
+      params: [ "String" ]
+      doc: "Gets an integer by key from state of current account."
+      paramsDoc: [ "The key." ]
+      complexity: 10
+    }
+    {
+      name: "getIntegerValue"
+      params: [ "String" ]
+      doc: "Gets an integer by key from state of current account. Throws an exception if there is no data."
+      paramsDoc: [ "The key." ]
+      complexity: 10
+    }
+    {
+      name: "getString"
+      params: [ "String" ]
+      doc: "Gets a string by key from state of current account."
+      paramsDoc: [ "The key." ]
+      complexity: 10
+    }
+    {
+      name: "getStringValue"
+      params: [ "String" ]
+      doc: "Gets a string by key from state of current account. Throws an exception if there is no data."
+      paramsDoc: [ "The key." ]
+      complexity: 10
+    }
+  ]
+}

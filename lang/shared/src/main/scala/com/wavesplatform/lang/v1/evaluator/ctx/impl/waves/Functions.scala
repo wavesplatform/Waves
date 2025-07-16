@@ -145,7 +145,7 @@ object Functions {
   private def getDataByIndexF(name: String, dataType: DataType, version: StdLibVersion): BaseFunction[Environment] =
     UserFunction(
       name,
-      Map[StdLibVersion, Long](V1 -> 30L, V2 -> 30L, V3 -> 30L, V4 -> 4L),
+      Map[StdLibVersion, Long](V1 -> 30L, V2 -> 30L, V3 -> 30L, V4 -> 4L, V9 -> 2L),
       UNION(dataType.innerType, UNIT),
       ("@data", LIST(commonDataEntryType(version))),
       ("@index", LONG)
