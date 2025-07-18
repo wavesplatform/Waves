@@ -4,7 +4,7 @@ Jmh / version := "1.37"
 
 libraryDependencies ++= Seq(
   "org.scodec"             %% "scodec-core"         % "2.3.2",
-  "org.eclipse.collections" % "eclipse-collections" % "12.0.0",
+  "org.eclipse.collections" % "eclipse-collections" % "13.0.0",
   "commons-codec"           % "commons-codec"       % "1.18.0"
 ) ++ Dependencies.logDeps
 

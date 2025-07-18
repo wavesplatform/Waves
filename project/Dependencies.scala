@@ -5,14 +5,14 @@ import scalapb.compiler.Version.scalapbVersion
 
 //noinspection TypeAnnotation
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.122.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.123.Final"
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "4.31.1"
   val overrides = Def.setting(
     Seq(
       "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
       "com.google.code.gson"      % "gson"           % "2.13.1",
-      "com.squareup.okio"         % "okio-jvm"       % "3.13.0",
+      "com.squareup.okio"         % "okio-jvm"       % "3.15.0",
       "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
       nettyModule("codec-http2"),
       nettyModule("codec-http"),
@@ -33,13 +33,13 @@ object Dependencies {
   private[this] val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.5.2" classifier "protobuf-src" intransitive ()
 
-  private def pekkoModule(module: String) = ("org.apache.pekko" %% s"pekko-$module" % "1.1.4")
+  private def pekkoModule(module: String) = ("org.apache.pekko" %% s"pekko-$module" % "1.1.5")
 
   private def pekkoHttpModule(module: String, version: String = "1.2.0") = "org.apache.pekko" %% module % version
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.7"
 
-  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.19.1"
+  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.19.2"
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.9.8" // 4.10+ requires Java 17 https://github.com/web3j/web3j/issues/1907
 
@@ -60,7 +60,7 @@ object Dependencies {
   val playJson = "org.playframework" %% "play-json" % "3.0.5"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
-  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.5" % Test)
+  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.9" % Test)
 
   private def sttp3Module(module: String) = "com.softwaremill.sttp.client3" %% module % "3.11.0"
 
@@ -90,9 +90,9 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
-    "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.23", // To support Apple ARM
-    "com.spotify"                      % "docker-client"                 % "8.16.0",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.19.1",
+    "com.github.jnr" % "jnr-unixsocket" % "0.38.23", // To support Apple ARM
+    "com.spotify"    % "docker-client"  % "8.16.0",
+    jacksonModule("dataformat", "dataformat-properties"),
     asyncHttpClient
   ).map(_ % Test)
 
@@ -124,7 +124,7 @@ object Dependencies {
         .exclude("org.scala-js", "scalajs-library_2.13")
         .cross(CrossVersion.for3Use2_13),
       "commons-net"            % "commons-net"               % "3.11.1",
-      "commons-io"             % "commons-io"                % "2.19.0",
+      "commons-io"             % "commons-io"                % "2.20.0",
       "com.github.pureconfig" %% "pureconfig-core"           % "0.17.9",
       "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.9",
       "net.logstash.logback"   % "logstash-logback-encoder"  % "8.1" % Runtime,
@@ -145,7 +145,7 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "13.3.0",
+      "com.esaulpaugh"              % "headlong"      % "13.3.1",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
     ) ++ console ++ logDeps ++ protobuf.value
@@ -179,7 +179,7 @@ object Dependencies {
   lazy val rideRunner = Def.setting(
     Seq(
       rocksdb,
-      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.2.1",
+      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.2.2",
       "net.logstash.logback"          % "logstash-logback-encoder" % "8.1" % Runtime,
       kamonModule("caffeine"),
       kamonModule("prometheus"),
