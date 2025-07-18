@@ -216,7 +216,7 @@ object PureFunctionsRebenchmark {
 
   @State(Scope.Benchmark)
   class FromBase16 {
-    @Param(Array("32", "64", "128", "1024", "8192", "16383"))
+    @Param(Array("1024", "8192", "16383"))
     var byteCount  = 0
     var expr: EXPR = uninitialized
 
@@ -245,13 +245,13 @@ object PureFunctionsRebenchmark {
   }
 
   class ToBase16 extends ToBaseStr(FunctionIds.TOBASE16) {
-    @Param(Array("128", "256", "512", "8192"))
+    @Param(Array("512", "1024", "8192"))
     var byteCount = 0
   }
 
   @State(Scope.Benchmark)
   class SumByteString {
-    @Param(Array("1", "1024", "4096", "16384", "32766"))
+    @Param(Array("1024", "4096", "16384", "32766"))
     var prefixLength = 0
     var expr: EXPR   = uninitialized
 

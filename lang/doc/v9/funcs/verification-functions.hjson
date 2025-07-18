@@ -335,7 +335,7 @@
         "Hash of transaction."
         "Index of the transaction in the block."
       ]
-      complexity: 30
+      complexity: 3
     }
   ]
 }

@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.syntax.either.*
 import ch.obermuhlner.math.big.BigDecimalMath
+import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto.{Blake2b256, Curve25519, Keccak256, Sha256}
@@ -13,7 +14,6 @@ import com.wavesplatform.zwaves.bls12.Groth16 as Bls12Groth16
 import com.wavesplatform.zwaves.bn256.Groth16 as Bn256Groth16
 import org.web3j.crypto.Sign
 import org.web3j.crypto.Sign.SignatureData
-import org.web3j.utils
 
 import java.math.{BigInteger, MathContext, BigDecimal as BD}
 import java.security.spec.InvalidKeySpecException
@@ -38,11 +38,13 @@ object Global extends BaseGlobal {
       result <- Base64.tryDecode(input).toEither.left.map(_ => "can't parse Base64 string")
     } yield result
 
+  private val base16Codec: BaseEncoding = BaseEncoding.base16().lowerCase().ignoreCase()
+
   override def base16EncodeImpl(input: Array[Byte]): Either[String, String] =
-    tryEither(utils.Numeric.toHexString(input, 0, input.length, false))
+    tryEither(base16Codec.encode(input))
 
   override def base16DecodeImpl(input: String): Either[String, Array[Byte]] =
-    tryEither(utils.Numeric.hexStringToByteArray(input))
+    tryEither(base16Codec.decode(input))
 
   private def tryEither[A](f: => A): Either[String, A] =
     Try(f).toEither
@@ -182,7 +184,7 @@ object Global extends BaseGlobal {
     if (handleLeadingZerosInPublicKey) {
       org.web3j.utils.Numeric.toBytesPadded(pk, 64)
     } else {
-      utils.Numeric.hexStringToByteArray(pk.toString(16))
+      base16Codec.decode(pk.toString(16))
     }
   }
 }

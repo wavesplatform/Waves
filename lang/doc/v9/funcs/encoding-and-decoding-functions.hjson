@@ -110,7 +110,14 @@
       params: [ "ByteVector" ]
       doc: "Encodes array of bytes to [Base16](https://en.wikipedia.org/wiki/Hexadecimal) string."
       paramsDoc: [ "The array of bytes to encode." ]
-      complexity: 10
+      complexity: 4
+    }
+    {
+      name: "toBase16String_1C"
+      params: [ "ByteVector" ]
+      doc: "Encodes array of bytes to [Base16](https://en.wikipedia.org/wiki/Hexadecimal) string."
+      paramsDoc: [ "The array of bytes to encode. Max array length is 1024 bytes." ]
+      complexity: 1
     }
     {
       name: "toBase58String"
@@ -124,14 +131,28 @@
       params: [ "ByteVector" ]
       doc: "Encodes array of bytes to [Base64](https://en.wikipedia.org/wiki/Base64) string."
       paramsDoc: [ "The array of bytes to encode." ]
-      complexity: 35
+      complexity: 3
+    }
+    {
+      name: "toBase64String_1C"
+      params: [ "ByteVector" ]
+      doc: "Encodes array of bytes to [Base64](https://en.wikipedia.org/wiki/Base64) string."
+      paramsDoc: [ "The array of bytes to encode. Max length is 1024 bytes." ]
+      complexity: 1
     }
     {
       name: "fromBase16String"
       params: [ "String" ]
       doc: "Decodes [Base16](https://en.wikipedia.org/wiki/Hexadecimal) string to an array of bytes."
       paramsDoc: [ "The string to decode." ]
-      complexity: 10
+      complexity: 4
+    }
+    {
+      name: "fromBase16String_1C"
+      params: [ "String" ]
+      doc: "Decodes [Base16](https://en.wikipedia.org/wiki/Hexadecimal) string to an array of bytes."
+      paramsDoc: [ "The string to decode. Max length is 2048 chars." ]
+      complexity: 1
     }
     {
       name: "fromBase58String"
@@ -145,7 +166,14 @@
       params: [ "String" ]
       doc: "Decodes [Base64](https://en.wikipedia.org/wiki/Base64) string to an array of bytes."
       paramsDoc: [ "The string to decode." ]
-      complexity: 40
+      complexity: 12
+    }
+    {
+      name: "fromBase64String_1C"
+      params: [ "String" ]
+      doc: "Decodes [Base64](https://en.wikipedia.org/wiki/Base64) string to an array of bytes."
+      paramsDoc: [ "The string to decode. Max resulting byte array size is 1024 bytes." ]
+      complexity: 1
     }
     {
       name: "addressFromString"

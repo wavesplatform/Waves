@@ -68,13 +68,13 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   private def evalV1[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
     defaultEvaluator[T](context, expr)
 
-  private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
+  private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR)(using version: StdLibVersion): Either[ExecutionError, T] =
     EvaluatorV2
       .applyCompleted(
         context,
         expr,
         LogExtraInfo(),
-        implicitly[StdLibVersion],
+        version,
         correctFunctionCallScope = true,
         newMode = true,
         enableExecutionLog = false,
@@ -83,7 +83,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       ._3
       .asInstanceOf[Either[ExecutionError, T]]
 
-  private def eval[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
+  private def eval[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR)(using version: StdLibVersion): Either[ExecutionError, T] = {
     val evaluatorV1Result = evalV1[T](context, expr)
     val evaluatorV2Result = evalV2[T](context, expr)
 
@@ -91,7 +91,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     evaluatorV1Result
   }
 
-  private def evalPure[T <: EVALUATED](context: EvaluationContext[NoContext, Id] = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
+  private def evalPure[T <: EVALUATED](context: EvaluationContext[NoContext, Id] = pureEvalContext, expr: EXPR)(using version: StdLibVersion): Either[ExecutionError, T] =
     eval[T](context.asInstanceOf[EvaluationContext[Environment, Id]], expr)
 
   private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
@@ -487,7 +487,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("dropRightBytes(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) { case (xs, number) =>
       val expr   = FUNCTION_CALL(Native(FunctionIds.DROP_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-      val actual = evalPure[EVALUATED](pureContext(using V6).evaluationContext, expr).leftMap(_.message)
+      val actual = evalPure[EVALUATED](pureContext(using V6).evaluationContext, expr)(using V6).leftMap(_.message)
       val limit  = 165947
       actual shouldBe (
         if (number < 0)
@@ -503,7 +503,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("takeRightBytes(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) { case (xs, number) =>
       val expr   = FUNCTION_CALL(Native(FunctionIds.TAKE_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-      val actual = evalPure[EVALUATED](pureContext(using V6).evaluationContext, expr).leftMap(_.message)
+      val actual = evalPure[EVALUATED](pureContext(using V6).evaluationContext, expr)(using V6).leftMap(_.message)
       val limit  = 165947
       actual shouldBe (
         if (number < 0)

@@ -12,14 +12,14 @@
       params: [ "String", "Int" ]
       doc: "Drops the first n characters of a string"
       paramsDoc: [ "The string.", "The number n." ]
-      complexity: 20
+      complexity: 2
     }
     {
       name: "dropRight"
       params: [ "String", "Int" ]
       doc: "Drops the last n characters of a string"
       paramsDoc: [ "The string.", "The number n." ]
-      complexity: 20
+      complexity: 2
     }
     {
       name: "indexOf"
@@ -82,14 +82,28 @@
       params: [ "String", "Int" ]
       doc: "Takes the first n characters from a string"
       paramsDoc: [ "The string.", "The number n." ]
-      complexity: 20
+      complexity: 2
     }
     {
       name: "takeRight"
       params: [ "String", "Int" ]
       doc: "Takes the last n characters from a string"
       paramsDoc: [ "The string.", "The number n." ]
-      complexity: 20
+      complexity: 2
+    }
+    {
+      name: "replaceAll"
+      params: [ "String", "String", "String" ]
+      doc: "Replaces all of the occurrences of the substring in the given string."
+      paramsDoc: [ "The string.", "The substring.", "The replacement." ]
+      complexity: 2
+    }
+    {
+      name: "replaceFirst"
+      params: [ "String", "String", "String" ]
+      doc: "Replaces the first occurrence of the substring in the given string."
+      paramsDoc: [ "The string.", "The substring.", "The replacement." ]
+      complexity: 2
     }
   ]
 }

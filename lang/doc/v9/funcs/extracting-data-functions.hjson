@@ -34,28 +34,28 @@
       params: [ "List[BinaryEntry|BooleanEntry|DeleteEntry|IntegerEntry|StringEntry]", "Int" ]
       doc: "Gets integer from a list of data entries by index"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
-      complexity: 4
+      complexity: 2
     }
 	{
       name: "getBoolean"
       params: [ "List[BinaryEntry|BooleanEntry|DeleteEntry|IntegerEntry|StringEntry]", "Int" ]
       doc: "Gets a boolean value from a list of data entries by index"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
-      complexity: 4
+      complexity: 2
     }
 	{
       name: "getBinary"
       params: [ "List[BinaryEntry|BooleanEntry|DeleteEntry|IntegerEntry|StringEntry]", "Int" ]
       doc: "Gets a binary value from a list of data entries by index"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
-      complexity: 4
+      complexity: 2
     }
 	{
       name: "getString"
       params: [ "List[BinaryEntry|BooleanEntry|DeleteEntry|IntegerEntry|StringEntry]", "Int" ]
       doc: "Gets a string value from a list of data entries by index"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
-      complexity: 4
+      complexity: 2
     }
 	{
       name: "getIntegerValue"
@@ -90,28 +90,28 @@
       params: [ "List[BinaryEntry|BooleanEntry|DeleteEntry|IntegerEntry|StringEntry]", "Int" ]
       doc: "Extract data by index (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
-      complexity: 4
+      complexity: 2
     }
 	{
       name: "getBooleanValue"
       params: [ "List[BinaryEntry|BooleanEntry|DeleteEntry|IntegerEntry|StringEntry]", "Int" ]
       doc: "Extract data by index (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
-      complexity: 4
+      complexity: 2
     }
 	{
       name: "getBinaryValue"
       params: [ "List[BinaryEntry|BooleanEntry|DeleteEntry|IntegerEntry|StringEntry]", "Int" ]
       doc: "Extract data by index (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
-      complexity: 4
+      complexity: 2
     }
 	{
       name: "getStringValue"
       params: [ "List[BinaryEntry|BooleanEntry|DeleteEntry|IntegerEntry|StringEntry]", "Int" ]
       doc: "Extract data by index (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
-      complexity: 4
+      complexity: 2
     }
   ]
 }
