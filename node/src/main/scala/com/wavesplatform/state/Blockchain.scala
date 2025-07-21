@@ -90,7 +90,7 @@ trait Blockchain {
 
   def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey]
 
-  def activeGenerators(at: Height): Set[PublicKey]
+  def activeGenerators(at: Height): Set[PublicKey] // TODO: Remove
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 

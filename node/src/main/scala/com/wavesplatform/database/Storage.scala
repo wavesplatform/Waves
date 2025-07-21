@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.StateSnapshot
+import com.wavesplatform.transaction.DiscardedBlocks
 
 trait Storage {
   def append(
@@ -15,6 +16,6 @@ trait Storage {
       block: Block
   ): Unit
   def lastBlock: Option[Block]
-  def rollbackTo(height: Int): Either[String, Seq[(Block, ByteStr, Option[BlockSnapshot])]]
+  def rollbackTo(height: Int): Either[String, DiscardedBlocks]
   def safeRollbackHeight: Int
 }

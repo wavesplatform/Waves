@@ -5,10 +5,10 @@ import com.google.common.collect.ArrayListMultimap
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.protobuf.{BlockMetaExt, BlockMeta as PBBlockMeta}
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
@@ -300,6 +300,20 @@ abstract class Caches extends Blockchain with Storage {
       CurrentBalance(amount, Height(height), prevBalance.height),
       BalanceNode(amount, prevBalance.height)
     )
+    val balances = VectorMap() ++ updatedBalanceNodes.map { case ((address, asset), v) =>
+      (addressIdWithFallback(address, newAddressIds), asset) -> v
+    }
+
+    // TODO: This is a full block, not a key block. Add in Snapshot and don't override? Or in NG?
+    // TODO: Leasing
+    val committedGeneratorsBalances = for {
+      (wavesPK, blsPK) <- snapshot.nextCommittedGenerators
+    } yield {
+      val address      = wavesPK.toAddress
+      val addressId    = addressIdWithFallback(address, newAddressIds)
+      val wavesBalance = balancesCache.get((address, Waves)).balance
+      ???
+    }
 
     val newEntries = for {
       (address, entries) <- snapshot.accountData
@@ -348,7 +362,7 @@ abstract class Caches extends Blockchain with Storage {
       carryFee,
       computedBlockStateHash,
       newAddressIds,
-      VectorMap() ++ updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v },
+      balances,
       leaseBalancesWithNodes.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance },
       orderFillsWithNodes,
       updatedDataWithNodes,
@@ -387,8 +401,8 @@ abstract class Caches extends Blockchain with Storage {
           (),
           s"Rollback is possible only to the block at the height: $safeRollbackHeight"
         )
-      discardedBlocks = doRollback(height)
     } yield {
+      val discardedBlocks = doRollback(height)
       current = loadCurrentBlock()
 
       activatedFeaturesCache = loadActivatedFeatures()

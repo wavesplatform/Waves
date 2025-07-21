@@ -239,7 +239,8 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
             crypto
               .verifyVRF(blockToApply.header.generationSignature, blockchain.hitSource(blockCount + 1).get.arr, blockToApply.sender)
               .explicitGet(),
-            None
+            None,
+            ??? // TODO:
           ) should beRight
 
           blockchain.lastBlockId shouldBe Some(blockToApply.id())
@@ -260,7 +261,8 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
       blockchain.processBlock(
         blockToApply,
         blockchain.blockHeader(2).get.header.generationSignature,
-        None
+        None,
+        ??? // TODO: ???
       ) should beRight
 
       blockchain.lastBlockId shouldBe Some(blockToApply.id())
@@ -288,7 +290,12 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
       val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block, block.header.generationSignature.take(Block.HitSourceLength), None) should beRight
+        bcu.processBlock(
+          block,
+          block.header.generationSignature.take(Block.HitSourceLength),
+          None,
+          ??? // TODO: ???
+        ) should beRight
       }
 
       f(Env(pos, bcu, accounts, blocks))

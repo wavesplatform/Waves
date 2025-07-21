@@ -359,15 +359,17 @@ package object database {
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
 
-  def readCommittedGenerator(data: Array[Byte]): (PublicKey, BlsPublicKey) = {
+  def readCommittedGenerator(data: Array[Byte]): (PublicKey, BlsPublicKey, Long) = {
     // require(data.length == KeyLength + 0) // TODO:
-    val (rawWavesPublicKey, rawBlsPublicKey) = data.splitAt(KeyLength)
-    (PublicKey(rawWavesPublicKey), BlsPublicKey(rawBlsPublicKey))
+    val rawWavesPublicKey     = data.take(KeyLength)
+    val rawBlsPublicKey       = data.slice(KeyLength, KeyLength + BlsPublicKey.SizeInBytes)
+    val balanceBeforeKeyBlock = data.drop(KeyLength + BlsPublicKey.SizeInBytes)
+    (PublicKey(rawWavesPublicKey), BlsPublicKey(rawBlsPublicKey), Longs.fromByteArray(balanceBeforeKeyBlock))
   }
 
-  def writeCommittedGenerator(data: (PublicKey, BlsPublicKey)) = {
-    val (wavesPublicKey, blsPublicKey) = data
-    wavesPublicKey.arr ++ blsPublicKey.asByteStr.arr
+  def writeCommittedGenerator(data: (PublicKey, BlsPublicKey, Long)) = {
+    val (wavesPublicKey, blsPublicKey, balanceBeforeKeyBlock) = data
+    wavesPublicKey.arr ++ blsPublicKey.asByteStr.arr ++ Longs.toByteArray(balanceBeforeKeyBlock)
   }
 
   def getKeyBuffersFromKeys(keys: collection.IndexedSeq[Key[?]]): collection.IndexedSeq[ByteBuffer] =

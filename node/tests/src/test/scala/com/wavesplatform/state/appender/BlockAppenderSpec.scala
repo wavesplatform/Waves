@@ -63,7 +63,8 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
           com.wavesplatform.crypto
             .verifyVRF(block.header.generationSignature, d.blockchain.hitSource(1).get.arr, block.sender)
             .explicitGet(),
-          None
+          None,
+          ??? // TODO: ???
         )
         .explicitGet() shouldBe Ignored
 

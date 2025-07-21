@@ -96,10 +96,10 @@ class LightNodeTest extends PropSpec with WithDomain {
 
         val blockSnapshots  = newBlocks(10)
         val discardedBlocks = d.rollbackTo(genesisSignature)
-        discardedBlocks.head._1.header.reference shouldBe genesisSignature
-        discardedBlocks.flatMap(_._3).toList shouldBe maybeExpectedSnapshots.getOrElse(blockSnapshots)
-        discardedBlocks.foreach { case (block, _, snapshot) =>
-          d.appendBlockE(block, snapshot) should beRight
+        discardedBlocks.head.block.header.reference shouldBe genesisSignature
+        discardedBlocks.flatMap(_.snapshot).toList shouldBe maybeExpectedSnapshots.getOrElse(blockSnapshots)
+        discardedBlocks.foreach { x =>
+          d.appendBlockE(x.block, x.snapshot) should beRight
         }
       }
     }

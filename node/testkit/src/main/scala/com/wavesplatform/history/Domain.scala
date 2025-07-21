@@ -622,7 +622,7 @@ object Domain {
         }
 
       hitSourcesE.flatMap { case (hitSource, challengedHitSource) =>
-        bcu.processBlock(block, hitSource, snapshot, challengedHitSource)
+        bcu.processBlock(block, hitSource, snapshot, ???, challengedHitSource) // TODO: ???
       }
     }
   }

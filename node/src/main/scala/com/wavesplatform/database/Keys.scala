@@ -250,6 +250,6 @@ object Keys {
   def maliciousMinerBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
     historyKey(MaliciousMinerBanHeights, addressBytes)
 
-  def committedGenerators(at: Height, idx: Int): Key[(PublicKey, BlsPublicKey)] =
+  def committedGenerator(at: Height, idx: Int): Key[(PublicKey, BlsPublicKey, Long)] =
     Key(CommittedGenerators, h(at) ++ Ints.toByteArray(idx), readCommittedGenerator, writeCommittedGenerator)
 }

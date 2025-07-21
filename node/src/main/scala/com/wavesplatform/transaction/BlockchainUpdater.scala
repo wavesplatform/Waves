@@ -1,4 +1,6 @@
 package com.wavesplatform.transaction
+
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
@@ -12,6 +14,7 @@ trait BlockchainUpdater {
       block: Block,
       hitSource: ByteStr,
       snapshot: Option[BlockSnapshot],
+      generatorBalances: Map[Address, Long],
       challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true

@@ -53,8 +53,8 @@ class DataKeyRollback extends PropSpec with SharedDomain {
     )
     domain.appendBlock()
     val discardedBlocks = domain.rollbackTo(domain.blockchain.blockId(domain.blockchain.height - 2).get)
-    discardedBlocks.foreach { case (block, _, _) =>
-      domain.appendBlock(block)
+    discardedBlocks.foreach { x =>
+      domain.appendBlock(x.block)
     }
   }
 }

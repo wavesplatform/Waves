@@ -10,13 +10,13 @@ import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockSnapshot
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.{BlockMetaExt, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
@@ -529,6 +529,11 @@ class RocksDBWriter(
 
       val threshold = newSafeRollbackHeight
 
+//      for (((wavesPK, blsPK), i) <- snapshot.nextCommittedGenerators.zipWithIndex) {
+//        val key = Keys.committedGenerator(Height(height), i)
+//        rw.put(key, (wavesPK, blsPK, rw.get()))
+//      }
+
       appendBalances(balances, snapshot.assetStatics, rw)
       appendData(newAddresses, data, rw)
 
@@ -727,11 +732,6 @@ class RocksDBWriter(
         val txNum = transactionsWithSize(TransactionId @@ txId)._1
         val key   = Keys.ethereumTransactionMeta(Height(height), txNum, rdb.apiHandle)
         rw.put(key, Some(pbMeta))
-      }
-      
-      for ((pks, i) <- snapshot.nextCommittedGenerators.zipWithIndex) {
-        val key = Keys.committedGenerators(Height(height), i)
-        rw.put(key, pks)
       }
 
       expiredKeys.foreach(rw.delete)
@@ -1136,7 +1136,7 @@ class RocksDBWriter(
             Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb, block.transactionData)))
           } else None
 
-          (block, Caches.toHitSource(discardedMeta), snapshot)
+          DiscardedBlock(block, Caches.toHitSource(discardedMeta), snapshot, ???) // TODO:
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
@@ -1300,14 +1300,15 @@ class RocksDBWriter(
 
   // TODO:
   override protected def loadCommittedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = readOnly { ro =>
-    val key = Keys.committedGenerators(at, 0)
+    val key = Keys.committedGenerator(at, 0)
 
     val r = Map.newBuilder[PublicKey, BlsPublicKey]
-    Using(ro.newIterator) { iter =>
-      iter.seek(key.keyBytes)
-      while (iter.isValid && iter.key().startsWith(key.keyBytes.dropRight(Ints.BYTES))) r += key.parse(iter.value())
-      r
-    }.get.result()
+//    Using(ro.newIterator) { iter =>
+//      iter.seek(key.keyBytes)
+//      while (iter.isValid && iter.key().startsWith(key.keyBytes.dropRight(Ints.BYTES))) r += key.parse(iter.value())
+//      r
+//    }.get.result()
+    r.result()
   }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>

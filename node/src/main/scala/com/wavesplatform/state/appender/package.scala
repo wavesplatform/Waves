@@ -1,6 +1,7 @@
 package com.wavesplatform.state
 
 import cats.syntax.either.*
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
@@ -10,6 +11,7 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.BlockSnapshotResponse
 import com.wavesplatform.protobuf.PBSnapshots
+import com.wavesplatform.state
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.transaction.*
@@ -21,6 +23,8 @@ import kamon.Kamon
 package object appender {
 
   val MaxTimeDrift: Long = 100 // millis
+
+  private case class BlockApplyResultWithBalances(applyResult: BlockApplyResult, generatorBalances: Map[Address, Long])
 
   // Invalid blocks, that are already in blockchain
   private val exceptions = List(
@@ -35,7 +39,7 @@ package object appender {
     )
 
   private[appender] def appendKeyBlock(
-      blockchainUpdater: BlockchainUpdater & Blockchain,
+      blockchain: BlockchainUpdater & Blockchain,
       utx: UtxPool,
       pos: PoSSelector,
       time: Time,
@@ -44,12 +48,16 @@ package object appender {
       txSignParCheck: Boolean
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] =
     for {
-      hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
-      newHeight <-
+      parentHeight <- parentBlockHeight(blockchain, block)
+      committedGenerators = blockchain.committedGenerators(parentHeight).keySet.map(_.toAddress)
+      (hitSource, gb) <-
+        if (verify) validateBlockAndReturnBalances(blockchain, pos, time, committedGenerators)(block, parentHeight)
+        else validateGenerationSignature(blockchain, pos, committedGenerators)(block, parentHeight)
+      applyResult <-
         metrics.appendBlock
           .measureSuccessful(
-            blockchainUpdater
-              .processBlock(block, hitSource, snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)), None, verify, txSignParCheck)
+            blockchain
+              .processBlock(block, hitSource, snapshot.map(responseToSnapshot(block, blockchain.height + 1)), gb, None, verify, txSignParCheck)
           )
           .map {
             case res @ Applied(discardedDiffs, _) =>
@@ -65,31 +73,36 @@ package object appender {
               res
             case res => res
           }
-    } yield newHeight
+    } yield applyResult
 
   private[appender] def appendExtensionBlock(
-      blockchainUpdater: BlockchainUpdater & Blockchain,
+      blockchain: BlockchainUpdater & Blockchain,
       pos: PoSSelector,
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, (BlockApplyResult, Int)] = {
     if (block.header.challengedHeader.nonEmpty) {
-      processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block, snapshot)
+      processBlockWithChallenge(blockchain, pos, time, verify, txSignParCheck)(block, snapshot)
     } else {
       for {
-        hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
+        parentHeight <- parentBlockHeight(blockchain, block)
+        committedGenerators = blockchain.committedGenerators(parentHeight).keySet.map(_.toAddress)
+        (hitSource, gb) <-
+          if (verify) validateBlockAndReturnBalances(blockchain, pos, time, committedGenerators)(block, parentHeight)
+          else validateGenerationSignature(blockchain, pos, committedGenerators)(block, parentHeight)
         applyResult <- metrics.appendBlock.measureSuccessful(
-          blockchainUpdater.processBlock(
+          blockchain.processBlock(
             block,
             hitSource,
-            snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)),
+            snapshot.map(responseToSnapshot(block, blockchain.height + 1)),
+            gb,
             None,
             verify,
             txSignParCheck
           )
         )
-      } yield applyResult -> blockchainUpdater.height
+      } yield applyResult -> blockchain.height
     }
   }
 
@@ -117,7 +130,7 @@ package object appender {
     }
 
   private def processBlockWithChallenge(
-      blockchainUpdater: BlockchainUpdater & Blockchain,
+      blockchain: BlockchainUpdater & Blockchain,
       pos: PoSSelector,
       time: Time,
       verify: Boolean,
@@ -126,67 +139,137 @@ package object appender {
     val challengedBlock = block.toOriginal
     for {
       challengedHitSource <-
-        if (verify) validateBlock(blockchainUpdater, pos, time)(challengedBlock) else pos.validateGenerationSignature(challengedBlock)
-      hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
+        if (verify)
+          for {
+            parentHeight <- parentBlockHeight(blockchain, challengedBlock)
+            committedGenerators = blockchain.committedGenerators(parentHeight).keySet.map(_.toAddress)
+            (hitSource, _) <- validateBlock(blockchain, pos, time, committedGenerators)(challengedBlock, parentHeight)
+          } yield hitSource
+        else pos.validateGenerationSignature(challengedBlock)
+      parentHeight <- parentBlockHeight(blockchain, block)
+      committedGenerators = blockchain.committedGenerators(parentHeight).keySet.map(_.toAddress)
+      (hitSource, gb) <-
+        if (verify)
+          validateBlockAndReturnBalances(blockchain, pos, time, committedGenerators)(block, parentHeight) // TODO: Do we need a balance correction?
+        else validateGenerationSignature(blockchain, pos, committedGenerators)(block, parentHeight)
       applyResult <-
         metrics.appendBlock
           .measureSuccessful(
-            blockchainUpdater.processBlock(
+            blockchain.processBlock(
               block,
               hitSource,
-              snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)),
+              snapshot.map(responseToSnapshot(block, blockchain.height + 1)),
+              gb,
               Some(challengedHitSource),
               verify,
               txSignParCheck
             )
           )
-    } yield applyResult -> blockchainUpdater.height
+    } yield applyResult -> blockchain.height
   }
 
-  private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time)(block: Block) =
-    for {
-      _ <- Miner.isAllowedForMining(block.sender.toAddress, blockchainUpdater).leftMap(BlockAppendError(_, block))
-      hitSource <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
-        val balance = blockchainUpdater.generatingBalance(block.sender.toAddress, Some(parent))
-        Either.cond(
-          blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
-          balance + block.header.challengedHeader.map(ch => blockchainUpdater.generatingBalance(ch.generator.toAddress, Some(parent))).getOrElse(0L),
-          s"generator's effective balance $balance is less that required for generation"
-        )
+  private def generatorBalances(
+      blockchain: Blockchain,
+      height: Height,
+      block: Block,
+      generators: Iterable[Address]
+  ): Either[ValidationError, Map[Address, Long]] =
+    generators
+      .foldLeft(Map.empty[Address, Long].asRight[String]) {
+        case (Right(r), generator) =>
+          for {
+            b <- genBalance(blockchain, generator, height, block)
+          } yield r.updated(generator, b)
+
+        case (r, _) => r
       }
+      .left
+      .map(GenericError(_))
+
+  private def validateGenerationSignature(blockchain: Blockchain, pos: PoSSelector, committedGenerators: Set[Address])(
+      block: Block,
+      parentHeight: Height
+  ): Either[ValidationError, (ByteStr, Map[Address, Long])] =
+    for {
+      hitSource <- pos.validateGenerationSignature(block)
+      xs        <- generatorBalances(blockchain, parentHeight, block, committedGenerators)
+    } yield (hitSource, xs)
+
+  private def validateBlockAndReturnBalances(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time, committedGenerators: Set[Address])(
+      block: Block,
+      parentHeight: Height
+  ): Either[ValidationError, (ByteStr, Map[Address, Long])] = {
+    for {
+      (hitSource, minerBalance) <- validateBlock(blockchainUpdater, pos, time, committedGenerators)(block, parentHeight)
+      generatorBalances         <- generatorBalances(blockchainUpdater, parentHeight, block, committedGenerators - block.sender.toAddress)
+    } yield (hitSource, generatorBalances.updated(block.sender.toAddress, minerBalance))
+  }
+
+  private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time, committedGenerators: Set[Address])(
+      block: Block,
+      parentHeight: Height
+  ): Either[ValidationError, (hitSource: ByteStr, minerBalance: Long)] = {
+    val blockSenderAddress = block.sender.toAddress
+    for {
+      _ <- Miner.isAllowedForMining(blockSenderAddress, blockchainUpdater).leftMap(BlockAppendError(_, block))
+      r <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), committedGenerators)(block, parentHeight)
       _ <- validateStateHash(block, blockchainUpdater)
       _ <- validateChallengedHeader(block, blockchainUpdater)
-    } yield hitSource
+    } yield r
+  }
 
-  private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, block: Block)(
-      genBalance: (Int, BlockId) => Either[String, Long]
-  ): Either[ValidationError, ByteStr] =
+  private def parentBlockHeight(blockchain: Blockchain, block: Block): Either[ValidationError, Height] =
+    blockchain
+      .heightOf(block.header.reference)
+      .toRight(GenericError(s"height: history does not contain parent ${block.header.reference}"))
+      .map(Height(_))
+
+  private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, committedGenerators: Set[Address])(
+      block: Block,
+      parentHeight: Height
+  ): Either[ValidationError, (hitSource: ByteStr, minerBalance: Long)] =
     metrics.blockConsensusValidation
       .measureSuccessful {
-
         val blockTime = block.header.timestamp
+        val miner     = block.sender.toAddress
 
         for {
-          height <- blockchain
-            .heightOf(block.header.reference)
-            .toRight(GenericError(s"height: history does not contain parent ${block.header.reference}"))
           parent <- blockchain.parentHeader(block.header).toRight(GenericError(s"parent: history does not contain parent ${block.header.reference}"))
           grandParent = blockchain.parentHeader(parent, 2)
-          effectiveBalance <- genBalance(height, block.header.reference).left.map(GenericError(_))
-          _                <- validateBlockVersion(height, block, blockchain)
-          _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime, currentTs))
-          _                <- pos.validateBaseTarget(height, block, parent, grandParent)
-          hitSource        <- pos.validateGenerationSignature(block)
+
+          // If no one commited, fallback to a classic
+          _ <- Either.raiseUnless(committedGenerators.isEmpty || committedGenerators.contains(miner)) {
+            GenericError(s"$miner is not allowed to mine, allowed: ${committedGenerators.mkString(", ")}")
+          }
+
+          minerBalance <- genBalance(blockchain, miner, parentHeight, block).leftMap(GenericError(_)) // Fail fast
+          _            <- validateBlockVersion(parentHeight, block, blockchain)
+          _            <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime, currentTs))
+          _            <- pos.validateBaseTarget(parentHeight, block, parent, grandParent)
+          hitSource    <- pos.validateGenerationSignature(block)
           _ <- pos
-            .validateBlockDelay(height, block.header, parent, effectiveBalance)
-            .orElse(checkExceptions(height, block))
-        } yield hitSource
+            .validateBlockDelay(parentHeight, block.header, parent, minerBalance)
+            .orElse(checkExceptions(parentHeight, block))
+        } yield (hitSource, minerBalance)
       }
       .left
       .map {
         case GenericError(x) => GenericError(s"Block $block is invalid: $x")
         case x               => x
       }
+
+  // TODO: What if challenged?
+  private def genBalance(blockchain: Blockchain, generatorAddress: Address, parentHeight: Height, block: Block): Either[String, Long] = {
+    val parentBlockId = block.header.reference
+    val balance       = blockchain.generatingBalance(generatorAddress, Some(parentBlockId))
+
+    if (blockchain.isEffectiveBalanceValid(parentHeight, block, balance))
+      Either.right(
+        balance + block.header.challengedHeader.map(_ => blockchain.generatingBalance(generatorAddress, Some(parentBlockId))).getOrElse(0L)
+      )
+    else if (generatorAddress == block.sender.toAddress) Either.left(s"generator's effective balance $balance is less that required for generation")
+    else Either.right(0L) // Ignore for a regular generator, not a miner
+  }
 
   private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
     Either

@@ -226,6 +226,7 @@ class BlockchainUpdaterImpl(
       block: Block,
       hitSource: ByteStr,
       snapshot: Option[BlockSnapshot],
+      generatorBalances: Map[Address, Long],
       challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
@@ -499,22 +500,20 @@ class BlockchainUpdaterImpl(
           blocks <- rocksdb.rollbackTo(height).leftMap(GenericError(_))
         } yield {
           ngState = None
-          val liquidBlockData = {
-            maybeNg.map { ng =>
-              val block = ng.bestLiquidBlock
-              val snapshot = if (wavesSettings.enableLightMode && block.transactionData.nonEmpty) {
-                Some(
-                  BlockSnapshot(
-                    block.id(),
-                    ng.bestLiquidSnapshot.transactions.toSeq.map { case (_, txInfo) =>
-                      (txInfo.snapshot.copy(transactions = VectorMap.empty), txInfo.status)
-                    }
-                  )
+          val liquidBlockData = maybeNg.map { ng =>
+            val block = ng.bestLiquidBlock
+            val snapshot = if (wavesSettings.enableLightMode && block.transactionData.nonEmpty) {
+              Some(
+                BlockSnapshot(
+                  block.id(),
+                  ng.bestLiquidSnapshot.transactions.toSeq.map { case (_, txInfo) =>
+                    (txInfo.snapshot.copy(transactions = VectorMap.empty), txInfo.status)
+                  }
                 )
-              } else None
-              (block, ng.hitSource, snapshot)
-            }.toSeq
-          }
+              )
+            } else None
+            DiscardedBlock(block, ng.hitSource, snapshot, generatorBalances = Map.empty)
+          }.toSeq
           blocks ++ liquidBlockData
         }
     }

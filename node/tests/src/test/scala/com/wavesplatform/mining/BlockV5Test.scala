@@ -125,7 +125,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
   "Miner" should "generate valid blocks" in forAll(genesis) { case (minerAcc1, minerAcc2, genesis) =>
     val disabledFeatures = new AtomicReference(Set[Short]())
     withBlockchain(disabledFeatures, testTime) { blockchain =>
-      blockchain.processBlock(genesis, genesis.header.generationSignature, None) should beRight
+      blockchain.processBlock(genesis, genesis.header.generationSignature, None, ???) should beRight // TODO: ???
       withMiner(blockchain, testTime, testSettings) { case (miner, append) =>
         for (h <- 2 until BlockV5ActivationHeight) {
 
@@ -249,7 +249,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
 
   "Miner" should "generate valid blocks when feature pre-activated" in forAll(genesis) { case (minerAcc1, _, genesis) =>
     withBlockchain(new AtomicReference(Set()), testTime, preActivatedTestSettings) { blockchain =>
-      blockchain.processBlock(genesis, genesis.header.generationSignature, None) should beRight
+      blockchain.processBlock(genesis, genesis.header.generationSignature, None, ???) should beRight // TODO: ???
       withMiner(blockchain, testTime, testSettings) { case (miner, append) =>
         for (h <- blockchain.height to 110) {
 
@@ -269,7 +269,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
   "Block version" should "be validated accordingly features activation" in forAll(genesis) { case (minerAcc, _, genesis) =>
     val disabledFeatures = new AtomicReference(Set.empty[Short])
     withBlockchain(disabledFeatures, testTime) { blockchain =>
-      blockchain.processBlock(genesis, genesis.header.generationSignature, None) should beRight
+      blockchain.processBlock(genesis, genesis.header.generationSignature, None, ???) should beRight // TODO: ???
       withMiner(blockchain, testTime, testSettings) { case (miner, append) =>
         def forge(): Block = {
           val forge = miner.forgeBlock(minerAcc)
@@ -348,18 +348,18 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
   "BlockchainUpdater" should "accept valid key blocks and microblocks" in forAll(updaterScenario) {
     case (bs, (ngBlock, ngMicros), (rewardBlock, rewardMicros), (protoBlock, protoMicros), (afterProtoBlock, afterProtoMicros)) =>
       withBlockchain(new AtomicReference(Set())) { blockchain =>
-        bs.foreach(b => blockchain.processBlock(b, b.header.generationSignature, None) should beRight)
+        bs.foreach(b => blockchain.processBlock(b, b.header.generationSignature, None, ???) should beRight) // TODO: ???
 
-        blockchain.processBlock(ngBlock, ngBlock.header.generationSignature, None) should beRight
+        blockchain.processBlock(ngBlock, ngBlock.header.generationSignature, None, ???) should beRight // TODO: ???
         ngMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
 
-        blockchain.processBlock(rewardBlock, rewardBlock.header.generationSignature, None) should beRight
+        blockchain.processBlock(rewardBlock, rewardBlock.header.generationSignature, None, ???) should beRight // TODO: ???
         rewardMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
 
-        blockchain.processBlock(protoBlock, protoBlock.header.generationSignature, None) should beRight
+        blockchain.processBlock(protoBlock, protoBlock.header.generationSignature, None, ???) should beRight // TODO: ???
         protoMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
 
-        blockchain.processBlock(afterProtoBlock, afterProtoBlock.header.generationSignature, None) should beRight
+        blockchain.processBlock(afterProtoBlock, afterProtoBlock.header.generationSignature, None, ???) should beRight // TODO: ???
         afterProtoMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
       }
   }

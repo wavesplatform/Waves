@@ -84,6 +84,7 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
   def validateGenerationSignature(block: Block): Either[ValidationError, ByteStr] = {
     val blockGenSig = block.header.generationSignature
 
+    // TODO: we already check this
     blockchain.heightOf(block.header.reference).toRight(GenericError(s"Block reference ${block.header.reference} doesn't exist")).flatMap { height =>
       if (vrfActivated(height + 1)) {
         getHitSource(height)
