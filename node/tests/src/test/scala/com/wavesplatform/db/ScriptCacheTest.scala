@@ -24,16 +24,17 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
   val AMOUNT     = 10000000000L
   val FEE        = 5000000
 
-
   def mkScripts(num: Int): List[(Script, Long)] = {
     (0 until num).map { ind =>
-      ScriptCompiler.compile(
-        s"""
-           |let ind = $ind
-           |true
+      ScriptCompiler
+        .compile(
+          s"""
+             |let ind = $ind
+             |true
           """.stripMargin,
-        ScriptEstimatorV2
-      ).explicitGet()
+          ScriptEstimatorV2
+        )
+        .explicitGet()
     }.toList
   }
 
@@ -119,7 +120,7 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
           .block
 
         bcu
-          .processBlock(blockWithEmptyScriptTx, blockWithEmptyScriptTx.header.generationSignature, None, ???) // TODO: ???
+          .processBlock(blockWithEmptyScriptTx, blockWithEmptyScriptTx.header.generationSignature, snapshot = None, generatorBalances = Map.empty)
           .explicitGet()
 
         bcu.accountScript(account.toAddress) shouldEqual None
@@ -143,7 +144,7 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
       val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block, block.header.generationSignature, None, ???) should beRight // TODO: ??? empty?
+        bcu.processBlock(block, block.header.generationSignature, snapshot = None, generatorBalances = Map.empty) should beRight
       }
 
       f(accounts, bcu)

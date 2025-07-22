@@ -236,7 +236,8 @@ abstract class Caches extends Blockchain with Storage {
       reward: Option[Long],
       hitSource: ByteStr,
       computedBlockStateHash: ByteStr,
-      block: Block
+      block: Block,
+      generatorBalances: GeneratorBalances // TODO: Don't forget rollbacks
   ): Unit = {
     val newHeight = current.height + 1
     val newScore  = block.blockScore() + current.score
@@ -306,14 +307,13 @@ abstract class Caches extends Blockchain with Storage {
 
     // TODO: This is a full block, not a key block. Add in Snapshot and don't override? Or in NG?
     // TODO: Leasing
-    val committedGeneratorsBalances = for {
-      (wavesPK, blsPK) <- snapshot.nextCommittedGenerators
-    } yield {
-      val address      = wavesPK.toAddress
-      val addressId    = addressIdWithFallback(address, newAddressIds)
-      val wavesBalance = balancesCache.get((address, Waves)).balance
-      ???
-    }
+    // val committedGeneratorsBalances = for {
+    //   (wavesPK, blsPK) <- snapshot.nextCommittedGenerators
+    // } yield {
+    //   val address   = wavesPK.toAddress
+    //   val addressId = addressIdWithFallback(address, newAddressIds)
+    //   ???
+    // }
 
     val newEntries = for {
       (address, entries) <- snapshot.accountData

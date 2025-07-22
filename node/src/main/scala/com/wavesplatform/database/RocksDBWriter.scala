@@ -1136,7 +1136,7 @@ class RocksDBWriter(
             Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb, block.transactionData)))
           } else None
 
-          DiscardedBlock(block, Caches.toHitSource(discardedMeta), snapshot, ???) // TODO:
+          DiscardedBlock(block, Caches.toHitSource(discardedMeta), snapshot, Map.empty) // TODO: generatorBalances
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
@@ -1300,15 +1300,16 @@ class RocksDBWriter(
 
   // TODO:
   override protected def loadCommittedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = readOnly { ro =>
-    val key = Keys.committedGenerator(at, 0)
-
-    val r = Map.newBuilder[PublicKey, BlsPublicKey]
+//    val key = Keys.committedGenerator(at, 0)
+//
+//    val r = Map.newBuilder[PublicKey, BlsPublicKey]
 //    Using(ro.newIterator) { iter =>
 //      iter.seek(key.keyBytes)
 //      while (iter.isValid && iter.key().startsWith(key.keyBytes.dropRight(Ints.BYTES))) r += key.parse(iter.value())
 //      r
 //    }.get.result()
-    r.result()
+//    r.result()
+    Map.empty
   }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>

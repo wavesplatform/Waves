@@ -226,7 +226,7 @@ class BlockchainUpdaterImpl(
       block: Block,
       hitSource: ByteStr,
       snapshot: Option[BlockSnapshot],
-      generatorBalances: Map[Address, Long],
+      generatorBalances: GeneratorBalances,
       challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
@@ -391,7 +391,8 @@ class BlockchainUpdaterImpl(
                           prevReward,
                           prevHitSource,
                           referencedComputedStateHash,
-                          referencedForgedBlock
+                          referencedForgedBlock,
+                          generatorBalances
                         )
                         BlockStats.appended(referencedForgedBlock, referencedLiquidSnapshot.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
@@ -833,7 +834,7 @@ class BlockchainUpdaterImpl(
 
   override def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = Map.empty // TODO: Implement
 
-  override def activeGenerators(at: Height): Set[PublicKey] = committedGenerators(at).keySet.filter(_ => true) // TODO: Implement filter
+  override def activeGenerators(at: Height): Set[PublicKey] = Set.empty // TODO: Implement
 
   override def snapshotBlockchain: SnapshotBlockchain = readLock {
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))

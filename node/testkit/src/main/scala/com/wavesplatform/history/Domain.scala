@@ -23,7 +23,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
-import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.appender.{BlockAppender, generatorBalances, getCommittedGeneratorsAndParentHeight}
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.*
@@ -603,7 +603,7 @@ object Domain {
     def processBlock(block: Block, snapshot: Option[BlockSnapshot] = None): Either[ValidationError, BlockApplyResult] = {
       val hitSourcesE =
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
-          Right(block.header.generationSignature -> block.header.challengedHeader.map(_.generationSignature))
+          Right((block.header.generationSignature, block.header.challengedHeader.map(_.generationSignature), Map.empty))
         else {
           val parentHeight = bcu.heightOf(block.header.reference).getOrElse(bcu.height)
 
@@ -618,11 +618,13 @@ object Domain {
             challengedHs <- block.header.challengedHeader.traverse(ch =>
               crypto.verifyVRF(ch.generationSignature, prevHs.arr, ch.generator, bcu.isFeatureActivated(RideV6, parentHeight))
             )
-          } yield hs -> challengedHs
+            data <- getCommittedGeneratorsAndParentHeight(bcu, block)
+            gb   <- generatorBalances(bcu, data.parentHeight, block, data.committedGenerators)
+          } yield (hs, challengedHs, gb)
         }
 
-      hitSourcesE.flatMap { case (hitSource, challengedHitSource) =>
-        bcu.processBlock(block, hitSource, snapshot, ???, challengedHitSource) // TODO: ???
+      hitSourcesE.flatMap { case (hitSource, challengedHitSource, generatorBalances) =>
+        bcu.processBlock(block, hitSource, snapshot, generatorBalances, challengedHitSource)
       }
     }
   }

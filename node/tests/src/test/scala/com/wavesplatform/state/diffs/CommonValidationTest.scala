@@ -56,10 +56,11 @@ class CommonValidationTest extends PropSpec with WithState {
           preconditionDiff,
           preconditionFees,
           totalFee,
-          None,
+          reward = None,
           genesisBlock.header.generationSignature,
           computedStateHash,
-          genesisBlock
+          genesisBlock,
+          generatorBalances = Map.empty
         )
 
         f(FeeValidation(blockchain, transferTx))
@@ -81,7 +82,16 @@ class CommonValidationTest extends PropSpec with WithState {
     withRocksDBWriter(settings) { blockchain =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
         BlockDiffer.fromBlock(blockchain, None, genesisBlock, None, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
-      blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, computedStateHash, genesisBlock)
+      blockchain.append(
+        preconditionDiff,
+        preconditionFees,
+        totalFee,
+        reward = None,
+        genesisBlock.header.generationSignature,
+        computedStateHash,
+        genesisBlock,
+        generatorBalances = Map.empty
+      )
 
       f(FeeValidation(blockchain, transferTx))
     }
@@ -156,7 +166,16 @@ class CommonValidationTest extends PropSpec with WithState {
     withRocksDBWriter(settings) { blockchain =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
         BlockDiffer.fromBlock(blockchain, None, genesisBlock, None, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
-      blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, computedStateHash, genesisBlock)
+      blockchain.append(
+        preconditionDiff,
+        preconditionFees,
+        totalFee,
+        reward = None,
+        genesisBlock.header.generationSignature,
+        computedStateHash,
+        genesisBlock,
+        generatorBalances = Map.empty
+      )
 
       f(FeeValidation(blockchain, transferTx))
     }

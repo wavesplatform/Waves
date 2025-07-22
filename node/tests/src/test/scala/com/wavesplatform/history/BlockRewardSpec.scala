@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.RewardApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.database.{Keys, DBExt}
+import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -271,7 +271,16 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       withDomain(rewardSettings) { d =>
         b2s.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
           val BlockDiffer.Result(snapshot, carryFee, totalFee, _, _, computedStateHash) = differ(d.rocksDBWriter, prevBlock, curBlock)
-          d.rocksDBWriter.append(snapshot, carryFee, totalFee, None, curBlock.header.generationSignature, computedStateHash, curBlock)
+          d.rocksDBWriter.append(
+            snapshot,
+            carryFee,
+            totalFee,
+            reward = None,
+            curBlock.header.generationSignature,
+            computedStateHash,
+            curBlock,
+            generatorBalances = Map.empty
+          )
           Some(curBlock)
         }
 
@@ -1325,8 +1334,8 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       )
     )
 
-  private val blockMiner                           = TxHelpers.signer(10001)
-  private val initialMinerBalance                  = 100_000.waves
+  private val blockMiner          = TxHelpers.signer(10001)
+  private val initialMinerBalance = 100_000.waves
 
   private def assertBalances(blockchain: Blockchain, expectedBalances: (Address, Long)*)(implicit pos: Position): Unit =
     expectedBalances.foreach { case (address, balance) =>
@@ -1425,10 +1434,12 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     )
 
     d.blockchain.wavesAmount(15) shouldBe
-      BigInt(100_000_000.waves + // 1: genesis
-        3 * 6.waves +            // 2..4: before boost activation
-        5 * 60.waves +           // 5..9: boosted reward before change
-        5 * (6.waves + rewardDelta) * 10 + // 10..14: boosted reward after change
-        6.waves + rewardDelta)   // 15: non-boosted after change
+      BigInt(
+        100_000_000.waves +                  // 1: genesis
+          3 * 6.waves +                      // 2..4: before boost activation
+          5 * 60.waves +                     // 5..9: boosted reward before change
+          5 * (6.waves + rewardDelta) * 10 + // 10..14: boosted reward after change
+          6.waves + rewardDelta
+      ) // 15: non-boosted after change
   }
 }

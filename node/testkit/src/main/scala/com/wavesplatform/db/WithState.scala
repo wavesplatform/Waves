@@ -19,6 +19,7 @@ import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
+import com.wavesplatform.state.appender.{generatorBalances, getCommittedGeneratorsAndParentHeight}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{
@@ -147,15 +148,16 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
 
     preconditions.foreach { precondition =>
       val preconditionBlock = blockWithComputedStateHash(precondition.block, precondition.signer, bcu).resultE.explicitGet()
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) = differ(state, preconditionBlock).explicitGet()
+      val BlockDiffer.Result(snapshot, carryFee, totalFee, _, _, computedStateHash) = differ(state, preconditionBlock).explicitGet()
       state.append(
-        preconditionDiff,
-        preconditionFees,
+        snapshot,
+        carryFee,
         totalFee,
-        None,
+        reward = None,
         preconditionBlock.header.generationSignature,
         computedStateHash,
-        preconditionBlock
+        preconditionBlock,
+        generatorBalances = Map.empty
       )
     }
     val snapshot =
@@ -193,18 +195,21 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       )
 
     preconditions.foreach { precondition =>
-      val preconditionBlock = blockWithComputedStateHash(precondition.block, precondition.signer, bcu).resultE.explicitGet()
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
-        differ(state, state.lastBlock, preconditionBlock).resultE.explicitGet()
-      state.append(
-        preconditionDiff,
-        preconditionFees,
-        totalFee,
+      (for {
+        preconditionBlock                   <- blockWithComputedStateHash(precondition.block, precondition.signer, bcu).resultE
+        diffResult                          <- differ(state, state.lastBlock, preconditionBlock).resultE
+        (parentHeight, committedGenerators) <- getCommittedGeneratorsAndParentHeight(bcu, preconditionBlock)
+        generatorBalances                   <- generatorBalances(bcu, parentHeight, preconditionBlock, committedGenerators)
+      } yield state.append(
+        diffResult.snapshot,
+        diffResult.carry,
+        diffResult.totalFee,
         None,
         preconditionBlock.header.generationSignature,
-        computedStateHash,
-        preconditionBlock
-      )
+        diffResult.computedStateHash,
+        preconditionBlock,
+        generatorBalances
+      )).explicitGet()
     }
 
     val snapshot1 =
@@ -236,30 +241,57 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       )
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-      val preconditionBlock = blockWithComputedStateHash(curBlock.block, curBlock.signer, bcu).resultE.explicitGet()
-      val BlockDiffer.Result(snapshot, fees, totalFee, _, _, computedStateHash) = differ(state, prevBlock, preconditionBlock).explicitGet()
-      state.append(snapshot, fees, totalFee, None, preconditionBlock.header.generationSignature, computedStateHash, preconditionBlock)
-      Some(preconditionBlock)
+      (for {
+        preconditionBlock <- blockWithComputedStateHash(curBlock.block, curBlock.signer, bcu).resultE
+        diffResult        <- differ(state, prevBlock, preconditionBlock)
+        // This can be improved, but we don't care in tests
+        (parentHeight, committedGenerators) <- getCommittedGeneratorsAndParentHeight(bcu, preconditionBlock)
+        generatorBalances                   <- generatorBalances(bcu, parentHeight, preconditionBlock, committedGenerators)
+      } yield {
+        state.append(
+          diffResult.snapshot,
+          diffResult.carry,
+          diffResult.totalFee,
+          None,
+          preconditionBlock.header.generationSignature,
+          diffResult.computedStateHash,
+          preconditionBlock,
+          generatorBalances
+        )
+        Some(preconditionBlock)
+      }).explicitGet()
     }
 
-    val checkedBlock = blockWithComputedStateHash(block.block, block.signer, bcu).resultE.explicitGet()
-    val BlockDiffer.Result(snapshot, fees, totalFee, _, _, computedStateHash) = differ(state, state.lastBlock, checkedBlock).explicitGet()
-    val ngState =
-      NgState(
+    (for {
+      checkedBlock                        <- blockWithComputedStateHash(block.block, block.signer, bcu).resultE
+      diffResult                          <- differ(state, state.lastBlock, checkedBlock)
+      (parentHeight, committedGenerators) <- getCommittedGeneratorsAndParentHeight(bcu, checkedBlock)
+      generatorBalances                   <- generatorBalances(bcu, parentHeight, checkedBlock, committedGenerators)
+    } yield {
+      val ngState = NgState(
         checkedBlock,
-        snapshot,
-        fees,
-        totalFee,
-        computedStateHash,
+        diffResult.snapshot,
+        diffResult.carry,
+        diffResult.totalFee,
+        diffResult.computedStateHash,
         fs.preActivatedFeatures.keySet,
+        reward = None,
+        checkedBlock.header.generationSignature,
+        leasesToCancel = Map()
+      )
+      assertion(diffResult.snapshot, SnapshotBlockchain(state, ngState))
+      state.append(
+        diffResult.snapshot,
+        diffResult.carry,
+        diffResult.totalFee,
         None,
         checkedBlock.header.generationSignature,
-        Map()
+        diffResult.computedStateHash,
+        checkedBlock,
+        generatorBalances
       )
-    val cb = SnapshotBlockchain(state, ngState)
-    assertion(snapshot, cb)
-    state.append(snapshot, fees, totalFee, None, checkedBlock.header.generationSignature, computedStateHash, checkedBlock)
-    assertion(snapshot, state)
+      assertion(diffResult.snapshot, state)
+    }).explicitGet()
   }
 
   def assertNgDiffState(preconditions: Seq[BlockWithSigner], block: BlockWithSigner, fs: FunctionalitySettings = TFS.Enabled)(
@@ -281,7 +313,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
 
       def differ(blockchain: Blockchain, b: Block) =
         BlockDiffer.fromBlock(
-          getCompBlockchain(blockchain),
+          blockchain,
           state.lastBlock,
           b,
           None,
@@ -289,24 +321,28 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
           b.header.generationSignature
         )
 
-      test(txs => {
+      test { txs =>
         val nextHeight   = state.height + 1
         val isProto      = state.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(nextHeight > 1 && nextHeight >= _)
         val block        = TestBlock.create(txs, if (isProto) Block.ProtoBlockVersion else Block.PlainBlockVersion)
         val checkedBlock = blockWithComputedStateHash(block.block, block.signer, bcu).resultE.explicitGet()
 
-        differ(state, checkedBlock).map { result =>
-          state.append(
-            result.snapshot,
-            result.carry,
-            result.totalFee,
-            None,
-            checkedBlock.header.generationSignature.take(Block.HitSourceLength),
-            result.computedStateHash,
-            checkedBlock
-          )
-        }
-      })
+        val blockchain = getCompBlockchain(state)
+        for {
+          result                              <- differ(blockchain, checkedBlock)
+          (parentHeight, committedGenerators) <- getCommittedGeneratorsAndParentHeight(blockchain, checkedBlock)
+          generatorBalances                   <- generatorBalances(blockchain, parentHeight, checkedBlock, committedGenerators)
+        } yield state.append(
+          result.snapshot,
+          result.carry,
+          result.totalFee,
+          None,
+          checkedBlock.header.generationSignature.take(Block.HitSourceLength),
+          result.computedStateHash,
+          checkedBlock,
+          generatorBalances
+        )
+      }
     }
 
   def assertBalanceInvariant(snapshot: StateSnapshot, db: RocksDBWriter, rewardAndFee: Long = 0): Unit = {

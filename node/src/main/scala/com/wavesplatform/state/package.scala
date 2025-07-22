@@ -58,8 +58,13 @@ package object state {
     )
   }
 
+  type GeneratorBalances = Map[Address, Long]
+
   object Height extends TaggedType[Int] {
     implicit val format: Format[Height] = implicitly[Format[Int]].bimap(Height(_), identity)
+    implicit final class Ops(val self: Height) {
+      def next: Height = Height(self + 1)
+    }
   }
   type Height = Height.Type
 
