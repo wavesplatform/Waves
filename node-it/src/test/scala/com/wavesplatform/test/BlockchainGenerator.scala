@@ -174,7 +174,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
               ByteStr.empty,
               Nil
             )
-            blockchain.processBlock(pseudoBlock, ByteStr.empty, None, verify = false)
+            blockchain.processBlock(pseudoBlock, ByteStr.empty, snapshot = None, generatorBalances = ???, verify = false) // TODO:
           }
         case Left(err) => log.error(s"Error appending block: $err")
       }
