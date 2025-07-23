@@ -17,7 +17,7 @@ import com.wavesplatform.test.PropSpec
 import org.scalatest.Inside
 import org.scalatest.exceptions.TestFailedException
 
-abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
+trait EvaluatorSpecBase extends ScriptGen, Inside {
   val lastVersion: StdLibVersion = DirectiveDictionary[StdLibVersion].all.last
 
   def eval(
@@ -92,3 +92,5 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
     ExpressionCompiler.compile(code, NoLibraries, ctx.compilerContext, version, allowIllFormedStrings = true).map(_._1)
   }
 }
+
+abstract class EvaluatorSpec extends PropSpec, EvaluatorSpecBase
