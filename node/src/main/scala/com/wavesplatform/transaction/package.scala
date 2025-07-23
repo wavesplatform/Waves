@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import cats.data.ValidatedNel
-import com.wavesplatform.account.{Address, PrivateKey}
+import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError

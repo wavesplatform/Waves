@@ -1299,18 +1299,19 @@ class RocksDBWriter(
   override protected def loadBlockHeight(blockId: BlockId): Option[Int] = readOnly(_.get(Keys.heightOf(blockId)))
 
   // TODO:
-  override protected def loadCommittedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = readOnly { ro =>
-//    val key = Keys.committedGenerator(at, 0)
-//
-//    val r = Map.newBuilder[PublicKey, BlsPublicKey]
-//    Using(ro.newIterator) { iter =>
-//      iter.seek(key.keyBytes)
-//      while (iter.isValid && iter.key().startsWith(key.keyBytes.dropRight(Ints.BYTES))) r += key.parse(iter.value())
-//      r
-//    }.get.result()
-//    r.result()
-    Map.empty
-  }
+  override protected def loadCommittedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = Map.empty
+  // readOnly { ro =>
+  //    val key = Keys.committedGenerator(at, 0)
+  //
+  //    val r = Map.newBuilder[PublicKey, BlsPublicKey]
+  //    Using(ro.newIterator) { iter =>
+  //      iter.seek(key.keyBytes)
+  //      while (iter.isValid && iter.key().startsWith(key.keyBytes.dropRight(Ints.BYTES))) r += key.parse(iter.value())
+  //      r
+  //    }.get.result()
+  //    r.result()
+  //    Map.empty
+  //  }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     for {

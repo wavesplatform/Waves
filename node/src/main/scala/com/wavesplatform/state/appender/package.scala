@@ -2,7 +2,6 @@ package com.wavesplatform.state
 
 import cats.syntax.either.*
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector

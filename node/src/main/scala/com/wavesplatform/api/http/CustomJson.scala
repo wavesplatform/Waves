@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http
 
 import com.fasterxml.jackson.core.io.SegmentedStringWriter
-import com.fasterxml.jackson.core.util.BufferRecyclers
+import com.fasterxml.jackson.core.util.JsonRecyclerPools
 import com.fasterxml.jackson.core.{JsonGenerator, JsonProcessingException}
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.databind.{JsonMappingException, JsonSerializer, ObjectMapper, SerializerProvider}
@@ -90,7 +90,8 @@ object CustomJson {
     .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, true)
 
   def writeValueAsString(value: JsValue): String = {
-    val sw = new SegmentedStringWriter(BufferRecyclers.getBufferRecycler)
+    val br = JsonRecyclerPools.defaultPool().acquireAndLinkPooled()
+    val sw = new SegmentedStringWriter(br)
     try mapper.writeValue(sw, value)
     catch {
       case e: JsonProcessingException =>
@@ -98,7 +99,7 @@ object CustomJson {
       case e: IOException =>
         // shouldn't really happen, but is declared as possibility so:
         throw JsonMappingException.fromUnexpectedIOE(e)
-    }
+    } finally JsonRecyclerPools.defaultPool().releasePooled(br)
     sw.getAndClear
   }
 }
