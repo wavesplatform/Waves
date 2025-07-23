@@ -1,0 +1,17 @@
+name: Run Integration Tests
+on:
+  workflow_dispatch:
+
+jobs:
+  it:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'sbt'
+      - uses: sbt/setup-sbt@v1
+      - name: Run Integration Tests
+        run: sbt --batch ";node-it/docker;node-it/test"
