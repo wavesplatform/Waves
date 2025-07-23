@@ -35,10 +35,12 @@ import scala.util.Random
 trait BaseGlobal {
   val MaxBase16Bytes: Int               = 8 * 1024
   val MaxBase16String: Int              = 32 * 1024
+  val MaxBase16String_1C: Int           = 2048
   val MaxBase58Bytes                    = 64
   val MaxBase58String                   = 100
   val MaxBase64Bytes: Int               = 32 * 1024
   val MaxBase64String: Int              = 44 * 1024
+  val MaxBase64String_1C: Int           = 1375
   val MaxLiteralLength: Int             = 12 * 1024
   val MaxAddressLength                  = 36
   val MaxByteStrSizeForVerifyFuncs: Int = 32 * 1024

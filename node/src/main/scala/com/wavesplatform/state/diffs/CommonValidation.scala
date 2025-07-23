@@ -148,7 +148,7 @@ object CommonValidation {
         case V1 | V2 | V3 if sc.containsArray       => barrierByVersion(V4)
         case V1 | V2 if sc.containsBlockV2()        => barrierByVersion(V3)
         case V1 | V2                                => Right(tx)
-        case v @ (v3 | V4 | V5 | V6 | V7 | V8 | V9) => barrierByVersion(v)
+        case v @ (V3 | V4 | V5 | V6 | V7 | V8 | V9) => barrierByVersion(v)
       }
 
       def oldScriptVersionDeactivation(sc: Script): Either[ActivationError, Unit] = sc.stdLibVersion match {

@@ -1,6 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import cats.implicits.*
+import cats.syntax.either.*
+import cats.syntax.semigroup.*
+import cats.syntax.traverse.*
 import cats.{Id, Monad}
 import com.wavesplatform.common.merkle.Merkle.createRoot
 import com.wavesplatform.common.state.ByteStr
@@ -338,7 +340,8 @@ object CryptoContext {
         name: String,
         complexities: Map[StdLibVersion, Long],
         functionId: Short,
-        limit: Int = global.MaxBase64String
+        inputSizeLimit: Int = global.MaxBase64String,
+        resultSizeLimit: Option[Int] = None
     ): BaseFunction[NoContext] =
       NativeFunction(
         name,
@@ -348,12 +351,21 @@ object CryptoContext {
         ("str", STRING)
       ) {
         case CONST_STRING(str: String) :: Nil =>
-          global.base64Decode(str, limit).leftMap(CommonError(_)).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+          for {
+            bs <- global.base64Decode(str, inputSizeLimit).leftMap(CommonError(_))
+            _ <- resultSizeLimit
+              .toLeft(())
+              .leftFlatMap { limit =>
+                Either.raiseWhen(bs.length > limit)(s"byte vector length ${bs.length} exceeds limit $limit")
+              }
+              .leftMap(CommonError(_))
+            cbs <- CONST_BYTESTR(ByteStr(bs))
+          } yield cbs
         case xs => notImplemented[Id, EVALUATED](s"$name(str: String)", xs)
       }
 
     val fromBase64String    = fromBase64StringF("fromBase64String", Map(V1 -> 10L, V4 -> 40L, V9 -> 12L), FROMBASE64)
-    val fromBase64String_1C = fromBase64StringF("fromBase64String_1C", Map(V9 -> 1L), FROMBASE64_1C)
+    val fromBase64String_1C = fromBase64StringF("fromBase64String_1C", Map(V9 -> 1L), FROMBASE64_1C, global.MaxBase64String_1C, Some(1024))
 
     val checkMerkleProofF: BaseFunction[NoContext] =
       NativeFunction(
@@ -410,7 +422,7 @@ object CryptoContext {
 
     def fromBase16String(checkLength: Boolean) =
       fromBase16StringF("fromBase16String", Map(V3 -> 10L, V9 -> 4L), FROMBASE16, if (checkLength) Some(global.MaxBase16String) else None)
-    val fromBase16String_1C = fromBase16StringF("fromBase16String_1C", Map(V9 -> 1L), FROMBASE16_1C, Some(2048))
+    val fromBase16String_1C = fromBase16StringF("fromBase16String_1C", Map(V9 -> 1L), FROMBASE16_1C, Some(global.MaxBase16String_1C))
 
     val bls12Groth16VerifyL: Array[BaseFunction[NoContext]] =
       functionFamily(
