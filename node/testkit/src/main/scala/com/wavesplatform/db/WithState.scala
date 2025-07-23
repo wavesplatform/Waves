@@ -19,7 +19,6 @@ import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
-import com.wavesplatform.state.appender.{generatorBalances, getCommittedGeneratorsAndParentHeight}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{
@@ -196,19 +195,17 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
 
     preconditions.foreach { precondition =>
       (for {
-        preconditionBlock                   <- blockWithComputedStateHash(precondition.block, precondition.signer, bcu).resultE
-        diffResult                          <- differ(state, state.lastBlock, preconditionBlock).resultE
-        (parentHeight, committedGenerators) <- getCommittedGeneratorsAndParentHeight(bcu, preconditionBlock)
-        generatorBalances                   <- generatorBalances(bcu, parentHeight, preconditionBlock, committedGenerators)
+        preconditionBlock <- blockWithComputedStateHash(precondition.block, precondition.signer, bcu).resultE
+        diffResult        <- differ(state, state.lastBlock, preconditionBlock).resultE
       } yield state.append(
         diffResult.snapshot,
         diffResult.carry,
         diffResult.totalFee,
-        None,
+        reward = None,
         preconditionBlock.header.generationSignature,
         diffResult.computedStateHash,
         preconditionBlock,
-        generatorBalances
+        generatorBalances = Map.empty
       )).explicitGet()
     }
 
@@ -244,29 +241,24 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       (for {
         preconditionBlock <- blockWithComputedStateHash(curBlock.block, curBlock.signer, bcu).resultE
         diffResult        <- differ(state, prevBlock, preconditionBlock)
-        // This can be improved, but we don't care in tests
-        (parentHeight, committedGenerators) <- getCommittedGeneratorsAndParentHeight(bcu, preconditionBlock)
-        generatorBalances                   <- generatorBalances(bcu, parentHeight, preconditionBlock, committedGenerators)
       } yield {
         state.append(
           diffResult.snapshot,
           diffResult.carry,
           diffResult.totalFee,
-          None,
+          reward = None,
           preconditionBlock.header.generationSignature,
           diffResult.computedStateHash,
           preconditionBlock,
-          generatorBalances
+          generatorBalances = Map.empty
         )
         Some(preconditionBlock)
       }).explicitGet()
     }
 
     (for {
-      checkedBlock                        <- blockWithComputedStateHash(block.block, block.signer, bcu).resultE
-      diffResult                          <- differ(state, state.lastBlock, checkedBlock)
-      (parentHeight, committedGenerators) <- getCommittedGeneratorsAndParentHeight(bcu, checkedBlock)
-      generatorBalances                   <- generatorBalances(bcu, parentHeight, checkedBlock, committedGenerators)
+      checkedBlock <- blockWithComputedStateHash(block.block, block.signer, bcu).resultE
+      diffResult   <- differ(state, state.lastBlock, checkedBlock)
     } yield {
       val ngState = NgState(
         checkedBlock,
@@ -284,11 +276,11 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         diffResult.snapshot,
         diffResult.carry,
         diffResult.totalFee,
-        None,
+        reward = None,
         checkedBlock.header.generationSignature,
         diffResult.computedStateHash,
         checkedBlock,
-        generatorBalances
+        generatorBalances = Map.empty
       )
       assertion(diffResult.snapshot, state)
     }).explicitGet()
@@ -329,18 +321,16 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
 
         val blockchain = getCompBlockchain(state)
         for {
-          result                              <- differ(blockchain, checkedBlock)
-          (parentHeight, committedGenerators) <- getCommittedGeneratorsAndParentHeight(blockchain, checkedBlock)
-          generatorBalances                   <- generatorBalances(blockchain, parentHeight, checkedBlock, committedGenerators)
+          result <- differ(blockchain, checkedBlock)
         } yield state.append(
           result.snapshot,
           result.carry,
           result.totalFee,
-          None,
+          reward = None,
           checkedBlock.header.generationSignature.take(Block.HitSourceLength),
           result.computedStateHash,
           checkedBlock,
-          generatorBalances
+          generatorBalances = Map.empty
         )
       }
     }
