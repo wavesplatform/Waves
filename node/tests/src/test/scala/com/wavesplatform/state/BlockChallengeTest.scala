@@ -1906,7 +1906,7 @@ class BlockChallengeTest
     appenderWithChallenger(block).runSyncUnsafe()
     if (!channel1.outboundMessages().isEmpty)
       check(PBBlockSpec.deserializeData(channel1.readOutbound[RawBytes]().data).get)
-    else fail("block should be defined") // TODO <--------------
+    else fail("block should be defined")
   }
 
   private def createBlockAppender(d: Domain): Block => Task[Either[ValidationError, BlockApplyResult]] =

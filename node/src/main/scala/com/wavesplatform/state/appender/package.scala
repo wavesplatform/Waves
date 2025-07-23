@@ -172,10 +172,10 @@ package object appender {
     } yield applyResult -> blockchain.height
   }
 
-  /**
-   * @param parentHeight Of newBlock. Generator balances must be taken before a block application.
-   * @return
-   */
+  /** @param parentHeight
+    *   Of newBlock. Generator balances must be taken before a block application.
+    * @return
+    */
   def generatorBalances(
       blockchain: Blockchain,
       parentHeight: Height,
@@ -251,7 +251,7 @@ package object appender {
           hitSource    <- pos.validateGenerationSignature(block)
           _ <- pos
             .validateBlockDelay(parentHeight, block.header, parent, minerBalance)
-            .orElse(checkExceptions(parentHeight, block))
+            .leftFlatMap(checkExceptions(parentHeight, block, _))
         } yield (hitSource, minerBalance)
       }
       .left
@@ -273,14 +273,8 @@ package object appender {
     else Either.right(0L) // Ignore for a regular generator, not a miner
   }
 
-  private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
-    Either
-      .cond(
-        exceptions.contains((height, block.id())),
-        (),
-        GenericError(s"Block time ${block.header.timestamp} less than expected")
-      )
-  }
+  private def checkExceptions(height: Int, block: Block, origError: ValidationError): Either[ValidationError, Unit] =
+    Either.raiseUnless(exceptions.contains((height, block.id())))(origError)
 
   private def validateBlockVersion(parentHeight: Int, block: Block, blockchain: Blockchain): Either[ValidationError, Unit] = {
     Either.cond(
