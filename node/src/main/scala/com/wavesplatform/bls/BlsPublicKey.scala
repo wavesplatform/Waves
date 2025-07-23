@@ -6,7 +6,7 @@ opaque type BlsPublicKey = ByteStr
 
 object BlsPublicKey {
   val SizeInBytes = 48 // TODO: ???
-  
+
   def apply(x: ByteStr): BlsPublicKey     = x
   def apply(x: Array[Byte]): BlsPublicKey = ByteStr(x)
 
