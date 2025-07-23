@@ -76,12 +76,13 @@ object RollbackBenchmark extends ScorexLogging {
     log.info("Appending genesis block")
     rocksDBWriter.append(
       StateSnapshot.build(rocksDBWriter, portfolios.toMap).explicitGet(),
-      0,
-      0,
-      None,
+      carryFee = 0,
+      totalFee = 0,
+      reward = None,
       genesisBlock.header.generationSignature,
-      ByteStr.empty,
-      genesisBlock
+      computedBlockStateHash = ByteStr.empty,
+      genesisBlock,
+      generatorBalances = Map.empty
     )
 
     val nextBlock =
@@ -104,7 +105,16 @@ object RollbackBenchmark extends ScorexLogging {
     val nextSnapshot = StateSnapshot.build(rocksDBWriter, portfolios2.toMap).explicitGet()
 
     log.info("Appending next block")
-    rocksDBWriter.append(nextSnapshot, 0, 0, None, ByteStr.empty, ByteStr.empty, nextBlock)
+    rocksDBWriter.append(
+      nextSnapshot,
+      carryFee = 0,
+      totalFee = 0,
+      reward = None,
+      hitSource = ByteStr.empty,
+      computedBlockStateHash = ByteStr.empty,
+      nextBlock,
+      generatorBalances = Map.empty
+    )
 
     log.info("Rolling back")
     val start = System.nanoTime()

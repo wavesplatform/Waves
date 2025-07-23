@@ -80,7 +80,16 @@ trait BaseState {
         .fromBlock(state, prev, next, None, MiningConstraint.Unlimited, next.header.generationSignature)
         .explicitGet()
 
-    state.append(differResult.snapshot, 0, 0, None, next.header.generationSignature, differResult.computedStateHash, next)
+    state.append(
+      differResult.snapshot,
+      carryFee = 0,
+      totalFee = 0,
+      reward = None,
+      next.header.generationSignature,
+      differResult.computedStateHash,
+      next,
+      generatorBalances = Map.empty
+    )
   }
 
   def applyBlock(b: Block): Unit = {
