@@ -143,18 +143,15 @@ package object appender {
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, (BlockApplyResult, Int)] = {
     val challengedBlock = block.toOriginal
     for {
+      data <- getCommittedGeneratorsAndParentHeight(blockchain, challengedBlock)
       challengedHitSource <-
-        if (verify)
-          for {
-            data           <- getCommittedGeneratorsAndParentHeight(blockchain, challengedBlock)
-            (hitSource, _) <- validateBlock(blockchain, pos, time, data.committedGenerators)(challengedBlock, data.parentHeight)
-          } yield hitSource
+        if (verify) validateBlock(blockchain, pos, time, data.committedGenerators)(challengedBlock, data.parentHeight).map(_.hitSource)
         else pos.validateGenerationSignature(challengedBlock)
 
-      data <- getCommittedGeneratorsAndParentHeight(blockchain, block)
       (hitSource, gb) <-
         if (verify) validateBlockAndReturnBalances(blockchain, pos, time, data.committedGenerators)(block, data.parentHeight)
         else validateGenerationSignature(blockchain, pos, data.committedGenerators)(block, data.parentHeight)
+
       applyResult <-
         metrics.appendBlock
           .measureSuccessful(
@@ -259,14 +256,13 @@ package object appender {
         case x               => x
       }
 
-  // TODO: What if challenged?
   private def genBalance(blockchain: Blockchain, generatorAddress: Address, parentHeight: Height, block: Block): Either[String, Long] = {
     val parentBlockId = block.header.reference
     val balance       = blockchain.generatingBalance(generatorAddress, Some(parentBlockId))
 
     if (blockchain.isEffectiveBalanceValid(parentHeight, block, balance))
       Either.right(
-        balance + block.header.challengedHeader.map(_ => blockchain.generatingBalance(generatorAddress, Some(parentBlockId))).getOrElse(0L)
+        balance + block.header.challengedHeader.map(ch => blockchain.generatingBalance(ch.generator.toAddress, Some(parentBlockId))).getOrElse(0L)
       )
     else if (generatorAddress == block.sender.toAddress) Either.left(s"generator's effective balance $balance is less that required for generation")
     else Either.right(0L) // Ignore for a regular generator, not a miner

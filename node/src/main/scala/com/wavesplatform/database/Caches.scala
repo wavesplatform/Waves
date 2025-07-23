@@ -401,8 +401,8 @@ abstract class Caches extends Blockchain with Storage {
           (),
           s"Rollback is possible only to the block at the height: $safeRollbackHeight"
         )
+      discardedBlocks = doRollback(height)
     } yield {
-      val discardedBlocks = doRollback(height)
       current = loadCurrentBlock()
 
       activatedFeaturesCache = loadActivatedFeatures()

@@ -136,7 +136,7 @@ class BlockChallengeTest
       appendAndCheck(
         d.createBlock(
           Block.ProtoBlockVersion,
-          Seq.empty,
+          txs = Seq.empty,
           strictTime = true,
           stateHash = Some(Some(invalidStateHash)),
           timestamp = Some(Long.MaxValue)

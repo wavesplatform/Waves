@@ -310,7 +310,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     )
 
     EndorseBlockSynchronizer.start(
-      maxActiveEndorsers = settings.blockchainSettings.functionalitySettings.maxActiveGenerators,
+      maxActiveEndorsers = settings.blockchainSettings.functionalitySettings.maxGenerators,
       lastEndorsers = blockchainUpdater.lastBlockInfo.collect {
         case bi if blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, bi.height) =>
           val h = Height(bi.height)

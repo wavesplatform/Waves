@@ -80,7 +80,7 @@ case class FunctionalitySettings(
     blockRewardBoostPeriod: Int = 1000,
     paymentsCheckHeight: Int = 0,
     unitsRegistryAddress: Option[String] = None,
-    maxActiveGenerators: Int = 5,
+    maxGenerators: Int = 5,
     commitmentPeriod: Int = 1000
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
@@ -145,7 +145,7 @@ object FunctionalitySettings {
     blockRewardBoostPeriod = 300_000,
     paymentsCheckHeight = 4303300,
     unitsRegistryAddress = Some("3P8LfPXcveST7WKkV3UACQNdr6J3shPYong"),
-    maxActiveGenerators = 128, // BLS has much worse performance from 129
+    maxGenerators = 128, // BLS has much worse performance from 129
     commitmentPeriod = 10_000
   )
 
@@ -164,7 +164,7 @@ object FunctionalitySettings {
     xtnBuybackRewardPeriod = 2000,
     blockRewardBoostPeriod = 2_000,
     unitsRegistryAddress = Some("3N9fwNGJcUcAbhh7YPr6mrpuGJD4tApZFsT"),
-    maxActiveGenerators = 10,
+    maxGenerators = 10,
     commitmentPeriod = 3000
   )
 
@@ -181,7 +181,7 @@ object FunctionalitySettings {
     xtnBuybackAddress = Some("3MbhiRiLFLJ1EVKNP9npRszcLLQDjwnFfZM"),
     xtnBuybackRewardPeriod = 1000,
     paymentsCheckHeight = 2195900,
-    maxActiveGenerators = 3,
+    maxGenerators = 3,
     commitmentPeriod = 100
   )
 }
