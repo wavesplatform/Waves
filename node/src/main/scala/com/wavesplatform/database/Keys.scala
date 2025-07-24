@@ -1,8 +1,7 @@
 package com.wavesplatform.database
 
-import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.account.{Address, Alias, PublicKey}
-import com.wavesplatform.bls.BlsPublicKey
+import com.google.common.primitives.{Ints, Longs, Shorts}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
@@ -253,6 +252,9 @@ object Keys {
   def generatorBalance(at: Height, addressId: AddressId, cfh: RDB.ApiHandle): Key[Long] =
     Key(GeneratorBalances, h(at) ++ addressId.toByteArray, Longs.fromByteArray, Longs.toByteArray, Some(cfh.handle))
 
-  def committedGenerator(at: Height, idx: Int): Key[(PublicKey, BlsPublicKey, Long)] =
-    Key(CommittedGenerators, h(at) ++ Ints.toByteArray(idx), readCommittedGenerator, writeCommittedGenerator)
+  def committedGeneratorsCount(periodStartHeight: Height): Key[Short] =
+    Key(CommittedGeneratorsCount, h(periodStartHeight), Option(_).fold(0: Short)(Shorts.fromByteArray), Shorts.toByteArray)
+
+  def committedGenerator(periodStartHeight: Height, at: Height, idx: Int): Key[(AddressId, TransactionId)] =
+    Key(CommittedGenerators, h(periodStartHeight) ++ h(at) ++ Ints.toByteArray(idx), readCommittedGenerator, writeCommittedGenerator)
 }

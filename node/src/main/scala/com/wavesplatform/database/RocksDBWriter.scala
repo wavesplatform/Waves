@@ -489,13 +489,15 @@ class RocksDBWriter(
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       generatorBalances: Map[AddressId, Long],
+      nextCommittedGenerators: Map[AddressId, TransactionId],
       stateHash: StateHashBuilder.Result
   ): Unit = {
     log.trace(s"Persisting block ${blockMeta.id} at height $height")
     readWrite { rw =>
       val expiredKeys = new ArrayBuffer[Array[Byte]]
+      val h           = Height(height) // TODO
 
-      rw.put(Keys.height, Height(height))
+      rw.put(Keys.height, h)
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
       val newSafeRollbackHeight      = height - dbSettings.maxRollbackDepth
@@ -531,11 +533,6 @@ class RocksDBWriter(
       val threshold = newSafeRollbackHeight
 
       appendBalances(balances, snapshot.assetStatics, rw)
-
-      // for (((wavesPK, blsPK), i) <- snapshot.nextCommittedGenerators.zipWithIndex) {
-      //   val key = Keys.committedGenerator(Height(height), i)
-      //   rw.put(key, (wavesPK, blsPK, rw.get()))
-      // }
 
       for ((addressId, balance) <- generatorBalances) yield {
         val key = Keys.generatorBalance(Height(height), addressId, rdb.apiHandle)
@@ -708,6 +705,18 @@ class RocksDBWriter(
           activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
           rw.put(Keys.activatedFeatures, featuresToSave)
         }
+      }
+
+      if (nextCommittedGenerators.nonEmpty) {
+        val nextPeriodStartHeight            = Blockchain.currentGenerationPeriodStartHeight(h, settings.functionalitySettings)
+        val nextPeriodGeneratorsCurrentCount = rw.get(Keys.committedGeneratorsCount(nextPeriodStartHeight))
+        val nextPeriodGeneratorsUpdatedCount = (nextPeriodGeneratorsCurrentCount + nextCommittedGenerators.size).shortValue
+
+        for (((addressId, txnId), i) <- nextCommittedGenerators.zip(Iterator.from(nextPeriodGeneratorsCurrentCount))) {
+          val key = Keys.committedGenerator(nextPeriodStartHeight, h, i)
+          rw.put(key, (addressId, txnId))
+        }
+        rw.put(Keys.committedGeneratorsCount(nextPeriodStartHeight), nextPeriodGeneratorsUpdatedCount)
       }
 
       rw.put(Keys.issuedAssets(height), snapshot.assetStatics.keySet.toSeq)

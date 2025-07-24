@@ -14,7 +14,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
+import com.wavesplatform.transaction.{Asset, CommitToGenerationTransaction, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 import org.github.jamm.MemoryMeter
@@ -227,6 +227,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       generatorBalances: Map[AddressId, Long],
+      nextCommittedGenerators: Map[AddressId, TransactionId],
       stateHash: StateHashBuilder.Result
   ): Unit
 
@@ -289,10 +290,23 @@ abstract class Caches extends Blockchain with Storage {
       (address, balance)
     }
 
-    val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
-    for ((_, nti) <- snapshot.transactions)
+    val addressTransactions            = ArrayListMultimap.create[AddressId, TransactionId]()
+    val nextCommittedGeneratorsBuilder = Map.newBuilder[AddressId, TransactionId]
+    for ((_, nti) <- snapshot.transactions) {
       for (addr <- nti.affected)
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
+
+      nti.transaction match {
+        case txn: CommitToGenerationTransaction =>
+          val addressId = addressIdWithFallback(txn.sender.toAddress, newAddressIds)
+          nextCommittedGeneratorsBuilder += addressId -> TransactionId(txn.id())
+        case _ =>
+      }
+    }
+    val nextCommittedGenerators = nextCommittedGeneratorsBuilder.result()
+
+//    if (newHeight % settings.functionalitySettings.commitmentPeriod == 0)
+//      committedGeneratorsCache = snapshot.nextCommittedGenerators
 
     val updatedBalanceNodes = for {
       case ((address, asset), amount) <- snapshot.balances
@@ -306,13 +320,6 @@ abstract class Caches extends Blockchain with Storage {
     val generatorBalanceNodes = for {
       (address, balance) <- generatorBalances
     } yield (addressIdWithFallback(address, newAddressIds), balance)
-
-    // val committedGeneratorsBalances = for {
-    //   (wavesPK, blsPK) <- snapshot.nextCommittedGenerators
-    // } yield {
-    //   val address   = wavesPK.toAddress
-    //   val addressId = addressIdWithFallback(address, newAddressIds)
-    // }
 
     val newEntries = for {
       (address, entries) <- snapshot.accountData
@@ -368,6 +375,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       generatorBalanceNodes,
+      nextCommittedGenerators,
       stateHash.result()
     )
 
@@ -387,9 +395,6 @@ abstract class Caches extends Blockchain with Storage {
     scriptCache.putAll(snapshot.accountScriptsByAddress.asJava)
     assetScriptCache.putAll(snapshot.assetScripts.view.mapValues(Some(_)).toMap.asJava)
     accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
-    // TODO: Wrong, because of period, not a block
-    // if (newHeight % settings.functionalitySettings.commitmentPeriod == 0)
-    //   committedGeneratorsCache = snapshot.nextCommittedGenerators
   }
 
   protected def doRollback(targetHeight: Int): DiscardedBlocks
