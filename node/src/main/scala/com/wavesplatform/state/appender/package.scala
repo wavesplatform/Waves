@@ -56,14 +56,14 @@ package object appender {
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] =
     for {
       data <- getCommittedGeneratorsAndParentHeight(blockchain, block)
-      (hitSource, gb) <-
+      (hitSource, generatorBalances) <-
         if (verify) validateBlockAndReturnBalances(blockchain, pos, time, data.committedGenerators)(block, data.parentHeight)
         else validateGenerationSignature(blockchain, pos, data.committedGenerators)(block, data.parentHeight)
       applyResult <-
         metrics.appendBlock
           .measureSuccessful(
             blockchain
-              .processBlock(block, hitSource, snapshot.map(responseToSnapshot(block, blockchain.height + 1)), gb, None, verify, txSignParCheck)
+              .processBlock(block, hitSource, snapshot.map(responseToSnapshot(block, blockchain.height + 1)), generatorBalances, None, verify, txSignParCheck)
           )
           .map {
             case res @ Applied(discardedDiffs, _) =>
@@ -93,7 +93,7 @@ package object appender {
     } else {
       for {
         data <- getCommittedGeneratorsAndParentHeight(blockchain, block)
-        (hitSource, gb) <-
+        (hitSource, generatorBalances) <-
           if (verify) validateBlockAndReturnBalances(blockchain, pos, time, data.committedGenerators)(block, data.parentHeight)
           else validateGenerationSignature(blockchain, pos, data.committedGenerators)(block, data.parentHeight)
         applyResult <- metrics.appendBlock.measureSuccessful(
@@ -101,7 +101,7 @@ package object appender {
             block,
             hitSource,
             snapshot.map(responseToSnapshot(block, blockchain.height + 1)),
-            gb,
+            generatorBalances,
             None,
             verify,
             txSignParCheck
@@ -148,7 +148,7 @@ package object appender {
         if (verify) validateBlock(blockchain, pos, time, data.committedGenerators)(challengedBlock, data.parentHeight).map(_.hitSource)
         else pos.validateGenerationSignature(challengedBlock)
 
-      (hitSource, gb) <-
+      (hitSource, generatorBalances) <-
         if (verify) validateBlockAndReturnBalances(blockchain, pos, time, data.committedGenerators)(block, data.parentHeight)
         else validateGenerationSignature(blockchain, pos, data.committedGenerators)(block, data.parentHeight)
 
@@ -159,7 +159,7 @@ package object appender {
               block,
               hitSource,
               snapshot.map(responseToSnapshot(block, blockchain.height + 1)),
-              gb,
+              generatorBalances,
               Some(challengedHitSource),
               verify,
               txSignParCheck

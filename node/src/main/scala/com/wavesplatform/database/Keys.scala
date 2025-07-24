@@ -2,10 +2,10 @@ package com.wavesplatform.database
 
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -249,6 +249,9 @@ object Keys {
 
   def maliciousMinerBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
     historyKey(MaliciousMinerBanHeights, addressBytes)
+
+  def generatorBalance(at: Height, addressId: AddressId, cfh: RDB.ApiHandle): Key[Long] =
+    Key(GeneratorBalances, h(at) ++ addressId.toByteArray, Longs.fromByteArray, Longs.toByteArray, Some(cfh.handle))
 
   def committedGenerator(at: Height, idx: Int): Key[(PublicKey, BlsPublicKey, Long)] =
     Key(CommittedGenerators, h(at) ++ Ints.toByteArray(idx), readCommittedGenerator, writeCommittedGenerator)

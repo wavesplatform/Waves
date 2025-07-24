@@ -226,6 +226,7 @@ abstract class Caches extends Blockchain with Storage {
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
+      generatorBalances: Map[AddressId, Long],
       stateHash: StateHashBuilder.Result
   ): Unit
 
@@ -237,7 +238,7 @@ abstract class Caches extends Blockchain with Storage {
       hitSource: ByteStr,
       computedBlockStateHash: ByteStr,
       block: Block,
-      generatorBalances: GeneratorBalances // TODO: Don't forget rollbacks
+      generatorBalances: GeneratorBalances
   ): Unit = {
     val newHeight = current.height + 1
     val newScore  = block.blockScore() + current.score
@@ -301,18 +302,16 @@ abstract class Caches extends Blockchain with Storage {
       CurrentBalance(amount, Height(height), prevBalance.height),
       BalanceNode(amount, prevBalance.height)
     )
-    val balances = VectorMap() ++ updatedBalanceNodes.map { case ((address, asset), v) =>
-      (addressIdWithFallback(address, newAddressIds), asset) -> v
-    }
 
-    // TODO: This is a full block, not a key block. Add in Snapshot and don't override? Or in NG?
-    // TODO: Leasing
+    val generatorBalanceNodes = for {
+      (address, balance) <- generatorBalances
+    } yield (addressIdWithFallback(address, newAddressIds), balance)
+
     // val committedGeneratorsBalances = for {
     //   (wavesPK, blsPK) <- snapshot.nextCommittedGenerators
     // } yield {
     //   val address   = wavesPK.toAddress
     //   val addressId = addressIdWithFallback(address, newAddressIds)
-    //   ???
     // }
 
     val newEntries = for {
@@ -362,12 +361,13 @@ abstract class Caches extends Blockchain with Storage {
       carryFee,
       computedBlockStateHash,
       newAddressIds,
-      balances,
+      VectorMap() ++ updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v },
       leaseBalancesWithNodes.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance },
       orderFillsWithNodes,
       updatedDataWithNodes,
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
+      generatorBalanceNodes,
       stateHash.result()
     )
 
@@ -387,8 +387,9 @@ abstract class Caches extends Blockchain with Storage {
     scriptCache.putAll(snapshot.accountScriptsByAddress.asJava)
     assetScriptCache.putAll(snapshot.assetScripts.view.mapValues(Some(_)).toMap.asJava)
     accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
-    if (newHeight % settings.functionalitySettings.commitmentPeriod == 0)
-      committedGeneratorsCache = snapshot.nextCommittedGenerators
+    // TODO: Wrong, because of period, not a block
+    // if (newHeight % settings.functionalitySettings.commitmentPeriod == 0)
+    //   committedGeneratorsCache = snapshot.nextCommittedGenerators
   }
 
   protected def doRollback(targetHeight: Int): DiscardedBlocks

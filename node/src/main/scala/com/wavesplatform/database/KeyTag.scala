@@ -59,6 +59,7 @@ enum KeyTag {
     BlockStateHash,
     AddressLeaseInfoSeqNr,
     AddressLeaseInfoSeq,
+    GeneratorBalances,
     CommittedGenerators
 
   def prefixBytes: Array[Byte] = Shorts.toByteArray(ordinal.toShort)

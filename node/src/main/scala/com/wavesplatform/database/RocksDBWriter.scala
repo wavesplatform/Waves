@@ -488,6 +488,7 @@ class RocksDBWriter(
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
+      generatorBalances: Map[AddressId, Long],
       stateHash: StateHashBuilder.Result
   ): Unit = {
     log.trace(s"Persisting block ${blockMeta.id} at height $height")
@@ -529,12 +530,18 @@ class RocksDBWriter(
 
       val threshold = newSafeRollbackHeight
 
-//      for (((wavesPK, blsPK), i) <- snapshot.nextCommittedGenerators.zipWithIndex) {
-//        val key = Keys.committedGenerator(Height(height), i)
-//        rw.put(key, (wavesPK, blsPK, rw.get()))
-//      }
-
       appendBalances(balances, snapshot.assetStatics, rw)
+
+      // for (((wavesPK, blsPK), i) <- snapshot.nextCommittedGenerators.zipWithIndex) {
+      //   val key = Keys.committedGenerator(Height(height), i)
+      //   rw.put(key, (wavesPK, blsPK, rw.get()))
+      // }
+
+      for ((addressId, balance) <- generatorBalances) yield {
+        val key = Keys.generatorBalance(Height(height), addressId, rdb.apiHandle)
+        rw.put(key, balance)
+      }
+
       appendData(newAddresses, data, rw)
 
       val changedAddresses = (addressTransactions.asScala.keys ++ balances.keys.map(_._1)).toSet
@@ -994,6 +1001,10 @@ class RocksDBWriter(
               balancesToInvalidate += address -> assetId
               rollbackBalanceHistory(rw, Keys.assetBalance(addressId, assetId), Keys.assetBalanceAt(addressId, assetId, _), currentHeight)
             }
+          }
+
+          rw.iterateOver(KeyTag.GeneratorBalances.prefixBytes ++ KeyHelpers.h(currentHeight), Some(rdb.apiHandle.handle)) { e =>
+            rw.delete(e.getKey)
           }
 
           for ((addressId, address) <- changedAddresses) {
