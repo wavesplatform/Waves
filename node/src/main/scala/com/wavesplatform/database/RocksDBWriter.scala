@@ -708,7 +708,7 @@ class RocksDBWriter(
       }
 
       if (nextCommittedGenerators.nonEmpty) {
-        val nextPeriodStartHeight            = Blockchain.currentGenerationPeriodStartHeight(h, settings.functionalitySettings)
+        val nextPeriodStartHeight            = Blockchain.nextGenerationPeriodStartHeight(h, settings.functionalitySettings)
         val nextPeriodGeneratorsCurrentCount = rw.get(Keys.committedGeneratorsCount(nextPeriodStartHeight))
         val nextPeriodGeneratorsUpdatedCount = (nextPeriodGeneratorsCurrentCount + nextCommittedGenerators.size).shortValue
 
@@ -981,6 +981,7 @@ class RocksDBWriter(
 
     log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
+    val discardedGenerationPeriods = mutable.Set.empty[Height]
     val discardedBlocks: DiscardedBlocks =
       for (currentHeightInt <- height until targetHeight by -1; currentHeight = Height(currentHeightInt)) yield {
         val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
@@ -991,6 +992,7 @@ class RocksDBWriter(
         val aliasesToInvalidate      = Seq.newBuilder[Alias]
         val blockHeightsToInvalidate = Seq.newBuilder[ByteStr]
 
+        val nextGenerationPeriod = Blockchain.nextGenerationPeriodStartHeight(currentHeight, settings.functionalitySettings)
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
 
@@ -1014,6 +1016,14 @@ class RocksDBWriter(
 
           rw.iterateOver(KeyTag.GeneratorBalances.prefixBytes ++ KeyHelpers.h(currentHeight), Some(rdb.apiHandle.handle)) { e =>
             rw.delete(e.getKey)
+          }
+
+          if (!discardedGenerationPeriods.contains(nextGenerationPeriod)) {
+            discardedGenerationPeriods += nextGenerationPeriod
+            rw.iterateOver(KeyTag.CommittedGenerators.prefixBytes ++ KeyHelpers.h(nextGenerationPeriod), Some(rdb.apiHandle.handle)) { e =>
+              rw.delete(e.getKey)
+            }
+            rw.delete(Keys.committedGeneratorsCount(nextGenerationPeriod))
           }
 
           for ((addressId, address) <- changedAddresses) {
