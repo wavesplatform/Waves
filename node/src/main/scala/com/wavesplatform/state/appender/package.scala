@@ -63,7 +63,15 @@ package object appender {
         metrics.appendBlock
           .measureSuccessful(
             blockchain
-              .processBlock(block, hitSource, snapshot.map(responseToSnapshot(block, blockchain.height + 1)), generatorBalances, None, verify, txSignParCheck)
+              .processBlock(
+                block,
+                hitSource,
+                snapshot.map(responseToSnapshot(block, blockchain.height + 1)),
+                generatorBalances,
+                challengedHitSource = None,
+                verify,
+                txSignParCheck
+              )
           )
           .map {
             case res @ Applied(discardedDiffs, _) =>
@@ -102,7 +110,7 @@ package object appender {
             hitSource,
             snapshot.map(responseToSnapshot(block, blockchain.height + 1)),
             generatorBalances,
-            None,
+            challengedHitSource = None,
             verify,
             txSignParCheck
           )
