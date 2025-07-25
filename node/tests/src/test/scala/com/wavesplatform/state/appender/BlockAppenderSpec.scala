@@ -2,6 +2,7 @@ package com.wavesplatform.state.appender
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block
+import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
@@ -9,7 +10,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.mining.BlockChallengerImpl
 import com.wavesplatform.network.{EndorseBlockSpec, MessageCodecL1, PBBlockSpec, PeerDatabase, RawBytes}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Ignored
-import com.wavesplatform.state.{CompleteBlockchainUpdater, ForwardingBlockchainUpdaterImpl, Height}
+import com.wavesplatform.state.{CompleteBlockchainUpdater, ForwardingBlockchainUpdaterImpl, GenerationPeriod}
 import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.wallet.Wallet
@@ -117,7 +118,9 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
 
   it should "broadcast a block endorsement after the feature activation" in {
     def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-      override def activeGenerators(at: Height): Set[PublicKey] = Set(sender.publicKey)
+      private val blsKeyPair = BlsKeyPair(sender.privateKey)
+
+      override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = Map(sender.publicKey -> blsKeyPair.publicKey)
     }
 
     withDomain(

@@ -29,7 +29,7 @@ import com.wavesplatform.mining.{BlockChallengerImpl, Miner, MinerDebugInfo, Min
 import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, CompleteBlockchainUpdater, Height, TxMeta}
+import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, CompleteBlockchainUpdater, GenerationPeriod, Height, TxMeta}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -313,8 +313,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       maxActiveEndorsers = settings.blockchainSettings.functionalitySettings.maxGenerators,
       lastEndorsers = blockchainUpdater.lastBlockInfo.collect {
         case bi if blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, bi.height) =>
-          val h = Height(bi.height)
-          (h, blockchainUpdater.activeGenerators(h))
+          val h      = Height(bi.height)
+          val period = GenerationPeriod.from(h, settings.blockchainSettings.functionalitySettings)
+          (h, blockchainUpdater.committedGenerators(period).keySet)
       },
       endorseBlocks = messageObserver.endorseBlocks,
       allChannels = allChannels,

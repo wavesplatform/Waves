@@ -16,7 +16,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.MaxTimeDrift
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.{Blockchain, Height, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, GenerationPeriod, Height, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -148,9 +148,9 @@ class BlockChallengerImpl(
     for {
       id <- blockchainUpdater.blockId(height).toSeq
       finalizedId = id // TODO:
-      active      = blockchainUpdater.activeGenerators(Height(height + 1))
+      committed   = blockchainUpdater.committedGenerators(GenerationPeriod.from(height, settings.blockchainSettings.functionalitySettings))
       account <- wallet.privateKeyAccounts
-      if active.contains(account.publicKey)
+      if committed.contains(account.publicKey)
     } yield BlockEndorsement.full(account, finalizedId, id, height)
 
   private def withProcessingTxs[A](txs: Seq[Transaction])(body: Task[A]): Task[A] =

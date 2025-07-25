@@ -3,16 +3,16 @@ package com.wavesplatform.state
 import com.wavesplatform.account.*
 import com.wavesplatform.block.Block.*
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatureStatus, BlockchainFeatures}
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.Issue
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings}
+import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
@@ -88,9 +88,7 @@ trait Blockchain {
 
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
-  def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey]
-
-  def activeGenerators(at: Height): Set[PublicKey] // TODO: Remove
+  def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
@@ -242,15 +240,6 @@ object Blockchain {
         }
         .fold(1)(_ => BlockRewardCalculator.RewardBoost)
 
-    def currentGenerationPeriodStartHeight: Height =
-      Blockchain.currentGenerationPeriodStartHeight(Height(blockchain.height), blockchain.settings.functionalitySettings)
+    def currentGenerationPeriod: GenerationPeriod = GenerationPeriod.from(Height(blockchain.height), blockchain.settings.functionalitySettings)
   }
-
-  def currentGenerationPeriodStartHeight(height: Height, functionalitySettings: FunctionalitySettings): Height = {
-    val commitmentPeriod = functionalitySettings.commitmentPeriod
-    Height((height / commitmentPeriod) * commitmentPeriod)
-  }
-
-  def nextGenerationPeriodStartHeight(height: Height, functionalitySettings: FunctionalitySettings): Height =
-    Height(currentGenerationPeriodStartHeight(height, functionalitySettings) + functionalitySettings.commitmentPeriod)
 }

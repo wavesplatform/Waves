@@ -12,7 +12,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{Blockchain, Height}
+import com.wavesplatform.state.{GenerationPeriod, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, UnsupportedTransactionType, UnsupportedTypeAndVersion, WrongChain}
 import com.wavesplatform.transaction.assets.*
@@ -281,14 +281,14 @@ class TransactionFactory(wallet: Wallet, time: Time, currentHeight: Height, func
     }
 
   def commitToGeneration(request: CommitToGenerationRequest, signerAddress: String): Either[ValidationError, CommitToGenerationTransaction] = {
-    val defaultGenerationPeriodStart = Blockchain.nextGenerationPeriodStartHeight(currentHeight, functionalitySettings)
+    val defaultPeriod = GenerationPeriod.from(currentHeight, functionalitySettings).next
     for {
       sender <- request.sender match {
         case Some(sender) => wallet.findPrivateKey(sender)
         case None         => Left(GenericError("invalid.sender"))
       }
       signer <- wallet.findPrivateKey(signerAddress)
-      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender.publicKey, defaultGenerationPeriodStart)
+      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender.publicKey, defaultPeriod.start)
     } yield {
       tx.signWith(signer.privateKey)
     }

@@ -199,9 +199,9 @@ abstract class Caches extends Blockchain with Storage {
   protected def discardBlockHeight(blockId: ByteStr): Unit = blockHeightCache.invalidate(blockId)
 
   @volatile
-  protected var committedGeneratorsCache: Map[PublicKey, BlsPublicKey] = loadCommittedGenerators(this.currentGenerationPeriodStartHeight)
-  protected def loadCommittedGenerators(at: Height): Map[PublicKey, BlsPublicKey]
-  override def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = committedGeneratorsCache
+  protected var committedGeneratorsCache: Map[PublicKey, BlsPublicKey] = loadCommittedGenerators(this.currentGenerationPeriod)
+  protected def loadCommittedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey]
+  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = committedGeneratorsCache
 
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()

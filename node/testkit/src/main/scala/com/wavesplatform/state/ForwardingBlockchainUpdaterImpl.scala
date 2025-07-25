@@ -1,6 +1,7 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.transaction.BlockchainUpdater
 
 class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) extends Blockchain with BlockchainUpdater with NG {
@@ -61,9 +62,8 @@ class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) exten
     liquidBlockMeta,
     bestLiquidSnapshot,
     bestLiquidSnapshotAndFees,
-    snapshotBlockchain,
-    committedGenerators
+    snapshotBlockchain
   }
 
-  override def activeGenerators(at: Height): Set[PublicKey] = delegate.activeGenerators(at)
+  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = delegate.committedGenerators(at)
 }

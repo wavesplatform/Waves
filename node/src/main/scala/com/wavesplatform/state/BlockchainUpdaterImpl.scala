@@ -6,13 +6,13 @@ import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot, SignedBlockHeader}
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.RocksDBWriter
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.ConsensusImprovements
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
@@ -832,9 +832,7 @@ class BlockchainUpdaterImpl(
       .getOrElse(rocksdb.lastStateHash(None))
   }
 
-  override def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = Map.empty // TODO: Implement
-
-  override def activeGenerators(at: Height): Set[PublicKey] = Set.empty // TODO: Implement
+  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = Map.empty // TODO: Implement
 
   override def snapshotBlockchain: SnapshotBlockchain = readLock {
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))

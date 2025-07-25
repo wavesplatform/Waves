@@ -708,15 +708,15 @@ class RocksDBWriter(
       }
 
       if (nextCommittedGenerators.nonEmpty) {
-        val nextPeriodStartHeight            = Blockchain.nextGenerationPeriodStartHeight(h, settings.functionalitySettings)
-        val nextPeriodGeneratorsCurrentCount = rw.get(Keys.committedGeneratorsCount(nextPeriodStartHeight))
+        val nextPeriod                       = GenerationPeriod.from(h, settings.functionalitySettings).next
+        val nextPeriodGeneratorsCurrentCount = rw.get(Keys.committedGeneratorsCount(nextPeriod))
         val nextPeriodGeneratorsUpdatedCount = (nextPeriodGeneratorsCurrentCount + nextCommittedGenerators.size).shortValue
 
         for (((addressId, txnId), i) <- nextCommittedGenerators.zip(Iterator.from(nextPeriodGeneratorsCurrentCount))) {
-          val key = Keys.committedGenerator(nextPeriodStartHeight, h, i)
+          val key = Keys.committedGenerator(nextPeriod, h, i)
           rw.put(key, (addressId, txnId))
         }
-        rw.put(Keys.committedGeneratorsCount(nextPeriodStartHeight), nextPeriodGeneratorsUpdatedCount)
+        rw.put(Keys.committedGeneratorsCount(nextPeriod), nextPeriodGeneratorsUpdatedCount)
       }
 
       rw.put(Keys.issuedAssets(height), snapshot.assetStatics.keySet.toSeq)
@@ -981,7 +981,7 @@ class RocksDBWriter(
 
     log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-    val discardedGenerationPeriods = mutable.Set.empty[Height]
+    val discardedGenerationPeriods = mutable.Set.empty[GenerationPeriod]
     val discardedBlocks: DiscardedBlocks =
       for (currentHeightInt <- height until targetHeight by -1; currentHeight = Height(currentHeightInt)) yield {
         val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
@@ -992,7 +992,7 @@ class RocksDBWriter(
         val aliasesToInvalidate      = Seq.newBuilder[Alias]
         val blockHeightsToInvalidate = Seq.newBuilder[ByteStr]
 
-        val nextGenerationPeriod = Blockchain.nextGenerationPeriodStartHeight(currentHeight, settings.functionalitySettings)
+        val nextPeriod = GenerationPeriod.from(currentHeight, settings.functionalitySettings).next
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
 
@@ -1018,12 +1018,12 @@ class RocksDBWriter(
             rw.delete(e.getKey)
           }
 
-          if (!discardedGenerationPeriods.contains(nextGenerationPeriod)) {
-            discardedGenerationPeriods += nextGenerationPeriod
-            rw.iterateOver(KeyTag.CommittedGenerators.prefixBytes ++ KeyHelpers.h(nextGenerationPeriod), Some(rdb.apiHandle.handle)) { e =>
+          if (!discardedGenerationPeriods.contains(nextPeriod)) {
+            discardedGenerationPeriods += nextPeriod
+            rw.iterateOver(KeyTag.CommittedGenerators.prefixBytes ++ KeyHelpers.h(nextPeriod.start), Some(rdb.apiHandle.handle)) { e =>
               rw.delete(e.getKey)
             }
-            rw.delete(Keys.committedGeneratorsCount(nextGenerationPeriod))
+            rw.delete(Keys.committedGeneratorsCount(nextPeriod))
           }
 
           for ((addressId, address) <- changedAddresses) {
@@ -1329,7 +1329,7 @@ class RocksDBWriter(
   override protected def loadBlockHeight(blockId: BlockId): Option[Int] = readOnly(_.get(Keys.heightOf(blockId)))
 
   // TODO:
-  override protected def loadCommittedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = Map.empty
+  override protected def loadCommittedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = Map.empty
   // readOnly { ro =>
   //    val key = Keys.committedGenerator(at, 0)
   //
@@ -1474,7 +1474,5 @@ class RocksDBWriter(
   def snapshotStateHash(height: Int): ByteStr =
     readOnly(_.get(Keys.blockStateHash(height)))
 
-  override def committedGenerators(at: Height): Map[PublicKey, BlsPublicKey] = Map.empty // TODO:
-
-  override def activeGenerators(at: Height): Set[PublicKey] = Set.empty // TODO:
+  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = Map.empty // TODO:
 }
