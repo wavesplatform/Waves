@@ -5,6 +5,7 @@ import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
@@ -22,6 +23,7 @@ import com.wavesplatform.state.{
   AssetScriptInfo,
   BalanceSnapshot,
   DataEntry,
+  GenerationPeriod,
   Height,
   LeaseBalance,
   StateSnapshot,
@@ -203,9 +205,7 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override def lastStateHash(refId: Option[BlockId]): BlockId = ???
 
-  override def committedGenerators(at: Height): Set[PublicKey] = ???
-
-  override def activeGenerators(at: Height): Set[PublicKey] = ???
+  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = ???
 
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =

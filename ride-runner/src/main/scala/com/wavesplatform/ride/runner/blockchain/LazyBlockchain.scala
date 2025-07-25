@@ -6,6 +6,7 @@ import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -31,6 +32,7 @@ import com.wavesplatform.state.{
   AssetScriptInfo,
   BalanceSnapshot,
   DataEntry,
+  GenerationPeriod,
   Height,
   LeaseBalance,
   StateSnapshot,
@@ -209,9 +211,7 @@ class LazyBlockchain[TagT] private (
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
     getTransactionHeight(TransactionId(id)).map(TxMeta(_, TxMeta.Status.Succeeded, 0)) // Other information not used
 
-  override def committedGenerators(at: Height): AffectedTags[PublicKey] = ???
-
-  override def activeGenerators(at: Height): AffectedTags[PublicKey] = ???
+  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = ???
 
   private def getTransactionHeight(id: TransactionId): Option[Height] = db.directReadWrite { implicit ctx =>
     memCache.getOrLoad(MemCacheKey.Transaction(id)) { key =>
