@@ -495,7 +495,7 @@ class RocksDBWriter(
     log.trace(s"Persisting block ${blockMeta.id} at height $height")
     readWrite { rw =>
       val expiredKeys = new ArrayBuffer[Array[Byte]]
-      val h           = Height(height) // TODO
+      val h           = Height(height)
 
       rw.put(Keys.height, h)
 
@@ -509,7 +509,7 @@ class RocksDBWriter(
         }
       }
 
-      rw.put(Keys.blockMetaAt(Height(height)), Some(blockMeta))
+      rw.put(Keys.blockMetaAt(h), Some(blockMeta))
       rw.put(Keys.heightOf(blockMeta.id), Some(height))
       blockHeightCache.put(blockMeta.id, Some(height))
 
@@ -535,7 +535,7 @@ class RocksDBWriter(
       appendBalances(balances, snapshot.assetStatics, rw)
 
       for ((addressId, balance) <- generatorBalances) yield {
-        val key = Keys.generatorBalance(Height(height), addressId, rdb.apiHandle)
+        val key = Keys.generatorBalance(h, addressId, rdb.apiHandle)
         rw.put(key, balance)
       }
 
@@ -627,9 +627,9 @@ class RocksDBWriter(
           val meta = TxMeta(Height @@ blockMeta.height, txInfo.status, txInfo.spentComplexity)
           val txId = TransactionId(id)
 
-          val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((meta, tx)))
+          val size = rw.put(Keys.transactionAt(h, num, rdb.txHandle), Some((meta, tx)))
           rw.put(
-            Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle),
+            Keys.transactionStateSnapshotAt(h, num, rdb.txSnapshotHandle),
             Some(PBSnapshots.toProtobuf(txInfo.snapshot, txInfo.status))
           )
           rw.put(Keys.transactionMetaById(txId, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, meta.status.protobuf, 0, size)))
@@ -650,7 +650,7 @@ class RocksDBWriter(
               val (num, tx, size) = transactionsWithSize(txId)
               (tx.tpe.id.toByte, num, size)
             }.toSeq
-            rw.put(Keys.addressTransactionHN(addressId, nextSeqNr, rdb.apiHandle), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
+            rw.put(Keys.addressTransactionHN(addressId, nextSeqNr, rdb.apiHandle), Some((h, txTypeNumSeq.sortBy(-_._2))))
             rw.put(txSeqNrKey, nextSeqNr)
           }
       }
@@ -746,7 +746,7 @@ class RocksDBWriter(
 
       for ((txId, pbMeta) <- snapshot.ethereumTransactionMeta) {
         val txNum = transactionsWithSize(TransactionId @@ txId)._1
-        val key   = Keys.ethereumTransactionMeta(Height(height), txNum, rdb.apiHandle)
+        val key   = Keys.ethereumTransactionMeta(h, txNum, rdb.apiHandle)
         rw.put(key, Some(pbMeta))
       }
 
