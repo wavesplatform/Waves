@@ -533,12 +533,6 @@ class RocksDBWriter(
       val threshold = newSafeRollbackHeight
 
       appendBalances(balances, snapshot.assetStatics, rw)
-
-      for ((addressId, balance) <- generatorBalances) yield {
-        val key = Keys.generatorBalance(h, addressId, rdb.apiHandle)
-        rw.put(key, balance)
-      }
-
       appendData(newAddresses, data, rw)
 
       val changedAddresses = (addressTransactions.asScala.keys ++ balances.keys.map(_._1)).toSet
@@ -707,16 +701,19 @@ class RocksDBWriter(
         }
       }
 
+      // TODO: Store in one key
+      // TODO: Option to not store
+      for ((addressId, balance) <- generatorBalances) yield {
+        val key = Keys.generatorBalance(h, addressId, rdb.apiHandle)
+        rw.put(key, balance)
+      }
+
       if (nextCommittedGenerators.nonEmpty) {
         val nextPeriod                       = GenerationPeriod.from(h, settings.functionalitySettings).next
-        val nextPeriodGeneratorsCurrentCount = rw.get(Keys.committedGeneratorsCount(nextPeriod))
-        val nextPeriodGeneratorsUpdatedCount = (nextPeriodGeneratorsCurrentCount + nextCommittedGenerators.size).shortValue
+        val nextPeriodGeneratorsUpdatedCount = rw.get(Keys.committedGeneratorsCount(nextPeriod)) + nextCommittedGenerators.size
 
-        for (((addressId, txnId), i) <- nextCommittedGenerators.zip(Iterator.from(nextPeriodGeneratorsCurrentCount))) {
-          val key = Keys.committedGenerator(nextPeriod, h, i)
-          rw.put(key, (addressId, txnId))
-        }
-        rw.put(Keys.committedGeneratorsCount(nextPeriod), nextPeriodGeneratorsUpdatedCount)
+        rw.put(Keys.committedGenerators(nextPeriod, h), nextCommittedGenerators)
+        rw.put(Keys.committedGeneratorsCount(nextPeriod), nextPeriodGeneratorsUpdatedCount.toShort)
       }
 
       rw.put(Keys.issuedAssets(height), snapshot.assetStatics.keySet.toSeq)
@@ -981,7 +978,6 @@ class RocksDBWriter(
 
     log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-    val discardedGenerationPeriods = mutable.Set.empty[GenerationPeriod]
     val discardedBlocks: DiscardedBlocks =
       for (currentHeightInt <- height until targetHeight by -1; currentHeight = Height(currentHeightInt)) yield {
         val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
@@ -1012,18 +1008,6 @@ class RocksDBWriter(
               balancesToInvalidate += address -> assetId
               rollbackBalanceHistory(rw, Keys.assetBalance(addressId, assetId), Keys.assetBalanceAt(addressId, assetId, _), currentHeight)
             }
-          }
-
-          rw.iterateOver(KeyTag.GeneratorBalances.prefixBytes ++ KeyHelpers.h(currentHeight), Some(rdb.apiHandle.handle)) { e =>
-            rw.delete(e.getKey)
-          }
-
-          if (!discardedGenerationPeriods.contains(nextPeriod)) {
-            discardedGenerationPeriods += nextPeriod
-            rw.iterateOver(KeyTag.CommittedGenerators.prefixBytes ++ KeyHelpers.h(nextPeriod.start), Some(rdb.apiHandle.handle)) { e =>
-              rw.delete(e.getKey)
-            }
-            rw.delete(Keys.committedGeneratorsCount(nextPeriod))
           }
 
           for ((addressId, address) <- changedAddresses) {
@@ -1075,7 +1059,8 @@ class RocksDBWriter(
 
           rollbackAssetsInfo(rw, currentHeight)
 
-          val blockTxs = loadTransactions(currentHeight, rdb)
+          val blockTxs              = loadTransactions(currentHeight, rdb)
+          var commitToGenerationTxs = 0
           blockTxs.view.zipWithIndex.foreach { case ((_, tx), idx) =>
             val num = TxNum(idx.toShort)
             (tx: @unchecked) match {
@@ -1115,6 +1100,8 @@ class RocksDBWriter(
                 ordersToInvalidate += rollbackOrderFill(rw, tx.sellOrder.id(), currentHeight)
               case _: EthereumTransaction =>
                 rw.delete(Keys.ethereumTransactionMeta(currentHeight, num, rdb.apiHandle))
+              case _: CommitToGenerationTransaction =>
+                commitToGenerationTxs += 1
             }
 
             if (tx.tpe != TransactionType.Genesis) {
@@ -1123,6 +1110,20 @@ class RocksDBWriter(
             }
             rw.delete(Keys.transactionStateSnapshotAt(currentHeight, num, rdb.txSnapshotHandle))
           }
+
+          rw.iterateOver(KeyTag.GeneratorBalances.prefixBytes ++ KeyHelpers.h(currentHeight), Some(rdb.apiHandle.handle)) { e =>
+            rw.delete(e.getKey)
+          }
+
+          rw.delete(Keys.committedGenerators(nextPeriod, Height(height)))
+          val committedGeneratorsCountKey     = Keys.committedGeneratorsCount(nextPeriod)
+          val updatedCommittedGeneratorsCount = rw.get(committedGeneratorsCountKey) - commitToGenerationTxs
+          if (updatedCommittedGeneratorsCount < 0)
+            throw new IllegalArgumentException(
+              s"Unexpected committed generators: $updatedCommittedGeneratorsCount, commitments in block: $commitToGenerationTxs"
+            )
+          else if (updatedCommittedGeneratorsCount == 0) rw.delete(committedGeneratorsCountKey)
+          else rw.put(committedGeneratorsCountKey, updatedCommittedGeneratorsCount.toShort)
 
           discardedMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress())) match {
             case Some(addr) =>

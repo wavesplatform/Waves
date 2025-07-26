@@ -358,16 +358,25 @@ package object database {
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
 
-  def readCommittedGenerator(data: Array[Byte]): (AddressId, TransactionId) = {
-    // require(data.length == KeyLength + 0) // TODO:
-    val (rawAddressId, rawCommittedToGenerationTransactionId) = data.splitAt(Longs.BYTES)
-    (Longs.fromByteArray(rawAddressId), TransactionId(ByteStr(rawCommittedToGenerationTransactionId)))
+  def readCommittedGenerators(data: Array[Byte]): Map[AddressId, TransactionId] = {
+    val addressSize     = Longs.BYTES
+    val transactionSize = DigestLength
+    data
+      .grouped(addressSize + transactionSize)
+      .map { data =>
+        val (rawAddressId, rawCommittedToGenerationTransactionId) = data.splitAt(addressSize)
+        (Longs.fromByteArray(rawAddressId), TransactionId(ByteStr(rawCommittedToGenerationTransactionId)))
+      }
+      .toMap
   }
 
-  def writeCommittedGenerator(data: (AddressId, TransactionId)): Array[Byte] = {
-    val (addressId, committedToGenerationTransactionId) = data
-    Longs.toByteArray(addressId) ++ committedToGenerationTransactionId.arr
-  }
+  def writeCommittedGenerators(data: Map[AddressId, TransactionId]): Array[Byte] =
+    data.view
+      .map { (addressId, committedToGenerationTransactionId) =>
+        Longs.toByteArray(addressId) ++ committedToGenerationTransactionId.arr
+      }
+      .flatten
+      .toArray
 
   def getKeyBuffersFromKeys(keys: collection.IndexedSeq[Key[?]]): collection.IndexedSeq[ByteBuffer] =
     keys.map { k =>
