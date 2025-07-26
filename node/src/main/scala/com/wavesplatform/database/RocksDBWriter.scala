@@ -701,12 +701,8 @@ class RocksDBWriter(
         }
       }
 
-      // TODO: Store in one key
       // TODO: Option to not store
-      for ((addressId, balance) <- generatorBalances) yield {
-        val key = Keys.generatorBalance(h, addressId, rdb.apiHandle)
-        rw.put(key, balance)
-      }
+      rw.put(Keys.generatorBalances(h, rdb.apiHandle), generatorBalances)
 
       if (nextCommittedGenerators.nonEmpty) {
         val nextPeriod                       = GenerationPeriod.from(h, settings.functionalitySettings).next
@@ -1111,11 +1107,8 @@ class RocksDBWriter(
             rw.delete(Keys.transactionStateSnapshotAt(currentHeight, num, rdb.txSnapshotHandle))
           }
 
-          rw.iterateOver(KeyTag.GeneratorBalances.prefixBytes ++ KeyHelpers.h(currentHeight), Some(rdb.apiHandle.handle)) { e =>
-            rw.delete(e.getKey)
-          }
-
-          rw.delete(Keys.committedGenerators(nextPeriod, Height(height)))
+          rw.delete(Keys.generatorBalances(currentHeight, rdb.apiHandle))
+          rw.delete(Keys.committedGenerators(nextPeriod, currentHeight))
           val committedGeneratorsCountKey     = Keys.committedGeneratorsCount(nextPeriod)
           val updatedCommittedGeneratorsCount = rw.get(committedGeneratorsCountKey) - commitToGenerationTxs
           if (updatedCommittedGeneratorsCount < 0)

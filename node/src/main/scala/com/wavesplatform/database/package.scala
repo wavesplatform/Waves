@@ -358,6 +358,25 @@ package object database {
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
 
+  def readGeneratorBalances(data: Array[Byte]): Map[AddressId, Long] = {
+    val addressSize, balanceSize = Longs.BYTES
+    data
+      .grouped(addressSize + balanceSize)
+      .map { data =>
+        val (rawAddressId, rawBalance) = data.splitAt(addressSize)
+        (Longs.fromByteArray(rawAddressId), Longs.fromByteArray(rawBalance))
+      }
+      .toMap
+  }
+
+  def writeGeneratorBalances(data: Map[AddressId, Long]): Array[Byte] =
+    data.view
+      .map { (addressId, balance) =>
+        Longs.toByteArray(addressId) ++ Longs.toByteArray(balance)
+      }
+      .flatten
+      .toArray
+
   def readCommittedGenerators(data: Array[Byte]): Map[AddressId, TransactionId] = {
     val addressSize     = Longs.BYTES
     val transactionSize = DigestLength
