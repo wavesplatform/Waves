@@ -240,6 +240,7 @@ object Blockchain {
         }
         .fold(1)(_ => BlockRewardCalculator.RewardBoost)
 
-    def currentGenerationPeriod: GenerationPeriod = GenerationPeriod.from(Height(blockchain.height), blockchain.settings.functionalitySettings)
+    def generationPeriodOf(h: Height): GenerationPeriod = GenerationPeriod.from(h, blockchain.settings.functionalitySettings)
+    def currentGenerationPeriod: GenerationPeriod       = this.generationPeriodOf(Height(blockchain.height))
   }
 }

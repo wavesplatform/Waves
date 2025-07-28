@@ -249,6 +249,7 @@ object Keys {
   def maliciousMinerBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
     historyKey(MaliciousMinerBanHeights, addressBytes)
 
+  // TODO: Just seq to preserve committing order?
   def generatorBalances(at: Height, cfh: RDB.ApiHandle): Key[Map[AddressId, Long]] =
     Key(GeneratorBalances, h(at), readGeneratorBalances, writeGeneratorBalances, Some(cfh.handle))
 

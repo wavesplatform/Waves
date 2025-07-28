@@ -44,7 +44,7 @@ package object appender {
         .heightOf(block.header.reference)
         .toRight(GenericError(s"height: history does not contain parent ${block.header.reference}"))
     } yield {
-      val period = GenerationPeriod.from(Height(parentHeight + 1), blockchain.settings.functionalitySettings)
+      val period = blockchain.generationPeriodOf(Height(parentHeight + 1))
       // TODO: committedGenerators should return Address?
       (Height(parentHeight), blockchain.committedGenerators(period).keySet.map(_.toAddress))
     }

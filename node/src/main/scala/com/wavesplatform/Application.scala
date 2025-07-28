@@ -314,8 +314,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       lastEndorsers = blockchainUpdater.lastBlockInfo.collect {
         case bi if blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, bi.height) =>
           val h      = Height(bi.height)
-          val period = GenerationPeriod.from(h, settings.blockchainSettings.functionalitySettings)
-          (h, blockchainUpdater.committedGenerators(period).keySet)
+          val period = blockchainUpdater.generationPeriodOf(h)
+          (h, blockchainUpdater.committedGenerators(period).keySet) // TODO: from common api?
       },
       endorseBlocks = messageObserver.endorseBlocks,
       allChannels = allChannels,

@@ -705,7 +705,7 @@ class RocksDBWriter(
       rw.put(Keys.generatorBalances(h, rdb.apiHandle), generatorBalances)
 
       if (nextCommittedGenerators.nonEmpty) {
-        val nextPeriod                       = GenerationPeriod.from(h, settings.functionalitySettings).next
+        val nextPeriod                       = this.generationPeriodOf(h).next
         val nextPeriodGeneratorsUpdatedCount = rw.get(Keys.committedGeneratorsCount(nextPeriod)) + nextCommittedGenerators.size
 
         rw.put(Keys.committedGenerators(nextPeriod, h), nextCommittedGenerators)
@@ -984,7 +984,7 @@ class RocksDBWriter(
         val aliasesToInvalidate      = Seq.newBuilder[Alias]
         val blockHeightsToInvalidate = Seq.newBuilder[ByteStr]
 
-        val nextPeriod = GenerationPeriod.from(currentHeight, settings.functionalitySettings).next
+        val nextPeriod = this.generationPeriodOf(currentHeight).next
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
 
