@@ -489,7 +489,7 @@ class RocksDBWriter(
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       generatorBalances: Map[AddressId, Long],
-      nextCommittedGenerators: Map[AddressId, TransactionId],
+      nextCommittedGenerators: Seq[(AddressId, TransactionId)],
       stateHash: StateHashBuilder.Result
   ): Unit = {
     log.trace(s"Persisting block ${blockMeta.id} at height $height")

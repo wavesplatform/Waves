@@ -377,7 +377,7 @@ package object database {
       .flatten
       .toArray
 
-  def readCommittedGenerators(data: Array[Byte]): Map[AddressId, TransactionId] = {
+  def readCommittedGenerators(data: Array[Byte]): Seq[(AddressId, TransactionId)] = {
     val addressSize     = Longs.BYTES
     val transactionSize = DigestLength
     data
@@ -386,16 +386,13 @@ package object database {
         val (rawAddressId, rawCommittedToGenerationTransactionId) = data.splitAt(addressSize)
         (Longs.fromByteArray(rawAddressId), TransactionId(ByteStr(rawCommittedToGenerationTransactionId)))
       }
-      .toMap
+      .toSeq
   }
 
-  def writeCommittedGenerators(data: Map[AddressId, TransactionId]): Array[Byte] =
-    data.view
-      .map { (addressId, committedToGenerationTransactionId) =>
-        Longs.toByteArray(addressId) ++ committedToGenerationTransactionId.arr
-      }
-      .flatten
-      .toArray
+  def writeCommittedGenerators(data: Seq[(AddressId, TransactionId)]): Array[Byte] =
+    data.view.flatMap { (addressId, committedToGenerationTransactionId) =>
+      Longs.toByteArray(addressId) ++ committedToGenerationTransactionId.arr
+    }.toArray
 
   def getKeyBuffersFromKeys(keys: collection.IndexedSeq[Key[?]]): collection.IndexedSeq[ByteBuffer] =
     keys.map { k =>

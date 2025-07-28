@@ -227,7 +227,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       generatorBalances: Map[AddressId, Long],
-      nextCommittedGenerators: Map[AddressId, TransactionId],
+      nextCommittedGenerators: Seq[(AddressId, TransactionId)],
       stateHash: StateHashBuilder.Result
   ): Unit
 
@@ -290,8 +290,8 @@ abstract class Caches extends Blockchain with Storage {
       (address, balance)
     }
 
-    val addressTransactions            = ArrayListMultimap.create[AddressId, TransactionId]()
-    val nextCommittedGeneratorsBuilder = Map.newBuilder[AddressId, TransactionId]
+    val addressTransactions        = ArrayListMultimap.create[AddressId, TransactionId]()
+    var nextCommittedGeneratorsRev = List[(AddressId, TransactionId)]()
     for ((_, nti) <- snapshot.transactions) {
       for (addr <- nti.affected)
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
@@ -299,11 +299,10 @@ abstract class Caches extends Blockchain with Storage {
       nti.transaction match {
         case txn: CommitToGenerationTransaction =>
           val addressId = addressIdWithFallback(txn.sender.toAddress, newAddressIds)
-          nextCommittedGeneratorsBuilder += addressId -> TransactionId(txn.id())
+          nextCommittedGeneratorsRev ::= addressId -> TransactionId(txn.id())
         case _ =>
       }
     }
-    val nextCommittedGenerators = nextCommittedGeneratorsBuilder.result()
 
 //    if (newHeight % settings.functionalitySettings.commitmentPeriod == 0)
 //      committedGeneratorsCache = snapshot.nextCommittedGenerators
@@ -375,7 +374,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       generatorBalanceNodes,
-      nextCommittedGenerators,
+      nextCommittedGeneratorsRev.reverse,
       stateHash.result()
     )
 

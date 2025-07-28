@@ -256,6 +256,6 @@ object Keys {
   def committedGeneratorsCount(period: GenerationPeriod): Key[Short] =
     Key(CommittedGeneratorsCount, h(period.start), Option(_).fold(0: Short)(Shorts.fromByteArray), Shorts.toByteArray)
 
-  def committedGenerators(period: GenerationPeriod, commitmentHeight: Height): Key[Map[AddressId, TransactionId]] =
+  def committedGenerators(period: GenerationPeriod, commitmentHeight: Height): Key[Seq[(AddressId, TransactionId)]] =
     Key(CommittedGenerators, h(period.start) ++ h(commitmentHeight), readCommittedGenerators, writeCommittedGenerators)
 }
