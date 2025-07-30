@@ -199,9 +199,9 @@ abstract class Caches extends Blockchain with Storage {
   protected def discardBlockHeight(blockId: ByteStr): Unit = blockHeightCache.invalidate(blockId)
 
   @volatile
-  protected var committedGeneratorsCache: Map[PublicKey, BlsPublicKey] = loadCommittedGenerators(this.currentGenerationPeriod)
-  protected def loadCommittedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey]
-  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = committedGeneratorsCache
+  protected var committedGeneratorsCache: Map[BlsPublicKey, Address] = loadCommittedGenerators(this.currentGenerationPeriod)
+  protected def loadCommittedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address]
+  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = committedGeneratorsCache
 
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
@@ -227,7 +227,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       generatorBalances: Map[AddressId, Long],
-      nextCommittedGenerators: Seq[(AddressId, TransactionId)],
+      nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
   ): Unit
 
@@ -291,7 +291,7 @@ abstract class Caches extends Blockchain with Storage {
     }
 
     val addressTransactions        = ArrayListMultimap.create[AddressId, TransactionId]()
-    var nextCommittedGeneratorsRev = List[(AddressId, TransactionId)]()
+    var nextCommittedGeneratorsRev = List[(AddressId, BlsPublicKey, TransactionId)]()
     for ((_, nti) <- snapshot.transactions) {
       for (addr <- nti.affected)
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
@@ -299,13 +299,14 @@ abstract class Caches extends Blockchain with Storage {
       nti.transaction match {
         case txn: CommitToGenerationTransaction =>
           val addressId = addressIdWithFallback(txn.sender.toAddress, newAddressIds)
-          nextCommittedGeneratorsRev ::= addressId -> TransactionId(txn.id())
+          nextCommittedGeneratorsRev ::= (addressId, txn.endorsementPublicKey, TransactionId(txn.id()))
         case _ =>
       }
     }
 
-//    if (newHeight % settings.functionalitySettings.commitmentPeriod == 0)
-//      committedGeneratorsCache = snapshot.nextCommittedGenerators
+    // TODO:
+    //    if (newHeight % settings.functionalitySettings.commitmentPeriod == 0)
+    //      committedGeneratorsCache = snapshot.nextCommittedGenerators
 
     val updatedBalanceNodes = for {
       case ((address, asset), amount) <- snapshot.balances

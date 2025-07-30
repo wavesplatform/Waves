@@ -4,9 +4,9 @@ import cats.data.Ior
 import cats.implicits.{catsSyntaxEitherId, catsSyntaxSemigroup, toBifunctorOps, toTraverseOps}
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -33,7 +33,7 @@ case class StateSnapshot(
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
     scriptsComplexity: Long = 0,
     erc20Addresses: Map[ERC20Address, IssuedAsset] = Map(),
-    nextCommittedGenerators: Map[PublicKey, BlsPublicKey] = Map()
+    nextCommittedGenerators: Map[BlsPublicKey, Address] = Map() // TODO: remove?
 ) {
 
   // ignores lease balances from portfolios
@@ -88,7 +88,7 @@ object StateSnapshot {
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
       scriptsComplexity: Long = 0,
       transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap(),
-      nextCommittedGenerators: Map[PublicKey, BlsPublicKey] = Map()
+      nextCommittedGenerators: Map[BlsPublicKey, Address] = Map()
   ): Either[ValidationError, StateSnapshot] = {
     val r =
       for {

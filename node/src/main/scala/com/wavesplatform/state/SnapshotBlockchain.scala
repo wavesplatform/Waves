@@ -230,7 +230,7 @@ case class SnapshotBlockchain(
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
-  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] =
+  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] =
     if (blockMeta.isDefined) snapshot.nextCommittedGenerators
     else inner.committedGenerators(at)
 }

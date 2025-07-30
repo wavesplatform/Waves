@@ -4,7 +4,7 @@ import cats.implicits.catsSyntaxNestedBitraverse
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
-import com.google.common.primitives.Ints
+import com.google.common.primitives.{Ints, Longs}
 import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.common.WavesBalanceIterator
@@ -489,7 +489,7 @@ class RocksDBWriter(
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       generatorBalances: Map[AddressId, Long],
-      nextCommittedGenerators: Seq[(AddressId, TransactionId)],
+      nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
   ): Unit = {
     log.trace(s"Persisting block ${blockMeta.id} at height $height")
@@ -1322,20 +1322,27 @@ class RocksDBWriter(
 
   override protected def loadBlockHeight(blockId: BlockId): Option[Int] = readOnly(_.get(Keys.heightOf(blockId)))
 
-  // TODO:
-  override protected def loadCommittedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = Map.empty
-  // readOnly { ro =>
-  //    val key = Keys.committedGenerator(at, 0)
-  //
-  //    val r = Map.newBuilder[PublicKey, BlsPublicKey]
-  //    Using(ro.newIterator) { iter =>
-  //      iter.seek(key.keyBytes)
-  //      while (iter.isValid && iter.key().startsWith(key.keyBytes.dropRight(Ints.BYTES))) r += key.parse(iter.value())
-  //      r
-  //    }.get.result()
-  //    r.result()
-  //    Map.empty
-  //  }
+  override protected def loadCommittedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = readOnly { ro =>
+    val key = Keys.committedGenerators(at, Height(0))
+
+    val pks        = new mutable.ArrayBuffer[BlsPublicKey](settings.functionalitySettings.maxGenerators)
+    val addressIds = new mutable.ArrayBuffer[AddressId](settings.functionalitySettings.maxGenerators)
+    ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
+      val xs = key.parse(dbEntry.getValue)
+      xs.foreach { (addressId, blsPK, _) =>
+        pks.append(blsPK)
+        addressIds.append(addressId)
+      }
+    }
+
+    val addresses = ro.multiGet(addressIds.map(Keys.idToAddress), Longs.BYTES)
+    pks.view
+      .zip(addresses)
+      .collect { case (pk, Some(address)) =>
+        pk -> address
+      }
+      .toMap
+  }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     for {
@@ -1467,6 +1474,4 @@ class RocksDBWriter(
 
   def snapshotStateHash(height: Int): ByteStr =
     readOnly(_.get(Keys.blockStateHash(height)))
-
-  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = Map.empty // TODO:
 }

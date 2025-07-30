@@ -88,7 +88,7 @@ trait Blockchain {
 
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
-  def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey]
+  def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 

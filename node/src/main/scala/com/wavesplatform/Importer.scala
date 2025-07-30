@@ -5,7 +5,7 @@ import cats.syntax.apply.*
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.Exporter.Formats
-import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
+import com.wavesplatform.api.common.*
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
@@ -158,6 +158,8 @@ object Importer extends ScorexLogging {
             CommonAccountsApi(() => blockchainUpdater.snapshotBlockchain, rdb, blockchainUpdater)
           override def assetsApi: CommonAssetsApi =
             CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.orEmpty, rdb.db, blockchainUpdater)
+          override def generatorsApi: CommonGeneratorsApi =
+            CommonGeneratorsApi(rdb, blockchainUpdater)
         }
       }
 

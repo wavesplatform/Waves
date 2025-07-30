@@ -832,7 +832,9 @@ class BlockchainUpdaterImpl(
       .getOrElse(rocksdb.lastStateHash(None))
   }
 
-  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = Map.empty // TODO: Implement
+  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = readLock {
+    snapshotBlockchain.committedGenerators(at)
+  }
 
   override def snapshotBlockchain: SnapshotBlockchain = readLock {
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))

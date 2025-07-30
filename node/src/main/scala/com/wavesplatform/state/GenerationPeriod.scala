@@ -3,7 +3,8 @@ package com.wavesplatform.state
 import com.wavesplatform.settings.FunctionalitySettings
 
 case class GenerationPeriod(start: Height, period: Int) {
-  def next: GenerationPeriod = GenerationPeriod(Height(start + period), period)
+  def next: GenerationPeriod    = GenerationPeriod(Height(start + period), period)
+  override def toString: String = s"GenerationPeriod(s=$start, p=$period)"
 }
 
 object GenerationPeriod {

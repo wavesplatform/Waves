@@ -26,6 +26,7 @@ trait Context {
   def blocksApi: CommonBlocksApi
   def accountsApi: CommonAccountsApi
   def assetsApi: CommonAssetsApi
+  def generatorsApi: CommonGeneratorsApi
 
   def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean]
   def utxEvents: Observable[UtxEvent]

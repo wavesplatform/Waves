@@ -596,6 +596,8 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
     rdb.db,
     blockchain
   )
+  
+  val generatorsApi: CommonGeneratorsApi = CommonGeneratorsApi(rdb, blockchain)
 }
 
 object Domain {

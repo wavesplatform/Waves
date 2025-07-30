@@ -19,12 +19,12 @@ object CommitToGenerationTransactionDiff {
         )
       }
       _ <- Either.raiseUnless(tx.generationPeriodStart == next.start) {
-        GenericError(s"Expected then next period start height ($next), got ${tx.generationPeriodStart}")
+        GenericError(s"Expected the next period start height (${next.start}), got ${tx.generationPeriodStart}")
       }
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = Map(tx.sender.toAddress -> Portfolio.build(Asset.Waves -> -tx.fee.value)),
-        nextCommittedGenerators = Map(tx.sender -> tx.endorsementPublicKey)
+        nextCommittedGenerators = Map(tx.endorsementPublicKey -> tx.sender.toAddress)
       )
     } yield snapshot
   }

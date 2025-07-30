@@ -2,6 +2,7 @@ package com.wavesplatform.database
 
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
@@ -249,13 +250,14 @@ object Keys {
   def maliciousMinerBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
     historyKey(MaliciousMinerBanHeights, addressBytes)
 
-  // TODO: Just seq to preserve committing order?
+  // TODO: Option
   def generatorBalances(at: Height, cfh: RDB.ApiHandle): Key[Map[AddressId, Long]] =
     Key(GeneratorBalances, h(at), readGeneratorBalances, writeGeneratorBalances, Some(cfh.handle))
 
   def committedGeneratorsCount(period: GenerationPeriod): Key[Short] =
     Key(CommittedGeneratorsCount, h(period.start), Option(_).fold(0: Short)(Shorts.fromByteArray), Shorts.toByteArray)
 
-  def committedGenerators(period: GenerationPeriod, commitmentHeight: Height): Key[Seq[(AddressId, TransactionId)]] =
+  // TODO: Option
+  def committedGenerators(period: GenerationPeriod, commitmentHeight: Height): Key[Seq[(AddressId, BlsPublicKey, TransactionId)]] =
     Key(CommittedGenerators, h(period.start) ++ h(commitmentHeight), readCommittedGenerators, writeCommittedGenerators)
 }

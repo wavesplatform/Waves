@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import com.google.common.cache.CacheBuilder
 import com.typesafe.scalalogging.LazyLogging
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.state.Height
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
@@ -13,7 +13,7 @@ import monix.reactive.Observable
 import scala.jdk.CollectionConverters.*
 
 object EndorseBlockSynchronizer extends LazyLogging {
-  type EndorsersAt = (Height, Set[PublicKey])
+  type EndorsersAt = (Height, Set[BlsPublicKey])
 
   def start(
       maxActiveEndorsers: Int,

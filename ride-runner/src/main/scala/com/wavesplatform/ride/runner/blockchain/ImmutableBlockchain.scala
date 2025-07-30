@@ -205,7 +205,7 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override def lastStateHash(refId: Option[BlockId]): BlockId = ???
 
-  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = ???
+  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = ???
 
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =

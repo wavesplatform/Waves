@@ -8,6 +8,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.*
@@ -377,21 +378,27 @@ package object database {
       .flatten
       .toArray
 
-  def readCommittedGenerators(data: Array[Byte]): Seq[(AddressId, TransactionId)] = {
+  def readCommittedGenerators(data: Array[Byte]): Seq[(AddressId, BlsPublicKey, TransactionId)] = {
     val addressSize     = Longs.BYTES
     val transactionSize = DigestLength
     data
-      .grouped(addressSize + transactionSize)
+      .grouped(addressSize + BlsPublicKey.SizeInBytes + transactionSize)
       .map { data =>
-        val (rawAddressId, rawCommittedToGenerationTransactionId) = data.splitAt(addressSize)
-        (Longs.fromByteArray(rawAddressId), TransactionId(ByteStr(rawCommittedToGenerationTransactionId)))
+        val addressIdBytes                          = data.take(addressSize)
+        val blsPublicKeyBytes                       = data.slice(addressSize, addressSize + BlsPublicKey.SizeInBytes)
+        val committedToGenerationTransactionIdBytes = data.takeRight(transactionSize)
+        (
+          Longs.fromByteArray(addressIdBytes),
+          BlsPublicKey(blsPublicKeyBytes),
+          TransactionId(ByteStr(committedToGenerationTransactionIdBytes))
+        )
       }
       .toSeq
   }
 
-  def writeCommittedGenerators(data: Seq[(AddressId, TransactionId)]): Array[Byte] =
-    data.view.flatMap { (addressId, committedToGenerationTransactionId) =>
-      Longs.toByteArray(addressId) ++ committedToGenerationTransactionId.arr
+  def writeCommittedGenerators(data: Seq[(AddressId, BlsPublicKey, TransactionId)]): Array[Byte] =
+    data.view.flatMap { (addressId, blsPublicKey, committedToGenerationTransactionId) =>
+      Longs.toByteArray(addressId) ++ blsPublicKey.asByteStr.arr ++ committedToGenerationTransactionId.arr
     }.toArray
 
   def getKeyBuffersFromKeys(keys: collection.IndexedSeq[Key[?]]): collection.IndexedSeq[ByteBuffer] =

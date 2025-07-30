@@ -4,6 +4,7 @@ import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.block.{Block, BlockEndorsement, ChallengedHeader}
+import com.wavesplatform.bls.BlsKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.BlockchainFeatures
@@ -16,7 +17,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.MaxTimeDrift
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.{Blockchain, GenerationPeriod, Height, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, Height, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -150,8 +151,9 @@ class BlockChallengerImpl(
       finalizedId = id // TODO:
       committed   = blockchainUpdater.committedGenerators(blockchainUpdater.generationPeriodOf(height))
       account <- wallet.privateKeyAccounts
-      if committed.contains(account.publicKey)
-    } yield BlockEndorsement.full(account, finalizedId, id, height)
+      blsPK = BlsKeyPair(account.privateKey)
+      if committed.contains(blsPK.publicKey)
+    } yield BlockEndorsement.full(blsPK, finalizedId, id, height)
 
   private def withProcessingTxs[A](txs: Seq[Transaction])(body: Task[A]): Task[A] =
     Task(processingTxs.putAll(txs.map(tx => tx.id() -> tx).toMap.asJava))

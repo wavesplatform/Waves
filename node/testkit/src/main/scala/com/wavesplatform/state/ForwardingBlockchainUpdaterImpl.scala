@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.Address
 import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.transaction.BlockchainUpdater
 
@@ -65,5 +65,5 @@ class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) exten
     snapshotBlockchain
   }
 
-  override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = delegate.committedGenerators(at)
+  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = delegate.committedGenerators(at)
 }
