@@ -145,15 +145,10 @@ object CommonValidation {
         RideVersionProvider.actualVersionByFeature.map { case (feature, version) => (version, activationBarrier(feature)) }.toMap
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
-        case V1 | V2 | V3 if sc.containsArray => barrierByVersion(V4)
-        case V1 | V2 if sc.containsBlockV2()  => barrierByVersion(V3)
-        case V1 | V2                          => Right(tx)
-        case V3                               => barrierByVersion(V3)
-        case V4                               => barrierByVersion(V4)
-        case V5                               => barrierByVersion(V5)
-        case V6                               => barrierByVersion(V6)
-        case V7                               => barrierByVersion(V7)
-        case V8                               => barrierByVersion(V8)
+        case V1 | V2 | V3 if sc.containsArray       => barrierByVersion(V4)
+        case V1 | V2 if sc.containsBlockV2()        => barrierByVersion(V3)
+        case V1 | V2                                => Right(tx)
+        case v @ (V3 | V4 | V5 | V6 | V7 | V8 | V9) => barrierByVersion(v)
       }
 
       def oldScriptVersionDeactivation(sc: Script): Either[ActivationError, Unit] = sc.stdLibVersion match {

@@ -1,33 +1,20 @@
 package com.wavesplatform.lang.v1
 
-import cats.implicits.catsSyntaxSemigroup
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.Curve25519
-import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
+import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{Common, Global}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 import java.util.concurrent.TimeUnit
 import scala.util.Random
-
-object SEvaluatorBenchmark {
-  val lastVersion = StdLibVersion.VersionDic.all.max
-  val context =
-    (PureContext.build(lastVersion, useNewPowPrecision = true) |+| CryptoContext.build(Global, lastVersion, true))
-      .withEnvironment[Environment]
-      .evaluationContext(Common.emptyBlockchainEnvironment())
-}
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -36,59 +23,58 @@ object SEvaluatorBenchmark {
 @Warmup(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 class ScriptEvaluatorBenchmark {
-  import com.wavesplatform.lang.v1.SEvaluatorBenchmark.*
   @Benchmark
-  def bigSum(st: BigSum, bh: Blackhole): Unit = bh.consume(eval(context, st.expr))
+  def bigSum(st: BigSum, bh: Blackhole): Unit = bh.consume(eval(st.expr))
 
   @Benchmark
-  def nestedBlocks(st: NestedBlocks, bh: Blackhole): Unit = bh.consume(eval(context, st.expr))
+  def nestedBlocks(st: NestedBlocks, bh: Blackhole): Unit = bh.consume(eval(st.expr))
 
   @Benchmark
-  def signatures(st: Signatures, bh: Blackhole): Unit = bh.consume(eval(context, st.expr))
+  def signatures(st: Signatures, bh: Blackhole): Unit = bh.consume(eval(st.expr))
 
   @Benchmark
-  def base58encode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(eval(context, st.encode))
+  def base58encode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(eval(st.encode))
 
   @Benchmark
-  def base58decode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(eval(context, st.decode))
+  def base58decode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(eval(st.decode))
 
   @Benchmark
-  def stringConcat(st: Concat, bh: Blackhole): Unit = bh.consume(eval(context, st.strings))
+  def stringConcat(st: Concat, bh: Blackhole): Unit = bh.consume(eval(st.strings))
 
   @Benchmark
-  def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(eval(context, st.bytes))
+  def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(eval(st.bytes))
 
   @Benchmark
   def listMedianRandomElements(st: Median, bh: Blackhole): Unit =
-    bh.consume(eval(context, st.randomElements(Random.nextInt(10000))))
+    bh.consume(eval(st.randomElements(Random.nextInt(10000))))
 
   @Benchmark
   def listMedianSortedElements(st: Median, bh: Blackhole): Unit =
-    bh.consume(eval(context, st.sortedElements))
+    bh.consume(eval(st.sortedElements))
 
   @Benchmark
   def listMedianSortedReverseElements(st: Median, bh: Blackhole): Unit =
-    bh.consume(eval(context, st.sortedReverseElements))
+    bh.consume(eval(st.sortedReverseElements))
 
   @Benchmark
   def listMedianEqualElements(st: Median, bh: Blackhole): Unit =
-    bh.consume(eval(context, st.equalElements))
+    bh.consume(eval(st.equalElements))
 
   @Benchmark
   def listRemoveFirstByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
-    bh.consume(eval(context, st.removeFirst))
+    bh.consume(eval(st.removeFirst))
 
   @Benchmark
   def listRemoveMiddleByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
-    bh.consume(eval(context, st.removeMiddle))
+    bh.consume(eval(st.removeMiddle))
 
   @Benchmark
   def listRemoveLastByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
-    bh.consume(eval(context, st.removeLast))
+    bh.consume(eval(st.removeLast))
 
   @Benchmark
   def sigVerify32Kb(st: SigVerify32Kb, bh: Blackhole): Unit =
-    bh.consume(eval(context, st.expr))
+    bh.consume(eval(st.expr))
 }
 
 @State(Scope.Benchmark)

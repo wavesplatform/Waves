@@ -1,15 +1,13 @@
 package com.wavesplatform.lang.v1
-import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.PureFunctionsRebenchmark.evalV5
 import com.wavesplatform.lang.v1.SumStringBenchmark.*
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
+import java.util.concurrent.TimeUnit
 import scala.util.Random
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -21,27 +19,27 @@ import scala.util.Random
 class SumStringBenchmark {
   @Benchmark
   def sumString1_32766(st: SumString1_32766, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def sumString32766_1(st: SumString32766_1, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def sumString16383_16383(st: SumString16383_16383, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def sumString1_10000(st: SumString1_10000, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def sumString10000_1(st: SumString10000_1, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 
   @Benchmark
   def sumString5000_5000(st: SumString5000_5000, bh: Blackhole): Unit =
-    bh.consume(evalV5(st.expr))
+    bh.consume(eval(st.expr))
 }
 
 object SumStringBenchmark {

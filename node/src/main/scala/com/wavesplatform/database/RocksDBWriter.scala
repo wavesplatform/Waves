@@ -4,7 +4,7 @@ import cats.implicits.catsSyntaxNestedBitraverse
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.Ints
 import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.common.WavesBalanceIterator

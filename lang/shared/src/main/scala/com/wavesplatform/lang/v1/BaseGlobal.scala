@@ -35,10 +35,12 @@ import scala.util.Random
 trait BaseGlobal {
   val MaxBase16Bytes: Int               = 8 * 1024
   val MaxBase16String: Int              = 32 * 1024
+  val MaxBase16String_1C: Int           = 2048
   val MaxBase58Bytes                    = 64
   val MaxBase58String                   = 100
   val MaxBase64Bytes: Int               = 32 * 1024
   val MaxBase64String: Int              = 44 * 1024
+  val MaxBase64String_1C: Int           = 1375
   val MaxLiteralLength: Int             = 12 * 1024
   val MaxAddressLength                  = 36
   val MaxByteStrSizeForVerifyFuncs: Int = 32 * 1024
@@ -48,20 +50,18 @@ trait BaseGlobal {
   def base58Encode(input: Array[Byte]): Either[String, String]
   def base58Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
 
-  def base64Encode(input: Array[Byte]): Either[String, String]
+  def base64Encode(input: Array[Byte], limit: Int = MaxBase64Bytes): Either[String, String]
   def base64Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
 
-  def base16Encode(input: Array[Byte], checkLength: Boolean): Either[String, String] =
-    if (checkLength && input.length > MaxBase16Bytes)
-      Left(s"Base16 encode input length=${input.length} should not exceed $MaxBase16Bytes")
-    else
-      base16EncodeImpl(input)
+  def base16Encode(input: Array[Byte], limit: Option[Int] = Some(MaxBase16Bytes)): Either[String, String] = limit match {
+    case Some(lim) if input.length > lim => Left(s"Base16 encode input length=${input.length} should not exceed $lim")
+    case _                               => base16EncodeImpl(input)
+  }
 
-  def base16Decode(input: String, checkLength: Boolean): Either[String, Array[Byte]] =
-    if (checkLength && input.length > MaxBase16String)
-      Left(s"Base16 decode input length=${input.length} should not exceed $MaxBase16String")
-    else
-      base16DecodeImpl(input)
+  def base16Decode(input: String, limit: Option[Int] = Some(MaxBase16String)): Either[String, Array[Byte]] = limit match {
+    case Some(lim) if input.length > lim => Left(s"Base16 decode input length=${input.length} should not exceed $lim")
+    case _                               => base16DecodeImpl(input)
+  }
 
   protected def base16EncodeImpl(input: Array[Byte]): Either[String, String]
 

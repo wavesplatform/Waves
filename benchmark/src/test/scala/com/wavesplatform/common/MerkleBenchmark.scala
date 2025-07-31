@@ -1,94 +1,54 @@
 package com.wavesplatform.common
 
-import java.util.concurrent.TimeUnit
-
 import com.google.common.primitives.Ints
-import com.wavesplatform.common.merkle.*
 import com.wavesplatform.common.merkle.Merkle.*
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
+import com.wavesplatform.crypto.fastHash
+import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BYTESTR, CONST_LONG, EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.eval
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import org.openjdk.jmh.annotations.{Level as _, *}
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.util.Random
+import java.util.concurrent.TimeUnit
+import scala.compiletime.uninitialized
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 10)
-@Measurement(iterations = 10)
+@Warmup(iterations = 20, time = 1)
+@Measurement(iterations = 20, time = 1)
 class MerkleBenchmark {
-
   @Benchmark
-  def merkelCreateRoot4(st: MerkleBenchmark.Merkle4St, bh: Blackhole): Unit =
-    bh.consume(st.proofs.map({ case (proof, value, index) => createRoot(value, index, proof) }))
-
-  @Benchmark
-  def merkelCreateRoot6(st: MerkleBenchmark.Merkle6St, bh: Blackhole): Unit =
-    bh.consume(st.proofs.map({ case (proof, value, index) => createRoot(value, index, proof) }))
-
-  @Benchmark
-  def merkelCreateRoot8(st: MerkleBenchmark.Merkle8St, bh: Blackhole): Unit =
-    bh.consume(st.proofs.map({ case (proof, value, index) => createRoot(value, index, proof) }))
-
-  @Benchmark
-  def merkelCreateRoot10(st: MerkleBenchmark.Merkle10St, bh: Blackhole): Unit =
-    bh.consume(st.proofs.map({ case (proof, value, index) => createRoot(value, index, proof) }))
-
-  @Benchmark
-  def merkelCreateRoot12(st: MerkleBenchmark.Merkle12St, bh: Blackhole): Unit =
-    bh.consume(st.proofs.map({ case (proof, value, index) => createRoot(value, index, proof) }))
-
-  @Benchmark
-  def merkelCreateRoot14(st: MerkleBenchmark.Merkle14St, bh: Blackhole): Unit =
-    bh.consume(st.proofs.map({ case (proof, value, index) => createRoot(value, index, proof) }))
-
-  @Benchmark
-  def merkelCreateRoot16(st: MerkleBenchmark.Merkle16St, bh: Blackhole): Unit =
-    bh.consume(st.proofs.map({ case (proof, value, index) => createRoot(value, index, proof) }))
+  def createMerkleRoot(st: MerkleBenchmark.MerkleTreeData, bh: Blackhole): Unit =
+    bh.consume(require(eval(st.expr).asInstanceOf[CONST_BYTESTR].bs == st.root))
 }
 
 object MerkleBenchmark {
+  @State(Scope.Benchmark)
+  class MerkleTreeData {
+    @Param(Array("2", "4", "8", "16"))
+    var depth = 0
+    var expr: EXPR = uninitialized
+    var root: ByteStr = uninitialized
 
-  def testData(deep: Int): (Seq[Level], List[LeafData]) = {
-    val n    = BigInt(2).pow(deep - 1).toInt
-    val size = n + 1 + Random.nextInt(n)
-    val data: List[LeafData] =
-      List
-        .fill(size)(Random.nextInt(10000))
-        .map(Ints.toByteArray)
-
-    (mkLevels(data), data)
+    @Setup def setup(): Unit = {
+      val leaves = (1 to BigInt(2).pow(depth).toInt).map(i => Ints.toByteArray(i))
+      val levels = mkLevels(leaves)
+      val proofs = mkProofs(leaves.size - 1, levels)
+      val item = fastHash(Ints.toByteArray(leaves.size))
+      root = ByteStr(levels.head.head)
+      expr = FUNCTION_CALL(
+        Native(FunctionIds.CREATE_MERKLE_ROOT),
+        List(
+          ARR(proofs.reverse.map(d => CONST_BYTESTR(ByteStr(d)).explicitGet()).toIndexedSeq, limited = true).explicitGet(),
+          CONST_BYTESTR(ByteStr(item)).explicitGet(),
+          CONST_LONG(leaves.size - 1)
+        )
+      )
+    }
   }
-
-  class MerkleDeep(size: Int) {
-    val leafs  = testData(size)._2
-    val levels = mkLevels(leafs)
-    val root   = levels.head.head
-    val proofs = List(
-      (mkProofs(0, levels), hash(leafs(0)), 0),
-      (mkProofs(size - 1, levels), hash(leafs(size - 1)), size - 1),
-      (mkProofs(size / 2, levels), hash(leafs(size / 2)), size / 2)
-    )
-  }
-
-  @State(Scope.Benchmark)
-  class Merkle4St extends MerkleDeep(4)
-
-  @State(Scope.Benchmark)
-  class Merkle6St extends MerkleDeep(6)
-
-  @State(Scope.Benchmark)
-  class Merkle8St extends MerkleDeep(8)
-
-  @State(Scope.Benchmark)
-  class Merkle10St extends MerkleDeep(10)
-
-  @State(Scope.Benchmark)
-  class Merkle12St extends MerkleDeep(12)
-
-  @State(Scope.Benchmark)
-  class Merkle14St extends MerkleDeep(14)
-
-  @State(Scope.Benchmark)
-  class Merkle16St extends MerkleDeep(16)
 }

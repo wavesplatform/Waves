@@ -407,8 +407,9 @@ object Terms {
       }
 
     def apply(xs: IndexedSeq[EVALUATED], limited: Boolean): Either[ExecutionError, ARR] = {
-      val weight = EMPTYARR_WEIGHT + ELEM_WEIGHT * xs.size + xs.map(_.weight).sum
-      ARR(xs, weight, limited)
+      var measuredWeight = EMPTYARR_WEIGHT + ELEM_WEIGHT * xs.size
+      xs.foreach { ev => measuredWeight += ev.weight }
+      ARR(xs, measuredWeight, limited)
     }
   }
 

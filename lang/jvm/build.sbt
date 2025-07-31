@@ -6,6 +6,10 @@ developers := List(
   Developer("irakitnykh", "Ivan Rakitnykh", "mrkr.reg@gmail.com", url("https://github.com/mrkraft"))
 )
 
+lazy val listComplexFunctions = inputKey[File]("List functions with complexity > 1")
+
+listComplexFunctions := Tasks.listComplexFunctions.evaluated
+
 inTask(assembly)(
   Seq(
     test            := {},

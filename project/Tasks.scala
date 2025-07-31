@@ -1,32 +1,51 @@
-import java.io.File
-import java.nio.file.{Files, Paths}
-
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.{ClassTagExtensions, DefaultScalaModule}
 import org.hjson.JsonValue
-import sbt.Keys.{baseDirectory, sourceManaged}
-import sbt.{Def, IO, _}
+import sbt.Keys.{baseDirectory, sourceManaged, target}
+import sbt.{Def, IO, *}
 
-import scala.collection.JavaConverters._
+import java.io.File
+import java.nio.file.{Files, Paths}
+import scala.collection.JavaConverters.*
+import complete.DefaultParsers.*
 
 object Tasks {
-  lazy val docSource = Def.task {
-    val mapper = new ObjectMapper() with ClassTagExtensions
-    mapper.registerModule(DefaultScalaModule)
+  val mapper = new ObjectMapper() with ClassTagExtensions
+  mapper.registerModule(DefaultScalaModule)
 
+  lazy val listComplexFunctions = Def.inputTask {
+    val version = (' ' ~> NatBasic).parsed
+    val baseLangDir = baseDirectory.value.getParentFile.getAbsolutePath
+
+    val complexFuncs = for {
+      path <- Files.list(Paths.get(s"$baseLangDir/doc/v$version/funcs")).iterator().asScala
+      json = JsonValue.readHjson(Files.newBufferedReader(path)).asObject().toString
+      func <- mapper.readValue[Map[String, List[FuncSourceData]]](json).head._2
+      if func.complexity > 1
+    } yield s"${func.name};${func.complexity};${func.params.mkString(",")}"
+
+
+    val targetFile = ((Compile / target).value / s"complex-functions-v$version.csv")
+    IO.write(targetFile, complexFuncs.mkString("\n").getBytes("utf-8"))
+    targetFile
+  }
+
+  lazy val docSource = Def.task {
     val baseLangDir = baseDirectory.value.getParentFile.getAbsolutePath
 
     def toMapChecked[K, V](data: Seq[V], key: V => K): Map[K, V] =
       data.distinct
         .groupBy(key)
-        .ensuring(_.forall {
-          case (_, v) =>
+        .ensuring(
+          _.forall { case (_, v) =>
             if (v.size == 1) true
             else {
               println(v)
               false
             }
-        }, "Duplicate detected")
+          },
+          "Duplicate detected"
+        )
         .mapValues(_.head)
 
     def str(s: String): String = "\"" + s + "\""

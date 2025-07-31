@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
+import java.util.concurrent.TimeUnit
 
 import cats.Id
 import cats.syntax.bifunctor.*
@@ -52,10 +52,10 @@ class EnvironmentFunctionsBenchmark {
   def base58_26_encode_test(): String = hashTest(26, Global.base58Encode(_).explicitGet()) // for addressFromString_full_test
 
   @Benchmark
-  def base16_decode_test(): Array[Byte] = Global.base16Decode(string32Kb, checkLength = true).explicitGet()
+  def base16_decode_test(): Array[Byte] = Global.base16Decode(string32Kb).explicitGet()
 
   @Benchmark
-  def base16_encode_test(): String = Global.base16Encode(bytes8Kb, checkLength = true).explicitGet()
+  def base16_encode_test(): String = Global.base16Encode(bytes8Kb).explicitGet()
 
   @Benchmark
   def sha256_test(): Array[Byte] = hashTest(Global.sha256)
@@ -150,11 +150,7 @@ object EnvironmentFunctionsBenchmark {
 
   val bytes8Kb: Array[Byte] = ("FEDCBA9876543210" * (8 * 1024 / 16)).getBytes(StandardCharsets.UTF_8)
 
-  def randomBytes(length: Int): Array[Byte] = {
-    val bytes = Array.fill[Byte](length)(0)
-    ThreadLocalRandom.current().nextBytes(bytes)
-    bytes
-  }
+  
 
   def randomAddress: ByteStr = ByteStr(Common.addressFromPublicKey(ChainId, randomBytes(Curve25519.KeyLength)))
 

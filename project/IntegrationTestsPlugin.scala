@@ -81,8 +81,8 @@ object IntegrationTestsPlugin extends AutoPlugin {
                 dockerCpu * 2
               } finally docker.close()
             } catch {
-              case NonFatal(_) =>
-                sLog.value.warn(s"Could not connect to Docker, is the daemon running?")
+              case NonFatal(e) =>
+                sLog.value.warn(s"Could not connect to Docker, is the daemon running? ${e.getMessage}")
                 sLog.value.info(s"System CPU count: ${EvaluateTask.SystemProcessors}")
                 EvaluateTask.SystemProcessors
             }

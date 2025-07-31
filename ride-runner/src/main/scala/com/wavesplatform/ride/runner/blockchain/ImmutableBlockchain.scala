@@ -2,7 +2,7 @@ package com.wavesplatform.ride.runner.blockchain
 
 import com.github.benmanes.caffeine.cache.{CacheLoader, Caffeine, LoadingCache}
 import com.google.protobuf.UnsafeByteOperations
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.bls.BlsPublicKey

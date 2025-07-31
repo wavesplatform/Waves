@@ -8,26 +8,7 @@ import com.wavesplatform.lang.directives.values.{Account, Expression, StdLibVers
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BIGINT, CONST_BYTESTR, CONST_LONG, CONST_STRING, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.evaluator.FunctionIds.{
-  BIGINT_TO_BYTES,
-  BYTES_TO_BIGINT,
-  BYTES_TO_BIGINT_LIM,
-  DIV_BIGINT,
-  FRACTION_BIGINT,
-  FRACTION_BIGINT_ROUNDS,
-  GE_BIGINT,
-  GT_BIGINT,
-  MAX_LIST_BIGINT,
-  MEDIAN_LISTBIGINT,
-  MIN_LIST_BIGINT,
-  MOD_BIGINT,
-  MUL_BIGINT,
-  STRING_TO_BIGINT,
-  STRING_TO_BIGINTOPT,
-  SUB_BIGINT,
-  SUM_BIGINT,
-  UMINUS_BIGINT
-}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, Rounding}
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
@@ -42,145 +23,145 @@ import java.util.concurrent.TimeUnit
 @Measurement(iterations = 10, time = 1)
 class BigIntOpsBenchmark {
   @Benchmark
-  def sum1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.sumExpr1))
+  def sum1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.sumExpr1))
 
   @Benchmark
-  def sum2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.sumExpr2))
+  def sum2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.sumExpr2))
 
   @Benchmark
-  def sum3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.sumExpr3))
+  def sum3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.sumExpr3))
 
   @Benchmark
-  def sum4(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.sumExpr4))
+  def sum4(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.sumExpr4))
 
   @Benchmark
-  def sub1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.subExpr1))
+  def sub1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.subExpr1))
 
   @Benchmark
-  def sub2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.subExpr2))
+  def sub2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.subExpr2))
 
   @Benchmark
-  def sub3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.subExpr3))
+  def sub3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.subExpr3))
 
   @Benchmark
-  def sub4(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.subExpr4))
+  def sub4(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.subExpr4))
 
   @Benchmark
-  def mul1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.mulExpr1))
+  def mul1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.mulExpr1))
 
   @Benchmark
-  def mul2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.mulExpr2))
+  def mul2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.mulExpr2))
 
   @Benchmark
-  def mul3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.mulExpr3))
+  def mul3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.mulExpr3))
 
   @Benchmark
-  def div1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.divExpr1))
+  def div1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.divExpr1))
 
   @Benchmark
-  def div2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.divExpr2))
+  def div2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.divExpr2))
 
   @Benchmark
-  def div3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.divExpr3))
+  def div3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.divExpr3))
 
   @Benchmark
-  def mod1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.modExpr1))
+  def mod1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.modExpr1))
 
   @Benchmark
-  def mod2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.modExpr2))
+  def mod2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.modExpr2))
 
   @Benchmark
-  def mod3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.modExpr3))
+  def mod3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.modExpr3))
 
   @Benchmark
-  def mod4(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.modExpr4))
+  def mod4(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.modExpr4))
 
   @Benchmark
-  def fraction1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.fractionExpr1))
+  def fraction1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.fractionExpr1))
 
   @Benchmark
-  def fraction2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.fractionExpr2))
+  def fraction2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.fractionExpr2))
 
   @Benchmark
-  def fraction3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.fractionExpr3))
+  def fraction3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.fractionExpr3))
 
   @Benchmark
-  def fraction1Round(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.fractionRoundExpr1))
+  def fraction1Round(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.fractionRoundExpr1))
 
   @Benchmark
-  def fraction2Round(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.fractionRoundExpr2))
+  def fraction2Round(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.fractionRoundExpr2))
 
   @Benchmark
-  def fraction3Round(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.fractionRoundExpr3))
+  def fraction3Round(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.fractionRoundExpr3))
 
   @Benchmark
-  def uminus1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.uminusExpr1))
+  def uminus1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.uminusExpr1))
 
   @Benchmark
-  def uminus2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.uminusExpr2))
+  def uminus2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.uminusExpr2))
 
   @Benchmark
-  def ge1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.geExpr1))
+  def ge1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.geExpr1))
 
   @Benchmark
-  def ge2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.geExpr2))
+  def ge2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.geExpr2))
 
   @Benchmark
-  def ge3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.geExpr3))
+  def ge3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.geExpr3))
 
   @Benchmark
-  def gt1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.gtExpr1))
+  def gt1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.gtExpr1))
 
   @Benchmark
-  def gt2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.gtExpr2))
+  def gt2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.gtExpr2))
 
   @Benchmark
-  def gt3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.gtExpr3))
+  def gt3(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.gtExpr3))
 
   @Benchmark
-  def listMin1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.listMinExpr1))
+  def listMin1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.listMinExpr1))
 
   @Benchmark
-  def listMin2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.listMinExpr2))
+  def listMin2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.listMinExpr2))
 
   @Benchmark
-  def listMax1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.listMaxExpr1))
+  def listMax1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.listMaxExpr1))
 
   @Benchmark
-  def listMax2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.listMaxExpr2))
+  def listMax2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.listMaxExpr2))
 
   @Benchmark
-  def medianList(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.medianListExpr))
+  def medianList(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.medianListExpr))
 
   @Benchmark
-  def bigIntToBytes1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.bigIntToBytes1))
+  def bigIntToBytes1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.bigIntToBytes1))
 
   @Benchmark
-  def bigIntToBytes2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.bigIntToBytes2))
+  def bigIntToBytes2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.bigIntToBytes2))
 
   @Benchmark
-  def bytesToBigInt1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.bytesToBigIntExpr1))
+  def bytesToBigInt1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.bytesToBigIntExpr1))
 
   @Benchmark
-  def bytesToBigInt2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.bytesToBigIntExpr2))
+  def bytesToBigInt2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.bytesToBigIntExpr2))
 
   @Benchmark
-  def bytesToBigIntLim1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.bytesToBigIntLimExpr1))
+  def bytesToBigIntLim1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.bytesToBigIntLimExpr1))
 
   @Benchmark
-  def bytesToBigIntLim2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.bytesToBigIntLimExpr2))
+  def bytesToBigIntLim2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.bytesToBigIntLimExpr2))
 
   @Benchmark
-  def stringToBigInt1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.stringToBigIntExpr1))
+  def stringToBigInt1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.stringToBigIntExpr1))
 
   @Benchmark
-  def stringToBigInt2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.stringToBigIntExpr2))
+  def stringToBigInt2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.stringToBigIntExpr2))
 
   @Benchmark
-  def stringToBigIntOpt1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.stringToBigIntOptExpr1))
+  def stringToBigIntOpt1(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.stringToBigIntOptExpr1))
 
   @Benchmark
-  def stringToBigIntOpt2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.ctx, s.stringToBigIntOptExpr2))
+  def stringToBigIntOpt2(bh: Blackhole, s: BigIntOpsSt): Unit = bh.consume(eval(s.stringToBigIntOptExpr2))
 }
 
 @State(Scope.Benchmark)
@@ -196,7 +177,8 @@ class BigIntOpsSt {
   val maxSqrt = CONST_BIGINT(BigInt("57896044618658097711785492504343953926634992332820282019728792003956564819968"))
   val three   = CONST_BIGINT(3)
   val two     = CONST_BIGINT(2)
-  val list = ARR((PureContext.BigIntMin to PureContext.BigIntMin + PureContext.MaxListLengthV4 - 1).map(CONST_BIGINT.apply), limited = true).explicitGet()
+  val list =
+    ARR((PureContext.BigIntMin to PureContext.BigIntMin + PureContext.MaxListLengthV4 - 1).map(CONST_BIGINT.apply), limited = true).explicitGet()
   val listReversed = ARR(list.xs.reverse, limited = true).explicitGet()
   val maxBytes     = PureContext.BigIntMax.toByteArray
 

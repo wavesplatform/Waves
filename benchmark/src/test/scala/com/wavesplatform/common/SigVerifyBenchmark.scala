@@ -1,12 +1,19 @@
 package com.wavesplatform.common
 
-import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.common.SigVerifyBenchmark.*
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.Curve25519
-import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
+import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.eval
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
+import com.wavesplatform.utils.randomBytes
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
+
+import java.util.concurrent.TimeUnit
+import scala.compiletime.uninitialized
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -16,96 +23,30 @@ import org.openjdk.jmh.infra.Blackhole
 @Measurement(iterations = 30, time = 1)
 class SigVerifyBenchmark {
   @Benchmark
-  def sigVerify_128b(st: CurveSt128b, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
-  @Benchmark
-  def sigVerify_1Kb(st: CurveSt1Kb, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
-  @Benchmark
-  def sigVerify_5Kb(st: CurveSt5Kb, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
-  @Benchmark
-  def sigVerify_6Kb(st: CurveSt6Kb, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
-  @Benchmark
-  def sigVerify_7Kb(st: CurveSt7Kb, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
-  @Benchmark
-  def sigVerify_8Kb(st: CurveSt8Kb, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
-  @Benchmark
-  def sigVerify_16Kb(st: CurveSt16Kb, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
-  @Benchmark
-  def sigVerify_32Kb(st: CurveSt32Kb, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
-  @Benchmark
-  def sigVerify_64Kb(st: CurveSt64Kb, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
-  @Benchmark
-  def sigVerify_128Kb(st: CurveSt128Kb, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
-  @Benchmark
-  def sigVerify_150Kb(st: CurveSt150Kb, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
-  // For DataTransaction.MaxProtoBytes
-  @Benchmark
-  def sigVerify_162Kb(st: CurveSt162Kb, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(st.signature, st.message, st.publicKey))
-
+  def sigVerify(st: SigVerifySt, bh: Blackhole): Unit = {
+    bh.consume(eval(st.expr))
+  }
 }
 
 object SigVerifyBenchmark {
   @State(Scope.Benchmark)
-  class CurveSt162Kb extends CurveSt(162 * 1024)
+  class SigVerifySt {
+    @Param(Array("128", "1024", "8192", "16384", "32768", "65536", "131072", "153600"))
+    var dataSize   = 0
+    var expr: EXPR = uninitialized
 
-  @State(Scope.Benchmark)
-  class CurveSt150Kb extends CurveSt(150 * 1024)
-
-  @State(Scope.Benchmark)
-  class CurveSt128Kb extends CurveSt(128 * 1024)
-
-  @State(Scope.Benchmark)
-  class CurveSt64Kb extends CurveSt(64 * 1024)
-
-  @State(Scope.Benchmark)
-  class CurveSt32Kb extends CurveSt(32 * 1024)
-
-  @State(Scope.Benchmark)
-  class CurveSt16Kb extends CurveSt(16 * 1024)
-
-  @State(Scope.Benchmark)
-  class CurveSt8Kb extends CurveSt(8 * 1024)
-
-  @State(Scope.Benchmark)
-  class CurveSt7Kb extends CurveSt(7 * 1024)
-
-  @State(Scope.Benchmark)
-  class CurveSt6Kb extends CurveSt(6 * 1024)
-
-  @State(Scope.Benchmark)
-  class CurveSt5Kb extends CurveSt(5 * 1024)
-
-  @State(Scope.Benchmark)
-  class CurveSt1Kb extends CurveSt(1024)
-
-  @State(Scope.Benchmark)
-  class CurveSt128b extends CurveSt(128)
-
-  class CurveSt(size: Int) {
-    val (privateKey, publicKey) = curve25519.generateKeypair
-    val message                 = randomBytes(size)
-    val signature               = curve25519.sign(privateKey, message)
+    @Setup def setup(): Unit = {
+      val (privateKey, publicKey) = Curve25519.createKeyPair(randomBytes(32))
+      val message                 = randomBytes(dataSize)
+      val signature               = Curve25519.sign(privateKey, message)
+      expr = FUNCTION_CALL(
+        Native(FunctionIds.SIGVERIFY),
+        List(
+          CONST_BYTESTR(ByteStr(message), CONST_BYTESTR.NoLimit).explicitGet(),
+          CONST_BYTESTR(ByteStr(signature)).explicitGet(),
+          CONST_BYTESTR(ByteStr(publicKey)).explicitGet()
+        )
+      )
+    }
   }
 }

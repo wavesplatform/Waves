@@ -139,7 +139,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       ("base64:AA==", "Illegal length of script: 1"),
       ("base64:AAQB", "Invalid content type of script: 4"),
       ("base64:AAEF", "Invalid checksum"),
-      ("base64:CQEF", "Invalid version of script: 9")
+      ("base64:CgEF", "Invalid version of script: 10")
     )
 
   forAll(invalidScript) { (script: String, error: String) =>

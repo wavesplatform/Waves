@@ -20,7 +20,8 @@ object Global extends BaseGlobal {
       x <- Try(Base58.decode(input)).toEither.leftMap(_.getMessage)
     } yield x
 
-  override def base64Encode(input: Array[Byte]): Either[String, String] = Right(Base64.encode(input))
+  override def base64Encode(input: Array[Byte], limit: Int): Either[String, String] =
+    Either.cond(input.length <= limit, Base64.encode(input), s"base64Encode input exceeds $limit")
   override def base64Decode(input: String, limit: Int): Either[String, Array[Byte]] =
     for {
       _ <- Either.cond(input.length <= limit, {}, s"Input is too long (${input.length}), limit is $limit")

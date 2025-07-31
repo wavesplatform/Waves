@@ -29,8 +29,8 @@ object Global extends BaseGlobal {
     if (input.length > limit) Left(s"base58Decode input exceeds $limit")
     else Base58.tryDecodeWithLimit(input, limit).toEither.left.map(_ => "can't parse Base58 string")
 
-  def base64Encode(input: Array[Byte]): Either[String, String] =
-    Either.cond(input.length <= MaxBase64Bytes, Base64.encode(input), s"base64Encode input exceeds $MaxBase64Bytes")
+  def base64Encode(input: Array[Byte], limit: Int): Either[String, String] =
+    Either.cond(input.length <= limit, Base64.encode(input), s"base64Encode input exceeds $limit")
 
   def base64Decode(input: String, limit: Int): Either[String, Array[Byte]] =
     for {
@@ -38,13 +38,13 @@ object Global extends BaseGlobal {
       result <- Base64.tryDecode(input).toEither.left.map(_ => "can't parse Base64 string")
     } yield result
 
-  private val base16Encoder: BaseEncoding = BaseEncoding.base16().lowerCase()
+  private val base16Codec: BaseEncoding = BaseEncoding.base16().lowerCase().ignoreCase()
 
   override def base16EncodeImpl(input: Array[Byte]): Either[String, String] =
-    tryEither(base16Encoder.encode(input))
+    tryEither(base16Codec.encode(input))
 
   override def base16DecodeImpl(input: String): Either[String, Array[Byte]] =
-    tryEither(base16Encoder.decode(input.toLowerCase))
+    tryEither(base16Codec.decode(input))
 
   private def tryEither[A](f: => A): Either[String, A] =
     Try(f).toEither
@@ -184,7 +184,7 @@ object Global extends BaseGlobal {
     if (handleLeadingZerosInPublicKey) {
       org.web3j.utils.Numeric.toBytesPadded(pk, 64)
     } else {
-      base16Encoder.decode(pk.toString(16))
+      base16Codec.decode(pk.toString(16))
     }
   }
 }
