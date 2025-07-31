@@ -3,12 +3,14 @@ package com.wavesplatform.http
 import com.wavesplatform.api.common.CommonGeneratorsApi
 import com.wavesplatform.api.http.{GeneratorsApiRoute, RouteTimeout}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.db.WithState
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.settings.{WalletSettings, WavesSettings}
 import com.wavesplatform.state.Height
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.{TransactionType, TxHelpers}
 import com.wavesplatform.utils.SharedSchedulerMixin
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.*
@@ -28,7 +30,8 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
 
   private val wallet  = Wallet(WalletSettings(file = None, password = None, Some(ByteStr("seed".getBytes()))))
   private val miner   = wallet.generateNewAccounts(1).head
-  private val balance = 1_000_000_000_000L
+  private val deposit = FeeConstants(TransactionType.CommitToGeneration) * FeeUnit // TODO: not a fee
+  private val balance = GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator1 + deposit
 
   override def genesisBalances: Seq[WithState.AddrWithBalance] = Seq(AddrWithBalance(miner.toAddress, balance))
 
@@ -43,20 +46,18 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
   )
 
   routePath("/at/{height}") in {
+    def height           = Height(domain.blockchain.height)
     val generationPeriod = domain.blockchain.currentGenerationPeriod.next
-    println(generationPeriod)
-    val txn = TxHelpers.commitToGeneration(generationPeriod.start, sender = miner)
+    val txn              = TxHelpers.commitToGeneration(generationPeriod.start, sender = miner)
     domain.appendBlock(txn)
-    println(domain.blockchain.containsTransaction(txn))
     domain.appendBlock()
 
-    val height = Height(domain.blockchain.height)
-    println(domain.generatorsApi.generators(height))
+    // TODO: Add a test before this height
     Get(routePath(s"/at/$height")) ~> route ~> check {
       responseAs[JsValue] shouldBe Json.arr(
         Json.obj(
           "address"       -> miner.toAddress.toString,
-          "balance"       -> balance,
+          "balance"       -> (balance - deposit),
           "transactionId" -> txn.id().toString
         )
       )

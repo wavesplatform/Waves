@@ -250,14 +250,12 @@ object Keys {
   def maliciousMinerBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
     historyKey(MaliciousMinerBanHeights, addressBytes)
 
-  // TODO: Option
-  def generatorBalances(at: Height, cfh: RDB.ApiHandle): Key[Map[AddressId, Long]] =
-    Key(GeneratorBalances, h(at), readGeneratorBalances, writeGeneratorBalances, Some(cfh.handle))
+  def generatorBalances(at: Height, cfh: RDB.ApiHandle): Key[Option[Map[AddressId, Long]]] =
+    Key.opt(GeneratorBalances, h(at), readGeneratorBalances, writeGeneratorBalances, Some(cfh.handle))
 
   def committedGeneratorsCount(period: GenerationPeriod): Key[Short] =
     Key(CommittedGeneratorsCount, h(period.start), Option(_).fold(0: Short)(Shorts.fromByteArray), Shorts.toByteArray)
 
-  // TODO: Option
-  def committedGenerators(period: GenerationPeriod, commitmentHeight: Height): Key[Seq[(AddressId, BlsPublicKey, TransactionId)]] =
-    Key(CommittedGenerators, h(period.start) ++ h(commitmentHeight), readCommittedGenerators, writeCommittedGenerators)
+  def committedGenerators(period: GenerationPeriod, commitmentHeight: Height): Key[Option[Seq[(AddressId, BlsPublicKey, TransactionId)]]] =
+    Key.opt(CommittedGenerators, h(period.start) ++ h(commitmentHeight), readCommittedGenerators, writeCommittedGenerators)
 }

@@ -1,8 +1,8 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockEndorsement
+import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.state.Height
@@ -22,8 +22,8 @@ import scala.util.Using
 class EndorseBlockSynchronizerSpec extends FreeSpec {
   private val testScheduler = TestScheduler(ExecutionModel.AlwaysAsyncExecution)
 
-  private val activeGenerator    = TxHelpers.signer(0)
-  private val committedGenerator = TxHelpers.signer(1)
+  private val activeGenerator    = BlsKeyPair(TxHelpers.signer(0).privateKey)
+  private val committedGenerator = BlsKeyPair(TxHelpers.signer(1).privateKey)
   private val finalizedId        = mkRandomBlockId
   private val blockId            = mkRandomBlockId
   private val blockHeight        = Height(10)
@@ -82,7 +82,7 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     val endorsements = PS[(Channel, EndorseBlock)]()
     val synchronizer = EndorseBlockSynchronizer.start(1, last, endorsements, allChannels, testScheduler)
 
-    def blockchainUpdated(height: Int, newEndorsers: PublicKey*): Unit = {
+    def blockchainUpdated(height: Int, newEndorsers: BlsPublicKey*): Unit = {
       last.onNext((Height(height), newEndorsers.toSet))
       testScheduler.tick()
     }

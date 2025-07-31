@@ -1,6 +1,6 @@
 package com.wavesplatform.state.appender
 
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -120,7 +120,7 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
     def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
       private val blsKeyPair = BlsKeyPair(sender.privateKey)
 
-      override def committedGenerators(at: GenerationPeriod): Map[PublicKey, BlsPublicKey] = Map(sender.publicKey -> blsKeyPair.publicKey)
+      override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = Map(blsKeyPair.publicKey -> sender.toAddress)
     }
 
     withDomain(

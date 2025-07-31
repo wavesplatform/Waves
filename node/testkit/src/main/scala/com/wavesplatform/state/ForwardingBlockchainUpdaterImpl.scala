@@ -62,7 +62,8 @@ class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) exten
     liquidBlockMeta,
     bestLiquidSnapshot,
     bestLiquidSnapshotAndFees,
-    snapshotBlockchain
+    snapshotBlockchain,
+    recentGeneratorBalances
   }
 
   override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = delegate.committedGenerators(at)

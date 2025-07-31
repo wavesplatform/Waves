@@ -431,7 +431,8 @@ class BlockchainUpdaterImpl(
                     featuresApprovedWithBlock(block),
                     reward,
                     hitSource,
-                    cancelLeases(collectLeasesToCancel(newHeight), newHeight)
+                    cancelLeases(collectLeasesToCancel(newHeight), newHeight),
+                    generatorBalances
                   )
                 )
 
@@ -838,6 +839,10 @@ class BlockchainUpdaterImpl(
 
   override def snapshotBlockchain: SnapshotBlockchain = readLock {
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))
+  }
+
+  override def recentGeneratorBalances: Option[GeneratorBalances] = readLock {
+    ngState.map(_.generatorBalances)
   }
 
   // noinspection ScalaStyle,TypeAnnotation

@@ -702,13 +702,13 @@ class RocksDBWriter(
       }
 
       // TODO: Option to not store
-      rw.put(Keys.generatorBalances(h, rdb.apiHandle), generatorBalances)
+      rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances))
 
       if (nextCommittedGenerators.nonEmpty) {
         val nextPeriod                       = this.generationPeriodOf(h).next
         val nextPeriodGeneratorsUpdatedCount = rw.get(Keys.committedGeneratorsCount(nextPeriod)) + nextCommittedGenerators.size
 
-        rw.put(Keys.committedGenerators(nextPeriod, h), nextCommittedGenerators)
+        rw.put(Keys.committedGenerators(nextPeriod, h), Some(nextCommittedGenerators))
         rw.put(Keys.committedGeneratorsCount(nextPeriod), nextPeriodGeneratorsUpdatedCount.toShort)
       }
 
@@ -1328,14 +1328,14 @@ class RocksDBWriter(
     val pks        = new mutable.ArrayBuffer[BlsPublicKey](settings.functionalitySettings.maxGenerators)
     val addressIds = new mutable.ArrayBuffer[AddressId](settings.functionalitySettings.maxGenerators)
     ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
-      val xs = key.parse(dbEntry.getValue)
+      val xs = key.parse(dbEntry.getValue).getOrElse(Seq.empty)
       xs.foreach { (addressId, blsPK, _) =>
         pks.append(blsPK)
         addressIds.append(addressId)
       }
     }
 
-    val addresses = ro.multiGet(addressIds.map(Keys.idToAddress), Longs.BYTES)
+    val addresses = ro.multiGet(addressIds.map(Keys.idToAddress), Address.AddressLength)
     pks.view
       .zip(addresses)
       .collect { case (pk, Some(address)) =>

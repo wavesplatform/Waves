@@ -55,6 +55,7 @@ case class NgState(
     reward: Option[Long],
     hitSource: ByteStr,
     leasesToCancel: Map[ByteStr, StateSnapshot],
+    generatorBalances: GeneratorBalances = Map.empty,
     microSnapshots: Map[BlockId, CachedMicroDiff] = Map.empty,
     microBlocks: List[MicroBlockInfo] = List.empty,
     internalCaches: NgStateCaches = new NgStateCaches

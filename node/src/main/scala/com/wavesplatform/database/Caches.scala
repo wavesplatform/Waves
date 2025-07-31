@@ -304,9 +304,9 @@ abstract class Caches extends Blockchain with Storage {
       }
     }
 
-    // TODO:
-    //    if (newHeight % settings.functionalitySettings.commitmentPeriod == 0)
-    //      committedGeneratorsCache = snapshot.nextCommittedGenerators
+    // TODO: test
+    if (newHeight % settings.functionalitySettings.commitmentPeriod == 0)
+      committedGeneratorsCache = snapshot.nextCommittedGenerators
 
     val updatedBalanceNodes = for {
       case ((address, asset), amount) <- snapshot.balances
