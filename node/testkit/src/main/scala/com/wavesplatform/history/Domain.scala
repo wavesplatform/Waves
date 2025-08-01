@@ -23,7 +23,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
-import com.wavesplatform.state.appender.{BlockAppender, generatorBalances, getCommittedGeneratorsAndParentHeight}
+import com.wavesplatform.state.appender.{BlockAppender, findBlockAndGetGenerators, getGeneratorBalances}
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.*
@@ -620,9 +620,8 @@ object Domain {
             challengedHs <- block.header.challengedHeader.traverse(ch =>
               crypto.verifyVRF(ch.generationSignature, prevHs.arr, ch.generator, bcu.isFeatureActivated(RideV6, parentHeight))
             )
-            data <- getCommittedGeneratorsAndParentHeight(bcu, block)
-            gb = generatorBalances(bcu, block, data.committedGenerators)
-          } yield (hs, challengedHs, gb)
+            data <- findBlockAndGetGenerators(bcu, block)
+          } yield (hs, challengedHs, data.generatorBalances)
         }
 
       hitSourcesE.flatMap { case (hitSource, challengedHitSource, generatorBalances) =>

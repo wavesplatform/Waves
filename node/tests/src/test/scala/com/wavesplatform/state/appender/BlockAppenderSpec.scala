@@ -11,7 +11,7 @@ import com.wavesplatform.mining.BlockChallengerImpl
 import com.wavesplatform.network.{EndorseBlockSpec, MessageCodecL1, PBBlockSpec, PeerDatabase, RawBytes}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Ignored
 import com.wavesplatform.state.{CompleteBlockchainUpdater, ForwardingBlockchainUpdaterImpl, GenerationPeriod}
-import com.wavesplatform.test.{FlatSpec, TestTime}
+import com.wavesplatform.test.{FreeSpec, TestTime}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.embedded.EmbeddedChannel
@@ -23,16 +23,14 @@ import org.scalatest.BeforeAndAfterAll
 
 import scala.jdk.CollectionConverters.*
 
-class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll {
+class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll {
   private val appenderScheduler: SchedulerService = Schedulers.singleThread("appender")
   private val testTime: TestTime                  = TestTime()
 
   private val seed   = ByteStr("finality-test".getBytes())
   private val sender = Wallet.generateNewAccount(seed.arr, nonce = 0)
 
-  behavior of "BlockAppender"
-
-  it should "not broadcast block that wasn't applied to state" in {
+  "should not broadcast block that wasn't applied to state" in {
     withDomain(DomainPresets.ConsensusImprovements, AddrWithBalance.enoughBalances(sender)) { d =>
       val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val channel1 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
@@ -74,7 +72,7 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
     }
   }
 
-  it should "not broadcast a block endorsement before the feature activation" in {
+  "should not broadcast a block endorsement before the feature activation" in {
     withDomain(DomainPresets.TransactionStateSnapshot, AddrWithBalance.enoughBalances(sender)) { d =>
       val blockChallenger = new BlockChallengerImpl(
         d.blockchain,
@@ -116,56 +114,235 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
     }
   }
 
-  it should "broadcast a block endorsement after the feature activation" in {
-    def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-      private val blsKeyPair = BlsKeyPair(sender.privateKey)
-
-      override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = Map(blsKeyPair.publicKey -> sender.toAddress)
-    }
-
-    withDomain(
-      DomainPresets.DeterministicFinality.copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed))),
-      AddrWithBalance.enoughBalances(sender),
-      wrapBU = wrapBU
-    ) { d =>
-      d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
-
-      val blockChallenger = new BlockChallengerImpl(
-        d.blockchain,
-        new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
-        d.wallet,
-        d.settings,
-        testTime,
-        d.posSelector,
-        _ => throw new RuntimeException("Unexpected call in block challenger")
-      )
-
-      val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-      val channel1 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
-      val channel2 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
-      channels.add(channel1)
-      channels.add(channel2)
-      val appender = BlockAppender(
-        d.blockchain,
-        testTime,
-        d.utxPool,
-        d.posSelector,
-        channels,
-        PeerDatabase.NoOp,
-        Some(blockChallenger),
-        appenderScheduler
-      )(channel2, _, None)
-
-      val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
-      testTime.setTime(block.header.timestamp)
-      appender(block).runSyncUnsafe()
-
-      val endorsements = channel1.outboundMessages().asScala.count {
-        case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
-        case _                                                     => false
+  // TODO: make it shorter
+  "when DeterministicFinality activated" - {
+    "should append a block if no one committed" in {
+      def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
+        override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = Map.empty
       }
 
-      endorsements shouldBe 1
+      withDomain(
+        DomainPresets.DeterministicFinality.copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed))),
+        AddrWithBalance.enoughBalances(sender),
+        wrapBU = wrapBU
+      ) { d =>
+        d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
+
+        val blockChallenger = new BlockChallengerImpl(
+          d.blockchain,
+          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+          d.wallet,
+          d.settings,
+          testTime,
+          d.posSelector,
+          _ => throw new RuntimeException("Unexpected call in block challenger")
+        )
+
+        val appender = BlockAppender(
+          d.blockchain,
+          testTime,
+          d.utxPool,
+          d.posSelector,
+          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+          PeerDatabase.NoOp,
+          Some(blockChallenger),
+          appenderScheduler
+        )(new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp)), _, snapshot = None)
+
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
+        testTime.setTime(block.header.timestamp)
+        appender(block).runSyncUnsafe()
+
+        d.blockchain.isLastBlockId(block.id()) shouldBe true
+      }
+    }
+
+    "should append a block if committed" in {
+      def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
+        private val blsKeyPair = BlsKeyPair(sender.privateKey)
+
+        override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = Map(blsKeyPair.publicKey -> sender.toAddress)
+      }
+
+      withDomain(
+        DomainPresets.DeterministicFinality.copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed))),
+        AddrWithBalance.enoughBalances(sender),
+        wrapBU = wrapBU
+      ) { d =>
+        d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
+
+        val blockChallenger = new BlockChallengerImpl(
+          d.blockchain,
+          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+          d.wallet,
+          d.settings,
+          testTime,
+          d.posSelector,
+          _ => throw new RuntimeException("Unexpected call in block challenger")
+        )
+
+        val appender = BlockAppender(
+          d.blockchain,
+          testTime,
+          d.utxPool,
+          d.posSelector,
+          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+          PeerDatabase.NoOp,
+          Some(blockChallenger),
+          appenderScheduler
+        )(new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp)), _, snapshot = None)
+
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
+        testTime.setTime(block.header.timestamp)
+        appender(block).runSyncUnsafe()
+
+        d.blockchain.isLastBlockId(block.id()) shouldBe true
+      }
+    }
+
+    "should append a block if no one eligible committed" in {
+      val poorGenerator = Wallet.generateNewAccount(seed.arr, nonce = 1)
+
+      def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
+        private val blsKeyPair = BlsKeyPair(poorGenerator.privateKey)
+
+        override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = Map(blsKeyPair.publicKey -> poorGenerator.toAddress)
+      }
+
+      withDomain(
+        DomainPresets.DeterministicFinality.copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed))),
+        AddrWithBalance
+          .enoughBalances(sender)
+          .appended(AddrWithBalance.toAddrWithBalance(poorGenerator -> 1L)), // Lost all leasings and funds
+        wrapBU = wrapBU
+      ) { d =>
+        d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
+
+        val blockChallenger = new BlockChallengerImpl(
+          d.blockchain,
+          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+          d.wallet,
+          d.settings,
+          testTime,
+          d.posSelector,
+          _ => throw new RuntimeException("Unexpected call in block challenger")
+        )
+
+        val appender = BlockAppender(
+          d.blockchain,
+          testTime,
+          d.utxPool,
+          d.posSelector,
+          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+          PeerDatabase.NoOp,
+          Some(blockChallenger),
+          appenderScheduler
+        )(new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp)), _, snapshot = None)
+
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
+        testTime.setTime(block.header.timestamp)
+        appender(block).runSyncUnsafe()
+
+        d.blockchain.isLastBlockId(block.id()) shouldBe true
+      }
+    }
+
+    "should reject a block if not committed" in {
+      val generator = Wallet.generateNewAccount(seed.arr, nonce = 1)
+
+      def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
+        private val blsKeyPair = BlsKeyPair(generator.privateKey)
+
+        override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = Map(blsKeyPair.publicKey -> generator.toAddress)
+      }
+
+      withDomain(
+        DomainPresets.DeterministicFinality.copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed))),
+        AddrWithBalance.enoughBalances(sender, generator),
+        wrapBU = wrapBU
+      ) { d =>
+        d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
+
+        val blockChallenger = new BlockChallengerImpl(
+          d.blockchain,
+          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+          d.wallet,
+          d.settings,
+          testTime,
+          d.posSelector,
+          _ => throw new RuntimeException("Unexpected call in block challenger")
+        )
+
+        val appender = BlockAppender(
+          d.blockchain,
+          testTime,
+          d.utxPool,
+          d.posSelector,
+          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+          PeerDatabase.NoOp,
+          Some(blockChallenger),
+          appenderScheduler
+        )(new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp)), _, snapshot = None)
+
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
+        testTime.setTime(block.header.timestamp)
+        appender(block).runSyncUnsafe()
+
+        d.blockchain.isLastBlockId(block.id()) shouldBe false
+      }
+    }
+
+    "should broadcast a block endorsement" in {
+      def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
+        private val blsKeyPair = BlsKeyPair(sender.privateKey)
+
+        override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = Map(blsKeyPair.publicKey -> sender.toAddress)
+      }
+
+      withDomain(
+        DomainPresets.DeterministicFinality.copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed))),
+        AddrWithBalance.enoughBalances(sender),
+        wrapBU = wrapBU
+      ) { d =>
+        d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
+
+        val blockChallenger = new BlockChallengerImpl(
+          d.blockchain,
+          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+          d.wallet,
+          d.settings,
+          testTime,
+          d.posSelector,
+          _ => throw new RuntimeException("Unexpected call in block challenger")
+        )
+
+        val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+        val channel1 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
+        val channel2 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
+        channels.add(channel1)
+        channels.add(channel2)
+        val appender = BlockAppender(
+          d.blockchain,
+          testTime,
+          d.utxPool,
+          d.posSelector,
+          channels,
+          PeerDatabase.NoOp,
+          Some(blockChallenger),
+          appenderScheduler
+        )(channel2, _, None)
+
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
+        testTime.setTime(block.header.timestamp)
+        appender(block).runSyncUnsafe()
+
+        val endorsements = channel1.outboundMessages().asScala.count {
+          case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
+          case _                                                     => false
+        }
+
+        endorsements shouldBe 1
+      }
     }
   }
 
