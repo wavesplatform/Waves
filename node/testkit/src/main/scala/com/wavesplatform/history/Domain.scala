@@ -621,7 +621,7 @@ object Domain {
               crypto.verifyVRF(ch.generationSignature, prevHs.arr, ch.generator, bcu.isFeatureActivated(RideV6, parentHeight))
             )
             data <- getCommittedGeneratorsAndParentHeight(bcu, block)
-            gb = generatorBalances(bcu, data.parentHeight, block, data.committedGenerators)
+            gb = generatorBalances(bcu, block, data.committedGenerators)
           } yield (hs, challengedHs, gb)
         }
 

@@ -1323,10 +1323,11 @@ class RocksDBWriter(
   override protected def loadBlockHeight(blockId: BlockId): Option[Int] = readOnly(_.get(Keys.heightOf(blockId)))
 
   override protected def loadCommittedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = readOnly { ro =>
-    val key = Keys.committedGenerators(at, Height(0))
+    val maxGenerators = settings.functionalitySettings.maxGenerators
+    val key           = Keys.committedGenerators(at, Height(0))
 
-    val pks        = new mutable.ArrayBuffer[BlsPublicKey](settings.functionalitySettings.maxGenerators)
-    val addressIds = new mutable.ArrayBuffer[AddressId](settings.functionalitySettings.maxGenerators)
+    val pks        = new mutable.ArrayBuffer[BlsPublicKey](maxGenerators)
+    val addressIds = new mutable.ArrayBuffer[AddressId](maxGenerators)
     ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
       val xs = key.parse(dbEntry.getValue).getOrElse(Seq.empty)
       xs.foreach { (addressId, blsPK, _) =>

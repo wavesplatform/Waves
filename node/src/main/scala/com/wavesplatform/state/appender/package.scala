@@ -71,7 +71,7 @@ package object appender {
                 block,
                 hitSource,
                 snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)),
-                generatorBalances(blockchainUpdater, data.parentHeight, block, data.committedGenerators),
+                generatorBalances(blockchainUpdater, block, data.committedGenerators),
                 challengedHitSource = None,
                 verify,
                 txSignParCheck
@@ -113,7 +113,7 @@ package object appender {
             block,
             hitSource,
             snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)),
-            generatorBalances(blockchainUpdater, data.parentHeight, block, data.committedGenerators),
+            generatorBalances(blockchainUpdater, block, data.committedGenerators),
             challengedHitSource = None,
             verify,
             txSignParCheck
@@ -172,7 +172,7 @@ package object appender {
               block,
               hitSource,
               snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)),
-              generatorBalances(blockchainUpdater, data.parentHeight, block, data.committedGenerators),
+              generatorBalances(blockchainUpdater, block, data.committedGenerators),
               Some(challengedHitSource),
               verify,
               txSignParCheck
@@ -181,16 +181,7 @@ package object appender {
     } yield applyResult -> blockchainUpdater.height
   }
 
-  /** @param parentHeight
-    *   Of newBlock. Generator balances must be taken before a block application.
-    * @return
-    */
-  def generatorBalances(
-      blockchain: Blockchain,
-      parentHeight: Height,
-      newBlock: Block,
-      generators: Iterable[Address]
-  ): GeneratorBalances = {
+  def generatorBalances(blockchain: Blockchain, newBlock: Block, generators: Iterable[Address]): GeneratorBalances = {
     val parentBlockId = newBlock.header.reference
     generators.map { generator =>
       val balance = blockchain.generatingBalance(generator, Some(parentBlockId))
