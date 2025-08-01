@@ -46,13 +46,12 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
   )
 
   routePath("/at/{height}") in {
-    def height           = Height(domain.blockchain.height)
     val generationPeriod = domain.blockchain.currentGenerationPeriod.next
     val txn              = TxHelpers.commitToGeneration(generationPeriod.start, sender = miner)
     domain.appendBlock(txn)
     domain.appendBlock()
 
-    // TODO: Add a test before this height
+    val height = Height(domain.blockchain.height)
     Get(routePath(s"/at/$height")) ~> route ~> check {
       responseAs[JsValue] shouldBe Json.arr(
         Json.obj(

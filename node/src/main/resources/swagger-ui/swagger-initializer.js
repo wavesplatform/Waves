@@ -16,8 +16,7 @@ window.onload = function() {
     ],
     layout: "StandaloneLayout",
     tagsSorter: "alpha",
-    operationsSorter: "alpha",
-    tryItOutEnabled: false
+    operationsSorter: "alpha"
   });
 
   //</editor-fold>
