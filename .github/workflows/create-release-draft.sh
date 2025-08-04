@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-sbt -Dproject.version=${RELEASE_VERSION} --batch 'buildPackages $RELEASE_NETWORKS'
+sbt -Dproject.version=${RELEASE_VERSION} --batch "buildPackages $RELEASE_NETWORKS"
 
 assets=$(find . \( -path ./docker -o -path ./node/target/universal \) -prune  -o \( -name '*.deb' -o -name '*all*.jar' -o -name '*.tgz' \) -print)
 sha256sums=$(sha256sum $assets | sed 's|\..*/||')
