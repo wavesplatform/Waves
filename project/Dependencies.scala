@@ -5,14 +5,14 @@ import scalapb.compiler.Version.scalapbVersion
 
 //noinspection TypeAnnotation
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.123.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.3.Final"
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "4.31.1"
   val overrides = Def.setting(
     Seq(
       "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
       "com.google.code.gson"      % "gson"           % "2.13.1",
-      "com.squareup.okio"         % "okio-jvm"       % "3.15.0",
+      "com.squareup.okio"         % "okio-jvm"       % "3.16.0",
       "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
       nettyModule("codec-http2"),
       nettyModule("codec-http"),
@@ -45,7 +45,7 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.73.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.74.0"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.4.8-jre"

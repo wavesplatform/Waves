@@ -7,7 +7,7 @@ import com.wavesplatform.utils.ScorexLogging
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.*
 import io.netty.channel.group.ChannelGroup
-import io.netty.channel.nio.NioEventLoopGroup
+import io.netty.channel.nio.NioIoHandler
 import io.netty.channel.socket.nio.NioSocketChannel
 
 import java.io.IOException
@@ -17,7 +17,7 @@ import scala.concurrent.{Future, Promise}
 class NetworkClient(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char, nodeName: String, nonce: Long, allChannels: ChannelGroup)
     extends ScorexLogging {
 
-  private val workerGroup = new NioEventLoopGroup()
+  private val workerGroup = new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
   private val handshake   = Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, nodeName, nonce, None)
 
   def connect(remoteAddress: InetSocketAddress): Future[Channel] = {
