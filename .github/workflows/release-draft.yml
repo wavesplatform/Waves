@@ -16,7 +16,7 @@ jobs:
   publish-release-draft:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       attestations: write
       id-token: write
     steps:
@@ -28,7 +28,13 @@ jobs:
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
       - run: ./.github/workflows/create-release-draft.sh
+        id: create-release-draft
         env:
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_NETWORKS: ${{ inputs.networks }}
           RELEASE_BRANCH: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPO: ${{ github.repository }}
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.create-release-draft.outputs.subject-path }}
