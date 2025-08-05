@@ -1,5 +1,5 @@
-name: Publish release draft
-run-name: Publish release draft for ${{ inputs.version }} from ${{ github.ref_name }}
+name: Prepare release draft
+run-name: Prepare release draft for ${{ inputs.version }} from ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
@@ -13,10 +13,10 @@ on:
         required: true
 
 jobs:
-  publish-release-draft:
+  prepare-release-draft:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       attestations: write
       id-token: write
     steps:
@@ -27,8 +27,14 @@ jobs:
           java-version: '11'
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
-      - run: ./.github/workflows/create-release-draft.sh
+      - run: ./.github/workflows/prepare-release-draft.sh
+        id: prepare-release-draft
         env:
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_NETWORKS: ${{ inputs.networks }}
           RELEASE_BRANCH: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPO: ${{ github.repository }}
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.prepare-release-draft.outputs.subject-path }}

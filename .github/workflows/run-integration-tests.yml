@@ -1,0 +1,33 @@
+name: Run Integration Tests
+on:
+  pull_request:
+
+jobs:
+  run-integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'sbt'
+      - uses: sbt/setup-sbt@v1
+      - name: Run Integration Tests
+        run: sbt --batch ";node-it/docker;node-it/test"
+        env:
+          RUN_ID: ${{ github.ref_name }}-${{ github.run_number }}-${{ github.run_attempt }}
+      - uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          reporter: java-junit
+          name: JUnit Report
+          path: 'node-it/target/test-reports/*.xml'
+      - name: Upload Logs
+        uses: actions/upload-artifact@v4
+        if: cancelled() || failure()
+        with:
+          if-no-files-found: ignore
+          name: test-logs
+          path: |
+            node-it/target/logs/*/

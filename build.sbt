@@ -262,13 +262,20 @@ completeQaseRun := Def.task {
   (`lang-testkit` / Test / runMain).toTask(" com.wavesplatform.report.QaseRunCompleter").value
 }.value
 
-lazy val buildDebPackages = taskKey[Unit]("Build debian packages")
+lazy val buildDebPackages = taskKey[Unit]("Build DEB packages")
 buildDebPackages := {
   (`grpc-server` / Debian / packageBin).value
   (node / Debian / packageBin).value
 }
 
-def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser) { (state, args) =>
+lazy val buildPlatformIndependentArtifacts = taskKey[Unit]("Build fat JARs for node and ride-runner and TGZ for grpc-server")
+buildPlatformIndependentArtifacts := {
+  (node / assembly).value
+  (`ride-runner` / assembly).value
+  (`grpc-server` / Universal / packageZipTarball).value
+}
+
+lazy val buildReleaseArtifacts: Command = Command("buildReleaseArtifacts")(_ => Network.networkParser) { (state, args) =>
   args.toSet[Network].foreach { n =>
     val newState = Project
       .extract(state)
@@ -279,9 +286,9 @@ def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser
     Project.extract(newState).runTask(buildDebPackages, newState)
   }
 
-  Project.extract(state).runTask(packageAll, state)
+  Project.extract(state).runTask(buildPlatformIndependentArtifacts, state)
 
   state
 }
 
-commands ++= Seq(checkPR, buildPackages)
+commands ++= Seq(checkPR, buildReleaseArtifacts)
