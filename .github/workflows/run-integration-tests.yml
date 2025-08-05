@@ -3,7 +3,7 @@ on:
   pull_request:
 
 jobs:
-  it:
+  run-integration-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
