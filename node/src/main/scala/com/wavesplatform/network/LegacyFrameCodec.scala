@@ -26,7 +26,7 @@ abstract class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessag
   protected def rawDataToMessage(rawData: MessageRawData): AnyRef
 
   override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit =
-    try {
+    if (!ctx.isRemoved && ctx.channel().isActive) try {
       require(in.readInt() == Magic, "invalid magic number")
 
       val code = in.readByte()
