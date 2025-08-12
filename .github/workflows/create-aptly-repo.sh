@@ -22,7 +22,7 @@ done
 
 aptly repo create main
 aptly repo add main packages/
-aptly publish repo -batch -architectures=all -distribution=jammy -gpg-key=$GPG_KEY_ID -passphrase=$GPG_PASSPHRASE main
+aptly publish repo -batch -architectures="arm64,amd64,all" -distribution=stable -gpg-key=$GPG_KEY_ID -passphrase=$GPG_PASSPHRASE main
 
 gpg --armor --export $GPG_KEY_ID > /home/runner/.aptly/public/pubkey.txt
 
@@ -35,6 +35,14 @@ cat > /home/runner/.aptly/public/index.html <<EOF
 </head>
 <body>
 <h1>Waves Platform APT Repository</h1>
+To add the repository, run the following:
+<pre>
+echo "deb [signed-by=/etc/apt/keyrings/wavesplatform.asc] https://wavesplatform.github.io/Waves stable main" | sudo tee /etc/apt/sources.list.d/wavesplatform.list
+# For releases older than Debian 12 and Ubuntu 22.04, create the directory first:
+sudo mkdir -p /etc/apt/keyrings; sudo chmod 755 /etc/apt/keyrings
+sudo wget -O /etc/apt/keyrings/wavesplatform.asc https://wavesplatform.github.io/Waves/pubkey.txt
+sudo apt-get update
+</pre>
 </body>
 </html>
 EOF
