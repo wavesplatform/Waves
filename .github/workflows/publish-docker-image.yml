@@ -50,7 +50,7 @@ jobs:
             echo 'annotations<<EOF'
             echo org.opencontainers.image.source=https://github.com/${{ github.repository }}/tree/${{ github.sha }}/docker
             echo org.opencontainers.image.licenses=MIT
-            echo org.opencontainers.image.description=Unit Zero Node
+            echo org.opencontainers.image.description=Waves Node
             echo org.opencontainers.image.base.name=${{ inputs.baseImage }}
             echo org.opencontainers.image.base.digest=${{ steps.versions.outputs.base-image-digest }}
             echo org.opencontainers.image.version=${{ steps.versions.outputs.node-version }}
