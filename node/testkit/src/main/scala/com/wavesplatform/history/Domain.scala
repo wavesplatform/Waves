@@ -23,7 +23,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
-import com.wavesplatform.state.appender.{BlockAppender, findBlockAndGetGenerators, getGeneratorBalances}
+import com.wavesplatform.state.appender.{BlockAppender, findBlockAndGetGenerators}
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.*
