@@ -64,7 +64,7 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
     val sender   = TxHelpers.defaultSigner
     val tx       = TxHelpers.commitToGeneration(Height(3000), sender)
     withDomain(settings, AddrWithBalance.enoughBalances(sender)) { d =>
-      d.appendBlockE(tx) should produce("Deterministic Finality feature has not been activated yet")
+      d.appendBlockE(tx) should produce("Deterministic Finality & RIDE V9 feature has not been activated yet")
       d.appendBlock()
       d.appendBlock(tx)
     }
