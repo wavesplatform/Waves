@@ -4,8 +4,8 @@ import cats.syntax.semigroup.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -33,7 +33,6 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.utils.*
 import org.scalatest.Assertion
-import org.scalatest.OptionValues.convertOptionToValuable
 
 class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
   import DomainPresets.*
@@ -360,8 +359,8 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
                |
                | let lastBlockBaseTarget = lastBlock.baseTarget == 2
                | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
-              Array.fill(Block.GenerationSignatureLength)(0: Byte)
-            )}'
+                Array.fill(Block.GenerationSignatureLength)(0: Byte)
+              )}'
                | let lastBlockGenerator = lastBlock.generator.bytes == base58'${TestBlock.defaultSigner.publicKey.toAddress}'
                | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${TestBlock.defaultSigner.publicKey}'
                |
@@ -881,7 +880,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
       .filter(_ >= V5)
       .foreach { version =>
         val (masterAcc, recipient, genesis, _, dataTransaction, _, _) = preconditionsAndPayments
-        val fs                                                                 = settingsForRide(version).blockchainSettings.functionalitySettings
+        val fs                                                        = settingsForRide(version).blockchainSettings.functionalitySettings
         assertDiffAndState(fs) { append =>
           val (intKey, intValue)         = dataTransaction.data.collectFirst { case IntegerDataEntry(key, value) => (key, value) }.get
           val (booleanKey, booleanValue) = dataTransaction.data.collectFirst { case BooleanDataEntry(key, value) => (key, value) }.get

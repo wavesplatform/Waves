@@ -436,8 +436,7 @@ class BlockChallengeTest
 
       (1 to 998).foreach(_ => d.appendBlock())
 
-      val commitTxs         = Seq(challengedMiner, challengingMiner).map(acc => TxHelpers.commitToGeneration(1002, acc))
-      val commitTxsTotalFee = commitTxs.map(_.fee.value).sum
+      val commitTxs = Seq(challengedMiner, challengingMiner).map(acc => TxHelpers.commitToGeneration(1002, acc))
       d.appendBlock(commitTxs*)
       d.blockchain.height shouldBe 1001
 
