@@ -4,7 +4,7 @@ import cats.syntax.either.*
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
@@ -46,7 +46,7 @@ package object appender {
     } yield {
       val blockHeight         = Height(parentHeight + 1)
       val period              = blockchain.generationPeriodOf(blockHeight)
-      val committedGenerators = blockchain.committedGenerators(period).values.toSet
+      val committedGenerators = blockchain.committedGenerators(period).values.toSet // TODO: + from newBlock if changes generationPeriod
       val generatorBalances   = getGeneratorBalances(blockchain, block, committedGenerators)
       val eligibleGenerators = generatorBalances.view.collect {
         case (generator, balance) if blockchain.isEffectiveBalanceValid(parentHeight, block, balance) =>
@@ -187,10 +187,10 @@ package object appender {
     } yield applyResult -> blockchainUpdater.height
   }
 
-  def getGeneratorBalances(blockchain: Blockchain, newBlock: Block, generators: Iterable[Address]): GeneratorBalances = {
+  private def getGeneratorBalances(blockchain: Blockchain, newBlock: Block, generators: Iterable[Address]): GeneratorBalances = {
     val parentBlockId = newBlock.header.reference
     generators.map { generator =>
-      val balance = blockchain.generatingBalance(generator, Some(parentBlockId))
+      val balance = GeneratingBalanceProvider.unchallengedBalance(blockchain, generator, Some(parentBlockId)) // TODO: unchallenged
       generator -> balance
     }.toMap
   }
@@ -198,13 +198,13 @@ package object appender {
   /** @return
     *   Hit source
     */
-  private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time, committedGenerators: Set[Address])(
+  private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time, eligibleGenerators: Set[Address])(
       block: Block,
       parentHeight: Height
   ): Either[ValidationError, ByteStr] =
     for {
       _ <- Miner.isAllowedForMining(block.sender.toAddress, blockchainUpdater).leftMap(BlockAppendError(_, block))
-      r <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), committedGenerators)(block, parentHeight)
+      r <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), eligibleGenerators)(block, parentHeight)
       _ <- validateStateHash(block, blockchainUpdater)
       _ <- validateChallengedHeader(block, blockchainUpdater)
     } yield r

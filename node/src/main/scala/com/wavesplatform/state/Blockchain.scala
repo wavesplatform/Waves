@@ -129,6 +129,13 @@ object Blockchain {
       case _                          => false
     }
 
+    def unbannedEffectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long = {
+      val blockHeight = block.flatMap(b => blockchain.heightOf(b)).getOrElse(blockchain.height)
+      val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
+      val balances    = blockchain.balanceSnapshots(address, bottomLimit, block)
+      balances.view.map(_.effectiveBalance).min
+    }
+
     def effectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long = {
       val blockHeight = block.flatMap(b => blockchain.heightOf(b)).getOrElse(blockchain.height)
       val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)

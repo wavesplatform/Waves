@@ -58,7 +58,18 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
   var triggers: Seq[BlockchainUpdateTriggers] = Nil
 
   val posSelector: PoSSelector = PoSSelector(blockchainUpdater, None)
+  def nextBlockTime(generator: KeyPair): Long = {
+    val parentHeight = blockchain.height
+    val parent       = blockchain.blockHeader(parentHeight).map(_.header).getOrElse(lastBlock.header)
 
+    // TODO: challenging balance?
+    posSelector
+      .getValidBlockDelay(parentHeight, generator, parent.baseTarget, blockchain.generatingBalance(generator.toAddress))
+      .map(_ + parent.timestamp)
+      .explicitGet()
+  }
+
+  // TODO: testTime?
   val transactionDiffer: Transaction => TracedResult[ValidationError, StateSnapshot] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
@@ -68,6 +79,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
   def createDiffE(tx: Transaction): Either[ValidationError, StateSnapshot] = transactionDiffer(tx).resultE
   def createDiff(tx: Transaction): StateSnapshot                           = createDiffE(tx).explicitGet()
 
+  // TODO: testTime?
   lazy val utxPool: UtxPoolImpl =
     new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
@@ -131,6 +143,8 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
       )
 
     lazy val transactions: CommonTransactionsApi = commonTransactionsApi(blockChallenger)
+
+    lazy val generatorsApi: CommonGeneratorsApi = CommonGeneratorsApi(rdb, blockchain)
   }
 
   def liquidState: Option[NgState] = {
@@ -412,7 +426,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
                 .map(_ + parent.timestamp)
             )
         } else
-          Right(System.currentTimeMillis() - (1 hour).toMillis)
+          Right(testTime.getTimestamp() - (1 hour).toMillis)
       consensus <-
         if (blockchain.height > 0)
           posSelector
@@ -434,7 +448,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
       blockWithoutStateHash <- Block
         .buildAndSign(
           version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
-          timestamp = if (strictTime) resultTimestamp else SystemTime.getTimestamp(),
+          timestamp = if (strictTime) resultTimestamp else testTime.getTimestamp(),
           reference = reference,
           baseTarget = resultBt,
           generationSignature = consensus.generationSignature,
@@ -476,7 +490,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
       resultBlock <- Block
         .buildAndSign(
           version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
-          timestamp = if (strictTime) resultTimestamp else SystemTime.getTimestamp(),
+          timestamp = if (strictTime) resultTimestamp else testTime.getTimestamp(),
           reference = reference,
           baseTarget = resultBt,
           generationSignature = consensus.generationSignature,

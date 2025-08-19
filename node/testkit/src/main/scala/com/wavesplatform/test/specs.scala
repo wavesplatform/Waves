@@ -5,9 +5,14 @@ import org.scalacheck.ShrinkLowPriority
 import org.scalatest.*
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-trait BaseSuite extends matchers.should.Matchers with ScalaCheckPropertyChecks with ShrinkLowPriority with TransactionGen with EitherMatchers {
+trait BaseSuite
+    extends matchers.should.Matchers
+    with ScalaCheckPropertyChecks
+    with ShrinkLowPriority
+    with TransactionGen
+    with EitherMatchers
+    with OptionValues {
   this: Suite =>
-
 }
 
 abstract class FunSuite extends funsuite.AnyFunSuite with BaseSuite

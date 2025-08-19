@@ -1322,29 +1322,6 @@ class RocksDBWriter(
 
   override protected def loadBlockHeight(blockId: BlockId): Option[Int] = readOnly(_.get(Keys.heightOf(blockId)))
 
-  override protected def loadCommittedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = readOnly { ro =>
-    val maxGenerators = settings.functionalitySettings.maxGenerators
-    val key           = Keys.committedGenerators(at, Height(0))
-
-    val pks        = new mutable.ArrayBuffer[BlsPublicKey](maxGenerators)
-    val addressIds = new mutable.ArrayBuffer[AddressId](maxGenerators)
-    ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
-      val xs = key.parse(dbEntry.getValue).getOrElse(Seq.empty)
-      xs.foreach { (addressId, blsPK, _) =>
-        pks.append(blsPK)
-        addressIds.append(addressId)
-      }
-    }
-
-    val addresses = ro.multiGet(addressIds.map(Keys.idToAddress), Address.AddressLength)
-    pks.view
-      .zip(addresses)
-      .collect { case (pk, Some(address)) =>
-        pk -> address
-      }
-      .toMap
-  }
-
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     for {
       h       <- db.get(Keys.leaseDetailsHistory(leaseId)).headOption
@@ -1466,6 +1443,30 @@ class RocksDBWriter(
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] =
     readOnly(_.get(Keys.maliciousMinerBanHeights(address.bytes)))
+
+  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = {
+    val maxGenerators = settings.functionalitySettings.maxGenerators
+    val pks           = new mutable.ArrayBuffer[BlsPublicKey](maxGenerators)
+    val addressIds    = new mutable.ArrayBuffer[AddressId](maxGenerators)
+
+    val key = Keys.committedGenerators(at, Height(0))
+    val addresses = rdb.db.readOnly { ro =>
+      ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
+        val xs = key.parse(dbEntry.getValue).getOrElse(Seq.empty)
+        xs.foreach { (addressId, blsPK, _) =>
+          pks.append(blsPK)
+          addressIds.append(addressId)
+        }
+      }
+
+      ro.multiGet(addressIds.map(Keys.idToAddress), Address.AddressLength)
+    }
+
+    pks.view
+      .zip(addresses)
+      .collect { case (pk, Some(address)) => pk -> address }
+      .toMap
+  }
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))

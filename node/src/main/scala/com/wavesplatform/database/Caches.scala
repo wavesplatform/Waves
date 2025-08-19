@@ -199,11 +199,6 @@ abstract class Caches extends Blockchain with Storage {
   protected def discardBlockHeight(blockId: ByteStr): Unit = blockHeightCache.invalidate(blockId)
 
   @volatile
-  protected var committedGeneratorsCache: Map[BlsPublicKey, Address] = loadCommittedGenerators(this.currentGenerationPeriod)
-  protected def loadCommittedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address]
-  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = committedGeneratorsCache
-
-  @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
   protected def loadApprovedFeatures(): Map[Short, Int]
   override def approvedFeatures: Map[Short, Int] = approvedFeaturesCache
@@ -303,10 +298,6 @@ abstract class Caches extends Blockchain with Storage {
         case _ =>
       }
     }
-
-    // TODO: test
-    if (newHeight % settings.functionalitySettings.commitmentPeriod == 0)
-      committedGeneratorsCache = snapshot.nextCommittedGenerators
 
     val updatedBalanceNodes = for {
       case ((address, asset), amount) <- snapshot.balances
