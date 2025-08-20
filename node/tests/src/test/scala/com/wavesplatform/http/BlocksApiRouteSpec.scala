@@ -152,6 +152,16 @@ class BlocksApiRouteSpec
     }
   }
 
+  // TODO:
+  routePath("/headers/finalized") in {
+    (() => blocksApi.finalizedHeight).expects().returning(2).once()
+    (blocksApi.metaAtHeight).expects(2).returning(Some(testBlock2Meta)).once()
+    Get(routePath("/headers/finalized")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      response shouldBe testBlock2HeaderJson
+    }
+  }
+
   routePath("/headers/{id}") in {
     (blocksApi.meta).expects(testBlock1.id()).returning(Some(testBlock1Meta)).once()
     (blocksApi.meta).expects(testBlock2.id()).returning(Some(testBlock2Meta)).once()

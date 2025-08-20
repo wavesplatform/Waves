@@ -61,7 +61,9 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
         seq(start, end, includeTransactions = false)
       } ~ path("last") {
         at(commonApi.currentHeight, includeTransactions = false)
-      } ~ path(BlockId) { id =>
+      } ~ path("finalized") {
+        at(commonApi.finalizedHeight, includeTransactions = false)
+      }~ path(BlockId) { id =>
         complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
       }
     } ~ path("heightByTimestamp" / LongNumber) { timestamp =>
