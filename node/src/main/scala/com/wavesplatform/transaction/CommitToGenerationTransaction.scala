@@ -41,6 +41,8 @@ final case class CommitToGenerationTransaction(
 }
 
 object CommitToGenerationTransaction {
+  val DepositInWavelets = 100_00000000L
+
   implicit val validator: TxValidator[CommitToGenerationTransaction] = CommitToGenerationTxValidator
 
   implicit def signed(tx: CommitToGenerationTransaction, privateKey: PrivateKey): CommitToGenerationTransaction = {

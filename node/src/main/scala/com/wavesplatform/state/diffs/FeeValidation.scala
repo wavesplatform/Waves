@@ -44,7 +44,7 @@ object FeeValidation {
     TransactionType.UpdateAssetInfo    -> 1,
     TransactionType.Ethereum           -> 1,
     TransactionType.InvokeExpression   -> 10,
-    TransactionType.CommitToGeneration -> 1_000_000
+    TransactionType.CommitToGeneration -> 100 // TODO: decide
   )
 
   def apply(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {

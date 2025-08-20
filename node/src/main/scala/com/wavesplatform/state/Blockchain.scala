@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
+import com.wavesplatform.transaction.{Asset, CommitToGenerationTransaction, ERC20Address, Transaction}
 
 trait Blockchain {
   def settings: BlockchainSettings
@@ -158,8 +158,17 @@ object Blockchain {
 
     def wavesPortfolio(address: Address): Portfolio = Portfolio(
       blockchain.balance(address),
-      blockchain.leaseBalance(address)
+      blockchain.leaseBalance(address),
+      generationDeposit = this.generationDeposit(address)
     )
+
+    // TODO: not efficient?
+    def generationDeposit(address: Address): Long = {
+      val curr            = blockchain.currentGenerationPeriod
+      val committedOnCurr = blockchain.committedGenerators(curr).values.find(_ == address).size
+      val committedOnNext = blockchain.committedGenerators(curr.next).values.find(_ == address).size
+      (committedOnCurr + committedOnNext) * CommitToGenerationTransaction.DepositInWavelets
+    }
 
     def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)

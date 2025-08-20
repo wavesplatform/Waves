@@ -121,7 +121,7 @@ object StateSnapshot {
 
   // ignores lease balances from portfolios
   private def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, VectorMap[(Address, Asset), Long]] =
-    flatTraverse(portfolios) { case (address, Portfolio(wavesAmount, _, assets)) =>
+    flatTraverse(portfolios) { case (address, Portfolio(wavesAmount, _, assets, _)) =>
       val assetBalancesE = flatTraverse(assets) {
         case (_, 0) =>
           Right(VectorMap[(Address, Asset), Long]())
@@ -156,7 +156,7 @@ object StateSnapshot {
   private def leaseBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, Map[Address, LeaseBalance]] =
     portfolios.toSeq
       .flatTraverse {
-        case (address, Portfolio(_, lease, _)) if lease.out != 0 || lease.in != 0 =>
+        case (address, Portfolio(_, lease, _, _)) if lease.out != 0 || lease.in != 0 =>
           val bLease = blockchain.leaseBalance(address)
           for {
             newIn  <- safeSum(bLease.in, lease.in, s"$address -> Lease")

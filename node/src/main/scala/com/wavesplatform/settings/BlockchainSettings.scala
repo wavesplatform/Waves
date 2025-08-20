@@ -81,7 +81,7 @@ case class FunctionalitySettings(
     paymentsCheckHeight: Int = 0,
     unitsRegistryAddress: Option[String] = None,
     maxGenerators: Int = 5,
-    commitmentPeriod: Int = 1000
+    generationPeriod: Int = 1000
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -146,7 +146,7 @@ object FunctionalitySettings {
     paymentsCheckHeight = 4303300,
     unitsRegistryAddress = Some("3P8LfPXcveST7WKkV3UACQNdr6J3shPYong"),
     maxGenerators = 128, // BLS has much worse performance from 129
-    commitmentPeriod = 10_000
+    generationPeriod = 10_000
   )
 
   val TESTNET: FunctionalitySettings = apply(
@@ -165,7 +165,7 @@ object FunctionalitySettings {
     blockRewardBoostPeriod = 2_000,
     unitsRegistryAddress = Some("3N9fwNGJcUcAbhh7YPr6mrpuGJD4tApZFsT"),
     maxGenerators = 10,
-    commitmentPeriod = 3000
+    generationPeriod = 3000
   )
 
   val STAGENET: FunctionalitySettings = apply(
@@ -182,7 +182,7 @@ object FunctionalitySettings {
     xtnBuybackRewardPeriod = 1000,
     paymentsCheckHeight = 2195900,
     maxGenerators = 3,
-    commitmentPeriod = 100
+    generationPeriod = 100
   )
 }
 

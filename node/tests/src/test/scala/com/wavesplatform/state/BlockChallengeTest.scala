@@ -101,7 +101,7 @@ class BlockChallengeTest
     val challengedMiner = TxHelpers.signer(1)
     val testSettings = settings
       .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 1001)
-      .configure(_.copy(commitmentPeriod = 2))
+      .configure(_.copy(generationPeriod = 2))
 
     val deposit = FeeConstants(TransactionType.CommitToGeneration) * FeeUnit // TODO: not a fee
     withDomain(testSettings, balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
@@ -421,7 +421,7 @@ class BlockChallengeTest
     val challengedMiner = TxHelpers.signer(1)
     val testSettings = settings
       .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 1001)
-      .configure(_.copy(commitmentPeriod = 2))
+      .configure(_.copy(generationPeriod = 2))
 
     val deposit = FeeConstants(TransactionType.CommitToGeneration) * FeeUnit
     withDomain(testSettings, balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>

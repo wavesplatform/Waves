@@ -9,7 +9,7 @@ case class GenerationPeriod(start: Height, period: Int) {
 
 object GenerationPeriod {
   def from(h: Height, functionalitySettings: FunctionalitySettings): GenerationPeriod = {
-    val commitmentPeriod = functionalitySettings.commitmentPeriod
+    val commitmentPeriod = functionalitySettings.generationPeriod
     GenerationPeriod(
       start = Height((h / commitmentPeriod) * commitmentPeriod),
       period = commitmentPeriod

@@ -23,7 +23,7 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
     orig.copy(
       restAPISettings = restAPISettings,
       blockchainSettings = orig.blockchainSettings.copy(
-        functionalitySettings = orig.blockchainSettings.functionalitySettings.copy(commitmentPeriod = 3)
+        functionalitySettings = orig.blockchainSettings.functionalitySettings.copy(generationPeriod = 3)
       )
     )
   }

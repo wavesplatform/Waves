@@ -59,14 +59,39 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
     }
   }
 
-  "Accepted after the feature activation" in {
-    val settings = DeterministicFinality.setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 3)
-    val sender   = TxHelpers.defaultSigner
-    val tx       = TxHelpers.commitToGeneration(Height(3000), sender)
-    withDomain(settings, AddrWithBalance.enoughBalances(sender)) { d =>
-      d.appendBlockE(tx) should produce("Deterministic Finality & RIDE V9 feature has not been activated yet")
-      d.appendBlock()
-      d.appendBlock(tx)
-    }
+  private val sender = TxHelpers.defaultSigner
+
+  "Accepted after the feature activation" in withDomain(
+    DeterministicFinality.setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 3),
+    AddrWithBalance.enoughBalances(sender)
+  ) { d =>
+    val tx = TxHelpers.commitToGeneration(Height(3000), sender)
+    d.appendBlockE(tx) should produce("Deterministic Finality & RIDE V9 feature has not been activated yet")
+    d.appendBlock()
+    d.appendBlock(tx)
+  }
+
+  "Generator deposit taken and returned" in withDomain(
+    DeterministicFinality.configure(x => x.copy(generationPeriod = 3)),
+    AddrWithBalance.enoughBalances(sender)
+  ) { d =>
+    info("Deposit for one period")
+    val currPeriodTx = TxHelpers.commitToGeneration(Height(3), sender)
+    d.appendBlock(currPeriodTx)
+    d.blockchain.wavesPortfolio(sender.toAddress).generationDeposit shouldBe CommitToGenerationTransaction.DepositInWavelets
+    // TODO: check balances
+
+    d.appendBlock()
+    d.blockchain.height shouldBe 3
+
+    info("Deposit for two periods")
+    val nextPeriodTx = TxHelpers.commitToGeneration(Height(6), sender)
+    d.appendBlock(nextPeriodTx)
+    d.blockchain.wavesPortfolio(sender.toAddress).generationDeposit shouldBe 2 * CommitToGenerationTransaction.DepositInWavelets
+
+    (5 to 6).foreach(_ => d.appendBlock())
+
+    info("Deposit for one period if not committed for next")
+    d.blockchain.wavesPortfolio(sender.toAddress).generationDeposit shouldBe CommitToGenerationTransaction.DepositInWavelets
   }
 }
