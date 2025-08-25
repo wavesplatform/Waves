@@ -1,0 +1,14 @@
+{
+  "name": "@wavesplatform/repl",
+  "version": "0.1.0-snapshot",
+  "description": "RIDE REPL",
+  "main": "dist/mrepl.js",
+  "module": "dist/repl.js",
+  "browser": "dist/repl.js",
+  "files": ["dist/"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wavesplatform/Waves.git"
+  }
+}

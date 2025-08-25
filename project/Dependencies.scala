@@ -30,7 +30,7 @@ object Dependencies {
   )
 
   // Node protobuf schemas
-  private[this] val protoSchemasLib =
+  lazy val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.5.2" classifier "protobuf-src" intransitive ()
 
   private def pekkoModule(module: String) = ("org.apache.pekko" %% s"pekko-$module" % "1.1.5")
@@ -86,6 +86,13 @@ object Dependencies {
       "com.wavesplatform" % "zwaves" % "0.2.1",
       web3jModule("crypto").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
       protoSchemasLib % "protobuf"
+    )
+  )
+
+  lazy val scalapbRuntimeJS = Def.setting(
+    Seq(
+      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion),
+      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion % "protobuf")
     )
   )
 
@@ -159,8 +166,6 @@ object Dependencies {
 
   lazy val scalapbRuntime = Def.setting(
     Seq(
-      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion).exclude(gProto.organization, gProto.name),
-      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion % "protobuf").exclude(gProto.organization, gProto.name),
       gProto,
       gProto % "protobuf"
     )

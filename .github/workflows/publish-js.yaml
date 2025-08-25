@@ -19,7 +19,7 @@ jobs:
           java-version: '11'
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
-      - run: sbt --batch 'langJS/fullOptJS'
+      - run: sbt --batch ';langJS/fullOptJS;replJS/fullOptJS'
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
@@ -27,6 +27,9 @@ jobs:
       - run: |
           version=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-snapshot.$RUN_NUMBER.$RUN_ATTEMPT
           cd lang/js
+          npm version $version --no-git-tag-version
+          npm publish --provenance --access public --tag snapshot
+          cd ../../repl/js
           npm version $version --no-git-tag-version
           npm publish --provenance --access public --tag snapshot
         env:

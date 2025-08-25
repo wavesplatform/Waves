@@ -2,13 +2,13 @@
   "name": "@wavesplatform/lang",
   "version": "0.1.0",
   "description": "RIDE Compiler",
-  "main": "dist/main.js",
-  "module": "dist/main.js",
-  "browser": "dist/main.js",
+  "main": "dist/lang.js",
+  "module": "dist/lang.js",
+  "browser": "dist/lang.js",
   "files": ["dist/"],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wavesplatform/Waves.git"
+    "url": "git+https://github.com/wavesplatform/Waves.git"
   }
 }

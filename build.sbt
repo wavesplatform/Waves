@@ -1,6 +1,3 @@
-import Dependencies.gProto
-import scalapb.compiler.Version.scalapbVersion
-
 /* IDEA notes
  * May require to delete .idea and re-import with all checkboxes
  * Worksheets may not work: https://youtrack.jetbrains.com/issue/SCL-6726
@@ -20,7 +17,7 @@ ThisBuild / PB.protocVersion   := "4.31.1"
 ThisBuild / dependencyOverrides ++= Dependencies.overrides.value
 
 ThisBuild / pomIncludeRepository := { _ => false }
-ThisBuild / publishMavenStyle := true
+ThisBuild / publishMavenStyle    := true
 ThisBuild / publishTo := {
   val centralSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
   if (isSnapshot.value) Some("central-snapshots" at centralSnapshots)
@@ -50,23 +47,20 @@ lazy val lang =
 lazy val `lang-jvm` = lang.jvm
   .enablePlugins(PublishedModule)
   .settings(
-    name                                  := "RIDE Compiler",
-    normalizedName                        := "lang",
-    description                           := "The RIDE smart contract language compiler",
+    name           := "RIDE Compiler",
+    normalizedName := "lang",
+    description    := "The RIDE smart contract language compiler",
     libraryDependencies ++= Seq(
       "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
       Dependencies.gProto,
       Dependencies.gProto % "protobuf"
-    ),
+    )
   )
 
 lazy val `lang-js` = lang.js
   .enablePlugins(VersionObject)
   .settings(
-    libraryDependencies ++= Seq(
-      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion).exclude(gProto.organization, gProto.name),
-      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion % "protobuf").exclude(gProto.organization, gProto.name),
-    )
+    libraryDependencies ++= Dependencies.scalapbRuntimeJS.value
   )
 
 lazy val `lang-testkit` = project
@@ -120,16 +114,17 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .crossType(CrossType.Full)
   .settings(
-    libraryDependencies ++=
-      Dependencies.protobuf.value ++
-        Dependencies.circe.value,
+    libraryDependencies ++= Dependencies.circe.value ++ Seq(
+      Dependencies.protoSchemasLib % "protobuf"
+    ),
     inConfig(Compile)(
       Seq(
         PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
         PB.protoSources += PB.externalIncludePath.value,
         PB.generate / includeFilter := { (f: File) =>
           (** / "waves" / "*.proto").matches(f.toPath)
-        }
+        },
+        PB.deleteTargetDirectory := false
       )
     )
   )
@@ -137,7 +132,7 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
 lazy val `repl-jvm` = repl.jvm
   .dependsOn(`lang-jvm`, `lang-testkit`)
   .settings(
-    libraryDependencies ++= Dependencies.circe.value ++ Seq(
+    libraryDependencies ++= Seq(
       "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
       Dependencies.sttp3
     )
@@ -146,7 +141,9 @@ lazy val `repl-jvm` = repl.jvm
 lazy val `repl-js` = repl.js
   .dependsOn(`lang-js`)
   .settings(
-    libraryDependencies += "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
+    libraryDependencies ++= Dependencies.scalapbRuntimeJS.value ++ Seq(
+      "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
+    )
   )
 
 lazy val `curve25519-test` = project.dependsOn(node)
