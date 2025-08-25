@@ -28,7 +28,7 @@ jobs:
           version=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-snapshot.$RUN_NUMBER.$RUN_ATTEMPT
           cd lang/js
           npm version $version --no-git-tag-version
-          npm publish
+          npm publish --provenance --access public --tag snapshot
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_NUMBER: ${{ github.run_number }}
