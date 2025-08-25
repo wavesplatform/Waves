@@ -84,8 +84,9 @@ object Dependencies {
       curve25519,
       bouncyCastleProvider,
       "com.wavesplatform" % "zwaves" % "0.2.1",
-      web3jModule("crypto").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
-    ) ++ scalapbRuntime.value ++ protobuf.value
+      web3jModule("crypto").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
+      protoSchemasLib % "protobuf"
+    )
   )
 
   lazy val it = scalaTest +: Seq(

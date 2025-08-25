@@ -1,3 +1,6 @@
+import Dependencies.gProto
+import scalapb.compiler.Version.scalapbVersion
+
 /* IDEA notes
  * May require to delete .idea and re-import with all checkboxes
  * Worksheets may not work: https://youtrack.jetbrains.com/issue/SCL-6726
@@ -50,11 +53,21 @@ lazy val `lang-jvm` = lang.jvm
     name                                  := "RIDE Compiler",
     normalizedName                        := "lang",
     description                           := "The RIDE smart contract language compiler",
-    libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided
+    libraryDependencies ++= Seq(
+      "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
+      Dependencies.gProto,
+      Dependencies.gProto % "protobuf"
+    ),
   )
 
 lazy val `lang-js` = lang.js
   .enablePlugins(VersionObject)
+  .settings(
+    libraryDependencies ++= Seq(
+      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion).exclude(gProto.organization, gProto.name),
+      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion % "protobuf").exclude(gProto.organization, gProto.name),
+    )
+  )
 
 lazy val `lang-testkit` = project
   .in(file("lang/testkit"))
