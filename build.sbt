@@ -247,15 +247,15 @@ buildRIDERunnerForDocker := {
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := Def
   .sequential(
-    `waves-node` / clean,
+    clean,
     Def.task {
       (`lang-tests` / Test / test).value
       (`repl-jvm` / Test / test).value
-      (`lang-js` / Compile / fastOptJS).value
+      (`lang-js` / Compile / fullOptJS).value
       (`lang-tests-js` / Test / test).value
       (`grpc-server` / Test / test).value
       (`node-tests` / Test / test).value
-      (`repl-js` / Compile / fastOptJS).value
+      (`repl-js` / Compile / fullOptJS).value
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
       (`node-generator` / Compile / compile).value

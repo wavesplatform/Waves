@@ -45,17 +45,6 @@ jobs:
           find contracts/ride               -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
           find wavesducks-public/ride       -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
           find swopfi-smart-contracts/dApps -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;
-      - name: Publish snapshots
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-snapshots') }}
-        env:
-          SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
-          SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-        run: |
-          find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
-          version=$(echo ${{ github.base_ref }} | awk -F '[-.]' '{print $2"."$3}')
-          pr_number=${{ github.event.number }}
-          sbt -Dproject.version=$version-$pr_number-SNAPSHOT --batch publish
       - name: Save debug data
         uses: actions/upload-artifact@v4
         if: always()
@@ -69,6 +58,7 @@ jobs:
 
   run-integration-tests:
     name: Run integration tests
+    needs: check-pr
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -96,3 +86,48 @@ jobs:
           name: test-logs
           path: |
             node-it/target/logs/*/
+
+  publish-snapshots:
+    name: Publish snapshot packages
+    needs: check-pr
+    runs-on: ubuntu-latest
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-snapshots') }}
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    env:
+      PR_NUMBER: ${{ github.event.number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'sbt'
+          gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
+          gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
+      - uses: sbt/setup-sbt@v1
+      - run: echo "VERSION=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)" >> $GITHUB_ENV
+      - run: sbt -Dproject.version=$VERSION-$PR_NUMBER-SNAPSHOT --batch ';publish;langJS/fullOptJS;replJS/fullOptJS'
+        env:
+          SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://npm.pkg.github.com'
+      - run: |
+          version=$VERSION-snapshot$PR_NUMBER.$RUN_NUMBER.$RUN_ATTEMPT
+          cd lang/js
+          npm version $version --no-git-tag-version
+          npm publish --provenance --access public --tag snapshot
+          cd ../../repl/js
+          npm version $version --no-git-tag-version
+          npm publish --provenance --access public --tag snapshot
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}

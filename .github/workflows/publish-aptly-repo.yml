@@ -59,7 +59,7 @@ jobs:
           path: /home/runner/.aptly/public
   deploy:
     environment:
-      name: github-pages
+      name: prod
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: create-aptly-repo
