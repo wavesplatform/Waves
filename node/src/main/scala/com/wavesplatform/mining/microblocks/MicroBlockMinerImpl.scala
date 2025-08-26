@@ -182,7 +182,7 @@ class MicroBlockMinerImpl(
             accumulatedBlock.id(),
             signedBlock.signature,
             stateHash,
-            Seq.empty // TODO: endorsements
+            finalizationVoting = None // TODO: endorsements
           )
           .leftMap(MicroBlockBuildError.apply)
       } yield (signedBlock, microBlock)

@@ -20,7 +20,7 @@ case class MicroBlock(
     totalResBlockSig: ByteStr,
     signature: ByteStr,
     stateHash: Option[ByteStr],
-    endorsements: Seq[BlockEndorsement.Full]
+    finalizationVoting: Option[FinalizationVoting]
 ) extends Signed {
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(MicroBlockSerializer.toBytes(this))
 
@@ -31,7 +31,7 @@ case class MicroBlock(
 
   override def toString: String = s"MicroBlock(... -> ${reference.trim}, txs=${transactionData.size}"
 
-  def stringRepr(totalBlockId: ByteStr): String = s"MicroBlock(${totalBlockId.trim} -> ${reference.trim}, txs=${transactionData.size})"
+  def stringRepr(totalBlockId: ByteStr): String = s"MicroBlock(${totalBlockId.trim} -> ${reference.trim}, txs=${transactionData.size}${finalizationVoting.fold("")(f => s", f=$f")})"
 }
 
 object MicroBlock {
@@ -42,9 +42,9 @@ object MicroBlock {
       reference: BlockId,
       totalResBlockSig: BlockId,
       stateHash: Option[ByteStr],
-      endorsements: Seq[BlockEndorsement.Full]
+      finalizationVoting: Option[FinalizationVoting]
   ): Either[ValidationError, MicroBlock] =
-    MicroBlock(version, generator.publicKey, transactionData, reference, totalResBlockSig, ByteStr.empty, stateHash, endorsements).validate
+    MicroBlock(version, generator.publicKey, transactionData, reference, totalResBlockSig, ByteStr.empty, stateHash, finalizationVoting).validate
       .map(_.sign(generator.privateKey))
 
   // Legacy

@@ -81,7 +81,8 @@ object TestBlock {
         rewardVote = rewardVote,
         transactionData = txs,
         stateHash = stateHash,
-        challengedHeader = challengedHeader
+        challengedHeader = challengedHeader,
+        finalizationVoting = None
       )
     )
 
@@ -90,17 +91,18 @@ object TestBlock {
       defaultSigner,
       Block(
         BlockHeader(
-          1.toByte,
-          0,
+          version = 1.toByte,
+          timestamp = 0,
           ref,
-          2L,
+          baseTarget = 2L,
           randomOfLength(Block.GenerationSignatureLength),
           defaultSigner.publicKey,
-          Seq.empty,
-          -1L,
-          ByteStr.empty,
-          None,
-          None
+          featureVotes = Seq.empty,
+          rewardVote = -1L,
+          transactionsRoot = ByteStr.empty,
+          stateHash = None,
+          challengedHeader = None,
+          finalizationVoting = None
         ),
         ByteStr.empty,
         Seq.empty
@@ -111,17 +113,18 @@ object TestBlock {
     sign(
       defaultSigner,
       Block.create(
-        3.toByte,
-        0,
+        version = 3.toByte,
+        timestamp = 0,
         ref,
-        2L,
+        baseTarget = 2L,
         randomOfLength(Block.GenerationSignatureLength),
         defaultSigner.publicKey,
         features,
-        -1L,
-        Seq.empty,
-        None,
-        None
+        rewardVote = -1L,
+        transactionData = Seq.empty,
+        stateHash = None,
+        challengedHeader = None,
+        finalizationVoting = None
       )
     )
 }

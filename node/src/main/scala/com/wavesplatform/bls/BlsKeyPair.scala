@@ -10,8 +10,8 @@ sealed trait BlsKeyPair {
   def publicKey: BlsPublicKey
 
   // TODO: move to package?
-  def sign(message: Array[Byte]): Array[Byte]
-  def verify(message: Array[Byte], signature: Array[Byte]): Boolean = publicKey.verify(message, signature)
+  def sign(message: Array[Byte]): BlsSignature
+  def verify(message: Array[Byte], signature: BlsSignature): Boolean = publicKey.verify(message, signature)
 }
 
 object BlsKeyPair {
@@ -30,12 +30,13 @@ private final class BlsSeedKeyPair(private val wavesPrivateKey: Array[Byte]) ext
     BlsPublicKey(pk.compress()) // .serialize() // TODO compressed vs default
   }
 
-  def sign(message: Array[Byte]): Array[Byte] = { // TODO: Types
+  def sign(message: Array[Byte]): BlsSignature = { // TODO: Types
     val sig = new blst.P2()
-    sig
+    val xs = sig
       .hash_to(message, BlsDomainSeparationTag, publicKey.asByteStr.arr)
       .sign_with(privateKey)
       .compress() // .serialize() // TODO compressed vs default
+    BlsSignature(xs)
   }
 
   override def equals(other: Any): Boolean = other match {

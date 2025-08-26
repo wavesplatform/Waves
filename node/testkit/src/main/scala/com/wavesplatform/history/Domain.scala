@@ -356,7 +356,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
           reference = ref.getOrElse(blockchainUpdater.lastBlockId.get),
           totalResBlockSig = block.signature,
           stateHash = block.header.stateHash,
-          endorsements = Seq.empty // TODO: endorsements
+          finalizationVoting = None // TODO: endorsements
         )
     } yield microblock
   }

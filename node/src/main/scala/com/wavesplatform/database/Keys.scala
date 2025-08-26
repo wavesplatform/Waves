@@ -258,4 +258,6 @@ object Keys {
 
   def committedGenerators(period: GenerationPeriod, commitmentHeight: Height): Key[Option[Seq[(AddressId, BlsPublicKey, TransactionId)]]] =
     Key.opt(CommittedGenerators, h(period.start) ++ h(commitmentHeight), readCommittedGenerators, writeCommittedGenerators)
+
+  val finalizedBlockHeight: Key[Height] = heightKey(FinalizedBlockHeight)
 }

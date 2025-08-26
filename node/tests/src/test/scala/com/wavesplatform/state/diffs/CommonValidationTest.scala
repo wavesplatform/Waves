@@ -60,6 +60,7 @@ class CommonValidationTest extends PropSpec with WithState {
           genesisBlock.header.generationSignature,
           computedStateHash,
           genesisBlock,
+          newFinalizationHeight = None,
           generatorBalances = Map.empty
         )
 
@@ -90,6 +91,7 @@ class CommonValidationTest extends PropSpec with WithState {
         genesisBlock.header.generationSignature,
         computedStateHash,
         genesisBlock,
+        newFinalizationHeight = None,
         generatorBalances = Map.empty
       )
 
@@ -174,6 +176,7 @@ class CommonValidationTest extends PropSpec with WithState {
         genesisBlock.header.generationSignature,
         computedStateHash,
         genesisBlock,
+        newFinalizationHeight = None,
         generatorBalances = Map.empty
       )
 

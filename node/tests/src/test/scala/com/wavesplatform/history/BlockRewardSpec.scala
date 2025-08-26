@@ -279,6 +279,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
             curBlock.header.generationSignature,
             computedStateHash,
             curBlock,
+            newFinalizationHeight = None,
             generatorBalances = Map.empty
           )
           Some(curBlock)

@@ -2,8 +2,7 @@ package com.wavesplatform.transaction
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.*
-import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Height
@@ -19,7 +18,7 @@ final case class CommitToGenerationTransaction(
     generationPeriodStart: Height,
     timestamp: TxTimestamp,
     fee: TxPositiveAmount,
-    endorsementKeySignature: ByteStr,
+    endorsementKeySignature: BlsSignature,
     proofs: Proofs,
     override val chainId: Byte
 ) extends Transaction(TransactionType.CommitToGeneration)
@@ -34,7 +33,7 @@ final case class CommitToGenerationTransaction(
     Coeval.evalOnce(
       BaseTxJson.toJson(this) ++ Json.obj(
         "endorsementPublicKey"    -> endorsementPublicKey.asByteStr.toString,
-        "endorsementKeySignature" -> endorsementKeySignature.toString,
+        "endorsementKeySignature" -> endorsementKeySignature.base64Raw,
         "generationPeriodStart"   -> generationPeriodStart
       )
     )
@@ -50,7 +49,7 @@ object CommitToGenerationTransaction {
     val blsMessage = blsKP.publicKey.asByteStr.arr ++ Ints.toByteArray(tx.generationPeriodStart)
     val blsSig     = blsKP.sign(blsMessage)
 
-    val txWithBlsSig = tx.copy(endorsementPublicKey = blsKP.publicKey, endorsementKeySignature = ByteStr(blsSig))
+    val txWithBlsSig = tx.copy(endorsementPublicKey = blsKP.publicKey, endorsementKeySignature = blsSig)
     txWithBlsSig.copy(proofs = Proofs(crypto.sign(privateKey, txWithBlsSig.bodyBytes())))
   }
 
@@ -60,7 +59,7 @@ object CommitToGenerationTransaction {
       generationPeriodStart: Height,
       timestamp: TxTimestamp,
       feeInWaves: Long,
-      endorsementKeySignature: ByteStr,
+      endorsementKeySignature: BlsSignature,
       proofs: Proofs,
       chainId: Byte
   ): Either[ValidationError, CommitToGenerationTransaction] =
@@ -92,7 +91,7 @@ object CommitToGenerationTransaction {
       generationPeriodStart,
       timestamp,
       feeInWaves,
-      endorsementKeySignature = ByteStr.empty,
+      endorsementKeySignature = BlsSignature(Array.empty),
       Proofs.empty,
       chainId
     ).map(signed(_, sender.privateKey))

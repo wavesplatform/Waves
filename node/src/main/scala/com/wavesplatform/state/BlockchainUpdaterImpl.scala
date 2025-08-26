@@ -325,6 +325,7 @@ class BlockchainUpdaterImpl(
                 metrics.forgeBlockTimeStats.measureOptional(ng.snapshotOf(block.header.reference)) match {
                   case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                   case Some((referencedForgedBlock, referencedLiquidSnapshot, carry, totalFee, referencedComputedStateHash, discarded)) =>
+                    // Block on a new height
                     if (!verify || referencedForgedBlock.signatureValid()) {
                       val height = rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
@@ -349,19 +350,18 @@ class BlockchainUpdaterImpl(
                       )
 
                       for {
-                        differResult <- BlockDiffer
-                          .fromBlock(
-                            referencedBlockchain,
-                            Some(referencedForgedBlock),
-                            block,
-                            snapshot,
-                            constraint,
-                            hitSource,
-                            challengedHitSource,
-                            rocksdb.loadCacheData,
-                            verify,
-                            txSignParCheck = txSignParCheck
-                          )
+                        differResult <- BlockDiffer.fromBlock(
+                          referencedBlockchain,
+                          Some(referencedForgedBlock),
+                          block,
+                          snapshot,
+                          constraint,
+                          hitSource,
+                          challengedHitSource,
+                          rocksdb.loadCacheData,
+                          verify,
+                          txSignParCheck = txSignParCheck
+                        )
                       } yield {
                         val tempBlockchain = SnapshotBlockchain(
                           referencedBlockchain,
@@ -384,6 +384,21 @@ class BlockchainUpdaterImpl(
                           metrics.microBlockForkHeightStats.record(discarded.size)
                         }
 
+                        // TODO: validate signature or in other place?
+                        val endorsers               = referencedForgedBlock.header.finalizationVoting.fold(Seq.empty)(_.endorsers).toSet
+                        val finalizationBlockHeight = Height((height - 1).max(0))
+                        // TODO: generatorBalances stored in API DB, here we need to take them from memory
+                        val (totalGeneratorsBalance, votedGeneratorsBalance) = {
+                          val finalizationPeriod = GenerationPeriod.from(finalizationBlockHeight, settings.functionalitySettings)
+//                          rocksdb.committedGenerators(finalizationPeriod).collect {
+//                            case (pk, endorserAddr) if endorsers.contains(pk) => endorserAddr
+//                          }
+                          (BigInt(0), BigInt(0))
+                        }
+                        val shouldFinalize        = votedGeneratorsBalance >= (totalGeneratorsBalance * 2 / 3)
+                        val newFinalizationHeight = Option.when(shouldFinalize)(finalizationBlockHeight)
+
+                        // TODO: here
                         rocksdb.append(
                           liquidSnapshotWithCancelledLeases,
                           carry,
@@ -392,6 +407,7 @@ class BlockchainUpdaterImpl(
                           prevHitSource,
                           referencedComputedStateHash,
                           referencedForgedBlock,
+                          newFinalizationHeight,
                           generatorBalances
                         )
                         BlockStats.appended(referencedForgedBlock, referencedLiquidSnapshot.scriptsComplexity)

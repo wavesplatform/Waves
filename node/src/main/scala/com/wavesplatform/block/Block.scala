@@ -29,7 +29,8 @@ case class BlockHeader(
     rewardVote: Long,
     transactionsRoot: ByteStr,
     stateHash: Option[ByteStr],
-    challengedHeader: Option[ChallengedHeader]
+    challengedHeader: Option[ChallengedHeader],
+    finalizationVoting: Option[FinalizationVoting]
 ) {
   val score: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / baseTarget).ensuring(_ > 0))
 }
@@ -140,7 +141,8 @@ object Block {
       rewardVote: Long,
       transactionData: Seq[Transaction],
       stateHash: Option[ByteStr],
-      challengedHeader: Option[ChallengedHeader]
+      challengedHeader: Option[ChallengedHeader],
+      finalizationVoting: Option[FinalizationVoting]
   ): Block = {
     val transactionsRoot = mkTransactionsRoot(version, transactionData)
     Block(
@@ -155,7 +157,8 @@ object Block {
         rewardVote,
         transactionsRoot,
         stateHash,
-        challengedHeader
+        challengedHeader,
+        finalizationVoting
       ),
       ByteStr.empty,
       transactionData
@@ -193,7 +196,8 @@ object Block {
       rewardVote,
       txs,
       stateHash,
-      challengedHeader
+      challengedHeader,
+      finalizationVoting = None
     ).validate
       .map(_.sign(signer.privateKey))
 
@@ -223,11 +227,12 @@ object Block {
         baseTarget,
         GenesisGenerationSignature,
         GenesisGenerator.publicKey,
-        Seq(),
-        -1L,
+        featureVotes = Seq(),
+        rewardVote = -1L,
         txs,
-        None,
-        None
+        stateHash = None,
+        challengedHeader = None,
+        finalizationVoting = None
       )
       signedBlock = genesisSettings.signature match {
         case None             => block.sign(GenesisGenerator.privateKey)

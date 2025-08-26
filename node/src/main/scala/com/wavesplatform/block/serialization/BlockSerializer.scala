@@ -161,8 +161,20 @@ object BlockSerializer {
       val transactionData                                                          = parseTxs(buf, version)
       val Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature) = parseSuffix(buf, version)
 
-      val header =
-        BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot, None, None)
+      val header = BlockHeader(
+        version,
+        timestamp,
+        reference,
+        baseTarget,
+        generationSignature,
+        generator,
+        featureVotes,
+        rewardVote,
+        transactionsRoot,
+        stateHash = None,
+        challengedHeader = None,
+        finalizationVoting = None
+      )
 
       Block(header, signature, transactionData)
     }

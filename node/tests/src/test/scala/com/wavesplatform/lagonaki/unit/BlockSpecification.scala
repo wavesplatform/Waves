@@ -4,12 +4,12 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.metrics.Instrumented
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.*
-import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.crypto
+import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.test.*
+import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.transfer.*
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 
@@ -159,17 +159,18 @@ class BlockSpecification extends PropSpec {
     forAll(blockGen) { case (baseTarget, reference, generationSignature, _, transactionData) =>
       val block = Block
         .create(
-          3.toByte,
+          version = 3.toByte,
           time,
           reference,
           baseTarget,
           generationSignature,
           weakAccount,
-          Seq.empty,
-          -1L,
+          featureVotes = Seq.empty,
+          rewardVote = -1L,
           transactionData,
-          None,
-          None
+          stateHash = None,
+          challengedHeader = None,
+          finalizationVoting = None
         )
         .copy(signature = ByteStr(Array.fill(64)(0: Byte)))
       block.signatureValid() shouldBe false

@@ -3,7 +3,7 @@ package com.wavesplatform.protobuf.transaction
 import cats.syntax.traverse.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
-import com.wavesplatform.bls.BlsPublicKey
+import com.wavesplatform.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.ValidationError
@@ -330,7 +330,7 @@ object PBTransactions {
           Height(generationPeriodStart),
           timestamp,
           feeAmount,
-          endorsementKeySignature.toByteStr,
+          BlsSignature(endorsementKeySignature.toByteArray),
           proofs,
           chainId
         )

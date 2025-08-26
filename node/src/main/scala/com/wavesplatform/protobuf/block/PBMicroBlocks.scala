@@ -2,8 +2,6 @@ package com.wavesplatform.protobuf.block
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.BlockEndorsement
-import com.wavesplatform.block.BlockEndorsement.Full
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.network.MicroBlockResponse
@@ -13,16 +11,15 @@ import com.wavesplatform.protobuf.transaction.PBTransactions
 import scala.util.Try
 
 object PBMicroBlocks {
-
   def vanilla(signedMicro: PBSignedMicroBlock, unsafe: Boolean = false): Try[MicroBlockResponse] = Try {
     require(signedMicro.microBlock.isDefined, "microblock is missing")
     val microBlock   = signedMicro.getMicroBlock
     val transactions = microBlock.transactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
-    val endorsements = microBlock.endorsements.zipWithIndex.map { (x, i) =>
-      PBEndorseBlocks.vanilla(x) match {
-        case x: BlockEndorsement.Full => x
-        case _                        => throw new IllegalArgumentException(s"EndorseBlock $i is incomplete")
-      }
+
+    val finalizationVoting = microBlock.finalizationVoting.map { x =>
+      PBFinalizationVotings
+        .vanilla(x)
+        .getOrElse(throw new RuntimeException(s"Can't decode $x as a vanilla finalization voting"))
     }
 
     MicroBlockResponse(
@@ -34,7 +31,7 @@ object PBMicroBlocks {
         microBlock.updatedBlockSignature.toByteStr,
         signedMicro.signature.toByteStr,
         Option.unless(microBlock.stateHash.isEmpty)(microBlock.stateHash.toByteStr),
-        endorsements
+        finalizationVoting
       ),
       signedMicro.totalBlockId.toByteStr
     )
@@ -50,7 +47,7 @@ object PBMicroBlocks {
           senderPublicKey = microBlock.sender.toByteString,
           transactions = microBlock.transactionData.map(PBTransactions.protobuf),
           stateHash = microBlock.stateHash.getOrElse(ByteStr.empty).toByteString,
-          endorsements = microBlock.endorsements.map(PBEndorseBlocks.protobuf)
+          finalizationVoting = microBlock.finalizationVoting.map(PBFinalizationVotings.protobuf)
         )
       ),
       signature = microBlock.signature.toByteString,

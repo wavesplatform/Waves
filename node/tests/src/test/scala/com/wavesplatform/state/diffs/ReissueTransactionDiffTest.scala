@@ -98,6 +98,7 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
           block.header.generationSignature,
           computedStateHash,
           block,
+          newFinalizationHeight = None,
           generatorBalances = Map.empty
         )
       }

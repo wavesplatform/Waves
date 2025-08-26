@@ -156,6 +156,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         preconditionBlock.header.generationSignature,
         computedStateHash,
         preconditionBlock,
+        newFinalizationHeight = None,
         generatorBalances = Map.empty
       )
     }
@@ -205,6 +206,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         preconditionBlock.header.generationSignature,
         diffResult.computedStateHash,
         preconditionBlock,
+        newFinalizationHeight = None,
         generatorBalances = Map.empty
       )).explicitGet()
     }
@@ -250,6 +252,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
           preconditionBlock.header.generationSignature,
           diffResult.computedStateHash,
           preconditionBlock,
+          newFinalizationHeight = None,
           generatorBalances = Map.empty
         )
         Some(preconditionBlock)
@@ -280,6 +283,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         checkedBlock.header.generationSignature,
         diffResult.computedStateHash,
         checkedBlock,
+        newFinalizationHeight = None,
         generatorBalances = Map.empty
       )
       assertion(diffResult.snapshot, state)
@@ -330,6 +334,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
           checkedBlock.header.generationSignature.take(Block.HitSourceLength),
           result.computedStateHash,
           checkedBlock,
+          newFinalizationHeight = None,
           generatorBalances = Map.empty
         )
       }

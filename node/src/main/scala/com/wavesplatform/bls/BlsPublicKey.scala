@@ -13,9 +13,10 @@ object BlsPublicKey {
 
   extension (self: BlsPublicKey) {
     def asByteStr: ByteStr = self
+    def arr: Array[Byte]   = self.arr
 
-    def verify(message: Array[Byte], signature: Array[Byte]): Boolean = {
-      val _sig = new blst.P2_Affine(signature)
+    def verify(message: Array[Byte], signature: BlsSignature): Boolean = {
+      val _sig = new blst.P2_Affine(signature.arr)
       val _pk  = new blst.P1_Affine(self.arr)
       if (!_pk.in_group()) throw new java.lang.RuntimeException("disaster") // TODO:
 

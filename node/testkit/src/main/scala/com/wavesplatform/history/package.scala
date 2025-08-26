@@ -93,7 +93,7 @@ package object history {
         reference = prevTotal.id(),
         totalResBlockSig = newTotalBlock.signature,
         stateHash = newTotalBlock.header.stateHash,
-        endorsements = Seq.empty // TODO: endorsements
+        finalizationVoting = None // TODO: endorsements
       )
       .explicitGet()
     (newTotalBlock, new MicroBlockWithTotalId(nonSigned, newTotalBlock.id()))
@@ -109,7 +109,7 @@ package object history {
         reference = prevTotal.id(),
         totalResBlockSig = newTotalBlock.signature,
         stateHash = newTotalBlock.header.stateHash,
-        endorsements = Seq.empty // TODO: endorsements
+        finalizationVoting = None // TODO: endorsements
       )
       .explicitGet()
     (newTotalBlock, new MicroBlockWithTotalId(nonSigned, newTotalBlock.id()))

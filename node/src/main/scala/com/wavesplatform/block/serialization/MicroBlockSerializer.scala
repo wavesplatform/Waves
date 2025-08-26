@@ -40,6 +40,6 @@ object MicroBlockSerializer {
       val signature       = ByteStr(buf.getByteArray(SignatureLength))
       val stateHash       = buf.getByteArrayOpt(DigestLength).map(ByteStr(_))
 
-      MicroBlock(version, generator, transactionData, reference, totalResBlockSig, signature, stateHash, Seq.empty)
+      MicroBlock(version, generator, transactionData, reference, totalResBlockSig, signature, stateHash, None)
     }
 }

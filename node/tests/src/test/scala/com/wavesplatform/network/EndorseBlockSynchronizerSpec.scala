@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockEndorsement
-import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey}
+import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.state.Height
@@ -47,7 +47,7 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
         c.outChannel.outboundMessages() shouldBe empty
       }
 
-      "a wrong signature" in test(EndorseBlock(activeGenerator.publicKey, finalizedId, blockId, blockHeight, ByteStr.empty))
+      "a wrong signature" in test(EndorseBlock(activeGenerator.publicKey, finalizedId, blockId, blockHeight, BlsSignature(Array.empty)))
       "an unexpected height" in test(EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, blockId, Height(Int.MaxValue))))
       "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, finalizedId, blockId, blockHeight)))
       "an already finalized block" in test(EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, finalizedId, blockHeight)))

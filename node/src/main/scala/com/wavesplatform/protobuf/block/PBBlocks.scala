@@ -36,7 +36,8 @@ object PBBlocks {
           Option.unless(ch.stateHash.isEmpty)(ch.stateHash.toByteStr),
           ch.headerSignature.toByteStr
         )
-      }
+      },
+      finalizationVoting = None // TODO
     )
 
   def vanilla(block: PBBlock, unsafe: Boolean = false): Try[VanillaBlock] = Try {

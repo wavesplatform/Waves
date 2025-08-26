@@ -1,8 +1,9 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.account.{AddressScheme, PublicKey}
-import com.wavesplatform.bls.BlsPublicKey
+import com.wavesplatform.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -22,7 +23,7 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
     generationPeriodStart = Height(3000),
     timestamp = 1526287561757L,
     fee = TxPositiveAmount.unsafeFrom(100000000),
-    endorsementKeySignature = ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get,
+    endorsementKeySignature = BlsSignature(Base64.decode("OLI6mFSZD949zoVKqRt48SDNNnToWO+vUsmtCdeix7wH5RQkOwYQQvQEhQW/fmNCmsrmbW2IMt7SGjnCvPW9gQ==")),
     proofs = Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get),
     chainId = AddressScheme.current.chainId
   )
@@ -39,7 +40,7 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
       "generationPeriodStart": 3000,
       "endorsementPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
-      "endorsementKeySignature": "28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ",
+      "endorsementKeySignature": "OLI6mFSZD949zoVKqRt48SDNNnToWO+vUsmtCdeix7wH5RQkOwYQQvQEhQW/fmNCmsrmbW2IMt7SGjnCvPW9gQ==",
       "proofs": [
         "28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ"
       ],

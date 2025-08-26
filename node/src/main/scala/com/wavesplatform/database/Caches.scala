@@ -221,6 +221,7 @@ abstract class Caches extends Blockchain with Storage {
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
+      newFinalizationHeight: Option[Height],
       generatorBalances: Map[AddressId, Long],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
@@ -234,6 +235,7 @@ abstract class Caches extends Blockchain with Storage {
       hitSource: ByteStr,
       computedBlockStateHash: ByteStr,
       block: Block,
+      newFinalizationHeight: Option[Height],
       generatorBalances: GeneratorBalances
   ): Unit = {
     val newHeight = current.height + 1
@@ -365,6 +367,7 @@ abstract class Caches extends Blockchain with Storage {
       updatedDataWithNodes,
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
+      newFinalizationHeight,
       generatorBalanceNodes,
       nextCommittedGeneratorsRev.reverse,
       stateHash.result()

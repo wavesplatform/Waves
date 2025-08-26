@@ -402,11 +402,12 @@ object Importer extends ScorexLogging {
               lastHeader.baseTarget,
               lastHeader.generationSignature,
               lastHeader.generator,
-              Nil,
-              0,
-              ByteStr.empty,
-              None,
-              None
+              featureVotes = Nil,
+              rewardVote = 0,
+              transactionsRoot = ByteStr.empty,
+              stateHash = None,
+              challengedHeader = None,
+              finalizationVoting = None
             ),
             ByteStr.empty,
             Nil

@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.*
-import com.wavesplatform.bls.BlsPublicKey
+import com.wavesplatform.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Height
@@ -28,7 +28,7 @@ case class CommitToGenerationRequest(
         Height(generationPeriodStart.getOrElse(defaultGenerationPeriodStart)),
         timestamp.getOrElse(0L),
         FeeConstants(TransactionType.CommitToGeneration) * FeeUnit,
-        endorsementKeySignature = ByteStr.empty,
+        endorsementKeySignature = BlsSignature(Array.empty),
         Proofs.empty,
         chainId.getOrElse(AddressScheme.current.chainId)
       )
@@ -41,7 +41,7 @@ case class SignedCommitToGenerationRequest(
     generationPeriodStart: Int,
     timestamp: Long,
     fee: Long,
-    endorsementKeySignature: ByteStr,
+    endorsementKeySignature: BlsSignature,
     proofs: Proofs
 ) {
   def toTx: Either[ValidationError, CommitToGenerationTransaction] =
