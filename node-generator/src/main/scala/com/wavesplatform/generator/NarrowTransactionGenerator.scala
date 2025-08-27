@@ -239,7 +239,7 @@ class NarrowTransactionGenerator(
           (
             for {
               (sender, asset) <- randomSenderAndAsset(validIssueTxs)
-              transferCount = random.nextInt(MassTransferTransaction.MaxTransferCount)
+              transferCount = random.nextInt(MassTransferTransaction.MaxTransferCount - 30) + 30
               transfers = for (_ <- 0 until transferCount) yield {
                 val useAlias  = random.nextBoolean()
                 val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress

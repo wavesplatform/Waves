@@ -126,7 +126,7 @@ class Worker(
       Task.now(channel)
     else
       for {
-        _            <- if (cnt % 10 == 0) retrieveBalances.executeAsync else Task.unit
+       // _            <- if (cnt % 10 == 0) retrieveBalances.executeAsync else Task.unit
         validChannel <- validateChannel(channel)
         cntToSend    <- calcAndSaveCntToSend(state)
         _            <- logInfo(s"Sending $cntToSend transactions to $validChannel")
@@ -137,14 +137,17 @@ class Worker(
         r            <- Task.defer(pullAndWrite(validChannel, state, (cnt + 1) % 10))
       } yield r
 
-  private def calcAndSaveCntToSend(stateRef: Ref[Task, State]): Task[Int] =
+  private def calcAndSaveCntToSend(stateRef: Ref[Task, Worker.State]): Task[Int] =
     for {
-      utxCnt <- nodeUTXTransactionsToSendCount
-      state  <- stateRef.get
-      nextState = state.next(utxCnt)
-      _ <- logTrace(s"Prev state: $state, new state: $nextState, tx number to utx limit: $utxCnt")
-      _ <- stateRef.set(nextState)
-    } yield nextState.cnt
+      utxFree <- nodeUTXTransactionsToSendCount
+      _       <- logTrace(s"UTX free: $utxFree")
+      state   <- stateRef.get
+      next    = state.next(utxFree)
+      toSend  = math.min(next.cnt, utxFree)
+      _       <- logTrace(s"Prev state: $state, Next state: $next, toSend: $toSend")
+      _       <- stateRef.set(next)
+    } yield toSend
+
 
   private def withReconnect[A](baseTask: Task[A]): Task[A] =
     baseTask.onErrorHandleWith {
@@ -207,7 +210,8 @@ object Worker {
               case Some(ldt) if ldt.isBefore(LocalDateTime.now) => s.copy(cnt = utxToSendCnt, raised = true)
               case _ =>
                 val mayBeNextCnt = math.min(cnt + warmUp.step, warmUp.end)
-                val nextCnt      = math.min(mayBeNextCnt, utxToSendCnt)
+                val nextCnt = mayBeNextCnt
+                //val nextCnt      = math.min(mayBeNextCnt, utxToSendCnt)
                 WorkState(nextCnt, false, endAfter, warmUp)
             }
           }
