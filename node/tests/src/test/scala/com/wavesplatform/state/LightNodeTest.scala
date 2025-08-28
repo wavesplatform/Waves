@@ -70,7 +70,7 @@ class LightNodeTest extends PropSpec with WithDomain {
     }
   }
 
-  property(" NODE-1143. Rollback returns discarded block snapshots only for light node") {
+  property("NODE-1143. Rollback returns discarded block snapshots only for light node") {
     val sender    = TxHelpers.signer(1)
     val recipient = TxHelpers.address(2)
 

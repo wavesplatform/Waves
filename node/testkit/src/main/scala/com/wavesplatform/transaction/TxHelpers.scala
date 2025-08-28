@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.google.common.primitives.Ints
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.*
-import com.wavesplatform.bls.BlsPublicKey
+import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
@@ -464,13 +464,14 @@ object TxHelpers {
   def commitToGeneration(
       generationPeriodStart: Int,
       sender: KeyPair = defaultSigner,
+      endorsementPublicKey: BlsPublicKey = BlsKeyPair(defaultSigner.privateKey).publicKey,
       timestamp: TxTimestamp = timestamp,
-      fee: Long = FeeConstants(TransactionType.CommitToGeneration) * FeeUnit,
+      fee: Long = TestValues.commitToGenerationFee,
       chainId: Byte = AddressScheme.current.chainId
   ): CommitToGenerationTransaction = CommitToGenerationTransaction
     .selfSigned(
       sender,
-      BlsPublicKey(ByteStr.empty),
+      endorsementPublicKey,
       Height(generationPeriodStart),
       timestamp,
       fee,

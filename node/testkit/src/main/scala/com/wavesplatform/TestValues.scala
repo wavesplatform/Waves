@@ -18,7 +18,8 @@ object TestValues {
   val timestamp: Long    = System.currentTimeMillis()
   val fee: Long          = 1e6.toLong
 
-  val invokeFee: Long = FeeUnit * FeeConstants(TransactionType.InvokeScript)
+  val invokeFee: Long             = FeeUnit * FeeConstants(TransactionType.InvokeScript)
+  val commitToGenerationFee: Long = FeeConstants(TransactionType.CommitToGeneration) * FeeUnit
 
   def invokeFee(scripts: Int = 0, issues: Int = 0): Long =
     invokeFee + scripts * ScriptExtraFee + issues * FeeConstants(TransactionType.Issue) * FeeUnit

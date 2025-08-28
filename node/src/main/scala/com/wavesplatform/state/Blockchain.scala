@@ -113,14 +113,14 @@ object Blockchain {
         .flatMap(h => blockchain.blockHeader(h).map(_.header))
 
     def contains(block: Block): Boolean     = blockchain.contains(block.id())
-    def contains(blockId: ByteStr): Boolean = blockchain.heightOf(blockId).isDefined
+    def contains(blockId: BlockId): Boolean = blockchain.heightOf(blockId).isDefined
 
-    def blockId(atHeight: Int): Option[ByteStr] = blockchain.blockHeader(atHeight).map(_.id())
+    def blockId(atHeight: Int): Option[BlockId] = blockchain.blockHeader(atHeight).map(_.id())
 
     def lastBlockHeader: Option[SignedBlockHeader] = blockchain.blockHeader(blockchain.height)
-    def lastBlockId: Option[ByteStr]               = lastBlockHeader.map(_.id())
+    def lastBlockId: Option[BlockId]               = lastBlockHeader.map(_.id())
     def lastBlockTimestamp: Option[Long]           = lastBlockHeader.map(_.header.timestamp)
-    def lastBlockIds(howMany: Int): Seq[ByteStr]   = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
+    def lastBlockIds(howMany: Int): Seq[BlockId]   = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
 
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       (aoa: @unchecked) match {

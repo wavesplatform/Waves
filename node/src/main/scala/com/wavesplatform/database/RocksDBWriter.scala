@@ -13,6 +13,7 @@ import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.{BlockMetaExt, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
@@ -327,49 +328,83 @@ class RocksDBWriter(
     }.toMap
   }
 
-  override protected def loadGeneratorBalances(): (parent: Map[BlsPublicKey, Long], current: Map[BlsPublicKey, Long]) = readOnly { ro =>
-    // TODO if enabled API
-    val parentHeight  = Height((height - 1).max(GenesisBlockHeight))
-    val currentHeight = Height(height)
+  override protected def loadGeneratorBalances(): (parent: Map[BlsPublicKey, Long], current: Map[BlsPublicKey, Long]) =
+    if (lastBlock.isEmpty || height <= GenesisBlockHeight) (Map.empty, Map.empty)
+    else if (height == GenesisBlockHeight) {
+      val currentHeight  = Height(height)
+      val currentBlockId = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight")).id()
+      val currentPeriod  = this.generationPeriodOf(currentHeight)
 
-    val parentPeriod  = this.generationPeriodOf(parentHeight)
-    val currentPeriod = this.generationPeriodOf(currentHeight)
-
-    def rawGeneratorBalances(h: Height) = ro.get(Keys.generatorBalances(h, rdb.apiHandle)).getOrElse(Map.empty)
-
-    if (parentPeriod == currentPeriod) {
-      val commGens = rawCommittedGenerators(currentPeriod)
-      if (commGens.isEmpty) (Map.empty, Map.empty)
-      else {
-        val rawParentBalances  = rawGeneratorBalances(parentHeight)
-        val rawCurrentBalances = rawGeneratorBalances(currentHeight)
-
-        val (parent, current) = commGens.map { case (blsPk, aid) =>
-          (
-            blsPk -> rawParentBalances.getOrElse(aid, 0L),
-            blsPk -> rawCurrentBalances.getOrElse(aid, 0L)
-          )
-        }.unzip
-
-        (parent.toMap, current.toMap)
-      }
+      val currentCommGens = committedGenerators(currentPeriod)
+      val current         = if (currentCommGens.isEmpty) Map.empty else generatorBalances(currentCommGens, currentBlockId)
+      (Map.empty, current)
     } else {
-      val parentCommGens    = rawCommittedGenerators(parentPeriod)
-      val rawParentBalances = if (parentCommGens.isEmpty) Map.empty else rawGeneratorBalances(parentHeight)
+      val parentHeight  = Height(height - 1)
+      val parentBlockId = this.blockId(parentHeight).getOrElse(throw new IllegalStateException(s"No block on parent height: $parentHeight"))
 
-      val parent = parentCommGens.map { case (blsPk, aid) =>
-        blsPk -> rawParentBalances.getOrElse(aid, 0L)
+      val currentHeight  = Height(height)
+      val currentBlockId = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight")).id()
+
+      val parentPeriod  = this.generationPeriodOf(parentHeight)
+      val currentPeriod = this.generationPeriodOf(currentHeight)
+
+      if (parentPeriod == currentPeriod) {
+        val commGens = committedGenerators(currentPeriod)
+        if (commGens.isEmpty) (Map.empty, Map.empty)
+        else {
+          val parent  = generatorBalances(commGens, parentBlockId)
+          val current = generatorBalances(commGens, currentBlockId)
+          (parent, current)
+        }
+      } else {
+        val parentCommGens = committedGenerators(parentPeriod)
+        val parent         = if (parentCommGens.isEmpty) Map.empty else generatorBalances(parentCommGens, parentBlockId)
+
+        val currentCommGens = committedGenerators(currentPeriod)
+        val current         = if (currentCommGens.isEmpty) Map.empty else generatorBalances(currentCommGens, currentBlockId)
+        (parent, current)
       }
 
-      val currentCommGens    = rawCommittedGenerators(currentPeriod)
-      val rawCurrentBalances = if (currentCommGens.isEmpty) Map.empty else rawGeneratorBalances(currentHeight)
-
-      val current = currentCommGens.map { case (blsPk, aid) =>
-        blsPk -> rawCurrentBalances.getOrElse(aid, 0L)
-      }
-
-      (parent, current)
+      // TODO if enabled API
+      //    def rawGeneratorBalances(h: Height) = ro.get(Keys.generatorBalances(h, rdb.apiHandle)).getOrElse(Map.empty)
+//
+//    if (parentPeriod == currentPeriod) {
+//      val commGens = rawCommittedGenerators(currentPeriod)
+//      if (commGens.isEmpty) (Map.empty, Map.empty)
+//      else {
+//        val rawParentBalances  = rawGeneratorBalances(parentHeight)
+//        val rawCurrentBalances = rawGeneratorBalances(currentHeight)
+//
+//        val (parent, current) = commGens.map { case (blsPk, aid) =>
+//          (
+//            blsPk -> rawParentBalances.getOrElse(aid, 0L),
+//            blsPk -> rawCurrentBalances.getOrElse(aid, 0L)
+//          )
+//        }.unzip
+//
+//        (parent.toMap, current.toMap)
+//      }
+//    } else {
+//      val parentCommGens    = rawCommittedGenerators(parentPeriod)
+//      val rawParentBalances = if (parentCommGens.isEmpty) Map.empty else rawGeneratorBalances(parentHeight)
+//
+//      val parent = parentCommGens.map { case (blsPk, aid) =>
+//        blsPk -> rawParentBalances.getOrElse(aid, 0L)
+//      }
+//
+//      val currentCommGens    = rawCommittedGenerators(currentPeriod)
+//      val rawCurrentBalances = if (currentCommGens.isEmpty) Map.empty else rawGeneratorBalances(currentHeight)
+//
+//      val current = currentCommGens.map { case (blsPk, aid) =>
+//        blsPk -> rawCurrentBalances.getOrElse(aid, 0L)
+//      }
+//
+//      (parent, current)
+//    }
     }
+
+  private def generatorBalances(generators: Map[BlsPublicKey, Address], at: BlockId) = generators.map { case (blsPk, addr) =>
+    blsPk -> GeneratingBalanceProvider.balance(this, addr, Some(at))
   }
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =

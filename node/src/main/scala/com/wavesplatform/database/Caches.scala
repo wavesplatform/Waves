@@ -210,13 +210,9 @@ abstract class Caches extends Blockchain with Storage {
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   @volatile
-  private var parentGeneratorBalancesCache: Map[BlsPublicKey, Long] = Map.empty
-  override def parentGeneratorBalances(): Map[BlsPublicKey, Long]   = parentGeneratorBalancesCache
-
-  @volatile
-  private var currentGeneratorBalancesCache: Map[BlsPublicKey, Long] = Map.empty
-  override def currentGeneratorBalances(): Map[BlsPublicKey, Long]   = currentGeneratorBalancesCache
-
+  private var committedGeneratorBalancesCache                      = loadGeneratorBalances()
+  override def parentGeneratorBalances(): Map[BlsPublicKey, Long]  = committedGeneratorBalancesCache.parent
+  override def currentGeneratorBalances(): Map[BlsPublicKey, Long] = committedGeneratorBalancesCache.current
   protected def loadGeneratorBalances(): (parent: Map[BlsPublicKey, Long], current: Map[BlsPublicKey, Long])
 
   protected def doAppend(
@@ -266,8 +262,10 @@ abstract class Caches extends Blockchain with Storage {
     )
     current = CurrentBlockInfo(Height(newHeight), Some(newMeta), block.transactionData)
 
-    parentGeneratorBalancesCache = currentGeneratorBalancesCache
-    currentGeneratorBalancesCache = generatorBalances.map { case ((blsPk, _), balance) => blsPk -> balance }
+    committedGeneratorBalancesCache = (
+      committedGeneratorBalancesCache.current,
+      generatorBalances.map { case ((blsPk, _), balance) => blsPk -> balance }
+    )
 
     val newAddresses =
       mutable.Set[Address]() ++
@@ -421,9 +419,8 @@ abstract class Caches extends Blockchain with Storage {
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()
 
-      val generatorBalances = loadGeneratorBalances()
-      parentGeneratorBalancesCache = generatorBalances.parent
-      currentGeneratorBalancesCache = generatorBalances.current
+      // TODO: if rolled back by 1?
+      committedGeneratorBalancesCache = loadGeneratorBalances()
 
       discardedBlocks
     }
