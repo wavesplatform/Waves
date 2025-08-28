@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import cats.syntax.either.*
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.{Block, BlockSnapshot}
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.lang.ValidationError
@@ -46,11 +47,10 @@ package object appender {
     } yield {
       val blockHeight         = Height(parentHeight + 1)
       val period              = blockchain.generationPeriodOf(blockHeight)
-      val committedGenerators = blockchain.committedGenerators(period).values.toSet // TODO: + from newBlock if changes generationPeriod
+      val committedGenerators = blockchain.committedGenerators(period) // TODO: + from newBlock if changes generationPeriod
       val generatorBalances   = getGeneratorBalances(blockchain, block, committedGenerators)
       val eligibleGenerators = generatorBalances.view.collect {
-        case (generator, balance) if blockchain.isEffectiveBalanceValid(parentHeight, block, balance) =>
-          generator
+        case ((_, addr), balance) if blockchain.isEffectiveBalanceValid(parentHeight, block, balance) => addr
       }.toSet
       (Height(parentHeight), generatorBalances, eligibleGenerators)
     }
@@ -187,12 +187,12 @@ package object appender {
     } yield applyResult -> blockchainUpdater.height
   }
 
-  private def getGeneratorBalances(blockchain: Blockchain, newBlock: Block, generators: Iterable[Address]): GeneratorBalances = {
+  private def getGeneratorBalances(blockchain: Blockchain, newBlock: Block, generators: Map[BlsPublicKey, Address]): GeneratorBalances = {
     val parentBlockId = newBlock.header.reference
-    generators.map { generator =>
-      val balance = GeneratingBalanceProvider.unchallengedBalance(blockchain, generator, Some(parentBlockId)) // TODO: unchallenged
+    generators.map { case generator @ (_, addr) =>
+      val balance = GeneratingBalanceProvider.unchallengedBalance(blockchain, addr, Some(parentBlockId))
       generator -> balance
-    }.toMap
+    }
   }
 
   /** @return

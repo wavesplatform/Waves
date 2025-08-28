@@ -90,6 +90,10 @@ trait Blockchain {
 
   def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address]
 
+  def parentGeneratorBalances(): Map[BlsPublicKey, Long]
+
+  def currentGeneratorBalances(): Map[BlsPublicKey, Long]
+
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
   def lastStateHash(refId: Option[ByteStr]): ByteStr

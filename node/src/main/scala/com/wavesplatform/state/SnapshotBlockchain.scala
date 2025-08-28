@@ -233,6 +233,13 @@ case class SnapshotBlockchain(
   override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] =
     if (at == this.generationPeriodOf(Height(height)).next) snapshot.nextCommittedGenerators
     else inner.committedGenerators(at)
+
+  override def parentGeneratorBalances(): Map[BlsPublicKey, Long] =
+    if (blockMeta.isEmpty) inner.parentGeneratorBalances()
+    else inner.currentGeneratorBalances()
+
+  override def currentGeneratorBalances(): Map[BlsPublicKey, Long] =
+    maybeSnapshot.fold(inner.currentGeneratorBalances())(_ => Map.empty)
 }
 
 object SnapshotBlockchain {

@@ -385,20 +385,15 @@ class BlockchainUpdaterImpl(
                         }
 
                         // TODO: validate signature or in other place?
-                        val endorsers               = referencedForgedBlock.header.finalizationVoting.fold(Seq.empty)(_.endorsers).toSet
-                        val finalizationBlockHeight = Height((height - 1).max(0))
-                        // TODO: generatorBalances stored in API DB, here we need to take them from memory
-                        val (totalGeneratorsBalance, votedGeneratorsBalance) = {
-                          val finalizationPeriod = GenerationPeriod.from(finalizationBlockHeight, settings.functionalitySettings)
-//                          rocksdb.committedGenerators(finalizationPeriod).collect {
-//                            case (pk, endorserAddr) if endorsers.contains(pk) => endorserAddr
-//                          }
-                          (BigInt(0), BigInt(0))
-                        }
+                        val endorsers = referencedForgedBlock.header.finalizationVoting.fold(Seq.empty)(_.endorsers).toSet
+                        val parentGen = this.parentGeneratorBalances()
+                        val (totalGeneratorsBalance, votedGeneratorsBalance) =
+                          parentGen.foldLeft((BigInt(0), BigInt(0))) { case ((total, voted), (blsPk, b)) =>
+                            (total + b, if (endorsers.contains(blsPk)) voted + b else voted)
+                          }
                         val shouldFinalize        = votedGeneratorsBalance >= (totalGeneratorsBalance * 2 / 3)
-                        val newFinalizationHeight = Option.when(shouldFinalize)(finalizationBlockHeight)
+                        val newFinalizationHeight = Option.when(shouldFinalize)(Height(height))
 
-                        // TODO: here
                         rocksdb.append(
                           liquidSnapshotWithCancelledLeases,
                           carry,
@@ -447,8 +442,7 @@ class BlockchainUpdaterImpl(
                     featuresApprovedWithBlock(block),
                     reward,
                     hitSource,
-                    cancelLeases(collectLeasesToCancel(newHeight), newHeight),
-                    generatorBalances
+                    cancelLeases(collectLeasesToCancel(newHeight), newHeight)
                   )
                 )
 
@@ -853,12 +847,16 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.committedGenerators(at)
   }
 
-  override def snapshotBlockchain: SnapshotBlockchain = readLock {
-    ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))
+  override def parentGeneratorBalances(): Map[BlsPublicKey, Long] = readLock {
+    rocksdb.parentGeneratorBalances()
   }
 
-  override def recentGeneratorBalances: Option[GeneratorBalances] = readLock {
-    ngState.map(_.generatorBalances)
+  override def currentGeneratorBalances(): Map[BlsPublicKey, Long] = readLock {
+    rocksdb.currentGeneratorBalances()
+  }
+
+  override def snapshotBlockchain: SnapshotBlockchain = readLock {
+    ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))
   }
 
   // noinspection ScalaStyle,TypeAnnotation

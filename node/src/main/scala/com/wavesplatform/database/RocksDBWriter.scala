@@ -327,6 +327,51 @@ class RocksDBWriter(
     }.toMap
   }
 
+  override protected def loadGeneratorBalances(): (parent: Map[BlsPublicKey, Long], current: Map[BlsPublicKey, Long]) = readOnly { ro =>
+    // TODO if enabled API
+    val parentHeight  = Height((height - 1).max(GenesisBlockHeight))
+    val currentHeight = Height(height)
+
+    val parentPeriod  = this.generationPeriodOf(parentHeight)
+    val currentPeriod = this.generationPeriodOf(currentHeight)
+
+    def rawGeneratorBalances(h: Height) = ro.get(Keys.generatorBalances(h, rdb.apiHandle)).getOrElse(Map.empty)
+
+    if (parentPeriod == currentPeriod) {
+      val commGens = rawCommittedGenerators(currentPeriod)
+      if (commGens.isEmpty) (Map.empty, Map.empty)
+      else {
+        val rawParentBalances  = rawGeneratorBalances(parentHeight)
+        val rawCurrentBalances = rawGeneratorBalances(currentHeight)
+
+        val (parent, current) = commGens.map { case (blsPk, aid) =>
+          (
+            blsPk -> rawParentBalances.getOrElse(aid, 0L),
+            blsPk -> rawCurrentBalances.getOrElse(aid, 0L)
+          )
+        }.unzip
+
+        (parent.toMap, current.toMap)
+      }
+    } else {
+      val parentCommGens    = rawCommittedGenerators(parentPeriod)
+      val rawParentBalances = if (parentCommGens.isEmpty) Map.empty else rawGeneratorBalances(parentHeight)
+
+      val parent = parentCommGens.map { case (blsPk, aid) =>
+        blsPk -> rawParentBalances.getOrElse(aid, 0L)
+      }
+
+      val currentCommGens    = rawCommittedGenerators(currentPeriod)
+      val rawCurrentBalances = if (currentCommGens.isEmpty) Map.empty else rawGeneratorBalances(currentHeight)
+
+      val current = currentCommGens.map { case (blsPk, aid) =>
+        blsPk -> rawCurrentBalances.getOrElse(aid, 0L)
+      }
+
+      (parent, current)
+    }
+  }
+
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
     writableDB.withResource(r => database.loadAssetDescription(r, asset))
 
@@ -1446,6 +1491,7 @@ class RocksDBWriter(
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] =
     readOnly(_.get(Keys.maliciousMinerBanHeights(address.bytes)))
 
+  // TODO: use rawCommittedGenerators?
   override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = {
     val maxGenerators = settings.functionalitySettings.maxGenerators
     val pks           = new mutable.ArrayBuffer[BlsPublicKey](maxGenerators)
@@ -1465,10 +1511,27 @@ class RocksDBWriter(
     }
 
     pks.view
-      .zip(addresses)
-      .collect { case (pk, Some(address)) => pk -> address }
+      .lazyZip(addressIds)
+      .lazyZip(addresses)
+      .collect {
+        case (pk, _, Some(address)) => pk -> address
+        case (_, aid, None)         => throw new IllegalStateException(s"Can't find address for address id $aid")
+      }
       .toMap
   }
+
+  private def rawCommittedGenerators(at: GenerationPeriod): Map[BlsPublicKey, AddressId] =
+    rdb.db.readOnly { ro =>
+      val key = Keys.committedGenerators(at, Height(0))
+      var r   = Map.empty[BlsPublicKey, AddressId]
+      ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
+        val xs = key.parse(dbEntry.getValue).getOrElse(Seq.empty)
+        xs.foreach { (addressId, blsPK, _) =>
+          r += blsPK -> addressId
+        }
+      }
+      r
+    }
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))

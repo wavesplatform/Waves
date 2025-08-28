@@ -209,6 +209,16 @@ abstract class Caches extends Blockchain with Storage {
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
+  @volatile
+  private var parentGeneratorBalancesCache: Map[BlsPublicKey, Long] = Map.empty
+  override def parentGeneratorBalances(): Map[BlsPublicKey, Long]   = parentGeneratorBalancesCache
+
+  @volatile
+  private var currentGeneratorBalancesCache: Map[BlsPublicKey, Long] = Map.empty
+  override def currentGeneratorBalances(): Map[BlsPublicKey, Long]   = currentGeneratorBalancesCache
+
+  protected def loadGeneratorBalances(): (parent: Map[BlsPublicKey, Long], current: Map[BlsPublicKey, Long])
+
   protected def doAppend(
       blockMeta: PBBlockMeta,
       snapshot: StateSnapshot,
@@ -255,6 +265,9 @@ abstract class Caches extends Blockchain with Storage {
         (reward.getOrElse(0L) * this.blockRewardBoost(newHeight))
     )
     current = CurrentBlockInfo(Height(newHeight), Some(newMeta), block.transactionData)
+
+    parentGeneratorBalancesCache = currentGeneratorBalancesCache
+    currentGeneratorBalancesCache = generatorBalances.map { case ((blsPk, _), balance) => blsPk -> balance }
 
     val newAddresses =
       mutable.Set[Address]() ++
@@ -311,7 +324,7 @@ abstract class Caches extends Blockchain with Storage {
     )
 
     val generatorBalanceNodes = for {
-      (address, balance) <- generatorBalances
+      ((_, address), balance) <- generatorBalances
     } yield (addressIdWithFallback(address, newAddressIds), balance)
 
     val newEntries = for {
@@ -407,6 +420,11 @@ abstract class Caches extends Blockchain with Storage {
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()
+
+      val generatorBalances = loadGeneratorBalances()
+      parentGeneratorBalancesCache = generatorBalances.parent
+      currentGeneratorBalancesCache = generatorBalances.current
+
       discardedBlocks
     }
   }

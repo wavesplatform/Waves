@@ -4,6 +4,7 @@ import cats.Id
 import cats.implicits.*
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
+import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.utils.Paged
@@ -58,7 +59,7 @@ package object state {
     )
   }
 
-  type GeneratorBalances = Map[Address, Long]
+  type GeneratorBalances = Map[(BlsPublicKey, Address), Long]
 
   object Height extends TaggedType[Int] {
     implicit val format: Format[Height] = implicitly[Format[Int]].bimap(Height(_), identity)
@@ -67,6 +68,7 @@ package object state {
     }
   }
   type Height = Height.Type
+  val GenesisBlockHeight = Height(1)
 
   object TxNum extends TaggedType[Short]
   type TxNum = TxNum.Type

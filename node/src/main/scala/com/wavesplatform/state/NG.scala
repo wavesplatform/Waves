@@ -28,6 +28,4 @@ trait NG {
   def bestLiquidSnapshotAndFees: Option[(StateSnapshot, Long, Long)]
 
   def snapshotBlockchain: SnapshotBlockchain
-
-  def recentGeneratorBalances: Option[GeneratorBalances]
 }
