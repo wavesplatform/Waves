@@ -31,7 +31,8 @@ case class MicroBlock(
 
   override def toString: String = s"MicroBlock(... -> ${reference.trim}, txs=${transactionData.size}"
 
-  def stringRepr(totalBlockId: ByteStr): String = s"MicroBlock(${totalBlockId.trim} -> ${reference.trim}, txs=${transactionData.size}${finalizationVoting.fold("")(f => s", f=$f")})"
+  def stringRepr(totalBlockId: ByteStr): String =
+    s"MicroBlock(${totalBlockId.trim} -> ${reference.trim}, txs=${transactionData.size}${finalizationVoting.fold("")(f => s", f=$f")})"
 }
 
 object MicroBlock {

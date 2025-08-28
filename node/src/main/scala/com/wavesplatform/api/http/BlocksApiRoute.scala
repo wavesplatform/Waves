@@ -1,8 +1,5 @@
 package com.wavesplatform.api.http
 
-import scala.annotation.tailrec
-import scala.util.Try
-import org.apache.pekko.http.scaladsl.server.{Route, StandardRoute}
 import cats.syntax.either.*
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
@@ -14,7 +11,11 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
+import org.apache.pekko.http.scaladsl.server.{Route, StandardRoute}
 import play.api.libs.json.*
+
+import scala.annotation.tailrec
+import scala.util.Try
 
 case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, time: Time, routeTimeout: RouteTimeout) extends ApiRoute {
   import BlocksApiRoute.*
@@ -63,7 +64,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
         at(commonApi.currentHeight, includeTransactions = false)
       } ~ path("finalized") {
         at(commonApi.finalizedHeight, includeTransactions = false)
-      }~ path(BlockId) { id =>
+      } ~ path(BlockId) { id =>
         complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
       }
     } ~ path("heightByTimestamp" / LongNumber) { timestamp =>
