@@ -1,0 +1,70 @@
+# NPM registry supports only one source workflow per package: https://docs.npmjs.com/trusted-publishers#for-github-actions
+name: Publish packages to the npm registry
+on:
+  pull_request:
+  push:
+    branches: ['version-1.*.x']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version
+        required: true
+      tag:
+        description: Tag
+        required: true
+        default: snapshot
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    env:
+      PR_NUMBER: ${{ github.event.number }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'publish-snapshots') }}
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          echo "VERSION=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-$PR_NUMBER-snapshot.$RUN_NUMBER.$RUN_ATTEMPT" >> $GITHUB_ENV
+          echo "TAG=snapshot" >> $GITHUB_ENV
+      - if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
+          echo "TAG=${{ inputs.tag }}" >> $GITHUB_ENV
+      - if: ${{ github.event_name == 'release' }}
+        run: |
+          VERSION=$(echo ${{ github.release.tag_name }} | sed 's/^v//')
+          echo "VERSION=$VERSION >> $GITHUB_ENV
+          echo "TAG=latest" >> $GITHUB_ENV
+      - if: ${{ github.event_name == 'push' }}
+        run: |
+          echo "VERSION=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-snapshot.$RUN_NUMBER.$RUN_ATTEMPT" >> $GITHUB_ENV
+          echo "TAG=snapshot" >> $GITHUB_ENV
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'sbt'
+      - uses: sbt/setup-sbt@v1
+      - run: sbt --batch ';lang-tests/test;lang-tests-js/test;repl/test;langJS/fullOptJS;replJS/fullOptJS'
+      - uses: actions/setup-node@v4
+        with:
+          registry-url: 'https://registry.npmjs.org'
+      - run: |
+          cd lang/js
+          npm version $VERSION --no-git-tag-version
+          npm publish --provenance --access public --tag $TAG
+          cd ../../repl/js
+          npm version $VERSION --no-git-tag-version
+          npm publish --provenance --access public --tag $TAG
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}
