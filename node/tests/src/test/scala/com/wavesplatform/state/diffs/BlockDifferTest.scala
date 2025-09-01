@@ -11,6 +11,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
 import com.wavesplatform.mining.{MinerImpl, MiningConstraint}
+import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer.Result
 import com.wavesplatform.state.{Blockchain, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
@@ -282,6 +283,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
           d.settings,
           time,
           d.utxPool,
+          EndorsementStorage.Disabled,
           d.wallet,
           d.posSelector,
           Schedulers.singleThread("miner"),

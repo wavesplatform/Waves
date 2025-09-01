@@ -402,7 +402,8 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
             rewardVote = blockWithoutStateHash.header.rewardVote,
             signer = signer,
             stateHash = stateHash,
-            challengedHeader = None
+            challengedHeader = None,
+            finalizationVoting = None
           )
       )
     }
@@ -502,9 +503,10 @@ trait WithDomain extends WithState { suite: Suite =>
         txs,
         GenesisGenerator,
         Seq.empty,
-        -1,
+        rewardVote = -1,
         Option.when(fillStateHash)(TxStateSnapshotHashBuilder.createGenesisStateHash(txs)),
-        None
+        challengedHeader = None,
+        finalizationVoting = None
       )
     } yield block).explicitGet()
   }

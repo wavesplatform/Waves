@@ -12,7 +12,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.BlockSnapshotResponse
+import com.wavesplatform.network.{BlockSnapshotResponse, EndorsementStorage}
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.appender.BlockAppender
@@ -246,6 +246,7 @@ object MinerChallengeSimulator {
         wavesSettings,
         fakeTime,
         utx,
+        EndorsementStorage.Disabled,
         wallet,
         posSelector,
         scheduler,

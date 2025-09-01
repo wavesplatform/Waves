@@ -201,8 +201,9 @@ class BlockChallengerImpl(
         acc,
         blockFeatures(blockchainUpdater, settings),
         blockRewardVote(settings),
-        None,
-        None
+        stateHash = None,
+        challengedHeader = None,
+        finalizationVoting = None
       )
       hitSource <- pos.validateGenerationSignature(blockWithoutChallengeAndStateHash)
       blockchainWithNewBlock = SnapshotBlockchain(
@@ -252,7 +253,8 @@ class BlockChallengerImpl(
                 challengedSignature
               )
             )
-          else None
+          else None,
+          finalizationVoting = None
         )
     } yield {
       log.debug(s"Forged challenging block $challengingBlock")

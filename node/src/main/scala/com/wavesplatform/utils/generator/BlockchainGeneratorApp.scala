@@ -13,6 +13,7 @@ import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -159,6 +160,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       wavesSettings,
       fakeTime,
       utx,
+      EndorsementStorage.Disabled,
       wallet,
       posSelector,
       scheduler,

@@ -19,6 +19,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.mining.{BlockChallenger, BlockChallengerImpl}
+import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
@@ -82,6 +83,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
   // TODO: testTime?
   lazy val utxPool: UtxPoolImpl =
     new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
+  lazy val endorsementStorage: EndorsementStorage = EndorsementStorage.Disabled
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
   lazy val testTime: TestTime = TestTime()
@@ -346,7 +348,8 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
           lastBlock.header.featureVotes,
           lastBlock.header.rewardVote,
           sh,
-          None
+          challengedHeader = None,
+          finalizationVoting = None
         )
       microblock <- MicroBlock
         .buildAndSign(
@@ -447,17 +450,18 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
         else consensus.baseTarget.max(PoSCalculator.MinBaseTarget)
       blockWithoutStateHash <- Block
         .buildAndSign(
-          version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
-          timestamp = if (strictTime) resultTimestamp else testTime.getTimestamp(),
-          reference = reference,
-          baseTarget = resultBt,
-          generationSignature = consensus.generationSignature,
+          if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
+          if (strictTime) resultTimestamp else testTime.getTimestamp(),
+          reference,
+          resultBt,
+          consensus.generationSignature,
           txs = txs,
+          generator,
           featureVotes = Nil,
-          rewardVote = rewardVote,
-          signer = generator,
+          rewardVote,
           stateHash = None,
-          challengedHeader = challengedHeader
+          challengedHeader,
+          finalizationVoting = None
         )
       resultStateHash <- stateHash.map(Right(_)).getOrElse {
         if (blockchain.supportsLightNodeBlockFields(blockchain.height + 1)) {
@@ -489,17 +493,18 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
       }
       resultBlock <- Block
         .buildAndSign(
-          version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
-          timestamp = if (strictTime) resultTimestamp else testTime.getTimestamp(),
-          reference = reference,
-          baseTarget = resultBt,
-          generationSignature = consensus.generationSignature,
-          txs = txs,
+          if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
+          if (strictTime) resultTimestamp else testTime.getTimestamp(),
+          reference,
+          resultBt,
+          consensus.generationSignature,
+          txs,
+          generator,
           featureVotes = Nil,
-          rewardVote = rewardVote,
-          signer = generator,
-          stateHash = resultStateHash,
-          challengedHeader = challengedHeader
+          rewardVote,
+          resultStateHash,
+          challengedHeader,
+          finalizationVoting = None
         )
     } yield resultBlock
   }

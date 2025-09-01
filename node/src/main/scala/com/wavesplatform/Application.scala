@@ -145,6 +145,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
+    val endorsementStorage = EndorsementStorage(settings.blockchainSettings.functionalitySettings.maxGenerators)
+
     if (settings.minerSettings.enable)
       miner = new MinerImpl(
         allChannels,
@@ -152,6 +154,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         settings,
         time,
         utxStorage,
+        endorsementStorage,
         wallet,
         pos,
         minerScheduler,
@@ -312,14 +315,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     )
 
     EndorseBlockSynchronizer.start(
-      maxActiveEndorsers = settings.blockchainSettings.functionalitySettings.maxGenerators,
+      storage = endorsementStorage,
       lastEndorsers = blockchainUpdater.lastBlockInfo.collect {
         case bi if blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, bi.height) =>
           val h      = Height(bi.height)
           val period = blockchainUpdater.generationPeriodOf(h)
-          (h, blockchainUpdater.committedGenerators(period).keySet)
+          (bi.id, blockchainUpdater.committedGenerators(period).keySet)
       },
-      endorseBlocks = messageObserver.endorseBlocks,
+      receivingEndorsements = messageObserver.endorseBlocks,
       allChannels = allChannels,
       scheduler = endorseBlockSynchronizerScheduler
     )

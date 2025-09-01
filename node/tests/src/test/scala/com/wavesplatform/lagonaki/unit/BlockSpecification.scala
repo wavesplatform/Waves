@@ -48,10 +48,11 @@ class BlockSpecification extends PropSpec {
         ByteStr(generationSignature),
         Seq.fill(amt)(paymentTransaction),
         recipient,
-        Seq.empty,
-        -1L,
-        None,
-        None
+        featureVotes = Seq.empty,
+        rewardVote = -1L,
+        stateHash = None,
+        challengedHeader = None,
+        finalizationVoting = None
       )
       .explicitGet()
 
@@ -67,10 +68,11 @@ class BlockSpecification extends PropSpec {
             generationSignature,
             transactionData,
             recipient,
-            Seq.empty,
-            -1L,
-            None,
-            None
+            featureVotes = Seq.empty,
+            rewardVote = -1L,
+            stateHash = None,
+            challengedHeader = None,
+            finalizationVoting = None
           )
           .explicitGet()
         val parsedBlock = Block.parseBytes(block.bytes()).get
@@ -94,10 +96,11 @@ class BlockSpecification extends PropSpec {
           generationSignature,
           transactionData,
           recipient,
-          Seq(1),
-          -1L,
-          None,
-          None
+          featureVotes = Seq(1),
+          rewardVote = -1L,
+          stateHash = None,
+          challengedHeader = None,
+          finalizationVoting = None
         ) should produce("could not contain feature votes")
       }
     }
@@ -117,9 +120,10 @@ class BlockSpecification extends PropSpec {
         transactionData,
         recipient,
         supportedFeatures,
-        -1L,
-        None,
-        None
+        rewardVote = -1L,
+        stateHash = None,
+        challengedHeader = None,
+        finalizationVoting = None
       ) should produce(s"Block could not contain more than ${Block.MaxFeaturesInBlock} feature votes")
     }
   }
@@ -139,9 +143,10 @@ class BlockSpecification extends PropSpec {
           transactionData,
           recipient,
           featureVotes,
-          -1L,
-          None,
-          None
+          rewardVote = -1L,
+          stateHash = None,
+          challengedHeader = None,
+          finalizationVoting = None
         )
         .explicitGet()
       val parsedBlock = Block.parseBytes(block.bytes()).get
@@ -182,7 +187,7 @@ class BlockSpecification extends PropSpec {
       case (txs, acc, ref, gs) =>
         val (block, _) =
           Instrumented.withTimeMillis(
-            Block.buildAndSign(3.toByte, 1, ByteStr(ref), 1, ByteStr(gs), txs, acc, Seq.empty, -1L, None, None).explicitGet()
+            Block.buildAndSign(3.toByte, 1, ByteStr(ref), 1, ByteStr(gs), txs, acc, Seq.empty, -1L, None, None, None).explicitGet()
           )
         val (bytes, _) = Instrumented.withTimeMillis(block.bytes().dropRight(crypto.SignatureLength))
         val (hash, _)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))

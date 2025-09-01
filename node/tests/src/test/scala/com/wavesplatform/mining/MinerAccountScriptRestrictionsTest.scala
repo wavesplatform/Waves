@@ -108,6 +108,7 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
       wavesSettings,
       time,
       utx,
+      d.endorsementStorage,
       Wallet(WalletSettings(None, Some("123"), Some(ByteStr(minerAcc.seed)))),
       d.posSelector,
       Scheduler.singleThread("miner"),

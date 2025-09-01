@@ -51,9 +51,10 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
           Seq.empty,
           defaultSigner,
           features.sorted,
-          -1,
+          rewardVote = -1,
           Some(stateHash),
-          None
+          challengedHeader = None,
+          finalizationVoting = None
         )
         .explicitGet()
 

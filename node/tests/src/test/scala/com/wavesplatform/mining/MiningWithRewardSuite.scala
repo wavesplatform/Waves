@@ -11,6 +11,7 @@ import com.wavesplatform.database.{RDB, TestStorageFactory}
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG}
@@ -113,12 +114,24 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
     resources(settings).use { case (blockchainUpdater, _) =>
       for {
         _ <- Task.unit
-        pos          = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-        utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
-        scheduler    = Scheduler.singleThread("appender")
-        allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-        wallet       = Wallet(WalletSettings(None, Some("123"), None))
-        miner        = new MinerImpl(allChannels, blockchainUpdater, settings, ntpTime, utxPool, wallet, pos, scheduler, scheduler, Observable.empty)
+        pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
+        utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
+        scheduler   = Scheduler.singleThread("appender")
+        allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+        wallet      = Wallet(WalletSettings(None, Some("123"), None))
+        miner = new MinerImpl(
+          allChannels,
+          blockchainUpdater,
+          settings,
+          ntpTime,
+          utxPool,
+          EndorsementStorage.Disabled,
+          wallet,
+          pos,
+          scheduler,
+          scheduler,
+          Observable.empty
+        )
         account      = createAccount
         ts           = ntpTime.correctedTime() - 60000
         genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet())).block

@@ -24,7 +24,7 @@ object PBFinalizationVotings {
     new PBFinalizationVoting(
       v.endorsers.map(_.toByteString),
       v.aggregatedEndorsement.toByteString,
-      v.invalid.map { x =>
+      v.conflict.map { x =>
         PBEndorseBlock(
           x.endorser.toByteString,
           x.finalizedBlockId.toByteString,

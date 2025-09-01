@@ -56,6 +56,7 @@ class MinerImpl(
     settings: WavesSettings,
     timeService: Time,
     utx: UtxPool,
+    endorsementStorage: EndorsementStorage,
     wallet: Wallet,
     pos: PoSSelector,
     val minerScheduler: SchedulerService,
@@ -81,6 +82,7 @@ class MinerImpl(
     allChannels,
     blockchainUpdater,
     utx,
+    endorsementStorage,
     settings.minerSettings,
     minerScheduler,
     appenderScheduler,
@@ -210,7 +212,8 @@ class MinerImpl(
           blockFeatures(version),
           blockRewardVote(version),
           if (blockchainUpdater.supportsLightNodeBlockFields(height + 1)) stateHash else None,
-          None
+          challengedHeader = None,
+          finalizationVoting = None // Haven't voted in a key block
         )
         .leftMap(_.err)
     } yield (block, totalConstraint))

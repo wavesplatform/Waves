@@ -31,6 +31,7 @@ class MicroBlockMinerImpl(
     allChannels: ChannelGroup,
     blockchainUpdater: BlockchainUpdater & Blockchain,
     utx: UtxPool,
+    endorsementStorage: EndorsementStorage,
     settings: MinerSettings,
     minerScheduler: SchedulerService,
     appenderScheduler: SchedulerService,
@@ -113,7 +114,7 @@ class MicroBlockMinerImpl(
           _ <- Task.now(if (delay > Duration.Zero) log.trace(s"Sleeping ${delay.toMillis} ms before applying microBlock"))
           _ <- Task.sleep(delay)
           _ = log.trace(s"Generating microBlock for ${account.toAddress}, constraints: $updatedTotalConstraint")
-          blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed, stateHash)
+          blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed, stateHash) // TODO: here
             .leftWiden[Throwable]
             .liftTo[Task]
           (signedBlock, microBlock) = blocks
@@ -158,6 +159,7 @@ class MicroBlockMinerImpl(
       stateHash: Option[ByteStr]
   ): Either[MicroBlockMiningError, (Block, MicroBlock)] =
     microBlockBuildTimeStats.measureSuccessful {
+      val currentFinalizationVoting = endorsementStorage.takeAndClear(accumulatedBlock.header.reference)
       for {
         signedBlock <- Block
           .buildAndSign(
@@ -171,7 +173,12 @@ class MicroBlockMinerImpl(
             featureVotes = accumulatedBlock.header.featureVotes,
             rewardVote = accumulatedBlock.header.rewardVote,
             stateHash = if (blockchainUpdater.supportsLightNodeBlockFields()) stateHash else None,
-            challengedHeader = None
+            challengedHeader = None,
+            finalizationVoting = (accumulatedBlock.header.finalizationVoting, currentFinalizationVoting) match {
+              case (None, x)            => x
+              case (Some(acc), Some(x)) => Some(acc + x)
+              case (acc, _)             => acc
+            }
           )
           .leftMap(BlockBuildError.apply)
         microBlock <- MicroBlock
@@ -182,7 +189,7 @@ class MicroBlockMinerImpl(
             accumulatedBlock.id(),
             signedBlock.signature,
             stateHash,
-            finalizationVoting = None // TODO: endorsements
+            finalizationVoting = currentFinalizationVoting
           )
           .leftMap(MicroBlockBuildError.apply)
       } yield (signedBlock, microBlock)

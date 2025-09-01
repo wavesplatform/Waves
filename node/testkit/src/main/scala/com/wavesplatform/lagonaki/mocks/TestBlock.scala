@@ -23,17 +23,18 @@ object TestBlock {
   def sign(signer: KeyPair, b: Block): BlockWithSigner = {
     val x = Block
       .buildAndSign(
-        version = b.header.version,
-        timestamp = b.header.timestamp,
-        reference = b.header.reference,
-        baseTarget = b.header.baseTarget,
-        generationSignature = b.header.generationSignature,
-        txs = b.transactionData,
-        signer = signer,
-        featureVotes = b.header.featureVotes,
-        rewardVote = b.header.rewardVote,
-        stateHash = b.header.stateHash,
-        challengedHeader = b.header.challengedHeader
+        b.header.version,
+        b.header.timestamp,
+        b.header.reference,
+        b.header.baseTarget,
+        b.header.generationSignature,
+        b.transactionData,
+        signer,
+        b.header.featureVotes,
+        b.header.rewardVote,
+        b.header.stateHash,
+        b.header.challengedHeader,
+        b.header.finalizationVoting
       )
 
     BlockWithSigner(x.explicitGet(), signer)

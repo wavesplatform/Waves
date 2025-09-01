@@ -36,10 +36,11 @@ trait BlockGen extends TransactionGen { suite: Suite =>
         ByteStr(genSig),
         txs,
         signer,
-        Seq.empty,
-        -1L,
-        None,
-        None
+        featureVotes = Seq.empty,
+        rewardVote = -1L,
+        stateHash = None,
+        challengedHeader = None,
+        finalizationVoting = None
       )
       .explicitGet()
 

@@ -69,10 +69,11 @@ package object history {
         generationSignature = correctGenerationSignature(version),
         txs = txs,
         signer = signer,
-        Seq.empty,
-        -1L,
-        None,
-        None
+        featureVotes = Seq.empty,
+        rewardVote = -1L,
+        stateHash = None,
+        challengedHeader = None,
+        finalizationVoting = None
       )
       .explicitGet()
 

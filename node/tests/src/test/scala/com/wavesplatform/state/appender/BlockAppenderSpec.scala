@@ -123,8 +123,8 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
     val defaultSettings =
       DomainPresets.DeterministicFinality.copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed)))
 
-    def mkDefaultAppender(d: Domain)(b: Block): Unit = {
-      val blockChallenger = new BlockChallengerImpl(
+    class DefaultAppender(d: Domain) {
+      private val blockChallenger = new BlockChallengerImpl(
         d.blockchain,
         new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
         d.wallet,
@@ -134,7 +134,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         _ => throw new RuntimeException("Unexpected call in block challenger")
       )
 
-      val appender = BlockAppender(
+      private val appender = BlockAppender(
         d.blockchain,
         testTime,
         d.utxPool,
@@ -145,8 +145,14 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         appenderScheduler
       )(new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp)), _, snapshot = None)
 
-      appender(b).runSyncUnsafe()
-      if (d.lastBlockId != b.id()) fail(s"Can't apply block $b, see logs")
+      def apply(b: Block, requireAppended: Boolean = true): Unit = {
+        appender(b).runSyncUnsafe()
+        if (requireAppended && d.lastBlockId != b.id()) fail(s"Can't apply block $b, see logs")
+      }
+    }
+
+    object DefaultAppender {
+      def apply(d: Domain): DefaultAppender = new DefaultAppender(d)
     }
 
     def testWithGenerator(f: Domain => Any): Any = {
@@ -162,6 +168,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         wrapBU = wrapBU
       ) { d =>
         d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
+        f(d)
       }
     }
 
@@ -176,7 +183,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         wrapBU = wrapBU
       ) { d =>
         d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
-        val appender = mkDefaultAppender(d)
+        val appender = DefaultAppender(d)
 
         val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
         testTime.setTime(block.header.timestamp)
@@ -187,7 +194,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
     }
 
     "should append a block if committed" in testWithGenerator { d =>
-      val appender = mkDefaultAppender(d)
+      val appender = DefaultAppender(d)
 
       val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
       testTime.setTime(block.header.timestamp)
@@ -197,7 +204,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
     }
 
     "should append a block if no one eligible committed" in testWithGenerator { d =>
-      val appender = mkDefaultAppender(d)
+      val appender = DefaultAppender(d)
 
       val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
       testTime.setTime(block.header.timestamp)
@@ -221,11 +228,11 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         wrapBU = wrapBU
       ) { d =>
         d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
-        val appender = mkDefaultAppender(d)
+        val appender = DefaultAppender(d)
 
         val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
         testTime.setTime(block.header.timestamp)
-        appender(block)
+        appender(block, requireAppended = false)
 
         d.blockchain.isLastBlockId(block.id()) shouldBe false
       }
@@ -290,7 +297,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         )
       ) { d =>
         d.wallet.generateNewAccounts(3)
-        val appender          = mkDefaultAppender(d)
+        val appender          = DefaultAppender(d)
         val generationPeriod1 = d.blockchain.generationPeriodOf(Height(1)).next
 
         info("block2")

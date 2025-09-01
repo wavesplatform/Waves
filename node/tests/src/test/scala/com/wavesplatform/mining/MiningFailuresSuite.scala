@@ -7,6 +7,7 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.{BalanceSnapshot, BlockMinerInfo, Blockchain, NG}
@@ -66,6 +67,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
         wavesSettings.copy(blockchainSettings = blockchainSettings),
         ntpTime,
         utxPool,
+        EndorsementStorage.Disabled,
         wallet,
         pos,
         scheduler,

@@ -5,6 +5,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
+import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.{WalletSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, NG, appender}
@@ -37,7 +38,20 @@ trait WithMiner extends WithDomain { suite: Suite =>
     val utxPool           = new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
-    val miner = new MinerImpl(channels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable(), timeDrift)
+    val miner = new MinerImpl(
+      channels,
+      blockchain,
+      settings,
+      time,
+      utxPool,
+      EndorsementStorage.Disabled,
+      wallet,
+      pos,
+      minerScheduler,
+      appenderScheduler,
+      Observable(),
+      timeDrift
+    )
     def appendBlock(b: Block) = {
       val appendTask = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler, verify)(b, None)
       Await.result(appendTask.runToFuture(using appenderScheduler), Inf)

@@ -1,6 +1,5 @@
 package com.wavesplatform.mining
 
-import java.util.concurrent.CountDownLatch
 import com.wavesplatform.TestValues
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.ProtoBlockVersion
@@ -11,6 +10,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
+import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.test.DomainPresets.RideV6
@@ -24,6 +24,7 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.scalamock.scalatest.PathMockFactory
 
+import java.util.concurrent.CountDownLatch
 import scala.concurrent.duration.*
 import scala.util.Random
 
@@ -35,10 +36,11 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
     withDomain(settings, Seq(AddrWithBalance(acc.toAddress, TestValues.bigMoney))) { d =>
       val utxPool = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
       val microBlockMiner = new MicroBlockMinerImpl(
-        _ => (),
-        null,
+        setDebugState = _ => (),
+        allChannels = null,
         d.blockchainUpdater,
         utxPool,
+        EndorsementStorage.Disabled,
         settings.minerSettings,
         scheduler,
         scheduler,
@@ -86,12 +88,13 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
           d.lastBlockId,
           d.lastBlock.header.baseTarget,
           d.lastBlock.header.generationSignature,
-          Nil,
+          txs = Nil,
           acc,
-          Nil,
-          0,
-          None,
-          None
+          featureVotes = Nil,
+          rewardVote = 0,
+          stateHash = None,
+          challengedHeader = None,
+          finalizationVoting = None
         )
         .explicitGet()
 
@@ -131,8 +134,8 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         ): (Option[Seq[Transaction]], MiningConstraint, Option[ByteStr]) = {
           val (txs, constraint, stateHash) = inner.packUnconfirmed(rest, None, strategy, cancelled)
           val waitingConstraint = new MiningConstraint {
-            def isFull      : Boolean                                          = { eventHasBeenSent.await(); constraint.isFull }
-            def isOverfilled      : Boolean                                             = constraint.isOverfilled
+            def isFull: Boolean                                                         = { eventHasBeenSent.await(); constraint.isFull }
+            def isOverfilled: Boolean                                                   = constraint.isOverfilled
             def put(b: Blockchain, tx: Transaction, s: StateSnapshot): MiningConstraint = constraint.put(b, tx, s)
           }
           (txs, waitingConstraint, stateHash)
@@ -161,6 +164,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         null,
         d.blockchainUpdater,
         utxPool,
+        EndorsementStorage.Disabled,
         RideV6.minerSettings,
         miner,
         appender,

@@ -1,8 +1,5 @@
 package com.wavesplatform.mining
 
-import java.security.Permission
-import java.util.concurrent.{Semaphore, TimeUnit}
-
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.WithNewDBForEachTest
 import com.wavesplatform.account.KeyPair
@@ -13,6 +10,7 @@ import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.BlockWithMaxBaseTargetTest.Env
+import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.BlockAppender
@@ -31,6 +29,8 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 import org.scalacheck.{Arbitrary, Gen}
 
+import java.security.Permission
+import java.util.concurrent.{Semaphore, TimeUnit}
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 
@@ -44,7 +44,19 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
         val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
         val wallet      = Wallet(WalletSettings(None, Some("123"), None))
         val miner =
-          new MinerImpl(allChannels, bcu, settings, ntpTime, utxPoolStub, wallet, pos, scheduler, scheduler, Observable.empty)
+          new MinerImpl(
+            allChannels,
+            bcu,
+            settings,
+            ntpTime,
+            utxPoolStub,
+            EndorsementStorage.Disabled,
+            wallet,
+            pos,
+            scheduler,
+            scheduler,
+            Observable.empty
+          )
 
         val signal = new Semaphore(1)
         signal.acquire()

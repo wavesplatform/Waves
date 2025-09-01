@@ -186,7 +186,8 @@ object GenesisBlockGenerator {
           featureVotes = Seq.empty,
           rewardVote = -1L,
           stateHash = None,
-          challengedHeader = None
+          challengedHeader = None,
+          finalizationVoting = None
         )
         .explicitGet()
 

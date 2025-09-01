@@ -3,6 +3,7 @@ package com.wavesplatform.mining.microblocks
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint}
+import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
@@ -27,6 +28,7 @@ object MicroBlockMiner {
       allChannels: ChannelGroup,
       blockchainUpdater: BlockchainUpdater & Blockchain,
       utx: UtxPool,
+      endorsementStorage: EndorsementStorage,
       settings: MinerSettings,
       minerScheduler: SchedulerService,
       appenderScheduler: SchedulerService,
@@ -37,6 +39,7 @@ object MicroBlockMiner {
       allChannels,
       blockchainUpdater,
       utx,
+      endorsementStorage,
       settings,
       minerScheduler,
       appenderScheduler,

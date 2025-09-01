@@ -183,7 +183,8 @@ object Block {
       featureVotes: Seq[Short],
       rewardVote: Long,
       stateHash: Option[ByteStr],
-      challengedHeader: Option[ChallengedHeader]
+      challengedHeader: Option[ChallengedHeader],
+      finalizationVoting: Option[FinalizationVoting]
   ): Either[GenericError, Block] =
     create(
       version,
@@ -197,7 +198,7 @@ object Block {
       txs,
       stateHash,
       challengedHeader,
-      finalizationVoting = None
+      finalizationVoting
     ).validate
       .map(_.sign(signer.privateKey))
 
