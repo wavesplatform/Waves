@@ -21,7 +21,7 @@ object BlsPublicKey {
       if (!_pk.in_group()) throw new java.lang.RuntimeException("disaster") // TODO:
 
       val ctx = new blst.Pairing(true, BlsDomainSeparationTag)
-      ctx.aggregate(_pk, _sig, message, self.arr)
+      ctx.aggregate(_pk, _sig, message, self.arr) // TODO aug?
       ctx.commit()
       ctx.finalverify()
     }
