@@ -324,6 +324,25 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
       PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3, true)
     ) shouldBe Right(CONST_BOOLEAN(true))
   }
+  
+  property("test all hashes") {
+    val message = "hello world".getBytes()
+    val keyPair = keyPairGenerator.sample.get
+    val xpub = keyPair.getPublic
+    val xprv = keyPair.getPrivate
+    println(s"PUB=${Base64.encode(xpub.getEncoded)}")
+    println(s"MSG=${Base64.encode(message)}")
+    algs.foreach { alg =>
+      val prefix = RSA.digestAlgorithmPrefix(alg)
+
+      val privateSignature = Signature.getInstance(s"${prefix}withRSA", provider)
+      privateSignature.initSign(xprv)
+      privateSignature.update(message)
+
+      val signature = privateSignature.sign
+      println(s"$alg=${Base64.encode(signature)}")
+    }
+  }
 
   property("sign from scala") {
     val message = "hello world".getBytes()

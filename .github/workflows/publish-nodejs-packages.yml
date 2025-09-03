@@ -4,67 +4,63 @@ on:
   pull_request:
   push:
     branches: ['version-1.*.x']
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Version
-        required: true
-      tag:
-        description: Tag
-        required: true
-        default: snapshot
   release:
     types: [published]
+
+concurrency:
+  group: "npm-packages"
+  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: prod
+    environment:
+      name: prod
+      url: ${{ steps.publish.outputs.url }}
     permissions:
       contents: read
       attestations: write
       id-token: write
-    env:
-      PR_NUMBER: ${{ github.event.number }}
     steps:
       - uses: actions/checkout@v4
-      - if: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'publish-snapshots') }}
-        env:
-          RUN_NUMBER: ${{ github.run_number }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
-          PR_NUMBER: ${{ github.event.number }}
-        run: |
-          echo "VERSION=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-$PR_NUMBER-snapshot.$RUN_NUMBER.$RUN_ATTEMPT" >> $GITHUB_ENV
-          echo "TAG=snapshot" >> $GITHUB_ENV
-      - if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: |
-          echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
-          echo "TAG=${{ inputs.tag }}" >> $GITHUB_ENV
-      - if: ${{ github.event_name == 'release' }}
-        run: |
-          VERSION=$(echo ${{ github.release.tag_name }} | sed 's/^v//')
-          echo "VERSION=$VERSION >> $GITHUB_ENV
-          echo "TAG=latest" >> $GITHUB_ENV
-      - if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "VERSION=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-snapshot.$RUN_NUMBER.$RUN_ATTEMPT" >> $GITHUB_ENV
-          echo "TAG=snapshot" >> $GITHUB_ENV
+      - uses: proudust/gh-describe@70f72d4f6304ea053cf5a3d71c36211d5acc0c73
+        id: ghd
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '11'
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
-      - run: sbt --batch ';lang-tests/test;lang-tests-js/test;repl/test;langJS/fullOptJS;replJS/fullOptJS'
+      - run: sbt -Dproject.version=${{ steps.ghd.outputs.describe }} --batch ';lang-tests/test;lang-tests-js/test;repl/test;langJS/fullOptJS;replJS/fullOptJS'
       - uses: actions/setup-node@v4
         with:
           registry-url: 'https://registry.npmjs.org'
-      - run: |
+      - if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        run: |
+          SBT_VERSION=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)
+          PACKAGE_NAME=$(jq --raw-output .name lang/js/package.json)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            PREID="${{ github.event.number }}-snapshot"
+          else
+            PREID="snapshot"
+          fi
+          PREFIX=$SBT_VERSION-$PREID
+          NEXT=$(npm view $PACKAGE_NAME versions --json \
+            | jq --raw-output --arg prefix $PREFIX '[.[] | select(startswith($prefix))|capture("snapshot\\.(?<n>[0-9]+)").n|tonumber]|max + 1 // 0')
+          echo "VERSION=$PREFIX.$NEXT" >> $GITHUB_ENV
+          echo "TAG=snapshot" >> $GITHUB_ENV
+      - if: ${{ github.event_name == 'release' }}
+        run: |
+          echo "VERSION=$(echo ${{ github.release.tag_name }} | sed 's/^v//')" >> $GITHUB_ENV
+          echo "TAG=latest" >> $GITHUB_ENV
+      - id: publish
+        run: |
           cd lang/js
           npm version $VERSION --no-git-tag-version
           npm publish --provenance --access public --tag $TAG
           cd ../../repl/js
           npm version $VERSION --no-git-tag-version
           npm publish --provenance --access public --tag $TAG
+          echo "url=https://www.npmjs.com/package/@waves/ride-lang/v/$VERSION" >> "$GITHUB_OUTPUT"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}

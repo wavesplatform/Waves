@@ -109,37 +109,3 @@ jobs:
         run: |
           sbt --batch ";publishSigned;sonaRelease"
 
-  publish-js-packages:
-    environment: prod
-    name: Publish JS packages
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '11'
-          cache: 'sbt'
-      - uses: sbt/setup-sbt@v1
-      - run: sbt --batch ';langJS/fullOptJS;replJS/fullOptJS'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          registry-url: 'https://npm.pkg.github.com'
-      - run: |
-          cd lang/js
-          npm version ${REF_NAME#v} --no-git-tag-version
-          npm publish --provenance --access public --tag latest
-          cd ../../repl/js
-          npm version ${REF_NAME#v} --no-git-tag-version
-          npm publish --provenance --access public --tag latest
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_NUMBER: ${{ github.run_number }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
-          REF_NAME: ${{ github.ref_name }}
