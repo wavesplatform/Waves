@@ -12,7 +12,7 @@ enablePlugins(GitVersioning)
 
 git.uncommittedSignifier       := Some("DIRTY")
 ThisBuild / git.useGitDescribe := true
-ThisBuild / PB.protocVersion   := "4.31.1"
+ThisBuild / PB.protocVersion   := "4.32.0"
 
 ThisBuild / dependencyOverrides ++= Dependencies.overrides.value
 

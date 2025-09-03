@@ -5,9 +5,9 @@ import scalapb.compiler.Version.scalapbVersion
 
 //noinspection TypeAnnotation
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.3.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.4.Final"
 
-  val gProto = "com.google.protobuf" % "protobuf-java" % "4.31.1"
+  val gProto = "com.google.protobuf" % "protobuf-java" % "4.32.0"
   val overrides = Def.setting(
     Seq(
       "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
@@ -33,19 +33,19 @@ object Dependencies {
   lazy val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.5.2" classifier "protobuf-src" intransitive ()
 
-  private def pekkoModule(module: String) = ("org.apache.pekko" %% s"pekko-$module" % "1.1.5")
+  private def pekkoModule(module: String) = ("org.apache.pekko" %% s"pekko-$module" % "1.2.0")
 
   private def pekkoHttpModule(module: String, version: String = "1.2.0") = "org.apache.pekko" %% module % version
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.7"
 
-  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.19.2"
+  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.20.0"
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.9.8" // 4.10+ requires Java 17 https://github.com/web3j/web3j/issues/1907
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.74.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.75.0"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.4.8-jre"
@@ -60,7 +60,7 @@ object Dependencies {
   val playJson = "org.playframework" %% "play-json" % "3.0.5"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
-  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.9" % Test)
+  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.9.1" % Test)
 
   private def sttp3Module(module: String) = "com.softwaremill.sttp.client3" %% module % "3.11.0"
 
@@ -78,7 +78,7 @@ object Dependencies {
       monixModule("eval").value,
       "org.typelevel" %%% s"cats-core" % "2.13.0",
       "com.lihaoyi"   %%% "fastparse"  % "3.1.1",
-      "org.typelevel" %%% "cats-mtl"   % "1.5.0",
+      "org.typelevel" %%% "cats-mtl"   % "1.6.0",
       "ch.obermuhlner"  % "big-math"   % "2.3.2",
       googleGuava, // BaseEncoding.base16()
       curve25519,
@@ -123,7 +123,7 @@ object Dependencies {
     pekkoModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "10.2.1"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "10.4.2"
 
   lazy val node = Def.setting(
     Seq(
@@ -131,7 +131,7 @@ object Dependencies {
       ("org.rudogma" %%% "supertagged" % "2.0-RC2")
         .exclude("org.scala-js", "scalajs-library_2.13")
         .cross(CrossVersion.for3Use2_13),
-      "commons-net"            % "commons-net"               % "3.11.1",
+      "commons-net"            % "commons-net"               % "3.12.0",
       "commons-io"             % "commons-io"                % "2.20.0",
       "com.github.pureconfig" %% "pureconfig-core"           % "0.17.9",
       "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.9",

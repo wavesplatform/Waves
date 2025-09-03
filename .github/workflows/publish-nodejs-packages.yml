@@ -1,7 +1,6 @@
 # NPM registry supports only one source workflow per package: https://docs.npmjs.com/trusted-publishers#for-github-actions
 name: Publish packages to the npm registry
 on:
-  pull_request:
   push:
     branches: ['version-1.*.x']
   release:
@@ -35,16 +34,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           registry-url: 'https://registry.npmjs.org'
-      - if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+      - if: ${{ github.event_name == 'push' }}
         run: |
           SBT_VERSION=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)
           PACKAGE_NAME=$(jq --raw-output .name lang/js/package.json)
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            PREID="${{ github.event.number }}-snapshot"
-          else
-            PREID="snapshot"
-          fi
-          PREFIX=$SBT_VERSION-$PREID
+          PREFIX=$SBT_VERSION-snapshot
           NEXT=$(npm view $PACKAGE_NAME versions --json \
             | jq --raw-output --arg prefix $PREFIX '[.[] | select(startswith($prefix))|capture("snapshot\\.(?<n>[0-9]+)").n|tonumber]|max + 1 // 0')
           echo "VERSION=$PREFIX.$NEXT" >> $GITHUB_ENV
