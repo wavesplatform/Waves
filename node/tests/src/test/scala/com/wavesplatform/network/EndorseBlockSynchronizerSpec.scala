@@ -2,9 +2,9 @@ package com.wavesplatform.network
 
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockEndorsement
-import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.TxHelpers

@@ -4,8 +4,8 @@ import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings

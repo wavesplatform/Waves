@@ -1,7 +1,7 @@
 package com.wavesplatform.protobuf.block
 
 import com.wavesplatform.block.BlockEndorsement
-import com.wavesplatform.bls.{BlsPublicKey, BlsSignature}
+import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.protobuf.*
 
 import scala.util.Try
@@ -22,14 +22,14 @@ object PBFinalizationVotings {
 
   def protobuf(v: VanillaFinalizationVoting): PBFinalizationVoting =
     new PBFinalizationVoting(
-      v.endorsers.map(_.toByteString),
-      v.aggregatedEndorsement.toByteString,
+      v.endorsers.map(_.byteStr.toByteString),
+      v.aggregatedEndorsement.byteStr.toByteString,
       v.conflict.map { x =>
         PBEndorseBlock(
-          x.endorser.toByteString,
+          x.endorser.byteStr.toByteString,
           x.finalizedBlockId.toByteString,
           x.blockId.toByteString,
-          signature = x.signature.toByteString
+          signature = x.signature.byteStr.toByteString
         )
       }
     )

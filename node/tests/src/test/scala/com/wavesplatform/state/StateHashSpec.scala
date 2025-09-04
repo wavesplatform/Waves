@@ -2,9 +2,9 @@ package com.wavesplatform.state
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
-import com.wavesplatform.bls.BlsKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.test.FreeSpec

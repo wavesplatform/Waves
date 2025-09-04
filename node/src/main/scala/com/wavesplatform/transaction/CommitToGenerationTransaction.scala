@@ -2,8 +2,8 @@ package com.wavesplatform.transaction
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.*
-import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
@@ -32,8 +32,8 @@ final case class CommitToGenerationTransaction(
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
       BaseTxJson.toJson(this) ++ Json.obj(
-        "endorsementPublicKey"    -> endorsementPublicKey.asByteStr.toString,
-        "endorsementKeySignature" -> endorsementKeySignature.base64Raw,
+        "endorsementPublicKey"    -> endorsementPublicKey.base64,
+        "endorsementKeySignature" -> endorsementKeySignature.base64,
         "generationPeriodStart"   -> generationPeriodStart
       )
     )
@@ -46,7 +46,7 @@ object CommitToGenerationTransaction {
 
   implicit def signed(tx: CommitToGenerationTransaction, privateKey: PrivateKey): CommitToGenerationTransaction = {
     val blsKP      = BlsKeyPair(privateKey)
-    val blsMessage = blsKP.publicKey.asByteStr.arr ++ Ints.toByteArray(tx.generationPeriodStart)
+    val blsMessage = blsKP.publicKey.arr ++ Ints.toByteArray(tx.generationPeriodStart)
     val blsSig     = blsKP.sign(blsMessage)
 
     val txWithBlsSig = tx.copy(endorsementPublicKey = blsKP.publicKey, endorsementKeySignature = blsSig)
@@ -91,7 +91,7 @@ object CommitToGenerationTransaction {
       generationPeriodStart,
       timestamp,
       feeInWaves,
-      endorsementKeySignature = BlsSignature(Array.empty),
+      endorsementKeySignature = BlsSignature.empty,
       Proofs.empty,
       chainId
     ).map(signed(_, sender.privateKey))

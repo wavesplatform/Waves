@@ -3,13 +3,13 @@ package com.wavesplatform.network
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockEndorsement, MicroBlock}
-import com.wavesplatform.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.network.message.MessageSpec
 import com.wavesplatform.protobuf.block.EndorseBlock as PBEndorseBlock
 import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
-import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, toByteString}
+import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.{Signed, Transaction}
 import monix.eval.Coeval
@@ -119,11 +119,11 @@ object MicroBlockSnapshotResponse {
 case class EndorseBlock(endorserPublicKey: BlsPublicKey, finalizedBlockId: BlockId, blockId: BlockId, blockHeight: Height, signature: BlsSignature)
     extends Message {
   def toProtobuf: PBEndorseBlock = PBEndorseBlock(
-    endorserPublicKey.asByteStr.toByteString,
+    endorserPublicKey.byteStr.toByteString,
     finalizedBlockId.toByteString,
     blockId.toByteString,
     blockHeight,
-    signature.toByteString
+    signature.byteStr.toByteString
   )
 
   def verify(): Boolean = endorserPublicKey.verify(BlockEndorsement.mkMessage(finalizedBlockId, blockId, blockHeight), signature)

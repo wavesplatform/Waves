@@ -4,8 +4,8 @@ import cats.Id
 import cats.implicits.*
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.utils.Paged
 import play.api.libs.json.*

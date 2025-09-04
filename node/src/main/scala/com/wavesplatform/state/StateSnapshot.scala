@@ -4,8 +4,8 @@ import cats.data.Ior
 import cats.implicits.{catsSyntaxEitherId, catsSyntaxSemigroup, toBifunctorOps, toTraverseOps}
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias, PublicKey}
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

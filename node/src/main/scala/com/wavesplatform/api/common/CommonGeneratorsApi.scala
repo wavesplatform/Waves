@@ -4,7 +4,7 @@ import cats.syntax.either.*
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonGeneratorsApi.GeneratorEntry
-import com.wavesplatform.bls.BlsPublicKey
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database.{AddressId, DBExt, Keys, RDB}
 import com.wavesplatform.state.{Blockchain, Height, NG, TransactionId}
 import com.wavesplatform.utils.ScorexLogging

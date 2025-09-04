@@ -5,9 +5,9 @@ import cats.syntax.traverse.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError.*
-import com.wavesplatform.bls.BlsKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.FunctionSignatures
@@ -296,7 +296,7 @@ case class AddressApiRoute(
   def blsKey: Route = (path("bls" / AddrSegment) & get) { address =>
     complete {
       wallet.privateKeyAccount(address).map { kp =>
-        Json.obj("blsPublicKey" -> BlsKeyPair(kp.privateKey).publicKey.asByteStr.toString)
+        Json.obj("blsPublicKey" -> BlsKeyPair(kp.privateKey).publicKey.base64)
       }
     }
   }

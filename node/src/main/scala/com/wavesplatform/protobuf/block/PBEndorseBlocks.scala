@@ -1,7 +1,7 @@
 package com.wavesplatform.protobuf.block
 
 import com.wavesplatform.block.BlockEndorsement
-import com.wavesplatform.bls.BlsSignature
+import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.state.Height
 
@@ -27,10 +27,10 @@ object PBEndorseBlocks {
 
   def protobuf(x: BlockEndorsement.Full): PBEndorseBlock =
     new PBEndorseBlock(
-      endorserPublicKey = x.endorser.asByteStr.toByteString,
+      endorserPublicKey = x.endorser.byteStr.toByteString,
       finalizedBlockId = x.finalizedBlockId.toByteString,
       blockId = x.blockId.toByteString,
       blockHeight = x.blockHeight,
-      signature = x.signature.toByteString
+      signature = x.signature.byteStr.toByteString
     )
 }

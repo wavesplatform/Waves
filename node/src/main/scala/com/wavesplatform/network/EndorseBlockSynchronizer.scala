@@ -4,8 +4,8 @@ import com.google.common.cache.CacheBuilder
 import com.typesafe.scalalogging.LazyLogging
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.FinalizationVoting
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup

@@ -10,10 +10,10 @@ import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockSnapshot
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.{BlockMetaExt, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}

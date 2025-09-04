@@ -1,11 +1,11 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.*
-import com.wavesplatform.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.Height
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
+import com.wavesplatform.state.{Base64ByteStr, Height}
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, Proofs, TransactionType}
 import play.api.libs.json.*
 
@@ -28,7 +28,7 @@ case class CommitToGenerationRequest(
         Height(generationPeriodStart.getOrElse(defaultGenerationPeriodStart)),
         timestamp.getOrElse(0L),
         FeeConstants(TransactionType.CommitToGeneration) * FeeUnit,
-        endorsementKeySignature = BlsSignature(Array.empty),
+        endorsementKeySignature = BlsSignature.empty,
         Proofs.empty,
         chainId.getOrElse(AddressScheme.current.chainId)
       )
@@ -41,7 +41,7 @@ case class SignedCommitToGenerationRequest(
     generationPeriodStart: Int,
     timestamp: Long,
     fee: Long,
-    endorsementKeySignature: BlsSignature,
+    endorsementKeySignature: ByteStr,
     proofs: Proofs
 ) {
   def toTx: Either[ValidationError, CommitToGenerationTransaction] =
@@ -53,7 +53,7 @@ case class SignedCommitToGenerationRequest(
         Height(generationPeriodStart),
         timestamp,
         fee,
-        endorsementKeySignature,
+        BlsSignature(endorsementKeySignature),
         proofs,
         AddressScheme.current.chainId
       )

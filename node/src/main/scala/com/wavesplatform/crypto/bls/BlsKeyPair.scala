@@ -1,7 +1,6 @@
-package com.wavesplatform.bls
+package com.wavesplatform.crypto.bls
 
 import com.wavesplatform.account.PrivateKey as WavesPrivateKey
-import com.wavesplatform.bls
 import supranational.blst
 
 import java.util
@@ -19,25 +18,10 @@ object BlsKeyPair {
 }
 
 private final class BlsSeedKeyPair(private val wavesPrivateKey: Array[Byte]) extends BlsKeyPair {
-  private lazy val privateKey: blst.SecretKey = {
-    val sk = new blst.SecretKey()
-    sk.keygen(wavesPrivateKey)
-    sk
-  }
+  private lazy val sk: blst.SecretKey = BlsUtils.mkBlsSecretKey(wavesPrivateKey)
+  lazy val publicKey: BlsPublicKey    = BlsPublicKey(BlsUtils.mkBlsPublicKey(sk))
 
-  lazy val publicKey: BlsPublicKey = {
-    val pk = new blst.P1(privateKey)
-    BlsPublicKey(pk.compress()) // .serialize() // TODO compressed vs default
-  }
-
-  def sign(message: Array[Byte]): BlsSignature = { // TODO: Types
-    val sig = new blst.P2()
-    val xs = sig
-      .hash_to(message, BlsDomainSeparationTag, publicKey.asByteStr.arr)
-      .sign_with(privateKey)
-      .compress() // .serialize() // TODO compressed vs default
-    BlsSignature(xs)
-  }
+  def sign(message: Array[Byte]): BlsSignature = BlsSignature(BlsUtils.signBasic(sk, message))
 
   override def equals(other: Any): Boolean = other match {
     case other: BlsSeedKeyPair => util.Arrays.equals(other.wavesPrivateKey, wavesPrivateKey)

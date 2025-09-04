@@ -2,7 +2,7 @@ package com.wavesplatform.block
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
 import com.wavesplatform.state.Height
 
 enum BlockEndorsement {

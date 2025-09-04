@@ -3,9 +3,9 @@ package com.wavesplatform.state.appender
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
-import com.wavesplatform.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain

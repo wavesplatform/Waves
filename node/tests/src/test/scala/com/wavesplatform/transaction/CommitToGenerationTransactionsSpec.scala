@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.account.{AddressScheme, PublicKey}
-import com.wavesplatform.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures

@@ -3,9 +3,9 @@ package com.wavesplatform.protobuf.transaction
 import cats.syntax.traverse.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
-import com.wavesplatform.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -703,7 +703,7 @@ object PBTransactions {
       case tx: CommitToGenerationTransaction =>
         import tx.*
         val data = Data.CommitToGeneration(
-          CommitToGenerationTransactionData(generationPeriodStart, endorsementPublicKey.asByteStr.toByteString, endorsementKeySignature.toByteString)
+          CommitToGenerationTransactionData(generationPeriodStart, endorsementPublicKey.byteStr.toByteString, endorsementKeySignature.byteStr.toByteString)
         )
         PBTransactions.create(sender, chainId, fee.value, Waves, timestamp, tx.version, proofs.proofs, data)
 

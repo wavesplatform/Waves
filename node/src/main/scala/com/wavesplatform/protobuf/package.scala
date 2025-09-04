@@ -2,8 +2,8 @@ package com.wavesplatform
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
-import com.wavesplatform.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.TransactionId
 import com.wavesplatform.transaction.Asset
@@ -20,14 +20,6 @@ package object protobuf {
 
   implicit final class PublicKeyExt(private val pk: PublicKey) extends AnyVal {
     def toByteString: ByteString = ByteString.copyFrom(pk.arr)
-  }
-
-  extension (pk: BlsPublicKey) {
-    def toByteString: ByteString = ByteString.copyFrom(pk.arr)
-  }
-
-  extension (s: BlsSignature) {
-    def toByteString: ByteString = ByteString.copyFrom(s.arr)
   }
 
   implicit final class ByteStringExt(private val bs: ByteString) extends AnyVal {

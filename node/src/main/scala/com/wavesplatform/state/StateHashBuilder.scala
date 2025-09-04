@@ -2,9 +2,9 @@ package com.wavesplatform.state
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.StateHashBuilder.Result
@@ -97,7 +97,7 @@ class StateHashBuilder {
   }
 
   def addNextGenerator(blsPublicKey: BlsPublicKey, address: Address): Unit = {
-    addEntry(SectionId.NextGenerators, blsPublicKey.asByteStr.arr)(
+    addEntry(SectionId.NextGenerators, blsPublicKey.arr)(
       address.bytes
     )
   }

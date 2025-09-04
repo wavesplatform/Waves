@@ -4,9 +4,9 @@ import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.block.{Block, BlockEndorsement, ChallengedHeader}
-import com.wavesplatform.bls.BlsKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.BlockStats

@@ -3,9 +3,9 @@ package com.wavesplatform.state
 import cats.syntax.either.*
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.{Block, BlockSnapshot}
-import com.wavesplatform.bls.BlsPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner

@@ -4,11 +4,11 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{ScriptExecutionError as _, *}
 import com.wavesplatform.api.http.{CustomJson, RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.block.Block
-import com.wavesplatform.bls.BlsKeyPair
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.defaultSigner
 import com.wavesplatform.lang.directives.values.{V5, V7, V8}

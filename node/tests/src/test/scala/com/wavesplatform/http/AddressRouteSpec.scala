@@ -3,9 +3,9 @@ package com.wavesplatform.http
 import com.google.common.primitives.Longs
 import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, TooBigArrayAllocation}
 import com.wavesplatform.api.http.{AddressApiRoute, RouteTimeout}
-import com.wavesplatform.bls.BlsKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithState
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
