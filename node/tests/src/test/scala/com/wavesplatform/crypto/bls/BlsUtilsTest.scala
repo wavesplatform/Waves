@@ -1,32 +1,21 @@
 package com.wavesplatform.crypto.bls
 
-import com.wavesplatform.account.{KeyPair, PrivateKey}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.crypto.bls.BlsUtils.*
 import com.wavesplatform.test.FreeSpec
 import org.scalatest.EitherValues
 import supranational.blst
-import supranational.blst.BLST_ERROR
+import supranational.blst.SecretKey
 
 import scala.util.Random
-
-type BAggPublicKey = blst.P1
-type BAggSig       = blst.P2
-
-def mkBlsPrivateKey(wavesPrivateKey: PrivateKey): blst.SecretKey = {
-  val sk = new blst.SecretKey()
-  sk.keygen(wavesPrivateKey.arr)
-  sk
-}
 
 class BlsUtilsTest extends FreeSpec with EitherValues {
   "aggregation in verifyAgg" - {
     "different order of signatures and keys" in {
-      val wavesKP1    = mkRandomWavesKeyPair()
-      val privateKey1 = mkBlsPrivateKey(wavesKP1.privateKey)
+      val privateKey1 = mkRandomSecretKey()
       val publicKey1  = mkBlsPublicKey(privateKey1)
 
-      val wavesKP2    = mkRandomWavesKeyPair()
-      val privateKey2 = mkBlsPrivateKey(wavesKP2.privateKey)
+      val privateKey2 = mkRandomSecretKey()
       val publicKey2  = mkBlsPublicKey(privateKey2)
 
       val message = "assertion".getBytes()
@@ -39,16 +28,13 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
     }
 
     "associativity" in {
-      val wavesKP1    = mkRandomWavesKeyPair()
-      val privateKey1 = mkBlsPrivateKey(wavesKP1.privateKey)
+      val privateKey1 = mkRandomSecretKey()
       val publicKey1  = mkBlsPublicKey(privateKey1)
 
-      val wavesKP2    = mkRandomWavesKeyPair()
-      val privateKey2 = mkBlsPrivateKey(wavesKP2.privateKey)
+      val privateKey2 = mkRandomSecretKey()
       val publicKey2  = mkBlsPublicKey(privateKey2)
 
-      val wavesKP3    = mkRandomWavesKeyPair()
-      val privateKey3 = mkBlsPrivateKey(wavesKP3.privateKey)
+      val privateKey3 = mkRandomSecretKey()
       val publicKey3  = mkBlsPublicKey(privateKey3)
 
       val message = "assertion".getBytes()
@@ -63,5 +49,6 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
     }
   }
 
+  private def mkRandomSecretKey(): SecretKey  = mkBlsSecretKey(mkRandomWavesKeyPair().privateKey.arr)
   private def mkRandomWavesKeyPair(): KeyPair = KeyPair(Array.fill(32)(Random.nextInt().toByte))
 }

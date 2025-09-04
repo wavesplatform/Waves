@@ -1,11 +1,8 @@
 package com.wavesplatform.crypto.bls
 
-import com.wavesplatform.account.PrivateKey
 import supranational.blst
 import supranational.blst.BLST_ERROR
 
-// TODO: move to crypto.bls
-//
 private[bls] object BlsUtils {
   val BlsDomainSeparationTag = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_" // We have a non-standard PoP
 

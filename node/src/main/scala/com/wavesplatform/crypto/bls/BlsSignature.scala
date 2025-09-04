@@ -11,7 +11,7 @@ case class BlsSignature private (byteStr: ByteStr) extends AnyVal {
 
 object BlsSignature {
   val SizeInBytes = 98
-  val empty = BlsSignature(Array.empty[Byte])
+  val empty       = BlsSignature(Array.empty[Byte])
 
   // TODO: check size?
   def apply(arr: Array[Byte]): BlsSignature = new BlsSignature(ByteStr(arr))

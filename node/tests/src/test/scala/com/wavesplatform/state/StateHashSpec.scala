@@ -129,7 +129,7 @@ class StateHashSpec extends FreeSpec {
 
       "next generator" in {
         sect(NextGenerators) shouldBe hash(
-          blsAccount.publicKey.asByteStr.arr,
+          blsAccount.publicKey.byteStr.arr,
           wavesAccount.publicKey.toAddress.bytes
         )
       }

@@ -3,7 +3,7 @@ package com.wavesplatform
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.TransactionId
 import com.wavesplatform.transaction.Asset

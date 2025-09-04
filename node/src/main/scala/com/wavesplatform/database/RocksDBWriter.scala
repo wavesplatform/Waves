@@ -1555,18 +1555,18 @@ class RocksDBWriter(
       .toMap
   }
 
-  private def rawCommittedGenerators(at: GenerationPeriod): Map[BlsPublicKey, AddressId] =
-    rdb.db.readOnly { ro =>
-      val key = Keys.committedGenerators(at, Height(0))
-      var r   = Map.empty[BlsPublicKey, AddressId]
-      ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
-        val xs = key.parse(dbEntry.getValue).getOrElse(Seq.empty)
-        xs.foreach { (addressId, blsPK, _) =>
-          r += blsPK -> addressId
-        }
-      }
-      r
-    }
+  // private def rawCommittedGenerators(at: GenerationPeriod): Map[BlsPublicKey, AddressId] =
+  //   rdb.db.readOnly { ro =>
+  //     val key = Keys.committedGenerators(at, Height(0))
+  //     var r   = Map.empty[BlsPublicKey, AddressId]
+  //     ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
+  //       val xs = key.parse(dbEntry.getValue).getOrElse(Seq.empty)
+  //       xs.foreach { (addressId, blsPK, _) =>
+  //         r += blsPK -> addressId
+  //       }
+  //     }
+  //     r
+  //   }
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))

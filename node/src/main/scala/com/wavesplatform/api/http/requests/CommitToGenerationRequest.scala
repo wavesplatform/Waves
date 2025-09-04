@@ -4,8 +4,8 @@ import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.state.Height
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
-import com.wavesplatform.state.{Base64ByteStr, Height}
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, Proofs, TransactionType}
 import play.api.libs.json.*
 

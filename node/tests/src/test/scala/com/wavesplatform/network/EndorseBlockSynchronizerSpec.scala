@@ -49,7 +49,7 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
         c.outChannel.outboundMessages() shouldBe empty
       }
 
-      "a wrong signature" in test(EndorseBlock(activeGenerator.publicKey, finalizedId, blockId, blockHeight, BlsSignature(Array.empty)))
+      "a wrong signature" in test(EndorseBlock(activeGenerator.publicKey, finalizedId, blockId, blockHeight, BlsSignature.empty))
       "an unexpected height" in test(EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, blockId, Height(Int.MaxValue))))
       "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, finalizedId, blockId, blockHeight)))
       "an already finalized block" in test(EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, finalizedId, blockHeight)))

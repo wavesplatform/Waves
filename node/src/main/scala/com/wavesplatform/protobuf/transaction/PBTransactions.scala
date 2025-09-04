@@ -703,7 +703,11 @@ object PBTransactions {
       case tx: CommitToGenerationTransaction =>
         import tx.*
         val data = Data.CommitToGeneration(
-          CommitToGenerationTransactionData(generationPeriodStart, endorsementPublicKey.byteStr.toByteString, endorsementKeySignature.byteStr.toByteString)
+          CommitToGenerationTransactionData(
+            generationPeriodStart,
+            endorsementPublicKey.byteStr.toByteString,
+            endorsementKeySignature.byteStr.toByteString
+          )
         )
         PBTransactions.create(sender, chainId, fee.value, Waves, timestamp, tx.version, proofs.proofs, data)
 
