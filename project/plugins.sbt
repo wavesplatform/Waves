@@ -11,7 +11,7 @@ libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "1.0.0-alpha
 Seq(
   "com.eed3si9n"       % "sbt-assembly"             % "2.3.1",
   "com.github.sbt"     % "sbt-git"                  % "2.1.0",
-  "com.github.sbt"     % "sbt-native-packager"      % "1.11.1",
+  "com.github.sbt"     % "sbt-native-packager"      % "1.11.3",
   "com.github.sbt"     % "sbt-pgp"                  % "2.3.1",
   "com.lightbend.sbt"  % "sbt-javaagent"            % "0.1.6",
   "org.portable-scala" % "sbt-scalajs-crossproject" % "1.3.2",

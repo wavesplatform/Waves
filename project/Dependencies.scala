@@ -5,7 +5,7 @@ import scalapb.compiler.Version.scalapbVersion
 
 //noinspection TypeAnnotation
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.4.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.5.Final"
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "4.32.0"
   val overrides = Def.setting(
@@ -20,7 +20,6 @@ object Dependencies {
       nettyModule("codec-socks"),
       nettyModule("transport-native-unix-common"),
       nettyModule("resolver-dns"),
-      jacksonModule("core", "annotations"),
       jacksonModule("core", "core"),
       jacksonModule("core", "databind"),
       jacksonModule("datatype", "datatype-jdk8"),
