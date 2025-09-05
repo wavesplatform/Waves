@@ -78,16 +78,17 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
       SignedBlockHeader(
         header = BlockHeader(
           version = 5,
-          timestamp = blockInfo.timestamp,
+          blockInfo.timestamp,
           reference = ByteStr(Array.emptyByteArray),
-          baseTarget = blockInfo.baseTarget,
-          generationSignature = blockInfo.generationSignature,
-          generator = blockInfo.generatorPublicKey,
+          blockInfo.baseTarget,
+          blockInfo.generationSignature,
+          blockInfo.generatorPublicKey,
           featureVotes = Nil,
           rewardVote = -1,
           transactionsRoot = ByteStr(Array.emptyByteArray),
-          None,
-          None
+          stateHash = None,
+          challengedHeader = None,
+          finalizationVoting = None
         ),
         signature = ByteStr(Array.emptyByteArray)
       )

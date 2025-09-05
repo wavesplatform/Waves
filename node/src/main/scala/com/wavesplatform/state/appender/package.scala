@@ -50,7 +50,7 @@ package object appender {
       val committedGenerators = blockchain.committedGenerators(period) // TODO: + from newBlock if changes generationPeriod
       val generatorBalances   = getGeneratorBalances(blockchain, block, committedGenerators)
       val eligibleGenerators = generatorBalances.view.collect {
-        case ((_, addr), balance) if blockchain.isEffectiveBalanceValid(parentHeight, block, balance) => addr
+        case (addr, _, balance) if blockchain.isEffectiveBalanceValid(parentHeight, block, balance) => addr
       }.toSet
       (Height(parentHeight), generatorBalances, eligibleGenerators)
     }
@@ -187,11 +187,15 @@ package object appender {
     } yield applyResult -> blockchainUpdater.height
   }
 
-  private def getGeneratorBalances(blockchain: Blockchain, newBlock: Block, generators: Map[BlsPublicKey, Address]): GeneratorBalances = {
+  private def getGeneratorBalances(
+      blockchain: Blockchain,
+      newBlock: Block,
+      generators: Seq[(Address, BlsPublicKey, TransactionId)]
+  ): GeneratorBalances = {
     val parentBlockId = newBlock.header.reference
-    generators.map { case generator @ (_, addr) =>
+    generators.map { case (addr, blsPk, _) =>
       val balance = GeneratingBalanceProvider.unchallengedBalance(blockchain, addr, Some(parentBlockId))
-      generator -> balance
+      (addr, blsPk, balance)
     }
   }
 

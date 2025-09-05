@@ -385,11 +385,11 @@ class BlockchainUpdaterImpl(
                         }
 
                         // TODO: validate signature or in other place?
-                        val endorsers = referencedForgedBlock.header.finalizationVoting.fold(Seq.empty)(_.endorsers).toSet
-                        val parentGen = this.parentGeneratorBalances()
+                        val endorserIndexes = referencedForgedBlock.header.finalizationVoting.fold(Set.empty)(_.endorserIndexes.toSet)
+                        val parentGen       = this.parentGeneratorBalances()
                         val (totalGeneratorsBalance, votedGeneratorsBalance) =
-                          parentGen.foldLeft((BigInt(0), BigInt(0))) { case ((total, voted), (blsPk, b)) =>
-                            (total + b, if (endorsers.contains(blsPk)) voted + b else voted)
+                          parentGen.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0))) { case ((total, voted), (b, i)) =>
+                            (total + b, if (endorserIndexes.contains(i)) voted + b else voted)
                           }
                         val shouldFinalize        = votedGeneratorsBalance >= (totalGeneratorsBalance * 2 / 3)
                         val newFinalizationHeight = Option.when(shouldFinalize)(Height(height))
@@ -524,7 +524,7 @@ class BlockchainUpdaterImpl(
                 )
               )
             } else None
-            DiscardedBlock(block, ng.hitSource, snapshot, generatorBalances = Map.empty)
+            DiscardedBlock(block, ng.hitSource, snapshot, generatorBalances = Seq.empty)
           }.toSeq
           blocks ++ liquidBlockData
         }
@@ -843,15 +843,15 @@ class BlockchainUpdaterImpl(
       .getOrElse(rocksdb.lastStateHash(None))
   }
 
-  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = readLock {
+  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] = readLock {
     snapshotBlockchain.committedGenerators(at)
   }
 
-  override def parentGeneratorBalances(): Map[BlsPublicKey, Long] = readLock {
+  override def parentGeneratorBalances(): Seq[Long] = readLock {
     rocksdb.parentGeneratorBalances()
   }
 
-  override def currentGeneratorBalances(): Map[BlsPublicKey, Long] = readLock {
+  override def currentGeneratorBalances(): Seq[Long] = readLock {
     rocksdb.currentGeneratorBalances()
   }
 

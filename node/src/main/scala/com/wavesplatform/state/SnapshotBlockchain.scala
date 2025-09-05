@@ -230,16 +230,16 @@ case class SnapshotBlockchain(
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
-  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] =
+  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] =
     if (at == this.generationPeriodOf(Height(height)).next) snapshot.nextCommittedGenerators
     else inner.committedGenerators(at)
 
-  override def parentGeneratorBalances(): Map[BlsPublicKey, Long] =
+  override def parentGeneratorBalances(): Seq[Long] =
     if (blockMeta.isEmpty) inner.parentGeneratorBalances()
     else inner.currentGeneratorBalances()
 
-  override def currentGeneratorBalances(): Map[BlsPublicKey, Long] =
-    maybeSnapshot.fold(inner.currentGeneratorBalances())(_ => Map.empty)
+  override def currentGeneratorBalances(): Seq[Long] =
+    maybeSnapshot.fold(inner.currentGeneratorBalances())(_ => Seq.empty)
 }
 
 object SnapshotBlockchain {

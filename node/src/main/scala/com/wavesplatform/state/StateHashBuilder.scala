@@ -96,9 +96,10 @@ class StateHashBuilder {
     )
   }
 
-  def addNextGenerator(blsPublicKey: BlsPublicKey, address: Address): Unit = {
-    addEntry(SectionId.NextGenerators, blsPublicKey.arr)(
-      address.bytes
+  // TODO: do we need to add all data here?
+  def addNextGenerator(address: Address, blsPublicKey: BlsPublicKey, txnId: TransactionId): Unit = {
+    addEntry(SectionId.NextGenerators, txnId.arr)(
+      address.bytes ++ blsPublicKey.arr
     )
   }
 

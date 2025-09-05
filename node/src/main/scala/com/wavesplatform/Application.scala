@@ -320,7 +320,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         case bi if blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, bi.height) =>
           val h      = Height(bi.height)
           val period = blockchainUpdater.generationPeriodOf(h)
-          (bi.id, blockchainUpdater.committedGenerators(period).keySet)
+          (bi.id, blockchainUpdater.committedGenerators(period).view.map { case (_, blsPk, _) => blsPk }.toSet)
       },
       receivingEndorsements = messageObserver.endorseBlocks,
       allChannels = allChannels,

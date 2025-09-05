@@ -359,24 +359,13 @@ package object database {
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
 
-  def readGeneratorBalances(data: Array[Byte]): Map[AddressId, Long] = {
-    val addressSize, balanceSize = Longs.BYTES
+  def readGeneratorBalances(data: Array[Byte]): Seq[Long] =
     data
-      .grouped(addressSize + balanceSize)
-      .map { data =>
-        val (rawAddressId, rawBalance) = data.splitAt(addressSize)
-        (Longs.fromByteArray(rawAddressId), Longs.fromByteArray(rawBalance))
-      }
-      .toMap
-  }
+      .grouped(Longs.BYTES) // One entry (balance) size
+      .map(Longs.fromByteArray)
+      .toSeq
 
-  def writeGeneratorBalances(data: Map[AddressId, Long]): Array[Byte] =
-    data.view
-      .map { (addressId, balance) =>
-        Longs.toByteArray(addressId) ++ Longs.toByteArray(balance)
-      }
-      .flatten
-      .toArray
+  def writeGeneratorBalances(data: Seq[Long]): Array[Byte] = data.view.flatMap(Longs.toByteArray).toArray
 
   def readCommittedGenerators(data: Array[Byte]): Seq[(AddressId, BlsPublicKey, TransactionId)] = {
     val addressSize     = Longs.BYTES

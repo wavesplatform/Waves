@@ -88,11 +88,14 @@ trait Blockchain {
 
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
-  def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address]
+  def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)]
 
-  def parentGeneratorBalances(): Map[BlsPublicKey, Long]
+  /** @return
+    *   In commitment order
+    */
+  def parentGeneratorBalances(): Seq[Long]
 
-  def currentGeneratorBalances(): Map[BlsPublicKey, Long]
+  def currentGeneratorBalances(): Seq[Long]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
@@ -169,8 +172,8 @@ object Blockchain {
     // TODO: not efficient?
     def generationDeposit(address: Address): Long = {
       val curr            = blockchain.currentGenerationPeriod
-      val committedOnCurr = blockchain.committedGenerators(curr).values.find(_ == address).size
-      val committedOnNext = blockchain.committedGenerators(curr.next).values.find(_ == address).size
+      val committedOnCurr = blockchain.committedGenerators(curr).find(_._2 == address).size
+      val committedOnNext = blockchain.committedGenerators(curr.next).find(_._2 == address).size
       (committedOnCurr + committedOnNext) * CommitToGenerationTransaction.DepositInWavelets
     }
 

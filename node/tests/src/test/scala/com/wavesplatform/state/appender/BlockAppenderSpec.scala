@@ -12,7 +12,7 @@ import com.wavesplatform.history.Domain
 import com.wavesplatform.mining.BlockChallengerImpl
 import com.wavesplatform.network.{EndorseBlockSpec, MessageCodecL1, PBBlockSpec, PeerDatabase, RawBytes}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Ignored
-import com.wavesplatform.state.{CompleteBlockchainUpdater, ForwardingBlockchainUpdaterImpl, GenerationPeriod, Height}
+import com.wavesplatform.state.{CompleteBlockchainUpdater, ForwardingBlockchainUpdaterImpl, GenerationPeriod, Height, TransactionId}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{FreeSpec, NumericExt, TestTime}
 import com.wavesplatform.transaction.TxHelpers
@@ -68,7 +68,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
             .verifyVRF(block.header.generationSignature, d.blockchain.hitSource(1).get.arr, block.sender)
             .explicitGet(),
           snapshot = None,
-          generatorBalances = Map.empty
+          generatorBalances = Seq.empty
         )
         .explicitGet() shouldBe Ignored
 
@@ -159,7 +159,8 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
       def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
         private val blsKeyPair = BlsKeyPair(sender.privateKey)
 
-        override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = Map(blsKeyPair.publicKey -> sender.toAddress)
+        override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] =
+          Seq((sender.toAddress, blsKeyPair.publicKey, TxHelpers.randomId))
       }
 
       withDomain(
@@ -174,7 +175,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
 
     "should append a block if no one committed" in {
       def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-        override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = Map.empty
+        override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] = Seq.empty
       }
 
       withDomain(
@@ -219,7 +220,8 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
       def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
         private val blsKeyPair = BlsKeyPair(generator.privateKey)
 
-        override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = Map(blsKeyPair.publicKey -> generator.toAddress)
+        override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] =
+          Seq((generator.toAddress, blsKeyPair.publicKey, TxHelpers.randomId))
       }
 
       withDomain(
@@ -282,11 +284,8 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
       val miner1InitBalance = 100_000.waves
       val miner2InitBalance = 50_000.waves
 
-      val miner1      = Wallet.generateNewAccount(seed.arr, nonce = 1)
-      val miner1BlsPk = BlsKeyPair(miner1.privateKey).publicKey
-
-      val miner2      = Wallet.generateNewAccount(seed.arr, nonce = 2)
-      val miner2BlsPk = BlsKeyPair(miner2.privateKey).publicKey
+      val miner1 = Wallet.generateNewAccount(seed.arr, nonce = 1)
+      val miner2 = Wallet.generateNewAccount(seed.arr, nonce = 2)
 
       withDomain(
         defaultSettings.configure(_.copy(generationPeriod = 3)),
@@ -320,9 +319,9 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         appender(block3)
 
         d.blockchain.parentGeneratorBalances() shouldBe empty
-        d.blockchain.currentGeneratorBalances() shouldBe Map(
-          miner1BlsPk -> miner1InitBalance,
-          miner2BlsPk -> miner2InitBalance
+        d.blockchain.currentGeneratorBalances() shouldBe Seq(
+          miner1InitBalance,
+          miner2InitBalance
         )
 
         info("block4")
@@ -330,13 +329,13 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         testTime.setTime(block4.header.timestamp)
         appender(block4)
 
-        d.blockchain.parentGeneratorBalances() shouldBe Map(
-          miner1BlsPk -> miner1InitBalance,
-          miner2BlsPk -> miner2InitBalance
+        d.blockchain.parentGeneratorBalances() shouldBe Seq(
+          miner1InitBalance,
+          miner2InitBalance
         )
-        d.blockchain.currentGeneratorBalances() shouldBe Map(
-          miner1BlsPk -> (miner1InitBalance - transfer.amount.value - transfer.fee.value),
-          miner2BlsPk -> miner2InitBalance
+        d.blockchain.currentGeneratorBalances() shouldBe Seq(
+          miner1InitBalance - transfer.amount.value - transfer.fee.value,
+          miner2InitBalance
         )
       }
     }

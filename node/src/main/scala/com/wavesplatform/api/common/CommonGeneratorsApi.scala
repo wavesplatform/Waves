@@ -1,6 +1,5 @@
 package com.wavesplatform.api.common
 
-import cats.syntax.either.*
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonGeneratorsApi.GeneratorEntry
@@ -42,26 +41,19 @@ object CommonGeneratorsApi {
 
         val addresses = ro.multiGet(addressIds.map(Keys.idToAddress), Address.AddressLength)
         val balances =
-          if (at == blockchain.height) blockchain.currentGeneratorBalances().asRight
-          else if (at == blockchain.height - 1) blockchain.parentGeneratorBalances().asRight
-          else ro.get(Keys.generatorBalances(at, rdb.apiHandle)).getOrElse(Map.empty).asLeft
+          if (at == blockchain.height) blockchain.currentGeneratorBalances()
+          else if (at == blockchain.height - 1) blockchain.parentGeneratorBalances()
+          else ro.get(Keys.generatorBalances(at, rdb.apiHandle)).getOrElse(Seq.empty)
 
         (addressIds, addresses, blsPks, txnIds, balances)
       }
 
       addressIds
         .lazyZip(addresses)
+        .lazyZip(balances)
         .lazyZip(blsPks)
         .lazyZip(txIds)
-        .collect { case (addressId, Some(address), blsPk, txnId) =>
-          val mayBeBalance = balances match {
-            case Left(balances)  => balances.get(addressId)
-            case Right(balances) => balances.get(blsPk)
-          }
-          val balance = mayBeBalance.getOrElse {
-            log.warn(s"Can't find balance for addressId=$addressId, address=$address (commitment tx id=$txnId)")
-            0L
-          }
+        .collect { case ((_, Some(address), balance, _), txnId) => // TODO: address=None ?
           GeneratorEntry(address, balance, txnId)
         }
         .toSeq

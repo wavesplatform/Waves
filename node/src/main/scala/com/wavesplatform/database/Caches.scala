@@ -210,10 +210,10 @@ abstract class Caches extends Blockchain with Storage {
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   @volatile
-  private var committedGeneratorBalancesCache                      = loadGeneratorBalances()
-  override def parentGeneratorBalances(): Map[BlsPublicKey, Long]  = committedGeneratorBalancesCache.parent
-  override def currentGeneratorBalances(): Map[BlsPublicKey, Long] = committedGeneratorBalancesCache.current
-  protected def loadGeneratorBalances(): (parent: Map[BlsPublicKey, Long], current: Map[BlsPublicKey, Long])
+  private var committedGeneratorBalancesCache        = loadGeneratorBalances()
+  override def parentGeneratorBalances(): Seq[Long]  = committedGeneratorBalancesCache.parent
+  override def currentGeneratorBalances(): Seq[Long] = committedGeneratorBalancesCache.current
+  protected def loadGeneratorBalances(): (parent: Seq[Long], current: Seq[Long])
 
   protected def doAppend(
       blockMeta: PBBlockMeta,
@@ -228,7 +228,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizationHeight: Option[Height],
-      generatorBalances: Map[AddressId, Long],
+      generatorBalances: Seq[Long],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
   ): Unit
@@ -264,7 +264,7 @@ abstract class Caches extends Blockchain with Storage {
 
     committedGeneratorBalancesCache = (
       committedGeneratorBalancesCache.current,
-      generatorBalances.map { case ((blsPk, _), balance) => blsPk -> balance }
+      generatorBalances.map { case (_, _, balance) => balance }
     )
 
     val newAddresses =
@@ -321,10 +321,6 @@ abstract class Caches extends Blockchain with Storage {
       BalanceNode(amount, prevBalance.height)
     )
 
-    val generatorBalanceNodes = for {
-      ((_, address), balance) <- generatorBalances
-    } yield (addressIdWithFallback(address, newAddressIds), balance)
-
     val newEntries = for {
       (address, entries) <- snapshot.accountData
       (key, entry)       <- entries
@@ -379,7 +375,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       newFinalizationHeight,
-      generatorBalanceNodes,
+      committedGeneratorBalancesCache.current,
       nextCommittedGeneratorsRev.reverse,
       stateHash.result()
     )

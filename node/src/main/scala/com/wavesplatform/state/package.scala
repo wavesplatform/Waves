@@ -59,7 +59,7 @@ package object state {
     )
   }
 
-  type GeneratorBalances = Map[(BlsPublicKey, Address), Long]
+  type GeneratorBalances = Seq[(Address, BlsPublicKey, Long)]
 
   object Height extends TaggedType[Int] {
     implicit val format: Format[Height] = implicitly[Format[Int]].bimap(Height(_), identity)

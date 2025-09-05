@@ -157,7 +157,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         computedStateHash,
         preconditionBlock,
         newFinalizationHeight = None,
-        generatorBalances = Map.empty
+        generatorBalances = Seq.empty
       )
     }
     val snapshot =
@@ -207,7 +207,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         diffResult.computedStateHash,
         preconditionBlock,
         newFinalizationHeight = None,
-        generatorBalances = Map.empty
+        generatorBalances = Seq.empty
       )).explicitGet()
     }
 
@@ -253,7 +253,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
           diffResult.computedStateHash,
           preconditionBlock,
           newFinalizationHeight = None,
-          generatorBalances = Map.empty
+          generatorBalances = Seq.empty
         )
         Some(preconditionBlock)
       }).explicitGet()
@@ -284,7 +284,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         diffResult.computedStateHash,
         checkedBlock,
         newFinalizationHeight = None,
-        generatorBalances = Map.empty
+        generatorBalances = Seq.empty
       )
       assertion(diffResult.snapshot, state)
     }).explicitGet()
@@ -335,7 +335,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
           result.computedStateHash,
           checkedBlock,
           newFinalizationHeight = None,
-          generatorBalances = Map.empty
+          generatorBalances = Seq.empty
         )
       }
     }

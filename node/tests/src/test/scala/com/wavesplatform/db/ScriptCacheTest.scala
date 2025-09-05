@@ -120,7 +120,7 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
           .block
 
         bcu
-          .processBlock(blockWithEmptyScriptTx, blockWithEmptyScriptTx.header.generationSignature, snapshot = None, generatorBalances = Map.empty)
+          .processBlock(blockWithEmptyScriptTx, blockWithEmptyScriptTx.header.generationSignature, snapshot = None, generatorBalances = Seq.empty)
           .explicitGet()
 
         bcu.accountScript(account.toAddress) shouldEqual None
@@ -144,7 +144,7 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
       val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block, block.header.generationSignature, snapshot = None, generatorBalances = Map.empty) should beRight
+        bcu.processBlock(block, block.header.generationSignature, snapshot = None, generatorBalances = Seq.empty) should beRight
       }
 
       f(accounts, bcu)

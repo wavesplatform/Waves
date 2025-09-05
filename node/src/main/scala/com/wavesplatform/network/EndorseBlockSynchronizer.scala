@@ -25,6 +25,8 @@ case class FinalizationVoting(
 ) {
 ??
    */
+
+  // TODO: Preserves the order of insertion
   def tryAdd(msg: EndorseBlock): Boolean
   def switch(endorsedBlockId: BlockId, endorsers: Set[BlsPublicKey]): Unit // TODO: use in appender when changed height
   def takeAndClear(endorsedBlockId: BlockId): Option[FinalizationVoting]

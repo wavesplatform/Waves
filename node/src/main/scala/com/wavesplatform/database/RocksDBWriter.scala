@@ -328,16 +328,16 @@ class RocksDBWriter(
     }.toMap
   }
 
-  override protected def loadGeneratorBalances(): (parent: Map[BlsPublicKey, Long], current: Map[BlsPublicKey, Long]) =
-    if (lastBlock.isEmpty || height <= GenesisBlockHeight) (Map.empty, Map.empty)
+  override protected def loadGeneratorBalances(): (parent: Seq[Long], current: Seq[Long]) =
+    if (lastBlock.isEmpty || height <= GenesisBlockHeight) (Seq.empty, Seq.empty)
     else if (height == GenesisBlockHeight) {
       val currentHeight  = Height(height)
       val currentBlockId = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight")).id()
       val currentPeriod  = this.generationPeriodOf(currentHeight)
 
       val currentCommGens = committedGenerators(currentPeriod)
-      val current         = if (currentCommGens.isEmpty) Map.empty else generatorBalances(currentCommGens, currentBlockId)
-      (Map.empty, current)
+      val current         = if (currentCommGens.isEmpty) Seq.empty else generatorBalances(currentCommGens, currentBlockId)
+      (Seq.empty, current)
     } else {
       val parentHeight  = Height(height - 1)
       val parentBlockId = this.blockId(parentHeight).getOrElse(throw new IllegalStateException(s"No block on parent height: $parentHeight"))
@@ -350,7 +350,7 @@ class RocksDBWriter(
 
       if (parentPeriod == currentPeriod) {
         val commGens = committedGenerators(currentPeriod)
-        if (commGens.isEmpty) (Map.empty, Map.empty)
+        if (commGens.isEmpty) (Seq.empty, Seq.empty)
         else {
           val parent  = generatorBalances(commGens, parentBlockId)
           val current = generatorBalances(commGens, currentBlockId)
@@ -358,10 +358,10 @@ class RocksDBWriter(
         }
       } else {
         val parentCommGens = committedGenerators(parentPeriod)
-        val parent         = if (parentCommGens.isEmpty) Map.empty else generatorBalances(parentCommGens, parentBlockId)
+        val parent         = if (parentCommGens.isEmpty) Seq.empty else generatorBalances(parentCommGens, parentBlockId)
 
         val currentCommGens = committedGenerators(currentPeriod)
-        val current         = if (currentCommGens.isEmpty) Map.empty else generatorBalances(currentCommGens, currentBlockId)
+        val current         = if (currentCommGens.isEmpty) Seq.empty else generatorBalances(currentCommGens, currentBlockId)
         (parent, current)
       }
 
@@ -403,8 +403,8 @@ class RocksDBWriter(
 //    }
     }
 
-  private def generatorBalances(generators: Map[BlsPublicKey, Address], at: BlockId) = generators.map { case (blsPk, addr) =>
-    blsPk -> GeneratingBalanceProvider.balance(this, addr, Some(at))
+  private def generatorBalances(generators: Seq[(Address, BlsPublicKey, TransactionId)], at: BlockId) = generators.map { case (addr, _, _) =>
+    GeneratingBalanceProvider.balance(this, addr, Some(at))
   }
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
@@ -569,7 +569,7 @@ class RocksDBWriter(
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizationHeight: Option[Height],
-      generatorBalances: Map[AddressId, Long],
+      generatorBalances: Seq[Long],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
   ): Unit = {
@@ -1242,7 +1242,7 @@ class RocksDBWriter(
             Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb, block.transactionData)))
           } else None
 
-          DiscardedBlock(block, Caches.toHitSource(discardedMeta), snapshot, Map.empty) // TODO: generatorBalances
+          DiscardedBlock(block, Caches.toHitSource(discardedMeta), snapshot, Seq.empty) // TODO: generatorBalances
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
@@ -1527,17 +1527,17 @@ class RocksDBWriter(
     readOnly(_.get(Keys.maliciousMinerBanHeights(address.bytes)))
 
   // TODO: use rawCommittedGenerators?
-  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = {
+  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] = {
     val maxGenerators = settings.functionalitySettings.maxGenerators
-    val pks           = new mutable.ArrayBuffer[BlsPublicKey](maxGenerators)
+    val rawGenerators = new mutable.ArrayBuffer[(BlsPublicKey, TransactionId)](maxGenerators)
     val addressIds    = new mutable.ArrayBuffer[AddressId](maxGenerators)
 
     val key = Keys.committedGenerators(at, Height(0))
     val addresses = rdb.db.readOnly { ro =>
       ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
         val xs = key.parse(dbEntry.getValue).getOrElse(Seq.empty)
-        xs.foreach { (addressId, blsPK, _) =>
-          pks.append(blsPK)
+        xs.foreach { (addressId, blsPK, txnId) =>
+          rawGenerators.append((blsPK, txnId))
           addressIds.append(addressId)
         }
       }
@@ -1545,14 +1545,14 @@ class RocksDBWriter(
       ro.multiGet(addressIds.map(Keys.idToAddress), Address.AddressLength)
     }
 
-    pks.view
+    addresses.view
+      .lazyZip(rawGenerators)
       .lazyZip(addressIds)
-      .lazyZip(addresses)
       .collect {
-        case (pk, _, Some(address)) => pk -> address
-        case (_, aid, None)         => throw new IllegalStateException(s"Can't find address for address id $aid")
+        case (Some(address), (pk, txnId), _) => (address, pk, txnId)
+        case (None, _, aid)                  => throw new IllegalStateException(s"Can't find address for address id $aid")
       }
-      .toMap
+      .toSeq
   }
 
   // private def rawCommittedGenerators(at: GenerationPeriod): Map[BlsPublicKey, AddressId] =

@@ -624,7 +624,7 @@ object Domain {
     def processBlock(block: Block, snapshot: Option[BlockSnapshot] = None): Either[ValidationError, BlockApplyResult] = {
       val hitSourcesE =
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
-          Right((block.header.generationSignature, block.header.challengedHeader.map(_.generationSignature), Map.empty))
+          Right((block.header.generationSignature, block.header.challengedHeader.map(_.generationSignature), Seq.empty))
         else {
           val parentHeight = bcu.heightOf(block.header.reference).getOrElse(bcu.height)
 
