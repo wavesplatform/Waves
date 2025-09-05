@@ -5,7 +5,6 @@ import cats.implicits.{catsSyntaxEitherId, catsSyntaxSemigroup, toBifunctorOps, 
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -32,8 +31,7 @@ case class StateSnapshot(
     scriptResults: Map[ByteStr, InvokeScriptResult] = Map(),
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
     scriptsComplexity: Long = 0,
-    erc20Addresses: Map[ERC20Address, IssuedAsset] = Map(),
-    nextCommittedGenerators: Seq[(Address, BlsPublicKey, TransactionId)] = Seq.empty
+    erc20Addresses: Map[ERC20Address, IssuedAsset] = Map()
 ) {
 
   // ignores lease balances from portfolios
@@ -87,8 +85,7 @@ object StateSnapshot {
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map(),
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
       scriptsComplexity: Long = 0,
-      transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap(),
-      nextCommittedGenerators: Seq[(Address, BlsPublicKey, TransactionId)] = Seq.empty
+      transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap()
   ): Either[ValidationError, StateSnapshot] = {
     val r =
       for {
@@ -113,8 +110,7 @@ object StateSnapshot {
         scriptResults,
         ethereumTransactionMeta,
         scriptsComplexity,
-        issuedAssets.view.map { case (id, _) => ERC20Address(id) -> id }.toMap,
-        nextCommittedGenerators
+        issuedAssets.view.map { case (id, _) => ERC20Address(id) -> id }.toMap
       )
     r.leftMap(GenericError(_))
   }
@@ -232,8 +228,7 @@ object StateSnapshot {
         s1.scriptResults |+| s2.scriptResults,
         s1.ethereumTransactionMeta ++ s2.ethereumTransactionMeta,
         s1.scriptsComplexity + s2.scriptsComplexity,
-        s1.erc20Addresses ++ s2.erc20Addresses,
-        s1.nextCommittedGenerators ++ s2.nextCommittedGenerators
+        s1.erc20Addresses ++ s2.erc20Addresses
       )
 
     private def combineDataEntries(

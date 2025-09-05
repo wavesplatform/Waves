@@ -231,8 +231,7 @@ case class SnapshotBlockchain(
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
   override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] =
-    if (at == this.generationPeriodOf(Height(height)).next) snapshot.nextCommittedGenerators
-    else inner.committedGenerators(at)
+    inner.committedGenerators(at)
 
   override def parentGeneratorBalances(): Seq[Long] =
     if (blockMeta.isEmpty) inner.parentGeneratorBalances()

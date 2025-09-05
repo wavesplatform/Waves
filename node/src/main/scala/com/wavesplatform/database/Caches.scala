@@ -360,7 +360,6 @@ abstract class Caches extends Blockchain with Storage {
     for (leaseId <- snapshot.cancelledLeases.keys) stateHash.addLeaseStatus(leaseId, isActive = false)
     for ((assetId, sponsorship) <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
     for ((alias, address) <- snapshot.aliases) stateHash.addAlias(address, alias.name)
-    snapshot.nextCommittedGenerators.foreach(stateHash.addNextGenerator)
 
     doAppend(
       newMeta,

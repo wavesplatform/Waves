@@ -23,8 +23,7 @@ object CommitToGenerationTransactionDiff {
       }
       snapshot <- StateSnapshot.build(
         blockchain,
-        portfolios = Map(tx.sender.toAddress -> Portfolio.build(Asset.Waves -> -tx.fee.value)),
-        nextCommittedGenerators = Seq((tx.sender.toAddress, tx.endorsementPublicKey, TransactionId(tx.id())))
+        portfolios = Map(tx.sender.toAddress -> Portfolio.build(Asset.Waves -> -tx.fee.value))
       )
     } yield snapshot
   }
