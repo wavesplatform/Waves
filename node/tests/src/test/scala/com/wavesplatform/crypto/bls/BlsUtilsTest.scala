@@ -4,7 +4,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.crypto.bls.BlsUtils.*
 import com.wavesplatform.test.FreeSpec
 import org.scalatest.EitherValues
-import supranational.blst
 import supranational.blst.SecretKey
 
 import scala.util.Random
@@ -22,7 +21,7 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
       val sig1    = signBasic(privateKey1, message)
       val sig2    = signBasic(privateKey2, message)
 
-      val aggSig = new blst.P2().add(new blst.P2(sig1)).add(new blst.P2(sig2)).compress()
+      val aggSig = BlsUtils.aggSign(sig1, sig2)
 
       BlsUtils.verifyAgg(aggSig, message, Seq(publicKey2, publicKey1)).value shouldBe true
     }
@@ -42,10 +41,9 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
       val sig2    = signBasic(privateKey2, message)
       val sig3    = signBasic(privateKey3, message)
 
-      val aggSig       = new blst.P2().add(new blst.P2(sig1)).add(new blst.P2(sig2)).compress()
-      val finalAggSig2 = new blst.P2_Affine(aggSig).to_jacobian().add(new blst.P2(sig3)).compress()
+      val aggSig = Seq(sig1, sig2, sig3).reduceLeft(BlsUtils.aggSign)
 
-      BlsUtils.verifyAgg(finalAggSig2, message, Seq(publicKey2, publicKey1, publicKey3)).value shouldBe true
+      BlsUtils.verifyAgg(aggSig, message, Seq(publicKey2, publicKey1, publicKey3)).value shouldBe true
     }
   }
 

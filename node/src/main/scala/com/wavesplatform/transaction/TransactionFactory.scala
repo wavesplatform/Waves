@@ -280,6 +280,7 @@ class TransactionFactory(wallet: Wallet, time: Time, currentHeight: Height, func
       tx.signWith(signer.privateKey)
     }
 
+  // TODO: wrong
   def commitToGeneration(request: CommitToGenerationRequest, signerAddress: String): Either[ValidationError, CommitToGenerationTransaction] = {
     val defaultPeriod = GenerationPeriod.from(currentHeight, functionalitySettings).next
     for {

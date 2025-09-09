@@ -27,6 +27,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{BlockChallengerImpl, Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network.*
+import com.wavesplatform.network.EndorsementStorage.EndorsementFilter
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, CompleteBlockchainUpdater, Height, TxMeta}
@@ -145,7 +146,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
-    val endorsementStorage = EndorsementStorage(settings.blockchainSettings.functionalitySettings.maxGenerators)
+    val endorsementStorage = EndorsementStorage.InMemory()
 
     if (settings.minerSettings.enable)
       miner = new MinerImpl(
@@ -316,11 +317,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     EndorseBlockSynchronizer.start(
       storage = endorsementStorage,
-      lastEndorsers = blockchainUpdater.lastBlockInfo.collect {
+      lastFilter = blockchainUpdater.lastBlockInfo.collect {
         case bi if blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, bi.height) =>
           val h      = Height(bi.height)
           val period = blockchainUpdater.generationPeriodOf(h)
-          (bi.id, blockchainUpdater.committedGenerators(period).view.map { case (_, blsPk, _) => blsPk }.toSet)
+          EndorsementFilter(
+            h,
+            bi.id,
+            bi.id, // blockchainUpdater.finalized, // TODO:
+            blockchainUpdater.committedGenerators(period).view.zipWithIndex.map { case ((_, blsPk, _), i) => blsPk -> i }.toMap
+          )
       },
       receivingEndorsements = messageObserver.endorseBlocks,
       allChannels = allChannels,

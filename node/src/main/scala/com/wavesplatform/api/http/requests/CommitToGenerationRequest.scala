@@ -28,7 +28,7 @@ case class CommitToGenerationRequest(
         Height(generationPeriodStart.getOrElse(defaultGenerationPeriodStart)),
         timestamp.getOrElse(0L),
         FeeConstants(TransactionType.CommitToGeneration) * FeeUnit,
-        endorsementKeySignature = BlsSignature.empty,
+        endorsementKeySignature = BlsSignature.Empty,
         Proofs.empty,
         chainId.getOrElse(AddressScheme.current.chainId)
       )
@@ -36,7 +36,7 @@ case class CommitToGenerationRequest(
 }
 
 case class SignedCommitToGenerationRequest(
-    sender: String,
+    senderPublicKey: String,
     endorsementPublicKey: ByteStr,
     generationPeriodStart: Int,
     timestamp: Long,
@@ -46,14 +46,15 @@ case class SignedCommitToGenerationRequest(
 ) {
   def toTx: Either[ValidationError, CommitToGenerationTransaction] =
     for {
-      _sender <- PublicKey.fromBase58String(sender)
+      _sender <- PublicKey.fromBase58String(senderPublicKey)
+      sig     <- BlsSignature(endorsementKeySignature)
       t <- CommitToGenerationTransaction.create(
         _sender,
         BlsPublicKey(endorsementPublicKey),
         Height(generationPeriodStart),
         timestamp,
         fee,
-        BlsSignature(endorsementKeySignature),
+        sig,
         proofs,
         AddressScheme.current.chainId
       )

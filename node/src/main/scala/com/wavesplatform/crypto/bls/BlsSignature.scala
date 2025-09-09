@@ -1,19 +1,41 @@
 package com.wavesplatform.crypto.bls
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 
-case class BlsSignature private (byteStr: ByteStr) extends AnyVal {
-  def arr: Array[Byte] = byteStr.arr
-
+sealed abstract class BlsSignature(val byteStr: ByteStr) {
+  def arr: Array[Byte]          = byteStr.arr
   def base64: String            = byteStr.base64
   override def toString: String = byteStr.base64Raw
 }
 
 object BlsSignature {
   val SizeInBytes = 98
-  val empty       = BlsSignature(Array.empty[Byte])
 
-  // TODO: check size?
-  def apply(arr: Array[Byte]): BlsSignature = new BlsSignature(ByteStr(arr))
-  def apply(byteStr: ByteStr): BlsSignature = new BlsSignature(byteStr)
+  object Empty extends BlsSignature(ByteStr.empty) {
+    override def toString: String = "empty"
+  }
+
+  case class NonEmpty private (override val byteStr: ByteStr) extends BlsSignature(byteStr)
+  object NonEmpty {
+    // TODO: check size and add def unsafe for append
+    def apply(arr: Array[Byte]): NonEmpty                        = new NonEmpty(ByteStr(arr))
+    def apply(byteStr: ByteStr): NonEmpty                        = new NonEmpty(byteStr)
+    private[bls] def unsafe(byteStr: ByteStr): NonEmpty = NonEmpty(byteStr)
+  }
+
+  def apply(arr: Array[Byte]): Either[ValidationError, NonEmpty] = apply(ByteStr(arr))
+  def apply(byteStr: ByteStr): Either[ValidationError, NonEmpty] = Either.cond(
+    byteStr.arr.length == SizeInBytes,
+    NonEmpty.unsafe(byteStr),
+    GenericError(s"Unexpected BLS signature length: ${byteStr.arr.length}, expected: $SizeInBytes")
+  )
+
+  extension (self: BlsSignature) {
+    def append(other: BlsSignature.NonEmpty): BlsSignature = self match {
+      case Empty          => other
+      case self: NonEmpty => NonEmpty(ByteStr(BlsUtils.aggSign(self.arr, other.arr)))
+    }
+  }
 }

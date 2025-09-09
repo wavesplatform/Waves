@@ -5,7 +5,6 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockEndorsement, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.network.message.MessageSpec
 import com.wavesplatform.protobuf.block.EndorseBlock as PBEndorseBlock
 import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
@@ -116,17 +115,15 @@ object MicroBlockSnapshotResponse {
     MicroBlockSnapshotResponse(snapshot.totalBlockId.toByteStr, snapshot.snapshots)
 }
 
-case class EndorseBlock(endorserPublicKey: BlsPublicKey, finalizedBlockId: BlockId, blockId: BlockId, blockHeight: Height, signature: BlsSignature)
+case class EndorseBlock(endorserPublicKey: ByteStr, finalizedBlockId: BlockId, blockId: BlockId, blockHeight: Height, signature: ByteStr)
     extends Message {
   def toProtobuf: PBEndorseBlock = PBEndorseBlock(
-    endorserPublicKey.byteStr.toByteString,
+    endorserPublicKey.toByteString,
     finalizedBlockId.toByteString,
     blockId.toByteString,
     blockHeight,
-    signature.byteStr.toByteString
+    signature.toByteString
   )
-
-  def verify(): Boolean = endorserPublicKey.verify(BlockEndorsement.mkMessage(finalizedBlockId, blockId, blockHeight), signature)
 
   override def toString: String = s"EndorseBlock(e=$endorserPublicKey, b=$blockId, $blockHeight, s=$signature)"
 }
@@ -134,12 +131,13 @@ case class EndorseBlock(endorserPublicKey: BlsPublicKey, finalizedBlockId: Block
 object EndorseBlock {
   def fromProtobuf(x: PBEndorseBlock): EndorseBlock =
     EndorseBlock(
-      BlsPublicKey(x.endorserPublicKey.toByteStr),
+      x.endorserPublicKey.toByteStr,
       x.finalizedBlockId.toByteStr,
       x.blockId.toByteStr,
       Height(x.blockHeight),
-      BlsSignature(x.signature.toByteArray)
+      x.signature.toByteStr
     )
 
-  def from(x: BlockEndorsement.Full): EndorseBlock = EndorseBlock(x.endorser, x.finalizedBlockId, x.blockId, x.blockHeight, x.signature)
+  def from(x: BlockEndorsement.Full): EndorseBlock =
+    EndorseBlock(x.endorser.byteStr, x.finalizedBlockId, x.blockId, x.blockHeight, x.signature.byteStr)
 }

@@ -324,16 +324,19 @@ object PBTransactions {
       case Data.CommitToGeneration(
             CommitToGenerationTransactionData(generationPeriodStart, endorsementPublicKey, endorsementKeySignature, `empty`)
           ) =>
-        CommitToGenerationTransaction.create(
-          sender,
-          BlsPublicKey(endorsementPublicKey.toByteStr),
-          Height(generationPeriodStart),
-          timestamp,
-          feeAmount,
-          BlsSignature(endorsementKeySignature.toByteArray),
-          proofs,
-          chainId
-        )
+        for {
+          sig <- BlsSignature(endorsementKeySignature.toByteArray)
+          tx <- CommitToGenerationTransaction.create(
+            sender,
+            BlsPublicKey(endorsementPublicKey.toByteStr),
+            Height(generationPeriodStart),
+            timestamp,
+            feeAmount,
+            sig,
+            proofs,
+            chainId
+          )
+        } yield tx
 
       case Data.InvokeExpression(InvokeExpressionTransactionData(expressionBytes, `empty`)) =>
         for {

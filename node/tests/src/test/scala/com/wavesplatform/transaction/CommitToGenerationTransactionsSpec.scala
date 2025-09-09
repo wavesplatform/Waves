@@ -23,7 +23,7 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
     generationPeriodStart = Height(3000),
     timestamp = 1526287561757L,
     fee = TxPositiveAmount.unsafeFrom(100000000),
-    endorsementKeySignature = BlsSignature(Base64.decode("OLI6mFSZD949zoVKqRt48SDNNnToWO+vUsmtCdeix7wH5RQkOwYQQvQEhQW/fmNCmsrmbW2IMt7SGjnCvPW9gQ==")),
+    endorsementKeySignature = BlsSignature(Base64.decode("OLI6mFSZD949zoVKqRt48SDNNnToWO+vUsmtCdeix7wH5RQkOwYQQvQEhQW/fmNCmsrmbW2IMt7SGjnCvPW9gQ==")).explicitGet(),
     proofs = Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get),
     chainId = AddressScheme.current.chainId
   )

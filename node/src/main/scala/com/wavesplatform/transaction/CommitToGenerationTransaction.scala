@@ -91,7 +91,7 @@ object CommitToGenerationTransaction {
       generationPeriodStart,
       timestamp,
       feeInWaves,
-      endorsementKeySignature = BlsSignature.empty,
+      endorsementKeySignature = BlsSignature.Empty,
       Proofs.empty,
       chainId
     ).map(signed(_, sender.privateKey))

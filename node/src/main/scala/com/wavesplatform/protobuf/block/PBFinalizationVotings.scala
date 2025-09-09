@@ -1,6 +1,7 @@
 package com.wavesplatform.protobuf.block
 
 import com.wavesplatform.block.BlockEndorsement
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.protobuf.*
 
@@ -8,11 +9,12 @@ import scala.util.Try
 
 object PBFinalizationVotings {
   def vanilla(pb: PBFinalizationVoting): Try[VanillaFinalizationVoting] = Try {
+    val sig = BlsSignature(pb.aggregatedEndorsementSignature.toByteArray).explicitGet() // TODO: better error
     VanillaFinalizationVoting(
       pb.endorserIndexes,
-      BlsSignature(pb.aggregatedEndorsementSignature.toByteArray),
+      sig,
       pb.conflictEndorsements.zipWithIndex.map { case (x, i) =>
-        PBEndorseBlocks.vanilla(x) match {
+        PBEndorseBlocks.vanilla(x, sig) match {
           case x: BlockEndorsement.Conflict => x
           case _                            => throw new IllegalArgumentException(s"EndorseBlock $i is incomplete")
         }

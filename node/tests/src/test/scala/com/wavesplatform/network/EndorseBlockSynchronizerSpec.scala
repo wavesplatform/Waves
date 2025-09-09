@@ -4,7 +4,8 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
+import com.wavesplatform.network.EndorsementStorage.EndorsementFilter
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.TxHelpers
@@ -30,9 +31,11 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
   private val blockId            = mkRandomBlockId
   private val blockHeight        = Height(10)
 
+  // TODO: EndorsementStorage
+  // TODO: Additional tests
   "Should ignore" - {
     "an already received endorsement" in withContext { c =>
-      c.blockchainUpdated(blockId, activeGenerator.publicKey)
+      c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
 
       val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, blockId, blockHeight))
       c.receivedEndorseBlock(msg)
@@ -44,12 +47,12 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
 
     "an endorsement with" - {
       def test(msg: EndorseBlock): Unit = withContext { c =>
-        c.blockchainUpdated(blockId, activeGenerator.publicKey)
+        c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
         c.receivedEndorseBlock(msg)
         c.outChannel.outboundMessages() shouldBe empty
       }
 
-      "a wrong signature" in test(EndorseBlock(activeGenerator.publicKey, finalizedId, blockId, blockHeight, BlsSignature.empty))
+      "a wrong signature" in test(EndorseBlock(activeGenerator.publicKey.byteStr, finalizedId, blockId, blockHeight, ByteStr.empty))
       "an unexpected height" in test(EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, blockId, Height(Int.MaxValue))))
       "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, finalizedId, blockId, blockHeight)))
       "an already finalized block" in test(EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, finalizedId, blockHeight)))
@@ -57,14 +60,15 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
   }
 
   "Should rebroadcast a valid endorsement on same height after a rollback" in withContext { c =>
-    c.blockchainUpdated(blockId, activeGenerator.publicKey)
+    // TODO: blockHeight
+    c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
 
     val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, blockId, blockHeight))
     c.receivedEndorseBlock(msg)
     c.outChannel.outboundMessages().poll()
 
-    c.blockchainUpdated(mkRandomBlockId, activeGenerator.publicKey) // height - 1
-    c.blockchainUpdated(blockId, activeGenerator.publicKey)
+    c.blockchainUpdated(blockHeight, mkRandomBlockId, activeGenerator.publicKey) // height - 1
+    c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
 
     // TODO: this should not pass
     c.receivedEndorseBlock(msg)
@@ -80,13 +84,13 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     allChannels.add(inChannel)
     allChannels.add(outChannel)
 
-    val last         = PS[(BlockId, Set[BlsPublicKey])]()
+    val last         = PS[EndorsementFilter]()
     val endorsements = PS[(Channel, EndorseBlock)]()
-    val storage      = EndorsementStorage(maxEndorsers = 1)
+    val storage      = EndorsementStorage.InMemory()
     val synchronizer = EndorseBlockSynchronizer.start(storage, last, endorsements, allChannels, testScheduler)
 
-    def blockchainUpdated(blockId: BlockId, newEndorsers: BlsPublicKey*): Unit = {
-      last.onNext((blockId, newEndorsers.toSet))
+    def blockchainUpdated(blockHeight: Height, blockId: BlockId, newEndorsers: BlsPublicKey*): Unit = {
+      last.onNext(EndorsementFilter(blockHeight, blockId, finalizedId, newEndorsers.zipWithIndex.toMap)) // TODO: finalizedId
       testScheduler.tick()
     }
 

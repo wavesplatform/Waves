@@ -159,7 +159,8 @@ class MicroBlockMinerImpl(
       stateHash: Option[ByteStr]
   ): Either[MicroBlockMiningError, (Block, MicroBlock)] =
     microBlockBuildTimeStats.measureSuccessful {
-      val currentFinalizationVoting = endorsementStorage.takeAndClear(accumulatedBlock.header.reference)
+      // TODO: Add miner's signature?
+      val currentFinalizationVoting = endorsementStorage.tryCollectAndClear(accumulatedBlock.header.reference)
       for {
         signedBlock <- Block
           .buildAndSign(
@@ -174,11 +175,7 @@ class MicroBlockMinerImpl(
             rewardVote = accumulatedBlock.header.rewardVote,
             stateHash = if (blockchainUpdater.supportsLightNodeBlockFields()) stateHash else None,
             challengedHeader = None,
-            finalizationVoting = (accumulatedBlock.header.finalizationVoting, currentFinalizationVoting) match {
-              case (None, x)            => x
-              case (Some(acc), Some(x)) => Some(acc + x)
-              case (acc, _)             => acc
-            }
+            finalizationVoting = currentFinalizationVoting.orElse(accumulatedBlock.header.finalizationVoting)
           )
           .leftMap(BlockBuildError.apply)
         microBlock <- MicroBlock

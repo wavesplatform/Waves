@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 case class BlsPublicKey private (byteStr: ByteStr) extends AnyVal {
   def arr: Array[Byte] = byteStr.arr
 
-  def verify(message: Array[Byte], signature: BlsSignature): Boolean =
+  def verify(message: Array[Byte], signature: BlsSignature.NonEmpty): Boolean =
     BlsUtils.verifyBasic(signature.arr, message, arr)
 
   def base64: String            = byteStr.base64

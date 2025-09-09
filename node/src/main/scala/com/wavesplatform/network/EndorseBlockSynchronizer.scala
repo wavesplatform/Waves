@@ -1,105 +1,121 @@
 package com.wavesplatform.network
 
-import com.google.common.cache.CacheBuilder
 import com.typesafe.scalalogging.LazyLogging
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.FinalizationVoting
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.bls.BlsPublicKey
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.block.{BlockEndorsement, FinalizationVoting}
+import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
+import com.wavesplatform.network.EndorsementStorage.EndorsementFilter
+import com.wavesplatform.state.Height
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
-import monix.execution.atomic.{Atomic, AtomicAny}
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 
-import scala.jdk.CollectionConverters.*
+import scala.collection.mutable
 
+// TODO: .switch: use in appender when changed height
 trait EndorsementStorage {
-  /*
- should store something like:
-case class FinalizationVoting(
-    endorsers: Seq[BlsPublicKey],
-    aggregatedEndorsement: BlsSignature,
-    invalid: Seq[BlockEndorsement.Conflict]
-) {
-??
-   */
 
-  // TODO: Preserves the order of insertion
-  def tryAdd(msg: EndorseBlock): Boolean
-  def switch(endorsedBlockId: BlockId, endorsers: Set[BlsPublicKey]): Unit // TODO: use in appender when changed height
-  def takeAndClear(endorsedBlockId: BlockId): Option[FinalizationVoting]
+  /** Add a vote, preserves the order of voting.
+    * @return
+    *   true, if it can be shared with neighbours
+    */
+  def tryAddVote(msg: EndorseBlock): Boolean
+
+  def startNewVoting(filter: EndorsementFilter): Unit
+
+  /** Returns a voting results at this time and resets all except an aggregated voting signature.
+    */
+  def tryCollectAndClear(endorsedBlockId: BlockId): Option[FinalizationVoting]
 }
 
 object EndorsementStorage {
+  type EndorserIndex = Int
+  case class EndorsementFilter(endorsedHeight: Height, endorsedId: BlockId, finalizedId: BlockId, expectedEndorsers: Map[BlsPublicKey, EndorserIndex])
+
   val Disabled: EndorsementStorage = new EndorsementStorage {
-    override def tryAdd(msg: EndorseBlock): Boolean                                   = false
-    override def switch(endorsedBlockId: BlockId, endorsers: Set[BlsPublicKey]): Unit = {}
-    override def takeAndClear(endorsedBlockId: BlockId): Option[FinalizationVoting]   = None
+    override def tryAddVote(msg: EndorseBlock): Boolean                                   = false
+    override def startNewVoting(filter: EndorsementFilter): Unit                          = {}
+    override def tryCollectAndClear(endorsedBlockId: BlockId): Option[FinalizationVoting] = None
   }
 
-  private case class Data(endorsedBlockId: BlockId, expectedEndorsers: Set[BlsPublicKey], voting: Option[FinalizationVoting])
+  // Logs?
+  class InMemory extends EndorsementStorage {
+    private var currentFilter = Option.empty[EndorsementFilter]
+    private val processed     = mutable.HashSet.empty[EndorseBlock]
 
-  def apply(
-      maxEndorsers: Int
-  ): EndorsementStorage = new EndorsementStorage with ScorexLogging {
-    private val current: Atomic[Data] = AtomicAny(Data(ByteStr.empty, Set.empty, None))
+    private var currentVoting = FinalizationVoting() // TODO: move to currentFilter?
 
-    private val known = CacheBuilder
-      .newBuilder()
-      .maximumSize(maxEndorsers * 2) // 2 for valid and conflict
-      .build[EndorseBlock, Object]
+    private val monitor            = new Object()
+    private def synced[T](f: => T) = monitor.synchronized(f)
 
-    private val dummy = new Object()
+    // TODO: move?
+    private def verify(msg: EndorseBlock): Option[BlsSignature.NonEmpty] = {
+      val pk = BlsPublicKey(msg.endorserPublicKey)
+      for {
+        sig <- BlsSignature(msg.signature).toOption
+        _   <- Option.when(pk.verify(BlockEndorsement.mkMessage(msg.finalizedBlockId, msg.blockId, msg.blockHeight), sig))(sig)
+      } yield sig
+    }
 
-    override def tryAdd(msg: EndorseBlock): Boolean = {
-      // TODO: getAndSet, update voting, remove expected
-      val c = current.get()
-      val r = fit(msg, c.endorsedBlockId, c.expectedEndorsers)
-      if (r) {
-        known.put(msg, dummy)
+    override def tryAddVote(msg: EndorseBlock): Boolean = synced {
+      currentFilter.exists { filter => // Empty means "no voting for now"
+        msg.blockHeight == filter.endorsedHeight &&
+        msg.blockId == filter.endorsedId && // Ignore endorsing other block because this could be a switch to a better branch
+        !processed.contains(msg) && {
+          val pk = BlsPublicKey(msg.endorserPublicKey)
+          // We don't track a number of endorsers, because it guaranteed by CommitToGeneration transaction validation
+          (verify(msg), filter.expectedEndorsers.get(pk)) match {
+            case (Some(sig), Some(idx)) =>
+              val isConflict = msg.finalizedBlockId == filter.finalizedId
+              // TODO: wrong
+              currentVoting = if (processed.isEmpty) { // First vote
+                if (isConflict) FinalizationVoting(conflict = Seq(toConflict(msg, pk, sig)))
+                else FinalizationVoting(aggregatedEndorsement = sig)
+              } else if (isConflict) currentVoting.withValid(idx, sig)
+              else currentVoting.withConflict(toConflict(msg, pk, sig))
+
+              processed += msg
+              true
+
+            case _ => false // Either empty signature or unexpected endorser
+          }
+        }
       }
-      r
     }
 
-    override def switch(endorsedBlockId: BlockId, endorsers: Set[BlsPublicKey]): Unit = {
-      current.set(Data(endorsedBlockId, endorsers, None))
+    private def toConflict(msg: EndorseBlock, pk: BlsPublicKey, verifiedSig: BlsSignature.NonEmpty): BlockEndorsement.Conflict =
+      BlockEndorsement.Conflict(pk, msg.finalizedBlockId, msg.blockId, verifiedSig)
 
-      logger.trace(s"Invalidating known endorsements for $endorsedBlockId")
-      val stale = known.asMap().keySet().asScala.filterNot(fit(_, endorsedBlockId, endorsers))
-      known.invalidateAll(stale.asJava)
+    override def startNewVoting(filter: EndorsementFilter): Unit = synced {
+      currentFilter = Some(filter)
+      processed.clear()
+      currentVoting = FinalizationVoting()
     }
 
-    override def takeAndClear(endorsedBlockId: BlockId): Option[FinalizationVoting] = {
-      val voting = current.getAndTransform { x => Data(x.endorsedBlockId, x.expectedEndorsers, None) }.voting
-
-      // Remove known:
-      // val endorsers = voting.fold(Seq.empty)(_.endorsers).toSet
-      // val k = known.asMap().keySet().asScala.filter(x => endorsers.contains(x.endorserPublicKey))
-      // known.invalidateAll(k.asJava)
-
-      voting
+    override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = synced {
+      currentFilter.filter(_.endorsedId == endorsedId).map { _ =>
+        val r = currentVoting
+        currentVoting = currentVoting.copy(endorserIndexes = Seq.empty, conflict = Seq.empty)
+        r
+      }
     }
-
-    private def fit(x: EndorseBlock, endorsedBlockId: BlockId, endorsers: Set[BlsPublicKey]): Boolean =
-      x.blockId == endorsedBlockId && endorsers.contains(x.endorserPublicKey)
   }
 }
 
 object EndorseBlockSynchronizer extends LazyLogging {
   def start(
       storage: EndorsementStorage,
-      lastEndorsers: Observable[(BlockId, Set[BlsPublicKey])],
+      lastFilter: Observable[EndorsementFilter],
       receivingEndorsements: Observable[(Channel, EndorseBlock)],
       allChannels: DefaultChannelGroup,
       scheduler: Scheduler
   ): Cancelable = {
     // TODO: move outside
-    lastEndorsers.foreach(Function.tupled(storage.switch))(using scheduler)
+    lastFilter.foreach(storage.startNewVoting)(using scheduler)
 
     receivingEndorsements.foreach { case (ch, x) =>
-      if (storage.tryAdd(x)) allChannels.broadcast(x, Some(ch))
+      if (storage.tryAddVote(x)) allChannels.broadcast(x, Some(ch))
     }(using scheduler)
   }
 }

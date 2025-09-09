@@ -6,13 +6,13 @@ import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
 import com.wavesplatform.state.Height
 
 enum BlockEndorsement {
-  case Full(endorser: BlsPublicKey, finalizedBlockId: BlockId, blockId: BlockId, blockHeight: Height, signature: BlsSignature)
-  case Conflict(endorser: BlsPublicKey, finalizedBlockId: BlockId, blockId: BlockId, signature: BlsSignature)
-  case Valid(endorser: BlsPublicKey, finalizedBlockId: BlockId, signature: BlsSignature)
+  case Full(endorser: BlsPublicKey, finalizedBlockId: BlockId, blockId: BlockId, blockHeight: Height, signature: BlsSignature.NonEmpty)
+  case Conflict(endorser: BlsPublicKey, finalizedBlockId: BlockId, blockId: BlockId, signature: BlsSignature.NonEmpty)
+  case Valid(endorser: BlsPublicKey, finalizedBlockId: BlockId, signature: BlsSignature.NonEmpty)
 }
 
 object BlockEndorsement {
-  def sign(kp: BlsKeyPair, finalizedId: BlockId, id: BlockId, height: Height): BlsSignature =
+  def sign(kp: BlsKeyPair, finalizedId: BlockId, id: BlockId, height: Height): BlsSignature.NonEmpty =
     kp.sign(mkMessage(finalizedId, id, height))
 
   def mkMessage(finalizedId: BlockId, id: BlockId, height: Height): Array[Byte] = finalizedId.arr ++ id.arr ++ Ints.toByteArray(height)
