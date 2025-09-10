@@ -33,7 +33,7 @@ class TransactionVersionValidationTest extends PropSpec with WithDomain {
   private val order1 = order(BUY, asset, Waves, price = 123456789, version = V1)
   private val order2 = order(SELL, asset, Waves, price = 123456789, version = V1)
 
-  private val txsByMaxVersion: Seq[(TxVersion, TxVersion => Transaction)] =
+  private lazy val txsByMaxVersion: Seq[(TxVersion, TxVersion => Transaction)] =
     Seq(
       (V3, v => transfer(version = v)),
       (V3, v => issue(version = v)),

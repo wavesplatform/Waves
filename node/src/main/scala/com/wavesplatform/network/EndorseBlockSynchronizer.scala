@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
-import com.typesafe.scalalogging.LazyLogging
+import cats.syntax.either.*
+import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
@@ -40,7 +41,7 @@ object EndorsementStorage {
   }
 
   // Logs?
-  class InMemory extends EndorsementStorage {
+  class InMemory extends EndorsementStorage with StrictLogging {
     private var currentFilter = Option.empty[EndorsementFilter]
     private val processed     = mutable.HashSet.empty[EndorseBlock]
 
@@ -50,7 +51,7 @@ object EndorsementStorage {
     private def synced[T](f: => T) = monitor.synchronized(f)
 
     // TODO: move?
-    private def verify(msg: EndorseBlock): Option[BlsSignature.NonEmpty] = {
+    private def verifySig(msg: EndorseBlock): Option[BlsSignature.NonEmpty] = {
       val pk = BlsPublicKey(msg.endorserPublicKey)
       for {
         sig <- BlsSignature(msg.signature).toOption
@@ -59,29 +60,29 @@ object EndorsementStorage {
     }
 
     override def tryAddVote(msg: EndorseBlock): Boolean = synced {
-      currentFilter.exists { filter => // Empty means "no voting for now"
-        msg.blockHeight == filter.endorsedHeight &&
-        msg.blockId == filter.endorsedId && // Ignore endorsing other block because this could be a switch to a better branch
-        !processed.contains(msg) && {
-          val pk = BlsPublicKey(msg.endorserPublicKey)
-          // We don't track a number of endorsers, because it guaranteed by CommitToGeneration transaction validation
-          (verify(msg), filter.expectedEndorsers.get(pk)) match {
-            case (Some(sig), Some(idx)) =>
-              val isConflict = msg.finalizedBlockId == filter.finalizedId
-              // TODO: wrong
-              currentVoting = if (processed.isEmpty) { // First vote
-                if (isConflict) FinalizationVoting(conflict = Seq(toConflict(msg, pk, sig)))
-                else FinalizationVoting(aggregatedEndorsement = sig)
-              } else if (isConflict) currentVoting.withValid(idx, sig)
-              else currentVoting.withConflict(toConflict(msg, pk, sig))
+      for {
+        filter <- currentFilter.toRight("Voting hasn't started")
+        _      <- Either.raiseUnless(msg.blockHeight == filter.endorsedHeight)(s"Expected height ${filter.endorsedHeight}")
+        _      <- Either.raiseUnless(msg.blockId == filter.endorsedId)(s"Expected block ${filter.endorsedId}") // Could be a switch to a better branch
+        _      <- Either.raiseWhen(processed.contains(msg))("Already processed")
+        sig    <- verifySig(msg).toRight("Invalid signature")
+        pk = BlsPublicKey(msg.endorserPublicKey)
+        idx <- filter.expectedEndorsers.get(pk).toRight(s"Expected endorsers: ${filter.expectedEndorsers.mkString(", ")}")
+      } yield {
+        val isConflict = msg.finalizedBlockId == filter.finalizedId
+        // TODO: wrong
+        currentVoting = if (processed.isEmpty) { // First vote
+          if (isConflict) FinalizationVoting(conflict = Seq(toConflict(msg, pk, sig)))
+          else FinalizationVoting(aggregatedEndorsement = sig)
+        } else if (isConflict) currentVoting.withValid(idx, sig)
+        else currentVoting.withConflict(toConflict(msg, pk, sig))
 
-              processed += msg
-              true
-
-            case _ => false // Either empty signature or unexpected endorser
-          }
-        }
+        processed += msg
+        true
       }
+    } match {
+      case Left(err) => logger.debug(s"Unexpected $msg: $err"); false
+      case Right(r)  => r
     }
 
     private def toConflict(msg: EndorseBlock, pk: BlsPublicKey, verifiedSig: BlsSignature.NonEmpty): BlockEndorsement.Conflict =
