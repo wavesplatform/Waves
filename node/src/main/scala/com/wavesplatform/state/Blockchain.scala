@@ -171,9 +171,11 @@ object Blockchain {
 
     // TODO: not efficient?
     def generationDeposit(address: Address): Long = {
-      val curr            = blockchain.currentGenerationPeriod
-      val committedOnCurr = blockchain.committedGenerators(curr).find(_._2 == address).size
-      val committedOnNext = blockchain.committedGenerators(curr.next).find(_._2 == address).size
+      val curr               = blockchain.currentGenerationPeriod
+      val allCommittedOnCurr = blockchain.committedGenerators(curr)
+      val committedOnCurr    = allCommittedOnCurr.find { case (generatorAddress, _, _) => generatorAddress == address }.size
+      val allCommittedOnNext = blockchain.committedGenerators(curr.next)
+      val committedOnNext    = allCommittedOnNext.find { case (generatorAddress, _, _) => generatorAddress == address }.size
       (committedOnCurr + committedOnNext) * CommitToGenerationTransaction.DepositInWavelets
     }
 

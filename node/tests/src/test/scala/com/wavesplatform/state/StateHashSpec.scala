@@ -47,6 +47,7 @@ class StateHashSpec extends FreeSpec {
     stateHash.addAssetBalance(address, assetId, 2000)
     stateHash.addAssetBalance(address1, assetId, 2000)
     stateHash.addWavesBalance(address, 1000)
+    stateHash.addNextCommittedGenerator(wavesAccount.toAddress, blsAccount.publicKey, TransactionId(commitTxn.id()))
     val result = stateHash.result()
 
     def hash(bs: Array[Byte]*): ByteStr    = ByteStr(com.wavesplatform.crypto.fastHash(bs.reduce(_ ++ _)))
@@ -126,6 +127,14 @@ class StateHashSpec extends FreeSpec {
           Longs.toByteArray(1000)
         )
       }
+
+      "next generator" in {
+        sect(NextCommittedGenerators) shouldBe hash(
+          commitTxn.id().arr,
+          wavesAccount.publicKey.toAddress.bytes,
+          blsAccount.publicKey.byteStr.arr
+        )
+      }
     }
 
     "total" in {
@@ -139,7 +148,8 @@ class StateHashSpec extends FreeSpec {
         LeaseBalance,
         LeaseStatus,
         Sponsorship,
-        Alias
+        Alias,
+        NextCommittedGenerators
       )
         .map(sect)
 

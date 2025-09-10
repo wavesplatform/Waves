@@ -11,7 +11,7 @@ sealed abstract class BlsSignature(val byteStr: ByteStr) {
 }
 
 object BlsSignature {
-  val SizeInBytes = 98
+  val SizeInBytes = 96
 
   object Empty extends BlsSignature(ByteStr.empty) {
     override def toString: String = "empty"

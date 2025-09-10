@@ -19,18 +19,22 @@ import scala.util.{Failure, Success}
 class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
   private val origTx = CommitToGenerationTransaction(
     sender = PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-    endorsementPublicKey = BlsPublicKey(ByteStr.decodeBase58("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").get),
+    endorsementPublicKey = BlsPublicKey(Base64.decode("jb9333lHnhHpkBH168ZrDRYM7d8vzs+t4yXwfpYhPw1dR6mvWnzjMU9TLmqgOjPb")),
     generationPeriodStart = Height(3000),
     timestamp = 1526287561757L,
     fee = TxPositiveAmount.unsafeFrom(100000000),
-    endorsementKeySignature = BlsSignature(Base64.decode("OLI6mFSZD949zoVKqRt48SDNNnToWO+vUsmtCdeix7wH5RQkOwYQQvQEhQW/fmNCmsrmbW2IMt7SGjnCvPW9gQ==")).explicitGet(),
+    endorsementKeySignature = BlsSignature(
+      Base64.decode(
+        "hmkx3WW+Ns3qUkDCxP5911lWw+BghFuDZhvbLWK3oJ6JbguzkAFy8tXAGMtCbZTWABx1zB2GiZTVp420HGDSxP5A3RnvLYtoQRGtZYbjOBfeyR/EktJofDyUPQjcFsib"
+      )
+    ).explicitGet(),
     proofs = Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get),
     chainId = AddressScheme.current.chainId
   )
 
   "JSON parsing" in {
     val js = Json.parse("""{
-      "id": "Cwtoj31MRz7Xf7HpDbfUetJwjxbymPJw84bZHZdEmwpj",
+      "id": "55Cy8fzNF8wNQjjtsFhiNCUQkCJL97iaLRYfnEVRpVnr",
       "type": 20,
       "version": 1,
       "fee": 100000000,
@@ -39,8 +43,8 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
       "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
       "generationPeriodStart": 3000,
-      "endorsementPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
-      "endorsementKeySignature": "OLI6mFSZD949zoVKqRt48SDNNnToWO+vUsmtCdeix7wH5RQkOwYQQvQEhQW/fmNCmsrmbW2IMt7SGjnCvPW9gQ==",
+      "endorsementPublicKey": "base64:jb9333lHnhHpkBH168ZrDRYM7d8vzs+t4yXwfpYhPw1dR6mvWnzjMU9TLmqgOjPb",
+      "endorsementKeySignature": "base64:hmkx3WW+Ns3qUkDCxP5911lWw+BghFuDZhvbLWK3oJ6JbguzkAFy8tXAGMtCbZTWABx1zB2GiZTVp420HGDSxP5A3RnvLYtoQRGtZYbjOBfeyR/EktJofDyUPQjcFsib",
       "proofs": [
         "28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ"
       ],

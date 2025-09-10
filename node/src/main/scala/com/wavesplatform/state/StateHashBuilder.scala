@@ -4,6 +4,7 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.StateHashBuilder.Result
@@ -92,6 +93,13 @@ class StateHashBuilder {
   def addSponsorship(asset: IssuedAsset, minSponsoredFee: Long): Unit = {
     addEntry(SectionId.Sponsorship, asset.id.arr)(
       Longs.toByteArray(minSponsoredFee)
+    )
+  }
+
+  // TODO: do we need to add all data here?
+  def addNextCommittedGenerator(address: Address, blsPublicKey: BlsPublicKey, txnId: TransactionId): Unit = {
+    addEntry(SectionId.NextCommittedGenerators, txnId.arr)(
+      address.bytes ++ blsPublicKey.arr
     )
   }
 
