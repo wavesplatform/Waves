@@ -46,10 +46,10 @@ case class SignedCommitToGenerationRequest(
 ) {
   def toTx: Either[ValidationError, CommitToGenerationTransaction] =
     for {
-      _sender <- PublicKey.fromBase58String(senderPublicKey)
-      sig     <- BlsSignature(endorsementKeySignature)
+      _senderPk <- PublicKey.fromBase58String(senderPublicKey)
+      sig       <- BlsSignature(endorsementKeySignature)
       t <- CommitToGenerationTransaction.create(
-        _sender,
+        _senderPk,
         BlsPublicKey(endorsementPublicKey),
         Height(generationPeriodStart),
         timestamp,

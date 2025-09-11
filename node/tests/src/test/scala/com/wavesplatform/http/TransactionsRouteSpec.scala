@@ -58,7 +58,7 @@ class TransactionsRouteSpec
   private val richAccount = TxHelpers.signer(10001)
   private val richAddress = richAccount.toAddress
 
-  override def settings: WavesSettings = DomainPresets.TransactionStateSnapshot.copy(
+  override def settings: WavesSettings = DomainPresets.DeterministicFinality.copy(
     restAPISettings = restAPISettings.copy(transactionsByAddressLimit = 5)
   )
   override def genesisBalances: Seq[AddrWithBalance] = Seq(AddrWithBalance(richAddress, 1_000_000.waves))
@@ -1057,6 +1057,13 @@ class TransactionsRouteSpec
           s"Invalid attachment. Length ${attachment.size} bytes exceeds maximum of ${TransferTransaction.MaxAttachmentSize} bytes."
         )
       )
+    }
+
+    "CommitToGeneration transaction" in {
+      val txn = TxHelpers.commitToGeneration(settings.blockchainSettings.functionalitySettings.generationPeriod)
+      Post(routePath("/broadcast"), txn.json()) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+      }
     }
   }
 
