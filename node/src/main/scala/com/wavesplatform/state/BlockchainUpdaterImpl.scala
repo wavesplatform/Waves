@@ -148,7 +148,6 @@ class BlockchainUpdaterImpl(
 
       approvedFeatures
     } else {
-
       Set.empty
     }
   }
@@ -393,7 +392,7 @@ class BlockchainUpdaterImpl(
                           }
                         val shouldFinalize = votedGeneratorsBalance >= (totalGeneratorsBalance * 2 / 3)
                         // height is actually a parent height, because we haven't updated it, see above
-                        val newFinalizationHeight = if (shouldFinalize) Height(height) else this.finalizedHeight
+                        val newFinalizationHeight = Height((if (shouldFinalize) Height(height) else this.finalizedHeight).max(GenesisBlockHeight))
 
                         rocksdb.append(
                           liquidSnapshotWithCancelledLeases,
@@ -732,6 +731,10 @@ class BlockchainUpdaterImpl(
     else rocksdb.blockHeader(height)
   }
 
+  override def finalizedHeightAt(at: Height): Option[Height] = readLock {
+    rocksdb.finalizedHeightAt(at)
+  }
+
   override def transferById(id: BlockId): Option[(Int, TransferTransactionLike)] = readLock {
     snapshotBlockchain.transferById(id)
   }
@@ -848,7 +851,7 @@ class BlockchainUpdaterImpl(
       .getOrElse(rocksdb.lastStateHash(None))
   }
 
-  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] = readLock {
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = readLock {
     snapshotBlockchain.committedGenerators(at)
   }
 

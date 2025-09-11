@@ -203,6 +203,8 @@ case class SnapshotBlockchain(
       case _                                          => inner.blockHeader(height)
     }
 
+  override def finalizedHeightAt(at: Height): Option[Height] = inner.finalizedHeightAt(at)
+
   override def heightOf(blockId: ByteStr): Option[Int] = blockMeta.filter(_._1.id() == blockId).map(_ => height) orElse inner.heightOf(blockId)
 
   /** Features related */
@@ -232,7 +234,7 @@ case class SnapshotBlockchain(
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
-  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] =
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] =
     if (at == this.currentGenerationPeriod.next) snapshot.nextCommittedGenerators
     else inner.committedGenerators(at)
 

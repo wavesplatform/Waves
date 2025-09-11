@@ -20,8 +20,8 @@ object BlsSignature {
   case class NonEmpty private (override val byteStr: ByteStr) extends BlsSignature(byteStr)
   object NonEmpty {
     // TODO: check size and add def unsafe for append
-    def apply(arr: Array[Byte]): NonEmpty                        = new NonEmpty(ByteStr(arr))
-    def apply(byteStr: ByteStr): NonEmpty                        = new NonEmpty(byteStr)
+    def apply(arr: Array[Byte]): NonEmpty               = new NonEmpty(ByteStr(arr))
+    def apply(byteStr: ByteStr): NonEmpty               = new NonEmpty(byteStr)
     private[bls] def unsafe(byteStr: ByteStr): NonEmpty = NonEmpty(byteStr)
   }
 

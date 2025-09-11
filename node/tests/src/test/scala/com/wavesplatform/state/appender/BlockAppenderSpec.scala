@@ -159,8 +159,8 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
       def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
         private val blsKeyPair = BlsKeyPair(sender.privateKey)
 
-        override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] =
-          Seq((sender.toAddress, blsKeyPair.publicKey, TxHelpers.randomId))
+        override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] =
+          IndexedSeq((sender.toAddress, blsKeyPair.publicKey, TxHelpers.randomId))
       }
 
       withDomain(
@@ -175,7 +175,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
 
     "should append a block if no one committed" in {
       def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-        override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] = Seq.empty
+        override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = IndexedSeq.empty
       }
 
       withDomain(
@@ -220,8 +220,8 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
       def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
         private val blsKeyPair = BlsKeyPair(generator.privateKey)
 
-        override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] =
-          Seq((generator.toAddress, blsKeyPair.publicKey, TxHelpers.randomId))
+        override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] =
+          IndexedSeq((generator.toAddress, blsKeyPair.publicKey, TxHelpers.randomId))
       }
 
       withDomain(

@@ -147,12 +147,15 @@ class BlockChallengerImpl(
 
   override def endorse(height: Height): Seq[BlockEndorsement.Full] =
     for {
-      id <- blockchainUpdater.blockId(height).toSeq
-      finalizedId = id // TODO:
-      committed   = blockchainUpdater.committedGenerators(blockchainUpdater.generationPeriodOf(height)).view.map { case (addr, _, _) => addr }.toSet
-      account <- wallet.privateKeyAccounts
-      if committed.contains(account.toAddress)
-    } yield BlockEndorsement.full(BlsKeyPair(account.privateKey), finalizedId, id, height)
+      endorsedId      <- blockchainUpdater.blockId(height).toSeq
+      finalizedHeight <- blockchainUpdater.finalizedHeightAt(height).toSeq
+      finalizedId     <- blockchainUpdater.blockId(finalizedHeight).toSeq
+      committed = blockchainUpdater.committedGenerators(blockchainUpdater.generationPeriodOf(height))
+      (account, idx) <- for {
+        ((committedAddr, _, _), idx) <- committed.zipWithIndex
+        pk                           <- wallet.privateKeyAccount(committedAddr).toSeq
+      } yield (pk, idx)
+    } yield BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, endorsedId, height)
 
   private def withProcessingTxs[A](txs: Seq[Transaction])(body: Task[A]): Task[A] =
     Task(processingTxs.putAll(txs.map(tx => tx.id() -> tx).toMap.asJava))

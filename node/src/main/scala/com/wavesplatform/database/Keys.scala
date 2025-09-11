@@ -259,10 +259,10 @@ object Keys {
   def committedGenerators(period: GenerationPeriod, commitmentHeight: Height): Key[Option[Seq[(AddressId, BlsPublicKey, TransactionId)]]] =
     Key.opt(CommittedGenerators, h(period.start) ++ h(commitmentHeight), readCommittedGenerators, writeCommittedGenerators)
 
-  def finalizedHeight(at: Height): Key[Height] = Key(
+  def finalizedHeight(at: Height): Key[Option[Height]] = Key.opt(
     FinalizedBlockHeight,
     h(at),
-    bytes => com.wavesplatform.state.Height(if (bytes != null && bytes.length >= Ints.BYTES) Ints.fromByteArray(bytes) else 1),
+    bytes => com.wavesplatform.state.Height(Ints.fromByteArray(bytes)),
     Ints.toByteArray
   )
 }

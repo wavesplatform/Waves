@@ -28,6 +28,7 @@ trait Blockchain {
   def score: BigInt
 
   def blockHeader(height: Int): Option[SignedBlockHeader]
+  def finalizedHeightAt(at: Height): Option[Height]
   def hitSource(height: Int): Option[ByteStr]
 
   def carryFee(refId: Option[ByteStr]): Long
@@ -89,7 +90,7 @@ trait Blockchain {
 
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
-  def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)]
+  def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)]
 
   /** @return
     *   In commitment order

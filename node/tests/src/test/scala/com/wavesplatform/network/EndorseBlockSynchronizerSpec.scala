@@ -25,11 +25,12 @@ import scala.util.Using
 class EndorseBlockSynchronizerSpec extends FreeSpec {
   private val testScheduler = TestScheduler(ExecutionModel.AlwaysAsyncExecution)
 
-  private val activeGenerator    = BlsKeyPair(TxHelpers.signer(0).privateKey)
-  private val committedGenerator = BlsKeyPair(TxHelpers.signer(1).privateKey)
-  private val finalizedId        = mkRandomBlockId
-  private val blockId            = mkRandomBlockId
-  private val blockHeight        = Height(10)
+  private val activeGenerator     = BlsKeyPair(TxHelpers.signer(0).privateKey)
+  private val committedGenerator  = BlsKeyPair(TxHelpers.signer(1).privateKey)
+  private val activeEndorserIndex = 1
+  private val finalizedId         = mkRandomBlockId
+  private val blockId             = mkRandomBlockId
+  private val blockHeight         = Height(10)
 
   // TODO: EndorsementStorage
   // TODO: Additional tests
@@ -37,7 +38,7 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     "an already received endorsement" in withContext { c =>
       c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
 
-      val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, blockId, blockHeight))
+      val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockId, blockHeight))
       c.receivedEndorseBlock(msg)
       c.outChannel.outboundMessages().poll() shouldBe msg
 
@@ -46,16 +47,23 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     }
 
     "an endorsement with" - {
+      // TODO: use args with default values instead
       def test(msg: EndorseBlock): Unit = withContext { c =>
         c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
         c.receivedEndorseBlock(msg)
         c.outChannel.outboundMessages() shouldBe empty
       }
 
-      "a wrong signature" in test(EndorseBlock(activeGenerator.publicKey.byteStr, finalizedId, blockId, blockHeight, ByteStr.empty))
-      "an unexpected height" in test(EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, blockId, Height(Int.MaxValue))))
-      "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, finalizedId, blockId, blockHeight)))
-      "an already finalized block" in test(EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, finalizedId, blockHeight)))
+      "a wrong signature" in test(
+        EndorseBlock(activeEndorserIndex, finalizedId, blockId, blockHeight, ByteStr.empty)
+      )
+      "an unexpected height" in test(
+        EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockId, Height(Int.MaxValue)))
+      )
+      "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, 2, finalizedId, blockId, blockHeight)))
+      "an already finalized block" in test(
+        EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, finalizedId, blockHeight))
+      )
     }
   }
 
@@ -63,7 +71,7 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     // TODO: blockHeight
     c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
 
-    val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, finalizedId, blockId, blockHeight))
+    val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockId, blockHeight))
     c.receivedEndorseBlock(msg)
     c.outChannel.outboundMessages().poll()
 
@@ -90,7 +98,7 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     val synchronizer = EndorseBlockSynchronizer.start(storage, last, endorsements, allChannels, testScheduler)
 
     def blockchainUpdated(blockHeight: Height, blockId: BlockId, newEndorsers: BlsPublicKey*): Unit = {
-      last.onNext(EndorsementFilter(blockHeight, blockId, finalizedId, newEndorsers.zipWithIndex.toMap)) // TODO: finalizedId
+      last.onNext(EndorsementFilter(blockHeight, blockId, finalizedId, newEndorsers.toIndexedSeq)) // TODO: finalizedId
       testScheduler.tick()
     }
 

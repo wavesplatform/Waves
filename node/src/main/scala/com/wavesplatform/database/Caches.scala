@@ -34,7 +34,7 @@ abstract class Caches extends Blockchain with Storage {
   private var current = loadCurrentBlock()
 
   @volatile
-  private var currentFinalized = loadFinalizedHeight(current.height)
+  private var currentFinalized = finalizedHeightAt(current.height).getOrElse(GenesisBlockHeight)
 
   private def loadCurrentBlock() = {
     val height = loadHeight()
@@ -42,7 +42,6 @@ abstract class Caches extends Blockchain with Storage {
   }
 
   protected def loadHeight(): Height
-  protected def loadFinalizedHeight(at: Height): Height
   protected def loadBlockMeta(height: Height): Option[PBBlockMeta]
   protected def loadTxs(height: Height): Seq[Transaction]
 
@@ -418,7 +417,7 @@ abstract class Caches extends Blockchain with Storage {
       discardedBlocks = doRollback(height)
     } yield {
       current = loadCurrentBlock()
-      currentFinalized = loadFinalizedHeight(current.height)
+      currentFinalized = finalizedHeightAt(current.height).getOrElse(GenesisBlockHeight)
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()

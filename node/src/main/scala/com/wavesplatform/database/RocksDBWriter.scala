@@ -178,12 +178,12 @@ class RocksDBWriter(
 
   override protected def loadHeight(): Height = writableDB.get(Keys.height)
 
-  override protected def loadFinalizedHeight(at: Height): Height = writableDB.get(Keys.finalizedHeight(at))
-
   override def safeRollbackHeight: Int = writableDB.get(Keys.safeRollbackHeight)
 
   override protected def loadBlockMeta(height: Height): Option[PBBlockMeta] =
     writableDB.get(Keys.blockMetaAt(height))
+
+  override def finalizedHeightAt(at: Height): Option[Height] = writableDB.get(Keys.finalizedHeight(at))
 
   override protected def loadTxs(height: Height): Seq[Transaction] =
     loadTransactions(height, rdb).map(_._2)
@@ -579,7 +579,7 @@ class RocksDBWriter(
       val h           = Height(height)
 
       rw.put(Keys.height, h)
-      rw.put(Keys.finalizedHeight(h), newFinalizedHeight)
+      rw.put(Keys.finalizedHeight(h), Some(newFinalizedHeight))
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
       val newSafeRollbackHeight      = height - dbSettings.maxRollbackDepth
@@ -1528,7 +1528,7 @@ class RocksDBWriter(
     readOnly(_.get(Keys.maliciousMinerBanHeights(address.bytes)))
 
   // TODO: use rawCommittedGenerators?
-  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey, TransactionId)] = {
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = {
     val maxGenerators = settings.functionalitySettings.maxGenerators
     val rawGenerators = new mutable.ArrayBuffer[(BlsPublicKey, TransactionId)](maxGenerators)
     val addressIds    = new mutable.ArrayBuffer[AddressId](maxGenerators)
@@ -1553,7 +1553,7 @@ class RocksDBWriter(
         case (Some(address), (pk, txnId), _) => (address, pk, txnId)
         case (None, _, aid)                  => throw new IllegalStateException(s"Can't find address for address id $aid")
       }
-      .toSeq
+      .toIndexedSeq
   }
 
   // private def rawCommittedGenerators(at: GenerationPeriod): Map[BlsPublicKey, AddressId] =

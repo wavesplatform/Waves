@@ -324,8 +324,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           EndorsementFilter(
             h,
             bi.id,
-            bi.id, // blockchainUpdater.finalized, // TODO:
-            blockchainUpdater.committedGenerators(period).view.zipWithIndex.map { case ((_, blsPk, _), i) => blsPk -> i }.toMap
+            blockchainUpdater.blockId(blockchainUpdater.finalizedHeight).getOrElse(throw new IllegalStateException("Can't find a finalized block")),
+            blockchainUpdater.committedGenerators(period).map { case (_, blsPk, _) => blsPk }
           )
       },
       receivingEndorsements = messageObserver.endorseBlocks,

@@ -9,17 +9,17 @@ object PBEndorseBlocks {
   // TODO:
   def vanilla(x: PBEndorseBlock, sig: BlsSignature.NonEmpty): BlockEndorsement = {
     if (x.blockId.isEmpty && x.blockHeight == 0)
-      BlockEndorsement.Valid(x.endorserPublicKey.toBlsPublicKey, x.finalizedBlockId.toByteStr, sig)
+      BlockEndorsement.Valid(x.endorserIndex, x.finalizedBlockId.toByteStr, sig)
     else if (x.blockHeight == 0)
       BlockEndorsement.Conflict(
-        x.endorserPublicKey.toBlsPublicKey,
+        x.endorserIndex,
         x.finalizedBlockId.toByteStr,
         x.blockId.toByteStr,
         sig
       )
     else
       BlockEndorsement.Full(
-        x.endorserPublicKey.toBlsPublicKey,
+        x.endorserIndex,
         x.finalizedBlockId.toByteStr,
         x.blockId.toByteStr,
         Height(x.blockHeight),
@@ -29,7 +29,7 @@ object PBEndorseBlocks {
 
   def protobuf(x: BlockEndorsement.Full): PBEndorseBlock =
     new PBEndorseBlock(
-      endorserPublicKey = x.endorser.byteStr.toByteString,
+      endorserIndex = x.endorserIndex,
       finalizedBlockId = x.finalizedBlockId.toByteString,
       blockId = x.blockId.toByteString,
       blockHeight = x.blockHeight,
