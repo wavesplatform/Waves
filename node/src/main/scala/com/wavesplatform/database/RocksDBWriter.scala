@@ -1069,6 +1069,7 @@ class RocksDBWriter(
         val nextPeriod = this.generationPeriodOf(currentHeight).next
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
+          rw.delete(Keys.finalizedHeight(currentHeight))
 
           val discardedMeta = rw
             .get(Keys.blockMetaAt(currentHeight))
