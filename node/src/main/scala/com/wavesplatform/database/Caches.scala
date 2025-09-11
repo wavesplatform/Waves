@@ -33,16 +33,22 @@ abstract class Caches extends Blockchain with Storage {
   @volatile
   private var current = loadCurrentBlock()
 
+  @volatile
+  private var currentFinalized = loadFinalizedHeight(current.height)
+
   private def loadCurrentBlock() = {
     val height = loadHeight()
     CurrentBlockInfo(height, loadBlockMeta(height), loadTxs(height))
   }
 
   protected def loadHeight(): Height
+  protected def loadFinalizedHeight(at: Height): Height
   protected def loadBlockMeta(height: Height): Option[PBBlockMeta]
   protected def loadTxs(height: Height): Seq[Transaction]
 
   override def height: Int = current.height
+
+  override def finalizedHeight: Height = currentFinalized
 
   override def score: BigInt = current.score
 
@@ -227,7 +233,7 @@ abstract class Caches extends Blockchain with Storage {
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
-      newFinalizationHeight: Option[Height],
+      newFinalizedHeight: Height,
       generatorBalances: Seq[Long],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
@@ -241,7 +247,7 @@ abstract class Caches extends Blockchain with Storage {
       hitSource: ByteStr,
       computedBlockStateHash: ByteStr,
       block: Block,
-      newFinalizationHeight: Option[Height],
+      newFinalizedHeight: Height,
       generatorBalances: GeneratorBalances
   ): Unit = {
     val newHeight = current.height + 1
@@ -261,6 +267,7 @@ abstract class Caches extends Blockchain with Storage {
         (reward.getOrElse(0L) * this.blockRewardBoost(newHeight))
     )
     current = CurrentBlockInfo(Height(newHeight), Some(newMeta), block.transactionData)
+    currentFinalized = newFinalizedHeight
 
     committedGeneratorBalancesCache = (
       committedGeneratorBalancesCache.current,
@@ -374,7 +381,7 @@ abstract class Caches extends Blockchain with Storage {
       updatedDataWithNodes,
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
-      newFinalizationHeight,
+      newFinalizedHeight,
       committedGeneratorBalancesCache.current,
       nextCommittedGeneratorsRev.reverse,
       stateHash.result()
@@ -411,6 +418,7 @@ abstract class Caches extends Blockchain with Storage {
       discardedBlocks = doRollback(height)
     } yield {
       current = loadCurrentBlock()
+      currentFinalized = loadFinalizedHeight(current.height)
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()

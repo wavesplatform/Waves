@@ -391,8 +391,9 @@ class BlockchainUpdaterImpl(
                           parentGen.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0))) { case ((total, voted), (b, i)) =>
                             (total + b, if (endorserIndexes.contains(i)) voted + b else voted)
                           }
-                        val shouldFinalize        = votedGeneratorsBalance >= (totalGeneratorsBalance * 2 / 3)
-                        val newFinalizationHeight = Option.when(shouldFinalize)(Height(height))
+                        val shouldFinalize = votedGeneratorsBalance >= (totalGeneratorsBalance * 2 / 3)
+                        // height is actually a parent height, because we haven't updated it, see above
+                        val newFinalizationHeight = if (shouldFinalize) Height(height) else this.finalizedHeight
 
                         rocksdb.append(
                           liquidSnapshotWithCancelledLeases,
@@ -677,6 +678,10 @@ class BlockchainUpdaterImpl(
 
   override def height: Int = readLock {
     rocksdb.height + ngState.fold(0)(_ => 1)
+  }
+
+  override def finalizedHeight: Height = readLock {
+    rocksdb.finalizedHeight
   }
 
   override def heightOf(blockId: BlockId): Option[Int] = readLock {

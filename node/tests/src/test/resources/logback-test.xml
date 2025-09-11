@@ -9,7 +9,7 @@
     <logger name="scorex.crypto.signatures.Curve25519$" level="INFO"/>
     <logger name="io.netty" level="ERROR"/>
 
-    <root level="${logback.test.level:-TRACE}">
+    <root level="${logback.test.level:-INFO}">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>

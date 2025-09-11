@@ -69,7 +69,7 @@ object CommonBlocksApi {
 
     def currentHeight: Int = blockchain.height
 
-    def finalizedHeight: Int = blockchain.height // TODO:
+    def finalizedHeight: Int = blockchain.finalizedHeight
 
     def blockAtHeight(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = blockInfoAt(height)
 

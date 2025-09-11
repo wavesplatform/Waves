@@ -19,6 +19,8 @@ trait EmptyBlockchain extends Blockchain {
 
   override def height: Int = 0
 
+  override def finalizedHeight: Height = Height(0)
+
   override def score: BigInt = 0
 
   override def blockHeader(height: Int): Option[SignedBlockHeader] = None

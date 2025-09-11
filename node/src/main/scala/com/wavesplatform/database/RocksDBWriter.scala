@@ -35,7 +35,7 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeS
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import io.netty.util.concurrent.DefaultThreadFactory
-import org.rocksdb.{RocksDB, Status}
+import org.rocksdb.Status
 import org.slf4j.LoggerFactory
 import sun.nio.ch.Util
 
@@ -81,8 +81,6 @@ object RocksDBWriter extends ScorexLogging {
         lastChange <- db.get(historyKey).headOption
       } yield db.get(valueKey(lastChange))
   }
-
-  private def loadHeight(db: RocksDB): Height = db.get(Keys.height)
 
   private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
 
@@ -178,7 +176,9 @@ class RocksDBWriter(
     addresses.view.zip(ro.multiGetOpt(addresses.view.map(Keys.addressId).toVector, 8)).toMap
   }
 
-  override protected def loadHeight(): Height = RocksDBWriter.loadHeight(writableDB)
+  override protected def loadHeight(): Height = writableDB.get(Keys.height)
+
+  override protected def loadFinalizedHeight(at: Height): Height = writableDB.get(Keys.finalizedHeight(at))
 
   override def safeRollbackHeight: Int = writableDB.get(Keys.safeRollbackHeight)
 
@@ -568,7 +568,7 @@ class RocksDBWriter(
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
-      newFinalizationHeight: Option[Height],
+      newFinalizedHeight: Height,
       generatorBalances: Seq[Long],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
@@ -579,7 +579,7 @@ class RocksDBWriter(
       val h           = Height(height)
 
       rw.put(Keys.height, h)
-      newFinalizationHeight.foreach(rw.put(Keys.finalizedBlockHeight, _))
+      rw.put(Keys.finalizedHeight(h), newFinalizedHeight)
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
       val newSafeRollbackHeight      = height - dbSettings.maxRollbackDepth

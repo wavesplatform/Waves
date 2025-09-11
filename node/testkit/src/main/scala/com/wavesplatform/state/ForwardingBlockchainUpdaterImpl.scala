@@ -8,6 +8,7 @@ class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) exten
   export delegate.{
     settings,
     height,
+    finalizedHeight,
     score,
     blockHeader,
     hitSource,
