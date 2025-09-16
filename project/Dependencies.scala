@@ -5,13 +5,14 @@ import scalapb.compiler.Version.scalapbVersion
 
 //noinspection TypeAnnotation
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.5.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.6.Final"
 
-  val gProto = "com.google.protobuf" % "protobuf-java" % "4.32.0"
+  val gProtoVersion = "4.32.1"
+  val gProto = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
   val overrides = Def.setting(
     Seq(
       "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
-      "com.google.code.gson"      % "gson"           % "2.13.1",
+      "com.google.code.gson"      % "gson"           % "2.13.2",
       "com.squareup.okio"         % "okio-jvm"       % "3.16.0",
       "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
       nettyModule("codec-http2"),
@@ -32,7 +33,7 @@ object Dependencies {
   lazy val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.5.2" classifier "protobuf-src" intransitive ()
 
-  private def pekkoModule(module: String) = ("org.apache.pekko" %% s"pekko-$module" % "1.2.0")
+  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.2.0"
 
   private def pekkoHttpModule(module: String, version: String = "1.2.0") = "org.apache.pekko" %% module % version
 
@@ -52,7 +53,7 @@ object Dependencies {
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.18"
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
-  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.2"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.3"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
 
@@ -90,8 +91,8 @@ object Dependencies {
 
   lazy val scalapbRuntimeJS = Def.setting(
     Seq(
-      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion),
-      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion % "protobuf")
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion,
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion % "protobuf"
     )
   )
 
@@ -106,7 +107,7 @@ object Dependencies {
   lazy val test = scalaTest +: Seq(
     logback,
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
-    "org.scalacheck"    %% "scalacheck"      % "1.18.1",
+    "org.scalacheck"    %% "scalacheck"      % "1.19.0",
     "org.mockito"        % "mockito-all"     % "1.10.19",
     "org.scalamock"     %% "scalamock"       % "6.2.0"
   ).map(_ % Test)
@@ -124,6 +125,7 @@ object Dependencies {
 
   private val rocksdb = "org.rocksdb" % "rocksdbjni" % "10.4.2"
 
+  val scalaLogging: ModuleID = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6"
   lazy val node = Def.setting(
     Seq(
       rocksdb,
@@ -150,7 +152,7 @@ object Dependencies {
       "org.bitlet" % "weupnp" % "0.1.4",
       monixModule("reactive").value,
       nettyHandler,
-      "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
+      scalaLogging,
       "eu.timepit"                 %% "refined"       % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"              % "headlong"      % "13.3.1",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches

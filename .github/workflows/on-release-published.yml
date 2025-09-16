@@ -6,6 +6,48 @@ on:
 
 jobs:
   publish-node-image:
+    uses: ./.github/workflows/publish-docker-image.yml
+    with:
+      dockerTags: |
+        type=match,pattern=v(.*),group=1
+        type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    secrets: inherit
+
+  push-private-node-image:
+    environment: prod
+    needs: publish-node-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      - id: meta-private
+        uses: docker/metadata-action@v5
+        with:
+          images: wavesplatform/waves-private-node
+          flavor: latest=false
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
+      - uses: docker/build-push-action@v5
+        with:
+          platforms: linux/amd64,linux/arm64
+          context: ./docker/private
+          push: true
+          pull: true
+          tags: ${{ steps.meta-private.outputs.tags }}
+          build-args: |
+            baseImage=wavesplatform/wavesnode@${{ needs.publish-node-image.outputs.image_digest }}
+
+  publish-ride-runner-image:
     environment: prod
     name: Publish Docker images
     runs-on: ubuntu-latest
@@ -17,31 +59,12 @@ jobs:
           java-version: '11'
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
-      - run: sbt --batch ';buildTarballsForDocker;buildRIDERunnerForDocker'
+      - run: sbt --batch 'buildRIDERunnerForDocker'
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      - id: meta-public
-        uses: docker/metadata-action@v5
-        with:
-          images: wavesplatform/wavesnode
-          flavor: latest=false
-          tags: |
-            type=match,pattern=v(.*),group=1
-            type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
-
-      - id: meta-private
-        uses: docker/metadata-action@v5
-        with:
-          images: wavesplatform/waves-private-node
-          flavor: latest=false
-          tags: |
-            type=ref,event=tag
-            type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
-
       - id: meta-ride-runner
         uses: docker/metadata-action@v5
         with:
@@ -50,25 +73,6 @@ jobs:
           tags: |
             type=match,pattern=v(.*),group=1
             type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
-
-      - uses: docker/build-push-action@v5
-        with:
-          platforms: linux/amd64,linux/arm64
-          context: ./docker
-          push: true
-          pull: true
-          tags: ${{ steps.meta-public.outputs.tags }}
-
-      - uses: docker/build-push-action@v5
-        with:
-          platforms: linux/amd64,linux/arm64
-          context: ./docker/private
-          push: true
-          pull: true
-          tags: ${{ steps.meta-private.outputs.tags }}
-          build-args: |
-            NODE_TAG=${{ steps.meta-public.outputs.version }}
-
       - uses: docker/build-push-action@v5
         with:
           context: ./ride-runner/docker

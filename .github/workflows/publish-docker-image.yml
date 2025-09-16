@@ -1,5 +1,5 @@
-name: Publish Docker image to GHCR
-run-name: Publish branch ${{ github.ref_name }} to tags ${{ inputs.dockerTags }}
+name: Publish Docker image
+run-name: Publish ref ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
@@ -9,8 +9,19 @@ on:
         required: true
       baseImage:
         description: 'Base image'
+        required: false
+  workflow_call:
+    inputs:
+      dockerTags:
+        type: string
+    secrets:
+      DOCKERHUB_USER:
         required: true
-        default: 'eclipse-temurin:21-jre-noble'
+      DOCKERHUB_PASSWORD:
+        required: true
+    outputs:
+      image_digest:
+        value: ${{ steps.push.outputs.digest }}
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
@@ -29,7 +40,10 @@ jobs:
       - uses: proudust/gh-describe@70f72d4f6304ea053cf5a3d71c36211d5acc0c73
         id: ghd
       - run: |
-          echo "base-image-digest=$(regctl manifest digest ${{ inputs.baseImage }})" >> "$GITHUB_OUTPUT"
+          BASE_IMAGE=${{ inputs.baseImage }}
+          echo "BASE_IMAGE=${BASE_IMAGE:-$(head -n1 docker/Dockerfile | cut -d= -f2-)}" >> "$GITHUB_ENV"
+      - run: |
+          echo "base-image-digest=$(regctl manifest digest ${{ env.BASE_IMAGE }})" >> "$GITHUB_OUTPUT"
           echo "node-version=$(echo ${{ steps.ghd.outputs.describe }} | cut -c 2-)" >> "$GITHUB_OUTPUT"
         id: versions
       - uses: actions/setup-java@v4
@@ -39,47 +53,68 @@ jobs:
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
       - run: sbt --batch -Dproject.version=${{ steps.versions.outputs.node-version }} buildTarballsForDocker
-      - run: |
+      - if: ${{ github.event.name == 'workflow_call' }}
+        run: |
           {
-            echo 'tags<<EOF'
+            echo 'TAGS<<EOF'
+            echo ${{ inputs.dockerTags }}
+            echo EOF
+          } >> "$GITHUB_ENV"
+          {
+            echo 'IMAGES<<EOF'
+            echo ${{ env.IMAGE_NAME }}
+            echo wavesplatform/wavesnode
+            echo EOF
+          } >> "$GITHUB_ENV"
+      - if: ${{ github.event.name == 'workflow_dispatch' }}
+        run: |
+          {
+            echo 'TAGS<<EOF'
             echo ${{ inputs.dockerTags }} | tr ',' '\n' | sed -e 's/^/type=raw,value=/'
             echo type=sha
             echo EOF
-          } >> "$GITHUB_OUTPUT"
+          } >> "$GITHUB_ENV"
+          echo "IMAGES=${{ env.IMAGE_NAME }}" >> "$GITHUB_ENV"
+      - run: |
           {
             echo 'annotations<<EOF'
             echo org.opencontainers.image.source=https://github.com/${{ github.repository }}/tree/${{ github.sha }}/docker
             echo org.opencontainers.image.licenses=MIT
             echo org.opencontainers.image.description=Waves Node
-            echo org.opencontainers.image.base.name=${{ inputs.baseImage }}
+            echo org.opencontainers.image.base.name=${{ env.BASE_IMAGE }}
             echo org.opencontainers.image.base.digest=${{ steps.versions.outputs.base-image-digest }}
             echo org.opencontainers.image.version=${{ steps.versions.outputs.node-version }}
             echo EOF
           } >> "$GITHUB_OUTPUT"
-        id: tag-list
+        id: annotations
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        if: ${{ github.event.name == 'workflow_call' }}
+        with:
+          username: ${{ secrets.dockerhub_user }}
+          password: ${{ secrets.dockerhub_password }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/metadata-action@v5
         id: meta
         env:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: index,manifest-descriptor,index-descriptor
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: ${{ env.IMAGES }}
           flavor: latest=${{ contains(inputs.dockerTags, 'latest') }}
-          tags: ${{ steps.tag-list.outputs.tags }}
+          tags: ${{ env.TAGS }}
           labels: ${{ steps.tag-list.outputs.annotations }}
-          annotations: ${{ steps.tag-list.outputs.annotations }}
+          annotations: ${{ steps.annotations.outputs.annotations }}
       - uses: docker/build-push-action@v6
         id: push
         with:
           context: ./docker
           platforms: linux/amd64,linux/arm64
           push: true
-          build-args: baseImage=${{ inputs.baseImage }}@${{ steps.versions.outputs.base-image-digest }}
+          build-args: baseImage=${{ env.BASE_IMAGE }}@${{ steps.versions.outputs.base-image-digest }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
@@ -89,6 +124,6 @@ jobs:
           {
             echo '## Image Info'
             echo '- This image: `${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}`'
-            echo '- Base image: `${{ inputs.baseImage }}@${{ steps.versions.outputs.base-image-digest }}`'
+            echo '- Base image: `${{ env.BASE_IMAGE }}@${{ steps.versions.outputs.base-image-digest }}`'
             echo '- Version: `${{ steps.versions.outputs.node-version }}`'
           } >> $GITHUB_STEP_SUMMARY

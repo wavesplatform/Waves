@@ -1,3 +1,3 @@
-ARG NODE_TAG=latest
-FROM wavesplatform/wavesnode:$NODE_TAG
+ARG baseImage=wavesplatform/wavesnode:latest
+FROM $baseImage
 COPY waves.custom.conf /etc/waves/waves.conf

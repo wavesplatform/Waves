@@ -1,10 +1,17 @@
 # NPM registry supports only one source workflow per package: https://docs.npmjs.com/trusted-publishers#for-github-actions
-name: Publish packages to the npm registry
+name: Publish packages to NPMJS
 on:
-  push:
-    branches: ['version-1.*.x']
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version
+        required: true
+      tag:
+        description: Package tag
+        required: true
+        default: snapshot
 
 concurrency:
   group: "npm-packages"
@@ -14,7 +21,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     environment:
-      name: prod
+      name: NPMJS
       url: ${{ steps.publish.outputs.url }}
     permissions:
       contents: read
@@ -34,18 +41,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           registry-url: 'https://registry.npmjs.org'
-      - if: ${{ github.event_name == 'push' }}
-        run: |
-          SBT_VERSION=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)
-          PACKAGE_NAME=$(jq --raw-output .name lang/js/package.json)
-          PREFIX=$SBT_VERSION-snapshot
-          NEXT=$(npm view $PACKAGE_NAME versions --json \
-            | jq --raw-output --arg prefix $PREFIX '[.[] | select(startswith($prefix))|capture("snapshot\\.(?<n>[0-9]+)").n|tonumber]|max + 1 // 0')
-          echo "VERSION=$PREFIX.$NEXT" >> $GITHUB_ENV
-          echo "TAG=snapshot" >> $GITHUB_ENV
+          node-version: '>=24.7.0' # Trusted publishing requires npm CLI version 11.5.1 or later.
+      - if: ${{ github.event_name == 'workflow_dispatch' }}
+        run:
+          echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
+          echo "TAG=${{ inputs.tag }}" >> $GITHUB_ENV
       - if: ${{ github.event_name == 'release' }}
         run: |
-          echo "VERSION=$(echo ${{ github.release.tag_name }} | sed 's/^v//')" >> $GITHUB_ENV
+          echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_ENV
           echo "TAG=latest" >> $GITHUB_ENV
       - id: publish
         run: |
@@ -56,5 +59,3 @@ jobs:
           npm version $VERSION --no-git-tag-version
           npm publish --provenance --access public --tag $TAG
           echo "url=https://www.npmjs.com/package/@waves/ride-lang/v/$VERSION" >> "$GITHUB_OUTPUT"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}

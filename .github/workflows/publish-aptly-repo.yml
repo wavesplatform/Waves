@@ -17,7 +17,7 @@ concurrency:
 jobs:
   create-aptly-repo:
     environment:
-      name: github-pages
+      name: aptly-repo
       url: https://apt.wavesplatform.com
     env:
       APTLY_VERSION: 1.6.2

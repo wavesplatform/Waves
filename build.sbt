@@ -12,7 +12,7 @@ enablePlugins(GitVersioning)
 
 git.uncommittedSignifier       := Some("DIRTY")
 ThisBuild / git.useGitDescribe := true
-ThisBuild / PB.protocVersion   := "4.32.0"
+ThisBuild / PB.protocVersion   := Dependencies.gProtoVersion
 
 ThisBuild / dependencyOverrides ++= Dependencies.overrides.value
 
@@ -69,9 +69,8 @@ lazy val `lang-testkit` = project
   .enablePlugins(PublishedModule)
   .settings(
     libraryDependencies ++=
-      Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps ++ Dependencies.logDeps ++ Seq(
-        "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
-      )
+      Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps ++ Dependencies.logDeps :+
+        Dependencies.scalaLogging
   )
 
 lazy val `lang-tests` = project
