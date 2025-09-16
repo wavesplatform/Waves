@@ -24,7 +24,8 @@ class PortfolioTest extends FunSuite {
         fooKey -> -13,
         barKey -> 14,
         bazKey -> 0
-      )
+      ),
+      generationDeposit = 15
     )
 
     val p = orig.pessimistic
@@ -34,6 +35,7 @@ class PortfolioTest extends FunSuite {
     p.assets(fooKey) shouldBe orig.assets(fooKey)
     p.assets shouldNot contain(barKey)
     p.assets shouldNot contain(bazKey)
+    p.generationDeposit shouldBe 15
   }
 
   test("pessimistic - positive balance is turned into zero") {

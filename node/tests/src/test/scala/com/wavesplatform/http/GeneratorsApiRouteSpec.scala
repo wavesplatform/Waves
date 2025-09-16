@@ -1,16 +1,16 @@
 package com.wavesplatform.http
 
+import com.wavesplatform.TestValues
 import com.wavesplatform.api.common.CommonGeneratorsApi
 import com.wavesplatform.api.http.{GeneratorsApiRoute, RouteTimeout}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.db.WithState
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.settings.{WalletSettings, WavesSettings}
-import com.wavesplatform.state.Height
-import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
+import com.wavesplatform.state.diffs
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{TransactionType, TxHelpers}
+import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 import com.wavesplatform.utils.SharedSchedulerMixin
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.*
@@ -28,12 +28,13 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
     )
   }
 
-  private val wallet  = Wallet(WalletSettings(file = None, password = None, Some(ByteStr("seed".getBytes()))))
-  private val miner   = wallet.generateNewAccounts(1).head
-  private val deposit = FeeConstants(TransactionType.CommitToGeneration) * FeeUnit // TODO: not a fee
-  private val balance = GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator1 + deposit
+  private val wallet        = Wallet(WalletSettings(file = None, password = None, Some(ByteStr("seed".getBytes()))))
+  private val generator     = wallet.generateNewAccounts(1).head
+  private val depositAndFee = CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee
+  private val balance       = diffs.ENOUGH_AMT + depositAndFee
 
-  override def genesisBalances: Seq[WithState.AddrWithBalance] = Seq(AddrWithBalance(miner.toAddress, balance))
+  override def genesisBalances: Seq[WithState.AddrWithBalance] =
+    AddrWithBalance(generator.toAddress, balance) +: AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)
 
   private val api = CommonGeneratorsApi(domain.rdb, domain.blockchainUpdater)
   private val route = seal(
@@ -47,16 +48,22 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
 
   routePath("/at/{height}") in {
     val generationPeriod = domain.blockchain.currentGenerationPeriod.next
-    val txn              = TxHelpers.commitToGeneration(generationPeriod.start, sender = miner)
-    domain.appendBlock(txn)
-    domain.appendBlock()
 
-    val height = Height(domain.blockchain.height)
-    Get(routePath(s"/at/$height")) ~> route ~> check {
+    val txn    = TxHelpers.commitToGeneration(generationPeriod.start, sender = generator)
+    val block1 = domain.createBlock(Block.PlainBlockVersion, Seq(txn), strictTime = true) // defaultSigner
+
+    domain.appender.appendBlock(block1)
+    Get(routePath(s"/at/${domain.blockchain.height}")) ~> route ~> check {
+      responseAs[JsValue] shouldBe Json.arr()
+    }
+
+    val block2 = domain.createBlock(Block.PlainBlockVersion, txs = Nil, strictTime = true, generator = generator)
+    domain.appender.appendBlock(block2)
+    Get(routePath(s"/at/${domain.blockchain.height}")) ~> route ~> check {
       responseAs[JsValue] shouldBe Json.arr(
         Json.obj(
-          "address"       -> miner.toAddress.toString,
-          "balance"       -> (balance - deposit),
+          "address"       -> generator.toAddress.toString,
+          "balance"       -> (balance - depositAndFee),
           "transactionId" -> txn.id().toString
         )
       )

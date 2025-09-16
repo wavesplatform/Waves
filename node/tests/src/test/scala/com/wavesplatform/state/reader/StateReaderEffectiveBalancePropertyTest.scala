@@ -62,7 +62,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
       withDomain(settings) { d =>
         d.appendBlock()
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
-          BalanceSnapshot(1, 600000000, 0, 0)
+          BalanceSnapshot(1, 600000000, 0, 0, 0)
         )
 
         d.appendMicroBlock(transfer(amount = 1))
@@ -70,45 +70,45 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe (
           if (fixed)
             List(
-              BalanceSnapshot(2, 1199999999, 0, 0),
-              BalanceSnapshot(1, 599399999, 0, 0)
+              BalanceSnapshot(2, 1199999999, 0, 0, 0),
+              BalanceSnapshot(1, 599399999, 0, 0, 0)
             )
           else
-            List(BalanceSnapshot(2, 1199999999, 0, 0))
+            List(BalanceSnapshot(2, 1199999999, 0, 0, 0))
         )
         d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
-          BalanceSnapshot(2, 1199999999, 0, 0)
+          BalanceSnapshot(2, 1199999999, 0, 0, 0)
         )
 
         d.appendMicroBlock(transfer(amount = 1))
         d.appendKeyBlock()
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
-          BalanceSnapshot(3, 1799999998, 0, 0),
-          BalanceSnapshot(2, 1199399998, 0, 0),
-          BalanceSnapshot(1, 599399999, 0, 0)
+          BalanceSnapshot(3, 1799999998, 0, 0, 0),
+          BalanceSnapshot(2, 1199399998, 0, 0, 0),
+          BalanceSnapshot(1, 599399999, 0, 0, 0)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
-          BalanceSnapshot(3, 1799999998, 0, 0)
+          BalanceSnapshot(3, 1799999998, 0, 0, 0)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 3, None) shouldBe List(
-          BalanceSnapshot(3, 1799999998, 0, 0)
+          BalanceSnapshot(3, 1799999998, 0, 0, 0)
         )
 
         d.appendMicroBlock(transfer(amount = 1))
         d.appendKeyBlock()
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
-          BalanceSnapshot(4, 2399999997L, 0, 0),
-          BalanceSnapshot(3, 1799399997, 0, 0),
-          BalanceSnapshot(2, 1199399998, 0, 0),
-          BalanceSnapshot(1, 599399999, 0, 0)
+          BalanceSnapshot(4, 2399999997L, 0, 0, 0),
+          BalanceSnapshot(3, 1799399997, 0, 0, 0),
+          BalanceSnapshot(2, 1199399998, 0, 0, 0),
+          BalanceSnapshot(1, 599399999, 0, 0, 0)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
-          BalanceSnapshot(4, 2399999997L, 0, 0),
-          BalanceSnapshot(3, 1799399997, 0, 0),
-          BalanceSnapshot(2, 1199399998, 0, 0)
+          BalanceSnapshot(4, 2399999997L, 0, 0, 0),
+          BalanceSnapshot(3, 1799399997, 0, 0, 0),
+          BalanceSnapshot(2, 1199399998, 0, 0, 0)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 3, None) shouldBe List(
-          BalanceSnapshot(4, 2399999997L, 0, 0)
+          BalanceSnapshot(4, 2399999997L, 0, 0, 0)
         )
       }
 
@@ -132,13 +132,15 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
           height = 2,
           regularBalance = startBalance + 6.waves + feeReward - feeCost - transferTx.amount.value,
           leaseIn = 0,
-          leaseOut = leaseTx.amount.value
+          leaseOut = leaseTx.amount.value,
+          generationDeposit = 0
         ),
         BalanceSnapshot(
           height = 1,
           regularBalance = startBalance,
           leaseIn = 0,
-          leaseOut = 0
+          leaseOut = 0,
+          generationDeposit = 0
         )
       )
     }
@@ -153,19 +155,22 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
             height = 3,
             regularBalance = startBalance + 12.waves + leaseTx.fee.value * 2 / 5 - leaseTx.fee.value - transferTx.amount.value,
             leaseIn = 0, // transfer fee is fully compensated by reward ↑
-            leaseOut = leaseTx.amount.value
+            leaseOut = leaseTx.amount.value,
+            generationDeposit = 0
           ),
           BalanceSnapshot(
             height = 2,
             regularBalance = startBalance + 6.waves + transferTx.fee.value * 2 / 5 - transferTx.fee.value - transferTx.amount.value,
             leaseIn = 0,
-            leaseOut = 0
+            leaseOut = 0,
+            generationDeposit = 0
           ),
           BalanceSnapshot(
             height = 1,
             regularBalance = startBalance,
             leaseIn = 0,
-            leaseOut = 0
+            leaseOut = 0,
+            generationDeposit = 0
           )
         )
       }

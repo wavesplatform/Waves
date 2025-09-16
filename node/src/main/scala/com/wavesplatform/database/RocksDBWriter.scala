@@ -33,7 +33,7 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.utils.{LoggerFacade, Numbers, ScorexLogging}
 import io.netty.util.concurrent.DefaultThreadFactory
 import org.rocksdb.Status
 import org.slf4j.LoggerFactory
@@ -364,43 +364,6 @@ class RocksDBWriter(
         val current         = if (currentCommGens.isEmpty) Seq.empty else generatorBalances(currentCommGens, currentBlockId)
         (parent, current)
       }
-
-      // TODO if enabled API
-      //    def rawGeneratorBalances(h: Height) = ro.get(Keys.generatorBalances(h, rdb.apiHandle)).getOrElse(Map.empty)
-//
-//    if (parentPeriod == currentPeriod) {
-//      val commGens = rawCommittedGenerators(currentPeriod)
-//      if (commGens.isEmpty) (Map.empty, Map.empty)
-//      else {
-//        val rawParentBalances  = rawGeneratorBalances(parentHeight)
-//        val rawCurrentBalances = rawGeneratorBalances(currentHeight)
-//
-//        val (parent, current) = commGens.map { case (blsPk, aid) =>
-//          (
-//            blsPk -> rawParentBalances.getOrElse(aid, 0L),
-//            blsPk -> rawCurrentBalances.getOrElse(aid, 0L)
-//          )
-//        }.unzip
-//
-//        (parent.toMap, current.toMap)
-//      }
-//    } else {
-//      val parentCommGens    = rawCommittedGenerators(parentPeriod)
-//      val rawParentBalances = if (parentCommGens.isEmpty) Map.empty else rawGeneratorBalances(parentHeight)
-//
-//      val parent = parentCommGens.map { case (blsPk, aid) =>
-//        blsPk -> rawParentBalances.getOrElse(aid, 0L)
-//      }
-//
-//      val currentCommGens    = rawCommittedGenerators(currentPeriod)
-//      val rawCurrentBalances = if (currentCommGens.isEmpty) Map.empty else rawGeneratorBalances(currentHeight)
-//
-//      val current = currentCommGens.map { case (blsPk, aid) =>
-//        blsPk -> rawCurrentBalances.getOrElse(aid, 0L)
-//      }
-//
-//      (parent, current)
-//    }
     }
 
   private def generatorBalances(generators: Seq[(Address, BlsPublicKey, TransactionId)], at: BlockId) = generators.map { case (addr, _, _) =>
@@ -1441,44 +1404,108 @@ class RocksDBWriter(
     }
   }
 
-  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readOnly { db =>
-    addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
-      val toHeight = to.flatMap(this.heightOf).getOrElse(this.height)
+  // Used only for effective balance calculations
+  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
+    readOnly { db =>
+      val toHeight = Height(to.flatMap(this.heightOf).getOrElse(this.height))
 
-      val lastBalance      = balancesCache.get((address, Asset.Waves))
-      val lastLeaseBalance = leaseBalanceCache.get(address)
+      val fromGenerationPeriod = this.generationPeriodOf(Height(from))
+      val toGenerationPeriod   = this.generationPeriodOf(toHeight).max(fromGenerationPeriod.next)
 
-      @tailrec
-      def collectBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
-        if (hh < from || hh <= 0)
-          acc :+ hh
-        else {
-          val bn     = balanceAtHeightCache.get((hh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(hh))))
-          val newAcc = if (hh > toHeight) acc else acc :+ hh
-          collectBalanceHistory(newAcc, bn.prevHeight)
+      addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0, 0))) { addressId =>
+        val committedPeriods         = collectGenerationPeriods(db, addressId, fromGenerationPeriod, toGenerationPeriod).toSet // TODO: return set
+        val releaseCommitmentHeights = committedPeriods.map(_.next.start)
+
+        val lastBalance      = balancesCache.get((address, Asset.Waves))
+        val lastLeaseBalance = leaseBalanceCache.get(address)
+
+        @tailrec
+        def collectBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
+          if (hh < from || hh <= 0)
+            acc :+ hh
+          else {
+            val bn     = balanceAtHeightCache.get((hh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(hh))))
+            val newAcc = if (hh > toHeight) acc else acc :+ hh
+            collectBalanceHistory(newAcc, bn.prevHeight)
+          }
+
+        @tailrec
+        def collectLeaseBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
+          if (hh < from || hh <= 0)
+            acc :+ hh
+          else {
+            val lbn    = leaseBalanceAtHeightCache.get((hh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(hh))))
+            val newAcc = if (hh > toHeight) acc else acc :+ hh
+            collectLeaseBalanceHistory(newAcc, lbn.prevHeight)
+          }
+
+        val wbh = slice(collectBalanceHistory(Vector.empty, lastBalance.height), from, toHeight)
+        val lbh = slice(collectLeaseBalanceHistory(Vector.empty, lastLeaseBalance.height), from, toHeight)
+        for {
+          (wh_, lh_) <- merge(wbh, lbh)
+          wh = Height(wh_)
+          lh = Height(lh_)
+          wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, wh)))
+          lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, lh)))
+        } yield {
+          val maxHeight = Height(wh.max(lh))
+
+          // A generator always spends WAVES for fee when commits to a generation.
+          // The deposit release is not interesting, because we calculate only pessimistic portfolio changes.
+          val generationPeriod = this.generationPeriodOf(wh)
+
+          val committedTimes = Numbers.when(committedPeriods.contains(generationPeriod))(1) +
+            Numbers.when(committedPeriods.contains(generationPeriod.next))(1)
+          val deposit = committedTimes * CommitToGenerationTransaction.DepositInWavelets
+
+          BalanceSnapshot(maxHeight, wb.balance, lb.in, lb.out, deposit)
         }
-
-      @tailrec
-      def collectLeaseBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
-        if (hh < from || hh <= 0)
-          acc :+ hh
-        else {
-          val lbn    = leaseBalanceAtHeightCache.get((hh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(hh))))
-          val newAcc = if (hh > toHeight) acc else acc :+ hh
-          collectLeaseBalanceHistory(newAcc, lbn.prevHeight)
-        }
-
-      val wbh = slice(collectBalanceHistory(Vector.empty, lastBalance.height), from, toHeight)
-      val lbh = slice(collectLeaseBalanceHistory(Vector.empty, lastLeaseBalance.height), from, toHeight)
-      for {
-        (wh, lh) <- merge(wbh, lbh)
-        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(wh))))
-        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(lh))))
-      } yield {
-        val height = wh.max(lh)
-        BalanceSnapshot(height, wb.balance, lb.in, lb.out)
       }
     }
+  }
+
+  private def collectGenerationPeriods(
+      db: ReadOnlyDB,
+      addressId: AddressId,
+      fromIncl: GenerationPeriod,
+      toIncl: GenerationPeriod
+  ): List[GenerationPeriod] = {
+    val key = Keys.committedGenerators(fromIncl, Height(0))
+    def getSeekBytes(at: GenerationPeriod): Array[Byte] =
+      Keys.committedGenerators(at, Height(0)).keyBytes.dropRight(Ints.BYTES) // Drop height
+
+    val prefixBytes             = KeyTag.CommittedGenerators.prefixBytes
+    val prefixLen               = prefixBytes.length
+    var r                       = List.empty[GenerationPeriod]
+    var continue                = true
+    var currentGenerationPeriod = fromIncl
+
+    Using.resource(db.newIterator) { iter =>
+      iter.seek(getSeekBytes(fromIncl))
+      while (iter.isValid && iter.key().startsWith(prefixBytes) && continue) {
+        val periodStart = Height(Ints.fromByteArray(iter.key().slice(prefixLen, prefixLen + Ints.BYTES)))
+
+        continue = periodStart <= toIncl.start
+        if (continue) {
+          if (periodStart != currentGenerationPeriod.start) currentGenerationPeriod = this.generationPeriodOf(periodStart)
+
+          val found = key
+            .parse(iter.value())
+            .exists { entries => entries.exists { case (currentAddressId, _, _) => currentAddressId == addressId } }
+
+          if (found) {
+            r = currentGenerationPeriod :: r
+
+            // It can't register twice on a generation period
+            val nextPeriod = currentGenerationPeriod.next
+            if (nextPeriod.start <= toIncl.start) iter.seek(getSeekBytes(nextPeriod))
+            else continue = false
+          } else iter.next()
+        }
+      }
+    }
+
+    r
   }
 
   override def loadHeightOf(blockId: ByteStr): Option[Int] = blockHeightCache.get(blockId)

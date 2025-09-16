@@ -1,7 +1,5 @@
 package com.wavesplatform.test
 
-import java.nio.file.Files
-
 import com.wavesplatform.database.{RDB, TestStorageFactory}
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -11,6 +9,8 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.{NTPTime, TestHelpers}
 import org.scalatest.{BeforeAndAfterAll, Suite}
+
+import java.nio.file.Files
 
 trait SharedDomain extends BeforeAndAfterAll with NTPTime with DBCacheSettings { suite: Suite =>
   private val path       = Files.createTempDirectory(s"rocks-temp-${getClass.getSimpleName}").toAbsolutePath

@@ -1,13 +1,14 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.TestValues
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.{CommitToGenerationTransaction, GenesisTransaction, TxHelpers, TxVersion}
 
 class BalanceDiffValidationTest extends PropSpec with WithState {
 

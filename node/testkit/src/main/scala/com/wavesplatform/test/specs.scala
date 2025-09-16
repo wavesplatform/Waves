@@ -1,5 +1,6 @@
 package com.wavesplatform.test
 
+import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.{EitherMatchers, TransactionGen}
 import org.scalacheck.ShrinkLowPriority
 import org.scalatest.*
@@ -11,7 +12,8 @@ trait BaseSuite
     with ShrinkLowPriority
     with TransactionGen
     with EitherMatchers
-    with OptionValues {
+    with OptionValues
+    with ScorexLogging {
   this: Suite =>
 }
 

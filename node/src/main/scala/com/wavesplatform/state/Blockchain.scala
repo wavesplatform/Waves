@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, CommitToGenerationTransaction, ERC20Address, Transaction}
+import com.wavesplatform.utils.Numbers
 
 trait Blockchain {
   def settings: BlockchainSettings
@@ -88,6 +89,17 @@ trait Blockchain {
 
   def wavesBalances(addresses: Seq[Address]): Map[Address, Long]
 
+  // TODO: optimize
+  def deposit(address: Address): Long = {
+    val currentPeriod = this.currentGenerationPeriod
+
+    val committedOnCurrent = committedGenerators(currentPeriod).exists { case (currentAddress, _, _) => currentAddress == address }
+    val committedOnNext    = committedGenerators(currentPeriod.next).exists { case (currentAddress, _, _) => currentAddress == address }
+
+    val committedTimes = Numbers.when(committedOnCurrent)(1) + Numbers.when(committedOnNext)(1)
+    committedTimes * CommitToGenerationTransaction.DepositInWavelets
+  }
+
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
   def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)]
@@ -97,7 +109,7 @@ trait Blockchain {
     */
   def parentGeneratorBalances(): Seq[Long]
 
-  def currentGeneratorBalances(): Seq[Long]
+  def currentGeneratorBalances(): Seq[Long] // TODO: IndexedSeq?
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
@@ -171,14 +183,18 @@ object Blockchain {
       generationDeposit = this.generationDeposit(address)
     )
 
-    // TODO: not efficient?
+    // TODO: not efficient? See RocksDBWriter.balanceSnapshots
     def generationDeposit(address: Address): Long = {
-      val curr               = blockchain.currentGenerationPeriod
+      val curr = blockchain.currentGenerationPeriod
+
       val allCommittedOnCurr = blockchain.committedGenerators(curr)
-      val committedOnCurr    = allCommittedOnCurr.find { case (generatorAddress, _, _) => generatorAddress == address }.size
       val allCommittedOnNext = blockchain.committedGenerators(curr.next)
-      val committedOnNext    = allCommittedOnNext.find { case (generatorAddress, _, _) => generatorAddress == address }.size
-      (committedOnCurr + committedOnNext) * CommitToGenerationTransaction.DepositInWavelets
+
+      val committedOnCurr = allCommittedOnCurr.exists { case (generatorAddress, _, _) => generatorAddress == address }
+      val committedOnNext = allCommittedOnNext.exists { case (generatorAddress, _, _) => generatorAddress == address }
+
+      val committedTimes = Numbers.when(committedOnCurr)(1) + Numbers.when(committedOnNext)(1)
+      committedTimes * CommitToGenerationTransaction.DepositInWavelets
     }
 
     def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =

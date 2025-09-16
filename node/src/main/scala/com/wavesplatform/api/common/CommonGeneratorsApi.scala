@@ -22,6 +22,8 @@ object CommonGeneratorsApi {
       val period = blockchain.generationPeriodOf(at)
 
       val (addressIds, addresses, blsPks, txIds, balances) = rdb.db.readOnly { ro =>
+        // TODO: Use Blockchain for this? NG.committed?
+        //  Technically this works, because generators committed on a previous period
         val key       = Keys.committedGenerators(period, at)
         val keyPrefix = key.keyBytes.dropRight(Ints.BYTES) // Drop height
 

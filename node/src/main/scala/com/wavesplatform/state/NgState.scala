@@ -57,7 +57,8 @@ case class NgState(
     leasesToCancel: Map[ByteStr, StateSnapshot],
     microSnapshots: Map[BlockId, CachedMicroDiff] = Map.empty,
     microBlocks: List[MicroBlockInfo] = List.empty,
-    internalCaches: NgStateCaches = new NgStateCaches
+    internalCaches: NgStateCaches = new NgStateCaches,
+    recentGeneratorBalances: GeneratorBalances = Seq.empty
 ) {
   def cancelExpiredLeases(snapshot: StateSnapshot): StateSnapshot =
     leasesToCancel

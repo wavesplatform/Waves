@@ -13,7 +13,8 @@ import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
+import com.wavesplatform.transaction.{Asset, CommitToGenerationTransaction, ERC20Address, Transaction}
+import com.wavesplatform.utils.Numbers
 
 case class SnapshotBlockchain(
     inner: Blockchain,
@@ -51,6 +52,13 @@ case class SnapshotBlockchain(
           )(balance => (innerBalances, snapshotBalances + (address -> balance)))
       }
     inner.wavesBalances(innerBalances) ++ snapshotBalances
+  }
+
+  override def deposit(address: Address): Long = {
+    val isCommitted = snapshot.nextCommittedGenerators.exists { case (currentAddress, _, _) => currentAddress == address }
+    val inSnapshot  = Numbers.when(isCommitted)(CommitToGenerationTransaction.DepositInWavelets)
+
+    inner.deposit(address) + inSnapshot
   }
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = {
@@ -131,6 +139,11 @@ case class SnapshotBlockchain(
 
   override def finalizedHeight: Height = inner.finalizedHeight
 
+  private def newGenerationPeriodStarted: Boolean = {
+    val h = Height(this.height)
+    blockMeta.isDefined && this.generationPeriodOf(h).start == h // First block in generation period
+  }
+
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
     case Right(addr)                  => Right(snapshot.aliases.getOrElse(alias, addr))
@@ -158,11 +171,13 @@ case class SnapshotBlockchain(
     if (maybeSnapshot.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
       inner.balanceSnapshots(address, from1, to)
     } else {
+      val h          = Height(height)
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
-      val bs         = BalanceSnapshot(height, Portfolio(balance, lease))
-      val height2Fix = this.height == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
-      if (inner.height > 0 && (from1 < this.height - 1 || height2Fix))
+      val deposit    = this.deposit(address)
+      val bs         = BalanceSnapshot(h, Portfolio(balance, lease, generationDeposit = deposit))
+      val height2Fix = h == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
+      if (inner.height > 0 && (from1 < h - 1 || height2Fix))
         bs +: inner.balanceSnapshots(address, from1, to)
       else
         Seq(bs)
@@ -243,7 +258,16 @@ case class SnapshotBlockchain(
     else inner.currentGeneratorBalances()
 
   override def currentGeneratorBalances(): Seq[Long] =
-    maybeSnapshot.fold(inner.currentGeneratorBalances())(_ => Seq.empty)
+    maybeSnapshot.foldLeft(inner.currentGeneratorBalances()) { (inner, _) =>
+      // TODO: Is there a better way? Do we really need this?
+      val recentGeneratorBalances = snapshot.nextCommittedGenerators.map { case (address, _, _) =>
+        balanceSnapshots(address, height, None).headOption
+      }
+
+      inner.zip(recentGeneratorBalances).map { case (inner, recent) =>
+        recent.map(_.effectiveBalance.min(inner)).getOrElse(inner)
+      }
+    }
 }
 
 object SnapshotBlockchain {

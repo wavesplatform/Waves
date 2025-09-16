@@ -3,8 +3,8 @@ package com.wavesplatform.state.diffs
 import cats.syntax.either.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.*
+import com.wavesplatform.transaction.CommitToGenerationTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.{Asset, CommitToGenerationTransaction}
 
 object CommitToGenerationTransactionDiff {
   def apply(blockchain: Blockchain)(tx: CommitToGenerationTransaction): Either[ValidationError, StateSnapshot] = {
@@ -23,7 +23,12 @@ object CommitToGenerationTransactionDiff {
       }
       snapshot <- StateSnapshot.build(
         blockchain,
-        portfolios = Map(tx.sender.toAddress -> Portfolio.build(Asset.Waves -> -tx.fee.value)),
+        portfolios = Map(
+          tx.sender.toAddress -> Portfolio(
+            balance = -tx.fee.value
+            // generationDeposit = ??? // We don't need this, because calculate from nextCommittedGenerators
+          )
+        ),
         nextCommittedGenerators = IndexedSeq((tx.sender.toAddress, tx.endorsementPublicKey, TransactionId(tx.id())))
       )
     } yield snapshot

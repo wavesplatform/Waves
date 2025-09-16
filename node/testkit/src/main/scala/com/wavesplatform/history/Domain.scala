@@ -19,7 +19,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.mining.{BlockChallenger, BlockChallengerImpl}
-import com.wavesplatform.network.EndorsementStorage
+import com.wavesplatform.network.{EndorsementStorage, MessageCodecL1, PeerDatabase}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
@@ -34,11 +34,13 @@ import com.wavesplatform.utils.{EthEncoding, Schedulers, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, TestValues, crypto}
+import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.ExecutionModel.SynchronousExecution
 import monix.execution.Scheduler
+import monix.execution.schedulers.SchedulerService
 import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers.*
 import play.api.libs.json.{JsNull, JsValue, Json}
@@ -51,7 +53,7 @@ import scala.util.control.NonFatal
 
 case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksDBWriter: RocksDBWriter, settings: WavesSettings) {
   import Domain.*
-  private given scheduler: Scheduler = Schedulers.singleThread("domain", executionModel = SynchronousExecution)
+  private given scheduler: SchedulerService = Schedulers.singleThread("domain", executionModel = SynchronousExecution)
 
   val blockchain: CompleteBlockchainUpdater = blockchainUpdater
 
@@ -617,6 +619,8 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
   )
 
   val generatorsApi: CommonGeneratorsApi = CommonGeneratorsApi(rdb, blockchain)
+
+  val appender: DefaultAppender = new DefaultAppender(this)(using scheduler)
 }
 
 object Domain {
@@ -659,5 +663,34 @@ object Domain {
       )
       .toSeq
       .flatten
+  }
+}
+
+class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
+  private val blockChallenger = new BlockChallengerImpl(
+    d.blockchain,
+    new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+    d.wallet,
+    d.settings,
+    d.testTime,
+    d.posSelector,
+    _ => throw new RuntimeException("Unexpected call in block challenger")
+  )
+
+  private val appender = BlockAppender(
+    d.blockchain,
+    d.testTime,
+    d.utxPool,
+    d.posSelector,
+    new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+    PeerDatabase.NoOp,
+    Some(blockChallenger),
+    appenderScheduler
+  )(new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp)), _, snapshot = None)
+
+  def appendBlock(b: Block, requireAppended: Boolean = true, adjustTestTime: Boolean = true): Unit = {
+    if (adjustTestTime) d.testTime.setTime(b.header.timestamp)
+    appender(b).runSyncUnsafe()
+    if (requireAppended && d.lastBlockId != b.id()) fail(s"Can't apply block $b, see logs")
   }
 }

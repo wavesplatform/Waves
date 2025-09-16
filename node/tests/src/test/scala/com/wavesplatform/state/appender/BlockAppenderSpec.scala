@@ -2,6 +2,7 @@ package com.wavesplatform.state.appender
 
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.CommonGeneratorsApi.GeneratorEntry
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -15,7 +16,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Ignored
 import com.wavesplatform.state.{CompleteBlockchainUpdater, ForwardingBlockchainUpdaterImpl, GenerationPeriod, Height, TransactionId}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{FreeSpec, NumericExt, TestTime}
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.embedded.EmbeddedChannel
@@ -123,38 +124,6 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
     val defaultSettings =
       DomainPresets.DeterministicFinality.copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed)))
 
-    class DefaultAppender(d: Domain) {
-      private val blockChallenger = new BlockChallengerImpl(
-        d.blockchain,
-        new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
-        d.wallet,
-        d.settings,
-        testTime,
-        d.posSelector,
-        _ => throw new RuntimeException("Unexpected call in block challenger")
-      )
-
-      private val appender = BlockAppender(
-        d.blockchain,
-        testTime,
-        d.utxPool,
-        d.posSelector,
-        new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
-        PeerDatabase.NoOp,
-        Some(blockChallenger),
-        appenderScheduler
-      )(new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp)), _, snapshot = None)
-
-      def apply(b: Block, requireAppended: Boolean = true): Unit = {
-        appender(b).runSyncUnsafe()
-        if (requireAppended && d.lastBlockId != b.id()) fail(s"Can't apply block $b, see logs")
-      }
-    }
-
-    object DefaultAppender {
-      def apply(d: Domain): DefaultAppender = new DefaultAppender(d)
-    }
-
     def testWithGenerator(f: Domain => Any): Any = {
       def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
         private val blsKeyPair = BlsKeyPair(sender.privateKey)
@@ -184,32 +153,24 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         wrapBU = wrapBU
       ) { d =>
         d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
-        val appender = DefaultAppender(d)
 
         val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
-        testTime.setTime(block.header.timestamp)
-        appender(block)
+        d.appender.appendBlock(block)
 
         d.blockchain.isLastBlockId(block.id()) shouldBe true
       }
     }
 
     "should append a block if committed" in testWithGenerator { d =>
-      val appender = DefaultAppender(d)
-
       val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
-      testTime.setTime(block.header.timestamp)
-      appender(block)
+      d.appender.appendBlock(block)
 
       d.blockchain.isLastBlockId(block.id()) shouldBe true
     }
 
     "should append a block if no one eligible committed" in testWithGenerator { d =>
-      val appender = DefaultAppender(d)
-
       val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
-      testTime.setTime(block.header.timestamp)
-      appender(block)
+      d.appender.appendBlock(block)
 
       d.blockchain.isLastBlockId(block.id()) shouldBe true
     }
@@ -230,11 +191,9 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         wrapBU = wrapBU
       ) { d =>
         d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
-        val appender = DefaultAppender(d)
 
         val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
-        testTime.setTime(block.header.timestamp)
-        appender(block, requireAppended = false)
+        d.appender.appendBlock(block, requireAppended = false)
 
         d.blockchain.isLastBlockId(block.id()) shouldBe false
       }
@@ -281,8 +240,8 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
     }
 
     "committed generators balances" in {
-      val miner1InitBalance = 100_000.waves
-      val miner2InitBalance = 50_000.waves
+      val miner1InitBalance = 100_000.waves + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee
+      val miner2InitBalance = 50_000.waves + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee
 
       val miner1 = Wallet.generateNewAccount(seed.arr, nonce = 1)
       val miner2 = Wallet.generateNewAccount(seed.arr, nonce = 2)
@@ -291,51 +250,52 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         defaultSettings.configure(_.copy(generationPeriod = 3)),
         Seq(
           sender -> 10_000.waves,
-          miner1 -> (miner1InitBalance + TestValues.commitToGenerationFee),
-          miner2 -> (miner2InitBalance + TestValues.commitToGenerationFee)
+          miner1 -> miner1InitBalance,
+          miner2 -> miner2InitBalance
         )
       ) { d =>
         d.wallet.generateNewAccounts(3)
-        val appender          = DefaultAppender(d)
         val generationPeriod1 = d.blockchain.generationPeriodOf(Height(1)).next
+        generationPeriod1.start shouldBe 3
 
-        info("block2")
-        val block2 = d.createBlock(
-          Block.ProtoBlockVersion,
-          Seq(miner1, miner2).map(TxHelpers.commitToGeneration(generationPeriod1.start, _)),
-          generator = sender, // Sender gets reward, miner1 and miner2 have exact generator balances
-          strictTime = true
-        )
-        testTime.setTime(block2.header.timestamp)
-        appender(block2)
+        log.info("block2")
+        val txs    = Seq(miner1, miner2).map(TxHelpers.commitToGeneration(generationPeriod1.start, _))
+        val block2 = d.createBlock(Block.ProtoBlockVersion, txs, generator = sender, strictTime = true)
+        d.appender.appendBlock(block2)
 
+        d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod) shouldBe empty
         d.blockchain.parentGeneratorBalances() shouldBe empty
         d.blockchain.currentGeneratorBalances() shouldBe empty
+        d.generatorsApi.generators(Height(d.blockchain.height)) shouldBe empty
 
-        info("block3")
-        val transfer = TxHelpers.transfer(miner1, miner2.toAddress, 5_000.waves)
+        log.info("block3, first period with committed generators")
+        val transfer = TxHelpers.transfer(miner1, miner2.toAddress, amount = 4_000.waves, fee = 1_000.waves)
         val block3   = d.createBlock(Block.ProtoBlockVersion, Seq(transfer), generator = miner2, strictTime = true)
-        testTime.setTime(block3.header.timestamp)
-        appender(block3)
+        d.appender.appendBlock(block3)
 
-        d.blockchain.parentGeneratorBalances() shouldBe empty
-        d.blockchain.currentGeneratorBalances() shouldBe Seq(
-          miner1InitBalance,
-          miner2InitBalance
+        d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod).map { case (addr, _, _) => addr } shouldBe
+          Seq(miner1, miner2).map(_.toAddress)
+        d.blockchain.parentGeneratorBalances() shouldBe empty // No committed generators in a parent block
+
+        val miner1BalanceBeforeBlock3 = miner1InitBalance - CommitToGenerationTransaction.DepositInWavelets - TestValues.commitToGenerationFee
+        val miner2BalanceBeforeBlock3 = miner2InitBalance - CommitToGenerationTransaction.DepositInWavelets - TestValues.commitToGenerationFee
+        d.blockchain.currentGeneratorBalances() shouldBe Seq(miner1BalanceBeforeBlock3, miner2BalanceBeforeBlock3)
+        d.generatorsApi.generators(Height(d.blockchain.height)) shouldBe Seq(
+          GeneratorEntry(miner1.toAddress, miner1BalanceBeforeBlock3, TransactionId(txs.head.id())),
+          GeneratorEntry(miner2.toAddress, miner2BalanceBeforeBlock3, TransactionId(txs(1).id()))
         )
 
-        info("block4")
+        log.info("block4")
         val block4 = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = miner2, strictTime = true)
-        testTime.setTime(block4.header.timestamp)
-        appender(block4)
+        d.appender.appendBlock(block4)
 
-        d.blockchain.parentGeneratorBalances() shouldBe Seq(
-          miner1InitBalance,
-          miner2InitBalance
-        )
-        d.blockchain.currentGeneratorBalances() shouldBe Seq(
-          miner1InitBalance - transfer.amount.value - transfer.fee.value,
-          miner2InitBalance
+        val miner1BalanceBeforeBlock4 = miner1BalanceBeforeBlock3 - transfer.amount.value - transfer.fee.value
+        val miner2BalanceBeforeBlock4 = miner2BalanceBeforeBlock3
+        d.blockchain.parentGeneratorBalances() shouldBe Seq(miner1BalanceBeforeBlock3, miner2BalanceBeforeBlock3)
+        d.blockchain.currentGeneratorBalances() shouldBe Seq(miner1BalanceBeforeBlock4, miner2BalanceBeforeBlock4)
+        d.generatorsApi.generators(Height(d.blockchain.height)) shouldBe Seq(
+          GeneratorEntry(miner1.toAddress, miner1BalanceBeforeBlock4, TransactionId(txs.head.id())),
+          GeneratorEntry(miner2.toAddress, miner2BalanceBeforeBlock4, TransactionId(txs(1).id()))
         )
       }
     }

@@ -385,15 +385,16 @@ class BlockchainUpdaterImpl(
 
                         // TODO: validate signature or in other place?
                         val endorserIndexes = referencedForgedBlock.header.finalizationVoting.fold(Set.empty)(_.endorserIndexes.toSet)
-                        val parentGen       = this.parentGeneratorBalances()
+                        val parentGen       = tempBlockchain.parentGeneratorBalances()
                         val (totalGeneratorsBalance, votedGeneratorsBalance) =
                           parentGen.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0))) { case ((total, voted), (b, i)) =>
-                            (total + b, if (endorserIndexes.contains(i)) voted + b else voted)
+                            (total + b, if (endorserIndexes.contains(i)) voted + b else voted) // TODO: or miner of this block
                           }
                         val shouldFinalize = votedGeneratorsBalance >= (totalGeneratorsBalance * 2 / 3)
                         // height is actually a parent height, because we haven't updated it, see above
                         val newFinalizationHeight = Height((if (shouldFinalize) Height(height) else this.finalizedHeight).max(GenesisBlockHeight))
 
+                        // NOTE: It writes the referenced block!
                         rocksdb.append(
                           liquidSnapshotWithCancelledLeases,
                           carry,
@@ -403,7 +404,7 @@ class BlockchainUpdaterImpl(
                           referencedComputedStateHash,
                           referencedForgedBlock,
                           newFinalizationHeight,
-                          generatorBalances
+                          ngState.fold(IndexedSeq.empty)(_.recentGeneratorBalances)
                         )
                         BlockStats.appended(referencedForgedBlock, referencedLiquidSnapshot.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
@@ -442,7 +443,8 @@ class BlockchainUpdaterImpl(
                     featuresApprovedWithBlock(block),
                     reward,
                     hitSource,
-                    cancelLeases(collectLeasesToCancel(newHeight), newHeight)
+                    cancelLeases(collectLeasesToCancel(newHeight), newHeight),
+                    recentGeneratorBalances = generatorBalances
                   )
                 )
 
@@ -812,12 +814,16 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.balance(address, mayBeAssetId)
   }
 
-  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), TxTimestamp] = readLock {
+  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = readLock {
     snapshotBlockchain.balances(req)
   }
 
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = readLock {
     snapshotBlockchain.wavesBalances(addresses)
+  }
+
+  override def deposit(address: Address): Long = readLock {
+    snapshotBlockchain.deposit(address)
   }
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = readLock {
@@ -856,11 +862,11 @@ class BlockchainUpdaterImpl(
   }
 
   override def parentGeneratorBalances(): Seq[Long] = readLock {
-    rocksdb.parentGeneratorBalances()
+    snapshotBlockchain.parentGeneratorBalances()
   }
 
   override def currentGeneratorBalances(): Seq[Long] = readLock {
-    rocksdb.currentGeneratorBalances()
+    ngState.fold(rocksdb.currentGeneratorBalances())(_.recentGeneratorBalances.map { case (_, _, b) => b })
   }
 
   override def snapshotBlockchain: SnapshotBlockchain = readLock {

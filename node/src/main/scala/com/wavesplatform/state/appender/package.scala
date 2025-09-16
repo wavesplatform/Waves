@@ -47,7 +47,7 @@ package object appender {
     } yield {
       val blockHeight         = Height(parentHeight + 1)
       val period              = blockchain.generationPeriodOf(blockHeight)
-      val committedGenerators = blockchain.committedGenerators(period) // TODO: + from newBlock if changes generationPeriod
+      val committedGenerators = blockchain.committedGenerators(period)
       val generatorBalances   = getGeneratorBalances(blockchain, block, committedGenerators)
       val eligibleGenerators = generatorBalances.view.collect {
         case (addr, _, balance) if blockchain.isEffectiveBalanceValid(parentHeight, block, balance) => addr

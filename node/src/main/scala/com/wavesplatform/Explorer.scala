@@ -5,8 +5,8 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{AddressPortfolio, CommonAccountsApi}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.database.*
 import com.wavesplatform.database.protobuf.StaticAssetInfo
 import com.wavesplatform.lang.script.ContractScript
@@ -39,7 +39,8 @@ object Explorer extends ScorexLogging {
     Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
-      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, StateSnapshot.empty, _ => true).flatten.to(VectorMap))
+      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, StateSnapshot.empty, _ => true).flatten.to(VectorMap)),
+      blockchain.deposit(address)
     )
 
   def main(argsRaw: Array[String]): Unit = {

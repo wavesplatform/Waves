@@ -228,7 +228,8 @@ class CommonValidationTest extends PropSpec with WithState {
         TxHelpers.reissue(asset, master, amount, chainId = invChainId),
         TxHelpers.sponsor(asset, Some(amount), master, version = TxVersion.V2, chainId = invChainId),
         TxHelpers.updateAssetInfo(asset.id, sender = master, chainId = invChainId),
-        TxHelpers.dataV2(master, Seq.empty, chainId = invChainId)
+        TxHelpers.dataV2(master, Seq.empty, chainId = invChainId),
+        TxHelpers.commitToGeneration(3000, chainId = invChainId)
       ).map(genesis -> _)
     }
 
