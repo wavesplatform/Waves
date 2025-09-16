@@ -1,7 +1,6 @@
 name: Publish aptly repo
 
 on:
-  pull_request:
   release:
     types: [published]
 

@@ -21,7 +21,7 @@ on:
         required: true
     outputs:
       image_digest:
-        value: ${{ steps.push.outputs.digest }}
+        value: ${{ jobs.build.outputs.digest }}
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
@@ -34,6 +34,8 @@ jobs:
       packages: write
       attestations: write
       id-token: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
       - uses: regclient/actions/regctl-installer@4d6888fcc4842c9630f60ebc91715a45dd9bd7a3
@@ -53,7 +55,7 @@ jobs:
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
       - run: sbt --batch -Dproject.version=${{ steps.versions.outputs.node-version }} buildTarballsForDocker
-      - if: ${{ github.event.name == 'workflow_call' }}
+      - if: ${{ github.event_name == 'workflow_call' }}
         run: |
           {
             echo 'TAGS<<EOF'
@@ -66,7 +68,7 @@ jobs:
             echo wavesplatform/wavesnode
             echo EOF
           } >> "$GITHUB_ENV"
-      - if: ${{ github.event.name == 'workflow_dispatch' }}
+      - if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           {
             echo 'TAGS<<EOF'
@@ -93,7 +95,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/login-action@v3
-        if: ${{ github.event.name == 'workflow_call' }}
+        if: ${{ github.event_name == 'workflow_call' }}
         with:
           username: ${{ secrets.dockerhub_user }}
           password: ${{ secrets.dockerhub_password }}
