@@ -139,11 +139,6 @@ case class SnapshotBlockchain(
 
   override def finalizedHeight: Height = inner.finalizedHeight
 
-  private def newGenerationPeriodStarted: Boolean = {
-    val h = Height(this.height)
-    blockMeta.isDefined && this.generationPeriodOf(h).start == h // First block in generation period
-  }
-
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
     case Right(addr)                  => Right(snapshot.aliases.getOrElse(alias, addr))

@@ -1413,8 +1413,7 @@ class RocksDBWriter(
       val toGenerationPeriod   = this.generationPeriodOf(toHeight).max(fromGenerationPeriod.next)
 
       addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0, 0))) { addressId =>
-        val committedPeriods         = collectGenerationPeriods(db, addressId, fromGenerationPeriod, toGenerationPeriod).toSet // TODO: return set
-        val releaseCommitmentHeights = committedPeriods.map(_.next.start)
+        val committedPeriods = collectGenerationPeriods(db, addressId, fromGenerationPeriod, toGenerationPeriod)
 
         val lastBalance      = balancesCache.get((address, Asset.Waves))
         val lastLeaseBalance = leaseBalanceCache.get(address)
@@ -1469,14 +1468,14 @@ class RocksDBWriter(
       addressId: AddressId,
       fromIncl: GenerationPeriod,
       toIncl: GenerationPeriod
-  ): List[GenerationPeriod] = {
+  ): Set[GenerationPeriod] = {
     val key = Keys.committedGenerators(fromIncl, Height(0))
     def getSeekBytes(at: GenerationPeriod): Array[Byte] =
       Keys.committedGenerators(at, Height(0)).keyBytes.dropRight(Ints.BYTES) // Drop height
 
     val prefixBytes             = KeyTag.CommittedGenerators.prefixBytes
     val prefixLen               = prefixBytes.length
-    var r                       = List.empty[GenerationPeriod]
+    var r                       = Set.empty[GenerationPeriod]
     var continue                = true
     var currentGenerationPeriod = fromIncl
 
@@ -1494,7 +1493,7 @@ class RocksDBWriter(
             .exists { entries => entries.exists { case (currentAddressId, _, _) => currentAddressId == addressId } }
 
           if (found) {
-            r = currentGenerationPeriod :: r
+            r += currentGenerationPeriod
 
             // It can't register twice on a generation period
             val nextPeriod = currentGenerationPeriod.next
