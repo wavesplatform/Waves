@@ -259,6 +259,9 @@ checkPRRaw := Def
       (benchmark / Test / compile).value
       (`node-generator` / Compile / compile).value
       (`ride-runner` / Test / test).value
+      (node / assembly).value
+      buildTarballsForDocker.value
+      (`lang-jvm` / assembly).value
     }
   )
   .value
