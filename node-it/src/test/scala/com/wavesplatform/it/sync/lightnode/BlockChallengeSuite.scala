@@ -122,7 +122,8 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
         featureVotes = Seq(22),
         rewardVote = 1000000000L,
         stateHash = Some(ByteStr.fill(32)(1)),
-        challengedHeader = None
+        challengedHeader = None,
+        finalizationVoting = None
       )
       .explicitGet()
   }

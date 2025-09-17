@@ -12,6 +12,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.{DBSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.BlockchainGenerator.{GenBlock, GenTx}
@@ -115,6 +116,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
         settings,
         time,
         utxPool,
+        EndorsementStorage.Disabled,
         Wallet(settings.walletSettings),
         PoSSelector(blockchain, None),
         scheduler,
@@ -145,7 +147,8 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
                   block.header.featureVotes,
                   block.header.rewardVote,
                   block.header.stateHash,
-                  block.header.challengedHeader
+                  block.header.challengedHeader,
+                  block.header.finalizationVoting
                 )
                 _ <- Await
                   .result(extAppender(blockWithTxs).runAsyncLogErr, Duration.Inf)
@@ -166,16 +169,17 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
                 lastHeader.baseTarget,
                 lastHeader.generationSignature,
                 lastHeader.generator,
-                Nil,
-                0,
-                ByteStr.empty,
-                None,
-                None
+                featureVotes = Nil,
+                rewardVote = 0,
+                transactionsRoot = ByteStr.empty,
+                stateHash = None,
+                challengedHeader = None,
+                finalizationVoting = None
               ),
               ByteStr.empty,
               Nil
             )
-            blockchain.processBlock(pseudoBlock, ByteStr.empty, snapshot = None, generatorBalances = Map.empty, verify = false)
+            blockchain.processBlock(pseudoBlock, ByteStr.empty, snapshot = None, generatorBalances = Seq.empty, verify = false)
           }
         case Left(err) => log.error(s"Error appending block: $err")
       }

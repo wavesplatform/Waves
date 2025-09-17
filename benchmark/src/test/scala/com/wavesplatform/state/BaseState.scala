@@ -1,7 +1,5 @@
 package com.wavesplatform.state
 
-import java.io.File
-import java.nio.file.Files
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
@@ -15,6 +13,9 @@ import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import org.openjdk.jmh.annotations.{Setup, TearDown}
 import org.scalacheck.{Arbitrary, Gen}
+
+import java.io.File
+import java.nio.file.Files
 
 trait BaseState {
   import BaseState.*
@@ -88,7 +89,8 @@ trait BaseState {
       next.header.generationSignature,
       differResult.computedStateHash,
       next,
-      generatorBalances = Map.empty
+      newFinalizedHeight = GenesisBlockHeight,
+      generatorBalances = Seq.empty
     )
   }
 

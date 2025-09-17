@@ -98,6 +98,8 @@ class LazyBlockchain[TagT] private (
   // Ride: blockInfoByHeight, lastBlock
   override def blockHeader(height: Int): Option[SignedBlockHeader] = blockHeaderWithVrf(Height(height)).map(_.header)
 
+  override def finalizedHeightAt(at: Height): Option[Height] = ???
+
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] = blockHeaderWithVrf(Height(height)).map(_.vrf)
 
@@ -126,6 +128,8 @@ class LazyBlockchain[TagT] private (
 
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = heightUntagged
+
+  override def finalizedHeight: Height = ???
 
   // Ride: environment initialization
   override def activatedFeatures: ActivatedFeatures = currentActivatedFeatures.get()
@@ -204,14 +208,18 @@ class LazyBlockchain[TagT] private (
     // NOTE: This code leads to a wrong generating balance, but we see no use-cases for now
     val lb           = leaseBalance(address)
     val wavesBalance = balance(address, Asset.Waves)
-    List(BalanceSnapshot(height, wavesBalance, lb.in, lb.out))
+    List(BalanceSnapshot(height, wavesBalance, lb.in, lb.out, 0))
   }
 
   // Ride: transactionHeightById
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
     getTransactionHeight(TransactionId(id)).map(TxMeta(_, TxMeta.Status.Succeeded, 0)) // Other information not used
 
-  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = ???
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = ???
+
+  override def parentGeneratorBalances(): Seq[Long] = ???
+
+  override def currentGeneratorBalances(): Seq[Long] = ???
 
   private def getTransactionHeight(id: TransactionId): Option[Height] = db.directReadWrite { implicit ctx =>
     memCache.getOrLoad(MemCacheKey.Transaction(id)) { key =>

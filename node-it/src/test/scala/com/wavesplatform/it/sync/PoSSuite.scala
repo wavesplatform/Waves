@@ -381,7 +381,8 @@ class PoSSuite extends BaseFunSuite with WaitForHeight2 {
         featureVotes = Seq.empty,
         rewardVote = -1L,
         stateHash = None,
-        challengedHeader = None
+        challengedHeader = None,
+        finalizationVoting = None
       )
       .explicitGet()
   }

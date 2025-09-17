@@ -27,6 +27,7 @@ import com.wavesplatform.state.{
   Height,
   LeaseBalance,
   StateSnapshot,
+  TransactionId,
   TxMeta
 }
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -99,6 +100,8 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   override def blockHeader(height: Int): Option[SignedBlockHeader] =
     blockHeaders.get(height)
 
+  override def finalizedHeightAt(at: Height): Option[Height] = ???
+
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] = input.blocks.get(height).flatMap(_.VRF)
 
@@ -107,6 +110,8 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = input.height
+
+  override def finalizedHeight: Height = ???
 
   override val activatedFeatures: ActivatedFeatures = settings.functionalitySettings.preActivatedFeatures ++ input.features.map(id => id -> height)
 
@@ -165,7 +170,7 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
       .flatMap { addressState => addressState.generatingBalance.map(_.value).orElse(addressState.balance(Waves)) }
       .getOrElse(0L)
 
-    Seq(BalanceSnapshot(height, generatingBalance, 0, 0))
+    Seq(BalanceSnapshot(height, generatingBalance, 0, 0, 0))
   }
 
   // Ride: wavesBalance (specifies to=None)
@@ -204,9 +209,13 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = Seq.empty
 
-  override def lastStateHash(refId: Option[BlockId]): BlockId = ???
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = ???
 
-  override def committedGenerators(at: GenerationPeriod): Map[BlsPublicKey, Address] = ???
+  override def parentGeneratorBalances(): Seq[Long] = ???
+
+  override def currentGeneratorBalances(): Seq[Long] = ???
+
+  override def lastStateHash(refId: Option[BlockId]): BlockId = ???
 
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =

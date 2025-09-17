@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state.{Portfolio, StateSnapshot}
+import com.wavesplatform.state.{GenesisBlockHeight, Portfolio, StateSnapshot}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
@@ -57,14 +57,15 @@ object RollbackBenchmark extends ScorexLogging {
         1.toByte,
         time.getTimestamp(),
         Block.GenesisReference,
-        1000,
+        baseTarget = 1000,
         Block.GenesisGenerationSignature,
         GenesisTransaction.create(issuer.publicKey.toAddress, 100000e8.toLong, time.getTimestamp()).explicitGet() +: assets,
         issuer,
-        Seq.empty,
-        -1,
-        None,
-        None
+        featureVotes = Seq.empty,
+        rewardVote = -1,
+        stateHash = None,
+        challengedHeader = None,
+        finalizationVoting = None
       )
       .explicitGet()
 
@@ -82,7 +83,8 @@ object RollbackBenchmark extends ScorexLogging {
       genesisBlock.header.generationSignature,
       computedBlockStateHash = ByteStr.empty,
       genesisBlock,
-      generatorBalances = Map.empty
+      newFinalizedHeight = GenesisBlockHeight,
+      generatorBalances = Seq.empty
     )
 
     val nextBlock =
@@ -93,12 +95,13 @@ object RollbackBenchmark extends ScorexLogging {
           genesisBlock.id(),
           1000,
           Block.GenesisGenerationSignature,
-          Seq.empty,
+          txs = Seq.empty,
           issuer,
-          Seq.empty,
-          -1,
-          None,
-          None
+          featureVotes = Seq.empty,
+          rewardVote = -1,
+          stateHash = None,
+          challengedHeader = None,
+          finalizationVoting = None
         )
         .explicitGet()
     val portfolios2  = addresses.map(_ -> Portfolio(1, assets = VectorMap(IssuedAsset(assets.head.id()) -> 1L)))
@@ -113,7 +116,8 @@ object RollbackBenchmark extends ScorexLogging {
       hitSource = ByteStr.empty,
       computedBlockStateHash = ByteStr.empty,
       nextBlock,
-      generatorBalances = Map.empty
+      newFinalizedHeight = GenesisBlockHeight,
+      generatorBalances = Seq.empty
     )
 
     log.info("Rolling back")
