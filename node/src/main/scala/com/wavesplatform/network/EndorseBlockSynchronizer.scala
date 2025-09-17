@@ -78,7 +78,7 @@ object EndorsementStorage {
         true
       }
     } match {
-      case Left(err) => logger.debug(s"Unexpected $msg: $err"); false
+      case Left(err) => logger.trace(s"Unexpected $msg: $err"); false
       case Right(r)  => r
     }
 

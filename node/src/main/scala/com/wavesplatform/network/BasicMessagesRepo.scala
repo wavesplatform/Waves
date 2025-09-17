@@ -2,7 +2,6 @@ package com.wavesplatform.network
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.Block.BlockIdLength
 import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -21,6 +20,8 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 import scala.reflect.ClassTag
 import scala.util.Try
+
+// For protobuf see https://protobuf.dev/programming-guides/encoding/#varints
 
 object GetPeersSpec extends MessageSpec[GetPeers.type] {
   override val messageCode: Message.MessageCode = 1: Byte
@@ -368,8 +369,7 @@ object EndorseBlockSpec extends MessageSpec[EndorseBlock] {
 
   override def serializeData(data: EndorseBlock): Array[Byte] = data.toProtobuf.toByteArray
 
-  // 8 bytes enough, see https://protobuf.dev/programming-guides/encoding/#varints
-  override val maxLength: Int = KeyLength + BlockIdLength + 8 + SignatureLength
+  override val maxLength: Int = 178 // 4 + 32*2 + 4 + 96 + 4 tags + 2 varint max overhead
 }
 
 // Virtual, only for logs
