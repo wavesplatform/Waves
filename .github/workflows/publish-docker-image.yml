@@ -22,14 +22,15 @@ on:
       DOCKERHUB_PASSWORD:
         required: true
     outputs:
-      image-digest:
-        value: ${{ jobs.build.outputs.digest }}
+      digest:
+        value: ${{ jobs.publish.outputs.digest }}
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 jobs:
-  build:
+  publish:
+    name: Publish Docker image
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     permissions:
@@ -44,7 +45,8 @@ jobs:
       - uses: regclient/actions/regctl-installer@4d6888fcc4842c9630f60ebc91715a45dd9bd7a3
       - uses: proudust/gh-describe@70f72d4f6304ea053cf5a3d71c36211d5acc0c73
         id: ghd
-      - run: |
+      - name: Prepare base image and node version
+        run: |
           BASE_IMAGE=${{ inputs.base-image }}
           BASE_IMAGE=${BASE_IMAGE:-$(head -n1 docker/Dockerfile | cut -d= -f2-)}
           echo "base-image=$BASE_IMAGE" >> "$GITHUB_OUTPUT"
@@ -57,8 +59,10 @@ jobs:
           java-version: '11'
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
-      - run: sbt --batch -Dproject.version=${{ steps.versions.outputs.node-version }} buildTarballsForDocker
-      - if: ${{ inputs.raw-docker-tags != '' }}
+      - name: Build tarballs for docker
+        run: sbt --batch -Dproject.version=${{ steps.versions.outputs.node-version }} buildTarballsForDocker
+      - name: Extract image name and tags from workflow_call inputs
+        if: ${{ inputs.raw-docker-tags != '' }}
         run: |
           {
             echo 'TAGS<<EOF'
@@ -71,7 +75,8 @@ jobs:
             echo wavesplatform/wavesnode
             echo EOF
           } >> "$GITHUB_ENV"
-      - if: ${{ github.event_name == 'workflow_dispatch' }}
+      - name: Extract image name and tags from workflow_dispatch inputs
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           {
             echo 'TAGS<<EOF'
@@ -80,7 +85,8 @@ jobs:
             echo EOF
           } >> "$GITHUB_ENV"
           echo "IMAGES=${{ env.IMAGE_NAME }}" >> "$GITHUB_ENV"
-      - run: |
+      - name: Prepare annotations
+        run: |
           {
             echo 'annotations<<EOF'
             echo org.opencontainers.image.source=https://github.com/${{ github.repository }}/tree/${{ github.sha }}/docker
@@ -118,14 +124,15 @@ jobs:
         with:
           context: ./docker
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name == 'workflow_dispatch' }}
+          push: true
           build-args: baseImage=${{ steps.versions.outputs.base-image }}@${{ steps.versions.outputs.base-image-digest }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - run: |
+      - name: Prepare summary
+        run: |
           {
             echo '## Image Info'
             echo '- This image: `${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}`'

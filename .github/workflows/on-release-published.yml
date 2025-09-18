@@ -1,46 +1,17 @@
 name: Publish release JARs and Docker images
 
 on:
-  pull_request:
   release:
     types: [published]
-  workflow_dispatch:
-    inputs:
-      tag:
-        type: string
-        description: Docker Tag
 
 jobs:
-  prepare-docker-tags:
-    runs-on: ubuntu-latest
-    outputs:
-      tags: ${{ steps.tags.outputs.tags }}
-    steps:
-      - id: tags
-        run: |
-          case ${{ github.event_name }} in
-            workflow_dispatch)
-              echo "tags=type=raw,value=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-              ;;
-            pull_request)
-              echo "tags=type=raw,value=1.5.11-1" >> "$GITHUB_OUTPUT"
-              ;;
-            release)
-              {
-                echo 'tags<<EOF'
-                echo 'type=match,pattern=v(.*),group=1'
-                echo 'type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}'
-                echo EOF
-              } >> "$GITHUB_OUTPUT"
-              ;;
-          esac
-
   publish-node-image:
     name: Publish Waves Node to Docker Hub
-    needs: prepare-docker-tags
     uses: ./.github/workflows/publish-docker-image.yml
     with:
-      raw-docker-tags: ${{ needs.prepare-docker-tags.outputs.tags }}
+      raw-docker-tags: |
+        type=match,pattern=v(.*),group=1
+        type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
       environment: Docker Hub
     permissions:
       contents: read
