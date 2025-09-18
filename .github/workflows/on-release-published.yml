@@ -1,25 +1,59 @@
 name: Publish release JARs and Docker images
 
 on:
+  pull_request:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        description: Docker Tag
 
 jobs:
+  prepare-docker-tags:
+    runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.tags.outputs.tags }}
+    steps:
+      - id: tags
+        run: |
+          case ${{ github.event_name }} in
+            workflow_dispatch)
+              echo "tags=type=raw,value=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+              ;;
+            pull_request)
+              echo "tags=type=raw,value=1.5.11-1" >> "$GITHUB_OUTPUT"
+              ;;
+            release)
+              {
+                echo 'tags<<EOF'
+                echo 'type=match,pattern=v(.*),group=1'
+                echo 'type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}'
+                echo EOF
+              } >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
   publish-node-image:
+    name: Publish Waves Node to Docker Hub
+    needs: prepare-docker-tags
     uses: ./.github/workflows/publish-docker-image.yml
     with:
-      dockerTags: |
-        type=match,pattern=v(.*),group=1
-        type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
+      raw-docker-tags: ${{ needs.prepare-docker-tags.outputs.tags }}
+      environment: Docker Hub
     permissions:
       contents: read
       packages: write
       attestations: write
       id-token: write
-    secrets: inherit
+    secrets:
+      DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
 
   push-private-node-image:
-    environment: prod
+    name: Publish Private Node to Docker Hub
+    environment: Docker Hub
     needs: publish-node-image
     runs-on: ubuntu-latest
     steps:
@@ -41,15 +75,15 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           context: ./docker/private
-          push: true
+          push: ${{ github.event_name == 'release' }}
           pull: true
           tags: ${{ steps.meta-private.outputs.tags }}
           build-args: |
-            baseImage=wavesplatform/wavesnode@${{ needs.publish-node-image.outputs.image_digest }}
+            baseImage=wavesplatform/wavesnode@${{ needs.publish-node-image.outputs.digest }}
 
   publish-ride-runner-image:
-    environment: prod
-    name: Publish Docker images
+    name: Publish RIDE Runner to Docker Hub
+    environment: Docker Hub
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -76,7 +110,7 @@ jobs:
       - uses: docker/build-push-action@v5
         with:
           context: ./ride-runner/docker
-          push: true
+          push: ${{ github.event_name == 'release' }}
           pull: true
           tags: ${{ steps.meta-ride-runner.outputs.tags }}
 
@@ -84,6 +118,7 @@ jobs:
     environment: prod
     name: Publish JARs to Sonatype
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' }}
     steps:
       - uses: actions/checkout@v4
       - id: sbt-version
