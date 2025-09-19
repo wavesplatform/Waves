@@ -24,8 +24,8 @@ import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
-import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
 import com.wavesplatform.transaction.EthereumTransaction.Transfer
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.*
@@ -33,7 +33,8 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.utils.{LoggerFacade, Numbers, ScorexLogging}
+import com.wavesplatform.transaction.{CommitToGenerationTransaction, *}
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import io.netty.util.concurrent.DefaultThreadFactory
 import org.rocksdb.Status
 import org.slf4j.LoggerFactory
@@ -82,31 +83,31 @@ object RocksDBWriter extends ScorexLogging {
       } yield db.get(valueKey(lastChange))
   }
 
-  private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
-
-    /** Fixed implementation where {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 5)]}}}
-      */
+  /** Merges height sequences: {{{([15, 12, 3], [12, 5], [3, 1]) => [(15, 12, 3), (12, 12, 3), (3, 5, 3), (3, 5, 1)]}}}
+    * @return
+    *   Each tuple contains balance components at {{{Height(max(x._1, x._2, x._3))}}}
+    */
+  private[database] def merge3(whs: Seq[Int], lhs: Seq[Int], dhs: Seq[Int]): Seq[(Int, Int, Int)] = {
     @tailrec
-    def recMergeFixed(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
-      buf += wh -> lh
-      if (wt.isEmpty && lt.isEmpty) {
-        buf
-      } else if (wt.isEmpty) {
-        recMergeFixed(wh, wt, lt.head, lt.tail, buf)
-      } else if (lt.isEmpty) {
-        recMergeFixed(wt.head, wt.tail, lh, lt, buf)
-      } else {
-        if (wh == lh) {
-          recMergeFixed(wt.head, wt.tail, lt.head, lt.tail, buf)
-        } else if (wh > lh) {
-          recMergeFixed(wt.head, wt.tail, lh, lt, buf)
-        } else {
-          recMergeFixed(wh, wt, lt.head, lt.tail, buf)
-        }
+    def loop(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], dh: Int, dt: Seq[Int], r: ArrayBuffer[(Int, Int, Int)]): ArrayBuffer[(Int, Int, Int)] = {
+      r.append((wh, lh, dh))
+
+      var th = Int.MinValue // target height
+      if (wt.nonEmpty && wh > th) th = wh
+      if (lt.nonEmpty && lh > th) th = lh
+      if (dt.nonEmpty && dh > th) th = dh
+
+      if (th == Int.MinValue) r
+      else {
+        val (nah, nat) = if (wh == th && wt.nonEmpty) (wt.head, wt.tail) else (wh, wt)
+        val (nbh, nbt) = if (lh == th && lt.nonEmpty) (lt.head, lt.tail) else (lh, lt)
+        val (nch, nct) = if (dh == th && dt.nonEmpty) (dt.head, dt.tail) else (dh, dt)
+
+        loop(nah, nat, nbh, nbt, nch, nct, r)
       }
     }
 
-    recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty).toSeq
+    loop(whs.head, whs.tail, lhs.head, lhs.tail, dhs.head, dhs.tail, ArrayBuffer.empty).toSeq
   }
 
   private implicit val buffersReleaseable: Releasable[collection.IndexedSeq[ByteBuffer]] = _.foreach(Util.releaseTemporaryDirectBuffer)
@@ -1404,17 +1405,17 @@ class RocksDBWriter(
     }
   }
 
-  // Used only for effective balance calculations
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
     readOnly { db =>
       val toHeight = Height(to.flatMap(this.heightOf).getOrElse(this.height))
 
-      val fromGenerationPeriod = this.generationPeriodOf(Height(from))
-      val toGenerationPeriod   = this.generationPeriodOf(toHeight).max(fromGenerationPeriod.next)
+      val (fromGenerationPeriod, toGenerationPeriod) = {
+        val fromPeriod = this.generationPeriodOf(Height(from))
+        // -1 and +1 periods, because a deposit is {deposit on this period} + {deposit on the next period}
+        (fromPeriod.prevOrThis, this.generationPeriodOf(toHeight).max(fromPeriod.next))
+      }
 
       addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0, 0))) { addressId =>
-        val committedPeriods = collectGenerationPeriods(db, addressId, fromGenerationPeriod, toGenerationPeriod)
-
         val lastBalance      = balancesCache.get((address, Asset.Waves))
         val lastLeaseBalance = leaseBalanceCache.get(address)
 
@@ -1438,73 +1439,102 @@ class RocksDBWriter(
             collectLeaseBalanceHistory(newAcc, lbn.prevHeight)
           }
 
-        val wbh = slice(collectBalanceHistory(Vector.empty, lastBalance.height), from, toHeight)
-        val lbh = slice(collectLeaseBalanceHistory(Vector.empty, lastLeaseBalance.height), from, toHeight)
+        val collectedDeposits    = collectGenerationDepositChanges(db, addressId, fromGenerationPeriod, toGenerationPeriod)
+        val slidedDepositHeights = slice(collectedDeposits.changedHeights, from, toHeight)
+
+        val cbh = collectBalanceHistory(Vector.empty, lastBalance.height)
+        val wbh = slice(cbh, from, toHeight)
+
+        val clbh = collectLeaseBalanceHistory(Vector.empty, lastLeaseBalance.height)
+        val lbh  = slice(clbh, from, toHeight)
+
         for {
-          (wh_, lh_) <- merge(wbh, lbh)
+          (wh_, lh_, dh_) <- merge3(wbh, lbh, slidedDepositHeights)
           wh = Height(wh_)
           lh = Height(lh_)
+          dh = Height(dh_)
           wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, wh)))
           lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, lh)))
+          d  = collectedDeposits.depositSize.getOrElse(dh, 0L)
         } yield {
-          val maxHeight = Height(wh.max(lh))
-
-          // A generator always spends WAVES for fee when commits to a generation.
-          // The deposit release is not interesting, because we calculate only pessimistic portfolio changes.
-          val generationPeriod = this.generationPeriodOf(wh)
-
-          val committedTimes = Numbers.when(committedPeriods.contains(generationPeriod))(1) +
-            Numbers.when(committedPeriods.contains(generationPeriod.next))(1)
-          val deposit = committedTimes * CommitToGenerationTransaction.DepositInWavelets
-
-          BalanceSnapshot(maxHeight, wb.balance, lb.in, lb.out, deposit)
+          val maxHeight = Height(wh.max(lh).max(dh))
+          BalanceSnapshot(maxHeight, wb.balance, lb.in, lb.out, d)
         }
       }
     }
   }
 
-  private def collectGenerationPeriods(
+  private def collectGenerationDepositChanges(
       db: ReadOnlyDB,
       addressId: AddressId,
       fromIncl: GenerationPeriod,
       toIncl: GenerationPeriod
-  ): Set[GenerationPeriod] = {
+  ): (changedHeights: Seq[Height], depositSize: Map[Height, Long]) = {
+    val toInclCommitted = toIncl.next // A generator commits to a next period, this is what we see in DB
+
     val key = Keys.committedGenerators(fromIncl, Height(0))
     def getSeekBytes(at: GenerationPeriod): Array[Byte] =
       Keys.committedGenerators(at, Height(0)).keyBytes.dropRight(Ints.BYTES) // Drop height
 
-    val prefixBytes             = KeyTag.CommittedGenerators.prefixBytes
-    val prefixLen               = prefixBytes.length
-    var r                       = Set.empty[GenerationPeriod]
-    var continue                = true
-    var currentGenerationPeriod = fromIncl
+    val depositDiffHeights = mutable.Map.empty[Height, Int] // +1 - added a deposit, -1 - released
 
     Using.resource(db.newIterator) { iter =>
       iter.seek(getSeekBytes(fromIncl))
+
+      var continue    = true
+      val prefixBytes = KeyTag.CommittedGenerators.prefixBytes
+      val prefixLen   = prefixBytes.length
       while (iter.isValid && iter.key().startsWith(prefixBytes) && continue) {
-        val periodStart = Height(Ints.fromByteArray(iter.key().slice(prefixLen, prefixLen + Ints.BYTES)))
+        val committedPeriodStartBytes = iter.key().slice(prefixLen, prefixLen + Ints.BYTES)
+        val committedPeriodStart      = Height(Ints.fromByteArray(committedPeriodStartBytes))
 
-        continue = periodStart <= toIncl.start
+        continue = committedPeriodStart <= toInclCommitted.start
         if (continue) {
-          if (periodStart != currentGenerationPeriod.start) currentGenerationPeriod = this.generationPeriodOf(periodStart)
-
           val found = key
             .parse(iter.value())
             .exists { entries => entries.exists { case (currentAddressId, _, _) => currentAddressId == addressId } }
 
           if (found) {
-            r += currentGenerationPeriod
+            val committedPeriod = this.generationPeriodOf(committedPeriodStart)
+            val nextPeriod      = committedPeriod.next
+
+            val depositHeightBytes = iter.key().takeRight(Ints.BYTES)
+            val depositHeight      = Height(Ints.fromByteArray(depositHeightBytes))
+            val releaseHeight      = nextPeriod.start
+
+            depositDiffHeights.updateWith(depositHeight)(orig => Some(orig.getOrElse(0) + 1))
+            depositDiffHeights.put(releaseHeight, -1)
 
             // It can't register twice on a generation period
-            val nextPeriod = currentGenerationPeriod.next
-            if (nextPeriod.start <= toIncl.start) iter.seek(getSeekBytes(nextPeriod))
+            if (nextPeriod.start <= toInclCommitted.start) iter.seek(getSeekBytes(nextPeriod))
             else continue = false
           } else iter.next()
         }
       }
     }
 
-    r
+    if (depositDiffHeights.isEmpty) (Seq(Height(0)), Map(Height(0) -> 0L))
+    else {
+      @tailrec
+      def process(
+          depositDiffHeights: List[(Height, Int)],
+          currentDeposit: Long,
+          changedHeights: List[Height],
+          depositSize: Map[Height, Long]
+      ): (List[Height], Map[Height, Long]) = depositDiffHeights match {
+        case Nil => (changedHeights, depositSize)
+        case (height, diff) :: tail =>
+          val updated = currentDeposit + diff * DepositInWavelets
+          process(
+            tail,
+            updated,
+            height :: changedHeights,
+            depositSize.updated(height, updated)
+          )
+      }
+
+      process(depositDiffHeights.toList.sortBy { case (h, _) => h }, 0L, List.empty, Map.empty)
+    }
   }
 
   override def loadHeightOf(blockId: ByteStr): Option[Int] = blockHeightCache.get(blockId)
@@ -1559,7 +1589,7 @@ class RocksDBWriter(
     val rawGenerators = new mutable.ArrayBuffer[(BlsPublicKey, TransactionId)](maxGenerators)
     val addressIds    = new mutable.ArrayBuffer[AddressId](maxGenerators)
 
-    val key = Keys.committedGenerators(at, Height(0))
+    val key = Keys.committedGenerators(at, at.start)
     val addresses = rdb.db.readOnly { ro =>
       ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
         val xs = key.parse(dbEntry.getValue).getOrElse(Seq.empty)

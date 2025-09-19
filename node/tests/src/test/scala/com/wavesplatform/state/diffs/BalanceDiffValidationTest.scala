@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.TestValues
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -7,7 +8,7 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{CommitToGenerationTransaction, GenesisTransaction, TxHelpers, TxVersion}
 
 class BalanceDiffValidationTest extends PropSpec with WithState {
 
@@ -61,6 +62,27 @@ class BalanceDiffValidationTest extends PropSpec with WithState {
       settings
     ) { snapshotEi =>
       snapshotEi should produce("trying to spend leased money")
+    }
+  }
+
+  property("cannot transfer more than own-generationDeposit") {
+    val notBlockedAmount = 100_000.waves
+    val initBalance = CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee +
+      notBlockedAmount + TestValues.fee
+
+    assertDiffEi(
+      Seq(
+        TestBlock.create(
+          Seq(
+            TxHelpers.genesis(TxHelpers.defaultAddress, amount = initBalance),
+            TxHelpers.commitToGeneration(generationPeriodStart = 3)
+          )
+        )
+      ),
+      TestBlock.create(Seq(TxHelpers.transfer(amount = notBlockedAmount + 1))),
+      DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(generationPeriod = 3)
+    ) { snapshotEi =>
+      snapshotEi should produce("xxx")
     }
   }
 }

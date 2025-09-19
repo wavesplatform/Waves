@@ -5,6 +5,7 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.database.RocksDBWriter.{merge3, slice}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -26,20 +27,43 @@ import scala.util.{Random, Using}
 class RocksDBWriterSpec extends FreeSpec with WithDomain {
   "Slice" - {
     "drops tail" in {
-      RocksDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
+      slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
     }
     "drops head" in {
-      RocksDBWriter.slice(Seq(10, 7, 4), 4, 8) shouldEqual Seq(7, 4)
+      slice(Seq(10, 7, 4), 4, 8) shouldEqual Seq(7, 4)
     }
     "includes Genesis" in {
-      RocksDBWriter.slice(Seq(10, 7), 5, 11) shouldEqual Seq(10, 7, 1)
+      slice(Seq(10, 7), 5, 11) shouldEqual Seq(10, 7, 1)
+    }
+    "with zero" in {
+      slice(Seq(10, 7, 0), 5, 11) shouldEqual Seq(10, 7, 0)
     }
   }
   "Merge" - {
     "correctly joins height ranges" in {
-      RocksDBWriter.merge(Seq(15, 12, 3), Seq(12, 5)) shouldEqual Seq((15, 12), (12, 12), (3, 5))
-      RocksDBWriter.merge(Seq(12, 5), Seq(15, 12, 3)) shouldEqual Seq((12, 15), (12, 12), (5, 3))
-      RocksDBWriter.merge(Seq(8, 4), Seq(8, 4)) shouldEqual Seq((8, 8), (4, 4))
+      merge3(Seq(15, 12, 3), Seq(12, 5), Seq(3, 1)) shouldEqual Seq((15, 12, 3), (12, 12, 3), (3, 5, 3), (3, 5, 1))
+      merge3(Seq(12, 5), Seq(15, 12, 3), Seq(9, 6)) shouldEqual Seq((12, 15, 9), (12, 12, 9), (5, 3, 9), (5, 3, 6))
+      merge3(Seq(8, 4), Seq(8, 4), Seq(1)) shouldEqual Seq((8, 8, 1), (4, 4, 1))
+    }
+
+    "zeroes" in {
+      merge3(Seq(1), Seq(0), Seq(0)) shouldEqual Seq((1, 0, 0))
+      merge3(Seq(0), Seq(0), Seq(0)) shouldEqual Seq((0, 0, 0))
+      merge3(Seq(0), Seq(2), Seq(0)) shouldEqual Seq((0, 2, 0))
+      merge3(Seq(4, 2, 1), Seq(0), Seq(0)) shouldEqual Seq((4, 0, 0), (2, 0, 0), (1, 0, 0))
+      merge3(Seq(4, 2, 1), Seq(0), Seq(6, 4, 2)) shouldEqual Seq((4, 0, 6), (4, 0, 4), (2, 0, 2), (1, 0, 2))
+    }
+
+    "one sequence longer than others, exhausted sequences keep head steady" in {
+      merge3(Seq(9, 8), Seq(3), Seq(2)) shouldBe Seq((9, 3, 2), (8, 3, 2))
+    }
+
+    "all heads equal but only some have tails" in {
+      merge3(Seq(5, 4), Seq(5), Seq(5, 1)) shouldBe Seq((5, 5, 5), (4, 5, 1))
+    }
+
+    "strictly descending and all tails exhausted at different times" in {
+      merge3(Seq(4, 2, 1), Seq(6, 3), Seq(5)) shouldBe Seq((4, 6, 5), (4, 3, 5), (2, 3, 5), (1, 3, 5))
     }
   }
 

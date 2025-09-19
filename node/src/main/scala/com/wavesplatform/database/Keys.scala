@@ -256,8 +256,17 @@ object Keys {
   def committedGeneratorsCount(period: GenerationPeriod): Key[Short] =
     Key(CommittedGeneratorsCount, h(period.start), Option(_).fold(0: Short)(Shorts.fromByteArray), Shorts.toByteArray)
 
-  def committedGenerators(period: GenerationPeriod, commitmentHeight: Height): Key[Option[Seq[(AddressId, BlsPublicKey, TransactionId)]]] =
-    Key.opt(CommittedGenerators, h(period.start) ++ h(commitmentHeight), readCommittedGenerators, writeCommittedGenerators)
+  /** Key: Int(committedPeriod.start) ++ Int(commitmentHeight)
+    * @note
+    *   committedPeriod.start >= commitmentHeight, because a generator can commit only for a next period
+    */
+  def committedGenerators(committedPeriod: GenerationPeriod, commitmentHeight: Height): Key[Option[Seq[(AddressId, BlsPublicKey, TransactionId)]]] =
+    Key.opt(
+      CommittedGenerators,
+      h(committedPeriod.start) ++ h(commitmentHeight),
+      readCommittedGenerators,
+      writeCommittedGenerators
+    )
 
   def finalizedHeight(at: Height): Key[Option[Height]] = Key.opt(
     FinalizedBlockHeight,

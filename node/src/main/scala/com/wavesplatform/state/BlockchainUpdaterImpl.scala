@@ -775,7 +775,14 @@ class BlockchainUpdaterImpl(
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readLock {
-    to.fold(ngState.flatMap(ng => ng.snapshotOf(ng.bestLiquidBlockId)))(id => ngState.flatMap(_.snapshotOf(id)))
+    val ngSnapshotOfTo = ngState.flatMap { ng =>
+      to match {
+        case Some(id) => ng.snapshotOf(id)
+        case None     => ng.snapshotOf(ng.bestLiquidBlockId)
+      }
+    }
+
+    ngSnapshotOfTo
       .fold[Blockchain](rocksdb) { case (block, diff, _, _, _, _) =>
         SnapshotBlockchain(rocksdb, diff, block, ByteStr.empty, 0L, None, None)
       }
