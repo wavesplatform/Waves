@@ -65,24 +65,38 @@ class BalanceDiffValidationTest extends PropSpec with WithState {
     }
   }
 
-  property("cannot transfer more than own-generationDeposit") {
+  property("commit to generation") {
+    val settings = DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(generationPeriod = 4)
+
     val notBlockedAmount = 100_000.waves
-    val initBalance = CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee +
-      notBlockedAmount + TestValues.fee
+    val initBalance      = notBlockedAmount + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee
 
     assertDiffEi(
-      Seq(
-        TestBlock.create(
-          Seq(
-            TxHelpers.genesis(TxHelpers.defaultAddress, amount = initBalance),
-            TxHelpers.commitToGeneration(generationPeriodStart = 3)
-          )
-        )
-      ),
-      TestBlock.create(Seq(TxHelpers.transfer(amount = notBlockedAmount + 1))),
-      DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(generationPeriod = 3)
+      Seq(TestBlock.create(Seq(TxHelpers.genesis(TxHelpers.defaultAddress, amount = initBalance)))),
+      TestBlock.create(Seq(TxHelpers.commitToGeneration(generationPeriodStart = 4))),
+      settings
     ) { snapshotEi =>
-      snapshotEi should produce("xxx")
+      snapshotEi.explicitGet()
+    }
+  }
+
+  property("cannot transfer more than own-generationDeposit") {
+    val settings = DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(generationPeriod = 4)
+
+    val notBlockedAmount = 100_000.waves
+    val initBalance =
+      notBlockedAmount + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee + TestValues.fee // for transfer
+
+    val transferAmount = notBlockedAmount + 1
+    assertDiffEi(
+      Seq(
+        TestBlock.create(Seq(TxHelpers.genesis(TxHelpers.defaultAddress, amount = initBalance))),
+        TestBlock.create(Seq(TxHelpers.commitToGeneration(generationPeriodStart = 4)))
+      ),
+      TestBlock.create(Seq(TxHelpers.transfer(amount = transferAmount))),
+      settings
+    ) { snapshotEi =>
+      snapshotEi should produce("trying to spend a deposit")
     }
   }
 }

@@ -20,10 +20,12 @@ object BalanceDiffValidation {
         newWaves: Long,
         newLease: LeaseBalance
     ): Either[(Address, String), Unit] = {
-      val oldWaves     = b.balance(acc)
-      val oldLease     = b.leaseBalance(acc)
-      val wavesDiff    = newWaves - oldWaves
-      val leaseOutDiff = newLease.out - oldLease.out
+      val oldWaves  = b.balance(acc)
+      val wavesDiff = newWaves - oldWaves
+
+      lazy val oldLease     = b.leaseBalance(acc)
+      lazy val leaseOutDiff = newLease.out - oldLease.out
+      lazy val oldDeposit   = b.deposit(acc)
 
       if (wavesDiff < 0) {
         if (newWaves < 0) {
@@ -37,6 +39,8 @@ object BalanceDiffValidation {
             else
               s"leased being more than own: $acc, old: ${(oldWaves, oldLease)}, new: ${(newWaves, newLease)}"
           Left(acc -> errorMessage)
+        } else if (newWaves - newLease.out - oldDeposit < 0) {
+          Left(acc -> s"$acc trying to spend a deposit, old: $oldWaves, deposit: $oldDeposit, new: ($newWaves, ${newLease.out})")
         } else {
           Right(())
         }
