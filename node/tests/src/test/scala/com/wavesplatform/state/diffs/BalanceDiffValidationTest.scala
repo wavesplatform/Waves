@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, GenesisTransaction, TxHelpers, TxVersion}
 
 class BalanceDiffValidationTest extends PropSpec with WithState {
-
   val ownLessThatLeaseOut: (GenesisTransaction, TransferTransaction, LeaseTransaction, LeaseTransaction, TransferTransaction) = {
     val master = TxHelpers.signer(1)
     val alice  = TxHelpers.signer(2)

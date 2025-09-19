@@ -61,7 +61,11 @@ class TransactionsRouteSpec
   override def settings: WavesSettings = DomainPresets.DeterministicFinality.copy(
     restAPISettings = restAPISettings.copy(transactionsByAddressLimit = 5)
   )
-  override def genesisBalances: Seq[AddrWithBalance] = Seq(AddrWithBalance(richAddress, 1_000_000.waves))
+
+  override def genesisBalances: Seq[AddrWithBalance] = Seq(
+    AddrWithBalance(richAddress, 1_000_000.waves),
+    AddrWithBalance(defaultAddress, 1_000_000.waves)
+  )
 
   private val transactionsApiRoute = new TransactionsApiRoute(
     settings.restAPISettings,

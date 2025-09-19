@@ -1,7 +1,7 @@
 package com.wavesplatform.state.appender
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.api.common.CommonGeneratorsApi.GeneratorEntry
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -124,17 +124,23 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
     val defaultSettings =
       DomainPresets.DeterministicFinality.copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed)))
 
+    val otherNodeGenerator = SeedKeyPair("other-node".getBytes())
+
     def testWithGenerator(f: Domain => Any): Any = {
       def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-        private val blsKeyPair = BlsKeyPair(sender.privateKey)
+        private val blsKeyPair          = BlsKeyPair(sender.privateKey)
+        private val otherNodeBlsKeyPair = BlsKeyPair(otherNodeGenerator.privateKey)
 
         override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] =
-          IndexedSeq((sender.toAddress, blsKeyPair.publicKey, TxHelpers.randomId))
+          IndexedSeq(
+            (sender.toAddress, blsKeyPair.publicKey, TxHelpers.randomId),
+            (otherNodeGenerator.toAddress, otherNodeBlsKeyPair.publicKey, TxHelpers.randomId)
+          )
       }
 
       withDomain(
         defaultSettings,
-        AddrWithBalance.enoughBalances(sender),
+        AddrWithBalance.enoughBalances(sender, otherNodeGenerator),
         wrapBU = wrapBU
       ) { d =>
         d.wallet.generateNewAccounts(1).foreach(x => require(x.toAddress == sender.toAddress))
@@ -226,7 +232,8 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         appenderScheduler
       )(channel2, _, None)
 
-      val b = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
+      // Use otherNodeGenerator, because a node can't send EndorseBlock for its blocks
+      val b = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = otherNodeGenerator, strictTime = true)
       testTime.setTime(b.header.timestamp)
       appender(b).runSyncUnsafe()
       if (d.lastBlockId != b.id()) fail(s"Can't apply block $b, see logs")
