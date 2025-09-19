@@ -6,17 +6,25 @@ import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.state.Height
 
 enum BlockEndorsement {
-  case Full(endorserIndex: Int, finalizedBlockId: BlockId, blockId: BlockId, blockHeight: Height, signature: BlsSignature.NonEmpty)
-  case Conflict(endorserIndex: Int, finalizedBlockId: BlockId, blockId: BlockId, signature: BlsSignature.NonEmpty)
-  case Valid(endorserIndex: Int, finalizedBlockId: BlockId, signature: BlsSignature.NonEmpty)
+  case Full(endorserIndex: Int, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, signature: BlsSignature.NonEmpty)
+  case Conflict(endorserIndex: Int, finalizedId: BlockId, endorsedId: BlockId, signature: BlsSignature.NonEmpty)
+  // TODO: do we need finalizedId?
+  case Valid(endorserIndex: Int, finalizedId: BlockId, signature: BlsSignature.NonEmpty)
 }
 
 object BlockEndorsement {
-  def sign(kp: BlsKeyPair, finalizedId: BlockId, id: BlockId, height: Height): BlsSignature.NonEmpty =
-    kp.sign(mkMessage(finalizedId, id, height))
+  def sign(kp: BlsKeyPair, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId): BlsSignature.NonEmpty =
+    kp.sign(mkMessage(finalizedId, finalizedHeight, endorsedId))
 
-  def mkMessage(finalizedId: BlockId, id: BlockId, height: Height): Array[Byte] = finalizedId.arr ++ id.arr ++ Ints.toByteArray(height)
+  def mkMessage(finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId): Array[Byte] =
+    finalizedId.arr ++ Ints.toByteArray(finalizedHeight) ++ endorsedId.arr
 
-  def full(endorserAccount: BlsKeyPair, endorserIndex: Int, finalizedId: BlockId, id: BlockId, height: Height): BlockEndorsement.Full =
-    BlockEndorsement.Full(endorserIndex, finalizedId, id, height, sign(endorserAccount, finalizedId, id, height))
+  def full(
+      endorserAccount: BlsKeyPair,
+      endorserIndex: Int,
+      finalizedId: BlockId,
+      finalizedHeight: Height,
+      endorsedId: BlockId
+  ): BlockEndorsement.Full =
+    BlockEndorsement.Full(endorserIndex, finalizedId, finalizedHeight, endorsedId, sign(endorserAccount, finalizedId, finalizedHeight, endorsedId))
 }

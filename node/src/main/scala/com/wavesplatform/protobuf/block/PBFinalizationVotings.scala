@@ -29,8 +29,8 @@ object PBFinalizationVotings {
       v.conflict.map { x =>
         PBEndorseBlock(
           x.endorserIndex,
-          x.finalizedBlockId.toByteString,
-          x.blockId.toByteString,
+          x.finalizedId.toByteString,
+          endorsedBlockId = x.endorsedId.toByteString,
           signature = x.signature.byteStr.toByteString
         )
       }

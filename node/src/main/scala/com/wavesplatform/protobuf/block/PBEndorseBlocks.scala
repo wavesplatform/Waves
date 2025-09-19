@@ -8,31 +8,31 @@ import com.wavesplatform.state.Height
 object PBEndorseBlocks {
   // TODO:
   def vanilla(x: PBEndorseBlock, sig: BlsSignature.NonEmpty): BlockEndorsement = {
-    if (x.blockId.isEmpty && x.blockHeight == 0)
+    if (x.endorsedBlockId.isEmpty && x.finalizedBlockHeight == 0)
       BlockEndorsement.Valid(x.endorserIndex, x.finalizedBlockId.toByteStr, sig)
-    else if (x.blockHeight == 0)
+    else if (x.finalizedBlockHeight == 0)
       BlockEndorsement.Conflict(
         x.endorserIndex,
         x.finalizedBlockId.toByteStr,
-        x.blockId.toByteStr,
+        x.endorsedBlockId.toByteStr,
         sig
       )
     else
       BlockEndorsement.Full(
         x.endorserIndex,
         x.finalizedBlockId.toByteStr,
-        x.blockId.toByteStr,
-        Height(x.blockHeight),
-        sig
+        Height(x.finalizedBlockHeight),
+        x.endorsedBlockId.toByteStr,
+        signature = sig
       )
   }
 
   def protobuf(x: BlockEndorsement.Full): PBEndorseBlock =
     new PBEndorseBlock(
       endorserIndex = x.endorserIndex,
-      finalizedBlockId = x.finalizedBlockId.toByteString,
-      blockId = x.blockId.toByteString,
-      blockHeight = x.blockHeight,
+      finalizedBlockId = x.finalizedId.toByteString,
+      finalizedBlockHeight = x.finalizedHeight,
+      endorsedBlockId = x.endorsedId.toByteString,
       signature = x.signature.byteStr.toByteString
     )
 }

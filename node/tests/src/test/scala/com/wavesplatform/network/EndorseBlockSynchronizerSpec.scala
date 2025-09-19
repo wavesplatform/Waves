@@ -38,7 +38,7 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     "an already received endorsement" in withContext { c =>
       c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
 
-      val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockId, blockHeight))
+      val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockHeight, blockId))
       c.receivedEndorseBlock(msg)
       c.outChannel.outboundMessages().poll() shouldBe msg
 
@@ -55,14 +55,14 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
       }
 
       "a wrong signature" in test(
-        EndorseBlock(activeEndorserIndex, finalizedId, blockId, blockHeight, ByteStr.empty)
+        EndorseBlock(activeEndorserIndex, finalizedId, blockHeight, blockId, ByteStr.empty)
       )
       "an unexpected height" in test(
-        EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockId, Height(Int.MaxValue)))
+        EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, Height(Int.MaxValue), blockId))
       )
-      "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, 2, finalizedId, blockId, blockHeight)))
+      "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, 2, finalizedId, blockHeight, blockId)))
       "an already finalized block" in test(
-        EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, finalizedId, blockHeight))
+        EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockHeight, finalizedId))
       )
     }
   }
@@ -71,7 +71,7 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     // TODO: blockHeight
     c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
 
-    val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockId, blockHeight))
+    val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockHeight, blockId))
     c.receivedEndorseBlock(msg)
     c.outChannel.outboundMessages().poll()
 
@@ -97,8 +97,8 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     val storage      = EndorsementStorage.InMemory()
     val synchronizer = EndorseBlockSynchronizer.start(storage, last, endorsements, allChannels, testScheduler)
 
-    def blockchainUpdated(blockHeight: Height, blockId: BlockId, newEndorsers: BlsPublicKey*): Unit = {
-      last.onNext(EndorsementFilter(blockHeight, blockId, finalizedId, newEndorsers.toIndexedSeq)) // TODO: finalizedId
+    def blockchainUpdated(finalizedHeight: Height, blockId: BlockId, newEndorsers: BlsPublicKey*): Unit = {
+      last.onNext(EndorsementFilter(finalizedId, finalizedHeight, blockId, newEndorsers.toIndexedSeq)) // TODO: finalizedId
       testScheduler.tick()
     }
 

@@ -31,7 +31,7 @@ trait EndorsementStorage {
 }
 
 object EndorsementStorage {
-  case class EndorsementFilter(endorsedHeight: Height, endorsedId: BlockId, finalizedId: BlockId, expectedEndorsers: IndexedSeq[BlsPublicKey])
+  case class EndorsementFilter(finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, expectedEndorsers: IndexedSeq[BlsPublicKey])
 
   val Disabled: EndorsementStorage = new EndorsementStorage {
     override def tryAddVote(msg: EndorseBlock): Boolean                                   = false
@@ -53,26 +53,25 @@ object EndorsementStorage {
     private def verifySig(msg: EndorseBlock, pk: BlsPublicKey): Option[BlsSignature.NonEmpty] =
       for {
         sig <- BlsSignature(msg.signature).toOption
-        _   <- Option.when(pk.verify(BlockEndorsement.mkMessage(msg.finalizedBlockId, msg.blockId, msg.blockHeight), sig))(sig)
+        _   <- Option.when(pk.verify(BlockEndorsement.mkMessage(msg.finalizedId, msg.finalizedHeight, msg.endorsedId), sig))(sig)
       } yield sig
 
     override def tryAddVote(msg: EndorseBlock): Boolean = synced {
       for {
         filter <- currentFilter.toRight("Voting hasn't started")
-        _      <- Either.raiseUnless(msg.blockHeight == filter.endorsedHeight)(s"Expected height ${filter.endorsedHeight}")
-        _      <- Either.raiseUnless(msg.blockId == filter.endorsedId)(s"Expected block ${filter.endorsedId}") // Could be a switch to a better branch
+        _      <- Either.raiseUnless(msg.finalizedHeight == filter.finalizedHeight)(s"Expected height ${filter.finalizedHeight}")
         _      <- Either.raiseWhen(msg.endorserIndex >= filter.expectedEndorsers.size)(s"There are only ${filter.expectedEndorsers.size} endorsers")
-        pk = filter.expectedEndorsers(msg.endorserIndex)
-        _   <- Either.raiseWhen(processed.contains(msg))("Already processed")
-        sig <- verifySig(msg, pk).toRight("Invalid signature")
+        _      <- Either.raiseWhen(processed.contains(msg))("Already processed")
+        endorserPk = filter.expectedEndorsers(msg.endorserIndex)
+        sig <- verifySig(msg, endorserPk).toRight("Invalid signature")
+        _   <- Either.raiseUnless(msg.endorsedId == filter.endorsedId)(s"Expected block ${filter.endorsedId}") // Could be a switch to a better branch
       } yield {
-        val isConflict = msg.finalizedBlockId == filter.finalizedId
-        // TODO: wrong
-        currentVoting = if (processed.isEmpty) { // First vote
-          if (isConflict) FinalizationVoting(conflict = Seq(toConflict(msg, sig)))
-          else FinalizationVoting(aggregatedEndorsement = sig)
-        } else if (isConflict) currentVoting.withValid(msg.endorserIndex, sig)
-        else currentVoting.withConflict(toConflict(msg, sig))
+        // TODO: Tests
+        val isConsistent = msg.finalizedId == filter.finalizedId
+        currentVoting = if (isConsistent) {
+          if (currentVoting.endorserIndexes.isEmpty) FinalizationVoting(aggregatedEndorsement = sig) // First vote
+          else currentVoting.withValid(msg.endorserIndex, sig)
+        } else currentVoting.withConflict(toConflict(msg, sig))
 
         processed += msg
         true
@@ -83,7 +82,7 @@ object EndorsementStorage {
     }
 
     private def toConflict(msg: EndorseBlock, verifiedSig: BlsSignature.NonEmpty): BlockEndorsement.Conflict =
-      BlockEndorsement.Conflict(msg.endorserIndex, msg.finalizedBlockId, msg.blockId, verifiedSig)
+      BlockEndorsement.Conflict(msg.endorserIndex, msg.finalizedId, msg.endorsedId, verifiedSig)
 
     override def startNewVoting(filter: EndorsementFilter): Unit = synced {
       currentFilter = Some(filter)

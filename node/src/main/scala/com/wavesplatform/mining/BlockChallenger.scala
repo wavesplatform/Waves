@@ -156,7 +156,7 @@ class BlockChallengerImpl(
         if committedAddr != blockMiner // A miner doesn’t need to endorse its own blocks - mining is already an endorsement
         pk <- wallet.privateKeyAccount(committedAddr).toSeq
       } yield (pk, idx)
-    } yield BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, endorsedId, height)
+    } yield BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
 
   private def withProcessingTxs[A](txs: Seq[Transaction])(body: Task[A]): Task[A] =
     Task(processingTxs.putAll(txs.map(tx => tx.id() -> tx).toMap.asJava))

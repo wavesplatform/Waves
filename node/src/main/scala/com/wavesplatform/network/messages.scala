@@ -115,28 +115,22 @@ object MicroBlockSnapshotResponse {
     MicroBlockSnapshotResponse(snapshot.totalBlockId.toByteStr, snapshot.snapshots)
 }
 
-case class EndorseBlock(endorserIndex: Int, finalizedBlockId: BlockId, blockId: BlockId, blockHeight: Height, signature: ByteStr) extends Message {
+case class EndorseBlock(endorserIndex: Int, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, signature: BlockId) extends Message {
   def toProtobuf: PBEndorseBlock = PBEndorseBlock(
     endorserIndex,
-    finalizedBlockId.toByteString,
-    blockId.toByteString,
-    blockHeight,
+    finalizedId.toByteString,
+    finalizedHeight,
+    endorsedId.toByteString,
     signature.toByteString
   )
 
-  override def toString: String = s"EndorseBlock(e=$endorserIndex, b=$blockId, $blockHeight, s=$signature)"
+  override def toString: String = s"EndorseBlock(e=$endorserIndex, f=$finalizedId, h=$finalizedHeight, b=$endorsedId, s=$signature)"
 }
 
 object EndorseBlock {
   def fromProtobuf(x: PBEndorseBlock): EndorseBlock =
-    EndorseBlock(
-      x.endorserIndex,
-      x.finalizedBlockId.toByteStr,
-      x.blockId.toByteStr,
-      Height(x.blockHeight),
-      x.signature.toByteStr
-    )
+    EndorseBlock(x.endorserIndex, x.finalizedBlockId.toByteStr, Height(x.finalizedBlockHeight), x.endorsedBlockId.toByteStr, x.signature.toByteStr)
 
   def from(x: BlockEndorsement.Full): EndorseBlock =
-    EndorseBlock(x.endorserIndex, x.finalizedBlockId, x.blockId, x.blockHeight, x.signature.byteStr)
+    EndorseBlock(x.endorserIndex, x.finalizedId, x.finalizedHeight, x.endorsedId, x.signature.byteStr)
 }
