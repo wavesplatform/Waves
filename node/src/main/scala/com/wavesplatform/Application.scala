@@ -19,6 +19,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{DBExt, Keys, RDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
@@ -317,13 +318,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     EndorseBlockSynchronizer.start(
       storage = endorsementStorage,
       lastFilter = blockchainUpdater.lastBlockInfo.collect {
-        case bi if bi.finalizedHeight.isDefined =>
-          val finalizedHeight = bi.finalizedHeight.get
-          val period          = blockchainUpdater.generationPeriodOf(bi.height)
-          val finalizedId     = blockchainUpdater.blockId(finalizedHeight).getOrElse(throw new IllegalStateException("Can't find a finalized block"))
+        case bi if blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, bi.height) =>
+          val period      = blockchainUpdater.generationPeriodOf(bi.height)
+          val finalizedId = blockchainUpdater.blockId(bi.finalizedHeight).getOrElse(throw new IllegalStateException("Can't find a finalized block"))
           EndorsementFilter(
             finalizedId,
-            finalizedHeight,
+            bi.finalizedHeight,
             bi.id,
             blockchainUpdater.committedGenerators(period).map { case (_, blsPk, _) => blsPk }
           )

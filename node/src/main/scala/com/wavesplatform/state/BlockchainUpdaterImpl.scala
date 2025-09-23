@@ -486,14 +486,10 @@ class BlockchainUpdaterImpl(
       endorsedBalance >= (totalBalance * 2 / 3)
     }
 
-    log.trace(
-      s"calculateFinalizationHeight: finalityActivationHeight=${votingBlockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality.id)}"
-    )
-    if (finalizationHeight < GenesisBlockHeight) None
+    if (finalizationHeight < GenesisBlockHeight) Some(GenesisBlockHeight) // For tests
     else
       for {
         finalityActivationHeight <- votingBlockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality.id)
-        _ = log.trace(s"calculateFinalizationHeight: votingHeight=$votingHeight, finalityActivationHeight=$finalityActivationHeight")
         r <-
           if (votingHeight > finalityActivationHeight) Some(finalizationHeight).filter(_ => shouldFinalizeByVoting())
           else Some(Height(GenesisBlockHeight.max(votingHeight - wavesSettings.synchronizationSettings.maxRollback)))
@@ -718,9 +714,7 @@ class BlockchainUpdaterImpl(
     rocksdb.height + ngState.fold(0)(_ => 1)
   }
 
-  override def finalizedHeight: Option[Height] = readLock {
-    rocksdb.finalizedHeight
-  }
+  override def finalizedHeight: Height = readLock(rocksdb.finalizedHeight)
 
   override def heightOf(blockId: BlockId): Option[Int] = readLock {
     ngState
@@ -768,10 +762,6 @@ class BlockchainUpdaterImpl(
       SignedBlockHeader(x.bestLiquidBlock.header, x.bestLiquidBlock.signature)
     }
     else rocksdb.blockHeader(height)
-  }
-
-  override def finalizedHeightAt(at: Height): Option[Height] = readLock {
-    rocksdb.finalizedHeightAt(at)
   }
 
   override def transferById(id: BlockId): Option[(Int, TransferTransactionLike)] = readLock {

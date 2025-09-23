@@ -25,8 +25,8 @@ import io.netty.channel.group.DefaultChannelGroup
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.ConcurrentSubject
-import pureconfig.ConfigSource
 import org.apache.commons.io.FileUtils
+import pureconfig.ConfigSource
 
 import java.io.{File, FileNotFoundException}
 import scala.concurrent.duration.*
@@ -189,8 +189,14 @@ object MinerChallengeSimulator {
       val dbSettings         = wavesSettings.dbSettings.copy(directory = correctBlockchainDbDir)
       val fixedWavesSettings = wavesSettings.copy(dbSettings = dbSettings)
       val rdb                = RDB.open(dbSettings)
-      val rocksDBWriter      = RocksDBWriter(rdb, fixedWavesSettings.blockchainSettings, fixedWavesSettings.dbSettings, false)
-      val fakeTime           = createFakeTime(rocksDBWriter.lastBlockTimestamp.get)
+      val rocksDBWriter = RocksDBWriter(
+        rdb,
+        fixedWavesSettings.blockchainSettings,
+        fixedWavesSettings.dbSettings,
+        fixedWavesSettings.synchronizationSettings.maxRollback,
+        isLightMode = false
+      )
+      val fakeTime = createFakeTime(rocksDBWriter.lastBlockTimestamp.get)
       val blockchainUpdater = new BlockchainUpdaterImpl(
         rocksDBWriter,
         fixedWavesSettings,

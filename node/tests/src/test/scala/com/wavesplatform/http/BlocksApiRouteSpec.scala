@@ -152,22 +152,12 @@ class BlocksApiRouteSpec
     }
   }
 
-  routePath("/headers/finalized") - {
-    "has a finalized block" in {
-      (() => blocksApi.finalizedHeight).expects().returning(Some(Height(2))).once()
-      (blocksApi.metaAtHeight).expects(2).returning(Some(testBlock2Meta)).once()
-      Get(routePath("/headers/finalized")) ~> route ~> check {
-        val response = responseAs[JsObject]
-        response shouldBe testBlock2HeaderJson
-      }
-    }
-
-    "hasn't a finalized block" in {
-      (() => blocksApi.finalizedHeight).expects().returning(None).once()
-      (blocksApi.metaAtHeight).expects(2).returning(Some(testBlock2Meta)).once()
-      Get(routePath("/headers/finalized")) ~> route ~> check {
-        status shouldBe StatusCodes.NotFound
-      }
+  routePath("/headers/finalized") in {
+    (() => blocksApi.finalizedHeight).expects().returning(Height(2)).once()
+    (blocksApi.metaAtHeight).expects(2).returning(Some(testBlock2Meta)).once()
+    Get(routePath("/headers/finalized")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      response shouldBe testBlock2HeaderJson
     }
   }
 

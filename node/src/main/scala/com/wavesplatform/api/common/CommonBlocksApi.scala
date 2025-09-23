@@ -13,7 +13,7 @@ trait CommonBlocksApi {
 
   def currentHeight: Int
 
-  def finalizedHeight: Option[Height]
+  def finalizedHeight: Height
 
   def block(blockId: BlockId): Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
 
@@ -69,7 +69,7 @@ object CommonBlocksApi {
 
     def currentHeight: Int = blockchain.height
 
-    def finalizedHeight: Option[Height] = blockchain.finalizedHeight
+    def finalizedHeight: Height = blockchain.finalizedHeight
 
     def blockAtHeight(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = blockInfoAt(height)
 

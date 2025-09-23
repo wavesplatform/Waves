@@ -116,12 +116,14 @@ object RocksDBWriter extends ScorexLogging {
       rdb: RDB,
       settings: BlockchainSettings,
       dbSettings: DBSettings,
+      maxSynchronizationRollbackHeight: Int,
       isLightMode: Boolean,
       forceCleanupExecutorService: Option[ExecutorService] = None
   ): RocksDBWriter = new RocksDBWriter(
     rdb,
     settings,
     dbSettings,
+    maxSynchronizationRollbackHeight,
     isLightMode,
     dbSettings.cleanupInterval match {
       case None => MoreExecutors.newDirectExecutorService() // We don't care if disabled
@@ -146,6 +148,7 @@ class RocksDBWriter(
     rdb: RDB,
     val settings: BlockchainSettings,
     val dbSettings: DBSettings,
+    val maxSynchronizationRollbackHeight: Int,
     isLightMode: Boolean,
     cleanupExecutorService: ExecutorService
 ) extends Caches
@@ -179,12 +182,14 @@ class RocksDBWriter(
 
   override protected def loadHeight(): Height = writableDB.get(Keys.height)
 
+  override protected def loadFinalizationHeight(): Height = writableDB.get(Keys.finalizedHeight).getOrElse {
+    Height(GenesisBlockHeight.max(height - maxSynchronizationRollbackHeight))
+  }
+
   override def safeRollbackHeight: Int = writableDB.get(Keys.safeRollbackHeight)
 
   override protected def loadBlockMeta(height: Height): Option[PBBlockMeta] =
     writableDB.get(Keys.blockMetaAt(height))
-
-  override def finalizedHeightAt(at: Height): Option[Height] = writableDB.get(Keys.finalizedHeight(at))
 
   override protected def loadTxs(height: Height): Seq[Transaction] =
     loadTransactions(height, rdb).map(_._2)
@@ -543,9 +548,7 @@ class RocksDBWriter(
       val h           = Height(height)
 
       rw.put(Keys.height, h)
-      newFinalizedHeight.foreach { h =>
-        rw.put(Keys.finalizedHeight(h), newFinalizedHeight)
-      }
+      if (newFinalizedHeight.isDefined) rw.put(Keys.finalizedHeight, newFinalizedHeight)
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
       val newSafeRollbackHeight      = height - dbSettings.maxRollbackDepth
@@ -1035,7 +1038,10 @@ class RocksDBWriter(
         val nextPeriod = this.generationPeriodOf(currentHeight).next
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
-          rw.delete(Keys.finalizedHeight(currentHeight))
+
+          // Can go below currentFinalizedHeight height only by force rollback (DebugApiRoute)
+          // During automatic rollbacks this won't happen, because we ask a block extension from the current finalized height
+          rw.put(Keys.finalizedHeight, Some(Height(finalizedHeight.min(currentHeight - 2).max(GenesisBlockHeight))))
 
           val discardedMeta = rw
             .get(Keys.blockMetaAt(currentHeight))

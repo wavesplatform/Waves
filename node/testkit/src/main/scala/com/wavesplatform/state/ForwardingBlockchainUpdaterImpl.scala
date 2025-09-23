@@ -11,7 +11,6 @@ class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) exten
     finalizedHeight,
     score,
     blockHeader,
-    finalizedHeightAt,
     hitSource,
     carryFee,
     heightOf,

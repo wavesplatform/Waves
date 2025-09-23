@@ -268,9 +268,9 @@ object Keys {
       writeCommittedGenerators
     )
 
-  def finalizedHeight(at: Height): Key[Option[Height]] = Key.opt(
+  val finalizedHeight: Key[Option[Height]] = Key.opt(
     FinalizedBlockHeight,
-    h(at),
+    Array.emptyByteArray,
     bytes => com.wavesplatform.state.Height(Ints.fromByteArray(bytes)),
     Ints.toByteArray
   )

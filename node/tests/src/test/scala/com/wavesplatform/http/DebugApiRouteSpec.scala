@@ -3299,11 +3299,11 @@ class DebugApiRouteSpec
 
       val rollbackParams          = RollbackParams(domain.blockchain.height - 2, returnTransactionsToUtx = false)
       val expectedFinalizedHeight = Height(rollbackParams.rollbackTo - 1)
-      expectedFinalizedHeight should be < domain.blockchain.finalizedHeight.value
+      expectedFinalizedHeight should be < domain.blockchain.finalizedHeight
 
       jsonPost(routePath("/rollback"), Json.toJson(rollbackParams)) ~> ApiKeyHeader ~> route ~> check {
         status shouldBe StatusCodes.OK
-        val finalizedHeight = domain.blockchain.finalizedHeight.value
+        val finalizedHeight = domain.blockchain.finalizedHeight
         finalizedHeight should be < domain.blockchain.height
         finalizedHeight shouldBe expectedFinalizedHeight
       }

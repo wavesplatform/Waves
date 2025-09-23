@@ -25,11 +25,10 @@ trait Blockchain {
   def settings: BlockchainSettings
 
   def height: Int
-  def finalizedHeight: Option[Height]
+  def finalizedHeight: Height
   def score: BigInt
 
   def blockHeader(height: Int): Option[SignedBlockHeader]
-  def finalizedHeightAt(at: Height): Option[Height]
   def hitSource(height: Int): Option[ByteStr]
 
   def carryFee(refId: Option[ByteStr]): Long

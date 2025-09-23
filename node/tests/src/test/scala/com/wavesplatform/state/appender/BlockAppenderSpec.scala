@@ -243,14 +243,6 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         case _                                                     => false
       }
 
-      getEndorsementsNumber() shouldBe 0
-
-      // Use otherNodeGenerator, because a node can't send EndorseBlock for its blocks
-      val block2 = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = otherNodeGenerator, strictTime = true)
-      testTime.setTime(block2.header.timestamp)
-      appender(block2).runSyncUnsafe()
-      if (d.lastBlockId != block2.id()) fail(s"Can't apply block $block2, see logs")
-
       getEndorsementsNumber() shouldBe 1
     }
 

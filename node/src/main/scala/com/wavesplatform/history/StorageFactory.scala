@@ -19,7 +19,8 @@ object StorageFactory extends ScorexLogging {
       miner: Miner = _ => ()
   ): (BlockchainUpdaterImpl, RocksDBWriter) = {
     checkVersion(rdb.db)
-    val rocksDBWriter = RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
+    val rocksDBWriter =
+      RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.synchronizationSettings.maxRollback, settings.enableLightMode)
     val bui = new BlockchainUpdaterImpl(
       rocksDBWriter,
       settings,

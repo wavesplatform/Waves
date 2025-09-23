@@ -19,13 +19,11 @@ trait EmptyBlockchain extends Blockchain {
 
   override def height: Int = GenesisBlockHeight
 
-  override def finalizedHeight: Option[Height] = None
+  override def finalizedHeight: Height = GenesisBlockHeight
 
   override def score: BigInt = 0
 
   override def blockHeader(height: Int): Option[SignedBlockHeader] = None
-
-  override def finalizedHeightAt(at: Height): Option[Height] = None
 
   override def hitSource(height: Int): Option[ByteStr] = None
 

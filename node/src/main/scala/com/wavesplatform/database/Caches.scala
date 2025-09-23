@@ -34,7 +34,7 @@ abstract class Caches extends Blockchain with Storage {
   private var current = loadCurrentBlock()
 
   @volatile
-  private var currentFinalized = finalizedHeightAt(current.height)
+  private var currentFinalizedHeight = loadFinalizationHeight()
 
   private def loadCurrentBlock() = {
     val height = loadHeight()
@@ -42,12 +42,13 @@ abstract class Caches extends Blockchain with Storage {
   }
 
   protected def loadHeight(): Height
+  protected def loadFinalizationHeight(): Height
   protected def loadBlockMeta(height: Height): Option[PBBlockMeta]
   protected def loadTxs(height: Height): Seq[Transaction]
 
   override def height: Int = current.height
 
-  override def finalizedHeight: Option[Height] = currentFinalized
+  override def finalizedHeight: Height = currentFinalizedHeight
 
   override def score: BigInt = current.score
 
@@ -266,7 +267,7 @@ abstract class Caches extends Blockchain with Storage {
         (reward.getOrElse(0L) * this.blockRewardBoost(newHeight))
     )
     current = CurrentBlockInfo(Height(newHeight), Some(newMeta), block.transactionData)
-    currentFinalized = newFinalizedHeight
+    newFinalizedHeight.foreach(currentFinalizedHeight = _)
 
     committedGeneratorBalancesCache = (
       committedGeneratorBalancesCache.current,
@@ -380,7 +381,7 @@ abstract class Caches extends Blockchain with Storage {
       updatedDataWithNodes,
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
-      currentFinalized,
+      newFinalizedHeight,
       committedGeneratorBalancesCache.current,
       nextCommittedGeneratorsRev.reverse,
       stateHash.result()
@@ -417,9 +418,7 @@ abstract class Caches extends Blockchain with Storage {
       discardedBlocks = doRollback(height)
     } yield {
       current = loadCurrentBlock()
-      // Can go below currentFinalized height only by force rollback (DebugApiRoute)
-      // During automatic rollbacks this won't happen, because we ask a block extension from the current finalized height
-      currentFinalized = currentFinalized.map(currentFinalized => Height(math.min(currentFinalized, current.height - 1)))
+      currentFinalizedHeight = loadFinalizationHeight()
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()
