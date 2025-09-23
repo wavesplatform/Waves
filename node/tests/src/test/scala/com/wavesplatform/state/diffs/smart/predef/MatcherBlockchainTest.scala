@@ -27,7 +27,7 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
     val blockchain: Blockchain = new Blockchain {
       override def settings: BlockchainSettings                                                                  = ???
       override def height: Int                                                                                   = ???
-      override def finalizedHeight: Height                                                                       = ???
+      override def finalizedHeight: Option[Height]                                                               = ???
       override def score: BigInt                                                                                 = ???
       override def blockHeader(height: Int): Option[SignedBlockHeader]                                           = ???
       override def finalizedHeightAt(at: Height): Option[Height]                                                 = ???

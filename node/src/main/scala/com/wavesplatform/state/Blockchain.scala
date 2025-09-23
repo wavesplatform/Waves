@@ -25,7 +25,7 @@ trait Blockchain {
   def settings: BlockchainSettings
 
   def height: Int
-  def finalizedHeight: Height
+  def finalizedHeight: Option[Height]
   def score: BigInt
 
   def blockHeader(height: Int): Option[SignedBlockHeader]

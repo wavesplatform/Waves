@@ -1624,7 +1624,7 @@ class DebugApiRouteSpec
              |  "error" : null
              |}, {
              |  "type" : "dApp",
-             |  "id" : "${dAppAddress}",
+             |  "id" : "$dAppAddress",
              |  "function" : "default",
              |  "args" : [ ],
              |  "invocations" : [ ],
@@ -3293,17 +3293,19 @@ class DebugApiRouteSpec
         newBlock.header.generationSignature,
         computedStateHash,
         newBlock,
-        newFinalizedHeight = finalizedHeight,
+        newFinalizedHeight = Some(finalizedHeight),
         generatorBalances = Seq.empty
       )
 
       val rollbackParams          = RollbackParams(domain.blockchain.height - 2, returnTransactionsToUtx = false)
-      val expectedFinalizedHeight = domain.blockchain.finalizedHeightAt(Height(domain.blockchain.height - 2)).value
-      expectedFinalizedHeight should be < domain.blockchain.finalizedHeight
+      val expectedFinalizedHeight = Height(rollbackParams.rollbackTo - 1)
+      expectedFinalizedHeight should be < domain.blockchain.finalizedHeight.value
 
       jsonPost(routePath("/rollback"), Json.toJson(rollbackParams)) ~> ApiKeyHeader ~> route ~> check {
         status shouldBe StatusCodes.OK
-        domain.blockchain.finalizedHeight shouldBe expectedFinalizedHeight
+        val finalizedHeight = domain.blockchain.finalizedHeight.value
+        finalizedHeight should be < domain.blockchain.height
+        finalizedHeight shouldBe expectedFinalizedHeight
       }
     }
   }

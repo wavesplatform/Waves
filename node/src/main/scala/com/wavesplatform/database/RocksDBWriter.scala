@@ -532,7 +532,7 @@ class RocksDBWriter(
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
-      newFinalizedHeight: Height,
+      newFinalizedHeight: Option[Height],
       generatorBalances: Seq[Long],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
@@ -543,7 +543,9 @@ class RocksDBWriter(
       val h           = Height(height)
 
       rw.put(Keys.height, h)
-      rw.put(Keys.finalizedHeight(h), Some(newFinalizedHeight))
+      newFinalizedHeight.foreach { h =>
+        rw.put(Keys.finalizedHeight(h), newFinalizedHeight)
+      }
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
       val newSafeRollbackHeight      = height - dbSettings.maxRollbackDepth

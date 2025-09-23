@@ -59,7 +59,7 @@ object EndorsementStorage {
     override def tryAddVote(msg: EndorseBlock): Boolean = synced {
       for {
         filter <- currentFilter.toRight("Voting hasn't started")
-        _      <- Either.raiseUnless(msg.finalizedHeight == filter.finalizedHeight)(s"Expected height ${filter.finalizedHeight}")
+        _      <- Either.raiseUnless(msg.finalizedHeight == filter.finalizedHeight)(s"Expected finalized height ${filter.finalizedHeight}")
         _      <- Either.raiseWhen(msg.endorserIndex >= filter.expectedEndorsers.size)(s"There are only ${filter.expectedEndorsers.size} endorsers")
         _      <- Either.raiseWhen(processed.contains(msg))("Already processed")
         endorserPk = filter.expectedEndorsers(msg.endorserIndex)

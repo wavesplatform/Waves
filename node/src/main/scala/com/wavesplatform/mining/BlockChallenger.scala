@@ -37,7 +37,7 @@ trait BlockChallenger {
   def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]]
   def getProcessingTx(id: ByteStr): Option[Transaction]
   def allProcessingTxs: Seq[Transaction]
-  def endorse(height: Height, blockMiner: Address): Seq[BlockEndorsement.Full]
+  def endorse(endorsedHeight: Height, finalizedHeight: Height, blockMiner: Address): Seq[BlockEndorsement.Full]
 }
 
 class BlockChallengerImpl(
@@ -145,12 +145,11 @@ class BlockChallengerImpl(
 
   override def allProcessingTxs: Seq[Transaction] = processingTxs.values.asScala.toSeq
 
-  override def endorse(height: Height, blockMiner: Address): Seq[BlockEndorsement.Full] =
+  override def endorse(endorsedHeight: Height, finalizedHeight: Height, blockMiner: Address): Seq[BlockEndorsement.Full] =
     for {
-      endorsedId      <- blockchainUpdater.blockId(height).toSeq
-      finalizedHeight <- blockchainUpdater.finalizedHeightAt(height).toSeq
-      finalizedId     <- blockchainUpdater.blockId(finalizedHeight).toSeq
-      committed = blockchainUpdater.committedGenerators(blockchainUpdater.generationPeriodOf(height))
+      endorsedId  <- blockchainUpdater.blockId(endorsedHeight).toSeq
+      finalizedId <- blockchainUpdater.blockId(finalizedHeight).toSeq
+      committed = blockchainUpdater.committedGenerators(blockchainUpdater.generationPeriodOf(endorsedHeight))
       (account, idx) <- for {
         ((committedAddr, _, _), idx) <- committed.zipWithIndex
         if committedAddr != blockMiner // A miner doesn’t need to endorse its own blocks - mining is already an endorsement

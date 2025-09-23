@@ -124,7 +124,7 @@ case class EndorseBlock(endorserIndex: Int, finalizedId: BlockId, finalizedHeigh
     signature.toByteString
   )
 
-  override def toString: String = s"EndorseBlock(e=$endorserIndex, f=$finalizedId, h=$finalizedHeight, b=$endorsedId, s=$signature)"
+  override def toString: String = s"EndorseBlock(e=$endorserIndex, f=$finalizedId, fh=$finalizedHeight, b=$endorsedId, s=$signature)"
 }
 
 object EndorseBlock {

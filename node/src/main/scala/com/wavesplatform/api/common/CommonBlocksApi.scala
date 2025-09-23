@@ -4,7 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.{Blockchain, TxMeta}
+import com.wavesplatform.state.{Blockchain, Height, TxMeta}
 import com.wavesplatform.transaction.Transaction
 import monix.reactive.Observable
 
@@ -13,7 +13,7 @@ trait CommonBlocksApi {
 
   def currentHeight: Int
 
-  def finalizedHeight: Int
+  def finalizedHeight: Option[Height]
 
   def block(blockId: BlockId): Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
 
@@ -69,7 +69,7 @@ object CommonBlocksApi {
 
     def currentHeight: Int = blockchain.height
 
-    def finalizedHeight: Int = blockchain.finalizedHeight
+    def finalizedHeight: Option[Height] = blockchain.finalizedHeight
 
     def blockAtHeight(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = blockInfoAt(height)
 

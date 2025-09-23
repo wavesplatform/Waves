@@ -63,7 +63,10 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       } ~ path("last") {
         at(commonApi.currentHeight, includeTransactions = false)
       } ~ path("finalized") {
-        at(commonApi.finalizedHeight, includeTransactions = false)
+        commonApi.finalizedHeight match {
+          case None     => complete(BlockDoesNotExist)
+          case Some(fh) => at(fh, includeTransactions = false)
+        }
       } ~ path(BlockId) { id =>
         complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
       }

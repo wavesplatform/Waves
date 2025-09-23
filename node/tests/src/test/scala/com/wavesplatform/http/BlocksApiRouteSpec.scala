@@ -1,8 +1,5 @@
 package com.wavesplatform.http
 
-import org.apache.pekko.http.scaladsl.model.StatusCodes
-import org.apache.pekko.http.scaladsl.model.headers.Accept
-import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.TestWallet
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
@@ -15,7 +12,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.state.{BlockRewardCalculator, Blockchain}
+import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, Height}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
@@ -23,6 +20,9 @@ import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
 import monix.reactive.Observable
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.headers.Accept
+import org.apache.pekko.http.scaladsl.server.Route
 import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Assertion
@@ -152,13 +152,22 @@ class BlocksApiRouteSpec
     }
   }
 
-  // TODO:
-  routePath("/headers/finalized") in {
-    (() => blocksApi.finalizedHeight).expects().returning(2).once()
-    (blocksApi.metaAtHeight).expects(2).returning(Some(testBlock2Meta)).once()
-    Get(routePath("/headers/finalized")) ~> route ~> check {
-      val response = responseAs[JsObject]
-      response shouldBe testBlock2HeaderJson
+  routePath("/headers/finalized") - {
+    "has a finalized block" in {
+      (() => blocksApi.finalizedHeight).expects().returning(Some(Height(2))).once()
+      (blocksApi.metaAtHeight).expects(2).returning(Some(testBlock2Meta)).once()
+      Get(routePath("/headers/finalized")) ~> route ~> check {
+        val response = responseAs[JsObject]
+        response shouldBe testBlock2HeaderJson
+      }
+    }
+
+    "hasn't a finalized block" in {
+      (() => blocksApi.finalizedHeight).expects().returning(None).once()
+      (blocksApi.metaAtHeight).expects(2).returning(Some(testBlock2Meta)).once()
+      Get(routePath("/headers/finalized")) ~> route ~> check {
+        status shouldBe StatusCodes.NotFound
+      }
     }
   }
 

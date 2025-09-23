@@ -233,17 +233,25 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
       )(channel2, _, None)
 
       // Use otherNodeGenerator, because a node can't send EndorseBlock for its blocks
-      val b = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = otherNodeGenerator, strictTime = true)
-      testTime.setTime(b.header.timestamp)
-      appender(b).runSyncUnsafe()
-      if (d.lastBlockId != b.id()) fail(s"Can't apply block $b, see logs")
+      val block1 = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = otherNodeGenerator, strictTime = true)
+      testTime.setTime(block1.header.timestamp)
+      appender(block1).runSyncUnsafe()
+      if (d.lastBlockId != block1.id()) fail(s"Can't apply block $block1, see logs")
 
-      val endorsements = channel1.outboundMessages().asScala.count {
+      def getEndorsementsNumber(): Long = channel1.outboundMessages().asScala.count {
         case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
         case _                                                     => false
       }
 
-      endorsements shouldBe 1
+      getEndorsementsNumber() shouldBe 0
+
+      // Use otherNodeGenerator, because a node can't send EndorseBlock for its blocks
+      val block2 = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = otherNodeGenerator, strictTime = true)
+      testTime.setTime(block2.header.timestamp)
+      appender(block2).runSyncUnsafe()
+      if (d.lastBlockId != block2.id()) fail(s"Can't apply block $block2, see logs")
+
+      getEndorsementsNumber() shouldBe 1
     }
 
     "committed generators balances" in {

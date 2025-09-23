@@ -9,7 +9,6 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.state.GenesisBlockHeight
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.ReissueTransaction
@@ -99,7 +98,7 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
           block.header.generationSignature,
           computedStateHash,
           block,
-          newFinalizedHeight = GenesisBlockHeight,
+          newFinalizedHeight = None,
           generatorBalances = Seq.empty
         )
       }

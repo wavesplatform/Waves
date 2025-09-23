@@ -11,7 +11,6 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.state.GenesisBlockHeight
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType
@@ -61,7 +60,7 @@ class CommonValidationTest extends PropSpec with WithState {
           genesisBlock.header.generationSignature,
           computedStateHash,
           genesisBlock,
-          newFinalizedHeight = GenesisBlockHeight,
+          newFinalizedHeight = None,
           generatorBalances = Seq.empty
         )
 
@@ -92,7 +91,7 @@ class CommonValidationTest extends PropSpec with WithState {
         genesisBlock.header.generationSignature,
         computedStateHash,
         genesisBlock,
-        newFinalizedHeight = GenesisBlockHeight,
+        newFinalizedHeight = None,
         generatorBalances = Seq.empty
       )
 
@@ -177,7 +176,7 @@ class CommonValidationTest extends PropSpec with WithState {
         genesisBlock.header.generationSignature,
         computedStateHash,
         genesisBlock,
-        newFinalizedHeight = GenesisBlockHeight,
+        newFinalizedHeight = None,
         generatorBalances = Seq.empty
       )
 

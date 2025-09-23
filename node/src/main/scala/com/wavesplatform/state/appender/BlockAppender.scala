@@ -87,7 +87,12 @@ object BlockAppender extends ScorexLogging {
 
             for {
               blockChallenger <- blockChallenger.toSeq
-              endorsement     <- blockChallenger.endorse(Height(blockchainUpdater.height - 1), newBlock.sender.toAddress)
+              finalizedHeight <- blockchainUpdater.finalizedHeight
+              endorsement <- blockChallenger.endorse(
+                endorsedHeight = Height(blockchainUpdater.height - 1),
+                finalizedHeight = finalizedHeight,
+                blockMiner = newBlock.sender.toAddress
+              )
             } allChannels.broadcast(EndorseBlock.from(endorsement))
           }
         }

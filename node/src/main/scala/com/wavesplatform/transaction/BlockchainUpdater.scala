@@ -5,7 +5,7 @@ import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnap
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
-import com.wavesplatform.state.{Blockchain, GeneratorBalances}
+import com.wavesplatform.state.{Blockchain, GeneratorBalances, Height}
 import monix.reactive.Observable
 
 trait BlockchainUpdater {
@@ -27,4 +27,4 @@ trait BlockchainUpdater {
   def shutdown(): Unit
 }
 
-case class LastBlockInfo(id: BlockId, height: Int, score: BigInt, ready: Boolean)
+case class LastBlockInfo(id: BlockId, height: Height, score: BigInt, finalizedHeight: Option[Height], ready: Boolean)

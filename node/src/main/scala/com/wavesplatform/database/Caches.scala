@@ -34,7 +34,7 @@ abstract class Caches extends Blockchain with Storage {
   private var current = loadCurrentBlock()
 
   @volatile
-  private var currentFinalized = finalizedHeightAt(current.height).getOrElse(GenesisBlockHeight)
+  private var currentFinalized = finalizedHeightAt(current.height)
 
   private def loadCurrentBlock() = {
     val height = loadHeight()
@@ -47,7 +47,7 @@ abstract class Caches extends Blockchain with Storage {
 
   override def height: Int = current.height
 
-  override def finalizedHeight: Height = currentFinalized
+  override def finalizedHeight: Option[Height] = currentFinalized
 
   override def score: BigInt = current.score
 
@@ -232,7 +232,7 @@ abstract class Caches extends Blockchain with Storage {
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
-      newFinalizedHeight: Height,
+      newFinalizedHeight: Option[Height],
       generatorBalances: Seq[Long],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
@@ -246,7 +246,7 @@ abstract class Caches extends Blockchain with Storage {
       hitSource: ByteStr,
       computedBlockStateHash: ByteStr,
       block: Block,
-      newFinalizedHeight: Height,
+      newFinalizedHeight: Option[Height],
       generatorBalances: GeneratorBalances
   ): Unit = {
     val newHeight = current.height + 1
@@ -380,7 +380,7 @@ abstract class Caches extends Blockchain with Storage {
       updatedDataWithNodes,
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
-      newFinalizedHeight,
+      currentFinalized,
       committedGeneratorBalancesCache.current,
       nextCommittedGeneratorsRev.reverse,
       stateHash.result()
@@ -417,7 +417,9 @@ abstract class Caches extends Blockchain with Storage {
       discardedBlocks = doRollback(height)
     } yield {
       current = loadCurrentBlock()
-      currentFinalized = finalizedHeightAt(current.height).getOrElse(GenesisBlockHeight)
+      // Can go below currentFinalized height only by force rollback (DebugApiRoute)
+      // During automatic rollbacks this won't happen, because we ask a block extension from the current finalized height
+      currentFinalized = currentFinalized.map(currentFinalized => Height(math.min(currentFinalized, current.height - 1)))
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()

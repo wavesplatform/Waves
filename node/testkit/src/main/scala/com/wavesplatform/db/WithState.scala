@@ -25,7 +25,6 @@ import com.wavesplatform.state.{
   Blockchain,
   BlockchainUpdaterImpl,
   CompleteBlockchainUpdater,
-  GenesisBlockHeight,
   NgState,
   SnapshotBlockchain,
   StateSnapshot,
@@ -157,7 +156,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         preconditionBlock.header.generationSignature,
         computedStateHash,
         preconditionBlock,
-        newFinalizedHeight = GenesisBlockHeight,
+        newFinalizedHeight = None,
         generatorBalances = Seq.empty
       )
     }
@@ -207,7 +206,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         preconditionBlock.header.generationSignature,
         diffResult.computedStateHash,
         preconditionBlock,
-        newFinalizedHeight = GenesisBlockHeight,
+        newFinalizedHeight = None,
         generatorBalances = Seq.empty
       )).explicitGet()
     }
@@ -253,7 +252,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
           preconditionBlock.header.generationSignature,
           diffResult.computedStateHash,
           preconditionBlock,
-          newFinalizedHeight = GenesisBlockHeight,
+          newFinalizedHeight = None,
           generatorBalances = Seq.empty
         )
         Some(preconditionBlock)
@@ -284,7 +283,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         checkedBlock.header.generationSignature,
         diffResult.computedStateHash,
         checkedBlock,
-        newFinalizedHeight = GenesisBlockHeight,
+        newFinalizedHeight = None,
         generatorBalances = Seq.empty
       )
       assertion(diffResult.snapshot, state)
@@ -335,7 +334,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
           checkedBlock.header.generationSignature.take(Block.HitSourceLength),
           result.computedStateHash,
           checkedBlock,
-          newFinalizedHeight = GenesisBlockHeight,
+          newFinalizedHeight = None,
           generatorBalances = Seq.empty
         )
       }

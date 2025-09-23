@@ -137,7 +137,7 @@ case class SnapshotBlockchain(
 
   override def height: Int = inner.height + blockMeta.size
 
-  override def finalizedHeight: Height = inner.finalizedHeight
+  override def finalizedHeight: Option[Height] = inner.finalizedHeight
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l

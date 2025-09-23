@@ -14,7 +14,7 @@ trait Storage {
       hitSource: ByteStr,
       computedBlockStateHash: ByteStr,
       block: Block,
-      newFinalizedHeight: Height,
+      newFinalizedHeight: Option[Height],
       generatorBalances: GeneratorBalances
   ): Unit
   def lastBlock: Option[Block]
