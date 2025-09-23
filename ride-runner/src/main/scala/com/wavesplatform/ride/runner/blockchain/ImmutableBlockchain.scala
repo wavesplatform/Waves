@@ -100,8 +100,6 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   override def blockHeader(height: Int): Option[SignedBlockHeader] =
     blockHeaders.get(height)
 
-  override def finalizedHeightAt(at: Height): Option[Height] = ???
-
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] = input.blocks.get(height).flatMap(_.VRF)
 

@@ -98,8 +98,6 @@ class LazyBlockchain[TagT] private (
   // Ride: blockInfoByHeight, lastBlock
   override def blockHeader(height: Int): Option[SignedBlockHeader] = blockHeaderWithVrf(Height(height)).map(_.header)
 
-  override def finalizedHeightAt(at: Height): Option[Height] = ???
-
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] = blockHeaderWithVrf(Height(height)).map(_.vrf)
 

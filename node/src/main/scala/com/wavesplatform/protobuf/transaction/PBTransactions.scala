@@ -321,14 +321,12 @@ object PBTransactions {
           chainId
         )
 
-      case Data.CommitToGeneration(
-            CommitToGenerationTransactionData(generationPeriodStart, endorsementPublicKey, endorsementKeySignature, `empty`)
-          ) =>
+      case Data.CommitToGeneration(CommitToGenerationTransactionData(generationPeriodStart, endorserPublicKey, commitmentSignature, `empty`)) =>
         for {
-          sig <- BlsSignature(endorsementKeySignature.toByteArray)
+          sig <- BlsSignature(commitmentSignature.toByteArray)
           tx <- CommitToGenerationTransaction.create(
             sender,
-            BlsPublicKey(endorsementPublicKey.toByteStr),
+            BlsPublicKey(endorserPublicKey.toByteStr),
             Height(generationPeriodStart),
             timestamp,
             feeAmount,
@@ -708,8 +706,8 @@ object PBTransactions {
         val data = Data.CommitToGeneration(
           CommitToGenerationTransactionData(
             generationPeriodStart,
-            endorsementPublicKey.byteStr.toByteString,
-            endorsementKeySignature.byteStr.toByteString
+            endorserPublicKey.byteStr.toByteString,
+            commitmentSignature.byteStr.toByteString
           )
         )
         PBTransactions.create(sender, chainId, fee.value, Waves, timestamp, tx.version, proofs.proofs, data)

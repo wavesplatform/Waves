@@ -29,7 +29,7 @@ object CommitToGenerationTransactionDiff {
             // generationDeposit = ??? // We don't need this, because calculate from nextCommittedGenerators
           )
         ),
-        nextCommittedGenerators = IndexedSeq((tx.sender.toAddress, tx.endorsementPublicKey, TransactionId(tx.id())))
+        nextCommittedGenerators = IndexedSeq((tx.sender.toAddress, tx.endorserPublicKey, TransactionId(tx.id())))
       )
     } yield snapshot
   }

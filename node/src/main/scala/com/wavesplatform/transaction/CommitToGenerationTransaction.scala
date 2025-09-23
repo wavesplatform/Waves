@@ -14,11 +14,11 @@ import play.api.libs.json.*
 
 final case class CommitToGenerationTransaction(
     sender: PublicKey,
-    endorsementPublicKey: BlsPublicKey,
+    endorserPublicKey: BlsPublicKey,
     generationPeriodStart: Height,
     timestamp: TxTimestamp,
     fee: TxPositiveAmount,
-    endorsementKeySignature: BlsSignature,
+    commitmentSignature: BlsSignature,
     proofs: Proofs,
     override val chainId: Byte
 ) extends Transaction(TransactionType.CommitToGeneration)
@@ -32,9 +32,9 @@ final case class CommitToGenerationTransaction(
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
       BaseTxJson.toJson(this) ++ Json.obj(
-        "endorsementPublicKey"    -> endorsementPublicKey.base64,
-        "endorsementKeySignature" -> endorsementKeySignature.base64,
-        "generationPeriodStart"   -> generationPeriodStart
+        "endorserPublicKey"     -> endorserPublicKey.base64,
+        "generationPeriodStart" -> generationPeriodStart,
+        "commitmentSignature"   -> commitmentSignature.base64
       )
     )
 }
@@ -49,7 +49,7 @@ object CommitToGenerationTransaction {
     val blsMessage = blsKP.publicKey.arr ++ Ints.toByteArray(tx.generationPeriodStart)
     val blsSig     = blsKP.sign(blsMessage)
 
-    val txWithBlsSig = tx.copy(endorsementPublicKey = blsKP.publicKey, endorsementKeySignature = blsSig)
+    val txWithBlsSig = tx.copy(endorserPublicKey = blsKP.publicKey, commitmentSignature = blsSig)
     txWithBlsSig.copy(proofs = Proofs(crypto.sign(privateKey, txWithBlsSig.bodyBytes())))
   }
 

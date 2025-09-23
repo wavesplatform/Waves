@@ -26,6 +26,7 @@ abstract class DBState extends ScorexLogging {
     rdb,
     settings.blockchainSettings,
     settings.dbSettings.copy(maxCacheSize = 1),
+    settings.synchronizationSettings.maxRollback,
     settings.enableLightMode
   )
 

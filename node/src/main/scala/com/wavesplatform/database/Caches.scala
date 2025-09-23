@@ -314,7 +314,7 @@ abstract class Caches extends Blockchain with Storage {
       nti.transaction match {
         case txn: CommitToGenerationTransaction =>
           val addressId = addressIdWithFallback(txn.sender.toAddress, newAddressIds)
-          nextCommittedGeneratorsRev ::= (addressId, txn.endorsementPublicKey, TransactionId(txn.id()))
+          nextCommittedGeneratorsRev ::= (addressId, txn.endorserPublicKey, TransactionId(txn.id()))
         case _ =>
       }
     }
