@@ -55,11 +55,11 @@ object CommitToGenerationTransaction {
 
   def create(
       sender: PublicKey,
-      endorsementPublicKey: BlsPublicKey,
+      endorserPublicKey: BlsPublicKey,
       generationPeriodStart: Height,
       timestamp: TxTimestamp,
       feeInWaves: Long,
-      endorsementKeySignature: BlsSignature,
+      commitmentSignature: BlsSignature,
       proofs: Proofs,
       chainId: Byte
   ): Either[ValidationError, CommitToGenerationTransaction] =
@@ -67,11 +67,11 @@ object CommitToGenerationTransaction {
       feeInWaves <- TxPositiveAmount(feeInWaves)(TxValidationError.InsufficientFee)
       tx <- CommitToGenerationTransaction(
         sender,
-        endorsementPublicKey,
+        endorserPublicKey,
         generationPeriodStart,
         timestamp,
         feeInWaves,
-        endorsementKeySignature,
+        commitmentSignature,
         proofs,
         chainId
       ).validatedEither
@@ -79,7 +79,7 @@ object CommitToGenerationTransaction {
 
   def selfSigned(
       sender: KeyPair,
-      endorsementPublicKey: BlsPublicKey,
+      endorserPublicKey: BlsPublicKey,
       generationPeriodStart: Height,
       timestamp: TxTimestamp,
       feeInWaves: Long,
@@ -87,11 +87,11 @@ object CommitToGenerationTransaction {
   ): Either[ValidationError, CommitToGenerationTransaction] =
     create(
       sender.publicKey,
-      endorsementPublicKey,
+      endorserPublicKey,
       generationPeriodStart,
       timestamp,
       feeInWaves,
-      endorsementKeySignature = BlsSignature.Empty,
+      commitmentSignature = BlsSignature.Empty,
       Proofs.empty,
       chainId
     ).map(signed(_, sender.privateKey))

@@ -43,8 +43,8 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
       "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
       "generationPeriodStart": 3000,
-      "endorsementPublicKey": "base64:jb9333lHnhHpkBH168ZrDRYM7d8vzs+t4yXwfpYhPw1dR6mvWnzjMU9TLmqgOjPb",
-      "endorsementKeySignature": "base64:hmkx3WW+Ns3qUkDCxP5911lWw+BghFuDZhvbLWK3oJ6JbguzkAFy8tXAGMtCbZTWABx1zB2GiZTVp420HGDSxP5A3RnvLYtoQRGtZYbjOBfeyR/EktJofDyUPQjcFsib",
+      "endorserPublicKey": "base64:jb9333lHnhHpkBH168ZrDRYM7d8vzs+t4yXwfpYhPw1dR6mvWnzjMU9TLmqgOjPb",
+      "commitmentSignature": "base64:hmkx3WW+Ns3qUkDCxP5911lWw+BghFuDZhvbLWK3oJ6JbguzkAFy8tXAGMtCbZTWABx1zB2GiZTVp420HGDSxP5A3RnvLYtoQRGtZYbjOBfeyR/EktJofDyUPQjcFsib",
       "proofs": [
         "28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ"
       ],

@@ -467,14 +467,14 @@ object TxHelpers {
   def commitToGeneration(
       generationPeriodStart: Int,
       sender: KeyPair = defaultSigner,
-      endorsementPublicKey: BlsPublicKey = BlsKeyPair(defaultSigner.privateKey).publicKey,
+      endorserPublicKey: BlsPublicKey = BlsKeyPair(defaultSigner.privateKey).publicKey,
       timestamp: TxTimestamp = timestamp,
       fee: Long = TestValues.commitToGenerationFee,
       chainId: Byte = AddressScheme.current.chainId
   ): CommitToGenerationTransaction = CommitToGenerationTransaction
     .selfSigned(
       sender,
-      endorsementPublicKey,
+      endorserPublicKey,
       Height(generationPeriodStart),
       timestamp,
       fee,
