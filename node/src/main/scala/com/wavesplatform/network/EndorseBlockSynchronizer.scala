@@ -87,7 +87,13 @@ object EndorsementStorage {
       BlockEndorsement.Conflict(msg.endorserIndex, msg.finalizedId, msg.endorsedId, verifiedSig)
 
     override def startNewVoting(filter: EndorsementFilter): Unit = synced {
-      currentFilter = Some(filter)
+      currentFilter = if (filter.expectedEndorsers.isEmpty) {
+        logger.info("No committed generators, don't collect endorsements")
+        None
+      } else {
+        logger.info(s"Started voting with $filter")
+        Some(filter)
+      }
       processed.clear()
       currentVoting = FinalizationVoting()
     }
@@ -111,10 +117,7 @@ object EndorseBlockSynchronizer extends LazyLogging {
       scheduler: Scheduler
   ): Cancelable = {
     // TODO: move outside
-    lastFilter.foreach { filter =>
-      storage.startNewVoting(filter)
-      logger.info(s"Started voting with $filter")
-    }(using scheduler)
+    lastFilter.foreach(storage.startNewVoting)(using scheduler)
 
     receivingEndorsements.foreach { case (ch, x) =>
       if (storage.tryAddVote(x)) allChannels.broadcast(x, Some(ch))

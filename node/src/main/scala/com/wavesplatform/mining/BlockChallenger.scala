@@ -146,16 +146,18 @@ class BlockChallengerImpl(
   override def allProcessingTxs: Seq[Transaction] = processingTxs.values.asScala.toSeq
 
   override def endorse(endorsedHeight: Height, finalizedHeight: Height, blockMiner: Address): Seq[BlockEndorsement.Full] =
-    for {
-      endorsedId  <- blockchainUpdater.blockId(endorsedHeight).toSeq
-      finalizedId <- blockchainUpdater.blockId(finalizedHeight).toSeq
-      committed = blockchainUpdater.committedGenerators(blockchainUpdater.generationPeriodOf(endorsedHeight))
-      (account, idx) <- for {
-        ((committedAddr, _, _), idx) <- committed.zipWithIndex
-        if committedAddr != blockMiner // A miner doesn’t need to endorse its own blocks - mining is already an endorsement
-        pk <- wallet.privateKeyAccount(committedAddr).toSeq
-      } yield (pk, idx)
-    } yield BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
+    if (!blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality)) Nil
+    else
+      for {
+        endorsedId  <- blockchainUpdater.blockId(endorsedHeight).toSeq
+        finalizedId <- blockchainUpdater.blockId(finalizedHeight).toSeq
+        committed = blockchainUpdater.committedGenerators(blockchainUpdater.generationPeriodOf(endorsedHeight))
+        (account, idx) <- for {
+          ((committedAddr, _, _), idx) <- committed.zipWithIndex
+          if committedAddr != blockMiner // A miner doesn’t need to endorse its own blocks - mining is already an endorsement
+          pk <- wallet.privateKeyAccount(committedAddr).toSeq
+        } yield (pk, idx)
+      } yield BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
 
   private def withProcessingTxs[A](txs: Seq[Transaction])(body: Task[A]): Task[A] =
     Task(processingTxs.putAll(txs.map(tx => tx.id() -> tx).toMap.asJava))
