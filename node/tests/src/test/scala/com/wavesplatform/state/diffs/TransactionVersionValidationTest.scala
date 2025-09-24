@@ -30,8 +30,8 @@ class TransactionVersionValidationTest extends PropSpec with WithDomain {
 
   private val asset  = IssuedAsset(issueTx1.id())
   private val asset2 = IssuedAsset(issueTx2.id())
-  private val order1 = order(BUY, asset, Waves, price = 123456789, version = V1)
-  private val order2 = order(SELL, asset, Waves, price = 123456789, version = V1)
+  private def order1 = order(BUY, asset, Waves, price = 123456789, version = V1)
+  private def order2 = order(SELL, asset, Waves, price = 123456789, version = V1)
 
   private def txsByMaxVersion: Seq[(TxVersion, TxVersion => Transaction)] =
     Seq(

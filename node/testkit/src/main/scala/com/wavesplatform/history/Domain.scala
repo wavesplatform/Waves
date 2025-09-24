@@ -427,7 +427,13 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
             .map(Right(_))
             .getOrElse(
               posSelector
-                .getValidBlockDelay(blockchain.height, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e11.toLong)
+                .getValidBlockDelay(
+                  blockchain.height,
+                  generator,
+                  parent.baseTarget,
+                  // HACK: 1e11 some generators in tests have less than minimum
+                  blockchain.generatingBalance(generator.toAddress).max(1e11.toLong)
+                )
                 .map(_ + parent.timestamp)
             )
         } else
@@ -689,7 +695,10 @@ class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
   )(new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp)), _, snapshot = None)
 
   def appendBlock(b: Block, requireAppended: Boolean = true, adjustTestTime: Boolean = true): Unit = {
-    if (adjustTestTime) d.testTime.setTime(b.header.timestamp)
+    if (adjustTestTime) {
+      val challengingTimestamp = b.header.challengedHeader.fold(Long.MinValue)(_.timestamp)
+      d.testTime.setTime(b.header.timestamp.max(challengingTimestamp))
+    }
     appender(b).runSyncUnsafe()
     if (requireAppended && d.lastBlockId != b.id()) fail(s"Can't apply block $b, see logs")
   }

@@ -28,14 +28,13 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
-import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.{TransactionStateSnapshot, WavesSettingsOps}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidStateHash, MicroBlockAppendError}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TransactionType, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{CommitToGenerationTransaction, EthTxGenerator, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{JsonMatchers, Schedulers, SharedSchedulerMixin}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
@@ -103,22 +102,22 @@ class BlockChallengeTest
       .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 1001)
       .configure(_.copy(generationPeriod = 2))
 
-    val deposit = FeeConstants(TransactionType.CommitToGeneration) * FeeUnit // TODO: not a fee
     withDomain(testSettings, balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
       val challengingMiner     = d.wallet.generateNewAccount().get
       val challengingMinerAddr = challengingMiner.toAddress
 
-      // TODO: to balances ^
+      val extraForDeposit = CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee
       d.appendBlock(
-        TxHelpers.transfer(TxHelpers.defaultSigner, challengingMinerAddr, 1000.waves + deposit),
-        TxHelpers.transfer(TxHelpers.defaultSigner, challengedMiner.toAddress, 2000.waves + deposit)
+        TxHelpers.transfer(TxHelpers.defaultSigner, challengingMinerAddr, 1000.waves + extraForDeposit),
+        TxHelpers.transfer(TxHelpers.defaultSigner, challengedMiner.toAddress, 2000.waves + extraForDeposit)
       )
-      (1 to 998).foreach(_ => d.appendBlock())
+      (1 to 998).foreach(_ => d.appendBlock(d.createBlock(Block.PlainBlockVersion, txs = Nil, strictTime = true)))
 
       val commitTxs               = Seq(challengedMiner, challengingMiner).map(acc => TxHelpers.commitToGeneration(1002, acc))
       val commitTxsTotalFee       = commitTxs.map(_.fee.value).sum
       val commitTxsFeeToNextMiner = commitTxsTotalFee - CurrentBlockFeePart.apply(commitTxsTotalFee)
-      d.appendBlock(commitTxs*)
+      val blockWithTxs            = d.createBlock(Block.PlainBlockVersion, commitTxs, strictTime = true)
+      d.appendBlock(blockWithTxs)
       d.blockchain.height shouldBe 1001
 
       val originalBlock =
@@ -130,9 +129,7 @@ class BlockChallengeTest
 
       val challengingBlock =
         d.createChallengingBlock(challengingMiner, originalBlock, strictTime = true, timestamp = Some(d.nextBlockTime(challengingMiner)))
-
-      d.testTime.setTime(challengingBlock.header.timestamp + GetTimeStampAdjustment)
-      d.blockAppender(challengingBlock).runSyncUnsafe() should beRight
+      d.appender.appendBlock(challengingBlock)
 
       d.blockchain.generatingBalance(
         challengingMinerAddr,
@@ -423,15 +420,14 @@ class BlockChallengeTest
       .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 1001)
       .configure(_.copy(generationPeriod = 2))
 
-    val deposit = FeeConstants(TransactionType.CommitToGeneration) * FeeUnit
     withDomain(testSettings, balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
       val challengingMiner    = d.wallet.generateNewAccount().get
       val challengedMinerAddr = challengedMiner.toAddress
 
-      // TODO: move to balances ^
+      val extraForDeposit = CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee
       d.appendBlock(
-        TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 2000.waves + deposit),
-        TxHelpers.transfer(TxHelpers.defaultSigner, challengedMinerAddr, 3000.waves + deposit)
+        TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 2000.waves + extraForDeposit),
+        TxHelpers.transfer(TxHelpers.defaultSigner, challengedMinerAddr, 3000.waves + extraForDeposit)
       )
 
       (1 to 998).foreach(_ => d.appendBlock())
@@ -440,24 +436,20 @@ class BlockChallengeTest
       d.appendBlock(commitTxs*)
       d.blockchain.height shouldBe 1001
 
-      val originalBlock =
-        d.createBlock(
-          Block.ProtoBlockVersion,
-          Seq(TxHelpers.transfer(challengedMiner, TxHelpers.defaultAddress, amount = 1.waves)),
-          strictTime = true,
-          generator = challengedMiner,
-          stateHash = Some(Some(invalidStateHash))
-        )
+      val originalBlock = d.createBlock(
+        Block.ProtoBlockVersion,
+        Seq(TxHelpers.transfer(challengedMiner, TxHelpers.defaultAddress, amount = 1.waves)),
+        strictTime = true,
+        generator = challengedMiner,
+        stateHash = Some(Some(invalidStateHash))
+      )
 
       val challengingBlock =
         d.createChallengingBlock(challengingMiner, originalBlock, strictTime = true, timestamp = Some(d.nextBlockTime(challengingMiner)))
 
       val effBalanceBefore = d.blockchain.effectiveBalance(challengedMinerAddr, 0)
 
-      d.testTime.setTime(challengingBlock.header.timestamp + GetTimeStampAdjustment)
-      // TODO:
-//       println(s"test: testTime.correctedTime=${d.testTime.correctedTime()}, testTime.getTimestamp=${d.testTime.getTimestamp()}, blockTs=${challengingBlock.header.timestamp}")
-      d.blockAppender(challengingBlock).runSyncUnsafe() should beRight // TODO: increased here?
+      d.appender.appendBlock(challengingBlock)
       d.blockchain.effectiveBalance(challengedMinerAddr, 0) shouldBe 0L
 
       withClue(s"challenged $challengedMinerAddr: ") {
