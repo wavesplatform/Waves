@@ -42,7 +42,6 @@ object EndorsementStorage {
     override def tryCollectAndClear(endorsedBlockId: BlockId): Option[FinalizationVoting] = None
   }
 
-  // Logs?
   class InMemory extends EndorsementStorage with StrictLogging {
     private var currentFilter = Option.empty[EndorsementFilter]
     private val processed     = mutable.HashSet.empty[EndorseBlock]

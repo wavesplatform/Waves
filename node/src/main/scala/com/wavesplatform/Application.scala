@@ -318,8 +318,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     EndorseBlockSynchronizer.start(
       storage = endorsementStorage,
       lastFilter = blockchainUpdater.lastBlockInfo.collect {
-        case bi if bi.height > GenesisBlockHeight && blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, bi.height - 1) =>
+        case bi if bi.height > GenesisBlockHeight =>
           val endorsedHeight = Height(bi.height - 1)
+          val isActivated    = blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, endorsedHeight)
 
           val endorsedId = blockchainUpdater
             .blockId(endorsedHeight)
@@ -330,12 +331,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
             .blockId(bi.finalizedHeight) // Finalized block is same
             .getOrElse(throw new IllegalStateException(s"Can't find a finalized block at ${bi.finalizedHeight}"))
 
-          EndorsementFilter(
-            finalizedId,
-            bi.finalizedHeight,
-            endorsedId,
-            blockchainUpdater.committedGenerators(period).map { case (_, blsPk, _) => blsPk }
-          )
+          val committedGenerators = if (isActivated) blockchainUpdater.committedGenerators(period).map { case (_, blsPk, _) => blsPk }
+          else IndexedSeq.empty
+
+          EndorsementFilter(finalizedId, bi.finalizedHeight, endorsedId, committedGenerators)
       },
       receivingEndorsements = messageObserver.endorseBlocks,
       allChannels = allChannels,
