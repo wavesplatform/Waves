@@ -31,7 +31,10 @@ trait EndorsementStorage {
 }
 
 object EndorsementStorage {
-  case class EndorsementFilter(finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, expectedEndorsers: IndexedSeq[BlsPublicKey])
+  case class EndorsementFilter(finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, expectedEndorsers: IndexedSeq[BlsPublicKey]) {
+    override def toString: String =
+      s"EndorsementFilter(fid=$finalizedId, fh=$finalizedHeight, eid=$endorsedId, e={${expectedEndorsers.mkString(", ")}})"
+  }
 
   val Disabled: EndorsementStorage = new EndorsementStorage {
     override def tryAddVote(msg: EndorseBlock): Boolean                                   = false
@@ -43,7 +46,6 @@ object EndorsementStorage {
   class InMemory extends EndorsementStorage with StrictLogging {
     private var currentFilter = Option.empty[EndorsementFilter]
     private val processed     = mutable.HashSet.empty[EndorseBlock]
-
     private var currentVoting = FinalizationVoting() // TODO: move to currentFilter?
 
     private val monitor            = new Object()
@@ -109,7 +111,10 @@ object EndorseBlockSynchronizer extends LazyLogging {
       scheduler: Scheduler
   ): Cancelable = {
     // TODO: move outside
-    lastFilter.foreach(storage.startNewVoting)(using scheduler)
+    lastFilter.foreach { filter =>
+      storage.startNewVoting(filter)
+      logger.info(s"Started voting with $filter")
+    }(using scheduler)
 
     receivingEndorsements.foreach { case (ch, x) =>
       if (storage.tryAddVote(x)) allChannels.broadcast(x, Some(ch))

@@ -30,7 +30,7 @@ import com.wavesplatform.network.*
 import com.wavesplatform.network.EndorsementStorage.EndorsementFilter
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, CompleteBlockchainUpdater, Height, TxMeta}
+import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, CompleteBlockchainUpdater, GenesisBlockHeight, Height, TxMeta}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -318,7 +318,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     EndorseBlockSynchronizer.start(
       storage = endorsementStorage,
       lastFilter = blockchainUpdater.lastBlockInfo.collect {
-        case bi if blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, bi.height - 1) =>
+        case bi if bi.height > GenesisBlockHeight && blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, bi.height - 1) =>
           val endorsedHeight = Height(bi.height - 1)
 
           val endorsedId = blockchainUpdater
