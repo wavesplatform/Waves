@@ -6,8 +6,9 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
 import com.wavesplatform.api.http.{BlocksApiRoute, CustomJson, RouteTimeout}
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.{Block, BlockEndorsement, BlockHeader, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -43,8 +44,9 @@ class BlocksApiRouteSpec
     BlocksApiRoute(restAPISettings, blocksApi, SystemTime, new RouteTimeout(60.seconds)(using sharedScheduler))
   private val route = blocksApiRoute.route
 
-  private val testBlock1 = TestBlock.create(Nil).block
-  private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion).block
+  private val testBlock1     = TestBlock.create(Nil).block
+  private val testBlock2     = TestBlock.create(Nil, Block.ProtoBlockVersion).block
+  private val finalizedBlock = TestBlock.create(Nil, Block.ProtoBlockVersion).block
 
   private val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 0L)
   private val testBlock2Json = testBlock2.json() ++ Json.obj(
@@ -68,9 +70,51 @@ class BlocksApiRouteSpec
     "VRF"          -> testBlock2.id().toString
   )
 
+  private val finalizedBlockHeaderJson =
+    BlockHeaderSerializer.toJson(finalizedBlock.header, finalizedBlock.bytes().length, 0, finalizedBlock.signature) ++ Json.obj(
+      "height"       -> 3,
+      "totalFee"     -> 0L,
+      "reward"       -> 5,
+      "rewardShares" -> Json.obj(finalizedBlock.header.generator.toAddress.toString -> 5),
+      "VRF"          -> finalizedBlock.id().toString,
+      "finalizationVoting" -> Json.obj(
+        "endorserIndexes" -> Seq(1, 0),
+        "aggregatedEndorsementSignature" -> "M4MkhxYz8oNM4n9E9pcmarkUZ3TS1zvYqdRm8X5jh1ZoPqirwXPp5poiC7u34QrWpqrr7zWGTWDETEiNG4srsh2eEJtuJXU5FKvx4h855vKTMiDNqf2V5bL5HpZmypcXdz",
+        "conflictEndorsements" -> Seq(
+          Json.obj(
+            "endorserIndex"    -> 0,
+            "finalizedBlockId" -> testBlock2.id(),
+            "signature" -> "h7iWQv6yGbjh8ZHTJeEYAiVx75us2zr6gFrXG3AUP28bngSit3ndAecRPEo57pi2egihEz1Xv1RTuURjX8kikP4HTcnoc3w9Veru8PF9AqduiRRkgK3yABf9ae8YxeE4Gy"
+          )
+        )
+      )
+    )
+
   private val testBlock1Meta = BlockMeta.fromBlock(testBlock1, 1, 0L, None, None)
   private val testBlock2Meta =
     BlockMeta.fromBlock(testBlock2, 2, 0L, Some(5), Some(testBlock2.id())).copy(rewardShares = Seq(testBlock2.header.generator.toAddress -> 5))
+
+  private val finalizedBlockMeta = {
+    val orig = BlockMeta.fromBlock(finalizedBlock, 3, 0L, Some(5), Some(finalizedBlock.id()))
+    orig.copy(
+      rewardShares = Seq(finalizedBlock.header.generator.toAddress -> 5),
+      header = orig.header.copy(
+        finalizationVoting = Some(
+          FinalizationVoting(
+            endorserIndexes = Seq(1, 0),
+            aggregatedEndorsement = BlsSignature.NonEmpty(Array.fill[Byte](BlsSignature.SizeInBytes)(1)),
+            conflict = Seq(
+              BlockEndorsement.Conflict(
+                endorserIndex = 0,
+                finalizedId = testBlock2.id(),
+                signature = BlsSignature.NonEmpty(Array.fill[Byte](BlsSignature.SizeInBytes)(2))
+              )
+            )
+          )
+        )
+      )
+    )
+  }
 
   private val invalidBlockId = ByteStr(new Array[Byte](32))
   (blocksApi.block).expects(invalidBlockId).returning(None).anyNumberOfTimes()
@@ -153,11 +197,11 @@ class BlocksApiRouteSpec
   }
 
   routePath("/headers/finalized") in {
-    (() => blocksApi.finalizedHeight).expects().returning(Height(2)).once()
-    (blocksApi.metaAtHeight).expects(2).returning(Some(testBlock2Meta)).once()
+    (() => blocksApi.finalizedHeight).expects().returning(Height(3)).once()
+    (blocksApi.metaAtHeight).expects(3).returning(Some(finalizedBlockMeta)).once()
     Get(routePath("/headers/finalized")) ~> route ~> check {
       val response = responseAs[JsObject]
-      response shouldBe testBlock2HeaderJson
+      response shouldBe finalizedBlockHeaderJson
     }
   }
 

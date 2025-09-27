@@ -7,6 +7,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 sealed abstract class BlsSignature(val byteStr: ByteStr) {
   def arr: Array[Byte]          = byteStr.arr
   def base64: String            = byteStr.base64
+  def base58: String            = byteStr.toString
   override def toString: String = byteStr.base64Raw
 }
 

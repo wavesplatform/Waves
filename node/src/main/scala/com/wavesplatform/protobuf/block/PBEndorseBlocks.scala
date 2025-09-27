@@ -14,7 +14,6 @@ object PBEndorseBlocks {
       BlockEndorsement.Conflict(
         x.endorserIndex,
         x.finalizedBlockId.toByteStr,
-        x.endorsedBlockId.toByteStr,
         sig
       )
     else

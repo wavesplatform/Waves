@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
 import cats.syntax.either.*
+import cats.syntax.option.*
 import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockEndorsement, FinalizationVoting}
@@ -44,8 +45,8 @@ object EndorsementStorage {
 
   class InMemory extends EndorsementStorage with StrictLogging {
     private var currentFilter = Option.empty[EndorsementFilter]
+    private var currentVoting = Option.empty[FinalizationVoting]
     private val processed     = mutable.HashSet.empty[EndorseBlock]
-    private var currentVoting = FinalizationVoting() // TODO: move to currentFilter?
 
     private val monitor            = new Object()
     private def synced[T](f: => T) = monitor.synchronized(f)
@@ -59,20 +60,23 @@ object EndorsementStorage {
 
     override def tryAddVote(msg: EndorseBlock): Boolean = synced {
       for {
-        filter <- currentFilter.toRight("Voting hasn't started")
-        _      <- Either.raiseUnless(msg.finalizedHeight == filter.finalizedHeight)(s"Expected finalized height ${filter.finalizedHeight}")
-        _      <- Either.raiseWhen(msg.endorserIndex >= filter.expectedEndorsers.size)(s"There are only ${filter.expectedEndorsers.size} endorsers")
-        _      <- Either.raiseWhen(processed.contains(msg))("Already processed")
+        filter     <- currentFilter.toRight("Voting hasn't started")
+        origVoting <- currentVoting.toRight("Voting hasn't started")
+        _          <- Either.raiseUnless(msg.finalizedHeight == filter.finalizedHeight)(s"Expected finalized height ${filter.finalizedHeight}")
+        _ <- Either.raiseWhen(msg.endorserIndex >= filter.expectedEndorsers.size)(s"There are only ${filter.expectedEndorsers.size} endorsers")
+        _ <- Either.raiseWhen(processed.contains(msg))("Already processed")
         endorserPk = filter.expectedEndorsers(msg.endorserIndex)
         sig <- verifySig(msg, endorserPk).toRight("Invalid signature")
         _   <- Either.raiseUnless(msg.endorsedId == filter.endorsedId)(s"Expected block ${filter.endorsedId}") // Could be a switch to a better branch
       } yield {
         // TODO: Tests
         val isConsistent = msg.finalizedId == filter.finalizedId
-        currentVoting = if (isConsistent) {
-          if (currentVoting.endorserIndexes.isEmpty) FinalizationVoting(aggregatedEndorsement = sig) // First vote
-          else currentVoting.withValid(msg.endorserIndex, sig)
-        } else currentVoting.withConflict(toConflict(msg, sig))
+        val updatedVoting = if (isConsistent) {
+          if (origVoting.endorserIndexes.isEmpty) origVoting.withSignature(sig) // First vote
+          else origVoting.withValid(msg.endorserIndex, sig)
+        } else origVoting.withConflict(toConflict(msg, sig))
+
+        currentVoting = updatedVoting.some
 
         processed += msg
         true
@@ -83,7 +87,7 @@ object EndorsementStorage {
     }
 
     private def toConflict(msg: EndorseBlock, verifiedSig: BlsSignature.NonEmpty): BlockEndorsement.Conflict =
-      BlockEndorsement.Conflict(msg.endorserIndex, msg.finalizedId, msg.endorsedId, verifiedSig)
+      BlockEndorsement.Conflict(msg.endorserIndex, msg.finalizedId, verifiedSig)
 
     override def startNewVoting(filter: EndorsementFilter): Unit = synced {
       currentFilter = if (filter.expectedEndorsers.isEmpty) {
@@ -93,16 +97,16 @@ object EndorsementStorage {
         logger.info(s"Started voting with $filter")
         Some(filter)
       }
+
+      currentVoting = FinalizationVoting().some
+
       processed.clear()
-      currentVoting = FinalizationVoting()
     }
 
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = synced {
-      currentFilter.filter(_.endorsedId == endorsedId).map { _ =>
-        val r = currentVoting
-        currentVoting = currentVoting.copy(endorserIndexes = Seq.empty, conflict = Seq.empty)
-        r
-      }
+      val orig = currentVoting
+      currentVoting = currentVoting.map(_.copy(endorserIndexes = Seq.empty, conflict = Seq.empty))
+      orig
     }
   }
 }

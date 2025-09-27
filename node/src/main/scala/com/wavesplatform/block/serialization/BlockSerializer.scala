@@ -1,6 +1,5 @@
 package com.wavesplatform.block.serialization
 
-import java.nio.ByteBuffer
 import com.google.common.io.ByteStreams.newDataOutput
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.PublicKey
@@ -15,6 +14,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json.{JsArray, JsNumber, JsObject, Json}
 
+import java.nio.ByteBuffer
 import scala.util.Try
 
 object BlockHeaderSerializer {
@@ -86,11 +86,28 @@ object BlockHeaderSerializer {
         case None => JsObject.empty
       }
 
+    val finalizationHeaderJson = blockHeader.finalizationVoting match {
+      case None => JsObject.empty
+      case Some(fh) =>
+        val builder = Json.newBuilder
+        if (fh.endorserIndexes.nonEmpty) builder += "endorserIndexes" -> fh.endorserIndexes
+        builder += "aggregatedEndorsementSignature"                   -> fh.aggregatedEndorsement.base58
+        if (fh.conflict.nonEmpty) builder += "conflictEndorsements" -> fh.conflict.map { x =>
+          Json.obj(
+            "endorserIndex"    -> x.endorserIndex,
+            "finalizedBlockId" -> x.finalizedId.toString,
+            "signature"        -> x.signature.base58
+          )
+        }
+
+        Json.obj("finalizationVoting" -> builder.result())
+    }
+
     Json.obj(
       "version"   -> blockHeader.version,
       "timestamp" -> blockHeader.timestamp,
       "reference" -> blockHeader.reference.toString
-    ) ++ consensusJson ++ featuresJson ++ rewardJson ++ generatorJson ++ stateHashJson ++ challengedHeaderJson
+    ) ++ consensusJson ++ featuresJson ++ rewardJson ++ generatorJson ++ stateHashJson ++ challengedHeaderJson ++ finalizationHeaderJson
   }
 
   def toJson(header: BlockHeader, blockSize: Int, transactionCount: Int, signature: ByteStr): JsObject =

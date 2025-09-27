@@ -30,7 +30,6 @@ object PBFinalizationVotings {
         PBEndorseBlock(
           x.endorserIndex,
           x.finalizedId.toByteString,
-          endorsedBlockId = x.endorsedId.toByteString,
           signature = x.signature.byteStr.toByteString
         )
       }
