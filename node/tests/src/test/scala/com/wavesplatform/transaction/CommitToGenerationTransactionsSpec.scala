@@ -100,4 +100,23 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
     info("Deposit for one period if not committed for next")
     d.blockchain.wavesPortfolio(sender.toAddress).generationDeposit shouldBe CommitToGenerationTransaction.DepositInWavelets
   }
+
+  "Can't commit twice" in withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender)) { d =>
+    info("First")
+    d.appendBlock(TxHelpers.commitToGeneration(Height(3000), sender))
+
+    info("Second")
+    d.appendBlockE(TxHelpers.commitToGeneration(Height(3000), sender)) should produce("is already committed")
+  }
+
+  "Can't commit more than maxGenerators" in withDomain(
+    DeterministicFinality.configure(x => x.copy(maxGenerators = 1)),
+    AddrWithBalance.enoughBalances(sender, TxHelpers.secondSigner)
+  ) { d =>
+    info("First")
+    d.appendBlock(TxHelpers.commitToGeneration(Height(3000), sender))
+
+    info("Second")
+    d.appendBlockE(TxHelpers.commitToGeneration(Height(3000), TxHelpers.secondSigner)) should produce("No free generator slots")
+  }
 }

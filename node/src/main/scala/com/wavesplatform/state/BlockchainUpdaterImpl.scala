@@ -440,14 +440,14 @@ class BlockchainUpdaterImpl(
                   )
                 )
 
-                publishLastBlockInfo()
-
                 if (
                   (block.header.timestamp > time
                     .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight % 100 == 0)
                 ) {
                   log.info(s"New height: $newHeight")
                 }
+
+                publishLastBlockInfo()
 
                 Applied(discDiffs, this.score)
             } getOrElse Ignored

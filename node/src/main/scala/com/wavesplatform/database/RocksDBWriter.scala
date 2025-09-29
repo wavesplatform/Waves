@@ -760,7 +760,7 @@ class RocksDBWriter(
         val nextPeriodGeneratorsUpdatedCount = rw.get(Keys.committedGeneratorsCount(nextPeriod)) + nextCommittedGenerators.size
 
         rw.put(Keys.committedGenerators(nextPeriod, h), Some(nextCommittedGenerators))
-        rw.put(Keys.committedGeneratorsCount(nextPeriod), nextPeriodGeneratorsUpdatedCount.toShort)
+        rw.put(Keys.committedGeneratorsCount(nextPeriod), nextPeriodGeneratorsUpdatedCount.toShort) // TODO: do we need this?
       }
 
       rw.put(Keys.issuedAssets(height), snapshot.assetStatics.keySet.toSeq)

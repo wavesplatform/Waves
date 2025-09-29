@@ -10,6 +10,7 @@ object CommitToGenerationTransactionDiff {
   def apply(blockchain: Blockchain)(tx: CommitToGenerationTransaction): Either[ValidationError, StateSnapshot] = {
     val current = blockchain.currentGenerationPeriod
     val next    = current.next
+    val sender  = tx.sender.toAddress
 
     for {
       // TODO: Check BLS signature
@@ -21,15 +22,20 @@ object CommitToGenerationTransactionDiff {
       _ <- Either.raiseUnless(tx.generationPeriodStart == next.start) {
         GenericError(s"Expected the next period start height (${next.start}), got ${tx.generationPeriodStart}")
       }
+      committed = blockchain.committedGenerators(next).map { case (address, _, _) => address }.toSet
+      _ <- Either.raiseWhen(committed.size == blockchain.settings.functionalitySettings.maxGenerators) {
+        GenericError(s"No free generator slots, committed ${committed.size} generators. Try next time")
+      }
+      _ <- Either.raiseWhen(committed.contains(sender)) { GenericError(s"$sender is already committed") }
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = Map(
-          tx.sender.toAddress -> Portfolio(
+          sender -> Portfolio(
             balance = -tx.fee.value
             // generationDeposit = ??? // We don't need this, because calculate from nextCommittedGenerators
           )
         ),
-        nextCommittedGenerators = IndexedSeq((tx.sender.toAddress, tx.endorserPublicKey, TransactionId(tx.id())))
+        nextCommittedGenerators = IndexedSeq((sender, tx.endorserPublicKey, TransactionId(tx.id())))
       )
     } yield snapshot
   }

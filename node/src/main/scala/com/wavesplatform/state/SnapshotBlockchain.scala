@@ -242,9 +242,11 @@ case class SnapshotBlockchain(
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] =
-    if (at == this.currentGenerationPeriod.next) snapshot.nextCommittedGenerators
-    else inner.committedGenerators(at)
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = {
+    val base = inner.committedGenerators(at)
+    if (at == this.currentGenerationPeriod.next) base ++ snapshot.nextCommittedGenerators
+    else base
+  }
 
   override def parentGeneratorBalances(): Seq[Long] =
     if (blockMeta.isEmpty) inner.parentGeneratorBalances()
