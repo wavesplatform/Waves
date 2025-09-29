@@ -877,8 +877,8 @@ class TransactionsRouteSpec
         status shouldEqual StatusCodes.OK
         val jsObject = responseAs[JsObject]
         (jsObject \ "senderPublicKey").as[String] shouldBe sender.publicKey.toString
-        (jsObject \ "endorserPublicKey").as[String] shouldBe blsKP.publicKey.base64
-        (jsObject \ "commitmentSignature").as[String] should startWith("base64:")
+        (jsObject \ "endorserPublicKey").as[String] shouldBe blsKP.publicKey.base58
+        (jsObject \ "commitmentSignature").asOpt[String] shouldBe defined
       }
     }
   }

@@ -296,7 +296,7 @@ case class AddressApiRoute(
   def blsKey: Route = (path("bls" / AddrSegment) & get) { address =>
     complete {
       wallet.privateKeyAccount(address).map { kp =>
-        Json.obj("blsPublicKey" -> BlsKeyPair(kp.privateKey).publicKey.base64)
+        Json.obj("blsPublicKey" -> BlsKeyPair(kp.privateKey).publicKey.base58)
       }
     }
   }

@@ -8,8 +8,8 @@ case class BlsPublicKey private (byteStr: ByteStr) extends AnyVal {
   def verify(message: Array[Byte], signature: BlsSignature.NonEmpty): Boolean =
     BlsUtils.verifyBasic(signature.arr, message, arr)
 
-  def base64: String            = byteStr.base64
-  override def toString: String = byteStr.base64Raw
+  def base58: String            = byteStr.toString
+  override def toString: String = byteStr.toString
 }
 
 object BlsPublicKey {

@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.db.WithDomain
@@ -19,13 +19,13 @@ import scala.util.{Failure, Success}
 class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
   private val origTx = CommitToGenerationTransaction(
     sender = PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-    endorserPublicKey = BlsPublicKey(Base64.decode("jb9333lHnhHpkBH168ZrDRYM7d8vzs+t4yXwfpYhPw1dR6mvWnzjMU9TLmqgOjPb")),
+    endorserPublicKey = BlsPublicKey(Base58.decode("6CagLT3FjEcaNHPYCaG2dcfEfzDj6ynVeZbxbLHkHdfzvbfBmBMkkatTYcBXD9cHMU")),
     generationPeriodStart = Height(3000),
     timestamp = 1526287561757L,
     fee = TxPositiveAmount.unsafeFrom(100000000),
     commitmentSignature = BlsSignature(
-      Base64.decode(
-        "hmkx3WW+Ns3qUkDCxP5911lWw+BghFuDZhvbLWK3oJ6JbguzkAFy8tXAGMtCbZTWABx1zB2GiZTVp420HGDSxP5A3RnvLYtoQRGtZYbjOBfeyR/EktJofDyUPQjcFsib"
+      Base58.decode(
+        "oJUBPLXnqejpwkkifzBbyQp63mPwypYq9GV7eAYqQGAvsE2LxU6csrrwLWgK1HdW28Ygku7vfkcMW1TCDCFymVXoqi7SpCwWGp3P6gegHusSPBsuVQQiQ5BWTYpUpSJjiBL"
       )
     ).explicitGet(),
     proofs = Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get),
@@ -43,8 +43,8 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
       "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
       "generationPeriodStart": 3000,
-      "endorserPublicKey": "base64:jb9333lHnhHpkBH168ZrDRYM7d8vzs+t4yXwfpYhPw1dR6mvWnzjMU9TLmqgOjPb",
-      "commitmentSignature": "base64:hmkx3WW+Ns3qUkDCxP5911lWw+BghFuDZhvbLWK3oJ6JbguzkAFy8tXAGMtCbZTWABx1zB2GiZTVp420HGDSxP5A3RnvLYtoQRGtZYbjOBfeyR/EktJofDyUPQjcFsib",
+      "endorserPublicKey": "6CagLT3FjEcaNHPYCaG2dcfEfzDj6ynVeZbxbLHkHdfzvbfBmBMkkatTYcBXD9cHMU",
+      "commitmentSignature": "oJUBPLXnqejpwkkifzBbyQp63mPwypYq9GV7eAYqQGAvsE2LxU6csrrwLWgK1HdW28Ygku7vfkcMW1TCDCFymVXoqi7SpCwWGp3P6gegHusSPBsuVQQiQ5BWTYpUpSJjiBL",
       "proofs": [
         "28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ"
       ],
