@@ -95,7 +95,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def lastStateHash(refId: Option[ByteStr]): ByteStr = TxStateSnapshotHashBuilder.InitStateHash
 
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = IndexedSeq.empty
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
 
   override def parentGeneratorBalances(): Seq[Long] = Seq.empty
 

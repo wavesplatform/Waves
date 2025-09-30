@@ -367,28 +367,32 @@ package object database {
 
   def writeGeneratorBalances(data: Seq[Long]): Array[Byte] = data.view.flatMap(Longs.toByteArray).toArray
 
-  def readCommittedGenerators(data: Array[Byte]): Seq[(AddressId, BlsPublicKey, TransactionId)] = {
-    val addressSize     = Longs.BYTES
-    val transactionSize = DigestLength
+  def readCommittedGenerators(data: Array[Byte]): Seq[(AddressId, BlsPublicKey)] = {
+    val addressSize = Longs.BYTES
     data
-      .grouped(addressSize + BlsPublicKey.SizeInBytes + transactionSize)
+      .grouped(addressSize + BlsPublicKey.SizeInBytes)
       .map { data =>
-        val addressIdBytes                          = data.take(addressSize)
-        val blsPublicKeyBytes                       = data.slice(addressSize, addressSize + BlsPublicKey.SizeInBytes)
-        val committedToGenerationTransactionIdBytes = data.takeRight(transactionSize)
+        val (addressIdBytes, blsPublicKeyBytes) = data.splitAt(addressSize)
         (
           Longs.fromByteArray(addressIdBytes),
-          BlsPublicKey(blsPublicKeyBytes),
-          TransactionId(ByteStr(committedToGenerationTransactionIdBytes))
+          BlsPublicKey(blsPublicKeyBytes)
         )
       }
       .toSeq
   }
 
-  def writeCommittedGenerators(data: Seq[(AddressId, BlsPublicKey, TransactionId)]): Array[Byte] =
-    data.view.flatMap { (addressId, blsPublicKey, committedToGenerationTransactionId) =>
-      Longs.toByteArray(addressId) ++ blsPublicKey.arr ++ committedToGenerationTransactionId.arr
-    }.toArray
+  def writeCommittedGenerators(data: Seq[(AddressId, BlsPublicKey)]): Array[Byte] =
+    data.view.flatMap { (addressId, blsPublicKey) => Longs.toByteArray(addressId) ++ blsPublicKey.arr }.toArray
+
+  def readCommitmentTransactions(data: Array[Byte]): Seq[TransactionId] = {
+    val transactionSize = DigestLength
+    data
+      .grouped(transactionSize)
+      .map { bytes => TransactionId(ByteStr(bytes)) }
+      .toSeq
+  }
+
+  def writeCommitmentTransactions(data: Seq[TransactionId]): Array[Byte] = data.view.flatMap(_.arr).toArray
 
   def getKeyBuffersFromKeys(keys: collection.IndexedSeq[Key[?]]): collection.IndexedSeq[ByteBuffer] =
     keys.map { k =>

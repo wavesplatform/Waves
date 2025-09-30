@@ -96,11 +96,9 @@ class StateHashBuilder {
     )
   }
 
-  // TODO: do we need to add all data here?
-  // TODO: index of commit to generation transaction
-  def addNextCommittedGenerator(address: Address, blsPublicKey: BlsPublicKey, txnId: TransactionId): Unit = {
-    addEntry(SectionId.NextCommittedGenerators, txnId.arr)(
-      address.bytes ++ blsPublicKey.arr
+  def addNextCommittedGenerator(address: Address, blsPublicKey: BlsPublicKey): Unit = {
+    addEntry(SectionId.NextCommittedGenerators, address.bytes)(
+      blsPublicKey.arr
     )
   }
 

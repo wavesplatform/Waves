@@ -331,8 +331,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
             .blockId(bi.finalizedHeight) // Finalized block is same
             .getOrElse(throw new IllegalStateException(s"Can't find a finalized block at ${bi.finalizedHeight}"))
 
-          val committedGenerators = if (isActivated) blockchainUpdater.committedGenerators(period).map { case (_, blsPk, _) => blsPk }
-          else IndexedSeq.empty
+          val committedGenerators =
+            if (isActivated) blockchainUpdater.committedGenerators(period).map { case (_, blsPk) => blsPk } else IndexedSeq.empty
 
           EndorsementFilter(finalizedId, bi.finalizedHeight, endorsedId, committedGenerators)
       },

@@ -68,5 +68,5 @@ class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) exten
     currentGeneratorBalances
   }
 
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = delegate.committedGenerators(at)
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = delegate.committedGenerators(at)
 }

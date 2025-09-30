@@ -24,21 +24,30 @@ object CommonGeneratorsApi {
       val (addressIds, addresses, blsPks, txIds, balances) = rdb.db.readOnly { ro =>
         // TODO: Use Blockchain for this? NG.committed?
         //  Technically this works, because generators committed on a previous period
-        val key       = Keys.committedGenerators(period, at)
-        val keyPrefix = key.keyBytes.dropRight(Ints.BYTES) // Drop height
+        val generatorsKey       = Keys.committedGenerators(period, at)
+        val generatorsKeyPrefix = generatorsKey.keyBytes.dropRight(Ints.BYTES) // Drop height
 
         val addressIds = new mutable.ArrayBuffer[AddressId](maxGenerators)
         val blsPks     = new mutable.ArrayBuffer[BlsPublicKey](maxGenerators)
         val txnIds     = new mutable.ArrayBuffer[TransactionId](maxGenerators)
-        ro.iterateOver(keyPrefix) { dbEntry =>
-          key
+        ro.iterateOver(generatorsKeyPrefix) { dbEntry =>
+          generatorsKey
             .parse(dbEntry.getValue)
             .getOrElse(Seq.empty)
-            .foreach { (addressId, blsPk, txnId) =>
+            .foreach { (addressId, blsPk) =>
               addressIds.append(addressId)
               blsPks.append(blsPk)
-              txnIds.append(txnId)
             }
+        }
+
+        val txnsKey       = Keys.commitmentTransactions(period, at)
+        val txnsKeyPrefix = txnsKey.keyBytes.dropRight(Ints.BYTES) // Drop height
+        ro.iterateOver(txnsKeyPrefix) { dbEntry =>
+          txnIds.appendAll(
+            txnsKey
+              .parse(dbEntry.getValue)
+              .getOrElse(Seq.empty)
+          )
         }
 
         val addresses = ro.multiGet(addressIds.map(Keys.idToAddress), Address.AddressLength)
@@ -50,15 +59,25 @@ object CommonGeneratorsApi {
         (addressIds, addresses, blsPks, txnIds, balances)
       }
 
-      addressIds
-        .lazyZip(addresses)
-        .lazyZip(balances)
-        .lazyZip(blsPks)
-        .lazyZip(txIds)
-        .collect { case ((_, Some(address), balance, _), txnId) => // TODO: address=None ?
-          GeneratorEntry(address, balance, txnId)
-        }
-        .toSeq
+      if (
+        addressIds.size == addresses.size &&
+        addresses.size == balances.size &&
+        balances.size == blsPks.size &&
+        blsPks.size == txIds.size
+      )
+        addressIds
+          .lazyZip(addresses)
+          .lazyZip(balances)
+          .lazyZip(blsPks)
+          .lazyZip(txIds)
+          .collect { case ((_, Some(address), balance, _), txnId) => // TODO: address=None ?
+            GeneratorEntry(address, balance, txnId)
+          }
+          .toSeq
+      else {
+        log.warn(s"Different size: addressIds=${addressIds.size}, addresses=${addresses.size}, balances=${balances.size}, blsPks=${blsPks.size}")
+        Seq.empty
+      }
     }
   }
 

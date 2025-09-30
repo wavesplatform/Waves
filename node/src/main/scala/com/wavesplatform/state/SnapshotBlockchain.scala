@@ -55,7 +55,7 @@ case class SnapshotBlockchain(
   }
 
   override def deposit(address: Address): Long = {
-    val isCommitted = snapshot.nextCommittedGenerators.exists { case (currentAddress, _, _) => currentAddress == address }
+    val isCommitted = snapshot.nextCommittedGenerators.exists { case (currentAddress, _) => currentAddress == address }
     val inSnapshot  = Numbers.when(isCommitted)(CommitToGenerationTransaction.DepositInWavelets)
 
     inner.deposit(address) + inSnapshot
@@ -242,7 +242,7 @@ case class SnapshotBlockchain(
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = {
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
     val base = inner.committedGenerators(at)
     if (at == this.currentGenerationPeriod.next) base ++ snapshot.nextCommittedGenerators
     else base
@@ -255,7 +255,7 @@ case class SnapshotBlockchain(
   override def currentGeneratorBalances(): Seq[Long] =
     maybeSnapshot.foldLeft(inner.currentGeneratorBalances()) { (inner, _) =>
       // TODO: Is there a better way? Do we really need this?
-      val recentGeneratorBalances = snapshot.nextCommittedGenerators.map { case (address, _, _) =>
+      val recentGeneratorBalances = snapshot.nextCommittedGenerators.map { case (address, _) =>
         balanceSnapshots(address, height, None).headOption
       }
 

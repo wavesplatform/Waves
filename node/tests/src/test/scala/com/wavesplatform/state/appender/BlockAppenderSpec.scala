@@ -131,10 +131,10 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         private val blsKeyPair          = BlsKeyPair(sender.privateKey)
         private val otherNodeBlsKeyPair = BlsKeyPair(otherNodeGenerator.privateKey)
 
-        override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] =
+        override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] =
           IndexedSeq(
-            (sender.toAddress, blsKeyPair.publicKey, TxHelpers.randomId),
-            (otherNodeGenerator.toAddress, otherNodeBlsKeyPair.publicKey, TxHelpers.randomId)
+            (sender.toAddress, blsKeyPair.publicKey),
+            (otherNodeGenerator.toAddress, otherNodeBlsKeyPair.publicKey)
           )
       }
 
@@ -150,7 +150,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
 
     "should append a block if no one committed" in {
       def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-        override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = IndexedSeq.empty
+        override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
       }
 
       withDomain(
@@ -187,8 +187,8 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
       def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
         private val blsKeyPair = BlsKeyPair(generator.privateKey)
 
-        override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] =
-          IndexedSeq((generator.toAddress, blsKeyPair.publicKey, TxHelpers.randomId))
+        override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] =
+          IndexedSeq((generator.toAddress, blsKeyPair.publicKey))
       }
 
       withDomain(
@@ -280,7 +280,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         val block3   = d.createBlock(Block.ProtoBlockVersion, Seq(transfer), generator = miner2, strictTime = true)
         d.appender.appendBlock(block3)
 
-        d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod).map { case (addr, _, _) => addr } shouldBe
+        d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod).map { case (addr, _) => addr } shouldBe
           Seq(miner1, miner2).map(_.toAddress)
         d.blockchain.parentGeneratorBalances() shouldBe empty // No committed generators in a parent block
 

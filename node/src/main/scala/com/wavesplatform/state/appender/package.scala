@@ -187,13 +187,9 @@ package object appender {
     } yield applyResult -> blockchainUpdater.height
   }
 
-  private def getGeneratorBalances(
-      blockchain: Blockchain,
-      newBlock: Block,
-      generators: Seq[(Address, BlsPublicKey, TransactionId)]
-  ): GeneratorBalances = {
+  private def getGeneratorBalances(blockchain: Blockchain, newBlock: Block, generators: Seq[(Address, BlsPublicKey)]): GeneratorBalances = {
     val parentBlockId = newBlock.header.reference
-    generators.map { case (addr, blsPk, _) =>
+    generators.map { case (addr, blsPk) =>
       val balance = GeneratingBalanceProvider.unchallengedBalance(blockchain, addr, Some(parentBlockId))
       (addr, blsPk, balance)
     }

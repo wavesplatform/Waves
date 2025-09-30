@@ -93,8 +93,8 @@ trait Blockchain {
   def deposit(address: Address): Long = {
     val currentPeriod = this.currentGenerationPeriod
 
-    val committedOnCurrent = committedGenerators(currentPeriod).exists { case (currentAddress, _, _) => currentAddress == address }
-    val committedOnNext    = committedGenerators(currentPeriod.next).exists { case (currentAddress, _, _) => currentAddress == address }
+    val committedOnCurrent = committedGenerators(currentPeriod).exists { case (currentAddress, _) => currentAddress == address }
+    val committedOnNext    = committedGenerators(currentPeriod.next).exists { case (currentAddress, _) => currentAddress == address }
 
     val committedTimes = Numbers.when(committedOnCurrent)(1) + Numbers.when(committedOnNext)(1)
     committedTimes * CommitToGenerationTransaction.DepositInWavelets
@@ -103,7 +103,7 @@ trait Blockchain {
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
   // TODO: cached
-  def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)]
+  def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)]
 
   /** @return
     *   In commitment order
@@ -191,8 +191,8 @@ object Blockchain {
       val allCommittedOnCurr = blockchain.committedGenerators(curr)
       val allCommittedOnNext = blockchain.committedGenerators(curr.next)
 
-      val committedOnCurr = allCommittedOnCurr.exists { case (generatorAddress, _, _) => generatorAddress == address }
-      val committedOnNext = allCommittedOnNext.exists { case (generatorAddress, _, _) => generatorAddress == address }
+      val committedOnCurr = allCommittedOnCurr.exists { case (generatorAddress, _) => generatorAddress == address }
+      val committedOnNext = allCommittedOnNext.exists { case (generatorAddress, _) => generatorAddress == address }
 
       val committedTimes = Numbers.when(committedOnCurr)(1) + Numbers.when(committedOnNext)(1)
       committedTimes * CommitToGenerationTransaction.DepositInWavelets

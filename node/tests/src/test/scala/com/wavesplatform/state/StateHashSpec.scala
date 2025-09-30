@@ -33,7 +33,6 @@ class StateHashSpec extends FreeSpec {
     val dataEntry    = StringDataEntry("test", "test")
     val wavesAccount = TxHelpers.defaultSigner
     val blsAccount   = BlsKeyPair(wavesAccount.privateKey)
-    val commitTxn    = TxHelpers.commitToGeneration(1000, wavesAccount, blsAccount.publicKey)
 
     stateHash.addLeaseBalance(address, 10000L, 10000L)
     stateHash.addAccountScript(address, Some(testScript))
@@ -47,7 +46,7 @@ class StateHashSpec extends FreeSpec {
     stateHash.addAssetBalance(address, assetId, 2000)
     stateHash.addAssetBalance(address1, assetId, 2000)
     stateHash.addWavesBalance(address, 1000)
-    stateHash.addNextCommittedGenerator(wavesAccount.toAddress, blsAccount.publicKey, TransactionId(commitTxn.id()))
+    stateHash.addNextCommittedGenerator(wavesAccount.toAddress, blsAccount.publicKey)
     val result = stateHash.result()
 
     def hash(bs: Array[Byte]*): ByteStr    = ByteStr(com.wavesplatform.crypto.fastHash(bs.reduce(_ ++ _)))
@@ -130,7 +129,6 @@ class StateHashSpec extends FreeSpec {
 
       "next generator" in {
         sect(NextCommittedGenerators) shouldBe hash(
-          commitTxn.id().arr,
           wavesAccount.publicKey.toAddress.bytes,
           blsAccount.publicKey.byteStr.arr
         )

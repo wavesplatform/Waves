@@ -372,7 +372,7 @@ class RocksDBWriter(
       }
     }
 
-  private def generatorBalances(generators: Seq[(Address, BlsPublicKey, TransactionId)], at: BlockId) = generators.map { case (addr, _, _) =>
+  private def generatorBalances(generators: Seq[(Address, BlsPublicKey)], at: BlockId) = generators.map { case (addr, _) =>
     GeneratingBalanceProvider.balance(this, addr, Some(at))
   }
 
@@ -756,11 +756,18 @@ class RocksDBWriter(
       rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances))
 
       if (nextCommittedGenerators.nonEmpty) {
-        val nextPeriod                       = this.generationPeriodOf(h).next
-        val nextPeriodGeneratorsUpdatedCount = rw.get(Keys.committedGeneratorsCount(nextPeriod)) + nextCommittedGenerators.size
+        val nextPeriod = this.generationPeriodOf(h).next
 
-        rw.put(Keys.committedGenerators(nextPeriod, h), Some(nextCommittedGenerators))
-        rw.put(Keys.committedGeneratorsCount(nextPeriod), nextPeriodGeneratorsUpdatedCount.toShort) // TODO: do we need this?
+        val (committedGenerators, commitmentTxnIds) = nextCommittedGenerators.unzip(using
+          { case (addressId, blsPk, txnId) =>
+            ((addressId, blsPk), txnId)
+          }
+        )
+
+        rw.put(Keys.committedGenerators(nextPeriod, h), Some(committedGenerators))
+
+        // TODO: Option to not store
+        rw.put(Keys.commitmentTransactions(nextPeriod, h), Some(commitmentTxnIds))
       }
 
       rw.put(Keys.issuedAssets(height), snapshot.assetStatics.keySet.toSeq)
@@ -1110,8 +1117,7 @@ class RocksDBWriter(
 
           rollbackAssetsInfo(rw, currentHeight)
 
-          val blockTxs              = loadTransactions(currentHeight, rdb)
-          var commitToGenerationTxs = 0
+          val blockTxs = loadTransactions(currentHeight, rdb)
           blockTxs.view.zipWithIndex.foreach { case ((_, tx), idx) =>
             val num = TxNum(idx.toShort)
             (tx: @unchecked) match {
@@ -1152,7 +1158,6 @@ class RocksDBWriter(
               case _: EthereumTransaction =>
                 rw.delete(Keys.ethereumTransactionMeta(currentHeight, num, rdb.apiHandle))
               case _: CommitToGenerationTransaction =>
-                commitToGenerationTxs += 1
             }
 
             if (tx.tpe != TransactionType.Genesis) {
@@ -1164,14 +1169,7 @@ class RocksDBWriter(
 
           rw.delete(Keys.generatorBalances(currentHeight, rdb.apiHandle))
           rw.delete(Keys.committedGenerators(nextPeriod, currentHeight))
-          val committedGeneratorsCountKey     = Keys.committedGeneratorsCount(nextPeriod)
-          val updatedCommittedGeneratorsCount = rw.get(committedGeneratorsCountKey) - commitToGenerationTxs
-          if (updatedCommittedGeneratorsCount < 0)
-            throw new IllegalArgumentException(
-              s"Unexpected committed generators: $updatedCommittedGeneratorsCount, commitments in block: $commitToGenerationTxs"
-            )
-          else if (updatedCommittedGeneratorsCount == 0) rw.delete(committedGeneratorsCountKey)
-          else rw.put(committedGeneratorsCountKey, updatedCommittedGeneratorsCount.toShort)
+          rw.delete(Keys.commitmentTransactions(nextPeriod, currentHeight))
 
           discardedMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress())) match {
             case Some(addr) =>
@@ -1500,7 +1498,7 @@ class RocksDBWriter(
         if (continue) {
           val found = key
             .parse(iter.value())
-            .exists { entries => entries.exists { case (currentAddressId, _, _) => currentAddressId == addressId } }
+            .exists { entries => entries.exists { case (currentAddressId, _) => currentAddressId == addressId } }
 
           if (found) {
             val committedPeriod = this.generationPeriodOf(committedPeriodStart)
@@ -1592,17 +1590,17 @@ class RocksDBWriter(
     readOnly(_.get(Keys.maliciousMinerBanHeights(address.bytes)))
 
   // TODO: use rawCommittedGenerators?
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = {
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
     val maxGenerators = settings.functionalitySettings.maxGenerators
-    val rawGenerators = new mutable.ArrayBuffer[(BlsPublicKey, TransactionId)](maxGenerators)
+    val rawGenerators = new mutable.ArrayBuffer[BlsPublicKey](maxGenerators)
     val addressIds    = new mutable.ArrayBuffer[AddressId](maxGenerators)
 
     val key = Keys.committedGenerators(at, at.start)
     val addresses = rdb.db.readOnly { ro =>
       ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
         val xs = key.parse(dbEntry.getValue).getOrElse(Seq.empty)
-        xs.foreach { (addressId, blsPK, txnId) =>
-          rawGenerators.append((blsPK, txnId))
+        xs.foreach { (addressId, blsPK) =>
+          rawGenerators.append(blsPK)
           addressIds.append(addressId)
         }
       }
@@ -1614,8 +1612,8 @@ class RocksDBWriter(
       .lazyZip(rawGenerators)
       .lazyZip(addressIds)
       .collect {
-        case (Some(address), (pk, txnId), _) => (address, pk, txnId)
-        case (None, _, aid)                  => throw new IllegalStateException(s"Can't find address for address id $aid")
+        case (Some(address), pk, _) => (address, pk)
+        case (None, _, aid)         => throw new IllegalStateException(s"Can't find address for address id $aid")
       }
       .toIndexedSeq
   }

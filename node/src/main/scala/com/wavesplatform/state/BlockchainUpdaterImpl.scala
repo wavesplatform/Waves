@@ -471,7 +471,7 @@ class BlockchainUpdaterImpl(
 
       val committedGenerators = votingBlockchain
         .committedGenerators(votingBlockchain.generationPeriodOf(finalizationHeight))
-        .map { case (address, _, _) => address }
+        .map { case (address, _) => address }
 
       val endorserIndexes   = votingBlock.header.finalizationVoting.fold(Set.empty)(_.endorserIndexes.toSet)
       val generatorBalances = votingBlockchain.parentGeneratorBalances() // Generator balances at voted block
@@ -891,7 +891,7 @@ class BlockchainUpdaterImpl(
       .getOrElse(rocksdb.lastStateHash(None))
   }
 
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = readLock {
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = readLock {
     snapshotBlockchain.committedGenerators(at)
   }
 

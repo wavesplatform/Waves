@@ -22,7 +22,7 @@ object CommitToGenerationTransactionDiff {
       _ <- Either.raiseUnless(tx.generationPeriodStart == next.start) {
         GenericError(s"Expected the next period start height (${next.start}), got ${tx.generationPeriodStart}")
       }
-      committed = blockchain.committedGenerators(next).map { case (address, _, _) => address }.toSet
+      committed = blockchain.committedGenerators(next).map { case (address, _) => address }.toSet
       _ <- Either.raiseWhen(committed.size == blockchain.settings.functionalitySettings.maxGenerators) {
         GenericError(s"No free generator slots, committed ${committed.size} generators. Try next time")
       }
@@ -35,7 +35,7 @@ object CommitToGenerationTransactionDiff {
             // generationDeposit = ??? // We don't need this, because calculate from nextCommittedGenerators
           )
         ),
-        nextCommittedGenerators = IndexedSeq((sender, tx.endorserPublicKey, TransactionId(tx.id())))
+        nextCommittedGenerators = IndexedSeq(sender -> tx.endorserPublicKey)
       )
     } yield snapshot
   }

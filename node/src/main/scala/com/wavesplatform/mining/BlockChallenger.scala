@@ -153,7 +153,7 @@ class BlockChallengerImpl(
         finalizedId <- blockchainUpdater.blockId(finalizedHeight).toSeq
         committed = blockchainUpdater.committedGenerators(blockchainUpdater.generationPeriodOf(endorsedHeight))
         (account, idx) <- for {
-          ((committedAddr, _, _), idx) <- committed.zipWithIndex
+          ((committedAddr, _), idx) <- committed.zipWithIndex
           if committedAddr != blockMiner // A miner doesn’t need to endorse its own blocks - mining is already an endorsement
           pk <- wallet.privateKeyAccount(committedAddr).toSeq
         } yield (pk, idx)

@@ -1,6 +1,6 @@
 package com.wavesplatform.database
 
-import com.google.common.primitives.{Ints, Longs, Shorts}
+import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -250,17 +250,18 @@ object Keys {
   def maliciousMinerBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
     historyKey(MaliciousMinerBanHeights, addressBytes)
 
-  def generatorBalances(at: Height, cfh: RDB.ApiHandle): Key[Option[Seq[Long]]] =
-    Key.opt(GeneratorBalances, h(at), readGeneratorBalances, writeGeneratorBalances, Some(cfh.handle))
-
-  def committedGeneratorsCount(period: GenerationPeriod): Key[Short] =
-    Key(CommittedGeneratorsCount, h(period.start), Option(_).fold(0: Short)(Shorts.fromByteArray), Shorts.toByteArray)
+  val finalizedHeight: Key[Option[Height]] = Key.opt(
+    FinalizedBlockHeight,
+    Array.emptyByteArray,
+    bytes => com.wavesplatform.state.Height(Ints.fromByteArray(bytes)),
+    Ints.toByteArray
+  )
 
   /** Key: Int(committedPeriod.start) ++ Int(commitmentHeight)
     * @note
     *   committedPeriod.start >= commitmentHeight, because a generator can commit only for a next period
     */
-  def committedGenerators(committedPeriod: GenerationPeriod, commitmentHeight: Height): Key[Option[Seq[(AddressId, BlsPublicKey, TransactionId)]]] =
+  def committedGenerators(committedPeriod: GenerationPeriod, commitmentHeight: Height): Key[Option[Seq[(AddressId, BlsPublicKey)]]] =
     Key.opt(
       CommittedGenerators,
       h(committedPeriod.start) ++ h(commitmentHeight),
@@ -268,10 +269,14 @@ object Keys {
       writeCommittedGenerators
     )
 
-  val finalizedHeight: Key[Option[Height]] = Key.opt(
-    FinalizedBlockHeight,
-    Array.emptyByteArray,
-    bytes => com.wavesplatform.state.Height(Ints.fromByteArray(bytes)),
-    Ints.toByteArray
-  )
+  def commitmentTransactions(committedPeriod: GenerationPeriod, commitmentHeight: Height): Key[Option[Seq[TransactionId]]] =
+    Key.opt(
+      CommitmentTransactions,
+      h(committedPeriod.start) ++ h(commitmentHeight),
+      readCommitmentTransactions,
+      writeCommitmentTransactions
+    )
+
+  def generatorBalances(at: Height, cfh: RDB.ApiHandle): Key[Option[Seq[Long]]] =
+    Key.opt(GeneratorBalances, h(at), readGeneratorBalances, writeGeneratorBalances, Some(cfh.handle))
 }

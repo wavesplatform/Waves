@@ -27,7 +27,6 @@ import com.wavesplatform.state.{
   Height,
   LeaseBalance,
   StateSnapshot,
-  TransactionId,
   TxMeta
 }
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -207,7 +206,7 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = Seq.empty
 
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey, TransactionId)] = IndexedSeq.empty
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
 
   override def parentGeneratorBalances(): Seq[Long] = Seq.empty
 
