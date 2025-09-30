@@ -89,14 +89,14 @@ jobs:
     environment: prod
     name: Publish JARs to Sonatype
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'release' }}
+    if: github.event_name == 'release'
     steps:
       - uses: actions/checkout@v4
       - id: sbt-version
         run: |
           sbt_version=$(cut -d\" -f2 version.sbt)
           echo "sbt_version=$sbt_version" >> "$GITHUB_OUTPUT"
-      - if: ${{ format('v{0}', steps.sbt-version.outputs.sbt_version) != github.ref_name }}
+      - if: format('v{0}', steps.sbt-version.outputs.sbt_version) != github.ref_name
         env:
           SBT_VERSION: ${{ steps.sbt-version.outputs.sbt_version }}
           RELEASE_VERSION: ${{ github.ref_name }}

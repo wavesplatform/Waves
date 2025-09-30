@@ -31,13 +31,13 @@ jobs:
           QASE_PROJECT_CODE: PR
           QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
           CHECKPR_RUN_ID: ${{ github.run_id }}
-      - uses: dorny/test-reporter@v2
+      - uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3
         if: always()
         with:
           reporter: java-junit
           name: JUnit Report
           path: '**/target/test-reports/*.xml'
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         id: filter
         with:
           filters: |
@@ -65,7 +65,7 @@ jobs:
     name: Compile ${{ matrix.repo }}
     runs-on: ubuntu-latest
     needs: check-pr
-    if: ${{ needs.check-pr.outputs.lang-changed == 'true' }}
+    if: needs.check-pr.outputs.lang-changed == 'true'
     strategy:
       matrix:
         repo:
@@ -102,7 +102,7 @@ jobs:
         run: sbt --batch ";node-it/docker;node-it/test"
         env:
           RUN_ID: ${{ github.ref_name }}-${{ github.run_number }}-${{ github.run_attempt }}
-      - uses: dorny/test-reporter@v2
+      - uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3
         if: always()
         with:
           reporter: java-junit
@@ -121,7 +121,7 @@ jobs:
     name: Publish snapshot packages
     needs: check-pr
     runs-on: ubuntu-latest
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-snapshots') }}
+    if: contains(github.event.pull_request.labels.*.name, 'publish-snapshots')
     env:
       PR_NUMBER: ${{ github.event.number }}
     steps:

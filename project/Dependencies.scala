@@ -33,7 +33,7 @@ object Dependencies {
   lazy val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.5.2" classifier "protobuf-src" intransitive ()
 
-  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.2.0"
+  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.2.1"
 
   private def pekkoHttpModule(module: String, version: String = "1.2.0") = "org.apache.pekko" %% module % version
 
@@ -48,7 +48,7 @@ object Dependencies {
   private def grpcModule(module: String) = "io.grpc" % module % "1.75.0"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
-  val googleGuava     = "com.google.guava"    % "guava"             % "33.4.8-jre"
+  val googleGuava     = "com.google.guava"    % "guava"             % "33.5.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.18"
@@ -67,7 +67,7 @@ object Dependencies {
   val sttp3      = sttp3Module("core")
   val sttp3Monix = sttp3Module("monix")
 
-  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.81"
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.82"
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 

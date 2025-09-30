@@ -42,10 +42,10 @@ cat > /home/runner/.aptly/public/index.html <<EOF
 <p>Latest release: $latest_release</p>
 <h3>Adding This Repository</h3>
 <pre>
-echo "deb [signed-by=/etc/apt/keyrings/wavesplatform.asc] https://wavesplatform.github.io/Waves stable main" | sudo tee /etc/apt/sources.list.d/wavesplatform.list
+echo "deb [signed-by=/etc/apt/keyrings/wavesplatform.asc] https://apt.wavesplatform.com stable main" | sudo tee /etc/apt/sources.list.d/wavesplatform.list
 # For releases older than Debian 12 and Ubuntu 22.04, create the directory first:
 sudo mkdir -p /etc/apt/keyrings; sudo chmod 755 /etc/apt/keyrings
-sudo wget -O /etc/apt/keyrings/wavesplatform.asc https://wavesplatform.github.io/Waves/pubkey.txt
+sudo wget -O /etc/apt/keyrings/wavesplatform.asc https://apt.wavesplatform.com/pubkey.txt
 sudo apt-get update
 </pre>
 <h3>Installing Waves Node</h3>
