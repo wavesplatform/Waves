@@ -1,6 +1,5 @@
 package com.wavesplatform.http
 
-import org.apache.pekko.http.scaladsl.model.headers.Accept
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.api.http.CustomJson
@@ -23,6 +22,7 @@ import com.wavesplatform.transaction.{Asset, AssetIdLength, TxHelpers}
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import monix.execution.schedulers.SchedulerService
+import org.apache.pekko.http.scaladsl.model.headers.Accept
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Inside
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
@@ -37,12 +37,8 @@ class UtilsRouteEvaluateSpec
     with PathMockFactory
     with Inside
     with WithDomain {
-  private val timeBounded: SchedulerService = Schedulers.timeBoundedFixedPool(
-    new HashedWheelTimer(),
-    5.seconds,
-    1,
-    "rest-time-limited"
-  )
+  private val timer                         = new HashedWheelTimer()
+  private val timeBounded: SchedulerService = Schedulers.timeBoundedFixedPool(timer, 5.seconds, 1, "rest-time-limited")
   private val utilsApi: UtilsApiRoute = UtilsApiRoute(
     new Time {
       def correctedTime(): Long = System.currentTimeMillis()
@@ -57,6 +53,7 @@ class UtilsRouteEvaluateSpec
 
   override def afterAll(): Unit = {
     timeBounded.shutdown()
+    timer.stop()
     super.afterAll()
   }
 
