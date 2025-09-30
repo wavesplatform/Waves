@@ -229,6 +229,7 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
   }
 
   property(s"string functions return correct results for unicode input after ${BlockchainFeatures.SynchronousCalls} activation") {
+    java.util.logging.Logger.getLogger("com.google.protobuf.CodedOutputStream").setLevel(java.util.logging.Level.OFF) // Disable garbage logs
     withDomain(RideV4)(assertNoFix)
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V5)
