@@ -16,7 +16,7 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils.TestRocksDB
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test.{FreeSpec, HasSecurityManager}
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.BaseTargetReachedMaximum
 import com.wavesplatform.utx.UtxPoolImpl
@@ -29,18 +29,14 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 import org.scalacheck.{Arbitrary, Gen}
 
-import java.security.Permission
-import java.util.concurrent.{Semaphore, TimeUnit}
+import java.util.concurrent.TimeUnit
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 
-class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with DBCacheSettings {
-
+class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with DBCacheSettings with HasSecurityManager {
   "base target limit" - {
     "node should stop if base target greater than maximum in block creation " in {
       withEnv { case Env(settings, pos, bcu, utxPoolStub, scheduler, account, lastBlock) =>
-        var stopReasonCode = 0
-
         val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
         val wallet      = Wallet(WalletSettings(None, Some("123"), None))
         val miner =
@@ -58,69 +54,29 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
             Observable.empty
           )
 
-        val signal = new Semaphore(1)
-        signal.acquire()
-
-        System.setSecurityManager(new SecurityManager {
-          override def checkPermission(perm: Permission): Unit = {}
-
-          override def checkPermission(perm: Permission, context: Object): Unit = {}
-
-          override def checkExit(status: Int): Unit = signal.synchronized {
-            super.checkExit(status)
-            stopReasonCode = status
-            if (status == BaseTargetReachedMaximum.code)
-              signal.release()
-            throw new SecurityException("System exit is not allowed")
+        withSecurityManager(BaseTargetReachedMaximum) { signal =>
+          try {
+            miner.forgeBlock(account)
+          } catch {
+            case _: SecurityException => // NOP
           }
-        })
 
-        try {
-          miner.forgeBlock(account)
-        } catch {
-          case _: SecurityException => // NOP
+          signal.tryAcquire(10, TimeUnit.SECONDS)
         }
-
-        signal.tryAcquire(10, TimeUnit.SECONDS)
-
-        stopReasonCode shouldBe BaseTargetReachedMaximum.code
-
-        System.setSecurityManager(null)
       }
     }
 
     "node should stop if base target greater than maximum in block append" in {
       withEnv { case Env(settings, pos, bcu, utxPoolStub, scheduler, _, lastBlock) =>
-        var stopReasonCode = 0
-
-        val signal = new Semaphore(1)
-        signal.acquire()
-
-        System.setSecurityManager(new SecurityManager {
-          override def checkPermission(perm: Permission): Unit = {}
-
-          override def checkPermission(perm: Permission, context: Object): Unit = {}
-
-          override def checkExit(status: Int): Unit = signal.synchronized {
-            super.checkExit(status)
-            stopReasonCode = status
-            if (status == BaseTargetReachedMaximum.code)
-              signal.release()
-            throw new SecurityException("System exit is not allowed")
+        withSecurityManager(BaseTargetReachedMaximum) { signal =>
+          val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock, None).onErrorRecoverWith[Any] {
+            case _: SecurityException =>
+              Task.unit
           }
-        })
+          Await.result(blockAppendTask.runToFuture(using scheduler), 1.minute)
 
-        val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock, None).onErrorRecoverWith[Any] {
-          case _: SecurityException =>
-            Task.unit
+          signal.tryAcquire(10, TimeUnit.SECONDS)
         }
-        Await.result(blockAppendTask.runToFuture(using scheduler), 1.minute)
-
-        signal.tryAcquire(10, TimeUnit.SECONDS)
-
-        stopReasonCode shouldBe BaseTargetReachedMaximum.code
-
-        System.setSecurityManager(null)
       }
     }
   }

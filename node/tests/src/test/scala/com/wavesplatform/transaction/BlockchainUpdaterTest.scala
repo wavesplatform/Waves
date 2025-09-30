@@ -8,14 +8,14 @@ import com.wavesplatform.history
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.RideV6
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test.{FreeSpec, HasSecurityManager}
+import com.wavesplatform.utils.UnsupportedFeature
 import org.scalactic.source.Position
 
-import java.security.Permission
-import java.util.concurrent.{Semaphore, TimeUnit}
+import java.util.concurrent.TimeUnit
 import scala.util.Try
 
-class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
+class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain with HasSecurityManager {
 
   private val ApprovalPeriod      = 100
   private val BlocksForActivation = (ApprovalPeriod * 0.9).toInt
@@ -416,35 +416,19 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
   "block processing should fail if unimplemented feature was activated on blockchain when autoShutdownOnUnsupportedFeature = yes and exit with code 38" in withDomain(
     WavesSettings
   ) { domain =>
-    val b      = domain.blockchainUpdater
-    val signal = new Semaphore(1)
-    signal.acquire()
+    val b = domain.blockchainUpdater
+    withSecurityManager(UnsupportedFeature) { signal =>
+      b.processBlock(genesisBlock)
 
-    System.setSecurityManager(new SecurityManager {
-      override def checkPermission(perm: Permission): Unit = {}
-
-      override def checkPermission(perm: Permission, context: Object): Unit = {}
-
-      override def checkExit(status: Int): Unit = signal.synchronized {
-        super.checkExit(status)
-        if (status == 38)
-          signal.release()
-        throw new SecurityException("System exit is not allowed")
+      (1 to ApprovalPeriod * 2 - 2).foreach { _ =>
+        b.processBlock(getNextTestBlockWithVotes(b, Seq(-1))) should beRight
       }
-    })
 
-    b.processBlock(genesisBlock)
+      Try(b.processBlock(getNextTestBlockWithVotes(b, Seq(-1)))).recover[Any] { case _: SecurityException => // NOP
+      }
 
-    (1 to ApprovalPeriod * 2 - 2).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(-1))) should beRight
+      signal.tryAcquire(10, TimeUnit.SECONDS)
     }
-
-    Try(b.processBlock(getNextTestBlockWithVotes(b, Seq(-1)))).recover[Any] { case _: SecurityException => // NOP
-    }
-
-    signal.tryAcquire(10, TimeUnit.SECONDS)
-
-    System.setSecurityManager(null)
   }
 
   "sunny day test when known feature activated" in withDomain(WavesSettings) { domain =>
