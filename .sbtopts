@@ -1,1 +1,1 @@
--J--add-exports=java.base/sun.nio.ch=ALL-UNNAMED -mem 4096
+-mem 4096 -J--add-exports=java.base/sun.nio.ch=ALL-UNNAMED -J--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED
