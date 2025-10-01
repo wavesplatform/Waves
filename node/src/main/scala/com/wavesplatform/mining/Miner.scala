@@ -102,9 +102,13 @@ class MinerImpl(
         wallet.privateKeyAccounts
       }
 
-      val hasAllowedForMiningScriptsAccounts =
-        accounts.filter(kp => hasAllowedForMiningScript(kp.toAddress, tempBlockchain.getOrElse(blockchainUpdater)))
-      scheduledAttempts := CompositeCancelable.fromSet(hasAllowedForMiningScriptsAccounts.map { account =>
+      val blockchain = tempBlockchain.getOrElse(blockchainUpdater)
+      val allowedAccounts = accounts.filter { kp =>
+        val address = kp.toAddress
+        hasAllowedForMiningScript(address, blockchain) && blockchain.isCommitted(blockchain.height + 1, address) // A new block will have + 1 height
+      }
+
+      scheduledAttempts := CompositeCancelable.fromSet(allowedAccounts.map { account =>
         generateBlockTask(account, tempBlockchain)
           .onErrorHandle(err => log.warn(s"Error mining Block", err))
           .runAsyncLogErr(using appenderScheduler)
@@ -239,19 +243,18 @@ class MinerImpl(
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
   def nextBlockGenerationTime(blockchain: Blockchain, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
-    val address = account.toAddress
-    val balance = blockchain.generatingBalance(address, Some(block.id()))
-    for {
-      _ <- blockchain.checkMiningAllowed(height, address, balance)
+    val balance = blockchain.generatingBalance(account.toAddress, Some(block.id()))
 
-      blockDelayE = pos.copy(blockchain = blockchain).getValidBlockDelay(height, account, block.header.baseTarget, balance)
-      delay <- blockDelayE.leftMap(_.toString)
-
-      expectedTS = delay + block.header.timestamp
-      _ <- Either.raiseUnless(0 < expectedTS && expectedTS < Long.MaxValue) {
-        s"Invalid next block generation time: $expectedTS"
-      }
-    } yield expectedTS
+    if (blockchain.isMiningAllowed(height, balance)) {
+      val blockDelayE = pos.copy(blockchain = blockchain).getValidBlockDelay(height, account, block.header.baseTarget, balance)
+      for {
+        delay <- blockDelayE.leftMap(_.toString)
+        expectedTS = delay + block.header.timestamp
+        _ <- Either.raiseUnless(0 < expectedTS && expectedTS < Long.MaxValue) {
+          s"Invalid next block generation time: $expectedTS"
+        }
+      } yield expectedTS
+    } else Left(s"Balance $balance of ${account.toAddress} is lower than required for generation")
   }
 
   private def nextBlockGenOffsetWithConditions(account: KeyPair, blockchain: Blockchain): Either[String, FiniteDuration] = {

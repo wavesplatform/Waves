@@ -104,6 +104,7 @@ case class FunctionalitySettings(
     s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod"
   )
   require(minAssetInfoUpdateInterval >= 0, "minAssetInfoUpdateInterval must be greater than or equal to 0")
+  require(generationPeriod > 0, "generationPeriod must be greater than 0")
 
   def activationWindowSize(height: Int): Int =
     featureCheckBlocksPeriod * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
