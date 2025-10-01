@@ -239,20 +239,19 @@ class MinerImpl(
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
   def nextBlockGenerationTime(blockchain: Blockchain, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
-    val balance = blockchain.generatingBalance(account.toAddress, Some(block.id()))
+    val address = account.toAddress
+    val balance = blockchain.generatingBalance(address, Some(block.id()))
+    for {
+      _ <- blockchain.checkMiningAllowed(height, address, balance)
 
-    if (blockchain.isMiningAllowed(height, balance)) {
-      val blockDelayE = pos.copy(blockchain = blockchain).getValidBlockDelay(height, account, block.header.baseTarget, balance)
-      for {
-        delay <- blockDelayE.leftMap(_.toString)
-        expectedTS = delay + block.header.timestamp
-        result <- Either.cond(
-          0 < expectedTS && expectedTS < Long.MaxValue,
-          expectedTS,
-          s"Invalid next block generation time: $expectedTS"
-        )
-      } yield result
-    } else Left(s"Balance $balance of ${account.toAddress} is lower than required for generation")
+      blockDelayE = pos.copy(blockchain = blockchain).getValidBlockDelay(height, account, block.header.baseTarget, balance)
+      delay <- blockDelayE.leftMap(_.toString)
+
+      expectedTS = delay + block.header.timestamp
+      _ <- Either.raiseUnless(0 < expectedTS && expectedTS < Long.MaxValue) {
+        s"Invalid next block generation time: $expectedTS"
+      }
+    } yield expectedTS
   }
 
   private def nextBlockGenOffsetWithConditions(account: KeyPair, blockchain: Blockchain): Either[String, FiniteDuration] = {
@@ -264,7 +263,6 @@ class MinerImpl(
       ts <- nextBlockGenerationTime(blockchain, height, lastBlock, account)
       calculatedOffset = ts - timeService.correctedTime()
       offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
-
     } yield offset
   }
 

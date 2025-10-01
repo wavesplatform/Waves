@@ -129,7 +129,7 @@ class BlockChallengerImpl(
       .map { pk =>
         pk -> blockchainUpdater.generatingBalance(pk.toAddress)
       }
-      .filter { case (_, balance) => blockchainUpdater.isMiningAllowed(blockchainUpdater.height, balance) }
+      .filter { case (pk, balance) => blockchainUpdater.checkMiningAllowed(blockchainUpdater.height, pk.toAddress, balance).isRight }
       .traverse { case (acc, initGenBalance) =>
         pos
           .getValidBlockDelay(

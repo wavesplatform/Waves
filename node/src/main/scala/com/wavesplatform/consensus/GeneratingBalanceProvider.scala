@@ -1,10 +1,11 @@
 package com.wavesplatform.consensus
 
+import cats.syntax.either.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 
 object GeneratingBalanceProvider {
   val MinimalEffectiveBalanceForGenerator1: Long = 1000000000000L
@@ -13,9 +14,17 @@ object GeneratingBalanceProvider {
   private val FirstDepth  = 50
   private val SecondDepth = 1000
 
-  def isMiningAllowed(blockchain: Blockchain, height: Int, effectiveBalance: Long): Boolean = {
-    val activated = blockchain.activatedFeatures.get(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(height >= _)
-    (!activated && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) || (activated && effectiveBalance >= MinimalEffectiveBalanceForGenerator2)
+  def checkMiningAllowed(blockchain: Blockchain, height: Int, miner: Address, effectiveBalance: Long): Either[String, Unit] = {
+    val smallerBalance = blockchain.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height)
+    for {
+      _ <- Either.raiseUnless(
+        !smallerBalance && effectiveBalance >= MinimalEffectiveBalanceForGenerator1 || smallerBalance && effectiveBalance >= MinimalEffectiveBalanceForGenerator2
+      ) {
+        s"Balance $effectiveBalance of $miner is lower than required for generation"
+      }
+      period = blockchain.generationPeriodOf(Height(height))
+      _ <- Either.raiseUnless(blockchain.isCommitted(miner, height))(s"$miner is not committed on the generation period started at ${period.start}")
+    } yield ()
   }
 
   // noinspection ScalaStyle

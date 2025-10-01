@@ -198,8 +198,8 @@ object Blockchain {
       committedTimes * CommitToGenerationTransaction.DepositInWavelets
     }
 
-    def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
-      GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
+    def checkMiningAllowed(height: Int, miner: Address, effectiveBalance: Long): Either[String, Unit] =
+      GeneratingBalanceProvider.checkMiningAllowed(blockchain, height, miner, effectiveBalance)
 
     def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
@@ -239,6 +239,13 @@ object Blockchain {
       if (blockchain.activatedFeatures.get(feature).exists(_ <= height)) BlockchainFeatureStatus.Activated
       else if (blockchain.approvedFeatures.get(feature).exists(_ <= height)) BlockchainFeatureStatus.Approved
       else BlockchainFeatureStatus.Undefined
+
+    def isCommitted(miner: Address, height: Int = blockchain.height): Boolean = {
+      lazy val committed = blockchain.committedGenerators(blockchain.generationPeriodOf(Height(height)))
+      !blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality, height)
+      || committed.isEmpty
+      || committed.exists { case (address, _) => address == miner }
+    }
 
     def currentBlockVersion: Byte = blockVersionAt(blockchain.height)
     def nextBlockVersion: Byte    = blockVersionAt(blockchain.height + 1)
