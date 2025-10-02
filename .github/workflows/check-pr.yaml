@@ -23,7 +23,7 @@ jobs:
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
       - uses: sbt/setup-sbt@v1
       - name: Check PR
-        run: sbt -J-Xlog:gc*=debug:file=./gc.log --batch ";scalafmtCheck;checkPR;completeQaseRun"
+        run: sbt -J-Xlog:gc*=debug:file=./gc.log --batch "scalafmtCheck;checkPR;completeQaseRun"
         env:
           QASE_ENABLE: true
           QASE_RUN_NAME: checkPR
@@ -99,7 +99,7 @@ jobs:
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
       - name: Run Integration Tests
-        run: sbt --batch ";node-it/docker;node-it/test"
+        run: sbt --batch "node-it/docker;node-it/test"
         env:
           RUN_ID: ${{ github.ref_name }}-${{ github.run_number }}-${{ github.run_attempt }}
       - uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3
@@ -134,7 +134,7 @@ jobs:
           gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
       - uses: sbt/setup-sbt@v1
-      - run: sbt -Dproject.version=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-$PR_NUMBER-SNAPSHOT --batch ';publish'
+      - run: sbt -Dproject.version=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-$PR_NUMBER-SNAPSHOT --batch publish
         env:
           SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
