@@ -138,7 +138,7 @@ object Blockchain {
     def lastBlockHeader: Option[SignedBlockHeader] = blockchain.blockHeader(blockchain.height)
     def lastBlockId: Option[BlockId]               = lastBlockHeader.map(_.id())
     def lastBlockTimestamp: Option[Long]           = lastBlockHeader.map(_.header.timestamp)
-    def lastBlockIds(howMany: Int): Seq[BlockId]   = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
+    def lastBlockIds(): Seq[BlockId]               = (blockchain.height to blockchain.finalizedHeight by -1).flatMap(blockId)
 
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       (aoa: @unchecked) match {
