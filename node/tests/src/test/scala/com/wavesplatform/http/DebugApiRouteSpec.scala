@@ -5,10 +5,9 @@ import com.wavesplatform.*
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.api.http.DebugApiRoute.AccountMiningInfo
-import com.wavesplatform.api.http.{DebugApiRoute, RollbackParams, RouteTimeout}
+import com.wavesplatform.api.http.{DebugApiRoute, RouteTimeout}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{V4, V5, V6}
@@ -16,12 +15,12 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
-import com.wavesplatform.mining.{Miner, MinerDebugInfo, MiningConstraint}
+import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.StateHash.SectionId
-import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
-import com.wavesplatform.state.{Blockchain, Height, StateHash}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.{Blockchain, StateHash}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.OrderType
@@ -52,22 +51,27 @@ class DebugApiRouteSpec
     dbSettings = DomainPresets.ContinuationTransaction.dbSettings.copy(storeStateHashes = true),
     restAPISettings = restAPISettings
   )
+
   private val configObject: ConfigObject = settings.config.root()
 
-  private val richAccount                            = TxHelpers.signer(905)
+  private val richAccount = TxHelpers.signer(905)
+
   override def genesisBalances: Seq[AddrWithBalance] = Seq(AddrWithBalance(richAccount.toAddress, 50_000.waves))
 
   val miner: Miner & MinerDebugInfo = new Miner with MinerDebugInfo {
-    override def scheduleMining(blockchain: Option[Blockchain]): Unit                           = ()
+    override def scheduleMining(blockchain: Option[Blockchain]): Unit = ()
+
     override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Right(FiniteDuration(0, TimeUnit.SECONDS))
-    override def state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
+
+    override def state: MinerDebugInfo.State = MinerDebugInfo.Disabled
   }
 
   val block: Block = TestBlock.create(Nil).block
   val testStateHash: StateHash = {
     import com.wavesplatform.utils.byteStrOrdering
     def randomHash: ByteStr = ByteStr(Array.fill(32)(Random.nextInt(256).toByte))
-    val hashes              = SectionId.values.map((_, randomHash)).toMap
+
+    val hashes = SectionId.values.map((_, randomHash)).toMap
     StateHash(randomHash, hashes)
   }
 
@@ -3272,40 +3276,6 @@ class DebugApiRouteSpec
 
       Get(routePath("/minerInfo")) ~> ApiKeyHeader ~> debugRoute.route ~> check {
         responseAs[Seq[AccountMiningInfo]].map(_.address) shouldBe minerAccs.map(_.toAddress.toString)
-      }
-    }
-  }
-
-  routePath("/rollback") - {
-    "should move a finalized height if rolled back too far" in {
-      (1 to 3).foreach(_ => domain.appendBlock())
-      val finalizedHeight = Height(domain.blockchain.height)
-      val newBlock        = domain.createBlock(Block.PlainBlockVersion, txs = Seq.empty)
-
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
-        BlockDiffer.fromBlock(domain.blockchain, None, newBlock, None, MiningConstraint.Unlimited, newBlock.header.generationSignature).explicitGet()
-
-      domain.rocksDBWriter.append(
-        preconditionDiff,
-        preconditionFees,
-        totalFee,
-        reward = None,
-        newBlock.header.generationSignature,
-        computedStateHash,
-        newBlock,
-        newFinalizedHeight = Some(finalizedHeight),
-        generatorBalances = Seq.empty
-      )
-
-      val rollbackParams          = RollbackParams(domain.blockchain.height - 2, returnTransactionsToUtx = false)
-      val expectedFinalizedHeight = Height(rollbackParams.rollbackTo - 1)
-      expectedFinalizedHeight should be < domain.blockchain.finalizedHeight
-
-      jsonPost(routePath("/rollback"), Json.toJson(rollbackParams)) ~> ApiKeyHeader ~> route ~> check {
-        status shouldBe StatusCodes.OK
-        val finalizedHeight = domain.blockchain.finalizedHeight
-        finalizedHeight should be < domain.blockchain.height
-        finalizedHeight shouldBe expectedFinalizedHeight
       }
     }
   }

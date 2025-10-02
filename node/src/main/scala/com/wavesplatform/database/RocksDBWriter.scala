@@ -182,9 +182,7 @@ class RocksDBWriter(
 
   override protected def loadHeight(): Height = writableDB.get(Keys.height)
 
-  override protected def loadFinalizationHeight(): Height = writableDB.get(Keys.finalizedHeight).getOrElse {
-    Height(GenesisBlockHeight.max(height - maxSynchronizationRollbackHeight))
-  }
+  override protected def loadFinalizedHeight(at: Height): Height = fallbackFinalizedHeight(at, writableDB.get(Keys.finalizedHeight(at)))
 
   override def safeRollbackHeight: Int = writableDB.get(Keys.safeRollbackHeight)
 
@@ -548,7 +546,7 @@ class RocksDBWriter(
       val h           = Height(height)
 
       rw.put(Keys.height, h)
-      if (newFinalizedHeight.isDefined) rw.put(Keys.finalizedHeight, newFinalizedHeight)
+      if (newFinalizedHeight.isDefined) rw.put(Keys.finalizedHeight(h), newFinalizedHeight)
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
       val newSafeRollbackHeight      = height - dbSettings.maxRollbackDepth
@@ -1045,10 +1043,7 @@ class RocksDBWriter(
         val nextPeriod = this.generationPeriodOf(currentHeight).next
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
-
-          // Can go below currentFinalizedHeight height only by force rollback (DebugApiRoute)
-          // During automatic rollbacks this won't happen, because we ask a block extension from the current finalized height
-          rw.put(Keys.finalizedHeight, Some(Height(finalizedHeight.min(currentHeight - 2).max(GenesisBlockHeight))))
+          rw.delete(Keys.finalizedHeight(currentHeight))
 
           val discardedMeta = rw
             .get(Keys.blockMetaAt(currentHeight))

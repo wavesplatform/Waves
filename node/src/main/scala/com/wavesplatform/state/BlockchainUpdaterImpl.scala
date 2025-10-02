@@ -459,6 +459,8 @@ class BlockchainUpdaterImpl(
     *   Block with votes for a parent block
     * @param votingBlockchain
     *   Blockchain at votingBlock
+    * @return
+    *   None if DeterministicFinality is not activated
     */
   private def calculateFinalizationHeight(votingBlock: Block, votingHeight: Height, votingBlockchain: Blockchain): Option[Height] = {
     val finalizationHeight = Height(votingHeight - 1)
@@ -467,7 +469,7 @@ class BlockchainUpdaterImpl(
       val minerAddress = votingBlockchain
         .blockHeader(finalizationHeight)
         .map(_.header.generator.toAddress)
-        .getOrElse(throw new IllegalStateException(s"Can't find a generator of $finalizationHeight"))
+        .getOrElse(throw new IllegalStateException(s"Can't find a generator of height $finalizationHeight"))
 
       val committedGenerators = votingBlockchain
         .committedGenerators(votingBlockchain.generationPeriodOf(finalizationHeight))
@@ -486,14 +488,10 @@ class BlockchainUpdaterImpl(
       endorsedBalance >= (totalBalance * 2 / 3)
     }
 
-    if (finalizationHeight < GenesisBlockHeight) Some(GenesisBlockHeight) // For tests
-    else
-      for {
-        finalityActivationHeight <- votingBlockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality.id)
-        r <-
-          if (votingHeight > finalityActivationHeight) Some(finalizationHeight).filter(_ => shouldFinalizeByVoting())
-          else Some(Height(GenesisBlockHeight.max(votingHeight - wavesSettings.synchronizationSettings.maxRollback)))
-      } yield r
+    for {
+      finalityActivationHeight <- votingBlockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality.id)
+      if votingHeight > GenesisBlockHeight && votingHeight >= finalityActivationHeight && shouldFinalizeByVoting()
+    } yield finalizationHeight
   }
 
   private def collectLeasesToCancel(newHeight: Int): Map[ByteStr, LeaseDetails] =
