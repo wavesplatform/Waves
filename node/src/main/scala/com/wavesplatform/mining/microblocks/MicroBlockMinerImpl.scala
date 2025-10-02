@@ -159,7 +159,6 @@ class MicroBlockMinerImpl(
       stateHash: Option[ByteStr]
   ): Either[MicroBlockMiningError, (Block, MicroBlock)] =
     microBlockBuildTimeStats.measureSuccessful {
-      // TODO: Add miner's signature?
       val currentFinalizationVoting = endorsementStorage.tryCollectAndClear(accumulatedBlock.header.reference)
       for {
         signedBlock <- Block
