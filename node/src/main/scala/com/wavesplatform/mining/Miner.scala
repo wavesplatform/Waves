@@ -121,7 +121,7 @@ class MinerImpl(
 
       scheduledAttempts := CompositeCancelable.fromSet(allowed.map { account =>
         generateBlockTask(account, tempBlockchain)
-          .onErrorHandle(err => log.warn(s"Error mining Block by $account", err))
+          .onErrorHandle(err => log.warn(s"Error mining Block by ${account.toAddress}", err))
           .runAsyncLogErr(using appenderScheduler)
       }.toSet)
       microBlockAttempt := SerialCancelable()

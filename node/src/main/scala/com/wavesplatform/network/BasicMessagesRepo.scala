@@ -369,7 +369,7 @@ object EndorseBlockSpec extends MessageSpec[EndorseBlock] {
 
   override def serializeData(data: EndorseBlock): Array[Byte] = data.toProtobuf.toByteArray
 
-  override val maxLength: Int = 178 // 4 + 32*2 + 4 + 96 + 4 tags + 2 varint max overhead
+  override val maxLength: Int = 238 // 4 + 32*2 (or 64*2 for old blocks) + 4 + 96 + 4 tags + 2 varint max overhead
 }
 
 // Virtual, only for logs
