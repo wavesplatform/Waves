@@ -10,7 +10,7 @@ import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.network.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
-import com.wavesplatform.state.{Blockchain, Height}
+import com.wavesplatform.state.{BlockEndorser, Blockchain, Height}
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature, InvalidStateHash}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -58,6 +58,7 @@ object BlockAppender extends ScorexLogging {
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
       blockChallenger: Option[BlockChallenger],
+      blockEndorser: BlockEndorser,
       scheduler: Scheduler
   )(ch: Channel, newBlock: Block, snapshot: Option[BlockSnapshotResponse]): Task[Unit] = {
     import metrics.*
@@ -82,18 +83,10 @@ object BlockAppender extends ScorexLogging {
           span.markNtp("block.applied")
           span.finishNtp()
           BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
-          if (blockchainUpdater.isLastBlockId(newBlock.id()) && (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined)) {
+          if (blockchainUpdater.isLastBlockId(newBlock.id()) && (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined))
             allChannels.broadcast(BlockForged(newBlock), Some(ch)) // Key block or challenging block
 
-            for {
-              blockChallenger <- blockChallenger.toSeq
-              endorsement <- blockChallenger.endorse(
-                endorsedHeight = Height(blockchainUpdater.height - 1),
-                finalizedHeight = blockchainUpdater.finalizedHeight,
-                blockMiner = newBlock.sender.toAddress
-              )
-            } allChannels.broadcast(EndorseBlock.from(endorsement))
-          }
+          blockEndorser.endorse(Height(blockchainUpdater.height - 1))
         }
       case Left(is: InvalidSignature) =>
         Task(peerDatabase.blacklistAndClose(ch, s"Could not append $newBlock: $is"))

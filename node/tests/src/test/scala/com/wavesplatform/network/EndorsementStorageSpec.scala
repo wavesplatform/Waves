@@ -5,8 +5,8 @@ import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
-import com.wavesplatform.network.EndorsementStorage.EndorsementFilter
-import com.wavesplatform.state.Height
+import com.wavesplatform.state.EndorsementStorage.EndorsementFilter
+import com.wavesplatform.state.{EndorsementStorage, Height}
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.TxHelpers
 import io.netty.channel.Channel
@@ -22,7 +22,7 @@ import java.util.concurrent.ThreadLocalRandom
 import scala.util.Using
 
 @Ignore // TODO:
-class EndorseBlockSynchronizerSpec extends FreeSpec {
+class EndorsementStorageSpec extends FreeSpec {
   private val testScheduler = TestScheduler(ExecutionModel.AlwaysAsyncExecution)
 
   private val activeGenerator     = BlsKeyPair(TxHelpers.signer(0).privateKey)
@@ -95,10 +95,10 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     val last         = PS[EndorsementFilter]()
     val endorsements = PS[(Channel, EndorseBlock)]()
     val storage      = EndorsementStorage.InMemory()
-    val synchronizer = EndorseBlockSynchronizer.start(storage, last, endorsements, allChannels, testScheduler)
+    // val synchronizer = EndorseBlockSynchronizer.start(storage, last, endorsements, allChannels, testScheduler)
 
     def blockchainUpdated(finalizedHeight: Height, blockId: BlockId, newEndorsers: BlsPublicKey*): Unit = {
-      last.onNext(EndorsementFilter(finalizedId, finalizedHeight, blockId, newEndorsers.toIndexedSeq)) // TODO: finalizedId
+      last.onNext(EndorsementFilter(miner = false, finalizedId, finalizedHeight, blockId, newEndorsers.toIndexedSeq)) // TODO: finalizedId
       testScheduler.tick()
     }
 
@@ -108,7 +108,6 @@ class EndorseBlockSynchronizerSpec extends FreeSpec {
     }
 
     override def close(): Unit = {
-      synchronizer.cancel()
       endorsements.onComplete()
       last.onComplete()
       allChannels.close()

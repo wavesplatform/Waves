@@ -182,7 +182,7 @@ class RocksDBWriter(
 
   override protected def loadHeight(): Height = writableDB.get(Keys.height)
 
-  override protected def loadFinalizedHeight(at: Height): Height = fallbackFinalizedHeight(at, writableDB.get(Keys.finalizedHeight(at)))
+  override def finalizedHeightAt(at: Height): Option[Height] = writableDB.get(Keys.finalizedHeight(at))
 
   override def safeRollbackHeight: Int = writableDB.get(Keys.safeRollbackHeight)
 

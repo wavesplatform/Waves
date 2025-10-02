@@ -1064,7 +1064,7 @@ class TransactionsRouteSpec
     }
 
     "CommitToGeneration transaction" in {
-      val txn = TxHelpers.commitToGeneration(settings.blockchainSettings.functionalitySettings.generationPeriod)
+      val txn = TxHelpers.commitToGeneration(settings.blockchainSettings.functionalitySettings.generationPeriodLength)
       Post(routePath("/broadcast"), txn.json()) ~> route ~> check {
         status shouldEqual StatusCodes.OK
       }

@@ -5,10 +5,9 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
-import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.{WalletSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, NG, appender}
+import com.wavesplatform.state.{Blockchain, EndorsementStorage, NG, appender}
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPoolImpl

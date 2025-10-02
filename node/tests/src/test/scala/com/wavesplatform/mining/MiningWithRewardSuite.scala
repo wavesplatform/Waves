@@ -11,10 +11,9 @@ import com.wavesplatform.database.{RDB, TestStorageFactory}
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, EndorsementStorage, NG}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}

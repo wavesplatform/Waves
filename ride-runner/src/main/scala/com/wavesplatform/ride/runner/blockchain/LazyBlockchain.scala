@@ -129,6 +129,8 @@ class LazyBlockchain[TagT] private (
 
   override def finalizedHeight: Height = heightUntagged // TODO:
 
+  override def finalizedHeightAt(at: Height): Option[Height] = None // TODO:
+
   // Ride: environment initialization
   override def activatedFeatures: ActivatedFeatures = currentActivatedFeatures.get()
 

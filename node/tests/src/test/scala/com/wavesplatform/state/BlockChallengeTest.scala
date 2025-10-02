@@ -100,7 +100,7 @@ class BlockChallengeTest
     val challengedMiner = TxHelpers.signer(1)
     val testSettings = settings
       .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 1001)
-      .configure(_.copy(generationPeriod = 2))
+      .configure(_.copy(generationPeriodLength = 2))
 
     withDomain(testSettings, balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
       val challengingMiner     = d.wallet.generateNewAccount().get
@@ -418,7 +418,7 @@ class BlockChallengeTest
     val challengedMiner = TxHelpers.signer(1)
     val testSettings = settings
       .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 1001)
-      .configure(_.copy(generationPeriod = 2))
+      .configure(_.copy(generationPeriodLength = 2))
 
     withDomain(testSettings, balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
       val challengingMiner    = d.wallet.generateNewAccount().get
@@ -1705,8 +1705,18 @@ class BlockChallengeTest
             }
           }
         )
-      val appender =
-        BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, channels, PeerDatabase.NoOp, blockChallenger, appenderScheduler)
+
+      val appender = BlockAppender(
+        d.blockchain,
+        testTime,
+        d.utxPool,
+        d.posSelector,
+        channels,
+        PeerDatabase.NoOp,
+        blockChallenger,
+        d.createBlockEndorser(channels),
+        appenderScheduler
+      )
 
       val route = new TransactionsApiRoute(
         d.settings.restAPISettings,
@@ -1969,6 +1979,7 @@ class BlockChallengeTest
         channels,
         PeerDatabase.NoOp,
         Some(createBlockChallenger(d, channels)),
+        d.createBlockEndorser(channels),
         appenderScheduler
       )(channel2, _, None)
 

@@ -7,11 +7,10 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
-import com.wavesplatform.state.{BalanceSnapshot, BlockMinerInfo, Blockchain, NG}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.{BalanceSnapshot, BlockMinerInfo, Blockchain, EndorsementStorage, NG}
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture

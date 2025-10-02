@@ -35,7 +35,7 @@ abstract class Caches extends Blockchain with Storage {
   private var current = loadCurrentBlock()
 
   @volatile
-  private var currentFinalizedHeight = loadFinalizedHeight(current.height)
+  private var currentFinalizedHeight = fallbackFinalizedHeight(current.height, finalizedHeightAt(current.height)) // TODO: just dynamic field?
 
   private def loadCurrentBlock() = {
     val height = loadHeight()
@@ -44,7 +44,7 @@ abstract class Caches extends Blockchain with Storage {
 
   protected def loadHeight(): Height
 
-  protected def loadFinalizedHeight(at: Height): Height
+  // Don't work with at > current height
   protected def fallbackFinalizedHeight(at: Height, finalizedHeight: Option[Height]): Height = finalizedHeight.getOrElse {
     Height(GenesisBlockHeight.max(at - maxSynchronizationRollbackHeight))
   }
@@ -427,7 +427,7 @@ abstract class Caches extends Blockchain with Storage {
 
       // Can go below currentFinalizedHeight height only by a force rollback (DebugApiRoute)
       // During automatic rollbacks this won't happen, because we ask a block extension from the current finalized height
-      currentFinalizedHeight = loadFinalizedHeight(current.height)
+      currentFinalizedHeight = fallbackFinalizedHeight(current.height, finalizedHeightAt(current.height))
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()

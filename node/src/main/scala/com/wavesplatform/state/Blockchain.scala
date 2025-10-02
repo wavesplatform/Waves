@@ -25,7 +25,10 @@ trait Blockchain {
   def settings: BlockchainSettings
 
   def height: Int
+
   def finalizedHeight: Height
+  def finalizedHeightAt(at: Height): Option[Height]
+
   def score: BigInt
 
   def blockHeader(height: Int): Option[SignedBlockHeader]
@@ -103,6 +106,7 @@ trait Blockchain {
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
   // TODO: cached
+  // TODO: named?
   def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)]
 
   /** @return

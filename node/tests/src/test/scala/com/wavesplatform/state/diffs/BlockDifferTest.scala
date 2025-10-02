@@ -11,10 +11,9 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
 import com.wavesplatform.mining.{MinerImpl, MiningConstraint}
-import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer.Result
-import com.wavesplatform.state.{Blockchain, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, EndorsementStorage, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.{TransactionStateSnapshot, WavesSettingsOps}
 import com.wavesplatform.test.node.*

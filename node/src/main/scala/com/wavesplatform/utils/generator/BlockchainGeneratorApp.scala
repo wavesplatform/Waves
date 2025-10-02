@@ -1,10 +1,7 @@
 package com.wavesplatform.utils.generator
 
-import java.io.{File, FileOutputStream, PrintWriter}
-import java.util.concurrent.TimeUnit
 import cats.implicits.*
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
-import com.wavesplatform.{GenesisBlockGenerator, Version}
 import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
@@ -13,19 +10,22 @@ import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.*
+import com.wavesplatform.state.EndorsementStorage
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{GenesisBlockGenerator, Version}
 import io.netty.channel.group.DefaultChannelGroup
 import monix.reactive.subjects.ConcurrentSubject
-import pureconfig.ConfigSource
 import play.api.libs.json.Json
+import pureconfig.ConfigSource
 import scopt.OParser
 
+import java.io.{File, FileOutputStream, PrintWriter}
+import java.util.concurrent.TimeUnit
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.*
 import scala.language.reflectiveCalls

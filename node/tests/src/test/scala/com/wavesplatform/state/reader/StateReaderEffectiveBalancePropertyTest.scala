@@ -175,7 +175,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
 
     val initBalance = ENOUGH_AMT
 
-    val settings = DeterministicFinality.configure(_.copy(generationPeriod = 3))
+    val settings = DeterministicFinality.configure(_.copy(generationPeriodLength = 3))
     withDomain(settings, balances = AddrWithBalance.enoughBalances(account1, account2)) { d =>
       def appendBlock(txs: Transaction*): Unit = {
         val block = d.createBlock(PlainBlockVersion, txs, strictTime = true, generator = account2)

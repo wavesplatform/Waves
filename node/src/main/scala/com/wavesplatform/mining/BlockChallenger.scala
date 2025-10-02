@@ -3,10 +3,9 @@ package com.wavesplatform.mining
 import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, SeedKeyPair}
-import com.wavesplatform.block.{Block, BlockEndorsement, ChallengedHeader}
+import com.wavesplatform.block.{Block, ChallengedHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.BlockStats
@@ -17,7 +16,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.MaxTimeDrift
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.{Blockchain, Height, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -37,7 +36,6 @@ trait BlockChallenger {
   def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]]
   def getProcessingTx(id: ByteStr): Option[Transaction]
   def allProcessingTxs: Seq[Transaction]
-  def endorse(endorsedHeight: Height, finalizedHeight: Height, blockMiner: Address): Seq[BlockEndorsement.Full]
 }
 
 class BlockChallengerImpl(
@@ -147,20 +145,6 @@ class BlockChallengerImpl(
   override def getProcessingTx(id: ByteStr): Option[Transaction] = Option(processingTxs.get(id))
 
   override def allProcessingTxs: Seq[Transaction] = processingTxs.values.asScala.toSeq
-
-  override def endorse(endorsedHeight: Height, finalizedHeight: Height, blockMiner: Address): Seq[BlockEndorsement.Full] =
-    if (!blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality)) Nil
-    else
-      for {
-        endorsedId  <- blockchainUpdater.blockId(endorsedHeight).toSeq
-        finalizedId <- blockchainUpdater.blockId(finalizedHeight).toSeq
-        committed = blockchainUpdater.committedGenerators(blockchainUpdater.generationPeriodOf(endorsedHeight))
-        (account, idx) <- for {
-          ((committedAddr, _), idx) <- committed.zipWithIndex
-          if committedAddr != blockMiner // A miner doesn’t need to endorse its own blocks - mining is already an endorsement
-          pk <- wallet.privateKeyAccount(committedAddr).toSeq
-        } yield (pk, idx)
-      } yield BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
 
   private def withProcessingTxs[A](txs: Seq[Transaction])(body: Task[A]): Task[A] =
     Task(processingTxs.putAll(txs.map(tx => tx.id() -> tx).toMap.asJava))

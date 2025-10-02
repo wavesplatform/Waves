@@ -10,9 +10,8 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
-import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.{Blockchain, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, EndorsementStorage, StateSnapshot}
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, defaultSigner, secondAddress, transfer}

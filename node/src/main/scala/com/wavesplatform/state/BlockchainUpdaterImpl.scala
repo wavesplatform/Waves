@@ -714,6 +714,8 @@ class BlockchainUpdaterImpl(
 
   override def finalizedHeight: Height = readLock(rocksdb.finalizedHeight)
 
+  override def finalizedHeightAt(at: Height): Option[Height] = readLock(rocksdb.finalizedHeightAt(at))
+
   override def heightOf(blockId: BlockId): Option[Int] = readLock {
     ngState
       .collect {

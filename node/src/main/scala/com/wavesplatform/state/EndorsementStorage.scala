@@ -1,17 +1,13 @@
-package com.wavesplatform.network
+package com.wavesplatform.state
 
 import cats.syntax.either.*
-import cats.syntax.option.*
-import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
+import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
-import com.wavesplatform.network.EndorsementStorage.EndorsementFilter
+import com.wavesplatform.network.EndorseBlock
+import com.wavesplatform.state.EndorsementStorage.EndorsementFilter
 import com.wavesplatform.state.Height
-import io.netty.channel.Channel
-import io.netty.channel.group.DefaultChannelGroup
-import monix.execution.{Cancelable, Scheduler}
-import monix.reactive.Observable
 
 import scala.collection.mutable
 
@@ -24,7 +20,10 @@ trait EndorsementStorage {
     */
   def tryAddVote(msg: EndorseBlock): Boolean
 
-  def startVoting(filter: EndorsementFilter): Unit
+  /** @return
+    *   true if it is a new voting
+    */
+  def startVoting(filter: EndorsementFilter): Boolean
 
   /** Returns a voting results at this time and resets all except an aggregated voting signature.
     */
@@ -32,9 +31,19 @@ trait EndorsementStorage {
 }
 
 object EndorsementStorage {
-  case class EndorsementFilter(finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, expectedEndorsers: IndexedSeq[BlsPublicKey]) {
+
+  /** @param miner
+    *   True if this node is a miner
+    */
+  case class EndorsementFilter(
+      miner: Boolean,
+      finalizedId: BlockId,
+      finalizedHeight: Height,
+      endorsedId: BlockId,
+      expectedEndorsers: IndexedSeq[BlsPublicKey]
+  ) {
     override def toString: String =
-      s"EndorsementFilter(fid=$finalizedId, fh=$finalizedHeight, eid=$endorsedId, e={${expectedEndorsers.mkString(", ")}})"
+      s"EndorsementFilter(m=$miner, fid=$finalizedId, fh=$finalizedHeight, eid=$endorsedId, e={${expectedEndorsers.mkString(", ")}})"
 
     def sameVoting(other: EndorsementFilter): Boolean =
       finalizedId == other.finalizedId && finalizedHeight == other.finalizedHeight && endorsedId == other.endorsedId
@@ -42,13 +51,13 @@ object EndorsementStorage {
 
   val Disabled: EndorsementStorage = new EndorsementStorage {
     override def tryAddVote(msg: EndorseBlock): Boolean                              = false
-    override def startVoting(filter: EndorsementFilter): Unit                        = {}
+    override def startVoting(filter: EndorsementFilter): Boolean                     = false
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = None
   }
 
   class InMemory extends EndorsementStorage with StrictLogging {
     private var currentFilter = Option.empty[EndorsementFilter]
-    private var currentVoting = Option.empty[FinalizationVoting]
+    private var currentVoting = FinalizationVoting()
     private val processed     = mutable.HashSet.empty[EndorseBlock]
 
     private val monitor            = new Object()
@@ -63,37 +72,38 @@ object EndorsementStorage {
 
     override def tryAddVote(msg: EndorseBlock): Boolean = synced {
       for {
-        filter     <- currentFilter.toRight("Voting hasn't started")
-        origVoting <- currentVoting.toRight("Voting hasn't started")
-        _          <- Either.raiseUnless(msg.finalizedHeight == filter.finalizedHeight)(s"Expected finalized height ${filter.finalizedHeight}")
-        _ <- Either.raiseWhen(msg.endorserIndex >= filter.expectedEndorsers.size)(s"There are only ${filter.expectedEndorsers.size} endorsers")
-        _ <- Either.raiseWhen(processed.contains(msg))("")
+        filter <- currentFilter.toRight("Voting hasn't started")
+        _      <- Either.raiseUnless(msg.finalizedHeight == filter.finalizedHeight)(s"Expected finalized height ${filter.finalizedHeight}")
+        _      <- Either.raiseWhen(msg.endorserIndex >= filter.expectedEndorsers.size)(s"There are only ${filter.expectedEndorsers.size} endorsers")
+        _      <- Either.raiseWhen(processed.contains(msg))("")
         endorserPk = filter.expectedEndorsers(msg.endorserIndex)
         sig <- verifySig(msg, endorserPk).toRight("Invalid signature")
         _   <- Either.raiseUnless(msg.endorsedId == filter.endorsedId)(s"Expected block ${filter.endorsedId}") // Could be a switch to a better branch
       } yield {
         // TODO: Tests
+        // TODO: Do we need this if not mine now?
         val isConsistent = msg.finalizedId == filter.finalizedId
-        val updatedVoting =
-          if (isConsistent) origVoting.withValid(msg.endorserIndex, sig)
-          else origVoting.withConflict(toConflict(msg, sig))
+        currentVoting =
+          if (isConsistent) currentVoting.withValid(msg.endorserIndex, sig)
+          else currentVoting.withConflict(toConflict(msg, sig))
 
-        currentVoting = updatedVoting.some
         processed += msg
+
+        !filter.miner // Share with neighbours only if this node isn't a miner
       }
     } match {
-      case Left("")  => false // Ignore without logs
-      case Left(err) => logger.trace(s"Unexpected $msg: $err"); false
-      case Right(_)  => true
+      case Left("")     => false // Ignore without logs
+      case Left(err)    => logger.trace(s"Unexpected $msg: $err"); false
+      case Right(share) => share
     }
 
     private def toConflict(msg: EndorseBlock, verifiedSig: BlsSignature.NonEmpty): BlockEndorsement.Conflict =
       BlockEndorsement.Conflict(msg.endorserIndex, msg.finalizedId, verifiedSig)
 
-    override def startVoting(filter: EndorsementFilter): Unit = synced {
+    override def startVoting(filter: EndorsementFilter): Boolean = synced {
       val isNewVoting = !currentFilter.exists(_.sameVoting(filter))
       if (isNewVoting) {
-        currentVoting = None
+        currentVoting = FinalizationVoting()
         processed.clear()
 
         currentFilter = if (filter.expectedEndorsers.isEmpty) {
@@ -104,34 +114,18 @@ object EndorsementStorage {
           Some(filter)
         }
       }
+      isNewVoting
     }
 
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = synced {
       for {
         currentFilter <- currentFilter
         if currentFilter.endorsedId == endorsedId
-        origVoting <- currentVoting
       } yield {
-        currentVoting = Some(origVoting.copy(endorserIndexes = Seq.empty, conflict = Seq.empty))
-        origVoting
+        val r = currentVoting
+        currentVoting = currentVoting.copy(endorserIndexes = Seq.empty, conflict = Seq.empty)
+        r
       }
     }
-  }
-}
-
-object EndorseBlockSynchronizer extends LazyLogging {
-  def start(
-      storage: EndorsementStorage,
-      lastFilter: Observable[EndorsementFilter],
-      receivingEndorsements: Observable[(Channel, EndorseBlock)],
-      allChannels: DefaultChannelGroup,
-      scheduler: Scheduler
-  ): Cancelable = {
-    // TODO: move outside
-    lastFilter.foreach(storage.startVoting)(using scheduler)
-
-    receivingEndorsements.foreach { case (ch, x) =>
-      if (storage.tryAddVote(x)) allChannels.broadcast(x, Some(ch))
-    }(using scheduler)
   }
 }

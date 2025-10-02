@@ -19,7 +19,6 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{DBExt, Keys, RDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
@@ -27,10 +26,9 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{BlockChallengerImpl, Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network.*
-import com.wavesplatform.network.EndorsementStorage.EndorsementFilter
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, CompleteBlockchainUpdater, GenesisBlockHeight, Height, TxMeta}
+import com.wavesplatform.state.{BlockEndorser, BlockRewardCalculator, Blockchain, CompleteBlockchainUpdater, EndorsementStorage, Height, TxMeta}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -180,8 +178,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         )
       } else None
 
+    val blockEndorser = new BlockEndorser.InMemory(blockchainUpdater, wallet, endorsementStorage, allChannels)
+
     val processBlock =
-      BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, blockChallenger, appenderScheduler)
+      BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, blockChallenger, blockEndorser, appenderScheduler)
 
     val processFork =
       ExtensionAppender(blockchainUpdater, utxStorage, pos, time, knownInvalidBlocks, peerDatabase, appenderScheduler)
@@ -315,31 +315,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       microblockSynchronizerScheduler
     )
 
-    EndorseBlockSynchronizer.start(
-      storage = endorsementStorage,
-      lastFilter = blockchainUpdater.lastBlockInfo.collect {
-        case bi if bi.height > GenesisBlockHeight =>
-          val endorsedHeight = Height(bi.height - 1)
-          val isActivated    = blockchainUpdater.isFeatureActivated(BlockchainFeatures.DeterministicFinality, endorsedHeight)
-
-          val endorsedId = blockchainUpdater
-            .blockId(endorsedHeight)
-            .getOrElse(throw new IllegalStateException(s"Can't find a endorsed block at $endorsedHeight"))
-
-          val period = blockchainUpdater.generationPeriodOf(endorsedHeight)
-          val finalizedId = blockchainUpdater
-            .blockId(bi.finalizedHeight) // Finalized block is same
-            .getOrElse(throw new IllegalStateException(s"Can't find a finalized block at ${bi.finalizedHeight}"))
-
-          val committedGenerators =
-            if (isActivated) blockchainUpdater.committedGenerators(period).map { case (_, blsPk) => blsPk } else IndexedSeq.empty
-
-          EndorsementFilter(finalizedId, bi.finalizedHeight, endorsedId, committedGenerators)
-      },
-      receivingEndorsements = messageObserver.endorseBlocks,
-      allChannels = allChannels,
-      scheduler = endorseBlockSynchronizerScheduler
-    )
+    messageObserver.endorseBlocks.foreach { case (ch, x) =>
+      if (endorsementStorage.tryAddVote(x)) allChannels.broadcast(x, Some(ch))
+    }(using endorseBlockSynchronizerScheduler)
 
     val (newBlocksWithSnapshot, extLoaderState, _) = RxExtensionLoader(
       settings.synchronizationSettings.synchronizationTimeout,

@@ -19,7 +19,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.mining.{BlockChallenger, BlockChallengerImpl}
-import com.wavesplatform.network.{EndorsementStorage, MessageCodecL1, PeerDatabase}
+import com.wavesplatform.network.{MessageCodecL1, PeerDatabase}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
@@ -35,7 +35,7 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, TestValues, crypto}
 import io.netty.channel.embedded.EmbeddedChannel
-import io.netty.channel.group.DefaultChannelGroup
+import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.ExecutionModel.SynchronousExecution
@@ -85,8 +85,12 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
   // TODO: testTime?
   lazy val utxPool: UtxPoolImpl =
     new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
+
   lazy val endorsementStorage: EndorsementStorage = EndorsementStorage.Disabled
-  lazy val wallet: Wallet                         = Wallet(settings.walletSettings.copy(file = None))
+  def createBlockEndorser(allChannels: ChannelGroup, storage: EndorsementStorage = endorsementStorage): BlockEndorser =
+    new BlockEndorser.InMemory(blockchain, wallet, storage, allChannels)
+
+  lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
   lazy val testTime: TestTime = TestTime()
   lazy val blockAppender: Block => Task[Either[ValidationError, BlockApplyResult]] =
@@ -673,15 +677,19 @@ object Domain {
 }
 
 class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
+  private val allChannelGroup = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+
   private val blockChallenger = new BlockChallengerImpl(
     d.blockchain,
-    new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+    allChannelGroup,
     d.wallet,
     d.settings,
     d.testTime,
     d.posSelector,
     _ => throw new RuntimeException("Unexpected call in block challenger")
   )
+
+  private val blockEndorser = new BlockEndorser.InMemory(d.blockchain, d.wallet, d.endorsementStorage, allChannelGroup)
 
   private val appender = BlockAppender(
     d.blockchain,
@@ -691,6 +699,7 @@ class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
     new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
     PeerDatabase.NoOp,
     Some(blockChallenger),
+    blockEndorser,
     appenderScheduler
   )(new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp)), _, snapshot = None)
 

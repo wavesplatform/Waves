@@ -81,7 +81,7 @@ case class FunctionalitySettings(
     paymentsCheckHeight: Int = 0,
     unitsRegistryAddress: Option[String] = None,
     maxGenerators: Int = 5,
-    generationPeriod: Int = 1000
+    generationPeriodLength: Int = 1000
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -104,7 +104,7 @@ case class FunctionalitySettings(
     s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod"
   )
   require(minAssetInfoUpdateInterval >= 0, "minAssetInfoUpdateInterval must be greater than or equal to 0")
-  require(generationPeriod > 0, "generationPeriod must be greater than 0")
+  require(generationPeriodLength > 0, "generationPeriod must be greater than 0")
 
   def activationWindowSize(height: Int): Int =
     featureCheckBlocksPeriod * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
@@ -147,7 +147,7 @@ object FunctionalitySettings {
     paymentsCheckHeight = 4303300,
     unitsRegistryAddress = Some("3P8LfPXcveST7WKkV3UACQNdr6J3shPYong"),
     maxGenerators = 128, // BLS has much worse performance from 129
-    generationPeriod = 10_000
+    generationPeriodLength = 10_000
   )
 
   val TESTNET: FunctionalitySettings = apply(
@@ -166,7 +166,7 @@ object FunctionalitySettings {
     blockRewardBoostPeriod = 2_000,
     unitsRegistryAddress = Some("3N9fwNGJcUcAbhh7YPr6mrpuGJD4tApZFsT"),
     maxGenerators = 10,
-    generationPeriod = 3000
+    generationPeriodLength = 3000
   )
 
   val STAGENET: FunctionalitySettings = apply(
@@ -183,7 +183,7 @@ object FunctionalitySettings {
     xtnBuybackRewardPeriod = 1000,
     paymentsCheckHeight = 2195900,
     maxGenerators = 3,
-    generationPeriod = 100
+    generationPeriodLength = 100
   )
 }
 

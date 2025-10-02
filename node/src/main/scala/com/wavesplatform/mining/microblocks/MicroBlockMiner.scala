@@ -3,9 +3,8 @@ package com.wavesplatform.mining.microblocks
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint}
-import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.MinerSettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, EndorsementStorage}
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup

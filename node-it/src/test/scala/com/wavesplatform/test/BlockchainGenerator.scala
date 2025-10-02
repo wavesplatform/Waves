@@ -12,8 +12,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.{DBSettings, WavesSettings}
+import com.wavesplatform.state.EndorsementStorage
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.BlockchainGenerator.{GenBlock, GenTx}
 import com.wavesplatform.transaction.*
@@ -121,9 +121,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
         PoSSelector(blockchain, None),
         scheduler,
         scheduler,
-        utxEvents.collect { case _: UtxEvent.TxAdded =>
-          ()
-        }
+        utxEvents.collect { case _: UtxEvent.TxAdded => () }
       )
 
       checkGenesis(settings, blockchain, Miner.Disabled)

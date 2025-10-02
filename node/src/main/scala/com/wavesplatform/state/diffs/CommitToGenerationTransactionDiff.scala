@@ -14,9 +14,9 @@ object CommitToGenerationTransactionDiff {
 
     for {
       // TODO: Check BLS signature
-      _ <- Either.raiseUnless(tx.generationPeriodStart % current.period == 0) {
+      _ <- Either.raiseUnless(tx.generationPeriodStart % current.length == 0) {
         GenericError(
-          s"Generation period start ${tx.generationPeriodStart} must be a multiple of ${current.period}. Allowed height is $next"
+          s"Generation period start ${tx.generationPeriodStart} must be a multiple of ${current.length}. Allowed height is $next"
         )
       }
       _ <- Either.raiseUnless(tx.generationPeriodStart == next.start) {

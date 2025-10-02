@@ -77,7 +77,7 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
   }
 
   "Generator deposit taken and returned" in withDomain(
-    DeterministicFinality.configure(x => x.copy(generationPeriod = 3)),
+    DeterministicFinality.configure(x => x.copy(generationPeriodLength = 3)),
     AddrWithBalance.enoughBalances(sender)
   ) { d =>
     info("Deposit for one period")

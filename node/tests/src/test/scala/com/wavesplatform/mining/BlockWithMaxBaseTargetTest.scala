@@ -10,7 +10,6 @@ import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.BlockWithMaxBaseTargetTest.Env
-import com.wavesplatform.network.EndorsementStorage
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.BlockAppender
