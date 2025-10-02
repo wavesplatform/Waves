@@ -103,14 +103,25 @@ class MinerImpl(
       }
 
       val blockchain = tempBlockchain.getOrElse(blockchainUpdater)
-      val allowedAccounts = accounts.filter { kp =>
-        val address = kp.toAddress
-        hasAllowedForMiningScript(address, blockchain) && blockchain.isCommitted(blockchain.height + 1, address) // A new block will have + 1 height
+      val (allowed, notAllowed, notCommitted) = {
+        val empty = List.empty[KeyPair]
+        accounts.foldLeft((empty, empty, empty)) { case ((allowed, notAllowed, notCommited), kp) =>
+          val address = kp.toAddress
+
+          if (!hasAllowedForMiningScript(address, blockchain)) (allowed, kp :: notAllowed, notCommited)
+          else if (!blockchain.isCommitted(blockchain.height + 1, address))
+            (allowed, notAllowed, kp :: notCommited) // A new block will have + 1 height
+          else (kp :: allowed, notAllowed, notCommited)
+        }
       }
 
-      scheduledAttempts := CompositeCancelable.fromSet(allowedAccounts.map { account =>
+      if (allowed.isEmpty) log.warn("Mining enabled, but no allowed accounts")
+      if (notAllowed.nonEmpty) log.debug(s"Scripting miners not allowed: ${notAllowed.map(_.toAddress).mkString(", ")}")
+      if (notCommitted.nonEmpty) log.debug(s"Not committed accounts: ${notCommitted.map(_.toAddress).mkString(", ")}")
+
+      scheduledAttempts := CompositeCancelable.fromSet(allowed.map { account =>
         generateBlockTask(account, tempBlockchain)
-          .onErrorHandle(err => log.warn(s"Error mining Block", err))
+          .onErrorHandle(err => log.warn(s"Error mining Block by $account", err))
           .runAsyncLogErr(using appenderScheduler)
       }.toSet)
       microBlockAttempt := SerialCancelable()
