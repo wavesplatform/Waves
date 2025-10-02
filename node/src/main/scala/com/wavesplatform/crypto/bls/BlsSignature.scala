@@ -33,6 +33,8 @@ object BlsSignature {
   )
 
   extension (self: BlsSignature) {
+    def isDefined: Boolean = self != Empty
+
     def append(other: BlsSignature.NonEmpty): BlsSignature = self match {
       case Empty          => other
       case self: NonEmpty => NonEmpty(ByteStr(BlsUtils.aggSign(self.arr, other.arr)))

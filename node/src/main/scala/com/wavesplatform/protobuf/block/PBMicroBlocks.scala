@@ -8,7 +8,7 @@ import com.wavesplatform.network.MicroBlockResponse
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.PBTransactions
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 object PBMicroBlocks {
   def vanilla(signedMicro: PBSignedMicroBlock, unsafe: Boolean = false): Try[MicroBlockResponse] = Try {
@@ -17,9 +17,10 @@ object PBMicroBlocks {
     val transactions = microBlock.transactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
 
     val finalizationVoting = microBlock.finalizationVoting.map { x =>
-      PBFinalizationVotings
-        .vanilla(x)
-        .getOrElse(throw new RuntimeException(s"Can't decode $x as a vanilla finalization voting"))
+      PBFinalizationVotings.vanilla(x) match {
+        case Failure(e) => throw new RuntimeException(s"Can't decode $x as a vanilla finalization voting: ${e.getMessage}", e)
+        case Success(x) => x
+      }
     }
 
     MicroBlockResponse(
