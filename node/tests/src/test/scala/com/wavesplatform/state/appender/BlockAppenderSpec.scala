@@ -235,6 +235,10 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
       appender(endorsedBlock).runSyncUnsafe()
       if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply block $endorsedBlock, see logs")
 
+      val nextBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator2, strictTime = true)
+      testTime.setTime(nextBlock.header.timestamp)
+      appender(nextBlock).runSyncUnsafe()
+
       def sentEndorsements: Long = channel1.outboundMessages().asScala.count {
         case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
         case _                                                     => false
