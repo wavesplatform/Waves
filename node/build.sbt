@@ -83,8 +83,8 @@ linuxScriptReplacements += ("network" -> network.value.toString)
 
 inConfig(Universal)(
   Seq(
-    maintainer                                              := "com.wavesplatform",
-    packageName                                             := s"waves-${version.value}",
+    maintainer  := "com.wavesplatform",
+    packageName := s"waves-${version.value}",
     mappings += (baseDirectory.value / s"waves-sample.conf" -> "doc/waves.conf.sample"),
     javaOptions ++= Seq(
       // -J prefix is required by the bash script

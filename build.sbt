@@ -286,4 +286,36 @@ def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser
   state
 }
 
-commands ++= Seq(checkPR, buildPackages)
+/** Command: generateGenesis <path-to-config>
+  * Runs: node / runMain com.wavesplatform.GenesisBlockGenerator <path>
+  * Path is always resolved relative to build root, output without "[info]".
+  */
+def generateGenesisCommand: Command =
+  Command.single("generateGenesis") { (state, rawPath) =>
+    val ex = Project.extract(state)
+
+    val rootBase = ex.get(LocalRootProject / baseDirectory)
+    val absFile = {
+      val f = file(rawPath)
+      if (f.isAbsolute) f else rootBase / rawPath
+    }
+
+    val stateWithSettings = ex.appendWithoutSession(
+      Seq(
+        ThisBuild / useSuperShell             := false,
+        node / Compile / run / outputStrategy := Some(StdoutOutput),
+        node / Compile / run / logLevel       := Level.Error
+      ),
+      state
+    )
+
+    val input = s" com.wavesplatform.GenesisBlockGenerator ${absFile.getAbsolutePath}"
+
+    Project
+      .extract(stateWithSettings)
+      .runInputTask(node / Compile / runMain, input, stateWithSettings)
+
+    state
+  }
+
+commands ++= Seq(checkPR, buildPackages, generateGenesisCommand)
