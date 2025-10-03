@@ -18,14 +18,14 @@ case class RewardsSettings(
     votingInterval: Int
 ) derives ConfigReader {
   require(initial >= 0, "initial must be greater than or equal to 0")
-  require(minIncrement > 0, "minIncrement must be greater than 0")
+  require(minIncrement > 0, "min-increment must be greater than 0")
   require(term > 0, "term must be greater than 0")
-  require(votingInterval > 0, "votingInterval must be greater than 0")
-  require(votingInterval <= term, s"votingInterval must be less than or equal to term($term)")
-  require(termAfterCappedRewardFeature > 0, "termAfterCappedRewardFeature must be greater than 0")
+  require(votingInterval > 0, "voting-interval must be greater than 0")
+  require(votingInterval <= term, s"voting-interval must be less than or equal to term($term)")
+  require(termAfterCappedRewardFeature > 0, "term-after-capped-reward-feature must be greater than 0")
   require(
     votingInterval <= termAfterCappedRewardFeature,
-    s"votingInterval must be less than or equal to termAfterCappedRewardFeature($termAfterCappedRewardFeature)"
+    s"voting-interval must be less than or equal to term-after-capped-reward-feature($termAfterCappedRewardFeature)"
   )
 
   def nearestTermEnd(activatedAt: Int, height: Int, modifyTerm: Boolean): Int = {
@@ -98,13 +98,13 @@ case class FunctionalitySettings(
   lazy val unitsRegistryAddressParsed: Either[String, Option[Address]] =
     unitsRegistryAddress.traverse(Address.fromString(_)).leftMap(_ => "Incorrect units-registry-address")
 
-  require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
+  require(featureCheckBlocksPeriod > 0, "feature-check-blocks-period must be greater than 0")
   require(
     (blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod),
-    s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod"
+    s"blocks-for-feature-activation must be in range 1 to $featureCheckBlocksPeriod"
   )
-  require(minAssetInfoUpdateInterval >= 0, "minAssetInfoUpdateInterval must be greater than or equal to 0")
-  require(generationPeriodLength > 0, "generationPeriod must be greater than 0")
+  require(minAssetInfoUpdateInterval >= 0, "min-asset-info-update-interval must be greater than or equal to 0")
+  require(generationPeriodLength > 0, "generation-period-length must be greater than 0")
 
   def activationWindowSize(height: Int): Int =
     featureCheckBlocksPeriod * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
@@ -283,7 +283,7 @@ object BlockchainSettings {
             genesis       <- customObjCur.atKey("genesis").flatMap(ConfigReader[GenesisSettings].from)
             rewards       <- customObjCur.atKey("rewards").flatMap(ConfigReader[RewardsSettings].from)
           } yield {
-            require(functionality.minBlockTime <= genesis.averageBlockDelay, "minBlockTime should be <= averageBlockDelay")
+            require(functionality.minBlockTime <= genesis.averageBlockDelay, "min-block-time should be <= average-block-delay")
             (networkId, functionality, genesis, rewards)
           }
       }
