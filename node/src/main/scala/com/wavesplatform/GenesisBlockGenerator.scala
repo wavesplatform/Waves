@@ -28,7 +28,7 @@ object GenesisBlockGenerator {
   private type SeedText = String
   private type Share    = Long
 
-  case class DistributionItem(seedText: String, nonce: Int, amount: Share, miner: Boolean = true)
+  case class DistributionItem(seedText: String, amount: Share, nonce: Int = 0, miner: Boolean = true)
 
   object DistributionItem {
     // This given is required for default args to work.
