@@ -23,7 +23,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.ParSignatureChecker.sigverify
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, ParSignatureChecker}
+import com.wavesplatform.state.{BlockEndorser, Blockchain, BlockchainUpdaterImpl, Height, ParSignatureChecker}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -37,7 +37,7 @@ import monix.reactive.Observable
 import scopt.OParser
 
 import java.io.*
-import java.net.{MalformedURLException, URL}
+import java.net.{MalformedURLException, URI}
 import java.time
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -330,7 +330,7 @@ object Importer extends ScorexLogging {
         case _ =>
           System.setProperty("http.agent", s"waves-node/${Version.VersionString}")
           try {
-            val url        = new URL(file)
+            val url        = URI.create(file).toURL
             val connection = url.openConnection()
             if (offset > 0) connection.setRequestProperty("Range", s"bytes=$offset-")
             connection.connect()
@@ -353,7 +353,7 @@ object Importer extends ScorexLogging {
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]] =
-      BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify, txSignParCheck = false)
+      BlockAppender(blockchainUpdater, time, utxPool, pos, BlockEndorser.Disabled, scheduler, importOptions.verify, txSignParCheck = false)
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)

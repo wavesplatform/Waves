@@ -38,7 +38,7 @@ object GeneratorSettings extends ConfigReaders {
     }
   )
 
-  given ConfigReader[URL] = ConfigReader[String].map(str => new URL(str))
+  given ConfigReader[URL] = ConfigReader[String].map(str => URI.create(str).toURL)
 
   case class NodeAddress(networkAddress: InetSocketAddress, apiAddress: URL) derives ConfigReader
 

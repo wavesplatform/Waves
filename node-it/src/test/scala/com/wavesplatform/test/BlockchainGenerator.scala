@@ -13,8 +13,8 @@ import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.settings.{DBSettings, WavesSettings}
-import com.wavesplatform.state.EndorsementStorage
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.{BlockEndorser, EndorsementStorage}
 import com.wavesplatform.test.BlockchainGenerator.{GenBlock, GenTx}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -107,7 +107,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
       use(rdbWriterRaw)
       val utxPool = use(new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable))
       val pos = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
-      val extAppender = BlockAppender(blockchain, time, utxPool, pos, scheduler)(_, None)
+      val extAppender = BlockAppender(blockchain, time, utxPool, pos, BlockEndorser.Disabled, scheduler)(_, None)
       val utxEvents = ConcurrentSubject.publish[UtxEvent]
 
       val miner = new MinerImpl(
@@ -116,6 +116,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
         settings,
         time,
         utxPool,
+        BlockEndorser.Disabled,
         EndorsementStorage.Disabled,
         Wallet(settings.walletSettings),
         PoSSelector(blockchain, None),

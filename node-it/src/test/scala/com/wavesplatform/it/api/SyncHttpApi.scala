@@ -1,11 +1,8 @@
 package com.wavesplatform.it.api
 
-import java.net.InetSocketAddress
-import org.apache.pekko.http.scaladsl.model.StatusCodes.BadRequest
-import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
-import com.wavesplatform.api.http.requests.IssueRequest
+import com.wavesplatform.api.http.requests.{CommitToGenerationRequest, IssueRequest}
 import com.wavesplatform.api.http.{ApiError, DebugMessage}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -14,24 +11,28 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, GenerationPeriod}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TxExchangeAmount, TxExchangePrice, TxVersion}
+import com.wavesplatform.transaction.{Asset, TransactionType, TxExchangeAmount, TxExchangePrice, TxVersion}
 import io.grpc.Status.Code
+import org.apache.pekko.http.scaladsl.model.StatusCodes.BadRequest
+import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, matchers}
 import play.api.libs.json.*
 import play.api.libs.json.Json.parse
 
+import java.net.InetSocketAddress
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Awaitable, Future}
 import scala.util.*
+import scala.util.chaining.*
 import scala.util.control.NonFatal
 
 object SyncHttpApi extends Assertions with matchers.should.Matchers {
@@ -544,6 +545,13 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def getMerkleProofPost(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProofPost(ids*))
 
+    def sign(req: CommitToGenerationRequest): Transaction =
+      sign(Json.obj("type" -> TransactionType.CommitToGeneration.id) ++ Json.toJsObject(req)).tap { r =>
+        require(r._type == TransactionType.CommitToGeneration.id)
+      }
+
+    def sign(json: JsValue): Transaction = sync(async(n).sign(json))
+
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
 
@@ -599,6 +607,11 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 
+    def currentGenerationPeriod: GenerationPeriod = GenerationPeriod.from(sync(async(n).height), n.settings)
+
+    def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Int =
+      waitForHeight(p.start, requestAwaitTime)
+
     def blacklist(address: InetSocketAddress): Unit =
       sync(async(n).blacklist(address))
 
@@ -628,6 +641,10 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
       sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
+
+    def generators(atHeight: Int, amountsAsStrings: Boolean = false): Seq[GeneratorsResponse.Entry] = sync(
+      async(n).generators(atHeight, amountsAsStrings)
+    )
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       sync(async(n).rollback(to, returnToUTX))

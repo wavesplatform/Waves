@@ -23,6 +23,7 @@ import monix.eval.Task
 import monix.execution.Scheduler
 
 import java.time.Instant
+import scala.util.chaining.*
 
 object BlockAppender extends ScorexLogging {
   def apply(
@@ -30,6 +31,7 @@ object BlockAppender extends ScorexLogging {
       time: Time,
       utxStorage: UtxPool,
       pos: PoSSelector,
+      blockEndorser: BlockEndorser,
       scheduler: Scheduler,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
@@ -42,7 +44,10 @@ object BlockAppender extends ScorexLogging {
         if (newBlock.header.challengedHeader.isDefined) {
           appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
         } else {
-          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
+          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot).tap {
+            case Right(_: Applied) => blockEndorser.endorse(Height(blockchainUpdater.height - 1))
+            case _                 =>
+          }
         }
       } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(Ignored)
@@ -71,7 +76,7 @@ object BlockAppender extends ScorexLogging {
       (for {
         _ <- EitherT(Task(Either.cond(newBlock.signatureValid(), (), GenericError("Invalid block signature"))))
         _ = span.markNtp("block.signatures-validated")
-        validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock, snapshot))
+        validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, blockEndorser, scheduler)(newBlock, snapshot))
       } yield validApplication).value
 
     val handle = append.flatMap {
@@ -83,10 +88,9 @@ object BlockAppender extends ScorexLogging {
           span.markNtp("block.applied")
           span.finishNtp()
           BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
-          if (blockchainUpdater.isLastBlockId(newBlock.id()) && (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined))
+          if (blockchainUpdater.isLastBlockId(newBlock.id()) && (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined)) {
             allChannels.broadcast(BlockForged(newBlock), Some(ch)) // Key block or challenging block
-
-          blockEndorser.endorse(Height(blockchainUpdater.height - 1))
+          }
         }
       case Left(is: InvalidSignature) =>
         Task(peerDatabase.blacklistAndClose(ch, s"Could not append $newBlock: $is"))

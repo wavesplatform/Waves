@@ -24,10 +24,10 @@ import org.asynchttpclient.Dsl.*
 import pureconfig.ConfigSource
 
 import java.io.{FileOutputStream, IOException}
-import java.net.{InetAddress, InetSocketAddress, URL}
+import java.net.{InetAddress, InetSocketAddress, URI, URL}
 import java.nio.file.{Files, Path, Paths}
-import java.time.{LocalDateTime, Duration as JDuration}
 import java.time.format.DateTimeFormatter
+import java.time.{LocalDateTime, Duration as JDuration}
 import java.util.Collections.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
@@ -621,7 +621,7 @@ object Docker {
       .mkString(" ")
 
   case class NodeInfo(restApiPort: Int, networkPort: Int, wavesIpAddress: String, ports: JMap[String, JList[PortBinding]]) {
-    val nodeApiEndpoint: URL                       = new URL(s"http://localhost:${externalPort(restApiPort)}")
+    val nodeApiEndpoint: URL                       = URI.create(s"http://localhost:${externalPort(restApiPort)}").toURL
     val hostNetworkAddress: InetSocketAddress      = new InetSocketAddress("localhost", externalPort(networkPort))
     val containerNetworkAddress: InetSocketAddress = new InetSocketAddress(wavesIpAddress, networkPort)
 
@@ -640,6 +640,6 @@ object Docker {
     def getConfig: Config = config
   }
 
-  private val debuggerPort      = new AtomicInteger(11000)
+  private val debuggerPort            = new AtomicInteger(11000)
   private def freeDebuggerPort(): Int = debuggerPort.getAndIncrement()
 }

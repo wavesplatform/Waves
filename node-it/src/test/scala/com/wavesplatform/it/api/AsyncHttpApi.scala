@@ -1,10 +1,5 @@
 package com.wavesplatform.it.api
 
-import java.io.IOException
-import java.net.{InetSocketAddress, URLEncoder}
-import java.util.concurrent.TimeoutException
-import java.util.{NoSuchElementException, UUID}
-import java.time.{Duration as JDuration}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.DebugMessage.*
@@ -12,8 +7,8 @@ import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.{ConnectReq, DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.features.api.{ActivationStatus, activationStatusFormat}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.invokeExpressionFee
@@ -25,7 +20,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.state.DataEntry.Format
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Height, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.{Order, ExchangeTransaction as ExchangeTx}
@@ -38,14 +33,14 @@ import com.wavesplatform.transaction.{
   CreateAliasTransaction,
   DataTransaction,
   Proofs,
+  TransactionSignOps,
+  TransactionValidationOps,
   TxDecimals,
   TxExchangeAmount,
   TxExchangePrice,
   TxNonNegativeAmount,
   TxPositiveAmount,
-  TxVersion,
-  TransactionSignOps,
-  TransactionValidationOps
+  TxVersion
 }
 import org.asynchttpclient.*
 import org.asynchttpclient.Dsl.{delete as _delete, get as _get, post as _post, put as _put}
@@ -55,12 +50,17 @@ import org.scalatest.{Assertions, matchers}
 import play.api.libs.json.*
 import play.api.libs.json.Json.{stringify, toJson}
 
+import java.io.IOException
+import java.net.{InetSocketAddress, URLEncoder}
+import java.time.Duration as JDuration
+import java.util.concurrent.TimeoutException
+import java.util.{NoSuchElementException, UUID}
 import scala.collection.immutable.VectorMap
-import scala.jdk.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration.*
+import scala.jdk.FutureConverters.*
 import scala.util.{Failure, Success}
 
 object AsyncHttpApi extends Assertions {
@@ -216,7 +216,7 @@ object AsyncHttpApi extends Assertions {
     def waitForBlackList(blackListSize: Int): Future[Seq[BlacklistedPeer]] =
       waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers > $blackListSize")(_.blacklistedPeers, _.lengthCompare(blackListSize) > 0, 500.millis)
 
-    def height: Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
+    def height: Future[Height] = get("/blocks/height").as[JsValue].map(v => Height((v \ "height").as[Int]))
 
     def blockAt(height: Int, amountsAsStrings: Boolean = false): Future[Block] =
       get(s"/blocks/at/$height", amountsAsStrings).as[Block](amountsAsStrings)
@@ -254,6 +254,9 @@ object AsyncHttpApi extends Assertions {
     def blockHeadersSeq(from: Int, to: Int, amountsAsStrings: Boolean = false): Future[Seq[BlockHeader]] =
       get(s"/blocks/headers/seq/$from/$to", amountsAsStrings)
         .as[Seq[BlockHeader]](amountsAsStrings)
+
+    def generators(atHeight: Int, amountsAsStrings: Boolean = false): Future[Seq[GeneratorsResponse.Entry]] =
+      get(s"/generators/at/$atHeight", amountsAsStrings).as(amountsAsStrings)
 
     def lastBlockHeader(amountsAsStrings: Boolean = false): Future[BlockHeader] =
       get("/blocks/headers/last", amountsAsStrings)
@@ -722,6 +725,9 @@ object AsyncHttpApi extends Assertions {
 
     def getMerkleProofPost(ids: String*): Future[Seq[MerkleProofResponse]] =
       postJson(s"/transactions/merkleProof", Json.obj("ids" -> ids)).as[Seq[MerkleProofResponse]]
+
+    def sign(json: JsValue): Future[Transaction] =
+      postJson(s"/transactions/sign", json).as[Transaction]
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 

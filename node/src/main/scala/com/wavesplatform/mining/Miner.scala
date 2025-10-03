@@ -56,6 +56,7 @@ class MinerImpl(
     settings: WavesSettings,
     timeService: Time,
     utx: UtxPool,
+    blockEndorser: BlockEndorser,
     endorsementStorage: EndorsementStorage,
     wallet: Wallet,
     pos: PoSSelector,
@@ -305,7 +306,7 @@ class MinerImpl(
         }
 
         def appendTask(block: Block, totalConstraint: MiningConstraint) =
-          BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block, None).flatMap {
+          BlockAppender(blockchainUpdater, timeService, utx, pos, blockEndorser, appenderScheduler)(block, None).flatMap {
             case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
               generateBlockTask(account, None)
 

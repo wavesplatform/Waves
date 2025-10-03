@@ -1,12 +1,12 @@
 package com.wavesplatform.utils
 
-import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
-import java.util.concurrent.{Future as JavaFuture, *}
-
 import io.netty.util.{Timeout, Timer}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.execution.{ExecutionModel, Features, UncaughtExceptionReporter}
 
+import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{Future as JavaFuture, *}
 import scala.concurrent.duration.*
 
 /** Helper methods to create schedulers with custom DiscardPolicy */
@@ -41,13 +41,17 @@ object Schedulers {
     }
   }
 
-  private def threadFactory(name: String, daemonic: Boolean, reporter: UncaughtExceptionReporter): ThreadFactory = { (r: Runnable) =>
-    val thread = new Thread(r)
-    thread.setName(name + "-" + thread.getId)
-    thread.setDaemon(daemonic)
-    thread.setUncaughtExceptionHandler((_: Thread, e: Throwable) => reporter.reportFailure(e))
+  private def threadFactory(name: String, daemonic: Boolean, reporter: UncaughtExceptionReporter): ThreadFactory = {
+    val counter = new AtomicInteger(1)
 
-    thread
+    { (r: Runnable) =>
+      val thread = new Thread(r)
+      thread.setName(s"$name-${counter.getAndIncrement()}")
+      thread.setDaemon(daemonic)
+      thread.setUncaughtExceptionHandler((_: Thread, e: Throwable) => reporter.reportFailure(e))
+
+      thread
+    }
   }
 
   def singleThread(

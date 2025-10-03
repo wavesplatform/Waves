@@ -145,6 +145,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
     val endorsementStorage = EndorsementStorage.InMemory()
+    val blockEndorser      = new BlockEndorser.InMemory(blockchainUpdater, wallet, endorsementStorage, allChannels)
 
     if (settings.minerSettings.enable)
       miner = new MinerImpl(
@@ -153,6 +154,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         settings,
         time,
         utxStorage,
+        blockEndorser,
         endorsementStorage,
         wallet,
         pos,
@@ -173,12 +175,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
             settings,
             time,
             pos,
-            appendBlock = BlockAppender(blockchainUpdater, time, utxStorage, pos, appenderScheduler)(_, None)
+            appendBlock = BlockAppender(blockchainUpdater, time, utxStorage, pos, blockEndorser, appenderScheduler)(_, None)
           )
         )
       } else None
-
-    val blockEndorser = new BlockEndorser.InMemory(blockchainUpdater, wallet, endorsementStorage, allChannels)
 
     val processBlock =
       BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, blockChallenger, blockEndorser, appenderScheduler)

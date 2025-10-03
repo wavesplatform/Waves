@@ -16,7 +16,7 @@ import com.wavesplatform.network.BlockSnapshotResponse
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{BalanceSnapshot, BlockchainUpdaterImpl, EndorsementStorage}
+import com.wavesplatform.state.{BalanceSnapshot, BlockEndorser, BlockchainUpdaterImpl, EndorsementStorage}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{Schedulers, Time}
 import com.wavesplatform.utx.UtxPoolImpl
@@ -252,6 +252,7 @@ object MinerChallengeSimulator {
         wavesSettings,
         fakeTime,
         utx,
+        BlockEndorser.Disabled,
         EndorsementStorage.Disabled,
         wallet,
         posSelector,
@@ -259,7 +260,7 @@ object MinerChallengeSimulator {
         scheduler,
         utxEvents.collect { case _: UtxEvent.TxAdded => () }
       )
-      val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, scheduler, verify = false)
+      val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, BlockEndorser.Disabled, scheduler, verify = false)
 
       miner -> blockAppender
     }

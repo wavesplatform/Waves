@@ -100,6 +100,7 @@ object EndorsementStorage {
     private def toConflict(msg: EndorseBlock, verifiedSig: BlsSignature.NonEmpty): BlockEndorsement.Conflict =
       BlockEndorsement.Conflict(msg.endorserIndex, msg.finalizedId, verifiedSig)
 
+    // TODO: if not activated
     override def startVoting(filter: EndorsementFilter): Boolean = synced {
       val isNewVoting = !currentFilter.exists(_.sameVoting(filter))
       if (isNewVoting) {

@@ -11,8 +11,8 @@ import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.settings.*
-import com.wavesplatform.state.EndorsementStorage
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.{BlockEndorser, EndorsementStorage}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
@@ -160,6 +160,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       wavesSettings,
       fakeTime,
       utx,
+      BlockEndorser.Disabled,
       EndorsementStorage.Disabled,
       wallet,
       posSelector,
@@ -167,7 +168,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       scheduler,
       utxEvents.collect { case _: UtxEvent.TxAdded => () }
     )
-    val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, scheduler, verify = false)(_, None)
+    val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, BlockEndorser.Disabled, scheduler, verify = false)(_, None)
 
     object Output {
       private var first = true

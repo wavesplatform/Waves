@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 
 case class GenerationPeriod(start: Height, length: Int) {
   def next: GenerationPeriod = move(start + length)
@@ -18,6 +18,8 @@ case class GenerationPeriod(start: Height, length: Int) {
 }
 
 object GenerationPeriod {
+  def from(h: Height, wavesSettings: WavesSettings): GenerationPeriod = from(h, wavesSettings.blockchainSettings.functionalitySettings)
+
   def from(h: Height, functionalitySettings: FunctionalitySettings): GenerationPeriod = {
     val l = functionalitySettings.generationPeriodLength
     GenerationPeriod(

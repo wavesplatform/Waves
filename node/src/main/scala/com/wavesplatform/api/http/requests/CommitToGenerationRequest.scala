@@ -10,15 +10,15 @@ import com.wavesplatform.transaction.{CommitToGenerationTransaction, Proofs, Tra
 import play.api.libs.json.*
 
 object CommitToGenerationRequest {
-  given Reads[CommitToGenerationRequest]       = Json.reads
-  given Reads[SignedCommitToGenerationRequest] = Json.reads
+  given OFormat[CommitToGenerationRequest]       = Json.format
+  given OFormat[SignedCommitToGenerationRequest] = Json.format
 }
 
 case class CommitToGenerationRequest(
     sender: Option[String],
-    generationPeriodStart: Option[Int],
-    timestamp: Option[Long],
-    chainId: Option[Byte]
+    generationPeriodStart: Option[Int] = None,
+    timestamp: Option[Long] = None,
+    chainId: Option[Byte] = None
 ) {
   def toTxFrom(sender: PublicKey, defaultGenerationPeriodStart: Height): Either[ValidationError, CommitToGenerationTransaction] =
     for {
