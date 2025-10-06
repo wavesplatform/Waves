@@ -6,18 +6,24 @@ import com.wavesplatform.settings.*
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.*
-import io.netty.channel.group.ChannelGroup
+import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
 import io.netty.channel.nio.NioIoHandler
 import io.netty.channel.socket.nio.NioSocketChannel
+import io.netty.util.concurrent.GlobalEventExecutor
 
 import java.io.IOException
 import java.net.InetSocketAddress
 import scala.concurrent.{Future, Promise}
 
-class NetworkClient(trafficLoggerSettings: TrafficLogger.Settings, applicationName: String, nodeName: String, nonce: Long, allChannels: ChannelGroup)
-    extends ScorexLogging {
+class NetworkClient(
+    applicationName: String,
+    nodeName: String = "network-client",
+    nonce: Long = 0L,
+    allChannels: ChannelGroup = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+    trafficLoggerSettings: TrafficLogger.Settings = TrafficLogger.Settings(Set.empty, Set.empty)
+) extends ScorexLogging {
   def this(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char, nodeName: String, nonce: Long, allChannels: ChannelGroup) =
-    this(trafficLoggerSettings, Constants.ApplicationName + chainId, nodeName, nonce, allChannels)
+    this(Constants.ApplicationName + chainId, nodeName, nonce, allChannels, trafficLoggerSettings)
 
   private val workerGroup = new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
   private val handshake   = Handshake(applicationName, Version.VersionTuple, nodeName, nonce, None)
