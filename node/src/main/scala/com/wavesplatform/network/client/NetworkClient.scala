@@ -14,11 +14,13 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import scala.concurrent.{Future, Promise}
 
-class NetworkClient(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char, nodeName: String, nonce: Long, allChannels: ChannelGroup)
+class NetworkClient(trafficLoggerSettings: TrafficLogger.Settings, applicationName: String, nodeName: String, nonce: Long, allChannels: ChannelGroup)
     extends ScorexLogging {
+  def this(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char, nodeName: String, nonce: Long, allChannels: ChannelGroup) =
+    this(trafficLoggerSettings, Constants.ApplicationName + chainId, nodeName, nonce, allChannels)
 
   private val workerGroup = new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
-  private val handshake   = Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, nodeName, nonce, None)
+  private val handshake   = Handshake(applicationName, Version.VersionTuple, nodeName, nonce, None)
 
   def connect(remoteAddress: InetSocketAddress): Future[Channel] = {
     val p = Promise[Channel]()
@@ -29,13 +31,13 @@ class NetworkClient(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char
       .handler(new LegacyChannelInitializer(trafficLoggerSettings, handshake, p))
 
     log.debug(s"Connecting to $remoteAddress")
-    val channelFuture = bootstrap.connect(remoteAddress)
-    channelFuture.addListener { (_: ChannelFuture) =>
+    val connectionFuture = bootstrap.connect(remoteAddress)
+    connectionFuture.addListener { (_: ChannelFuture) =>
       log.debug(s"Connected to $remoteAddress")
-      channelFuture.channel().write(p)
+      connectionFuture.channel().write(p)
     }
 
-    val channel = channelFuture.channel()
+    val channel = connectionFuture.channel()
     allChannels.add(channel)
     channel.closeFuture().addListener { (chf: ChannelFuture) =>
       if (!p.isCompleted) {
