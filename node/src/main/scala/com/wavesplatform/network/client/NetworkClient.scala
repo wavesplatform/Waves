@@ -1,7 +1,7 @@
 package com.wavesplatform.network.client
 
 import com.wavesplatform.Version
-import com.wavesplatform.network.{Handshake, TrafficLogger}
+import com.wavesplatform.network.{Handshake, LegacyFrameCodec, LegacyFrameCodecL1, PeerDatabase, TrafficLogger}
 import com.wavesplatform.settings.*
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.bootstrap.Bootstrap
@@ -13,6 +13,7 @@ import io.netty.util.concurrent.GlobalEventExecutor
 
 import java.io.IOException
 import java.net.InetSocketAddress
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 
 class NetworkClient(
@@ -20,7 +21,8 @@ class NetworkClient(
     nodeName: String = "network-client",
     nonce: Long = 0L,
     allChannels: ChannelGroup = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
-    trafficLoggerSettings: TrafficLogger.Settings = TrafficLogger.Settings(Set.empty, Set.empty)
+    trafficLoggerSettings: TrafficLogger.Settings = TrafficLogger.Settings(Set.empty, Set.empty),
+    frameCodec: LegacyFrameCodec = LegacyFrameCodecL1(PeerDatabase.NoOp, 5.seconds)
 ) extends ScorexLogging {
   def this(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char, nodeName: String, nonce: Long, allChannels: ChannelGroup) =
     this(Constants.ApplicationName + chainId, nodeName, nonce, allChannels, trafficLoggerSettings)
@@ -34,7 +36,7 @@ class NetworkClient(
     val bootstrap = new Bootstrap()
       .group(workerGroup)
       .channel(classOf[NioSocketChannel])
-      .handler(new LegacyChannelInitializer(trafficLoggerSettings, handshake, p))
+      .handler(new LegacyChannelInitializer(frameCodec, trafficLoggerSettings, handshake, p))
 
     log.debug(s"Connecting to $remoteAddress")
     val connectionFuture = bootstrap.connect(remoteAddress)
