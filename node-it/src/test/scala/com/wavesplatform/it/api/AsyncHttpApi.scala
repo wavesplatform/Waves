@@ -218,6 +218,8 @@ object AsyncHttpApi extends Assertions {
 
     def height: Future[Height] = get("/blocks/height").as[JsValue].map(v => Height((v \ "height").as[Int]))
 
+    def finalizedHeight: Future[Height] = get("/blocks/height/finalized").as[JsValue].map(v => Height((v \ "height").as[Int]))
+
     def blockAt(height: Int, amountsAsStrings: Boolean = false): Future[Block] =
       get(s"/blocks/at/$height", amountsAsStrings).as[Block](amountsAsStrings)
 
@@ -901,7 +903,7 @@ object AsyncHttpApi extends Assertions {
 
     def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = OK_200, waitForStatus: Boolean = false): Future[Response] = {
       def executeRequest: Future[Response] = {
-        val id = UUID.randomUUID()
+        val id = UUID.randomUUID().toString.take(8)
         n.log.trace(s"[$id] Executing request '$r'")
         if (r.getStringData != null) n.log.debug(s"[$id] Request's body '${r.getStringData}'")
         n.client
