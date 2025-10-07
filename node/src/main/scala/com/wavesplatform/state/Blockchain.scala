@@ -26,7 +26,6 @@ trait Blockchain {
 
   def height: Int
 
-  def finalizedHeight: Height
   def finalizedHeightAt(at: Height): Option[Height]
 
   def score: BigInt
@@ -137,12 +136,18 @@ object Blockchain {
     def contains(block: Block): Boolean     = blockchain.contains(block.id())
     def contains(blockId: BlockId): Boolean = blockchain.heightOf(blockId).isDefined
 
+    def finalizedHeightOrFallback(maxRollbackLength: Int, at: Height = Height(blockchain.height)): Height = {
+      val finalizedAt       = blockchain.finalizedHeightAt(at)
+      val minFallbackHeight = at - maxRollbackLength
+      Height(finalizedAt.getOrElse(GenesisBlockHeight).max(minFallbackHeight))
+    }
+
     def blockId(atHeight: Int): Option[BlockId] = blockchain.blockHeader(atHeight).map(_.id())
 
     def lastBlockHeader: Option[SignedBlockHeader] = blockchain.blockHeader(blockchain.height)
     def lastBlockId: Option[BlockId]               = lastBlockHeader.map(_.id())
     def lastBlockTimestamp: Option[Long]           = lastBlockHeader.map(_.header.timestamp)
-    def lastBlockIds(): Seq[BlockId]               = (blockchain.height to blockchain.finalizedHeight by -1).flatMap(blockId)
+    def lastBlockIds(howMany: Int): Seq[ByteStr]   = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
 
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       (aoa: @unchecked) match {

@@ -38,20 +38,19 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
       withEnv { case Env(settings, pos, bcu, utxPoolStub, scheduler, account, lastBlock) =>
         val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
         val wallet      = Wallet(WalletSettings(None, Some("123"), None))
-        val miner =
-          new MinerImpl(
-            allChannels,
-            bcu,
-            settings,
-            ntpTime,
-            utxPoolStub,
-            EndorsementStorage.Disabled,
-            wallet,
-            pos,
-            scheduler,
-            scheduler,
-            Observable.empty
-          )
+        val miner = new MinerImpl(
+          allChannels,
+          bcu,
+          settings,
+          ntpTime,
+          utxPoolStub,
+          EndorsementStorage.Disabled,
+          wallet,
+          pos,
+          scheduler,
+          scheduler,
+          Observable.empty
+        )
 
         withSecurityManager(BaseTargetReachedMaximum) { signal =>
           try {

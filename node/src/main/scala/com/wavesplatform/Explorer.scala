@@ -69,9 +69,8 @@ object Explorer extends ScorexLogging {
 
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
-    val rdb = RDB.open(settings.dbSettings)
-    val reader =
-      RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.synchronizationSettings.maxRollback, settings.enableLightMode)
+    val rdb    = RDB.open(settings.dbSettings)
+    val reader = RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")

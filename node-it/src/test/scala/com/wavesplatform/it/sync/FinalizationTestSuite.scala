@@ -9,6 +9,8 @@ import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 import com.wavesplatform.test.NumericExt
 import org.scalatest.OptionValues
 
+import scala.concurrent.duration.DurationInt
+
 class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -53,16 +55,31 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
       )
     )
 
-    node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true)
+    info("Finalized height checks")
+    val deadline               = 2.minutes.fromNow
+    val finalizedHeight1       = node.finalizedHeight
+    val waitingFinalizedHeight = finalizedHeight1 + 2
 
-    node.waitForHeight(node.height + 2)
+    var currFinalizedHeight = finalizedHeight1
+    var done                = false
+    while (!done && deadline.hasTimeLeft()) {
+      val currHeight = node.height
+      if (currHeight > waitingFinalizedHeight + 2)
+        fail(s"Finalization height doesn't rise: height=$currHeight, waiting for finalized height=$waitingFinalizedHeight")
+
+      // We need at least one transaction, otherwise there won't be a microblock, thus no voting, no finalization
+      node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true)
+
+      val updatedFinalizedHeight = node.finalizedHeight
+      if (updatedFinalizedHeight < currFinalizedHeight)
+        fail(s"Finalized height $updatedFinalizedHeight became lower than the previous $currFinalizedHeight")
+      else if (updatedFinalizedHeight != currFinalizedHeight)
+        log.debug(s"New finalized height: $currFinalizedHeight -> $updatedFinalizedHeight")
+
+      currFinalizedHeight = updatedFinalizedHeight
+      done = currFinalizedHeight > waitingFinalizedHeight
+    }
+
     // TODO
-//    val expectedBlacklistedPeers = nodes.size - 1
-//
-//    node.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers.size == $expectedBlacklistedPeers")(
-//      _ => node.blacklistedPeers,
-//      _.lengthCompare(expectedBlacklistedPeers) == 0,
-//      1.second
-//    )
   }
 }

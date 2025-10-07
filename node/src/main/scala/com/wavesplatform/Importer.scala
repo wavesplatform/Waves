@@ -150,6 +150,7 @@ object Importer extends ScorexLogging {
             )
           override def blocksApi: CommonBlocksApi =
             CommonBlocksApi(
+              settings.synchronizationSettings.maxRollback,
               blockchainUpdater,
               Application.loadBlockMetaAt(rdb.db, blockchainUpdater),
               Application.loadBlockInfoAt(rdb, blockchainUpdater)

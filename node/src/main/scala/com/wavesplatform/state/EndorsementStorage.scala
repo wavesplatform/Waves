@@ -114,7 +114,7 @@ object EndorsementStorage {
           logger.info(s"Started voting with $filter")
           Some(filter)
         }
-      }
+      } else logger.trace(s"Same voting: current=$currentVoting vs new=$filter")
       isNewVoting
     }
 

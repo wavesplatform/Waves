@@ -11,7 +11,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, GenerationPeriod}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, GenerationPeriod, Height}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -628,8 +628,9 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def debugBalanceHistory(address: String, amountsAsStrings: Boolean = false): Seq[BalanceHistory] =
       sync(async(n).debugBalanceHistory(address, amountsAsStrings))
 
-    def height: Int =
-      sync(async(n).height)
+    def height: Height = sync(async(n).height)
+
+    def finalizedHeight: Height = sync(async(n).finalizedHeight)
 
     def blockAt(height: Int, amountsAsStrings: Boolean = false): Block = sync(async(n).blockAt(height, amountsAsStrings))
 

@@ -17,7 +17,6 @@ object TestStorageFactory {
       rdb,
       settings.blockchainSettings,
       settings.dbSettings,
-      settings.synchronizationSettings.maxRollback,
       settings.enableLightMode,
       Some(MoreExecutors.newDirectExecutorService())
     )

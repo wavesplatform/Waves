@@ -116,14 +116,12 @@ object RocksDBWriter extends ScorexLogging {
       rdb: RDB,
       settings: BlockchainSettings,
       dbSettings: DBSettings,
-      maxSynchronizationRollbackHeight: Int,
       isLightMode: Boolean,
       forceCleanupExecutorService: Option[ExecutorService] = None
   ): RocksDBWriter = new RocksDBWriter(
     rdb,
     settings,
     dbSettings,
-    maxSynchronizationRollbackHeight,
     isLightMode,
     dbSettings.cleanupInterval match {
       case None => MoreExecutors.newDirectExecutorService() // We don't care if disabled
@@ -148,7 +146,6 @@ class RocksDBWriter(
     rdb: RDB,
     val settings: BlockchainSettings,
     val dbSettings: DBSettings,
-    val maxSynchronizationRollbackHeight: Int,
     isLightMode: Boolean,
     cleanupExecutorService: ExecutorService
 ) extends Caches
@@ -535,7 +532,7 @@ class RocksDBWriter(
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
-      newFinalizedHeight: Option[Height],
+      newFinalizedHeight: Height,
       generatorBalances: Seq[Long],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
@@ -546,7 +543,7 @@ class RocksDBWriter(
       val h           = Height(height)
 
       rw.put(Keys.height, h)
-      if (newFinalizedHeight.isDefined) rw.put(Keys.finalizedHeight(h), newFinalizedHeight)
+      rw.put(Keys.finalizedHeight(h), Some(newFinalizedHeight))
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
       val newSafeRollbackHeight      = height - dbSettings.maxRollbackDepth

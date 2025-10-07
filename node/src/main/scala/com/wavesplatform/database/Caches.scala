@@ -29,13 +29,9 @@ abstract class Caches extends Blockchain with Storage {
   import Caches.*
 
   val dbSettings: DBSettings
-  val maxSynchronizationRollbackHeight: Int
 
   @volatile
   private var current = loadCurrentBlock()
-
-  @volatile
-  private var currentFinalizedHeight = fallbackFinalizedHeight(current.height, finalizedHeightAt(current.height)) // TODO: just dynamic field?
 
   private def loadCurrentBlock() = {
     val height = loadHeight()
@@ -44,17 +40,10 @@ abstract class Caches extends Blockchain with Storage {
 
   protected def loadHeight(): Height
 
-  // Don't work with at > current height
-  protected def fallbackFinalizedHeight(at: Height, finalizedHeight: Option[Height]): Height = finalizedHeight.getOrElse {
-    Height(GenesisBlockHeight.max(at - maxSynchronizationRollbackHeight))
-  }
-
   protected def loadBlockMeta(height: Height): Option[PBBlockMeta]
   protected def loadTxs(height: Height): Seq[Transaction]
 
   override def height: Int = current.height
-
-  override def finalizedHeight: Height = currentFinalizedHeight
 
   override def score: BigInt = current.score
 
@@ -239,7 +228,7 @@ abstract class Caches extends Blockchain with Storage {
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
-      newFinalizedHeight: Option[Height],
+      newFinalizedHeight: Height,
       generatorBalances: Seq[Long],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
@@ -253,7 +242,7 @@ abstract class Caches extends Blockchain with Storage {
       hitSource: ByteStr,
       computedBlockStateHash: ByteStr,
       block: Block,
-      newFinalizedHeight: Option[Height],
+      newFinalizedHeight: Height,
       generatorBalances: GeneratorBalances
   ): Unit = {
     val newHeight = Height(current.height + 1)
@@ -273,7 +262,6 @@ abstract class Caches extends Blockchain with Storage {
         (reward.getOrElse(0L) * this.blockRewardBoost(newHeight))
     )
     current = CurrentBlockInfo(newHeight, Some(newMeta), block.transactionData)
-    currentFinalizedHeight = fallbackFinalizedHeight(newHeight, newFinalizedHeight)
 
     committedGeneratorBalancesCache = (
       committedGeneratorBalancesCache.current,
@@ -424,10 +412,6 @@ abstract class Caches extends Blockchain with Storage {
       discardedBlocks = doRollback(height)
     } yield {
       current = loadCurrentBlock()
-
-      // Can go below currentFinalizedHeight height only by a force rollback (DebugApiRoute)
-      // During automatic rollbacks this won't happen, because we ask a block extension from the current finalized height
-      currentFinalizedHeight = fallbackFinalizedHeight(current.height, finalizedHeightAt(current.height))
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()

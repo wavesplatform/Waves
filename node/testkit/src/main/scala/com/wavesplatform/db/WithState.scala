@@ -25,6 +25,7 @@ import com.wavesplatform.state.{
   Blockchain,
   BlockchainUpdaterImpl,
   CompleteBlockchainUpdater,
+  GenesisBlockHeight,
   NgState,
   SnapshotBlockchain,
   StateSnapshot,
@@ -156,7 +157,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         preconditionBlock.header.generationSignature,
         computedStateHash,
         preconditionBlock,
-        newFinalizedHeight = None,
+        newFinalizedHeight = GenesisBlockHeight,
         generatorBalances = Seq.empty
       )
     }
@@ -206,7 +207,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         preconditionBlock.header.generationSignature,
         diffResult.computedStateHash,
         preconditionBlock,
-        newFinalizedHeight = None,
+        newFinalizedHeight = GenesisBlockHeight,
         generatorBalances = Seq.empty
       )).explicitGet()
     }
@@ -252,7 +253,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
           preconditionBlock.header.generationSignature,
           diffResult.computedStateHash,
           preconditionBlock,
-          newFinalizedHeight = None,
+          newFinalizedHeight = GenesisBlockHeight,
           generatorBalances = Seq.empty
         )
         Some(preconditionBlock)
@@ -283,7 +284,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         checkedBlock.header.generationSignature,
         diffResult.computedStateHash,
         checkedBlock,
-        newFinalizedHeight = None,
+        newFinalizedHeight = GenesisBlockHeight,
         generatorBalances = Seq.empty
       )
       assertion(diffResult.snapshot, state)
@@ -334,7 +335,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
           checkedBlock.header.generationSignature.take(Block.HitSourceLength),
           result.computedStateHash,
           checkedBlock,
-          newFinalizedHeight = None,
+          newFinalizedHeight = GenesisBlockHeight,
           generatorBalances = Seq.empty
         )
       }
@@ -390,21 +391,20 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
      } else TracedResult(Right(None)))
     .flatMap { stateHash =>
       TracedResult(
-        Block
-          .buildAndSign(
-            version = blockWithoutStateHash.header.version,
-            timestamp = blockWithoutStateHash.header.timestamp,
-            reference = blockWithoutStateHash.header.reference,
-            baseTarget = blockWithoutStateHash.header.baseTarget,
-            generationSignature = blockWithoutStateHash.header.generationSignature,
-            txs = blockWithoutStateHash.transactionData,
-            featureVotes = blockWithoutStateHash.header.featureVotes,
-            rewardVote = blockWithoutStateHash.header.rewardVote,
-            signer = signer,
-            stateHash = stateHash,
-            challengedHeader = None,
-            finalizationVoting = None
-          )
+        Block.buildAndSign(
+          version = blockWithoutStateHash.header.version,
+          timestamp = blockWithoutStateHash.header.timestamp,
+          reference = blockWithoutStateHash.header.reference,
+          baseTarget = blockWithoutStateHash.header.baseTarget,
+          generationSignature = blockWithoutStateHash.header.generationSignature,
+          txs = blockWithoutStateHash.transactionData,
+          featureVotes = blockWithoutStateHash.header.featureVotes,
+          rewardVote = blockWithoutStateHash.header.rewardVote,
+          signer = signer,
+          stateHash = stateHash,
+          challengedHeader = None,
+          finalizationVoting = None
+        )
       )
     }
   }

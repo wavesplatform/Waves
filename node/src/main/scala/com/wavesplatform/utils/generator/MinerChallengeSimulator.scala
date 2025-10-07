@@ -193,7 +193,6 @@ object MinerChallengeSimulator {
         rdb,
         fixedWavesSettings.blockchainSettings,
         fixedWavesSettings.dbSettings,
-        fixedWavesSettings.synchronizationSettings.maxRollback,
         isLightMode = false
       )
       val fakeTime = createFakeTime(rocksDBWriter.lastBlockTimestamp.get)

@@ -40,6 +40,8 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
             .toRight(BlockDoesNotExist)
         )
       }
+    } ~ path("height" / "finalized") {
+      complete(Json.obj("height" -> commonApi.finalizedHeight))
     } ~ path("height" / BlockId) { signature =>
       complete(for {
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)

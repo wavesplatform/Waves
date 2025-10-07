@@ -257,8 +257,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         tx => transactionPublisher.validateAndBroadcast(tx, None),
         loadBlockAt(rdb, blockchainUpdater)
       )
-      override val blocksApi: CommonBlocksApi =
-        CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(rdb.db, blockchainUpdater), loadBlockInfoAt(rdb, blockchainUpdater))
+      override val blocksApi: CommonBlocksApi = CommonBlocksApi(
+        settings.synchronizationSettings.maxRollback,
+        blockchainUpdater,
+        loadBlockMetaAt(rdb.db, blockchainUpdater),
+        loadBlockInfoAt(rdb, blockchainUpdater)
+      )
       override val accountsApi: CommonAccountsApi =
         CommonAccountsApi(() => blockchainUpdater.snapshotBlockchain, rdb, blockchainUpdater)
       override val assetsApi: CommonAssetsApi =
@@ -323,7 +327,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       settings.synchronizationSettings.synchronizationTimeout,
       settings.synchronizationSettings.processedBlocksCacheTimeout,
       settings.enableLightMode,
-      Coeval(blockchainUpdater.lastBlockIds()),
+      Coeval(blockchainUpdater.lastBlockIds(settings.synchronizationSettings.maxRollback)),
       peerDatabase,
       knownInvalidBlocks,
       messageObserver.blocks,

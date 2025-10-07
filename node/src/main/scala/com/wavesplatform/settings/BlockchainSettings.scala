@@ -81,7 +81,7 @@ case class FunctionalitySettings(
     paymentsCheckHeight: Int = 0,
     unitsRegistryAddress: Option[String] = None,
     maxGenerators: Int = 5,
-    generationPeriodLength: Int = 1000
+    generationPeriodLength: Int = 1001
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -165,7 +165,7 @@ object FunctionalitySettings {
     xtnBuybackRewardPeriod = 2000,
     blockRewardBoostPeriod = 2_000,
     unitsRegistryAddress = Some("3N9fwNGJcUcAbhh7YPr6mrpuGJD4tApZFsT"),
-    maxGenerators = 10,
+    maxGenerators = 64,
     generationPeriodLength = 3000
   )
 
@@ -182,8 +182,8 @@ object FunctionalitySettings {
     xtnBuybackAddress = Some("3MbhiRiLFLJ1EVKNP9npRszcLLQDjwnFfZM"),
     xtnBuybackRewardPeriod = 1000,
     paymentsCheckHeight = 2195900,
-    maxGenerators = 3,
-    generationPeriodLength = 100
+    maxGenerators = 32,
+    generationPeriodLength = 1000
   )
 }
 

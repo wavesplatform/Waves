@@ -165,12 +165,21 @@ object Block {
     )
   }
 
-  def create(base: Block, transactionData: Seq[Transaction], signature: ByteStr, stateHash: Option[ByteStr]): Block =
-    base.copy(
-      signature = signature,
-      transactionData = transactionData,
-      header = base.header.copy(transactionsRoot = mkTransactionsRoot(base.header.version, transactionData), stateHash = stateHash)
+  def create(
+      base: Block,
+      transactionData: Seq[Transaction],
+      signature: ByteStr,
+      stateHash: Option[ByteStr],
+      finalizationVoting: Option[FinalizationVoting]
+  ): Block = base.copy(
+    signature = signature,
+    transactionData = transactionData,
+    header = base.header.copy(
+      transactionsRoot = mkTransactionsRoot(base.header.version, transactionData),
+      stateHash = stateHash,
+      finalizationVoting = finalizationVoting
     )
+  )
 
   def buildAndSign(
       version: Byte,

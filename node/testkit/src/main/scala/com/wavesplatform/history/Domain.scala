@@ -565,7 +565,12 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
     ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       Application.loadBlockInfoAt(db, blockchainUpdater)(height)
 
-    CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(rdb.db, blockchainUpdater), loadBlockInfoAt(rdb, blockchainUpdater))
+    CommonBlocksApi(
+      settings.synchronizationSettings.maxRollback,
+      blockchainUpdater,
+      loadBlockMetaAt(rdb.db, blockchainUpdater),
+      loadBlockInfoAt(rdb, blockchainUpdater)
+    )
   }
 
   // noinspection ScalaStyle

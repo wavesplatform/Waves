@@ -58,6 +58,7 @@ class BlockchainUpdaterImpl(
   private def readLock[B](f: => B): B  = inLock(lock.readLock(), f)
 
   private lazy val maxBlockReadinessAge = wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
+  private val maxSyncRollbackLength     = wavesSettings.synchronizationSettings.maxRollback
 
   @volatile
   private var ngState: Option[NgState] = Option.empty
@@ -72,7 +73,7 @@ class BlockchainUpdaterImpl(
   private def publishLastBlockInfo(): Unit =
     for (id <- this.lastBlockId; ts <- ngState.map(_.base.header.timestamp).orElse(rocksdb.lastBlockTimestamp)) {
       val blockchainReady = ts + maxBlockReadinessAge > time.correctedTime()
-      internalLastBlockInfo.onNext(LastBlockInfo(id, Height(height), score, finalizedHeight, blockchainReady))
+      internalLastBlockInfo.onNext(LastBlockInfo(id, Height(height), score, this.finalizedHeightOrFallback(maxSyncRollbackLength), blockchainReady))
     }
 
   publishLastBlockInfo()
@@ -271,7 +272,8 @@ class BlockchainUpdaterImpl(
                       val updatedBlockchain = SnapshotBlockchain(rocksdb, r.snapshot, block, hitSource, r.carry, reward, Some(r.computedStateHash))
                       miner.scheduleMining(Some(updatedBlockchain))
                       blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, reward, hitSource, referencedBlockchain)
-                      Option((r, Nil, reward, hitSource))
+                      val finalizedHeight = Height(GenesisBlockHeight.max(updatedBlockchain.height - maxSyncRollbackLength))
+                      Option((r, Nil, reward, hitSource, finalizedHeight))
                     }
               }
             case Some(ng) =>
@@ -308,7 +310,7 @@ class BlockchainUpdaterImpl(
 
                       blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, rocksdb.height)
                       blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, ng.reward, hitSource, referencedBlockchain)
-                      Some((r, allSnapshots, ng.reward, hitSource))
+                      Some((r, allSnapshots, ng.reward, hitSource, ng.latestFinalizedHeight))
                     }
                 } else if (areVersionsOfSameBlock(block, ng.base)) {
                   // silently ignore
@@ -359,7 +361,7 @@ class BlockchainUpdaterImpl(
                           txSignParCheck = txSignParCheck
                         )
                       } yield {
-                        val tempBlockchain = SnapshotBlockchain(
+                        val extendedBlockchain = SnapshotBlockchain(
                           referencedBlockchain,
                           differResult.snapshot,
                           block,
@@ -368,7 +370,7 @@ class BlockchainUpdaterImpl(
                           None,
                           Some(differResult.computedStateHash)
                         )
-                        miner.scheduleMining(Some(tempBlockchain))
+                        miner.scheduleMining(Some(extendedBlockchain))
 
                         log.trace(
                           s"Persisting block ${referencedForgedBlock.id()}, discarded microblock refs: ${discarded.map(_._1.reference).mkString("[", ",", "]")}"
@@ -380,13 +382,6 @@ class BlockchainUpdaterImpl(
                           metrics.microBlockForkHeightStats.record(discarded.size)
                         }
 
-                        // Votes are in "referencedForgedBlock" and we try to finalize a parent of "referencedForgedBlock".
-                        val newFinalizationHeight = calculateFinalizationHeight(
-                          votingBlock = referencedForgedBlock,
-                          votingHeight = Height(referencedForgedBlockParentHeight + 1), // height of referencedForgedBlock
-                          votingBlockchain = referencedBlockchain
-                        )
-
                         rocksdb.append(
                           liquidSnapshotWithCancelledLeases,
                           carry,
@@ -395,8 +390,8 @@ class BlockchainUpdaterImpl(
                           prevHitSource,
                           referencedComputedStateHash,
                           referencedForgedBlock, // It writes the referencedForgedBlock, not a block!
-                          newFinalizationHeight,
-                          ngState.fold(IndexedSeq.empty)(_.recentGeneratorBalances)
+                          ng.latestFinalizedHeight,
+                          ng.latestGeneratorBalances
                         )
                         BlockStats.appended(referencedForgedBlock, referencedLiquidSnapshot.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
@@ -406,7 +401,16 @@ class BlockchainUpdaterImpl(
                           log.trace(s"Discarded microblocks: $discardedMbs")
                         }
 
-                        Some((differResult, discardedSnapshots, reward, hitSource))
+                        // Votes are in "referencedForgedBlock" and we try to finalize a parent of "referencedForgedBlock".
+                        val newFinalizationHeight = calculateFinalizationHeight(
+                          votingBlock = referencedForgedBlock,
+                          votingHeight = Height(referencedBlockchain.height),
+                          votingBlockchain = referencedBlockchain
+                        )
+
+                        val finalizedHeight = newFinalizationHeight.getOrElse(referencedBlockchain.finalizedHeightOrFallback(maxSyncRollbackLength))
+                        log.debug(s"Finalized height at ${extendedBlockchain.height}: $finalizedHeight")
+                        Some((differResult, discardedSnapshots, reward, hitSource, finalizedHeight))
                       }
                     } else {
                       val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
@@ -416,11 +420,13 @@ class BlockchainUpdaterImpl(
                 }
           }).map {
             _ map {
+              // TODO: case class instead of tuple
               case (
                     BlockDiffer.Result(newBlockSnapshot, carry, totalFee, updatedTotalConstraint, _, computedStateHash),
                     discDiffs,
                     reward,
-                    hitSource
+                    hitSource,
+                    finalizedHeight
                   ) =>
                 val newHeight = rocksdb.height + 1
 
@@ -436,7 +442,8 @@ class BlockchainUpdaterImpl(
                     reward,
                     hitSource,
                     cancelLeases(collectLeasesToCancel(newHeight), newHeight),
-                    recentGeneratorBalances = generatorBalances
+                    latestFinalizedHeight = finalizedHeight,
+                    latestGeneratorBalances = generatorBalances
                   )
                 )
 
@@ -460,10 +467,10 @@ class BlockchainUpdaterImpl(
     * @param votingBlockchain
     *   Blockchain at votingBlock
     * @return
-    *   None if DeterministicFinality is not activated
+    *   None if not voted
     */
   private def calculateFinalizationHeight(votingBlock: Block, votingHeight: Height, votingBlockchain: Blockchain): Option[Height] = {
-    val finalizationHeight = Height(votingHeight - 1)
+    val finalizationHeight = Height(votingHeight - 1) // Will be finalized or not
 
     def shouldFinalizeByVoting(): Boolean = {
       val minerAddress = votingBlockchain
@@ -475,17 +482,32 @@ class BlockchainUpdaterImpl(
         .committedGenerators(votingBlockchain.generationPeriodOf(finalizationHeight))
         .map { case (address, _) => address }
 
-      val endorserIndexes   = votingBlock.header.finalizationVoting.fold(Set.empty)(_.endorserIndexes.toSet)
-      val generatorBalances = votingBlockchain.parentGeneratorBalances() // Generator balances at voted block
+      if (committedGenerators.isEmpty) {
+        log.debug(s"Finalization of $finalizationHeight: no committed generators")
+        false
+      } else {
+        val endorserIndexes   = votingBlock.header.finalizationVoting.fold(Set.empty)(_.endorserIndexes.toSet)
+        val generatorBalances = votingBlockchain.parentGeneratorBalances() // Generator balances at voted block
 
-      val (totalBalance, endorsedBalance) =
-        generatorBalances.view.zip(committedGenerators).zipWithIndex.foldLeft((BigInt(0), BigInt(0))) {
-          case ((totalBalance, endorsedBalance), ((generatorBalance, currentGeneratorAddress), i)) =>
-            val isEndorsed = endorserIndexes.contains(i) || currentGeneratorAddress == minerAddress
-            (totalBalance + generatorBalance, if (isEndorsed) endorsedBalance + generatorBalance else endorsedBalance)
-        }
+        val (totalBalance, endorsedBalance, endorsedGeneratorIdxs) =
+          generatorBalances.view.zip(committedGenerators).zipWithIndex.foldLeft((BigInt(0), BigInt(0), List.empty[Int])) {
+            case ((totalBalance, endorsedBalance, endorsedGeneratorIdxs), ((generatorBalance, currentGeneratorAddress), i)) =>
+              val isEndorsed = endorserIndexes.contains(i) || currentGeneratorAddress == minerAddress
+              (
+                totalBalance + generatorBalance,
+                if (isEndorsed) endorsedBalance + generatorBalance else endorsedBalance,
+                if (isEndorsed) i :: endorsedGeneratorIdxs else endorsedGeneratorIdxs
+              )
+          }
 
-      endorsedBalance >= (totalBalance * 2 / 3)
+        val balanceToFinalize = totalBalance * 2 / 3
+        val finalized         = endorsedBalance >= balanceToFinalize
+        log.debug(
+          s"Finalization of $finalizationHeight: ${if (finalized) "" else " not"} finalized, balance: $endorsedBalance/$balanceToFinalize, total: $totalBalance, endorsers: ${endorsedGeneratorIdxs.sorted}"
+        )
+
+        finalized
+      }
     }
 
     for {
@@ -607,7 +629,8 @@ class BlockchainUpdaterImpl(
                       accumulatedBlock,
                       accumulatedBlock.transactionData ++ microBlock.transactionData,
                       microBlock.totalResBlockSig,
-                      microBlock.stateHash
+                      microBlock.stateHash,
+                      accumulatedBlock.header.finalizationVoting
                     )
                     .signatureValid() -> computedStateHash
                 }
@@ -640,7 +663,9 @@ class BlockchainUpdaterImpl(
               this.ngState = Some(ng.append(microBlock, snapshot, carry, totalFee, System.currentTimeMillis, computedStateHash, Some(blockId)))
 
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${snapshot.hashString}")
-              internalLastBlockInfo.onNext(LastBlockInfo(blockId, Height(height), score, finalizedHeight, ready = true))
+              internalLastBlockInfo.onNext(
+                LastBlockInfo(blockId, Height(height), score, this.finalizedHeightOrFallback(maxSyncRollbackLength), ready = true)
+              )
 
               blockId
             }
@@ -712,9 +737,12 @@ class BlockchainUpdaterImpl(
     rocksdb.height + ngState.fold(0)(_ => 1)
   }
 
-  override def finalizedHeight: Height = readLock(rocksdb.finalizedHeight)
-
-  override def finalizedHeightAt(at: Height): Option[Height] = readLock(rocksdb.finalizedHeightAt(at))
+  override def finalizedHeightAt(at: Height): Option[Height] = readLock {
+    ngState
+      .filter(_ => at == height)
+      .map(_.latestFinalizedHeight)
+      .orElse(rocksdb.finalizedHeightAt(at))
+  }
 
   override def heightOf(blockId: BlockId): Option[Int] = readLock {
     ngState
@@ -900,7 +928,7 @@ class BlockchainUpdaterImpl(
   }
 
   override def currentGeneratorBalances(): Seq[Long] = readLock {
-    ngState.fold(rocksdb.currentGeneratorBalances())(_.recentGeneratorBalances.map { case (_, _, b) => b })
+    ngState.fold(rocksdb.currentGeneratorBalances())(_.latestGeneratorBalances.map { case (_, _, b) => b })
   }
 
   override def snapshotBlockchain: SnapshotBlockchain = readLock {

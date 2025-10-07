@@ -1,5 +1,6 @@
 package com.wavesplatform.mining.microblocks
 
+import cats.kernel.Monoid
 import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
@@ -160,6 +161,7 @@ class MicroBlockMinerImpl(
   ): Either[MicroBlockMiningError, (Block, MicroBlock)] =
     microBlockBuildTimeStats.measureSuccessful {
       val currentFinalizationVoting = endorsementStorage.tryCollectAndClear(accumulatedBlock.header.reference)
+      // TODO: collect balances and write log
       for {
         signedBlock <- Block
           .buildAndSign(
@@ -174,7 +176,7 @@ class MicroBlockMinerImpl(
             rewardVote = accumulatedBlock.header.rewardVote,
             stateHash = if (blockchainUpdater.supportsLightNodeBlockFields()) stateHash else None,
             challengedHeader = None,
-            finalizationVoting = currentFinalizationVoting.orElse(accumulatedBlock.header.finalizationVoting)
+            finalizationVoting = Monoid.combine(accumulatedBlock.header.finalizationVoting, currentFinalizationVoting)
           )
           .leftMap(BlockBuildError.apply)
         microBlock <- MicroBlock

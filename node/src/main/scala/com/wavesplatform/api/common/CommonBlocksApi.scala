@@ -32,6 +32,7 @@ trait CommonBlocksApi {
 
 object CommonBlocksApi {
   def apply(
+      maxSyncRollbackLength: Int,
       blockchain: Blockchain,
       metaAt: Int => Option[BlockMeta],
       blockInfoAt: Int => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
@@ -69,7 +70,7 @@ object CommonBlocksApi {
 
     def currentHeight: Int = blockchain.height
 
-    def finalizedHeight: Height = blockchain.finalizedHeight
+    def finalizedHeight: Height = blockchain.finalizedHeightOrFallback(maxSyncRollbackLength)
 
     def blockAtHeight(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = blockInfoAt(height)
 
