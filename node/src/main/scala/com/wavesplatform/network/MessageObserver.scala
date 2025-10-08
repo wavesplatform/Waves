@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.block.Block
-import com.wavesplatform.network.MessageObserverL1.Messages
+import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.Schedulers
 import io.netty.channel.ChannelHandler.Sharable
@@ -10,7 +10,7 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.ConcurrentSubject
 
 @Sharable
-class MessageObserverL1 extends ChannelInboundHandlerAdapter {
+class MessageObserver extends ChannelInboundHandlerAdapter {
 
   private implicit val scheduler: SchedulerService = Schedulers.fixedPool(2, "message-observer")
 
@@ -61,7 +61,7 @@ class MessageObserverL1 extends ChannelInboundHandlerAdapter {
   }
 }
 
-object MessageObserverL1 {
+object MessageObserver {
   type Messages = (
       ChannelObservable[Signatures],
       ChannelObservable[Block],

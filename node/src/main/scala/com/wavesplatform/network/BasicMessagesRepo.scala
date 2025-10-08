@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.serialization.MicroBlockSerializer
+import com.wavesplatform.block.serialization.{BlockHeaderSerializer, MicroBlockSerializer}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -15,6 +15,7 @@ import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, PBMicroBlocks, Signe
 import com.wavesplatform.protobuf.snapshot.{BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.transaction.{DataTransaction, EthereumTransaction, Transaction, TransactionParsers}
+import io.netty.channel.ChannelHandler.Sharable
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.util
@@ -392,4 +393,29 @@ object BasicMessagesRepo {
 
   val specsByCodes: Map[Byte, Spec]       = specs.map(s => s.messageCode -> s).toMap
   val specsByClasses: Map[Class[?], Spec] = specs.map(s => s.contentClass -> s).toMap
+
+  @Sharable
+  class MessageLogger(settings: TrafficLogger.Settings) extends TrafficLogger(settings) {
+
+    protected def codeOf(msg: AnyRef): Option[Byte] = {
+      val aux: PartialFunction[AnyRef, Byte] = {
+        case x: RawBytes                          => x.code
+        case _: Transaction                       => TransactionSpec.messageCode
+        case _: BigInt | _: LocalScoreChanged     => ScoreSpec.messageCode
+        case _: Block | _: BlockForged            => BlockSpec.messageCode
+        case x: com.wavesplatform.network.Message => specsByClasses(x.getClass).messageCode
+        case _: Handshake                         => HandshakeSpec.messageCode
+      }
+
+      aux.lift(msg)
+    }
+
+    protected def stringify(msg: Any): String = msg match {
+      case tx: Transaction => s"Transaction(${tx.id()})"
+      case b: Block =>
+        s"${b.id()}, header: ${BlockHeaderSerializer.toJson(b.header, b.bytes().length, b.transactionData.length, b.signature).toString}"
+      case RawBytes(code, data) => s"RawBytes(${specsByCodes(code).messageName}, ${data.length} bytes)"
+      case other                => other.toString
+    }
+  }
 }

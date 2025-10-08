@@ -60,6 +60,6 @@ class LegacyChannelInitializer(
         new LengthFieldPrepender(lengthFieldLength),
         new LengthFieldBasedFrameDecoder(maxFieldLength, 0, lengthFieldLength, 0, lengthFieldLength),
         frameCodec,
-        new TrafficLoggerL1(trafficLoggerSettings)
+        new BasicMessagesRepo.MessageLogger(trafficLoggerSettings)
       )
 }

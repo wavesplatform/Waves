@@ -103,7 +103,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val (blockchainUpdater, rocksDB) =
     StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
-  private val messageObserver = new MessageObserverL1
+  private val messageObserver = new MessageObserver
 
   @volatile
   private var maybeUtx: Option[UtxPool] = None
@@ -203,7 +203,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       rdb
     )
 
-    val historyReplier = new HistoryReplierL1(blockchainUpdater.score, history, settings.synchronizationSettings)(using historyRepliesScheduler)
+    val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(using historyRepliesScheduler)
 
     val transactionPublisher =
       TransactionPublisher.timeBounded(
