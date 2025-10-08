@@ -17,3 +17,19 @@ When a transaction is successfully created, the following information is logged:
 - Transaction ID
 - BLS Public Key
 - Commitment Signature
+
+## Configuration
+
+To enable this extension, add its fully qualified class name to the `waves.extensions` list in your node's configuration file.
+
+Example:
+```
+waves {
+  # ... other settings
+
+  extensions = [
+    # ... other extensions
+    com.wavesplatform.extension.CommitmentExtension
+  ]
+}
+```
