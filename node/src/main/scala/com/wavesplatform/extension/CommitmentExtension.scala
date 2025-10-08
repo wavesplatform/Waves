@@ -13,6 +13,7 @@ import monix.execution.Scheduler
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 class CommitmentExtension(context: Context) extends Extension with ScorexLogging {
   private implicit val scheduler: Scheduler = Scheduler.singleThread("commitment-extension")
@@ -23,30 +24,6 @@ class CommitmentExtension(context: Context) extends Extension with ScorexLogging
       val settings               = context.settings
       val generationPeriodLength = settings.blockchainSettings.functionalitySettings.generationPeriodLength
       val wallet                 = context.wallet
-
-      def waitForHeight(height: Int): Task[Unit] = {
-        def check(): Task[Unit] = {
-          if (context.blockchain.height >= height) {
-            Task.unit
-          } else {
-            Task.sleep(1.second) >> check()
-          }
-        }
-        check()
-      }
-
-      def loop(n: Long): Task[Unit] = {
-        val txSendHeight   = n * generationPeriodLength + 1
-        val periodToCommit = (n + 1) * generationPeriodLength
-
-        log.info(s"Waiting for height $txSendHeight to create commitment for period starting at $periodToCommit")
-
-        for {
-          _ <- waitForHeight(txSendHeight.toInt)
-          _ <- createTask(Height(periodToCommit.toInt))
-          _ <- loop(n + 1)
-        } yield ()
-      }
 
       def createTask(generationPeriodStart: Height): Task[Unit] = Task {
         wallet.privateKeyAccounts.foreach { account =>
@@ -89,17 +66,44 @@ class CommitmentExtension(context: Context) extends Extension with ScorexLogging
               },
               tx => {
                 log.info(s"Created CommitToGenerationTransaction with id: ${tx.id()} for account ${account.toAddress}")
-                log.info(s"BLS Public Key: ${blsKP.publicKey.base58}")
-                log.info(s"Commitment Signature: ${blsSig.base58}")
-                context.broadcastTransaction(tx)
+                context.broadcastTransaction(tx).onComplete {
+                  case Success(true) =>
+                    log.info(s"Successfully broadcasted commitment for ${account.toAddress}")
+                  case Success(false) =>
+                    log.debug(s"Failed to broadcast commitment for ${account.toAddress}, maybe it already exists.")
+                  case Failure(exception) =>
+                    log.warn(s"Failed to broadcast commitment for ${account.toAddress}", exception)
+                }
               }
             )
           }
         }
       }
 
-      val initialN = Math.floor((context.blockchain.height - 1).toDouble / generationPeriodLength).toLong
-      loop(initialN).runAsyncLogErr
+      def waitForNewHeight(currentHeight: Int): Task[Int] = {
+        def check(): Task[Int] = {
+          val newHeight = context.blockchain.height
+          if (newHeight > currentHeight) {
+            Task.now(newHeight)
+          } else {
+            Task.sleep(7.seconds) >> check()
+          }
+        }
+        check()
+      }
+
+      def heightLoop(h: Int): Task[Unit] = {
+        waitForNewHeight(h).flatMap { newHeight =>
+          val n = Math.floor((newHeight - 1).toDouble / generationPeriodLength).toLong
+          val periodToCommit = (n + 1) * generationPeriodLength
+
+          log.debug(s"Checking for commitments at height $newHeight for period $periodToCommit.")
+
+          createTask(Height(periodToCommit.toInt)) >> heightLoop(newHeight)
+        }
+      }
+
+      heightLoop(context.blockchain.height - 1).runAsyncLogErr
     } else {
       log.warn("DeterministicFinality feature is not activated. CommitmentExtension will not start.")
     }
