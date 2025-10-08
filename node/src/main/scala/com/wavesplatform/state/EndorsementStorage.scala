@@ -121,7 +121,7 @@ object EndorsementStorage {
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = synced {
       for {
         currentFilter <- currentFilter
-        if currentFilter.endorsedId == endorsedId
+        if currentFilter.endorsedId == endorsedId && currentVoting.hasUpdates
       } yield {
         val r = currentVoting
         currentVoting = currentVoting.copy(endorserIndexes = Seq.empty, conflict = Seq.empty)
