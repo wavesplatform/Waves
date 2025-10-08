@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state.{Portfolio, StateSnapshot}
+import com.wavesplatform.state.{GenesisBlockHeight, Portfolio, StateSnapshot}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
@@ -19,11 +19,10 @@ import scala.collection.immutable.VectorMap
 
 object RollbackBenchmark extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val settings = Application.loadApplicationConfig(Some(new File(args(0))))
-    val rdb      = RDB.open(settings.dbSettings)
-    val time     = new NTP(settings.ntpServer)
-    val rocksDBWriter =
-      RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.synchronizationSettings.maxRollback, settings.enableLightMode)
+    val settings      = Application.loadApplicationConfig(Some(new File(args(0))))
+    val rdb           = RDB.open(settings.dbSettings)
+    val time          = new NTP(settings.ntpServer)
+    val rocksDBWriter = RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val issuer = KeyPair(new Array[Byte](32))
 
@@ -84,7 +83,7 @@ object RollbackBenchmark extends ScorexLogging {
       genesisBlock.header.generationSignature,
       computedBlockStateHash = ByteStr.empty,
       genesisBlock,
-      newFinalizedHeight = None,
+      newFinalizedHeight = GenesisBlockHeight,
       generatorBalances = Seq.empty
     )
 
@@ -117,7 +116,7 @@ object RollbackBenchmark extends ScorexLogging {
       hitSource = ByteStr.empty,
       computedBlockStateHash = ByteStr.empty,
       nextBlock,
-      newFinalizedHeight = None,
+      newFinalizedHeight = GenesisBlockHeight,
       generatorBalances = Seq.empty
     )
 

@@ -306,7 +306,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
       val scheduler = Schedulers.singleThread("appender")
       val appender =
-        BlockAppender(d.blockchainUpdater, SystemTime, d.utxPool, d.posSelector, scheduler, verify = false)(_, None)
+        BlockAppender(d.blockchainUpdater, SystemTime, d.utxPool, d.posSelector, BlockEndorser.Disabled, scheduler, verify = false)(_, None)
 
       appender(worseBlock).runSyncUnsafe(1.minute) shouldBe Left(
         BlockAppendError(

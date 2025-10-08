@@ -16,12 +16,10 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.execution.ExecutionModel
 import monix.execution.schedulers.TestScheduler
 import monix.reactive.subjects.PublishSubject as PS
-import org.scalatest.Ignore
 
 import java.util.concurrent.ThreadLocalRandom
 import scala.util.Using
 
-@Ignore // TODO:
 class EndorsementStorageSpec extends FreeSpec {
   private val testScheduler = TestScheduler(ExecutionModel.AlwaysAsyncExecution)
 
@@ -29,16 +27,31 @@ class EndorsementStorageSpec extends FreeSpec {
   private val committedGenerator  = BlsKeyPair(TxHelpers.signer(1).privateKey)
   private val activeEndorserIndex = 1
   private val finalizedId         = mkRandomBlockId
-  private val blockId             = mkRandomBlockId
+  private val finalizedHeight     = Height(5)
+  private val endorsedId          = mkRandomBlockId
   private val blockHeight         = Height(10)
 
-  // TODO: EndorsementStorage
-  // TODO: Additional tests
-  "Should ignore" - {
-    "an already received endorsement" in withContext { c =>
-      c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
+  "tryCollectAndClear" ignore {
+    "returns None if no updates" in {
+      val s = new EndorsementStorage.InMemory
+      s.startVoting(
+        EndorsementFilter(
+          miner = false,
+          finalizedId,
+          finalizedHeight,
+          endorsedId,
+          expectedEndorsers = Vector(activeGenerator.publicKey, committedGenerator.publicKey)
+        )
+      )
+      false shouldBe true
+    }
+  }
 
-      val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockHeight, blockId))
+  "Should ignore" ignore {
+    "an already received endorsement" in withContext { c =>
+      c.blockchainUpdated(blockHeight, endorsedId, activeGenerator.publicKey)
+
+      val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockHeight, endorsedId))
       c.receivedEndorseBlock(msg)
       c.outChannel.outboundMessages().poll() shouldBe msg
 
@@ -49,34 +62,34 @@ class EndorsementStorageSpec extends FreeSpec {
     "an endorsement with" - {
       // TODO: use args with default values instead
       def test(msg: EndorseBlock): Unit = withContext { c =>
-        c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
+        c.blockchainUpdated(blockHeight, endorsedId, activeGenerator.publicKey)
         c.receivedEndorseBlock(msg)
         c.outChannel.outboundMessages() shouldBe empty
       }
 
       "a wrong signature" in test(
-        EndorseBlock(activeEndorserIndex, finalizedId, blockHeight, blockId, ByteStr.empty)
+        EndorseBlock(activeEndorserIndex, finalizedId, blockHeight, endorsedId, ByteStr.empty)
       )
       "an unexpected height" in test(
-        EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, Height(Int.MaxValue), blockId))
+        EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, Height(Int.MaxValue), endorsedId))
       )
-      "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, 2, finalizedId, blockHeight, blockId)))
+      "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, 2, finalizedId, blockHeight, endorsedId)))
       "an already finalized block" in test(
         EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockHeight, finalizedId))
       )
     }
   }
 
-  "Should rebroadcast a valid endorsement on same height after a rollback" in withContext { c =>
+  "Should rebroadcast a valid endorsement on same height after a rollback" ignore withContext { c =>
     // TODO: blockHeight
-    c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
+    c.blockchainUpdated(blockHeight, endorsedId, activeGenerator.publicKey)
 
-    val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockHeight, blockId))
+    val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockHeight, endorsedId))
     c.receivedEndorseBlock(msg)
     c.outChannel.outboundMessages().poll()
 
     c.blockchainUpdated(blockHeight, mkRandomBlockId, activeGenerator.publicKey) // height - 1
-    c.blockchainUpdated(blockHeight, blockId, activeGenerator.publicKey)
+    c.blockchainUpdated(blockHeight, endorsedId, activeGenerator.publicKey)
 
     // TODO: this should not pass
     c.receivedEndorseBlock(msg)

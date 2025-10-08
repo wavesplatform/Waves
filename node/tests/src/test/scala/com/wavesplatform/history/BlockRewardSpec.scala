@@ -16,7 +16,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, RewardsSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, Height}
+import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, GenesisBlockHeight, Height}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.{RideV6, WavesSettingsOps, BlockRewardDistribution as BlockRewardDistributionSettings}
 import com.wavesplatform.transaction.Asset.Waves
@@ -279,7 +279,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
             curBlock.header.generationSignature,
             computedStateHash,
             curBlock,
-            newFinalizedHeight = None,
+            newFinalizedHeight = GenesisBlockHeight,
             generatorBalances = Seq.empty
           )
           Some(curBlock)

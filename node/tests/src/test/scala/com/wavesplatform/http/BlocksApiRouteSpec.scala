@@ -291,7 +291,7 @@ class BlocksApiRouteSpec
         Some(BlockMeta(blocks(height - 1).header, ByteStr.empty, None, 1, 0, 0, 0, None, Seq.empty, None))
       else None
 
-    val blocksApi = CommonBlocksApi(blockchain, metaAt, _ => None)
+    val blocksApi = CommonBlocksApi(maxSyncRollbackLength = 100, blockchain, metaAt, _ => None)
     val route     = blocksApiRoute.copy(commonApi = blocksApi).route
     Get(routePath(s"/delay/${blocks.last.id()}/3")) ~> route ~> check {
       val delay = (responseAs[JsObject] \ "delay").as[Int]

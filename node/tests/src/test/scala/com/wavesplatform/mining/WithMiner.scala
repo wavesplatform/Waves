@@ -7,7 +7,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{WalletSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, EndorsementStorage, NG, appender}
+import com.wavesplatform.state.{BlockEndorser, Blockchain, EndorsementStorage, NG, appender}
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPoolImpl
@@ -43,6 +43,7 @@ trait WithMiner extends WithDomain { suite: Suite =>
       settings,
       time,
       utxPool,
+      BlockEndorser.Disabled,
       EndorsementStorage.Disabled,
       wallet,
       pos,
@@ -52,7 +53,7 @@ trait WithMiner extends WithDomain { suite: Suite =>
       timeDrift
     )
     def appendBlock(b: Block) = {
-      val appendTask = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler, verify)(b, None)
+      val appendTask = BlockAppender(blockchain, time, utxPool, pos, BlockEndorser.Disabled, appenderScheduler, verify)(b, None)
       Await.result(appendTask.runToFuture(using appenderScheduler), Inf)
     }
     f(miner, appendBlock)
