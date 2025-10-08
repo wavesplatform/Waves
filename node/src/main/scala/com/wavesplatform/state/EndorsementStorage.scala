@@ -18,7 +18,7 @@ trait EndorsementStorage {
     * @return
     *   true, if it can be shared with neighbours
     */
-  def tryAddVote(msg: EndorseBlock): Boolean
+  def tryAddVote(msg: EndorseBlock): Either[String, Boolean]
 
   /** @return
     *   true if it is a new voting
@@ -50,7 +50,7 @@ object EndorsementStorage {
   }
 
   val Disabled: EndorsementStorage = new EndorsementStorage {
-    override def tryAddVote(msg: EndorseBlock): Boolean                              = false
+    override def tryAddVote(msg: EndorseBlock): Either[String, Boolean]              = true.asRight
     override def startVoting(filter: EndorsementFilter): Boolean                     = false
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = None
   }
@@ -63,39 +63,34 @@ object EndorsementStorage {
     private val monitor            = new Object()
     private def synced[T](f: => T) = monitor.synchronized(f)
 
-    // TODO: move?
+    override def tryAddVote(msg: EndorseBlock): Either[String, Boolean] = synced {
+      for {
+        filter <- currentFilter.toRight("Voting hasn't started")
+        _      <- Either.raiseUnless(msg.finalizedHeight == filter.finalizedHeight)(s"Expected finalized height ${filter.finalizedHeight}")
+        _      <- Either.raiseWhen(msg.endorserIndex >= filter.expectedEndorsers.size)(s"There are only ${filter.expectedEndorsers.size} endorsers")
+        endorserPk = filter.expectedEndorsers(msg.endorserIndex)
+        sig <- verifySig(msg, endorserPk).toRight("Invalid signature")
+        _   <- Either.raiseUnless(msg.endorsedId == filter.endorsedId)(s"Expected block ${filter.endorsedId}") // Could be a switch to a better branch
+      } yield
+        if (processed.contains(msg)) false
+        else {
+          // TODO: Do we need this if not mine now?
+          val isConsistent = msg.finalizedId == filter.finalizedId
+          currentVoting =
+            if (isConsistent) currentVoting.withValid(msg.endorserIndex, sig)
+            else currentVoting.withConflict(toConflict(msg, sig))
+
+          processed += msg
+
+          !filter.miner // Share with neighbours only if this node isn't a miner
+        }
+    }
+
     private def verifySig(msg: EndorseBlock, pk: BlsPublicKey): Option[BlsSignature.NonEmpty] =
       for {
         sig <- BlsSignature(msg.signature).toOption
         _   <- Option.when(pk.verify(BlockEndorsement.mkMessage(msg.finalizedId, msg.finalizedHeight, msg.endorsedId), sig))(sig)
       } yield sig
-
-    override def tryAddVote(msg: EndorseBlock): Boolean = synced {
-      for {
-        filter <- currentFilter.toRight("Voting hasn't started")
-        _      <- Either.raiseUnless(msg.finalizedHeight == filter.finalizedHeight)(s"Expected finalized height ${filter.finalizedHeight}")
-        _      <- Either.raiseWhen(msg.endorserIndex >= filter.expectedEndorsers.size)(s"There are only ${filter.expectedEndorsers.size} endorsers")
-        _      <- Either.raiseWhen(processed.contains(msg))("")
-        endorserPk = filter.expectedEndorsers(msg.endorserIndex)
-        sig <- verifySig(msg, endorserPk).toRight("Invalid signature")
-        _   <- Either.raiseUnless(msg.endorsedId == filter.endorsedId)(s"Expected block ${filter.endorsedId}") // Could be a switch to a better branch
-      } yield {
-        // TODO: Tests
-        // TODO: Do we need this if not mine now?
-        val isConsistent = msg.finalizedId == filter.finalizedId
-        currentVoting =
-          if (isConsistent) currentVoting.withValid(msg.endorserIndex, sig)
-          else currentVoting.withConflict(toConflict(msg, sig))
-
-        processed += msg
-
-        !filter.miner // Share with neighbours only if this node isn't a miner
-      }
-    } match {
-      case Left("")     => false // Ignore without logs
-      case Left(err)    => logger.trace(s"Unexpected $msg: $err"); false
-      case Right(share) => share
-    }
 
     private def toConflict(msg: EndorseBlock, verifiedSig: BlsSignature.NonEmpty): BlockEndorsement.Conflict =
       BlockEndorsement.Conflict(msg.endorserIndex, msg.finalizedId, verifiedSig)

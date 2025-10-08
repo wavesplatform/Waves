@@ -320,7 +320,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     )
 
     messageObserver.endorseBlocks.foreach { case (ch, x) =>
-      if (endorsementStorage.tryAddVote(x)) allChannels.broadcast(x, Some(ch))
+      endorsementStorage.tryAddVote(x) match {
+        case Left(err)   => log.trace(s"Unexpected $x: $err")
+        case Right(true) => allChannels.broadcast(x, Some(ch))
+        case _           =>
+      }
     }(using endorseBlockSynchronizerScheduler)
 
     val (newBlocksWithSnapshot, extLoaderState, _) = RxExtensionLoader(

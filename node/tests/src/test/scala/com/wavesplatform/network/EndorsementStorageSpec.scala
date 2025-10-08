@@ -4,127 +4,103 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.state.EndorsementStorage.EndorsementFilter
 import com.wavesplatform.state.{EndorsementStorage, Height}
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test.{FreeSpec, produce}
 import com.wavesplatform.transaction.TxHelpers
-import io.netty.channel.Channel
-import io.netty.channel.embedded.EmbeddedChannel
-import io.netty.channel.group.DefaultChannelGroup
-import io.netty.util.concurrent.GlobalEventExecutor
-import monix.execution.ExecutionModel
-import monix.execution.schedulers.TestScheduler
-import monix.reactive.subjects.PublishSubject as PS
+import org.scalatest.EitherValues
 
 import java.util.concurrent.ThreadLocalRandom
-import scala.util.Using
 
-class EndorsementStorageSpec extends FreeSpec {
-  private val testScheduler = TestScheduler(ExecutionModel.AlwaysAsyncExecution)
-
+class EndorsementStorageSpec extends FreeSpec with EitherValues {
   private val activeGenerator     = BlsKeyPair(TxHelpers.signer(0).privateKey)
   private val committedGenerator  = BlsKeyPair(TxHelpers.signer(1).privateKey)
   private val activeEndorserIndex = 1
   private val finalizedId         = mkRandomBlockId
   private val finalizedHeight     = Height(5)
   private val endorsedId          = mkRandomBlockId
-  private val blockHeight         = Height(10)
 
-  "tryCollectAndClear" ignore {
-    "returns None if no updates" in {
-      val s = new EndorsementStorage.InMemory
-      s.startVoting(
-        EndorsementFilter(
-          miner = false,
-          finalizedId,
-          finalizedHeight,
-          endorsedId,
-          expectedEndorsers = Vector(activeGenerator.publicKey, committedGenerator.publicKey)
+  "tryAddVote" - {
+    "rebroadcast if valid" in {
+      val s = started
+
+      info("on endorsement")
+      val endorsement1 = BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, finalizedHeight, endorsedId)
+      s.tryAddVote(EndorseBlock.from(endorsement1)).value shouldBe true
+    }
+
+    "ignore if" - {
+      "an endorsement with" - {
+        def test(msg: EndorseBlock, error: String): Unit = started.tryAddVote(msg) should produce(error)
+
+        "a wrong signature" in test(
+          EndorseBlock(activeEndorserIndex, finalizedId, finalizedHeight, endorsedId, ByteStr.empty),
+          "Invalid signature"
         )
-      )
-      false shouldBe true
-    }
-  }
 
-  "Should ignore" ignore {
-    "an already received endorsement" in withContext { c =>
-      c.blockchainUpdated(blockHeight, endorsedId, activeGenerator.publicKey)
+        "an unexpected height" in test(
+          EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, Height(Int.MaxValue), endorsedId)),
+          "Expected finalized height"
+        )
 
-      val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockHeight, endorsedId))
-      c.receivedEndorseBlock(msg)
-      c.outChannel.outboundMessages().poll() shouldBe msg
+        "an unexpected endorser" in test(
+          EndorseBlock.from(BlockEndorsement.full(committedGenerator, 2, finalizedId, finalizedHeight, endorsedId)),
+          "There are only"
+        )
 
-      c.receivedEndorseBlock(msg)
-      c.outChannel.outboundMessages() shouldBe empty
-    }
-
-    "an endorsement with" - {
-      // TODO: use args with default values instead
-      def test(msg: EndorseBlock): Unit = withContext { c =>
-        c.blockchainUpdated(blockHeight, endorsedId, activeGenerator.publicKey)
-        c.receivedEndorseBlock(msg)
-        c.outChannel.outboundMessages() shouldBe empty
+        "an already finalized block" in test(
+          EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, finalizedHeight, finalizedId)),
+          "Expected block"
+        )
       }
 
-      "a wrong signature" in test(
-        EndorseBlock(activeEndorserIndex, finalizedId, blockHeight, endorsedId, ByteStr.empty)
-      )
-      "an unexpected height" in test(
-        EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, Height(Int.MaxValue), endorsedId))
-      )
-      "an unexpected endorser" in test(EndorseBlock.from(BlockEndorsement.full(committedGenerator, 2, finalizedId, blockHeight, endorsedId)))
-      "an already finalized block" in test(
-        EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockHeight, finalizedId))
-      )
+      "already seen" in {
+        val s = started
+
+        info("on endorsement")
+        val endorsement1 = BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, finalizedHeight, endorsedId)
+        s.tryAddVote(EndorseBlock.from(endorsement1))
+
+        info("on same endorsement")
+        s.tryAddVote(EndorseBlock.from(endorsement1)).value shouldBe false
+      }
     }
   }
 
-  "Should rebroadcast a valid endorsement on same height after a rollback" ignore withContext { c =>
-    // TODO: blockHeight
-    c.blockchainUpdated(blockHeight, endorsedId, activeGenerator.publicKey)
+  "tryCollectAndClear" - {
+    "returns None if no updates" in {
+      val s = started
 
-    val msg = EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, blockHeight, endorsedId))
-    c.receivedEndorseBlock(msg)
-    c.outChannel.outboundMessages().poll()
+      info("on start")
+      s.tryCollectAndClear(endorsedId) shouldBe empty
 
-    c.blockchainUpdated(blockHeight, mkRandomBlockId, activeGenerator.publicKey) // height - 1
-    c.blockchainUpdated(blockHeight, endorsedId, activeGenerator.publicKey)
+      info("on endorsement")
+      val endorsement1 = BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, finalizedHeight, endorsedId)
+      s.tryAddVote(EndorseBlock.from(endorsement1))
+      s.tryCollectAndClear(endorsedId) should not be empty
 
-    // TODO: this should not pass
-    c.receivedEndorseBlock(msg)
-    c.outChannel.outboundMessages().poll() shouldBe msg
+      info("on same endorsement")
+      s.tryAddVote(EndorseBlock.from(endorsement1))
+      s.tryCollectAndClear(endorsedId) shouldBe empty
+
+      info("no new endorsements")
+      s.tryCollectAndClear(endorsedId) shouldBe empty
+    }
   }
 
-  private def withContext(f: TestContext => Unit): Unit = Using(new TestContext)(f).get
-
-  private class TestContext extends AutoCloseable {
-    val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val inChannel   = new EmbeddedChannel(TestChannelId("in"))
-    val outChannel  = new EmbeddedChannel(TestChannelId("out"))
-    allChannels.add(inChannel)
-    allChannels.add(outChannel)
-
-    val last         = PS[EndorsementFilter]()
-    val endorsements = PS[(Channel, EndorseBlock)]()
-    val storage      = EndorsementStorage.InMemory()
-    // val synchronizer = EndorseBlockSynchronizer.start(storage, last, endorsements, allChannels, testScheduler)
-
-    def blockchainUpdated(finalizedHeight: Height, blockId: BlockId, newEndorsers: BlsPublicKey*): Unit = {
-      last.onNext(EndorsementFilter(miner = false, finalizedId, finalizedHeight, blockId, newEndorsers.toIndexedSeq)) // TODO: finalizedId
-      testScheduler.tick()
-    }
-
-    def receivedEndorseBlock(endorseBlock: EndorseBlock): Unit = {
-      endorsements.onNext((inChannel, endorseBlock))
-      testScheduler.tick()
-    }
-
-    override def close(): Unit = {
-      endorsements.onComplete()
-      last.onComplete()
-      allChannels.close()
-    }
+  private def started: EndorsementStorage = {
+    val r = new EndorsementStorage.InMemory
+    r.startVoting(
+      EndorsementFilter(
+        miner = false,
+        finalizedId,
+        finalizedHeight,
+        endorsedId,
+        expectedEndorsers = Vector(committedGenerator.publicKey, activeGenerator.publicKey)
+      )
+    ) shouldBe true
+    r
   }
 
   private def mkRandomBlockId: BlockId = ByteStr(Array.fill(SignatureLength)(ThreadLocalRandom.current().nextInt(Byte.MaxValue).toByte))
