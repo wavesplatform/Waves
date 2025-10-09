@@ -382,6 +382,15 @@ class BlockchainUpdaterImpl(
                           metrics.microBlockForkHeightStats.record(discarded.size)
                         }
 
+                        // Votes are in "referencedForgedBlock" and we try to finalize a parent of "referencedForgedBlock".
+                        val newFinalizationHeight = calculateFinalizationHeight(
+                          votingBlock = referencedForgedBlock,
+                          votingHeight = Height(referencedBlockchain.height),
+                          votingBlockchain = referencedBlockchain
+                        )
+                        val finalizedHeight = newFinalizationHeight.getOrElse(referencedBlockchain.finalizedHeightOrFallback(maxSyncRollbackLength))
+
+                        // Careful! This affects referencedBlockchain and extendedBlockchain, e.g. height
                         rocksdb.append(
                           liquidSnapshotWithCancelledLeases,
                           carry,
@@ -401,15 +410,6 @@ class BlockchainUpdaterImpl(
                           log.trace(s"Discarded microblocks: $discardedMbs")
                         }
 
-                        // Votes are in "referencedForgedBlock" and we try to finalize a parent of "referencedForgedBlock".
-                        val newFinalizationHeight = calculateFinalizationHeight(
-                          votingBlock = referencedForgedBlock,
-                          votingHeight = Height(referencedBlockchain.height),
-                          votingBlockchain = referencedBlockchain
-                        )
-
-                        val finalizedHeight = newFinalizationHeight.getOrElse(referencedBlockchain.finalizedHeightOrFallback(maxSyncRollbackLength))
-                        log.debug(s"Finalized height at ${extendedBlockchain.height}: $finalizedHeight")
                         Some((differResult, discardedSnapshots, reward, hitSource, finalizedHeight))
                       }
                     } else {
@@ -453,6 +453,8 @@ class BlockchainUpdaterImpl(
                 ) {
                   log.info(s"New height: $newHeight")
                 }
+
+                log.debug(s"Finalized height on $newHeight: $finalizedHeight")
 
                 publishLastBlockInfo()
 
@@ -503,7 +505,8 @@ class BlockchainUpdaterImpl(
         val balanceToFinalize = totalBalance * 2 / 3
         val finalized         = endorsedBalance >= balanceToFinalize
         log.debug(
-          s"Finalization of $finalizationHeight: ${if (finalized) "" else " not"} finalized, balance: $endorsedBalance/$balanceToFinalize, total: $totalBalance, endorsers: ${endorsedGeneratorIdxs.sorted}"
+          s"Finalization of $finalizationHeight in $votingHeight:${if (finalized) "" else " not"} finalized, voted: $endorsedBalance, " +
+            s"min: $balanceToFinalize, total: $totalBalance, endorsers: [${endorsedGeneratorIdxs.sorted.mkString(", ")}]"
         )
 
         finalized

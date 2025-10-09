@@ -242,7 +242,7 @@ package object appender {
       }
       .left
       .map {
-        case GenericError(x) => GenericError(s"Block $block is invalid: $x")
+        case GenericError(x) => GenericError(s"$block is invalid: $x")
         case x               => x
       }
 

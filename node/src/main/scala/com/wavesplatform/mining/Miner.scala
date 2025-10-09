@@ -116,7 +116,7 @@ class MinerImpl(
         }
       }
 
-      if (allowed.isEmpty) log.warn("Mining enabled, but no allowed accounts")
+      if (allowed.isEmpty) log.warn("Mining enabled, but no allowed accounts in wallet. Check your balances, commit to generation or disable mining")
       if (notAllowed.nonEmpty) log.debug(s"Scripting miners not allowed: ${notAllowed.map(_.toAddress).mkString(", ")}")
       if (notCommitted.nonEmpty) log.debug(s"Not committed accounts: ${notCommitted.map(_.toAddress).mkString(", ")}")
 
