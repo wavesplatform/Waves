@@ -61,7 +61,7 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
         override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = Right((defaultSigner, 0))
       }
       def block(height: Int) = d.blocksApi.blockAtHeight(height).get._1.header
-      def appendBlock()      = append(miner.forgeBlock(defaultSigner).explicitGet()._1).explicitGet()
+      def appendBlock()      = append(miner.forgeBlock(defaultSigner).toEither.explicitGet().newBlock).explicitGet()
       def appendMicro() = {
         d.utxPool.putIfNew(transfer()).resultE.explicitGet()
         microBlockMiner.generateOneMicroBlockTask(defaultSigner, d.lastBlock, Unlimited, 0).runSyncUnsafe()
@@ -135,7 +135,7 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
         miner.appenderScheduler,
         Observable.empty
       )
-      def appendBlock(ref: Option[ByteStr]) = append(miner.forgeBlock(signer, ref).explicitGet()._1).explicitGet()
+      def appendBlock(ref: Option[ByteStr]) = append(miner.forgeBlock(signer, ref).toEither.explicitGet().newBlock).explicitGet()
       def appendMicro() = {
         d.utxPool.putIfNew(transfer(from = signer)).resultE.explicitGet()
         microBlockMiner.generateOneMicroBlockTask(signer, d.lastBlock, Unlimited, 0).runSyncUnsafe()

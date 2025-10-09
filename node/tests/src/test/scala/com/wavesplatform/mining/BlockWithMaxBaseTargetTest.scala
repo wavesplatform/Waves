@@ -44,6 +44,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
           settings,
           ntpTime,
           utxPoolStub,
+          BlockEndorser.Disabled,
           EndorsementStorage.Disabled,
           wallet,
           pos,
@@ -67,10 +68,8 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
     "node should stop if base target greater than maximum in block append" in {
       withEnv { case Env(settings, pos, bcu, utxPoolStub, scheduler, _, lastBlock) =>
         withSecurityManager(BaseTargetReachedMaximum) { signal =>
-          val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock, None).onErrorRecoverWith[Any] {
-            case _: SecurityException =>
-              Task.unit
-          }
+          val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, BlockEndorser.Disabled, scheduler)(lastBlock, None)
+            .onErrorRecoverWith[Any] { case _: SecurityException => Task.unit }
           Await.result(blockAppendTask.runToFuture(using scheduler), 1.minute)
 
           signal.tryAcquire(10, TimeUnit.SECONDS)

@@ -22,7 +22,7 @@ import com.wavesplatform.utx.UtxPool.PackStrategy
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
-import monix.execution.schedulers.SchedulerService
+import monix.execution.Scheduler
 import monix.reactive.Observable
 
 import scala.concurrent.duration.*
@@ -34,8 +34,8 @@ class MicroBlockMinerImpl(
     utx: UtxPool,
     endorsementStorage: EndorsementStorage,
     settings: MinerSettings,
-    minerScheduler: SchedulerService,
-    appenderScheduler: SchedulerService,
+    minerScheduler: Scheduler,
+    appenderScheduler: Scheduler,
     transactionAdded: Observable[Unit]
 ) extends MicroBlockMiner
     with ScorexLogging {

@@ -13,7 +13,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
 import com.wavesplatform.mining.{MinerImpl, MiningConstraint}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer.Result
-import com.wavesplatform.state.{Blockchain, EndorsementStorage, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{BlockEndorser, Blockchain, EndorsementStorage, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.{TransactionStateSnapshot, WavesSettingsOps}
 import com.wavesplatform.test.node.*
@@ -282,6 +282,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
           d.settings,
           time,
           d.utxPool,
+          BlockEndorser.Disabled,
           EndorsementStorage.Disabled,
           d.wallet,
           d.posSelector,
@@ -295,7 +296,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
         d.appendMicroBlock(TxHelpers.transfer(sender, amount = 2))
 
         time.setTime(System.currentTimeMillis() + 2 * d.settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis)
-        val (block, _) = miner.forgeBlock(minerAcc).explicitGet()
+        val block = miner.forgeBlock(minerAcc).toEither.explicitGet().newBlock
 
         block.header.reference shouldBe refId
 

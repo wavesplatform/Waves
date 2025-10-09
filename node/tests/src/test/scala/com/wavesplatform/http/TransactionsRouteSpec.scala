@@ -865,10 +865,6 @@ class TransactionsRouteSpec
       val unsignedTxnJson = Json.parse(
         s"""{
            |  "type": 20,
-           |  "fee": 100000000000,
-           |  "timestamp": 1752222163486,
-           |  "version": 1,
-           |  "chainId": 84,
            |  "sender": "${sender.toAddress}"
            |}""".stripMargin
       )
@@ -876,6 +872,7 @@ class TransactionsRouteSpec
       Post(routePath("/sign"), unsignedTxnJson) ~> ApiKeyHeader ~> route ~> check {
         status shouldEqual StatusCodes.OK
         val jsObject = responseAs[JsObject]
+        (jsObject \ "generationPeriodStart").as[Int] shouldBe 3000
         (jsObject \ "senderPublicKey").as[String] shouldBe sender.publicKey.toString
         (jsObject \ "endorserPublicKey").as[String] shouldBe blsKP.publicKey.base58
         (jsObject \ "commitmentSignature").asOpt[String] shouldBe defined

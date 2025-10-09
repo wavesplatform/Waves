@@ -89,7 +89,7 @@ trait BaseState {
       next.header.generationSignature,
       differResult.computedStateHash,
       next,
-      newFinalizedHeight = None,
+      newFinalizedHeight = GenesisBlockHeight,
       generatorBalances = Seq.empty
     )
   }

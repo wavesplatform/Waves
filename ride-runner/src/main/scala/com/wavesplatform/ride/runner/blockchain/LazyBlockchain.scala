@@ -127,8 +127,6 @@ class LazyBlockchain[TagT] private (
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = heightUntagged
 
-  override def finalizedHeight: Height = heightUntagged // TODO:
-
   override def finalizedHeightAt(at: Height): Option[Height] = None // TODO:
 
   // Ride: environment initialization

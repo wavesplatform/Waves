@@ -11,7 +11,7 @@ import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.mining.{ForgeAttemptResult, Miner, MinerImpl}
 import com.wavesplatform.network.BlockSnapshotResponse
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
@@ -140,7 +140,7 @@ object MinerChallengeSimulator {
       fakeTime.time = nextTime
 
       miner.forgeBlock(bestMiner) match {
-        case Right((block, _)) =>
+        case ForgeAttemptResult.Success(block, _) =>
           blockAppender(block, None).runSyncUnsafe() match {
             case Right(BlockApplyResult.Applied(_, score)) => Some(score)
             case other =>
@@ -149,7 +149,7 @@ object MinerChallengeSimulator {
               Some(0)
           }
 
-        case Left(err) =>
+        case err =>
           println(s"Error generating block: $err")
           quit = true
           Some(0)

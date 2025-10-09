@@ -395,7 +395,8 @@ class BlockChallengeTest
           d.lastBlock,
           d.lastBlock.transactionData ++ invalidMicroblock.transactionData,
           invalidMicroblock.totalResBlockSig,
-          invalidMicroblock.stateHash
+          invalidMicroblock.stateHash,
+          finalizationVoting = None
         )
         .id()
 
@@ -1991,7 +1992,7 @@ class BlockChallengeTest
   }
 
   private def createBlockAppender(d: Domain): Block => Task[Either[ValidationError, BlockApplyResult]] =
-    BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, appenderScheduler)(_, None)
+    BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, BlockEndorser.Disabled, appenderScheduler)(_, None)
 
   private def createMicroBlockAppender(d: Domain): (Channel, MicroBlock) => Task[Unit] = { (ch, mb) =>
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)

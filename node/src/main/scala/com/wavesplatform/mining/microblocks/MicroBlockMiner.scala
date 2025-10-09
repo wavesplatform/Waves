@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
-import monix.execution.schedulers.SchedulerService
+import monix.execution.Scheduler
 import monix.reactive.Observable
 
 trait MicroBlockMiner {
@@ -29,8 +29,8 @@ object MicroBlockMiner {
       utx: UtxPool,
       endorsementStorage: EndorsementStorage,
       settings: MinerSettings,
-      minerScheduler: SchedulerService,
-      appenderScheduler: SchedulerService,
+      minerScheduler: Scheduler,
+      appenderScheduler: Scheduler,
       transactionAdded: Observable[Unit]
   ): MicroBlockMiner =
     new MicroBlockMinerImpl(

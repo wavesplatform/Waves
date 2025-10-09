@@ -10,7 +10,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BalanceSnapshot, BlockMinerInfo, Blockchain, EndorsementStorage, NG}
+import com.wavesplatform.state.{BalanceSnapshot, BlockEndorser, BlockMinerInfo, Blockchain, EndorsementStorage, NG}
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
@@ -66,6 +66,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
         wavesSettings.copy(blockchainSettings = blockchainSettings),
         ntpTime,
         utxPool,
+        BlockEndorser.Disabled,
         EndorsementStorage.Disabled,
         wallet,
         pos,

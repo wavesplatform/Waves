@@ -132,8 +132,8 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
 
           shiftTime(miner, minerAcc1)
 
-          val forge = miner.forgeBlock(minerAcc1)
-          val block = forge.explicitGet()._1
+          val forge = miner.forgeBlock(minerAcc1).toEither
+          val block = forge.explicitGet().newBlock
           append(block).explicitGet() shouldBe an[Applied]
           blockchain.height shouldBe h
         }
@@ -142,8 +142,8 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
 
         shiftTime(miner, minerAcc2)
 
-        val forgedAtActivationHeight = miner.forgeBlock(minerAcc2)
-        val blockAtActivationHeight  = forgedAtActivationHeight.explicitGet()._1
+        val forgedAtActivationHeight = miner.forgeBlock(minerAcc2).toEither
+        val blockAtActivationHeight  = forgedAtActivationHeight.explicitGet().newBlock
         blockAtActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
         append(blockAtActivationHeight).explicitGet() shouldBe an[Applied]
@@ -165,7 +165,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
 
         shiftTime(miner, minerAcc1)
 
-        val forgedAfterActivationHeight = miner.forgeBlock(minerAcc1)
+        val forgedAfterActivationHeight = miner.forgeBlock(minerAcc1).toEither
         val blockAfterActivationHeight  = forgedAfterActivationHeight.explicitGet()._1
         blockAfterActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
@@ -185,7 +185,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
 
         shiftTime(miner, minerAcc2)
 
-        val forgedAfterVRFUsing = miner.forgeBlock(minerAcc2)
+        val forgedAfterVRFUsing = miner.forgeBlock(minerAcc2).toEither
         val blockAfterVRFUsing  = forgedAfterVRFUsing.explicitGet()._1
         blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
 
@@ -214,7 +214,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
 
         shiftTime(miner, minerAcc2)
 
-        val oldVersionBlockForge = miner.forgeBlock(minerAcc2)
+        val oldVersionBlockForge = miner.forgeBlock(minerAcc2).toEither
         val oldVersionBlock      = oldVersionBlockForge.explicitGet()._1
         oldVersionBlock.header.version shouldBe Block.RewardBlockVersion
 
@@ -225,7 +225,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
 
           shiftTime(miner, minerAcc1)
 
-          val forged = miner.forgeBlock(minerAcc1)
+          val forged = miner.forgeBlock(minerAcc1).toEither
           val block  = forged.explicitGet()._1
           block.header.version shouldBe Block.ProtoBlockVersion
 
@@ -256,7 +256,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
 
           shiftTime(miner, minerAcc1)
 
-          val forged = miner.forgeBlock(minerAcc1)
+          val forged = miner.forgeBlock(minerAcc1).toEither
           val block  = forged.explicitGet()._1
           block.header.version shouldBe Block.ProtoBlockVersion
 
@@ -273,7 +273,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
       blockchain.processBlock(genesis, genesis.header.generationSignature, snapshot = None, generatorBalances = Seq.empty) should beRight
       withMiner(blockchain, testTime, testSettings) { case (miner, append) =>
         def forge(): Block = {
-          val forge = miner.forgeBlock(minerAcc)
+          val forge = miner.forgeBlock(minerAcc).toEither
           forge.explicitGet()._1
         }
 

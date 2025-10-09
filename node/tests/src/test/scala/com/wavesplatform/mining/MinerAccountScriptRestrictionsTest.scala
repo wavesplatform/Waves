@@ -1,34 +1,35 @@
 package com.wavesplatform.mining
 
 import com.wavesplatform.account.{KeyPair, SeedKeyPair}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{WalletSettings, WavesSettings}
+import com.wavesplatform.state.BlockEndorser
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
+import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
+import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import DomainPresets.*
-import com.wavesplatform.block.Block
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
-import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
-import com.wavesplatform.state.appender.BlockAppender
-import monix.eval.Task
 
 import scala.concurrent.duration.*
 
@@ -108,6 +109,7 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
       wavesSettings,
       time,
       utx,
+      BlockEndorser.Disabled,
       d.endorsementStorage,
       Wallet(WalletSettings(None, Some("123"), Some(ByteStr(minerAcc.seed)))),
       d.posSelector,
@@ -116,7 +118,7 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
       Observable.empty
     )
 
-    val appender = BlockAppender(d.blockchainUpdater, time, utx, d.posSelector, appenderScheduler)(_, None)
+    val appender = BlockAppender(d.blockchainUpdater, time, utx, d.posSelector, BlockEndorser.Disabled, appenderScheduler)(_, None)
 
     f(miner, appender, appenderScheduler)
 
@@ -130,9 +132,11 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
         .getValidBlockDelay(d.blockchain.height, minerAcc, d.lastBlock.header.baseTarget, d.blockchain.generatingBalance(minerAcc.toAddress))
         .explicitGet()
     )
-    val forge = miner.forgeBlock(minerAcc)
-    val block = forge.explicitGet()._1
-    appender(block).runSyncUnsafe(10.seconds)
+
+    for {
+      forge <- miner.forgeBlock(minerAcc).toEither
+      r     <- appender(forge.newBlock).runSyncUnsafe(10.seconds)
+    } yield r
   }
 
   private def setScript(script: Script): SetScriptTransaction =

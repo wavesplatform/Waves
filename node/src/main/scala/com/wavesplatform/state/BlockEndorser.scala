@@ -52,7 +52,8 @@ object BlockEndorser {
 
           endorsement = BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
           networkMsg  = EndorseBlock.from(endorsement)
-          if endorsementStorage.tryAddVote(networkMsg)
+          broadcast <- endorsementStorage.tryAddVote(networkMsg).toSeq
+          if broadcast
         } allChannels.broadcast(networkMsg)
     }
   }

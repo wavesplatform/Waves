@@ -108,8 +108,6 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = input.height
 
-  override def finalizedHeight: Height = input.solidFinalizationHeight
-
   override def finalizedHeightAt(at: Height): Option[Height] = ???
 
   override val activatedFeatures: ActivatedFeatures = settings.functionalitySettings.preActivatedFeatures ++ input.features.map(id => id -> height)
