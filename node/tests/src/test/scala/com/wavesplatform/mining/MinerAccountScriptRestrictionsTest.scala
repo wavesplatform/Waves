@@ -132,9 +132,11 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
         .getValidBlockDelay(d.blockchain.height, minerAcc, d.lastBlock.header.baseTarget, d.blockchain.generatingBalance(minerAcc.toAddress))
         .explicitGet()
     )
-    val forge = miner.forgeBlock(minerAcc)
-    val block = forge.explicitGet()._1
-    appender(block).runSyncUnsafe(10.seconds)
+
+    for {
+      forge <- miner.forgeBlock(minerAcc).toEither
+      r     <- appender(forge.newBlock).runSyncUnsafe(10.seconds)
+    } yield r
   }
 
   private def setScript(script: Script): SetScriptTransaction =

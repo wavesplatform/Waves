@@ -296,7 +296,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
         d.appendMicroBlock(TxHelpers.transfer(sender, amount = 2))
 
         time.setTime(System.currentTimeMillis() + 2 * d.settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis)
-        val (block, _) = miner.forgeBlock(minerAcc).explicitGet()
+        val block = miner.forgeBlock(minerAcc).toEither.explicitGet().newBlock
 
         block.header.reference shouldBe refId
 

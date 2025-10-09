@@ -102,7 +102,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
 
     // Test for empty key block with NG
     withEnv(bps, txs, settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.SmartAccounts)) { case Env(_, account, miner, _) =>
-      val (block, _) = forgeBlock(miner)(account).explicitGet()
+      val block = forgeBlock(miner)(account).explicitGet().newBlock
       Task(block.transactionData shouldBe empty)
     }
   }
@@ -157,7 +157,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
 
   private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] = miner.generateBlockTask(account, None)
 
-  private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (Block, MiningConstraint)] = miner.forgeBlock(account)
+  private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, ForgeAttemptResult.Success] = miner.forgeBlock(account).toEither
 
   private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdaterImpl, RDB)] =
     Resource

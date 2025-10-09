@@ -11,7 +11,7 @@ import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.mining.{ForgeAttemptResult, Miner, MinerImpl}
 import com.wavesplatform.settings.{DBSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{BlockEndorser, EndorsementStorage}
@@ -133,7 +133,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
           val correctedTimeTxs = genBlock.txs.map(correctTxTimestamp(_, time))
 
           miner.forgeBlock(genBlock.signer) match {
-            case Right((block, _)) =>
+            case ForgeAttemptResult.Success(block, _) =>
               for {
                 blockWithTxs <- Block.buildAndSign(
                   block.header.version,
@@ -153,7 +153,8 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
                   .result(extAppender(blockWithTxs).runAsyncLogErr, Duration.Inf)
               } yield exportToFile(blockWithTxs)
 
-            case Left(err) => Left(GenericError(err))
+            case ForgeAttemptResult.TemporaryFailure(err) => Left(GenericError(err))
+            case ForgeAttemptResult.PermanentFailure(err) => Left(GenericError(err))
           }
       }
       result match {

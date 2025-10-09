@@ -9,7 +9,7 @@ import com.wavesplatform.database.RDB
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.mining.{ForgeAttemptResult, Miner, MinerImpl}
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{BlockEndorser, EndorsementStorage}
@@ -249,7 +249,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       fakeTime.time = nextTime
 
       miner.forgeBlock(bestMiner) match {
-        case Right((block, _)) =>
+        case ForgeAttemptResult.Success(block, _) =>
           blockAppender(block).runSyncUnsafe() match {
             case Right(_) =>
               blocks += block
@@ -261,7 +261,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
               sys.exit(1)
           }
 
-        case Left(err) =>
+        case err =>
           log.error(s"Error generating block: $err")
           sys.exit(1)
       }
