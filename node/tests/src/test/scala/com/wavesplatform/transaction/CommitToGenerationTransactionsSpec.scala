@@ -35,7 +35,7 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
   "JSON parsing" in {
     val js = Json.parse("""{
       "id": "55Cy8fzNF8wNQjjtsFhiNCUQkCJL97iaLRYfnEVRpVnr",
-      "type": 20,
+      "type": 19,
       "version": 1,
       "fee": 100000000,
       "feeAssetId": null,
