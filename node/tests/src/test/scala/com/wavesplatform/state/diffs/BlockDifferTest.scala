@@ -23,6 +23,8 @@ import com.wavesplatform.utils.Schedulers
 import io.netty.channel.group.DefaultChannelGroup
 import monix.reactive.Observable
 
+import scala.concurrent.duration.DurationInt
+
 class BlockDifferTest extends FreeSpec with WithDomain {
   private val TransactionFee = 10
 
@@ -269,12 +271,14 @@ class BlockDifferTest extends FreeSpec with WithDomain {
       val sender   = TxHelpers.signer(1)
       val minerAcc = TxHelpers.signer(2)
       val settings = DomainPresets.TransactionStateSnapshot
+      val time     = TestTime() // TODO: migrate to d.testTime
       withDomain(
         settings.copy(minerSettings = settings.minerSettings.copy(quorum = 0)),
-        AddrWithBalance.enoughBalances(sender, minerAcc)
+        AddrWithBalance.enoughBalances(sender, minerAcc),
+        time = time
       ) { d =>
         d.appendBlock()
-        val time = TestTime()
+        time.setTime(d.lastBlock.header.timestamp)
 
         val miner = new MinerImpl(
           new DefaultChannelGroup("", null),
@@ -291,15 +295,15 @@ class BlockDifferTest extends FreeSpec with WithDomain {
           Observable.empty
         )
 
+        time.advance(d.settings.minerSettings.minMicroBlockAge)
         val refId = d.appendMicroBlock(TxHelpers.transfer(sender, amount = 1))
-        Thread.sleep(d.settings.minerSettings.minMicroBlockAge.toMillis)
+
+        time.advance(d.settings.minerSettings.minMicroBlockAge)
         d.appendMicroBlock(TxHelpers.transfer(sender, amount = 2))
 
-        time.setTime(System.currentTimeMillis() + 2 * d.settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis)
+        time.advance(d.settings.minerSettings.minMicroBlockAge - 1.millis)
         val block = miner.forgeBlock(minerAcc).toEither.explicitGet().newBlock
-
         block.header.reference shouldBe refId
-
         d.appendBlockE(block) should beRight
       }
     }

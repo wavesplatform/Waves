@@ -12,6 +12,7 @@ import scala.concurrent.duration.DurationInt
 trait Time {
   def correctedTime(): Long
   def getTimestamp(): Long
+  def monotonicMillis(): Long = System.nanoTime() / 1000
 }
 
 class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable {

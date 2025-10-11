@@ -172,7 +172,7 @@ class MinerImpl(
     val height          = blockchainUpdater.height
     val version         = blockchainUpdater.nextBlockVersion
     val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
-    val lastBlockInfo   = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills)
+    val lastBlockInfo   = blockchainUpdater.bestLastBlockInfo(timeService.monotonicMillis() - minMicroBlockDurationMills)
     val reference       = referenceOpt.getOrElse(lastBlockInfo.get.blockId)
     val address         = account.toAddress
 
