@@ -40,8 +40,8 @@ class NetworkClient(
 
     log.debug(s"Connecting to $remoteAddress")
     val connectionFuture = bootstrap.connect(remoteAddress)
-    connectionFuture.addListener { (_: ChannelFuture) =>
-      log.debug(s"Connected to $remoteAddress")
+    connectionFuture.addListener { (f: ChannelFuture) =>
+      log.debug(s"${if (f.isSuccess) "Connected to" else "Could not connect to"} $remoteAddress", f.cause)
       connectionFuture.channel().write(p)
     }
 

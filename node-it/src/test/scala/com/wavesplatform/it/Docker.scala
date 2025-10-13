@@ -26,8 +26,8 @@ import pureconfig.ConfigSource
 import java.io.{FileOutputStream, IOException}
 import java.net.{InetAddress, InetSocketAddress, URL}
 import java.nio.file.{Files, Path, Paths}
-import java.time.{LocalDateTime, Duration as JDuration}
 import java.time.format.DateTimeFormatter
+import java.time.{LocalDateTime, Duration as JDuration}
 import java.util.Collections.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
@@ -638,8 +638,10 @@ object Docker {
     override def networkAddress: InetSocketAddress = nodeInfo.containerNetworkAddress
 
     def getConfig: Config = config
+
+    override def networkAddressAccessibleFromHost: InetSocketAddress = nodeInfo.hostNetworkAddress
   }
 
-  private val debuggerPort      = new AtomicInteger(11000)
+  private val debuggerPort            = new AtomicInteger(11000)
   private def freeDebuggerPort(): Int = debuggerPort.getAndIncrement()
 }

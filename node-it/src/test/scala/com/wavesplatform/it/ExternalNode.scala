@@ -16,4 +16,6 @@ class ExternalNode(config: Config) extends Node(config) {
     val hostAndPort(host, port) = (config.getString("network-address"): @unchecked)
     new InetSocketAddress(host, port.toInt)
   }
+
+  override def networkAddressAccessibleFromHost: InetSocketAddress = networkAddress
 }

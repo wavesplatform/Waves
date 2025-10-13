@@ -57,7 +57,7 @@ object Dependencies {
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
 
-  val playJson = "org.playframework" %% "play-json" % "3.0.5"
+  val playJson = "org.playframework" %% "play-json" % "3.0.6"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.9.1" % Test)

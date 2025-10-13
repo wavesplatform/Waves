@@ -57,7 +57,7 @@ jobs:
           if-no-files-found: ignore
           name: debug-data
           path: |
-            gc.log
+            gc.log*
             hs*.log
             core*
 
@@ -101,7 +101,7 @@ jobs:
       - name: Run Integration Tests
         run: sbt --batch "node-it/docker;node-it/test"
         env:
-          RUN_ID: ${{ github.ref_name }}-${{ github.run_number }}-${{ github.run_attempt }}
+          RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}
       - uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3
         if: always()
         with:
