@@ -110,7 +110,7 @@ jobs:
           path: 'node-it/target/test-reports/*.xml'
       - name: Upload Logs
         uses: actions/upload-artifact@v4
-        if: cancelled() || failure()
+        if: always()
         with:
           if-no-files-found: ignore
           name: test-logs
