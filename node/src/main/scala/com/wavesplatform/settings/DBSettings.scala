@@ -12,6 +12,7 @@ case class DBSettings(
     maxCacheSize: Int,
     maxRollbackDepth: Int,
     cleanupInterval: Option[Int] = None,
+    txBloomFilterSize: Int,
     rocksdb: RocksDBSettings
 )
 

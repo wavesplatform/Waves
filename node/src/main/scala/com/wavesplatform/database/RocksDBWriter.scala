@@ -427,7 +427,10 @@ class RocksDBWriter(
   }
 
   private var TxFilterResetTs = lastBlock.fold(0L)(_.header.timestamp)
-  private def mkFilter()      = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 1_000_000, 0.001f)
+  private def mkFilter()      = {
+    println(s"\n\tALLOCATING BF=${dbSettings.txBloomFilterSize}\n")
+    BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), dbSettings.txBloomFilterSize, 0.001f)
+  }
   private var currentTxFilter = mkFilter()
   private var prevTxFilter = lastBlock match {
     case Some(b) =>
