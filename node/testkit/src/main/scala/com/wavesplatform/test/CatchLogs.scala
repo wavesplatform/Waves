@@ -1,5 +1,6 @@
 package com.wavesplatform.test
 
+import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
 import com.wavesplatform.utils.ScorexLogging
@@ -15,6 +16,7 @@ trait CatchLogs { this: ScorexLogging =>
     r.setContext(logger.getLoggerContext)
     r.start()
     logger.addAppender(r)
+    logger.setLevel(Level.TRACE) // Catch logs even logging is disabled
     r
   }
 }
