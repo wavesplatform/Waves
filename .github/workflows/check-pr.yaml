@@ -31,12 +31,12 @@ jobs:
           QASE_PROJECT_CODE: PR
           QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
           CHECKPR_RUN_ID: ${{ github.run_id }}
-      - uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3
+      - uses: scacap/action-surefire-report@5609ce4db72c09db044803b344a8968fd1f315da
         if: always()
         with:
-          reporter: java-junit
-          name: JUnit Report
-          path: '**/target/test-reports/*.xml'
+          report_paths: '**/target/test-reports/*.xml'
+          create_check: false
+          check_name: 'Check PR'
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         id: filter
         with:
@@ -60,7 +60,6 @@ jobs:
             gc.log*
             hs*.log
             core*
-            recording.jfr
 
   compile-contracts:
     name: Compile ${{ matrix.repo }}
@@ -103,12 +102,12 @@ jobs:
         run: sbt --batch "node-it/docker;node-it/test"
         env:
           RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}
-      - uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3
+      - uses: scacap/action-surefire-report@5609ce4db72c09db044803b344a8968fd1f315da
         if: always()
         with:
-          reporter: java-junit
-          name: JUnit Report
-          path: 'node-it/target/test-reports/*.xml'
+          report_paths: '**/target/test-reports/*.xml'
+          create_check: false
+          check_name: 'Run integration tests'
       - name: Upload Logs
         uses: actions/upload-artifact@v4
         if: always()
