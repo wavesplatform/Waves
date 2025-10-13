@@ -864,7 +864,7 @@ class TransactionsRouteSpec
       val blsKP  = BlsKeyPair(sender.privateKey)
       val unsignedTxnJson = Json.parse(
         s"""{
-           |  "type": 20,
+           |  "type": 19,
            |  "sender": "${sender.toAddress}"
            |}""".stripMargin
       )

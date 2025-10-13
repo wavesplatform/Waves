@@ -17,7 +17,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.*
-import com.wavesplatform.mining.MiningConstraint
+import com.wavesplatform.mining.{Miner, MiningConstraint}
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.utils.TestRocksDB
@@ -36,6 +36,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxHelpers}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.{NTPTime, TestHelpers}
 import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers
@@ -422,7 +423,9 @@ trait WithDomain extends WithState { suite: Suite =>
         DomainPresets.SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
       balances: Seq[AddrWithBalance] = Seq.empty,
       wrapDB: RocksDB => RocksDB = identity,
-      wrapBU: CompleteBlockchainUpdater => CompleteBlockchainUpdater = identity
+      wrapBU: CompleteBlockchainUpdater => CompleteBlockchainUpdater = identity,
+      miner: Miner = _ => (),
+      time: Time = ntpTime
   )(test: Domain => A): A =
     withRocksDBWriter(settings) { blockchain =>
       var domain: Domain = null
@@ -430,9 +433,10 @@ trait WithDomain extends WithState { suite: Suite =>
         new BlockchainUpdaterImpl(
           blockchain,
           settings,
-          ntpTime,
+          time,
           BlockchainUpdateTriggers.combined(domain.triggers),
-          loadActiveLeases(rdb, _, _)
+          loadActiveLeases(rdb, _, _),
+          miner
         )
       )
 

@@ -127,7 +127,7 @@ abstract class HandshakeHandler(
               ctx.channel().attr(NodeVersionAttributeKey).set(remoteHandshake.applicationVersion)
 
               Option(ctx.channel().attr(ConnectionStartAttributeKey).get()).foreach { start =>
-                log.trace(s"Time taken to accept handshake = ${System.currentTimeMillis() - start} ms")
+                log.trace(s"Time taken to accept handshake = ${System.nanoTime() / 1000 - start} ms")
               }
               ctx.channel().closeFuture().addListener { (f: ChannelFuture) =>
                 peerConnections.remove(key, f.channel())
@@ -209,7 +209,7 @@ object HandshakeHandler {
   ) extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase, allChannels) {
     override def channelActive(ctx: ChannelHandlerContext): Unit = {
       sendLocalHandshake(ctx)
-      ctx.channel().attr(ConnectionStartAttributeKey).set(System.currentTimeMillis())
+      ctx.channel().attr(ConnectionStartAttributeKey).set(System.nanoTime() / 1000)
       super.channelActive(ctx)
     }
   }
