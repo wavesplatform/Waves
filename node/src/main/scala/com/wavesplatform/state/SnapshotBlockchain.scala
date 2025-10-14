@@ -22,7 +22,8 @@ case class SnapshotBlockchain(
     blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
     carry: Long = 0,
     reward: Option[Long] = None,
-    stateHash: Option[ByteStr] = None
+    stateHash: Option[ByteStr] = None,
+    latestGeneratorBalances: Option[GeneratorBalances] = None
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
   lazy val snapshot: StateSnapshot          = maybeSnapshot.orEmpty
@@ -249,13 +250,11 @@ case class SnapshotBlockchain(
   }
 
   override def parentGeneratorBalances(): Seq[(Address, Long)] =
-    if (blockMeta.isEmpty) inner.parentGeneratorBalances()
+    if (latestGeneratorBalances.isEmpty) inner.parentGeneratorBalances()
     else inner.currentGeneratorBalances()
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] =
-    maybeSnapshot.fold(inner.currentGeneratorBalances()) { _ =>
-      throw new RuntimeException("currentGeneratorBalances is not implemented for SnapshotBlockchain")
-    }
+    latestGeneratorBalances.fold(inner.currentGeneratorBalances())(_.map { case (addr, _, b) => addr -> b })
 }
 
 object SnapshotBlockchain {
@@ -266,7 +265,8 @@ object SnapshotBlockchain {
       Some(SignedBlockHeader(ngState.bestLiquidBlock.header, ngState.bestLiquidBlock.signature) -> ngState.hitSource),
       ngState.carryFee,
       ngState.reward,
-      Some(ngState.bestLiquidComputedStateHash)
+      Some(ngState.bestLiquidComputedStateHash),
+      Some(ngState.latestGeneratorBalances)
     )
 
   def apply(inner: Blockchain, reward: Option[Long]): SnapshotBlockchain =

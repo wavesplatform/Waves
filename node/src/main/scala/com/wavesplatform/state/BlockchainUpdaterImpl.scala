@@ -925,12 +925,11 @@ class BlockchainUpdaterImpl(
   }
 
   override def parentGeneratorBalances(): Seq[(Address, Long)] = readLock {
-    if (ngState.isEmpty) snapshotBlockchain.parentGeneratorBalances()
-    else snapshotBlockchain.currentGeneratorBalances()
+    snapshotBlockchain.parentGeneratorBalances()
   }
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] = readLock {
-    ngState.fold(rocksdb.currentGeneratorBalances())(_.latestGeneratorBalances.map { case (addr, _, b) => addr -> b })
+    snapshotBlockchain.currentGeneratorBalances()
   }
 
   override def snapshotBlockchain: SnapshotBlockchain = readLock {

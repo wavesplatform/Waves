@@ -337,7 +337,10 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
 
         val miner1BalanceBeforeBlock3 = miner1InitBalance - CommitToGenerationTransaction.DepositInWavelets - TestValues.commitToGenerationFee
         val miner2BalanceBeforeBlock3 = miner2InitBalance - CommitToGenerationTransaction.DepositInWavelets - TestValues.commitToGenerationFee
-        d.blockchain.currentGeneratorBalances() shouldBe Seq(miner1BalanceBeforeBlock3, miner2BalanceBeforeBlock3)
+        d.blockchain.currentGeneratorBalances() shouldBe Seq(
+          generator2.publicKey.toAddress -> miner1BalanceBeforeBlock3,
+          generator3.publicKey.toAddress -> miner2BalanceBeforeBlock3
+        )
         d.generatorsApi.generators(Height(d.blockchain.height)) shouldBe Seq(
           GeneratorEntry(generator2.toAddress, miner1BalanceBeforeBlock3, TransactionId(txs.head.id())),
           GeneratorEntry(generator3.toAddress, miner2BalanceBeforeBlock3, TransactionId(txs(1).id()))
@@ -349,8 +352,14 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
 
         val miner1BalanceBeforeBlock4 = miner1BalanceBeforeBlock3 - transfer.amount.value - transfer.fee.value
         val miner2BalanceBeforeBlock4 = miner2BalanceBeforeBlock3
-        d.blockchain.parentGeneratorBalances() shouldBe Seq(miner1BalanceBeforeBlock3, miner2BalanceBeforeBlock3)
-        d.blockchain.currentGeneratorBalances() shouldBe Seq(miner1BalanceBeforeBlock4, miner2BalanceBeforeBlock4)
+        d.blockchain.parentGeneratorBalances() shouldBe Seq(
+          generator2.publicKey.toAddress -> miner1BalanceBeforeBlock3,
+          generator3.publicKey.toAddress -> miner2BalanceBeforeBlock3
+        )
+        d.blockchain.currentGeneratorBalances() shouldBe Seq(
+          generator2.publicKey.toAddress -> miner1BalanceBeforeBlock4,
+          generator3.publicKey.toAddress -> miner2BalanceBeforeBlock4
+        )
         d.generatorsApi.generators(Height(d.blockchain.height)) shouldBe Seq(
           GeneratorEntry(generator2.toAddress, miner1BalanceBeforeBlock4, TransactionId(txs.head.id())),
           GeneratorEntry(generator3.toAddress, miner2BalanceBeforeBlock4, TransactionId(txs(1).id()))
