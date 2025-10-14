@@ -211,10 +211,10 @@ abstract class Caches extends Blockchain with Storage {
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   @volatile
-  private var committedGeneratorBalancesCache        = loadGeneratorBalances()
-  override def parentGeneratorBalances(): Seq[Long]  = committedGeneratorBalancesCache.parent
-  override def currentGeneratorBalances(): Seq[Long] = committedGeneratorBalancesCache.current
-  protected def loadGeneratorBalances(): (parent: Seq[Long], current: Seq[Long])
+  private var committedGeneratorBalancesCache                   = loadGeneratorBalances()
+  override def parentGeneratorBalances(): Seq[(Address, Long)]  = committedGeneratorBalancesCache.parent
+  override def currentGeneratorBalances(): Seq[(Address, Long)] = committedGeneratorBalancesCache.current
+  protected def loadGeneratorBalances(): (parent: Seq[(Address, Long)], current: Seq[(Address, Long)])
 
   protected def doAppend(
       blockMeta: PBBlockMeta,
@@ -229,7 +229,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
-      generatorBalances: Seq[Long],
+      generatorBalances: Seq[(Address, Long)],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
   ): Unit
@@ -265,7 +265,7 @@ abstract class Caches extends Blockchain with Storage {
 
     committedGeneratorBalancesCache = (
       committedGeneratorBalancesCache.current,
-      generatorBalances.map { case (_, _, balance) => balance }
+      generatorBalances.map { case (addr, _, balance) => addr -> balance }
     )
 
     val newAddresses =

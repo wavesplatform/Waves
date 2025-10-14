@@ -300,7 +300,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
       }
     }
 
-    "committed generators balances" in {
+    "committed generators and balances" in {
       val miner1InitBalance = 100_000.waves + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee
       val miner2InitBalance = 50_000.waves + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee
 

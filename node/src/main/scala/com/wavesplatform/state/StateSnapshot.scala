@@ -33,7 +33,7 @@ case class StateSnapshot(
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
     scriptsComplexity: Long = 0,
     erc20Addresses: Map[ERC20Address, IssuedAsset] = Map(),
-    nextCommittedGenerators: IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
+    nextCommittedGenerators: Seq[(Address, BlsPublicKey)] = Seq.empty
 ) {
 
   // ignores lease balances from portfolios

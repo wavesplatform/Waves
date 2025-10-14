@@ -106,14 +106,13 @@ trait Blockchain {
 
   // TODO: cached
   // TODO: named?
-  def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)]
+  def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)]
 
-  /** @return
-    *   In commitment order
-    */
-  def parentGeneratorBalances(): Seq[Long]
+  /** @return In commitment order */
+  def parentGeneratorBalances(): Seq[(Address, Long)]
 
-  def currentGeneratorBalances(): Seq[Long] // TODO: IndexedSeq?
+  /** @return In commitment order */
+  def currentGeneratorBalances(): Seq[(Address, Long)]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
@@ -137,9 +136,8 @@ object Blockchain {
     def contains(blockId: BlockId): Boolean = blockchain.heightOf(blockId).isDefined
 
     def finalizedHeightOrFallback(maxRollbackLength: Int, at: Height = Height(blockchain.height)): Height = {
-      val finalizedAt       = blockchain.finalizedHeightAt(at)
-      val minFallbackHeight = at - maxRollbackLength
-      Height(finalizedAt.getOrElse(GenesisBlockHeight).max(minFallbackHeight))
+      val finalizedAt = blockchain.finalizedHeightAt(at)
+      Blockchain.finalizedHeightOrFallback(at, finalizedAt, maxRollbackLength)
     }
 
     def blockId(atHeight: Int): Option[BlockId] = blockchain.blockHeader(atHeight).map(_.id())
@@ -302,5 +300,10 @@ object Blockchain {
 
     def generationPeriodOf(h: Height): GenerationPeriod = GenerationPeriod.from(h, blockchain.settings.functionalitySettings)
     def currentGenerationPeriod: GenerationPeriod       = this.generationPeriodOf(Height(blockchain.height))
+  }
+
+  def finalizedHeightOrFallback(at: Height, latestFinalized: Option[Height], maxRollbackLength: Int): Height = {
+    val minFallbackHeight = at - maxRollbackLength
+    Height(latestFinalized.getOrElse(GenesisBlockHeight).max(minFallbackHeight))
   }
 }

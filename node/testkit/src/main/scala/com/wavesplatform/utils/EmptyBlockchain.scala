@@ -97,9 +97,9 @@ trait EmptyBlockchain extends Blockchain {
 
   override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
 
-  override def parentGeneratorBalances(): Seq[Long] = Seq.empty
+  override def parentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 
-  override def currentGeneratorBalances(): Seq[Long] = Seq.empty
+  override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 }
 
 object EmptyBlockchain extends EmptyBlockchain

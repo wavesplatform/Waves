@@ -329,7 +329,7 @@ class RocksDBWriter(
     }.toMap
   }
 
-  override protected def loadGeneratorBalances(): (parent: Seq[Long], current: Seq[Long]) =
+  override protected def loadGeneratorBalances(): (parent: Seq[(Address, Long)], current: Seq[(Address, Long)]) =
     if (lastBlock.isEmpty || height <= GenesisBlockHeight) (Seq.empty, Seq.empty)
     else if (height == GenesisBlockHeight) {
       val currentHeight  = Height(height)
@@ -367,8 +367,8 @@ class RocksDBWriter(
       }
     }
 
-  private def generatorBalances(generators: Seq[(Address, BlsPublicKey)], at: BlockId) = generators.map { case (addr, _) =>
-    GeneratingBalanceProvider.balance(this, addr, Some(at))
+  private def generatorBalances(generators: Seq[(Address, BlsPublicKey)], at: BlockId): Seq[(Address, Long)] = generators.map { case (addr, _) =>
+    addr -> GeneratingBalanceProvider.balance(this, addr, Some(at))
   }
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
@@ -533,7 +533,7 @@ class RocksDBWriter(
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
-      generatorBalances: Seq[Long],
+      generatorBalances: Seq[(Address, Long)],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
   ): Unit = {
@@ -748,7 +748,7 @@ class RocksDBWriter(
       }
 
       // TODO: Option to not store
-      rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances))
+      rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances.map { case (_, b) => b }))
 
       if (nextCommittedGenerators.nonEmpty) {
         val nextPeriod = this.generationPeriodOf(h).next

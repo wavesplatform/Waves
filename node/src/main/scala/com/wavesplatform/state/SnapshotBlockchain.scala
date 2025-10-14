@@ -242,26 +242,19 @@ case class SnapshotBlockchain(
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
+  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = {
     val base = inner.committedGenerators(at)
     if (at == this.currentGenerationPeriod.next) base ++ snapshot.nextCommittedGenerators
     else base
   }
 
-  override def parentGeneratorBalances(): Seq[Long] =
+  override def parentGeneratorBalances(): Seq[(Address, Long)] =
     if (blockMeta.isEmpty) inner.parentGeneratorBalances()
     else inner.currentGeneratorBalances()
 
-  override def currentGeneratorBalances(): Seq[Long] =
-    maybeSnapshot.foldLeft(inner.currentGeneratorBalances()) { (inner, _) =>
-      // TODO: Is there a better way? Do we really need this?
-      val recentGeneratorBalances = snapshot.nextCommittedGenerators.map { case (address, _) =>
-        balanceSnapshots(address, height, None).headOption
-      }
-
-      inner.zip(recentGeneratorBalances).map { case (inner, recent) =>
-        recent.map(_.effectiveBalance.min(inner)).getOrElse(inner)
-      }
+  override def currentGeneratorBalances(): Seq[(Address, Long)] =
+    maybeSnapshot.fold(inner.currentGeneratorBalances()) { _ =>
+      throw new RuntimeException("currentGeneratorBalances is not implemented for SnapshotBlockchain")
     }
 }
 
