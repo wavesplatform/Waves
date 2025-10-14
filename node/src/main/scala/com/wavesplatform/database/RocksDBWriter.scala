@@ -329,42 +329,15 @@ class RocksDBWriter(
     }.toMap
   }
 
-  override protected def loadGeneratorBalances(): (parent: Seq[(Address, Long)], current: Seq[(Address, Long)]) =
-    if (lastBlock.isEmpty || height <= GenesisBlockHeight) (Seq.empty, Seq.empty)
-    else if (height == GenesisBlockHeight) {
+  override protected def loadGeneratorBalances(): Seq[(Address, Long)] =
+    if (lastBlock.isEmpty || height <= GenesisBlockHeight) Seq.empty
+    else {
       val currentHeight  = Height(height)
       val currentBlockId = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight")).id()
       val currentPeriod  = this.generationPeriodOf(currentHeight)
 
       val currentCommGens = committedGenerators(currentPeriod)
-      val current         = if (currentCommGens.isEmpty) Seq.empty else generatorBalances(currentCommGens, currentBlockId)
-      (Seq.empty, current)
-    } else {
-      val parentHeight  = Height(height - 1)
-      val parentBlockId = this.blockId(parentHeight).getOrElse(throw new IllegalStateException(s"No block on parent height: $parentHeight"))
-
-      val currentHeight  = Height(height)
-      val currentBlockId = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight")).id()
-
-      val parentPeriod  = this.generationPeriodOf(parentHeight)
-      val currentPeriod = this.generationPeriodOf(currentHeight)
-
-      if (parentPeriod == currentPeriod) {
-        val commGens = committedGenerators(currentPeriod)
-        if (commGens.isEmpty) (Seq.empty, Seq.empty)
-        else {
-          val parent  = generatorBalances(commGens, parentBlockId)
-          val current = generatorBalances(commGens, currentBlockId)
-          (parent, current)
-        }
-      } else {
-        val parentCommGens = committedGenerators(parentPeriod)
-        val parent         = if (parentCommGens.isEmpty) Seq.empty else generatorBalances(parentCommGens, parentBlockId)
-
-        val currentCommGens = committedGenerators(currentPeriod)
-        val current         = if (currentCommGens.isEmpty) Seq.empty else generatorBalances(currentCommGens, currentBlockId)
-        (parent, current)
-      }
+      if (currentCommGens.isEmpty) Seq.empty else generatorBalances(currentCommGens, currentBlockId)
     }
 
   private def generatorBalances(generators: Seq[(Address, BlsPublicKey)], at: BlockId): Seq[(Address, Long)] = generators.map { case (addr, _) =>

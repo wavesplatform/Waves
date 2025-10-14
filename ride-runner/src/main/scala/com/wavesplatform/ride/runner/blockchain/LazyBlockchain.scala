@@ -215,8 +215,6 @@ class LazyBlockchain[TagT] private (
 
   override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = Seq.empty
 
-  override def parentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
-
   override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 
   private def getTransactionHeight(id: TransactionId): Option[Height] = db.directReadWrite { implicit ctx =>

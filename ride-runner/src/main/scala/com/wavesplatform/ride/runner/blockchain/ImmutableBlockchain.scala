@@ -208,8 +208,6 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = Seq.empty
 
-  override def parentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
-
   override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 
   override def lastStateHash(refId: Option[BlockId]): BlockId = ???

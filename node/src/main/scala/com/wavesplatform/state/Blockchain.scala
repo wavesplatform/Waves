@@ -109,9 +109,6 @@ trait Blockchain {
   def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)]
 
   /** @return In commitment order */
-  def parentGeneratorBalances(): Seq[(Address, Long)]
-
-  /** @return In commitment order */
   def currentGeneratorBalances(): Seq[(Address, Long)]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]

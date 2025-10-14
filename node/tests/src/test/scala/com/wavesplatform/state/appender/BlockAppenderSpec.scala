@@ -322,7 +322,6 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         d.appender.appendBlock(block2)
 
         d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod) shouldBe empty
-        d.blockchain.parentGeneratorBalances() shouldBe empty
         d.blockchain.currentGeneratorBalances() shouldBe empty
         d.generatorsApi.generators(Height(d.blockchain.height)) shouldBe empty
 
@@ -333,7 +332,6 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
 
         d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod).map { case (addr, _) => addr } shouldBe
           Seq(generator2, generator3).map(_.toAddress)
-        d.blockchain.parentGeneratorBalances() shouldBe empty // No committed generators in a parent block
 
         val miner1BalanceBeforeBlock3 = miner1InitBalance - CommitToGenerationTransaction.DepositInWavelets - TestValues.commitToGenerationFee
         val miner2BalanceBeforeBlock3 = miner2InitBalance - CommitToGenerationTransaction.DepositInWavelets - TestValues.commitToGenerationFee
@@ -352,10 +350,6 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
 
         val miner1BalanceBeforeBlock4 = miner1BalanceBeforeBlock3 - transfer.amount.value - transfer.fee.value
         val miner2BalanceBeforeBlock4 = miner2BalanceBeforeBlock3
-        d.blockchain.parentGeneratorBalances() shouldBe Seq(
-          generator2.publicKey.toAddress -> miner1BalanceBeforeBlock3,
-          generator3.publicKey.toAddress -> miner2BalanceBeforeBlock3
-        )
         d.blockchain.currentGeneratorBalances() shouldBe Seq(
           generator2.publicKey.toAddress -> miner1BalanceBeforeBlock4,
           generator3.publicKey.toAddress -> miner2BalanceBeforeBlock4

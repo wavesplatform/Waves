@@ -249,10 +249,6 @@ case class SnapshotBlockchain(
     else base
   }
 
-  override def parentGeneratorBalances(): Seq[(Address, Long)] =
-    if (latestGeneratorBalances.isEmpty) inner.parentGeneratorBalances()
-    else inner.currentGeneratorBalances()
-
   override def currentGeneratorBalances(): Seq[(Address, Long)] =
     latestGeneratorBalances.fold(inner.currentGeneratorBalances())(_.map { case (addr, _, b) => addr -> b })
 }

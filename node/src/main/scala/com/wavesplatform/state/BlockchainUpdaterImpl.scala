@@ -924,10 +924,6 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.committedGenerators(at)
   }
 
-  override def parentGeneratorBalances(): Seq[(Address, Long)] = readLock {
-    snapshotBlockchain.parentGeneratorBalances()
-  }
-
   override def currentGeneratorBalances(): Seq[(Address, Long)] = readLock {
     snapshotBlockchain.currentGeneratorBalances()
   }

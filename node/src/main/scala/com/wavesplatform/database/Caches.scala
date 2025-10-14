@@ -211,10 +211,9 @@ abstract class Caches extends Blockchain with Storage {
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   @volatile
-  private var committedGeneratorBalancesCache                   = loadGeneratorBalances()
-  override def parentGeneratorBalances(): Seq[(Address, Long)]  = committedGeneratorBalancesCache.parent
-  override def currentGeneratorBalances(): Seq[(Address, Long)] = committedGeneratorBalancesCache.current
-  protected def loadGeneratorBalances(): (parent: Seq[(Address, Long)], current: Seq[(Address, Long)])
+  private var currentGeneratorBalancesCache                     = loadGeneratorBalances()
+  override def currentGeneratorBalances(): Seq[(Address, Long)] = currentGeneratorBalancesCache
+  protected def loadGeneratorBalances(): Seq[(Address, Long)]
 
   protected def doAppend(
       blockMeta: PBBlockMeta,
@@ -263,10 +262,7 @@ abstract class Caches extends Blockchain with Storage {
     )
     current = CurrentBlockInfo(newHeight, Some(newMeta), block.transactionData)
 
-    committedGeneratorBalancesCache = (
-      committedGeneratorBalancesCache.current,
-      generatorBalances.map { case (addr, _, balance) => addr -> balance }
-    )
+    currentGeneratorBalancesCache = generatorBalances.map { case (addr, _, balance) => addr -> balance }
 
     val newAddresses =
       mutable.Set[Address]() ++
@@ -376,7 +372,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       newFinalizedHeight,
-      committedGeneratorBalancesCache.current,
+      currentGeneratorBalancesCache,
       nextCommittedGeneratorsRev.reverse,
       stateHash.result()
     )
@@ -416,8 +412,7 @@ abstract class Caches extends Blockchain with Storage {
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()
 
-      // TODO: if rolled back by 1?
-      committedGeneratorBalancesCache = loadGeneratorBalances()
+      currentGeneratorBalancesCache = loadGeneratorBalances()
 
       discardedBlocks
     }

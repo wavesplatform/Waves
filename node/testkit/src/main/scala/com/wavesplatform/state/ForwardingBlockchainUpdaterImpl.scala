@@ -64,7 +64,6 @@ class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) exten
     bestLiquidSnapshot,
     bestLiquidSnapshotAndFees,
     snapshotBlockchain,
-    parentGeneratorBalances,
     currentGeneratorBalances
   }
 
