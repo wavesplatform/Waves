@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.serialization.{BlockHeaderSerializer, MicroBlockSerializer}
 import com.wavesplatform.block.{Block, MicroBlock}
@@ -396,6 +397,8 @@ object BasicMessagesRepo {
 
   @Sharable
   class MessageLogger(settings: TrafficLogger.Settings) extends TrafficLogger(settings) {
+    @transient
+    override protected lazy val logger: Logger = Logger("com.wavesplatform.network.TrafficLogger")
 
     protected def codeOf(msg: AnyRef): Option[Byte] = {
       val aux: PartialFunction[AnyRef, Byte] = {
