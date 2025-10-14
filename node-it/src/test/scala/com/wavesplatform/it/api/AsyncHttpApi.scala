@@ -1,10 +1,5 @@
 package com.wavesplatform.it.api
 
-import java.io.IOException
-import java.net.{InetSocketAddress, URLEncoder}
-import java.util.concurrent.TimeoutException
-import java.util.{NoSuchElementException, UUID}
-import java.time.{Duration as JDuration}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.DebugMessage.*
@@ -12,8 +7,8 @@ import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.{ConnectReq, DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.features.api.{ActivationStatus, activationStatusFormat}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.invokeExpressionFee
@@ -38,15 +33,16 @@ import com.wavesplatform.transaction.{
   CreateAliasTransaction,
   DataTransaction,
   Proofs,
+  TransactionSignOps,
+  TransactionValidationOps,
   TxDecimals,
   TxExchangeAmount,
   TxExchangePrice,
   TxNonNegativeAmount,
   TxPositiveAmount,
-  TxVersion,
-  TransactionSignOps,
-  TransactionValidationOps
+  TxVersion
 }
+import monix.execution.atomic.AtomicInt
 import org.asynchttpclient.*
 import org.asynchttpclient.Dsl.{delete as _delete, get as _get, post as _post, put as _put}
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
@@ -55,15 +51,22 @@ import org.scalatest.{Assertions, matchers}
 import play.api.libs.json.*
 import play.api.libs.json.Json.{stringify, toJson}
 
+import java.io.IOException
+import java.net.{InetSocketAddress, URLEncoder}
+import java.time.Duration as JDuration
+import java.util.NoSuchElementException
+import java.util.concurrent.TimeoutException
 import scala.collection.immutable.VectorMap
-import scala.jdk.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration.*
+import scala.jdk.FutureConverters.*
 import scala.util.{Failure, Success}
 
 object AsyncHttpApi extends Assertions {
+
+  private val counter = AtomicInt(1)
 
   // noinspection ScalaStyle
   implicit class NodeAsyncHttpApi(val n: Node) extends Assertions with matchers.should.Matchers {
@@ -895,20 +898,19 @@ object AsyncHttpApi extends Assertions {
 
     def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = OK_200, waitForStatus: Boolean = false): Future[Response] = {
       def executeRequest: Future[Response] = {
-        val id = UUID.randomUUID()
-        n.log.trace(s"[$id] Executing request '$r'")
-        if (r.getStringData != null) n.log.debug(s"[$id] Request's body '${r.getStringData}'")
+        val id = counter.getAndIncrement()
+        n.log.trace(s"[$id] ${r.getMethod} ${r.getUrl}${Option(r.getStringData).fold("")(" " + _)}")
         n.client
           .executeRequest(
             r,
             new AsyncCompletionHandler[Response] {
               override def onCompleted(response: Response): Response = {
                 if (response.getStatusCode == statusCode) {
-                  n.log.debug(s"[$id] Request: ${r.getMethod} ${r.getUrl}\nResponse: ${response.getResponseBody}")
+                  n.log.debug(s"[$id] ${response.getStatusCode} ${response.getStatusText}: ${response.getResponseBody}")
                   response
                 } else {
                   n.log.debug(
-                    s"[$id] Request: ${r.getMethod} ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}"
+                    s"[$id] Expected status $statusCode != response status ${response.getStatusCode}: ${response.getResponseBody}"
                   )
                   throw UnexpectedStatusCodeException(r.getMethod, r.getUrl, response.getStatusCode, response.getResponseBody)
                 }
