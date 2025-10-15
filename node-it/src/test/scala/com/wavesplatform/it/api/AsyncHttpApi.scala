@@ -264,6 +264,10 @@ object AsyncHttpApi extends Assertions {
       get("/blocks/headers/last", amountsAsStrings)
         .as[BlockHeader](amountsAsStrings)
 
+    def finalizedBlockHeader(amountsAsStrings: Boolean = false): Future[BlockHeader] =
+      get("/blocks/headers/finalized", amountsAsStrings)
+        .as[BlockHeader](amountsAsStrings)
+
     def status: Future[Status] = get("/node/status").as[Status]
 
     def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]

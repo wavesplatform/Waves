@@ -631,7 +631,7 @@ class BlockchainUpdaterImpl(
                       accumulatedBlock.transactionData ++ microBlock.transactionData,
                       microBlock.totalResBlockSig,
                       microBlock.stateHash,
-                      accumulatedBlock.header.finalizationVoting
+                      microBlock.finalizationVoting
                     )
                     .signatureValid() -> computedStateHash
                 }

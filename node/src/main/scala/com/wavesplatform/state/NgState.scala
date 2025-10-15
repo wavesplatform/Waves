@@ -219,7 +219,7 @@ case class NgState(
           val init = (
             base.transactionData,
             Seq(base.header.finalizationVoting),
-            Option.empty[(ByteStr, Option[ByteStr], DiscardedMicroBlocks)]
+            Option.empty[(ByteStr, Option[ByteStr], DiscardedMicroBlocks)] // sig, stateHash, discarded
           )
           val (txs, voting, maybeFound) = microBlocksAsc.foldLeft(init) {
             case ((txs, voting, Some((sig, stateHash, discarded))), MicroBlockInfo(mbId, micro)) =>

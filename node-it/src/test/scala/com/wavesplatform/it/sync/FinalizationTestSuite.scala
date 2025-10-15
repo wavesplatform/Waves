@@ -80,6 +80,8 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
       done = currFinalizedHeight > waitingFinalizedHeight
     }
 
-    // TODO
+    info("Finalized header checks")
+    val finalizedBlock = node.finalizedBlockHeader()
+    finalizedBlock.height should be >= currFinalizedHeight
   }
 }

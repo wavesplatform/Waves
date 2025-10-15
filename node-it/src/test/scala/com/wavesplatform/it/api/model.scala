@@ -2,7 +2,7 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.DataEntry
+import com.wavesplatform.state.{DataEntry, Height}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status as GrpcStatus}
@@ -887,7 +887,7 @@ object Block {
 case class BlockHeader(
     id: String,
     signature: String,
-    height: Int,
+    height: Height,
     timestamp: Long,
     generator: String,
     transactionCount: Int,
@@ -927,7 +927,7 @@ object BlockHeader {
       } yield BlockHeader(
         id,
         signature,
-        height,
+        Height(height),
         timestamp,
         generator,
         transactionCount,

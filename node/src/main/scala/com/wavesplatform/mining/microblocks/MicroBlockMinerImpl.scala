@@ -115,7 +115,7 @@ class MicroBlockMinerImpl(
           _ <- Task.now(if (delay > Duration.Zero) log.trace(s"Sleeping ${delay.toMillis} ms before applying microBlock"))
           _ <- Task.sleep(delay)
           _ = log.trace(s"Generating microBlock for ${account.toAddress}, constraints: $updatedTotalConstraint")
-          blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed, stateHash) // TODO: here
+          blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed, stateHash)
             .leftWiden[Throwable]
             .liftTo[Task]
           (signedBlock, microBlock) = blocks
