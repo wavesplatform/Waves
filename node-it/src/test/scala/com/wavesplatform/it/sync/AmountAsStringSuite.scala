@@ -246,8 +246,8 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
     val blockLast        = sender.lastBlock(amountsAsStrings = true)
     val blockAt          = sender.blockAt(currentHeight, amountsAsStrings = true)
     val blockBySignature = sender.blockById(sender.lastBlock().id, amountsAsStrings = true)
-    val blockHeadersAt   = sender.blockHeadersAt(currentHeight, amountsAsStrings = true)
-    val blockHeadersLast = sender.lastBlockHeader(amountsAsStrings = true)
+    val blockHeaderAt    = sender.blockHeaderAt(currentHeight, amountsAsStrings = true)
+    val blockHeaderLast  = sender.lastBlockHeader(amountsAsStrings = true)
 
     for (block <- Seq(blockLast, blockAt, blockBySignature)) {
       block.reward shouldBe Some(reward)
@@ -255,7 +255,7 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
       block.totalFee shouldBe Some(0)
     }
 
-    for (block <- Seq(blockHeadersLast, blockHeadersAt)) {
+    for (block <- Seq(blockHeaderLast, blockHeaderAt)) {
       block.reward shouldBe Some(reward)
       block.desiredReward shouldBe Some(-1)
       block.totalFee shouldBe 0

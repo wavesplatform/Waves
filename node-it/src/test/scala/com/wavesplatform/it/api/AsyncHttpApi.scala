@@ -245,7 +245,7 @@ object AsyncHttpApi extends Assertions {
       get(s"/blocks/address/$address/$from/$to", amountsAsStrings)
         .as[Seq[Block]](amountsAsStrings)
 
-    def blockHeadersAt(height: Int, amountsAsStrings: Boolean = false): Future[BlockHeader] =
+    def blockHeaderAt(height: Int, amountsAsStrings: Boolean = false): Future[BlockHeader] =
       get(s"/blocks/headers/at/$height", amountsAsStrings)
         .as[BlockHeader](amountsAsStrings)
 
@@ -1039,7 +1039,7 @@ object AsyncHttpApi extends Assertions {
 
       def waitSameBlockHeaders =
         waitFor[BlockHeader](s"same blocks at height = $height")(retryInterval)(
-          _.blockHeadersAt(height),
+          _.blockHeaderAt(height),
           { blocks =>
             val id = blocks.map(_.id)
             id.forall(_ == id.head)

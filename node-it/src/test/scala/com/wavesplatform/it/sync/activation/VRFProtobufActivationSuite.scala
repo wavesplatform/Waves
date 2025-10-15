@@ -46,12 +46,12 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("miner generates block v4 before activation") {
-    val blockBeforeActivationHeight        = sender.blockAt(sender.height)
-    val blockHeadersBeforeActivationHeight = sender.blockHeadersAt(sender.height)
+    val blockBeforeActivationHeight       = sender.blockAt(sender.height)
+    val blockHeaderBeforeActivationHeight = sender.blockHeaderAt(sender.height)
     blockBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
-    blockHeadersBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
+    blockHeaderBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
     Base58.decode(blockBeforeActivationHeight.generationSignature.get).length shouldBe Block.GenerationSignatureLength
-    blockBeforeActivationHeight.baseTarget shouldBe blockHeadersBeforeActivationHeight.baseTarget
+    blockBeforeActivationHeight.baseTarget shouldBe blockHeaderBeforeActivationHeight.baseTarget
   }
 
   test("not able to broadcast tx of new versions before activation") {
@@ -107,13 +107,13 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("miner generates block v5 after activation") {
-    val blockAtActivationHeight        = sender.blockAt(sender.height)
-    val blockHeadersAtActivationHeight = sender.blockHeadersAt(sender.height)
+    val blockAtActivationHeight       = sender.blockAt(sender.height)
+    val blockHeaderAtActivationHeight = sender.blockHeaderAt(sender.height)
     blockAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
-    blockHeadersAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
+    blockHeaderAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
 
-    val blockHeaderById = sender.blockHeaderForId(blockHeadersAtActivationHeight.id)
-    blockHeaderById shouldBe blockHeadersAtActivationHeight
+    val blockHeaderById = sender.blockHeaderForId(blockHeaderAtActivationHeight.id)
+    blockHeaderById shouldBe blockHeaderAtActivationHeight
   }
 
   test("only able to get block by id (that is not equal to signature) after activation") {

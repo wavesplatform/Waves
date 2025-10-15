@@ -49,13 +49,13 @@ class MicroblocksFeeTestSuite extends BaseFreeSpec {
       initialBalances <- notMiner.debugStateAt(microblockActivationHeight - 1) // 100%
 
       balancesBeforeActivation <- notMiner.debugStateAt(microblockActivationHeight) // 100%
-      blockBeforeActivation    <- notMiner.blockHeadersAt(microblockActivationHeight)
+      blockBeforeActivation    <- notMiner.blockHeaderAt(microblockActivationHeight)
 
       balancesOnActivation <- notMiner.debugStateAt(microblockActivationHeight + 1) // 40%
-      blockOnActivation    <- notMiner.blockHeadersAt(microblockActivationHeight + 1)
+      blockOnActivation    <- notMiner.blockHeaderAt(microblockActivationHeight + 1)
 
       balancesAfterActivation <- notMiner.debugStateAt(microblockActivationHeight + 2) // 60% of previous + 40% of current
-      blockAfterActivation    <- notMiner.blockHeadersAt(microblockActivationHeight + 2)
+      blockAfterActivation    <- notMiner.blockHeaderAt(microblockActivationHeight + 2)
     } yield {
 
       balancesBeforeActivation(blockBeforeActivation.generator) shouldBe {
