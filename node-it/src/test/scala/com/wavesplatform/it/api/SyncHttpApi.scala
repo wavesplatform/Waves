@@ -634,6 +634,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def finalizedHeight: Height = sync(async(n).finalizedHeight)
 
+    def finalizedHeightAt(at: Int): Height = sync(async(n).finalizedHeightAt(at))
+
     def blockAt(height: Int, amountsAsStrings: Boolean = false): Block = sync(async(n).blockAt(height, amountsAsStrings))
 
     def blockSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[Block] =

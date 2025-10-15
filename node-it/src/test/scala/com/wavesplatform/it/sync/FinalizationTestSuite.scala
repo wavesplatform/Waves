@@ -57,11 +57,10 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
 
     info("Finalized height checks")
     val deadline               = 2.minutes.fromNow
-    val finalizedHeight1       = node.finalizedHeight
+    var finalizedHeight1       = node.finalizedHeight
     val waitingFinalizedHeight = finalizedHeight1 + 2
 
-    var currFinalizedHeight = finalizedHeight1
-    var done                = false
+    var done = false
     while (!done && deadline.hasTimeLeft()) {
       val currHeight = node.height
       if (currHeight > waitingFinalizedHeight + 2)
@@ -71,17 +70,23 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
       node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true)
 
       val updatedFinalizedHeight = node.finalizedHeight
-      if (updatedFinalizedHeight < currFinalizedHeight)
-        fail(s"Finalized height $updatedFinalizedHeight became lower than the previous $currFinalizedHeight")
-      else if (updatedFinalizedHeight != currFinalizedHeight)
-        log.debug(s"New finalized height: $currFinalizedHeight -> $updatedFinalizedHeight")
+      if (updatedFinalizedHeight < finalizedHeight1)
+        fail(s"Finalized height $updatedFinalizedHeight became lower than the previous $finalizedHeight1")
+      else if (updatedFinalizedHeight != finalizedHeight1)
+        log.debug(s"New finalized height: $finalizedHeight1 -> $updatedFinalizedHeight")
 
-      currFinalizedHeight = updatedFinalizedHeight
-      done = currFinalizedHeight > waitingFinalizedHeight
+      finalizedHeight1 = updatedFinalizedHeight
+      done = finalizedHeight1 > waitingFinalizedHeight
     }
 
-    info("Finalized header checks")
-    val finalizedBlock = node.finalizedBlockHeader()
-    finalizedBlock.height should be >= currFinalizedHeight
+    info("Finalized header and height checks")
+    val finalizedBlock1 = node.finalizedBlockHeader()
+    finalizedBlock1.height should be >= finalizedHeight1
+
+    val finalizedHeight2 = node.finalizedHeightAt(node.height)
+    finalizedHeight2 should be >= finalizedHeight1
+
+    val finalizedHeightBefore1 = node.finalizedHeightAt(finalizedBlock1.height)
+    finalizedHeightBefore1 should be < finalizedHeight1
   }
 }

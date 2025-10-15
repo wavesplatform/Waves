@@ -220,6 +220,8 @@ object AsyncHttpApi extends Assertions {
 
     def finalizedHeight: Future[Height] = get("/blocks/height/finalized").as[JsValue].map(v => Height((v \ "height").as[Int]))
 
+    def finalizedHeightAt(at: Int): Future[Height] = get(s"/blocks/finalized/at/$at").as[JsValue].map(v => Height((v \ "height").as[Int]))
+
     def blockAt(height: Int, amountsAsStrings: Boolean = false): Future[Block] =
       get(s"/blocks/at/$height", amountsAsStrings).as[Block](amountsAsStrings)
 
