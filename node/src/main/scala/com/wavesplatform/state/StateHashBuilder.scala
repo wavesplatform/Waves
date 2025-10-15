@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.bls.BlsPublicKey
@@ -96,8 +96,8 @@ class StateHashBuilder {
     )
   }
 
-  def addNextCommittedGenerator(address: Address, blsPublicKey: BlsPublicKey): Unit = {
-    addEntry(SectionId.NextCommittedGenerators, address.bytes)(
+  def addNextCommittedGenerator(publicKey: PublicKey, blsPublicKey: BlsPublicKey): Unit = {
+    addEntry(SectionId.NextCommittedGenerators, publicKey.arr)(
       blsPublicKey.arr
     )
   }

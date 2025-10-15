@@ -33,7 +33,7 @@ case class StateSnapshot(
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
     scriptsComplexity: Long = 0,
     erc20Addresses: Map[ERC20Address, IssuedAsset] = Map(),
-    nextCommittedGenerators: Seq[(Address, BlsPublicKey)] = Seq.empty
+    nextCommittedGenerators: Seq[(PublicKey, BlsPublicKey)] = Seq.empty
 ) {
 
   // ignores lease balances from portfolios
@@ -88,7 +88,7 @@ object StateSnapshot {
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
       scriptsComplexity: Long = 0,
       transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap(),
-      nextCommittedGenerators: IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
+      nextCommittedGenerators: Seq[(PublicKey, BlsPublicKey)] = Seq.empty
   ): Either[ValidationError, StateSnapshot] = {
     val r =
       for {

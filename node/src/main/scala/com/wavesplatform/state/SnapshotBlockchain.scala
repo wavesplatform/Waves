@@ -56,7 +56,7 @@ case class SnapshotBlockchain(
   }
 
   override def deposit(address: Address): Long = {
-    val isCommitted = snapshot.nextCommittedGenerators.exists { case (currentAddress, _) => currentAddress == address }
+    val isCommitted = snapshot.nextCommittedGenerators.exists { case (pk, _) => pk.toAddress == address }
     val inSnapshot  = Numbers.when(isCommitted)(CommitToGenerationTransaction.DepositInWavelets)
 
     inner.deposit(address) + inSnapshot
@@ -245,8 +245,7 @@ case class SnapshotBlockchain(
 
   override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = {
     val base = inner.committedGenerators(at)
-    if (at == this.currentGenerationPeriod.next) base ++ snapshot.nextCommittedGenerators
-    else base
+    if (at == this.currentGenerationPeriod.next) base ++ snapshot.nextCommittedGenerators.map { case (pk, blsPk) => pk.toAddress -> blsPk } else base
   }
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] =
