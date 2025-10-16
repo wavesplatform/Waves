@@ -8,6 +8,7 @@ class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) exten
   export delegate.{
     settings,
     height,
+    finalizedHeight,
     finalizedHeightAt,
     score,
     blockHeader,
@@ -64,9 +65,8 @@ class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) exten
     bestLiquidSnapshot,
     bestLiquidSnapshotAndFees,
     snapshotBlockchain,
-    parentGeneratorBalances,
     currentGeneratorBalances
   }
 
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = delegate.committedGenerators(at)
+  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = delegate.committedGenerators(at)
 }

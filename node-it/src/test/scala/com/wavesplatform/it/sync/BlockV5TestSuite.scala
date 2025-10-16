@@ -30,31 +30,31 @@ class BlockV5TestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
       currentHeight = nodes.head.height
 
       val lastBlockCurrentHeight         = nodes.head.lastBlock()
-      val lastBlockHeadersCurrentHeight  = nodes.head.lastBlockHeader()
+      val lastBlockHeaderCurrentHeight   = nodes.head.lastBlockHeader()
       val blockAtCurrentHeight           = nodes.head.blockAt(currentHeight)
-      val blockHeadersCurrentHeight      = nodes.head.blockHeadersAt(currentHeight)
+      val blockHeaderCurrentHeight       = nodes.head.blockHeaderAt(currentHeight)
       val blockBySignatureCurrentHeight  = nodes.head.blockById(blockAtCurrentHeight.id)
       val generationSignatureInBlockJson = ByteStr.decodeBase58(blockAtCurrentHeight.generationSignature.get).get
 
       blockAtCurrentHeight.version.value shouldBe Block.ProtoBlockVersion
       Base58.decode(blockAtCurrentHeight.id).length shouldBe crypto.DigestLength
-      blockHeadersCurrentHeight.version.value shouldBe Block.ProtoBlockVersion
+      blockHeaderCurrentHeight.version.value shouldBe Block.ProtoBlockVersion
       Base58.decode(blockAtCurrentHeight.vrf.value).length shouldBe Block.HitSourceLength
-      Base58.decode(blockHeadersCurrentHeight.vrf.value).length shouldBe Block.HitSourceLength
+      Base58.decode(blockHeaderCurrentHeight.vrf.value).length shouldBe Block.HitSourceLength
       blockAtCurrentHeight.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
-      blockHeadersCurrentHeight.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
+      blockHeaderCurrentHeight.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
       generationSignatureInBlockJson.arr.length shouldBe Block.GenerationVRFSignatureLength
 
       blockAtCurrentHeight shouldBe blockBySignatureCurrentHeight
       blockAtCurrentHeight shouldBe lastBlockCurrentHeight
-      blockHeadersCurrentHeight shouldBe lastBlockHeadersCurrentHeight
-      blockAtCurrentHeight.signature shouldBe blockHeadersCurrentHeight.signature
-      blockAtCurrentHeight.baseTarget shouldBe blockHeadersCurrentHeight.baseTarget
-      blockAtCurrentHeight.generationSignature shouldBe blockHeadersCurrentHeight.generationSignature
+      blockHeaderCurrentHeight shouldBe lastBlockHeaderCurrentHeight
+      blockAtCurrentHeight.signature shouldBe blockHeaderCurrentHeight.signature
+      blockAtCurrentHeight.baseTarget shouldBe blockHeaderCurrentHeight.baseTarget
+      blockAtCurrentHeight.generationSignature shouldBe blockHeaderCurrentHeight.generationSignature
     }
 
     "check block v5 at next height" in {
-      //Activation height + 1
+      // Activation height + 1
       nodes.head.waitForHeight(currentHeight + 1)
 
       val blockAfterVRFUsing = nodes.head.blockAt(currentHeight + 1)

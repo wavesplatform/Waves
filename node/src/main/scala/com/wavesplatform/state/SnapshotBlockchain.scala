@@ -22,7 +22,8 @@ case class SnapshotBlockchain(
     blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
     carry: Long = 0,
     reward: Option[Long] = None,
-    stateHash: Option[ByteStr] = None
+    stateHash: Option[ByteStr] = None,
+    latestGeneratorBalances: Option[GeneratorBalances] = None
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
   lazy val snapshot: StateSnapshot          = maybeSnapshot.orEmpty
@@ -55,7 +56,7 @@ case class SnapshotBlockchain(
   }
 
   override def deposit(address: Address): Long = {
-    val isCommitted = snapshot.nextCommittedGenerators.exists { case (currentAddress, _) => currentAddress == address }
+    val isCommitted = snapshot.nextCommittedGenerators.exists { case (pk, _) => pk.toAddress == address }
     val inSnapshot  = Numbers.when(isCommitted)(CommitToGenerationTransaction.DepositInWavelets)
 
     inner.deposit(address) + inSnapshot
@@ -136,6 +137,8 @@ case class SnapshotBlockchain(
       .orElse(inner.transactionSnapshot(id))
 
   override def height: Int = inner.height + blockMeta.size
+
+  override def finalizedHeight: Option[Height] = inner.finalizedHeight
 
   override def finalizedHeightAt(at: Height): Option[Height] = inner.finalizedHeightAt(at)
 
@@ -242,27 +245,13 @@ case class SnapshotBlockchain(
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
+  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = {
     val base = inner.committedGenerators(at)
-    if (at == this.currentGenerationPeriod.next) base ++ snapshot.nextCommittedGenerators
-    else base
+    if (at == this.currentGenerationPeriod.next) base ++ snapshot.nextCommittedGenerators.map { case (pk, blsPk) => pk.toAddress -> blsPk } else base
   }
 
-  override def parentGeneratorBalances(): Seq[Long] =
-    if (blockMeta.isEmpty) inner.parentGeneratorBalances()
-    else inner.currentGeneratorBalances()
-
-  override def currentGeneratorBalances(): Seq[Long] =
-    maybeSnapshot.foldLeft(inner.currentGeneratorBalances()) { (inner, _) =>
-      // TODO: Is there a better way? Do we really need this?
-      val recentGeneratorBalances = snapshot.nextCommittedGenerators.map { case (address, _) =>
-        balanceSnapshots(address, height, None).headOption
-      }
-
-      inner.zip(recentGeneratorBalances).map { case (inner, recent) =>
-        recent.map(_.effectiveBalance.min(inner)).getOrElse(inner)
-      }
-    }
+  override def currentGeneratorBalances(): Seq[(Address, Long)] =
+    latestGeneratorBalances.fold(inner.currentGeneratorBalances())(_.map { case (addr, _, b) => addr -> b })
 }
 
 object SnapshotBlockchain {
@@ -273,7 +262,8 @@ object SnapshotBlockchain {
       Some(SignedBlockHeader(ngState.bestLiquidBlock.header, ngState.bestLiquidBlock.signature) -> ngState.hitSource),
       ngState.carryFee,
       ngState.reward,
-      Some(ngState.bestLiquidComputedStateHash)
+      Some(ngState.bestLiquidComputedStateHash),
+      Some(ngState.latestGeneratorBalances)
     )
 
   def apply(inner: Blockchain, reward: Option[Long]): SnapshotBlockchain =

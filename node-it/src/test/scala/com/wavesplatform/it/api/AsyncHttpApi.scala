@@ -220,6 +220,8 @@ object AsyncHttpApi extends Assertions {
 
     def finalizedHeight: Future[Height] = get("/blocks/height/finalized").as[JsValue].map(v => Height((v \ "height").as[Int]))
 
+    def finalizedHeightAt(at: Int): Future[Height] = get(s"/blocks/finalized/at/$at").as[JsValue].map(v => Height((v \ "height").as[Int]))
+
     def blockAt(height: Int, amountsAsStrings: Boolean = false): Future[Block] =
       get(s"/blocks/at/$height", amountsAsStrings).as[Block](amountsAsStrings)
 
@@ -245,7 +247,7 @@ object AsyncHttpApi extends Assertions {
       get(s"/blocks/address/$address/$from/$to", amountsAsStrings)
         .as[Seq[Block]](amountsAsStrings)
 
-    def blockHeadersAt(height: Int, amountsAsStrings: Boolean = false): Future[BlockHeader] =
+    def blockHeaderAt(height: Int, amountsAsStrings: Boolean = false): Future[BlockHeader] =
       get(s"/blocks/headers/at/$height", amountsAsStrings)
         .as[BlockHeader](amountsAsStrings)
 
@@ -262,6 +264,10 @@ object AsyncHttpApi extends Assertions {
 
     def lastBlockHeader(amountsAsStrings: Boolean = false): Future[BlockHeader] =
       get("/blocks/headers/last", amountsAsStrings)
+        .as[BlockHeader](amountsAsStrings)
+
+    def finalizedBlockHeader(amountsAsStrings: Boolean = false): Future[BlockHeader] =
+      get("/blocks/headers/finalized", amountsAsStrings)
         .as[BlockHeader](amountsAsStrings)
 
     def status: Future[Status] = get("/node/status").as[Status]
@@ -1035,7 +1041,7 @@ object AsyncHttpApi extends Assertions {
 
       def waitSameBlockHeaders =
         waitFor[BlockHeader](s"same blocks at height = $height")(retryInterval)(
-          _.blockHeadersAt(height),
+          _.blockHeaderAt(height),
           { blocks =>
             val id = blocks.map(_.id)
             id.forall(_ == id.head)

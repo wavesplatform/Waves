@@ -19,6 +19,8 @@ trait EmptyBlockchain extends Blockchain {
 
   override def height: Int = GenesisBlockHeight
 
+  override def finalizedHeight: Option[Height] = None
+
   override def finalizedHeightAt(at: Height): Option[Height] = None
 
   override def score: BigInt = 0
@@ -97,9 +99,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
 
-  override def parentGeneratorBalances(): Seq[Long] = Seq.empty
-
-  override def currentGeneratorBalances(): Seq[Long] = Seq.empty
+  override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 }
 
 object EmptyBlockchain extends EmptyBlockchain

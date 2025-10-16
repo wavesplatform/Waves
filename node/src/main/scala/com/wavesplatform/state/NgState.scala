@@ -180,6 +180,7 @@ case class NgState(
 
   def createBlockId(microBlock: MicroBlock): BlockId = {
     val newTransactions = this.transactions ++ microBlock.transactionData
+    val newVoting       = this.finalizationVoting :+ microBlock.finalizationVoting
     val fullBlock =
       base.copy(
         transactionData = newTransactions,
@@ -187,7 +188,7 @@ case class NgState(
         header = base.header.copy(
           transactionsRoot = createTransactionsRoot(microBlock),
           stateHash = microBlock.stateHash,
-          finalizationVoting = Monoid.combine(base.header.finalizationVoting, microBlock.finalizationVoting)
+          finalizationVoting = Monoid.combineAll(newVoting)
         )
       )
     fullBlock.id()
@@ -219,7 +220,7 @@ case class NgState(
           val init = (
             base.transactionData,
             Seq(base.header.finalizationVoting),
-            Option.empty[(ByteStr, Option[ByteStr], DiscardedMicroBlocks)]
+            Option.empty[(ByteStr, Option[ByteStr], DiscardedMicroBlocks)] // sig, stateHash, discarded
           )
           val (txs, voting, maybeFound) = microBlocksAsc.foldLeft(init) {
             case ((txs, voting, Some((sig, stateHash, discarded))), MicroBlockInfo(mbId, micro)) =>

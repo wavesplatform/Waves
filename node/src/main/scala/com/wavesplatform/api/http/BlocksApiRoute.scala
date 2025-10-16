@@ -6,7 +6,7 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, TooBigArrayAllocation}
 import com.wavesplatform.block.Block
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.TxMeta
+import com.wavesplatform.state.{Height, TxMeta}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -41,7 +41,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
         )
       }
     } ~ path("height" / "finalized") {
-      complete(Json.obj("height" -> commonApi.finalizedHeight))
+      complete(Json.obj("height" -> commonApi.currentFinalizedHeight))
     } ~ path("height" / BlockId) { signature =>
       complete(for {
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
@@ -65,9 +65,13 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       } ~ path("last") {
         at(commonApi.currentHeight, includeTransactions = false)
       } ~ path("finalized") {
-        at(commonApi.finalizedHeight, includeTransactions = false)
+        at(commonApi.currentFinalizedHeight, includeTransactions = false)
       } ~ path(BlockId) { id =>
         complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
+      }
+    } ~ pathPrefix("finalized") {
+      path("at" / IntNumber) { height =>
+        complete(Json.obj("height" -> commonApi.finalizedHeightAt(Height(height))))
       }
     } ~ path("heightByTimestamp" / LongNumber) { timestamp =>
       val heightE = for {

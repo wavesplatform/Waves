@@ -35,7 +35,7 @@ object CommitToGenerationTransactionDiff {
             // generationDeposit = ??? // We don't need this, because calculate from nextCommittedGenerators
           )
         ),
-        nextCommittedGenerators = IndexedSeq(sender -> tx.endorserPublicKey)
+        nextCommittedGenerators = Seq(tx.sender -> tx.endorserPublicKey)
       )
     } yield snapshot
   }

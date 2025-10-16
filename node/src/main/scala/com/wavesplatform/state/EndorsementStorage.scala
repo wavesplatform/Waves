@@ -40,7 +40,7 @@ object EndorsementStorage {
       finalizedId: BlockId,
       finalizedHeight: Height,
       endorsedId: BlockId,
-      expectedEndorsers: IndexedSeq[BlsPublicKey]
+      expectedEndorsers: Seq[BlsPublicKey]
   ) {
     override def toString: String =
       s"EndorsementFilter(m=$miner, fid=$finalizedId, fh=$finalizedHeight, eid=$endorsedId, e={${expectedEndorsers.mkString(", ")}})"

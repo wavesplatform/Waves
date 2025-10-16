@@ -33,17 +33,22 @@ abstract class Caches extends Blockchain with Storage {
   @volatile
   private var current = loadCurrentBlock()
 
+  @volatile
+  private var currentFinalizedHeight = loadFinalizedHeight()
+
   private def loadCurrentBlock() = {
     val height = loadHeight()
     CurrentBlockInfo(height, loadBlockMeta(height), loadTxs(height))
   }
 
   protected def loadHeight(): Height
+  protected def loadFinalizedHeight(): Option[Height]
 
   protected def loadBlockMeta(height: Height): Option[PBBlockMeta]
   protected def loadTxs(height: Height): Seq[Transaction]
 
-  override def height: Int = current.height
+  override def height: Int                     = current.height
+  override def finalizedHeight: Option[Height] = currentFinalizedHeight
 
   override def score: BigInt = current.score
 
@@ -211,10 +216,9 @@ abstract class Caches extends Blockchain with Storage {
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   @volatile
-  private var committedGeneratorBalancesCache        = loadGeneratorBalances()
-  override def parentGeneratorBalances(): Seq[Long]  = committedGeneratorBalancesCache.parent
-  override def currentGeneratorBalances(): Seq[Long] = committedGeneratorBalancesCache.current
-  protected def loadGeneratorBalances(): (parent: Seq[Long], current: Seq[Long])
+  private var currentGeneratorBalancesCache                     = loadGeneratorBalances()
+  override def currentGeneratorBalances(): Seq[(Address, Long)] = currentGeneratorBalancesCache
+  protected def loadGeneratorBalances(): Seq[(Address, Long)]
 
   protected def doAppend(
       blockMeta: PBBlockMeta,
@@ -229,7 +233,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
-      generatorBalances: Seq[Long],
+      generatorBalances: Seq[(Address, Long)],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
   ): Unit
@@ -262,11 +266,9 @@ abstract class Caches extends Blockchain with Storage {
         (reward.getOrElse(0L) * this.blockRewardBoost(newHeight))
     )
     current = CurrentBlockInfo(newHeight, Some(newMeta), block.transactionData)
+    currentFinalizedHeight = Some(newFinalizedHeight)
 
-    committedGeneratorBalancesCache = (
-      committedGeneratorBalancesCache.current,
-      generatorBalances.map { case (_, _, balance) => balance }
-    )
+    currentGeneratorBalancesCache = generatorBalances.map { case (addr, _, balance) => addr -> balance }
 
     val newAddresses =
       mutable.Set[Address]() ++
@@ -376,7 +378,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       newFinalizedHeight,
-      committedGeneratorBalancesCache.current,
+      currentGeneratorBalancesCache,
       nextCommittedGeneratorsRev.reverse,
       stateHash.result()
     )
@@ -412,12 +414,13 @@ abstract class Caches extends Blockchain with Storage {
       discardedBlocks = doRollback(height)
     } yield {
       current = loadCurrentBlock()
+      if (currentFinalizedHeight.forall(_ < height)) // Happens only during a force rollback
+        currentFinalizedHeight = finalizedHeightAt(Height(height))
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()
 
-      // TODO: if rolled back by 1?
-      committedGeneratorBalancesCache = loadGeneratorBalances()
+      currentGeneratorBalancesCache = loadGeneratorBalances()
 
       discardedBlocks
     }

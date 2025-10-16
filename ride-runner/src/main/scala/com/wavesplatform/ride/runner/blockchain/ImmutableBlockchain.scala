@@ -108,6 +108,8 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = input.height
 
+  override def finalizedHeight: Option[Height] = ???
+
   override def finalizedHeightAt(at: Height): Option[Height] = ???
 
   override val activatedFeatures: ActivatedFeatures = settings.functionalitySettings.preActivatedFeatures ++ input.features.map(id => id -> height)
@@ -206,11 +208,9 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = Seq.empty
 
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
+  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = Seq.empty
 
-  override def parentGeneratorBalances(): Seq[Long] = Seq.empty
-
-  override def currentGeneratorBalances(): Seq[Long] = Seq.empty
+  override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 
   override def lastStateHash(refId: Option[BlockId]): BlockId = ???
 

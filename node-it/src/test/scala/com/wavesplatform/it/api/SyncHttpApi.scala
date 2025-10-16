@@ -193,7 +193,9 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def lastBlockHeader(amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).lastBlockHeader(amountsAsStrings))
 
-    def blockHeadersAt(height: Int, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeadersAt(height, amountsAsStrings))
+    def finalizedBlockHeader(amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).finalizedBlockHeader(amountsAsStrings))
+
+    def blockHeaderAt(height: Int, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeaderAt(height, amountsAsStrings))
 
     def blockHeaderForId(id: String, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeaderForId(id, amountsAsStrings))
 
@@ -631,6 +633,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def height: Height = sync(async(n).height)
 
     def finalizedHeight: Height = sync(async(n).finalizedHeight)
+
+    def finalizedHeightAt(at: Int): Height = sync(async(n).finalizedHeightAt(at))
 
     def blockAt(height: Int, amountsAsStrings: Boolean = false): Block = sync(async(n).blockAt(height, amountsAsStrings))
 

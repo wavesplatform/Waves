@@ -36,24 +36,31 @@ package object appender {
       block.transactionData.zip(s.snapshots).map { case (tx, pbs) => PBSnapshots.fromProtobuf(pbs, tx.id(), height) }
     )
 
+  /** @return generatorBalances before block
+    */
   def findBlockAndGetGenerators(
       blockchain: Blockchain,
       block: Block
-  ): Either[ValidationError, (parentHeight: Height, generatorBalances: GeneratorBalances, allowedGenerators: Set[Address])] =
-    for {
+  ): Either[ValidationError, (parentHeight: Height, generatorBalances: GeneratorBalances)] =
+    (for {
       parentHeight <- blockchain
         .heightOf(block.header.reference)
-        .toRight(GenericError(s"height: history does not contain parent ${block.header.reference}"))
+        .map(Height(_))
+        .toRight(s"height: history does not contain parent ${block.header.reference}")
+
+      blockHeight            = Height(parentHeight + 1)
+      committedOnBlockHeight = blockchain.committedGenerators(blockchain.generationPeriodOf(blockHeight))
+      minerAddress           = block.header.generator.toAddress
+      // TODO: allow if all generators have less than required balance
+      // If no one commited, fallback to classic
+      _ <- Either.raiseUnless(committedOnBlockHeight.isEmpty || committedOnBlockHeight.exists { case (addr, _) => addr == minerAddress }) {
+        s"$minerAddress is not allowed to generate a block, allowed: ${committedOnBlockHeight.map { case (addr, _) => addr }.mkString(", ")}. " +
+          s"If it is your node: commit to generation for a next epoch"
+      }
     } yield {
-      val blockHeight         = Height(parentHeight + 1)
-      val period              = blockchain.generationPeriodOf(blockHeight)
-      val committedGenerators = blockchain.committedGenerators(period)
-      val generatorBalances   = getGeneratorBalances(blockchain, block, committedGenerators)
-      val allowedGenerators = generatorBalances.view.collect {
-        case (addr, _, balance) if blockchain.isEffectiveBalanceValid(parentHeight, block, balance) => addr
-      }.toSet
-      (Height(parentHeight), generatorBalances, allowedGenerators)
-    }
+      val generatorBalances = getGeneratorBalances(blockchain, block, committedOnBlockHeight)
+      (parentHeight, generatorBalances)
+    }).leftMap(GenericError(_))
 
   private[appender] def appendKeyBlock(
       blockchainUpdater: BlockchainUpdater & Blockchain,
@@ -67,7 +74,7 @@ package object appender {
     for {
       data <- findBlockAndGetGenerators(blockchainUpdater, block)
       hitSource <-
-        if (verify) validateBlock(blockchainUpdater, pos, time, data.allowedGenerators)(block, data.parentHeight)
+        if (verify) validateBlock(blockchainUpdater, pos, time)(block, data.parentHeight)
         else pos.validateGenerationSignature(block)
       applyResult <-
         metrics.appendBlock
@@ -112,7 +119,7 @@ package object appender {
       for {
         data <- findBlockAndGetGenerators(blockchainUpdater, block)
         hitSource <-
-          if (verify) validateBlock(blockchainUpdater, pos, time, data.allowedGenerators)(block, data.parentHeight)
+          if (verify) validateBlock(blockchainUpdater, pos, time)(block, data.parentHeight)
           else pos.validateGenerationSignature(block)
         applyResult <- metrics.appendBlock.measureSuccessful(
           blockchainUpdater.processBlock(
@@ -164,11 +171,11 @@ package object appender {
       data <- findBlockAndGetGenerators(blockchainUpdater, challengedBlock)
 
       challengedHitSource <-
-        if (verify) validateBlock(blockchainUpdater, pos, time, data.allowedGenerators)(challengedBlock, data.parentHeight)
+        if (verify) validateBlock(blockchainUpdater, pos, time)(challengedBlock, data.parentHeight)
         else pos.validateGenerationSignature(challengedBlock)
 
       hitSource <-
-        if (verify) validateBlock(blockchainUpdater, pos, time, data.allowedGenerators)(block, data.parentHeight)
+        if (verify) validateBlock(blockchainUpdater, pos, time)(block, data.parentHeight)
         else pos.validateGenerationSignature(block)
 
       applyResult <-
@@ -198,18 +205,18 @@ package object appender {
   /** @return
     *   Hit source
     */
-  private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time, allowedGenerators: Set[Address])(
+  private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time)(
       block: Block,
       parentHeight: Height
   ): Either[ValidationError, ByteStr] =
     for {
       _ <- Miner.isAllowedForMining(block.sender.toAddress, blockchainUpdater).leftMap(BlockAppendError(_, block))
-      r <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), allowedGenerators)(block, parentHeight)
+      r <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime())(block, parentHeight)
       _ <- validateStateHash(block, blockchainUpdater)
       _ <- validateChallengedHeader(block, blockchainUpdater)
     } yield r
 
-  private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, allowedGenerators: Set[Address])(
+  private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long)(
       block: Block,
       parentHeight: Height
   ): Either[ValidationError, ByteStr] =
@@ -221,14 +228,6 @@ package object appender {
         for {
           parent <- blockchain.parentHeader(block.header).toRight(GenericError(s"parent: history does not contain parent ${block.header.reference}"))
           grandParent = blockchain.parentHeader(parent, 2)
-
-          // If no one commited, fallback to a classic
-          _ <- Either.raiseUnless(allowedGenerators.isEmpty || allowedGenerators.contains(miner)) {
-            GenericError(
-              s"$miner is not allowed to generate a block, allowed: ${allowedGenerators.mkString(", ")}. " +
-                s"If it is your node: commit to generation for a next epoch"
-            )
-          }
 
           minerBalance <- minerBalance(blockchain, miner, parentHeight, block).leftMap(GenericError(_))
           _            <- validateBlockVersion(parentHeight, block, blockchain)

@@ -58,7 +58,7 @@ object BalanceDiffValidation {
           case ((address, Waves), balance) =>
             val currentLeaseBalance = snapshot.leaseBalances.getOrElse(address, b.leaseBalance(address))
             val depositedOnNext = DepositInWavelets *
-              snapshot.nextCommittedGenerators.find { case (currAddress, _) => currAddress == address }.size
+              snapshot.nextCommittedGenerators.find { case (pk, _) => pk.toAddress == address }.size
             checkWaves(address, balance, currentLeaseBalance, depositedOnNext).fold(error => List(error), _ => Nil)
           case _ =>
             Nil

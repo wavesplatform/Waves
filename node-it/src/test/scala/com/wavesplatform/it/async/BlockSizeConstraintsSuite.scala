@@ -23,9 +23,9 @@ class BlockSizeConstraintsSuite extends BaseFreeSpec with TransferSending {
       _                 <- Future.sequence((0 to maxGroups).map(_ => processRequests(transfers, includeAttachment = true)))
       _                 <- miner.waitForHeight(3)
       _                 <- Future.sequence((0 to maxGroups).map(_ => processRequests(transfers, includeAttachment = true)))
-      blockHeaderBefore <- miner.blockHeadersAt(2)
+      blockHeaderBefore <- miner.blockHeaderAt(2)
       _                 <- miner.waitForHeight(4)
-      blockHeaderAfter  <- miner.blockHeadersAt(3)
+      blockHeaderAfter  <- miner.blockHeaderAt(3)
     } yield {
       val maxSizeInBytesAfterActivation = (1.1d * 1024 * 1024).toInt // including headers
       val blockSizeInBytesBefore        = blockHeaderBefore.blocksize

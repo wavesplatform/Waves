@@ -46,7 +46,7 @@ class StateHashSpec extends FreeSpec {
     stateHash.addAssetBalance(address, assetId, 2000)
     stateHash.addAssetBalance(address1, assetId, 2000)
     stateHash.addWavesBalance(address, 1000)
-    stateHash.addNextCommittedGenerator(wavesAccount.toAddress, blsAccount.publicKey)
+    stateHash.addNextCommittedGenerator(wavesAccount.publicKey, blsAccount.publicKey)
     val result = stateHash.result()
 
     def hash(bs: Array[Byte]*): ByteStr    = ByteStr(com.wavesplatform.crypto.fastHash(bs.reduce(_ ++ _)))
@@ -129,7 +129,7 @@ class StateHashSpec extends FreeSpec {
 
       "next generator" in {
         sect(NextCommittedGenerators) shouldBe hash(
-          wavesAccount.publicKey.toAddress.bytes,
+          wavesAccount.publicKey.arr,
           blsAccount.publicKey.byteStr.arr
         )
       }

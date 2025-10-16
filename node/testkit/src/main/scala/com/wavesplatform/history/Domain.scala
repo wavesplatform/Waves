@@ -6,7 +6,7 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.*
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, BlockSnapshot, ChallengedHeader, MicroBlock}
+import com.wavesplatform.block.{Block, BlockSnapshot, ChallengedHeader, FinalizationVoting, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -404,8 +404,9 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
       stateHash: Option[Option[ByteStr]] = None,
       challengedHeader: Option[ChallengedHeader] = None,
       rewardVote: Long = -1L,
-      timestamp: Option[Long] = None
-  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote, timestamp).explicitGet()
+      timestamp: Option[Long] = None,
+      voting: Option[FinalizationVoting] = None
+  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote, timestamp, voting).explicitGet()
 
   def createBlockE(
       version: Byte,
@@ -416,7 +417,8 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
       stateHash: Option[Option[ByteStr]] = None,
       challengedHeader: Option[ChallengedHeader] = None,
       rewardVote: Long = -1L,
-      timestamp: Option[Long] = None
+      timestamp: Option[Long] = None,
+      voting: Option[FinalizationVoting] = None
   ): Either[ValidationError, Block] = {
     val reference = ref.getOrElse(randomSig)
 
@@ -473,7 +475,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
           rewardVote,
           stateHash = None,
           challengedHeader,
-          finalizationVoting = None
+          finalizationVoting = voting
         )
       resultStateHash <- stateHash.map(Right(_)).getOrElse {
         if (blockchain.supportsLightNodeBlockFields(blockchain.height + 1)) {
@@ -516,7 +518,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
           rewardVote,
           resultStateHash,
           challengedHeader,
-          finalizationVoting = None
+          finalizationVoting = voting
         )
     } yield resultBlock
   }

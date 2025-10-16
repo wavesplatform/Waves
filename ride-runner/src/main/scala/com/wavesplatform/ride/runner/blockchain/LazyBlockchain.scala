@@ -127,6 +127,8 @@ class LazyBlockchain[TagT] private (
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = heightUntagged
 
+  override def finalizedHeight: Option[Height] = None // TODO:
+
   override def finalizedHeightAt(at: Height): Option[Height] = None // TODO:
 
   // Ride: environment initialization
@@ -213,11 +215,9 @@ class LazyBlockchain[TagT] private (
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
     getTransactionHeight(TransactionId(id)).map(TxMeta(_, TxMeta.Status.Succeeded, 0)) // Other information not used
 
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
+  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = Seq.empty
 
-  override def parentGeneratorBalances(): Seq[Long] = Seq.empty
-
-  override def currentGeneratorBalances(): Seq[Long] = Seq.empty
+  override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 
   private def getTransactionHeight(id: TransactionId): Option[Height] = db.directReadWrite { implicit ctx =>
     memCache.getOrLoad(MemCacheKey.Transaction(id)) { key =>

@@ -179,7 +179,9 @@ class RocksDBWriter(
 
   override protected def loadHeight(): Height = writableDB.get(Keys.height)
 
-  override def finalizedHeightAt(at: Height): Option[Height] = writableDB.get(Keys.finalizedHeight(at))
+  override protected def loadFinalizedHeight(): Option[Height] = writableDB.get(Keys.finalizedHeight)
+
+  override def finalizedHeightAt(at: Height): Option[Height] = writableDB.get(Keys.finalizedHeightAt(at))
 
   override def safeRollbackHeight: Int = writableDB.get(Keys.safeRollbackHeight)
 
@@ -329,46 +331,19 @@ class RocksDBWriter(
     }.toMap
   }
 
-  override protected def loadGeneratorBalances(): (parent: Seq[Long], current: Seq[Long]) =
-    if (lastBlock.isEmpty || height <= GenesisBlockHeight) (Seq.empty, Seq.empty)
-    else if (height == GenesisBlockHeight) {
+  override protected def loadGeneratorBalances(): Seq[(Address, Long)] =
+    if (lastBlock.isEmpty || height <= GenesisBlockHeight) Seq.empty
+    else {
       val currentHeight  = Height(height)
       val currentBlockId = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight")).id()
       val currentPeriod  = this.generationPeriodOf(currentHeight)
 
       val currentCommGens = committedGenerators(currentPeriod)
-      val current         = if (currentCommGens.isEmpty) Seq.empty else generatorBalances(currentCommGens, currentBlockId)
-      (Seq.empty, current)
-    } else {
-      val parentHeight  = Height(height - 1)
-      val parentBlockId = this.blockId(parentHeight).getOrElse(throw new IllegalStateException(s"No block on parent height: $parentHeight"))
-
-      val currentHeight  = Height(height)
-      val currentBlockId = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight")).id()
-
-      val parentPeriod  = this.generationPeriodOf(parentHeight)
-      val currentPeriod = this.generationPeriodOf(currentHeight)
-
-      if (parentPeriod == currentPeriod) {
-        val commGens = committedGenerators(currentPeriod)
-        if (commGens.isEmpty) (Seq.empty, Seq.empty)
-        else {
-          val parent  = generatorBalances(commGens, parentBlockId)
-          val current = generatorBalances(commGens, currentBlockId)
-          (parent, current)
-        }
-      } else {
-        val parentCommGens = committedGenerators(parentPeriod)
-        val parent         = if (parentCommGens.isEmpty) Seq.empty else generatorBalances(parentCommGens, parentBlockId)
-
-        val currentCommGens = committedGenerators(currentPeriod)
-        val current         = if (currentCommGens.isEmpty) Seq.empty else generatorBalances(currentCommGens, currentBlockId)
-        (parent, current)
-      }
+      if (currentCommGens.isEmpty) Seq.empty else generatorBalances(currentCommGens, currentBlockId)
     }
 
-  private def generatorBalances(generators: Seq[(Address, BlsPublicKey)], at: BlockId) = generators.map { case (addr, _) =>
-    GeneratingBalanceProvider.balance(this, addr, Some(at))
+  private def generatorBalances(generators: Seq[(Address, BlsPublicKey)], at: BlockId): Seq[(Address, Long)] = generators.map { case (addr, _) =>
+    addr -> GeneratingBalanceProvider.balance(this, addr, Some(at))
   }
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
@@ -533,7 +508,7 @@ class RocksDBWriter(
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
-      generatorBalances: Seq[Long],
+      generatorBalances: Seq[(Address, Long)],
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
       stateHash: StateHashBuilder.Result
   ): Unit = {
@@ -543,7 +518,7 @@ class RocksDBWriter(
       val h           = Height(height)
 
       rw.put(Keys.height, h)
-      rw.put(Keys.finalizedHeight(h), Some(newFinalizedHeight))
+      rw.put(Keys.finalizedHeightAt(h), Some(newFinalizedHeight))
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
       val newSafeRollbackHeight      = height - dbSettings.maxRollbackDepth
@@ -748,7 +723,7 @@ class RocksDBWriter(
       }
 
       // TODO: Option to not store
-      rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances))
+      rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances.map { case (_, b) => b }))
 
       if (nextCommittedGenerators.nonEmpty) {
         val nextPeriod = this.generationPeriodOf(h).next
@@ -1040,7 +1015,7 @@ class RocksDBWriter(
         val nextPeriod = this.generationPeriodOf(currentHeight).next
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
-          rw.delete(Keys.finalizedHeight(currentHeight))
+          rw.delete(Keys.finalizedHeightAt(currentHeight))
 
           val discardedMeta = rw
             .get(Keys.blockMetaAt(currentHeight))
