@@ -44,6 +44,11 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
           "Expected finalized height"
         )
 
+        "invalid index" in test(
+          EndorseBlock(-1, finalizedId, finalizedHeight, endorsedId, ByteStr.empty),
+          "Invalid endorser index"
+        )
+
         "an unexpected endorser" in test(
           EndorseBlock.from(BlockEndorsement.full(committedGenerator, 2, finalizedId, finalizedHeight, endorsedId)),
           "There are only"
