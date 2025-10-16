@@ -1558,9 +1558,9 @@ class RocksDBWriter(
 
   // TODO: use rawCommittedGenerators?
   override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
-    val maxGenerators = settings.functionalitySettings.maxGenerators
-    val rawGenerators = new mutable.ArrayBuffer[BlsPublicKey](maxGenerators)
-    val addressIds    = new mutable.ArrayBuffer[AddressId](maxGenerators)
+    val approxGenerators = settings.functionalitySettings.maxEndorsements // Rough buffer size
+    val rawGenerators    = new mutable.ArrayBuffer[BlsPublicKey](approxGenerators)
+    val addressIds       = new mutable.ArrayBuffer[AddressId](approxGenerators)
 
     val key = Keys.committedGenerators(at, at.start)
     val addresses = rdb.db.readOnly { ro =>

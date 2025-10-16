@@ -16,7 +16,7 @@ trait CommonGeneratorsApi {
 
 object CommonGeneratorsApi {
   def apply(rdb: RDB, blockchain: Blockchain & NG): CommonGeneratorsApi = new CommonGeneratorsApi with ScorexLogging {
-    private val maxGenerators = blockchain.settings.functionalitySettings.maxGenerators
+    private val approxGenerators = blockchain.settings.functionalitySettings.maxEndorsements // Rough buffer size
 
     override def generators(at: Height): Seq[GeneratorEntry] = {
       val period = blockchain.generationPeriodOf(at)
@@ -27,9 +27,9 @@ object CommonGeneratorsApi {
         val generatorsKey       = Keys.committedGenerators(period, at)
         val generatorsKeyPrefix = generatorsKey.keyBytes.dropRight(Ints.BYTES) // Drop height
 
-        val addressIds = new mutable.ArrayBuffer[AddressId](maxGenerators)
-        val blsPks     = new mutable.ArrayBuffer[BlsPublicKey](maxGenerators)
-        val txnIds     = new mutable.ArrayBuffer[TransactionId](maxGenerators)
+        val addressIds = new mutable.ArrayBuffer[AddressId](approxGenerators)
+        val blsPks     = new mutable.ArrayBuffer[BlsPublicKey](approxGenerators)
+        val txnIds     = new mutable.ArrayBuffer[TransactionId](approxGenerators)
         ro.iterateOver(generatorsKeyPrefix) { dbEntry =>
           generatorsKey
             .parse(dbEntry.getValue)
