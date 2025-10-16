@@ -67,6 +67,7 @@ object EndorsementStorage {
       for {
         filter <- currentFilter.toRight("Voting hasn't started")
         _      <- Either.raiseUnless(msg.finalizedHeight == filter.finalizedHeight)(s"Expected finalized height ${filter.finalizedHeight}")
+        _      <- Either.raiseWhen(msg.endorserIndex < 0)(s"Invalid endorser index: ${msg.endorserIndex}")
         _      <- Either.raiseWhen(msg.endorserIndex >= filter.expectedEndorsers.size)(s"There are only ${filter.expectedEndorsers.size} endorsers")
         endorserPk = filter.expectedEndorsers(msg.endorserIndex)
         sig <- verifySig(msg, endorserPk).toRight("Invalid signature")

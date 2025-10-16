@@ -23,9 +23,6 @@ object CommitToGenerationTransactionDiff {
         GenericError(s"Expected the next period start height (${next.start}), got ${tx.generationPeriodStart}")
       }
       committed = blockchain.committedGenerators(next).map { case (address, _) => address }.toSet
-      _ <- Either.raiseWhen(committed.size == blockchain.settings.functionalitySettings.maxGenerators) {
-        GenericError(s"No free generator slots, committed ${committed.size} generators. Try next time")
-      }
       _ <- Either.raiseWhen(committed.contains(sender)) { GenericError(s"$sender is already committed") }
       snapshot <- StateSnapshot.build(
         blockchain,
