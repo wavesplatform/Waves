@@ -44,7 +44,6 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       )
       d.appendBlock(block2)
       d.blockchain.finalizedHeightAt(Height(d.blockchain.height)).value shouldBe GenesisBlockHeight
-      block2.transactionData.foreach(println)
 
       log.debug(s"Append block 3 with votes")
       val aggSig = BlockEndorsement.sign(

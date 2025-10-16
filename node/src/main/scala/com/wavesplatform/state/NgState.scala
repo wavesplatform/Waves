@@ -180,6 +180,7 @@ case class NgState(
 
   def createBlockId(microBlock: MicroBlock): BlockId = {
     val newTransactions = this.transactions ++ microBlock.transactionData
+    val newVoting       = this.finalizationVoting :+ microBlock.finalizationVoting
     val fullBlock =
       base.copy(
         transactionData = newTransactions,
@@ -187,7 +188,7 @@ case class NgState(
         header = base.header.copy(
           transactionsRoot = createTransactionsRoot(microBlock),
           stateHash = microBlock.stateHash,
-          finalizationVoting = Monoid.combine(base.header.finalizationVoting, microBlock.finalizationVoting)
+          finalizationVoting = Monoid.combineAll(newVoting)
         )
       )
     fullBlock.id()

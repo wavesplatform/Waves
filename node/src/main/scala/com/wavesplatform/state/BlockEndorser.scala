@@ -32,7 +32,7 @@ object BlockEndorser {
             .blockHeader(endorsedHeight)
             .toSeq
 
-          finalizedHeight = blockchain.finalizedHeightOrFallback(votingHeight)
+          finalizedHeight = blockchain.finalizedHeightAtOrFallback(votingHeight)
           finalizedId <- blockchain
             .blockId(finalizedHeight)
             .toSeq

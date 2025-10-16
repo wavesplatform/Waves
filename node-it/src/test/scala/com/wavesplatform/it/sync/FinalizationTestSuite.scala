@@ -88,5 +88,14 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
 
     val finalizedHeightBefore1 = node.finalizedHeightAt(finalizedBlock1.height)
     finalizedHeightBefore1 should be < finalizedHeight1
+
+    info("Force rollback: prepare")
+    val startHeight = waitingFinalizedHeight + 2
+    node.waitForHeight(startHeight)
+    node.height should be > startHeight
+
+    val currentFinalizedHeight = node.finalizedHeight
+    node.rollback(currentFinalizedHeight - 1, returnToUTX = false)
+    node.waitFor("finalizedHeight decreased")(_.finalizedHeight, _ < currentFinalizedHeight, 1.second)
   }
 }

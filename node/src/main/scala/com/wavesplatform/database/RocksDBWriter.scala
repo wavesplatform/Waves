@@ -179,7 +179,9 @@ class RocksDBWriter(
 
   override protected def loadHeight(): Height = writableDB.get(Keys.height)
 
-  override def finalizedHeightAt(at: Height): Option[Height] = writableDB.get(Keys.finalizedHeight(at))
+  override protected def loadFinalizedHeight(): Option[Height] = writableDB.get(Keys.finalizedHeight)
+
+  override def finalizedHeightAt(at: Height): Option[Height] = writableDB.get(Keys.finalizedHeightAt(at))
 
   override def safeRollbackHeight: Int = writableDB.get(Keys.safeRollbackHeight)
 
@@ -516,7 +518,7 @@ class RocksDBWriter(
       val h           = Height(height)
 
       rw.put(Keys.height, h)
-      rw.put(Keys.finalizedHeight(h), Some(newFinalizedHeight))
+      rw.put(Keys.finalizedHeightAt(h), Some(newFinalizedHeight))
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
       val newSafeRollbackHeight      = height - dbSettings.maxRollbackDepth
@@ -1013,7 +1015,7 @@ class RocksDBWriter(
         val nextPeriod = this.generationPeriodOf(currentHeight).next
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
-          rw.delete(Keys.finalizedHeight(currentHeight))
+          rw.delete(Keys.finalizedHeightAt(currentHeight))
 
           val discardedMeta = rw
             .get(Keys.blockMetaAt(currentHeight))

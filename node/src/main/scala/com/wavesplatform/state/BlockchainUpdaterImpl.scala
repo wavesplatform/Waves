@@ -1,5 +1,6 @@
 package com.wavesplatform.state
 
+import cats.Monoid
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias, PublicKey}
@@ -73,7 +74,7 @@ class BlockchainUpdaterImpl(
   private def publishLastBlockInfo(): Unit =
     for (id <- this.lastBlockId; ts <- ngState.map(_.base.header.timestamp).orElse(rocksdb.lastBlockTimestamp)) {
       val blockchainReady = ts + maxBlockReadinessAge > time.correctedTime()
-      internalLastBlockInfo.onNext(LastBlockInfo(id, Height(height), score, this.finalizedHeightOrFallback(maxSyncRollbackLength), blockchainReady))
+      internalLastBlockInfo.onNext(LastBlockInfo(id, Height(height), score, this.finalizedHeightAtOrFallback(maxSyncRollbackLength), blockchainReady))
     }
 
   publishLastBlockInfo()
@@ -403,8 +404,7 @@ class BlockchainUpdaterImpl(
                           log.trace(s"Discarded microblocks: $discardedMbs")
                         }
 
-                        val newFinalizationHeight = calculateFinalizationHeight(rocksdb)
-                        val finalizedHeight = newFinalizationHeight.getOrElse {
+                        val newFinalizedHeight = calculateFinalizationHeight(rocksdb).getOrElse {
                           Blockchain.finalizedHeightOrFallback(
                             at = Height(rocksdb.height + 1),
                             latestFinalized = rocksdb.finalizedHeightAt(Height(rocksdb.height)),
@@ -412,7 +412,7 @@ class BlockchainUpdaterImpl(
                           )
                         }
 
-                        Some((differResult, discardedSnapshots, reward, hitSource, finalizedHeight))
+                        Some((differResult, discardedSnapshots, reward, hitSource, newFinalizedHeight))
                       }
                     } else {
                       val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
@@ -631,16 +631,13 @@ class BlockchainUpdaterImpl(
                       accumulatedBlock.transactionData ++ microBlock.transactionData,
                       microBlock.totalResBlockSig,
                       microBlock.stateHash,
-                      microBlock.finalizationVoting
+                      Monoid.combine(accumulatedBlock.header.finalizationVoting, microBlock.finalizationVoting)
                     )
                     .signatureValid() -> computedStateHash
                 }
-              _ <- Either
-                .cond(
-                  totalSignatureValid,
-                  (),
-                  MicroBlockAppendError("Invalid total block signature", microBlock)
-                )
+              _ <- Either.raiseUnless(totalSignatureValid) {
+                MicroBlockAppendError("Invalid total block signature", microBlock)
+              }
               blockDifferResult <- {
                 BlockDiffer.fromMicroBlock(
                   this,
@@ -665,7 +662,7 @@ class BlockchainUpdaterImpl(
 
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${snapshot.hashString}")
               internalLastBlockInfo.onNext(
-                LastBlockInfo(blockId, Height(height), score, this.finalizedHeightOrFallback(maxSyncRollbackLength), ready = true)
+                LastBlockInfo(blockId, Height(height), score, this.finalizedHeightAtOrFallback(maxSyncRollbackLength), ready = true)
               )
 
               blockId
@@ -736,6 +733,10 @@ class BlockchainUpdaterImpl(
 
   override def height: Int = readLock {
     rocksdb.height + ngState.fold(0)(_ => 1)
+  }
+
+  override def finalizedHeight: Option[Height] = readLock {
+    ngState.map(_.latestFinalizedHeight).orElse(rocksdb.finalizedHeight)
   }
 
   override def finalizedHeightAt(at: Height): Option[Height] = readLock {

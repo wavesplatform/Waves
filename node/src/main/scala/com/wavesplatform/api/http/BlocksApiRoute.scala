@@ -41,7 +41,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
         )
       }
     } ~ path("height" / "finalized") {
-      complete(Json.obj("height" -> commonApi.finalizedHeight))
+      complete(Json.obj("height" -> commonApi.currentFinalizedHeight))
     } ~ path("height" / BlockId) { signature =>
       complete(for {
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
@@ -65,7 +65,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       } ~ path("last") {
         at(commonApi.currentHeight, includeTransactions = false)
       } ~ path("finalized") {
-        at(commonApi.finalizedHeight, includeTransactions = false)
+        at(commonApi.currentFinalizedHeight, includeTransactions = false)
       } ~ path(BlockId) { id =>
         complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
       }
