@@ -83,8 +83,7 @@ case class Block(
             featureVotes = ch.featureVotes,
             rewardVote = ch.rewardVote,
             stateHash = ch.stateHash,
-            challengedHeader = None,
-            // finalizationVoting = ??? // TODO:
+            challengedHeader = None
           )
         }
         .getOrElse(header)

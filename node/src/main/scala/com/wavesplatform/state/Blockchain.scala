@@ -306,6 +306,6 @@ object Blockchain {
 
   def finalizedHeightOrFallback(at: Height, latestFinalized: Option[Height], maxRollbackLength: Int): Height = {
     val minFallbackHeight = at - maxRollbackLength
-    Height(latestFinalized.getOrElse(minFallbackHeight).max(GenesisBlockHeight))
+    Height(latestFinalized.getOrElse(GenesisBlockHeight).max(minFallbackHeight)) // Compare with fallback in the end
   }
 }
