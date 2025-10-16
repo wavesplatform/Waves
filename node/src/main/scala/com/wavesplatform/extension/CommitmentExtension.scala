@@ -113,7 +113,7 @@ class CommitmentExtension(context: Context) extends Extension with ScorexLogging
           if (newHeight > currentHeight) {
             Task.now(newHeight)
           } else {
-            Task.sleep(7.seconds) >> check()
+            Task.sleep(500.milli) >> check()
           }
         }
         check()
