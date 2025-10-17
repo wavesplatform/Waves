@@ -307,7 +307,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         val nextBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = otherGenerator, strictTime = true)
         testTime.setTime(nextBlock.header.timestamp)
         appender(nextBlock).runSyncUnsafe()
-        if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply nextBlock $nextBlock, see logs")
+        if (d.lastBlockId != nextBlock.id()) fail(s"Can't apply nextBlock $nextBlock, see logs")
         sentEndorsements shouldBe 1
       }
     }

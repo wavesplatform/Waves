@@ -45,7 +45,7 @@ object EndorsementStorage {
       finalizedId == other.finalizedId && finalizedHeight == other.finalizedHeight && endorsedId == other.endorsedId
   }
 
-  val Disabled: EndorsementStorage = new EndorsementStorage {
+  object Disabled extends EndorsementStorage {
     override def tryAddVote(msg: EndorseBlock): Either[String, Boolean]              = true.asRight
     override def startVoting(filter: EndorsementFilter): Boolean                     = false
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = None
