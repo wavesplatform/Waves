@@ -24,16 +24,16 @@ package object common {
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
   ): Observable[TransactionMeta] =
-    allAddressTransactions(rdb, maybeDiff, subject, sender, types, fromId).map { case (m, transaction, txNumOpt) =>
+    allAddressTransactions(rdb, maybeDiff, subject, sender, types, fromId).map { case (m, transaction, txNum) =>
       def loadISR(t: Transaction) =
         maybeDiff
           .flatMap { case (_, diff) => diff.scriptResults.get(t.id()) }
-          .orElse(txNumOpt.flatMap(loadInvokeScriptResult(rdb.db, rdb.apiHandle, m.height, _)))
+          .orElse(loadInvokeScriptResult(rdb.db, rdb.apiHandle, m.height, txNum))
 
       def loadETM(t: Transaction) =
         maybeDiff
           .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(t.id()) }
-          .orElse(txNumOpt.flatMap(loadEthereumMetadata(rdb.db, rdb.apiHandle, m.height, _)))
+          .orElse(loadEthereumMetadata(rdb.db, rdb.apiHandle, m.height, txNum))
 
       TransactionMeta.create(
         m.height,
