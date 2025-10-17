@@ -28,6 +28,10 @@ object BlockEndorser {
       val endorsedHeight = Height(votingHeight - 1)
       if (endorsedHeight > GenesisBlockHeight && blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality))
         for {
+          votingBlockHeader <- blockchain
+            .blockHeader(votingHeight)
+            .toSeq
+
           endorsedBlockHeader <- blockchain
             .blockHeader(endorsedHeight)
             .toSeq
@@ -37,16 +41,16 @@ object BlockEndorser {
             .blockId(finalizedHeight)
             .toSeq
 
-          endorsedId = endorsedBlockHeader.id()
-          committed  = blockchain.committedGenerators(blockchain.generationPeriodOf(votingHeight))
-          miner      = endorsedBlockHeader.header.generator.toAddress
-          isMiner    = wallet.privateKeyAccount(miner).isRight
-          filter     = EndorsementFilter(isMiner, finalizedId, finalizedHeight, endorsedId, committed.map { case (_, blsPk) => blsPk })
+          endorsedId       = endorsedBlockHeader.id()
+          committed        = blockchain.committedGenerators(blockchain.generationPeriodOf(votingHeight))
+          votingBlockMiner = votingBlockHeader.header.generator.toAddress
+          isMiner          = wallet.privateKeyAccount(votingBlockMiner).isRight
+          filter           = EndorsementFilter(isMiner, finalizedId, finalizedHeight, endorsedId, committed.map { case (_, blsPk) => blsPk })
           if endorsementStorage.startVoting(filter)
 
           (account, idx) <- for {
             ((committedAddr, _), idx) <- committed.zipWithIndex
-            if committedAddr != miner // A miner doesn’t need to endorse its own blocks - a mining is already an endorsement
+            if committedAddr != votingBlockMiner // A miner doesn’t need to endorse its own blocks - a mining is already an endorsement
             pk <- wallet.privateKeyAccount(committedAddr).toSeq
           } yield (pk, idx)
 

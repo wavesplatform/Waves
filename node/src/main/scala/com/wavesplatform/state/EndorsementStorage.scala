@@ -15,18 +15,14 @@ import scala.collection.mutable
 trait EndorsementStorage {
 
   /** Add a vote, preserves the order of voting.
-    * @return
-    *   true, if it can be shared with neighbours
+    * @return true, if it can be shared with neighbours
     */
   def tryAddVote(msg: EndorseBlock): Either[String, Boolean]
 
-  /** @return
-    *   true if it is a new voting
-    */
+  /** @return true if it is a new voting */
   def startVoting(filter: EndorsementFilter): Boolean
 
-  /** Returns a voting results at this time and resets all except an aggregated voting signature.
-    */
+  /** Returns a voting results at this time and resets all except an aggregated voting signature. */
   def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting]
 }
 

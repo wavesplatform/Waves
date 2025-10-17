@@ -481,16 +481,12 @@ class BlockchainUpdaterImpl(
         log.debug(s"$logPrefix no committed generators on $votingPeriod")
         false
       } else {
-        val minerAddress = votingBlockchain
-          .blockHeader(endorsedHeight)
-          .map(_.header.generator.toAddress)
-          .getOrElse(throw new IllegalStateException(s"Can't find a generator of height $endorsedHeight"))
-
-        val votedEndorserIndexes = votingBlock.header.finalizationVoting.fold(Set.empty)(_.endorserIndexes.toSet)
+        val votingBlockMinerAddress = votingBlock.header.generator.toAddress
+        val votedEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Set.empty)(_.endorserIndexes.toSet)
         val (totalBalance, endorsedBalance, endorsedGeneratorIdxs, minerIdx) =
           generatorBalances.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0), List.empty[Int], -1)) {
             case ((totalBalance, endorsedBalance, endorserIdxs, minerIdx), ((endorserAddress, endorserBalance), i)) =>
-              val isMiner    = endorserAddress == minerAddress
+              val isMiner    = endorserAddress == votingBlockMinerAddress
               val isEndorser = votedEndorserIndexes.contains(i)
               (
                 totalBalance + endorserBalance,
