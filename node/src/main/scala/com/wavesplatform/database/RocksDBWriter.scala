@@ -331,16 +331,23 @@ class RocksDBWriter(
     }.toMap
   }
 
-  override protected def loadGeneratorBalances(): Seq[(Address, Long)] =
+  override protected def loadGeneratorBalances(): Seq[(Address, Long)] = readOnly { _ =>
     if (lastBlock.isEmpty || height <= GenesisBlockHeight) Seq.empty
     else {
-      val currentHeight  = Height(height)
-      val currentBlockId = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight")).id()
-      val currentPeriod  = this.generationPeriodOf(currentHeight)
+      val currentHeight = Height(height)
+      val currentPeriod = this.generationPeriodOf(currentHeight)
 
       val currentCommGens = committedGenerators(currentPeriod)
-      if (currentCommGens.isEmpty) Seq.empty else generatorBalances(currentCommGens, currentBlockId)
+      if (currentCommGens.isEmpty) Seq.empty
+      else {
+        val currentBlock  = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight"))
+        val parentBlockId = currentBlock.header.reference
+
+        // Use parentBlockId, because this is how it works in appender/minerBalance, we don't count transactions in this block
+        generatorBalances(currentCommGens, parentBlockId)
+      }
     }
+  }
 
   private def generatorBalances(generators: Seq[(Address, BlsPublicKey)], at: BlockId): Seq[(Address, Long)] = generators.map { case (addr, _) =>
     addr -> GeneratingBalanceProvider.balance(this, addr, Some(at))

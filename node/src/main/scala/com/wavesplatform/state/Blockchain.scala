@@ -109,7 +109,7 @@ trait Blockchain {
   // TODO: named?
   def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)]
 
-  /** @return In commitment order */
+  /** @return Before applying transactions of this block, in commitment order */
   def currentGeneratorBalances(): Seq[(Address, Long)]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]

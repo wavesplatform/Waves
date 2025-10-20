@@ -259,7 +259,7 @@ object Keys {
   )
 
   def finalizedHeightAt(at: Height): Key[Option[Height]] = Key.opt(
-    FinalizedBlockHeight,
+    FinalizedBlockHeightAt,
     h(at),
     bytes => com.wavesplatform.state.Height(Ints.fromByteArray(bytes)),
     Ints.toByteArray

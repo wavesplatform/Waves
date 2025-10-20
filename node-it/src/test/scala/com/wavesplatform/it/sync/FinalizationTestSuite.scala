@@ -82,6 +82,13 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
       done = finalizedHeight1 > waitingFinalizedHeight
     }
 
+    step("Survives restart")
+    isolated {
+      val height = node.height
+      docker.restartContainer(node)
+      node.waitForHeight(height)
+    }
+
     step("Finalized block header and height checks")
     val finalizedBlock1 = node.finalizedBlockHeader()
     finalizedBlock1.height should be >= finalizedHeight1

@@ -273,8 +273,16 @@ class BlockchainUpdaterImpl(
                       val updatedBlockchain = SnapshotBlockchain(rocksdb, r.snapshot, block, hitSource, r.carry, reward, Some(r.computedStateHash))
                       miner.scheduleMining(Some(updatedBlockchain))
                       blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, reward, hitSource, referencedBlockchain)
-                      val finalizedHeight = Height(GenesisBlockHeight.max(updatedBlockchain.height - maxSyncRollbackLength))
-                      Option((r, Nil, reward, hitSource, finalizedHeight))
+
+                      val newFinalizedHeight = calculateFinalizationHeight(rocksdb).getOrElse {
+                        Blockchain.finalizedHeightOrFallback(
+                          at = Height(updatedBlockchain.height + 1),
+                          latestFinalized = rocksdb.finalizedHeightAt(Height(rocksdb.height)),
+                          maxRollbackLength = wavesSettings.synchronizationSettings.maxRollback
+                        )
+                      }
+
+                      Option((r, Nil, reward, hitSource, newFinalizedHeight))
                     }
               }
             case Some(ng) =>

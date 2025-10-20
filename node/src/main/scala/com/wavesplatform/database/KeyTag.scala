@@ -60,6 +60,7 @@ enum KeyTag {
     AddressLeaseInfoSeqNr,
     AddressLeaseInfoSeq,
     FinalizedBlockHeight,
+    FinalizedBlockHeightAt,
     CommittedGenerators,
     CommitmentTransactions,
     GeneratorBalances
