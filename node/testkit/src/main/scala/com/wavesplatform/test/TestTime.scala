@@ -4,7 +4,7 @@ import com.wavesplatform.utils.Time
 
 import scala.concurrent.duration.FiniteDuration
 
-case class TestTime(@volatile private var t: Long = System.currentTimeMillis(), private var monotonicMs: Long = System.nanoTime() / 1000)
+case class TestTime(@volatile private var t: Long = System.currentTimeMillis(), private var monotonicMs: Long = System.nanoTime() / 1_000_000)
     extends Time {
   def setTime(tt: Long): this.type = {
     t = tt

@@ -12,7 +12,7 @@ import scala.concurrent.duration.DurationInt
 trait Time {
   def correctedTime(): Long
   def getTimestamp(): Long
-  def monotonicMillis(): Long = System.nanoTime() / 1000
+  def monotonicMillis(): Long = System.nanoTime() / 1_000_000
 }
 
 class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable {
@@ -31,7 +31,7 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
 
   def correctedTime(): Long = {
     val timestamp = ntpTimestamp
-    val offset    = (System.nanoTime() - nanoTime) / 1000000
+    val offset    = (System.nanoTime() - nanoTime) / 1_000_000
     timestamp + offset
   }
 
@@ -51,7 +51,7 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
         val message         = info.getMessage
         val ntpTime         = message.getTransmitTimeStamp.getTime
         val serverSpentTime = message.getTransmitTimeStamp.getTime - message.getReceiveTimeStamp.getTime
-        val roundripTime    = (System.nanoTime() - beforeRequest) / 1000000 - serverSpentTime
+        val roundripTime    = (System.nanoTime() - beforeRequest) / 1_000_000 - serverSpentTime
         val corrected       = ntpTime + roundripTime / 2
         Some((info.getAddress, corrected, System.nanoTime()))
       } catch {
