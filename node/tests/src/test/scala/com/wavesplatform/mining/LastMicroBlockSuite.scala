@@ -69,11 +69,13 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       log.debug("Append block2")
       val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = Seq.empty, generator = otherNodeAcc, strictTime = true)
       d.appender.appendBlock(block2)
+      appenderScheduler.tickNext("this-appender-1", failIfNoTasks = false)
 
       log.debug("Append microBlock1")
       time.advance(microBlockInterval)
       val microBlock1 = d.createMicroBlock(signer = otherNodeAcc.some)(TxHelpers.transfer(to = otherNodeAcc.toAddress))
       d.appendMicroBlock(microBlock1)
+      appenderScheduler.tickNext("this-appender-2", failIfNoTasks = false)
 
       log.debug("Append microBlock2 (ref for next block)")
       time.advance(microBlockInterval)
@@ -84,8 +86,6 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       time.advance(minMicroBlockAge)
       d.nextBlockTime(thisNodeAcc) should be <= time.getTimestamp()
 
-      appenderScheduler.tickNext("this-appender-1")
-      appenderScheduler.tickNext("this-appender-2")
       minerScheduler.tickNext("this-miner-1")
       appenderScheduler.tickNext("this-appender-3")
 
@@ -130,12 +130,14 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       log.debug("Append block2")
       val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = Seq.empty, generator = otherNodeAcc, strictTime = true)
       d.appender.appendBlock(block2)
+      appenderScheduler.tickNext("this-appender-1", failIfNoTasks = false)
 
       log.debug("Append microBlock1 (ref for next block)")
       time.advance(microBlockInterval)
       val microBlock1 = d.createMicroBlock(signer = otherNodeAcc.some)(TxHelpers.transfer(to = otherNodeAcc.toAddress))
       d.appendMicroBlock(microBlock1)
       val liquidBlock1Id = d.lastBlockId
+      appenderScheduler.tickNext("this-appender-2", failIfNoTasks = false)
 
       log.debug("Append microBlock2")
       time.advance(microBlockInterval)
@@ -145,8 +147,6 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       time.advance(minMicroBlockAge / 2)
       d.nextBlockTime(thisNodeAcc) should be <= time.getTimestamp()
 
-      appenderScheduler.tickNext("this-appender-1")
-      appenderScheduler.tickNext("this-appender-2")
       minerScheduler.tickNext("this-miner-1")
       appenderScheduler.tickNext("this-appender-3")
 
