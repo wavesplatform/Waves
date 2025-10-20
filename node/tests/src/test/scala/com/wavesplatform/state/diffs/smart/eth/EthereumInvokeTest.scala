@@ -143,7 +143,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with I
   private def assert(dAppVersion: StdLibVersion, assetScriptVersion: StdLibVersion, paymentCount: Int, syncCall: Boolean = false) = {
     val (preparingTxs, ethInvoke, dApp, dApp2, assets) = preconditions(dAppVersion, assetScriptVersion, paymentCount, syncCall)
     val settings =
-      if (dAppVersion >= V9 || assetScriptVersion >= V9) Finality
+      if (dAppVersion >= V9 || assetScriptVersion >= V9) DeterministicFinality
       else if (dAppVersion >= V8 || assetScriptVersion >= V8) TransactionStateSnapshot 
       else BlockRewardDistribution
 

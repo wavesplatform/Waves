@@ -2,6 +2,7 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.it.api.FinalizationVoting.ConflictEndorsement
 import com.wavesplatform.state.{DataEntry, Height}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
@@ -901,6 +902,7 @@ case class BlockHeader(
     totalFee: Long,
     vrf: Option[String],
     challengedHeader: Option[ChallengedBlockHeader],
+    finalizationVoting: Option[FinalizationVoting],
     version: Option[Byte] = None
 )
 object BlockHeader {
@@ -924,6 +926,7 @@ object BlockHeader {
         transactionsRoot    <- (jsv \ "transactionsRoot").validateOpt[String]
         vrf                 <- (jsv \ "VRF").validateOpt[String]
         challengedHeader    <- (jsv \ "challengedHeader").validateOpt[ChallengedBlockHeader]
+        finalizationVoting  <- (jsv \ "finalizationVoting").validateOpt[FinalizationVoting]
       } yield BlockHeader(
         id,
         signature,
@@ -941,6 +944,7 @@ object BlockHeader {
         totalFee,
         vrf,
         challengedHeader,
+        finalizationVoting,
         version
       )
     ),
@@ -958,6 +962,20 @@ case class ChallengedBlockHeader(
 )
 object ChallengedBlockHeader {
   implicit val challengedBlockHeaderFormat: Format[ChallengedBlockHeader] = Json.format
+}
+
+case class FinalizationVoting(
+    aggregatedEndorsementSignature: String,
+    endorserIndexes: Seq[Int] = Seq.empty,
+    conflictEndorsements: Seq[ConflictEndorsement] = Seq.empty
+)
+object FinalizationVoting {
+  given OFormat[FinalizationVoting] = Json.format
+
+  case class ConflictEndorsement(endorserIndex: Int, finalizedBlockId: String, signature: String)
+  object ConflictEndorsement {
+    given OFormat[ConflictEndorsement] = Json.format
+  }
 }
 
 case class GenerationSignatureResponse(generationSignature: String)

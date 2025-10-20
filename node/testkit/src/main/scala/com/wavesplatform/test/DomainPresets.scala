@@ -103,7 +103,6 @@ object DomainPresets {
     )
 
   val TransactionStateSnapshot: WavesSettings = BlockRewardDistribution.addFeatures(BlockchainFeatures.LightNode)
-  val Finality: WavesSettings                 = TransactionStateSnapshot.addFeatures(BlockchainFeatures.DeterministicFinality)
 
   val DeterministicFinality: WavesSettings = TransactionStateSnapshot.addFeatures(BlockchainFeatures.DeterministicFinality)
 
@@ -117,7 +116,7 @@ object DomainPresets {
       case V6 => RideV6
       case V7 => BlockRewardDistribution
       case V8 => TransactionStateSnapshot
-      case V9 => Finality
+      case V9 => DeterministicFinality
     }
 
   def mostRecent: WavesSettings = RideV6

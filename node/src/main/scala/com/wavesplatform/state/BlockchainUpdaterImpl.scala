@@ -273,8 +273,16 @@ class BlockchainUpdaterImpl(
                       val updatedBlockchain = SnapshotBlockchain(rocksdb, r.snapshot, block, hitSource, r.carry, reward, Some(r.computedStateHash))
                       miner.scheduleMining(Some(updatedBlockchain))
                       blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, reward, hitSource, referencedBlockchain)
-                      val finalizedHeight = Height(GenesisBlockHeight.max(updatedBlockchain.height - maxSyncRollbackLength))
-                      Option((r, Nil, reward, hitSource, finalizedHeight))
+
+                      val newFinalizedHeight = calculateFinalizationHeight(rocksdb).getOrElse {
+                        Blockchain.finalizedHeightOrFallback(
+                          at = Height(updatedBlockchain.height + 1),
+                          latestFinalized = rocksdb.finalizedHeightAt(Height(rocksdb.height)),
+                          maxRollbackLength = wavesSettings.synchronizationSettings.maxRollback
+                        )
+                      }
+
+                      Option((r, Nil, reward, hitSource, newFinalizedHeight))
                     }
               }
             case Some(ng) =>
@@ -481,16 +489,12 @@ class BlockchainUpdaterImpl(
         log.debug(s"$logPrefix no committed generators on $votingPeriod")
         false
       } else {
-        val minerAddress = votingBlockchain
-          .blockHeader(endorsedHeight)
-          .map(_.header.generator.toAddress)
-          .getOrElse(throw new IllegalStateException(s"Can't find a generator of height $endorsedHeight"))
-
-        val votedEndorserIndexes = votingBlock.header.finalizationVoting.fold(Set.empty)(_.endorserIndexes.toSet)
+        val votingBlockMinerAddress = votingBlock.header.generator.toAddress
+        val votedEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Set.empty)(_.endorserIndexes.toSet)
         val (totalBalance, endorsedBalance, endorsedGeneratorIdxs, minerIdx) =
           generatorBalances.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0), List.empty[Int], -1)) {
             case ((totalBalance, endorsedBalance, endorserIdxs, minerIdx), ((endorserAddress, endorserBalance), i)) =>
-              val isMiner    = endorserAddress == minerAddress
+              val isMiner    = endorserAddress == votingBlockMinerAddress
               val isEndorser = votedEndorserIndexes.contains(i)
               (
                 totalBalance + endorserBalance,

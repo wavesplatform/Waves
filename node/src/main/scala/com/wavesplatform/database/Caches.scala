@@ -216,8 +216,13 @@ abstract class Caches extends Blockchain with Storage {
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   @volatile
-  private var currentGeneratorBalancesCache                     = loadGeneratorBalances()
-  override def currentGeneratorBalances(): Seq[(Address, Long)] = currentGeneratorBalancesCache
+  private var currentGeneratorBalancesCache = Option.empty[Seq[(Address, Long)]]
+  override def currentGeneratorBalances(): Seq[(Address, Long)] =
+    currentGeneratorBalancesCache.getOrElse {
+      val r = loadGeneratorBalances()
+      currentGeneratorBalancesCache = Some(r)
+      r
+    }
   protected def loadGeneratorBalances(): Seq[(Address, Long)]
 
   protected def doAppend(
@@ -268,7 +273,8 @@ abstract class Caches extends Blockchain with Storage {
     current = CurrentBlockInfo(newHeight, Some(newMeta), block.transactionData)
     currentFinalizedHeight = Some(newFinalizedHeight)
 
-    currentGeneratorBalancesCache = generatorBalances.map { case (addr, _, balance) => addr -> balance }
+    val updatedCurrentGeneratorBalances = generatorBalances.map { case (addr, _, balance) => addr -> balance }
+    currentGeneratorBalancesCache = Some(updatedCurrentGeneratorBalances)
 
     val newAddresses =
       mutable.Set[Address]() ++
@@ -378,7 +384,7 @@ abstract class Caches extends Blockchain with Storage {
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       newFinalizedHeight,
-      currentGeneratorBalancesCache,
+      updatedCurrentGeneratorBalances,
       nextCommittedGeneratorsRev.reverse,
       stateHash.result()
     )
@@ -420,7 +426,7 @@ abstract class Caches extends Blockchain with Storage {
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()
 
-      currentGeneratorBalancesCache = loadGeneratorBalances()
+      currentGeneratorBalancesCache = None
 
       discardedBlocks
     }

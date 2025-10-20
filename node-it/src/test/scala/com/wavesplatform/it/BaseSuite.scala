@@ -1,19 +1,20 @@
 package com.wavesplatform.it
 
-import java.io.File
-
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.test.TestUtils
 import monix.eval.Coeval
 import org.scalatest.*
 
+import java.io.File
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 
 trait BaseSuite
     extends ReportingTestName
     with NodesFromDocker
+    with TestUtils
     with matchers.should.Matchers
     with CancelAfterFailure
     with BeforeAndAfterAll

@@ -40,22 +40,25 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
     node.broadcastRequest(commitTxn2)
     node.waitForGenerationPeriod(period1)
 
-    val generators1 = node.generators(period1.start)
-    generators1.size shouldBe 2
-    generators1 shouldBe Seq(
-      GeneratorsResponse.Entry(
-        address = miner1Addr,
-        balance = 9990598000000L,
-        transactionId = commitTxn1.id
-      ),
-      GeneratorsResponse.Entry(
-        address = miner2Addr,
-        balance = 9989990000000L,
-        transactionId = commitTxn2.id
+    step("Generators")
+    isolated {
+      val generators = node.generators(period1.start)
+      generators.size shouldBe 2
+      generators shouldBe Seq(
+        GeneratorsResponse.Entry(
+          address = miner1Addr,
+          balance = 9990598000000L,
+          transactionId = commitTxn1.id
+        ),
+        GeneratorsResponse.Entry(
+          address = miner2Addr,
+          balance = 9989990000000L,
+          transactionId = commitTxn2.id
+        )
       )
-    )
+    }
 
-    info("Finalized height checks")
+    step("Finalized height checks")
     val deadline               = 2.minutes.fromNow
     var finalizedHeight1       = node.finalizedHeight
     val waitingFinalizedHeight = finalizedHeight1 + 2
@@ -79,7 +82,14 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
       done = finalizedHeight1 > waitingFinalizedHeight
     }
 
-    info("Finalized header and height checks")
+    step("Survives restart")
+    isolated {
+      val height = node.height
+      docker.restartContainer(node)
+      node.waitForHeight(height)
+    }
+
+    step("Finalized block header and height checks")
     val finalizedBlock1 = node.finalizedBlockHeader()
     finalizedBlock1.height should be >= finalizedHeight1
 
@@ -89,7 +99,28 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
     val finalizedHeightBefore1 = node.finalizedHeightAt(finalizedBlock1.height)
     finalizedHeightBefore1 should be < finalizedHeight1
 
-    info("Force rollback: prepare")
+    step("Finalization voting in a block header")
+    val blockHeader        = node.blockHeaderAt(node.height - 1)
+    val finalizationVoting = blockHeader.finalizationVoting.value
+
+    val generators: Seq[(data: GeneratorsResponse.Entry, index: Int)] = node.generators(blockHeader.height).zipWithIndex
+
+    val minerEndorser = generators.find { g => g.data.address == blockHeader.generator }.value
+
+    withClue(s"endorsers=[${finalizationVoting.endorserIndexes.mkString(", ")}], miner=${minerEndorser.index}: ") {
+      finalizationVoting.endorserIndexes should not contain minerEndorser.index
+    }
+
+    val totalBalance = generators.map { g => BigInt(g.data.balance) }.sum
+    val votedBalance = generators.collect {
+      case g if finalizationVoting.endorserIndexes.contains(g.index) || g.index == minerEndorser.index => BigInt(g.data.balance)
+    }.sum
+
+    withClue(s"totalBalance=$totalBalance, votedBalance=$votedBalance: ") {
+      votedBalance * 2 should be >= (totalBalance * 2)
+    }
+
+    step("Force rollback")
     val startHeight = waitingFinalizedHeight + 2
     node.waitForHeight(startHeight)
     node.height should be > startHeight

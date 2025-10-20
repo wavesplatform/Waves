@@ -218,6 +218,16 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
       val channel2 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
       channels.add(channel1)
       channels.add(channel2)
+
+      def sentEndorsements: Long = {
+        val r = channel1.outboundMessages().asScala.count {
+          case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
+          case _                                                     => false
+        }
+        channel1.outboundMessages().clear()
+        r
+      }
+
       val appender = BlockAppender(
         d.blockchain,
         testTime,
@@ -233,17 +243,13 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
       val endorsedBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
       testTime.setTime(endorsedBlock.header.timestamp)
       appender(endorsedBlock).runSyncUnsafe()
-      if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply block $endorsedBlock, see logs")
+      if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply endorsedBlock $endorsedBlock, see logs")
+      sentEndorsements shouldBe 0
 
       val nextBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator2, strictTime = true)
       testTime.setTime(nextBlock.header.timestamp)
       appender(nextBlock).runSyncUnsafe()
-
-      def sentEndorsements: Long = channel1.outboundMessages().asScala.count {
-        case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
-        case _                                                     => false
-      }
-
+      if (d.lastBlockId != nextBlock.id()) fail(s"Can't apply nextBlock $nextBlock, see logs")
       sentEndorsements shouldBe 0
     }
 
@@ -270,6 +276,16 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         val channel2 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
         channels.add(channel1)
         channels.add(channel2)
+
+        def sentEndorsements: Long = {
+          val r = channel1.outboundMessages().asScala.count {
+            case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
+            case _                                                     => false
+          }
+          channel1.outboundMessages().clear()
+          r
+        }
+
         val appender = BlockAppender(
           d.blockchain,
           testTime,
@@ -282,20 +298,16 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
           appenderScheduler
         )(channel2, _, None)
 
-        val endorsedBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = otherGenerator, strictTime = true)
+        val endorsedBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
         testTime.setTime(endorsedBlock.header.timestamp)
         appender(endorsedBlock).runSyncUnsafe()
-        if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply block $endorsedBlock, see logs")
+        if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply endorsedBlock $endorsedBlock, see logs")
+        sentEndorsements shouldBe 0
 
-        val nextBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
+        val nextBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = otherGenerator, strictTime = true)
         testTime.setTime(nextBlock.header.timestamp)
         appender(nextBlock).runSyncUnsafe()
-
-        def sentEndorsements: Long = channel1.outboundMessages().asScala.count {
-          case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
-          case _                                                     => false
-        }
-
+        if (d.lastBlockId != nextBlock.id()) fail(s"Can't apply nextBlock $nextBlock, see logs")
         sentEndorsements shouldBe 1
       }
     }

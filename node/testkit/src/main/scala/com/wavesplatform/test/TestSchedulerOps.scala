@@ -8,7 +8,7 @@ import scala.concurrent.duration.DurationInt
 
 trait TestSchedulerOps { this: Assertions & ScorexLogging =>
   extension (self: TestScheduler) {
-    def tickNext(label: String): Unit = {
+    def tickNext(label: String, failIfNoTasks: Boolean = true): Unit = {
       val before      = self.state.clock
       val closestTask = self.state.tasks.headOption
       closestTask match {
@@ -17,7 +17,8 @@ trait TestSchedulerOps { this: Assertions & ScorexLogging =>
           log.debug(s"Run $label task #${closestTask.id} ${waitStr(closestTask)}")
           self.tick(time)
 
-        case None => fail(s"Run $label: no tasks in scheduler $self")
+        case None =>
+          if (failIfNoTasks) fail(s"Run $label: no tasks in scheduler $self")
       }
     }
 

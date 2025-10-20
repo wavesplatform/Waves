@@ -14,18 +14,28 @@ trait ReportingTestName extends SuiteMixin with ScorexLogging {
   override protected lazy val log = LoggerFacade(LoggerFactory.getLogger("Test"))
 
   abstract override protected def runTest(testName: String, args: Args): Status = {
-    print(s"Test '$testName' started")
+    printTestWorkflow(s"Test '$testName' started")
     val r = super.runTest(testName, args)
-    print(s"Test '$testName' ${if (r.succeeds()) "SUCCEEDED" else "FAILED"}")
+    printTestWorkflow(s"Test '$testName' ${if (r.succeeds()) "SUCCEEDED" else "FAILED"}")
     r
   }
 
-  private def print(text: String): Unit = {
-    import scala.concurrent.ExecutionContext.Implicits.global
+  def step(text: String): Unit = {
     val formatted = s"---------- $text ----------"
     log.debug(formatted)
+    printDebugMessage(formatted)
+  }
+
+  private def printTestWorkflow(text: String): Unit = {
+    val formatted = s"========== $text =========="
+    log.debug(formatted)
+    printDebugMessage(formatted)
+  }
+
+  private def printDebugMessage(text: String): Unit = {
+    import scala.concurrent.ExecutionContext.Implicits.global
     try {
-      Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(formatted))), 10.seconds)
+      Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(text))), 10.seconds)
     } catch {
       case _: Throwable => ()
     }

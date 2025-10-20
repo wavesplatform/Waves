@@ -909,21 +909,24 @@ object AsyncHttpApi extends Assertions {
 
     def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = OK_200, waitForStatus: Boolean = false): Future[Response] = {
       def executeRequest: Future[Response] = {
-        val id = UUID.randomUUID().toString.take(8)
-        n.log.trace(s"[$id] Executing request '$r'")
-        if (r.getStringData != null) n.log.debug(s"[$id] Request's body '${r.getStringData}'")
+        val log = !(r.getMethod == "POST" && r.getUri.getPath == "/debug/print")
+        val id  = UUID.randomUUID().toString.take(8)
+        if (log) {
+          val s = new StringBuilder(s"[$id] Executing: ${r.getMethod} ${r.getUri}")
+          if (r.getHeaders != null && !r.getHeaders.isEmpty) s.append(s", ${r.getHeaders}")
+          if (r.getStringData != null) s.append(s", body:\n${r.getStringData}")
+          n.log.debug(s.toString())
+        }
         n.client
           .executeRequest(
             r,
             new AsyncCompletionHandler[Response] {
               override def onCompleted(response: Response): Response = {
                 if (response.getStatusCode == statusCode) {
-                  n.log.debug(s"[$id] Request: ${r.getMethod} ${r.getUrl}\nResponse: ${response.getResponseBody}")
+                  if (log) n.log.debug(s"[$id] Result: ${response.getResponseBody}")
                   response
                 } else {
-                  n.log.debug(
-                    s"[$id] Request: ${r.getMethod} ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}"
-                  )
+                  if (log) n.log.debug(s"[$id] Result: Unexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
                   throw UnexpectedStatusCodeException(r.getMethod, r.getUrl, response.getStatusCode, response.getResponseBody)
                 }
               }

@@ -20,8 +20,9 @@ object GeneratingBalanceProvider {
 
   // noinspection ScalaStyle
   def isEffectiveBalanceValid(blockchain: Blockchain, height: Int, block: Block, effectiveBalance: Long): Boolean =
-    block.header.timestamp < blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter || (block.header.timestamp >= blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
-      blockchain.activatedFeatures
+    block.header.timestamp < blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter
+      || block.header.timestamp >= blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1
+      || blockchain.activatedFeatures
         .get(BlockchainFeatures.SmallerMinimalGeneratingBalance.id)
         .exists(height >= _) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2
 

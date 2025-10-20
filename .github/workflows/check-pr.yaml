@@ -29,12 +29,12 @@ jobs:
           QASE_PROJECT_CODE: PR
           QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
           CHECKPR_RUN_ID: ${{ github.run_id }}
-      - uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3
+      - uses: scacap/action-surefire-report@5609ce4db72c09db044803b344a8968fd1f315da
         if: always()
         with:
-          reporter: java-junit
-          name: JUnit Report
-          path: '**/target/test-reports/*.xml'
+          report_paths: '**/target/test-reports/*.xml'
+          create_check: false
+          check_name: 'Check PR'
       - name: Save debug data
         uses: actions/upload-artifact@v4
         if: always()
@@ -42,7 +42,7 @@ jobs:
           if-no-files-found: ignore
           name: debug-data
           path: |
-            gc.log
+            gc.log*
             hs*.log
             core*
 
@@ -61,16 +61,16 @@ jobs:
       - name: Run Integration Tests
         run: sbt --batch "node-it/docker;node-it/test"
         env:
-          RUN_ID: ${{ github.ref_name }}-${{ github.run_number }}-${{ github.run_attempt }}
-      - uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3
+          RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}
+      - uses: scacap/action-surefire-report@5609ce4db72c09db044803b344a8968fd1f315da
         if: always()
         with:
-          reporter: java-junit
-          name: JUnit Report
-          path: 'node-it/target/test-reports/*.xml'
+          report_paths: '**/target/test-reports/*.xml'
+          create_check: false
+          check_name: 'Run integration tests'
       - name: Upload Logs
         uses: actions/upload-artifact@v4
-        if: cancelled() || failure()
+        if: always()
         with:
           if-no-files-found: ignore
           name: test-logs
