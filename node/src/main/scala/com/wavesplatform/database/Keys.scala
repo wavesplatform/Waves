@@ -127,8 +127,8 @@ object Keys {
   def addressScript(addressId: AddressId)(height: Int): Key[Option[AccountScriptInfo]] =
     Key.opt(AddressScript, hAddr(height, addressId), readAccountScriptInfo, writeAccountScriptInfo)
 
-  val approvedFeatures: Key[Map[Short, Int]]  = Key(ApprovedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
-  val activatedFeatures: Key[Map[Short, Int]] = Key(ActivatedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
+  val approvedFeatures: Key[Map[Short, Height]]  = Key(ApprovedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
+  val activatedFeatures: Key[Map[Short, Height]] = Key(ActivatedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
 
   def data(addressId: AddressId, key: String): Key[CurrentData] =
     Key(Data, addressId.toByteArray ++ key.utf8Bytes, readCurrentData(key), writeCurrentData)

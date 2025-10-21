@@ -355,7 +355,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
     val blockchain = stub[Blockchain]
     (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> Height(0)))
     (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
 
     val result = runScriptWithCustomContext[CONST_BOOLEAN](script, tx, V4, blockchain)
@@ -896,7 +896,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
     val directives = DirectiveSet(V2, Account, Expression).explicitGet()
     val blockchain = stub[Blockchain]
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> Height(0)))
 
     val ctx =
       PureContext.build(V2, useNewPowPrecision = true).withEnvironment[Environment] |+|

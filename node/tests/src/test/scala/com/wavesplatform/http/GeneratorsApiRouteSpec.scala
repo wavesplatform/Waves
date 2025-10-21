@@ -47,7 +47,7 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
   )
 
   routePath("/at/{height}") in {
-    val generationPeriod = domain.blockchain.currentGenerationPeriod.next
+    val generationPeriod = domain.blockchain.currentGenerationPeriod.value.next
 
     val txn    = TxHelpers.commitToGeneration(generationPeriod.start, sender = generator)
     val block1 = domain.createBlock(Block.PlainBlockVersion, Seq(txn), strictTime = true) // defaultSigner

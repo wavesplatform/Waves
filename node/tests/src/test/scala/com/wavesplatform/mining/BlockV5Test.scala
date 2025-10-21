@@ -14,7 +14,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG, diffs}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, NG, diffs}
 import com.wavesplatform.test.{FlatSpec, *}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -449,7 +449,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
     withRocksDBWriter(settings.blockchainSettings) { blockchain =>
       val bcu: BlockchainUpdaterImpl =
         new BlockchainUpdaterImpl(blockchain, settings, time, ignoreBlockchainUpdateTriggers, (_, _) => Map.empty) {
-          override def activatedFeatures: Map[Short, Int] = super.activatedFeatures -- disabledFeatures.get()
+          override def activatedFeatures: Map[Short, Height] = super.activatedFeatures -- disabledFeatures.get()
         }
       try f(bcu)
       finally bcu.shutdown()

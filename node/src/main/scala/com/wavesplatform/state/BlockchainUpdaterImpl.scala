@@ -13,7 +13,6 @@ import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database.RocksDBWriter
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.ConsensusImprovements
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
@@ -114,7 +113,7 @@ class BlockchainUpdaterImpl(
   override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo
 
   private def featuresApprovedWithBlock(block: Block): Set[Short] = {
-    val height = rocksdb.height + 1
+    val height = Height(rocksdb.height + 1)
 
     val featuresCheckPeriod        = functionalitySettings.activationWindowSize(height)
     val blocksForFeatureActivation = functionalitySettings.blocksForFeatureActivation(height)
@@ -158,11 +157,11 @@ class BlockchainUpdaterImpl(
     val settings   = this.settings.rewardsSettings
     val nextHeight = this.height + 1
 
-    if (height == 0 && rocksdb.featureActivationHeight(ConsensusImprovements.id).exists(_ <= 1))
+    if (height == 0 && rocksdb.featureActivationHeight(BlockchainFeatures.ConsensusImprovements).exists(_ <= 1))
       None
     else
       rocksdb
-        .featureActivationHeight(BlockchainFeatures.BlockReward.id)
+        .featureActivationHeight(BlockchainFeatures.BlockReward)
         .filter(_ <= nextHeight)
         .flatMap { activatedAt =>
           val mayBeReward     = lastBlockReward
@@ -516,7 +515,7 @@ class BlockchainUpdaterImpl(
     }
 
     for {
-      finalityActivationHeight <- votingBlockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality.id)
+      finalityActivationHeight <- votingBlockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality)
       if votingHeight > GenesisBlockHeight && votingHeight >= finalityActivationHeight && shouldFinalizeByVoting()
     } yield endorsedHeight
   }
@@ -524,7 +523,7 @@ class BlockchainUpdaterImpl(
   private def collectLeasesToCancel(newHeight: Int): Map[ByteStr, LeaseDetails] =
     if (rocksdb.isFeatureActivated(BlockchainFeatures.LeaseExpiration, newHeight)) {
       val toHeight = newHeight - rocksdb.settings.functionalitySettings.leaseExpiration
-      val fromHeight = rocksdb.featureActivationHeight(BlockchainFeatures.LeaseExpiration.id) match {
+      val fromHeight = rocksdb.featureActivationHeight(BlockchainFeatures.LeaseExpiration) match {
         case Some(`newHeight`) =>
           log.trace(s"Collecting leases created up till height $toHeight")
           1
@@ -679,17 +678,17 @@ class BlockchainUpdaterImpl(
     internalLastBlockInfo.onComplete()
   }
 
-  private def newlyApprovedFeatures = ngState.fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
+  private def newlyApprovedFeatures = ngState.fold(Map.empty[Short, Height])(_.approvedFeatures.map(_ -> Height(height)).toMap)
 
-  override def approvedFeatures: Map[Short, Int] = readLock {
+  override def approvedFeatures: Map[Short, Height] = readLock {
     newlyApprovedFeatures ++ rocksdb.approvedFeatures
   }
 
-  override def activatedFeatures: Map[Short, Int] = readLock {
-    (newlyApprovedFeatures.view.mapValues(_ + functionalitySettings.activationWindowSize(height)) ++ rocksdb.activatedFeatures).toMap
+  override def activatedFeatures: Map[Short, Height] = readLock {
+    (newlyApprovedFeatures.view.mapValues(h => Height(h + functionalitySettings.activationWindowSize(height))) ++ rocksdb.activatedFeatures).toMap
   }
 
-  override def featureVotes(height: Int): Map[Short, Int] = readLock {
+  override def featureVotes(height: Height): Map[Short, Int] = readLock {
     val innerVotes = rocksdb.featureVotes(height)
     ngState match {
       case Some(ng) if this.height <= height =>
@@ -890,8 +889,8 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.wavesBalances(addresses)
   }
 
-  override def deposit(address: Address): Long = readLock {
-    snapshotBlockchain.deposit(address)
+  override def generationDeposit(address: Address): Long = readLock {
+    snapshotBlockchain.generationDeposit(address)
   }
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = readLock {

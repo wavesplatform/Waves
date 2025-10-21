@@ -182,7 +182,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
         d.appender.appendBlock(block)
       }
 
-      val generationPeriod1 = d.rocksDBWriter.currentGenerationPeriod.next
+      val generationPeriod1 = d.rocksDBWriter.currentGenerationPeriod.value.next
       appendBlock( // 2
         commitToGeneration(generationPeriodStart = generationPeriod1.start, sender = account1),
         commitToGeneration(generationPeriodStart = generationPeriod1.start, sender = account2)

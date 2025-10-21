@@ -34,7 +34,7 @@ object Sponsorship {
 
   def sponsoredFeesSwitchHeight(blockchain: Blockchain): Int =
     blockchain
-      .featureActivationHeight(BlockchainFeatures.FeeSponsorship.id)
+      .featureActivationHeight(BlockchainFeatures.FeeSponsorship)
       .map(h => h + blockchain.settings.functionalitySettings.activationWindowSize(h))
       .getOrElse(Int.MaxValue)
 

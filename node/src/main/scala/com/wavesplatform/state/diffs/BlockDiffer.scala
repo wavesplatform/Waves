@@ -117,7 +117,7 @@ object BlockDiffer {
     val heightWithNewBlock = stateHeight + 1
 
     // height switch is next after activation
-    val ngHeight          = blockchain.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
+    val ngHeight          = blockchain.featureActivationHeight(BlockchainFeatures.NG).getOrElse(Int.MaxValue)
     val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
     val feeFromPreviousBlockE =

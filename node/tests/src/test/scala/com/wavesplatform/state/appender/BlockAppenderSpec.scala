@@ -325,7 +325,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         )
       ) { d =>
         d.wallet.generateNewAccounts(3)
-        val generationPeriod1 = d.blockchain.generationPeriodOf(Height(1)).next
+        val generationPeriod1 = d.blockchain.generationPeriodOf(Height(1)).value.next
         generationPeriod1.start shouldBe 3
 
         log.info("block2")
@@ -333,7 +333,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         val block2 = d.createBlock(Block.ProtoBlockVersion, txs, generator = generator1, strictTime = true)
         d.appender.appendBlock(block2)
 
-        d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod) shouldBe empty
+        d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value) shouldBe empty
         d.blockchain.currentGeneratorBalances() shouldBe empty
         d.generatorsApi.generators(Height(d.blockchain.height)) shouldBe empty
 
@@ -342,7 +342,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         val block3   = d.createBlock(Block.ProtoBlockVersion, Seq(transfer), generator = generator3, strictTime = true)
         d.appender.appendBlock(block3)
 
-        d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod).map { case (addr, _) => addr } shouldBe
+        d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map { case (addr, _) => addr } shouldBe
           Seq(generator2, generator3).map(_.toAddress)
 
         val miner1BalanceBeforeBlock3 = miner1InitBalance - CommitToGenerationTransaction.DepositInWavelets - TestValues.commitToGenerationFee

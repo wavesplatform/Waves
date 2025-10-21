@@ -1,10 +1,10 @@
 package com.wavesplatform.features.api
 
-import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.api.http.ApiRoute
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.settings.{FeaturesSettings, RestAPISettings}
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
+import org.apache.pekko.http.scaladsl.server.Route
 import play.api.libs.json.Json
 
 case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: FeaturesSettings, blockchain: Blockchain) extends ApiRoute {
@@ -14,7 +14,7 @@ case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: Featu
   }
 
   def status: Route = (get & path("status")) {
-    val height = blockchain.height
+    val height = Height(blockchain.height)
 
     val featureIds = (blockchain.featureVotes(height).keySet ++
       blockchain.approvedFeatures.keySet ++

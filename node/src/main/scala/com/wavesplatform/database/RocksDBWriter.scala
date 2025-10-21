@@ -11,6 +11,7 @@ import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto.bls.BlsPublicKey
@@ -335,16 +336,16 @@ class RocksDBWriter(
     if (lastBlock.isEmpty || height <= GenesisBlockHeight) Seq.empty
     else {
       val currentHeight = Height(height)
-      val currentPeriod = this.generationPeriodOf(currentHeight)
+      this.generationPeriodOf(currentHeight).fold(Nil) { currentPeriod =>
+        val currentCommGens = committedGenerators(currentPeriod)
+        if (currentCommGens.isEmpty) Seq.empty
+        else {
+          val currentBlock  = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight"))
+          val parentBlockId = currentBlock.header.reference
 
-      val currentCommGens = committedGenerators(currentPeriod)
-      if (currentCommGens.isEmpty) Seq.empty
-      else {
-        val currentBlock  = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight"))
-        val parentBlockId = currentBlock.header.reference
-
-        // Use parentBlockId, because this is how it works in appender/minerBalance, we don't count transactions in this block
-        generatorBalances(currentCommGens, parentBlockId)
+          // Use parentBlockId, because this is how it works in appender/minerBalance, we don't count transactions in this block
+          generatorBalances(currentCommGens, parentBlockId)
+        }
       }
     }
   }
@@ -365,12 +366,12 @@ class RocksDBWriter(
       .toMap
   }
 
-  override protected def loadApprovedFeatures(): Map[Short, Int] =
+  override protected def loadApprovedFeatures(): Map[Short, Height] =
     writableDB.get(Keys.approvedFeatures)
 
-  override protected def loadActivatedFeatures(): Map[Short, Int] = {
+  override protected def loadActivatedFeatures(): Map[Short, Height] = {
     val stateFeatures = writableDB.get(Keys.activatedFeatures)
-    stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
+    stateFeatures ++ settings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_))
   }
 
   override def wavesAmount(height: Int): BigInt =
@@ -711,20 +712,20 @@ class RocksDBWriter(
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
       if (height % activationWindowSize == 0) {
         val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
-        val newlyApprovedFeatures = featureVotes(height)
+        val newlyApprovedFeatures = featureVotes(h)
           .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
           .collect {
             case (featureId, voteCount) if voteCount + (if (blockMeta.getHeader.featureVotes.contains(featureId.toInt)) 1 else 0) >= minVotes =>
-              featureId -> height
+              featureId -> h
           }
 
         if (newlyApprovedFeatures.nonEmpty) {
           approvedFeaturesCache = newlyApprovedFeatures ++ approvedFeaturesCache
           rw.put(Keys.approvedFeatures, approvedFeaturesCache)
 
-          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ activatedFeaturesCache).toMap
+          val featuresToSave = (newlyApprovedFeatures.view.mapValues(h => Height(h + activationWindowSize)) ++ activatedFeaturesCache).toMap
 
-          activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
+          activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_))
           rw.put(Keys.activatedFeatures, featuresToSave)
         }
       }
@@ -732,8 +733,8 @@ class RocksDBWriter(
       // TODO: Option to not store
       rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances.map { case (_, b) => b }))
 
-      if (nextCommittedGenerators.nonEmpty) {
-        val nextPeriod = this.generationPeriodOf(h).next
+      if (nextCommittedGenerators.nonEmpty) this.generationPeriodOf(h).foreach { period =>
+        val nextPeriod = period.next
 
         val (committedGenerators, commitmentTxnIds) = nextCommittedGenerators.unzip(using
           { case (addressId, blsPk, txnId) =>
@@ -1019,7 +1020,7 @@ class RocksDBWriter(
         val aliasesToInvalidate      = Seq.newBuilder[Alias]
         val blockHeightsToInvalidate = Seq.newBuilder[ByteStr]
 
-        val nextPeriod = this.generationPeriodOf(currentHeight).next
+        val nextPeriod = this.generationPeriodOf(currentHeight).map(_.next)
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
           rw.delete(Keys.finalizedHeightAt(currentHeight))
@@ -1142,8 +1143,10 @@ class RocksDBWriter(
           }
 
           rw.delete(Keys.generatorBalances(currentHeight, rdb.apiHandle))
-          rw.delete(Keys.committedGenerators(nextPeriod, currentHeight))
-          rw.delete(Keys.commitmentTransactions(nextPeriod, currentHeight))
+          nextPeriod.foreach { nextPeriod =>
+            rw.delete(Keys.committedGenerators(nextPeriod, currentHeight))
+            rw.delete(Keys.commitmentTransactions(nextPeriod, currentHeight))
+          }
 
           discardedMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress())) match {
             case Some(addr) =>
@@ -1389,11 +1392,15 @@ class RocksDBWriter(
     readOnly { db =>
       val toHeight = Height(to.flatMap(this.heightOf).getOrElse(this.height))
 
-      val (fromGenerationPeriod, toGenerationPeriod) = {
-        val fromPeriod = this.generationPeriodOf(Height(from))
-        // -1 and +1 periods, because a deposit is {deposit on this period} + {deposit on the next period}
-        (fromPeriod.prevOrThis, this.generationPeriodOf(toHeight).max(fromPeriod.next))
-      }
+      val depositPeriods = for {
+        activation <- this.featureActivationHeight(BlockchainFeatures.DeterministicFinality)
+        r <- GenerationPeriod.enclosedPeriods(
+          activation,
+          this.settings.functionalitySettings.generationPeriodLength,
+          Height(from),
+          toHeight
+        )
+      } yield r
 
       addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0, 0))) { addressId =>
         val lastBalance      = balancesCache.get((address, Asset.Waves))
@@ -1419,7 +1426,9 @@ class RocksDBWriter(
             collectLeaseBalanceHistory(newAcc, lbn.prevHeight)
           }
 
-        val collectedDeposits    = collectGenerationDepositChanges(db, addressId, fromGenerationPeriod, toGenerationPeriod)
+        val collectedDeposits = depositPeriods.fold((Nil, Map.empty)) { depositPeriods =>
+          collectGenerationDepositChanges(db, addressId, depositPeriods.start, depositPeriods.end)
+        }
         val slidedDepositHeights = slice(collectedDeposits.changedHeights, from, toHeight)
 
         val cbh = collectBalanceHistory(Vector.empty, lastBalance.height)
@@ -1475,8 +1484,16 @@ class RocksDBWriter(
             .exists { entries => entries.exists { case (currentAddressId, _) => currentAddressId == addressId } }
 
           if (found) {
-            val committedPeriod = this.generationPeriodOf(committedPeriodStart)
-            val nextPeriod      = committedPeriod.next
+            val committedPeriod = this
+              .generationPeriodOf(committedPeriodStart)
+              .getOrElse(
+                throw new IllegalStateException(
+                  s"Database contains committed generators on height before activation: committedPeriodStart=$committedPeriodStart," +
+                    s"db key=${Base64.encode(iter.key())}"
+                )
+              )
+
+            val nextPeriod = committedPeriod.next
 
             val depositHeightBytes = iter.key().takeRight(Ints.BYTES)
             val depositHeight      = Height(Ints.fromByteArray(depositHeightBytes))
@@ -1519,7 +1536,7 @@ class RocksDBWriter(
 
   override def loadHeightOf(blockId: ByteStr): Option[Int] = blockHeightCache.get(blockId)
 
-  override def featureVotes(height: Int): Map[Short, Int] = readOnly { db =>
+  override def featureVotes(height: Height): Map[Short, Int] = readOnly { db =>
     settings.functionalitySettings
       .activationWindow(height)
       .flatMap { h =>

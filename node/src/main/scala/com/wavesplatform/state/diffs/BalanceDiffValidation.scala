@@ -24,7 +24,7 @@ object BalanceDiffValidation {
         additionalDeposit: Long
     ): Either[(Address, String), Unit] = {
       val oldWaves            = b.balance(acc)
-      val oldDeposit          = b.deposit(acc)
+      val oldDeposit          = b.generationDeposit(acc)
       val oldWavesWithDeposit = oldWaves - oldDeposit
       val oldLease            = b.leaseBalance(acc)
 

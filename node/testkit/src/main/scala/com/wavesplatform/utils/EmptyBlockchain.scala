@@ -34,11 +34,11 @@ trait EmptyBlockchain extends Blockchain {
   override def heightOf(blockId: ByteStr): Option[Int] = None
 
   /** Features related */
-  override def approvedFeatures: Map[Short, Int] = Map.empty
+  override def approvedFeatures: Map[Short, Height] = Map.empty
 
-  override def activatedFeatures: Map[Short, Int] = Map.empty
+  override def activatedFeatures: Map[Short, Height] = Map.empty
 
-  override def featureVotes(height: Int): Map[Short, Int] = Map.empty
+  override def featureVotes(height: Height): Map[Short, Int] = Map.empty
 
   /** Block reward related */
   override def blockReward(height: Int): Option[Long] = None

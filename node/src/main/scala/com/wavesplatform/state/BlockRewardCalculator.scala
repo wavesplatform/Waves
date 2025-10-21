@@ -31,9 +31,9 @@ object BlockRewardCalculator {
       xtnBuybackAddress: Option[Address],
       blockchain: Blockchain
   ): BlockRewardShares = {
-    val blockRewardDistributionHeight = blockchain.featureActivationHeight(BlockchainFeatures.BlockRewardDistribution.id).getOrElse(Int.MaxValue)
-    val cappedRewardHeight            = blockchain.featureActivationHeight(BlockchainFeatures.CappedReward.id).getOrElse(Int.MaxValue)
-    val ceaseXtnBuybackHeight         = blockchain.featureActivationHeight(BlockchainFeatures.CeaseXtnBuyback.id).getOrElse(Int.MaxValue)
+    val blockRewardDistributionHeight = blockchain.featureActivationHeight(BlockchainFeatures.BlockRewardDistribution).getOrElse(Int.MaxValue)
+    val cappedRewardHeight            = blockchain.featureActivationHeight(BlockchainFeatures.CappedReward).getOrElse(Int.MaxValue)
+    val ceaseXtnBuybackHeight         = blockchain.featureActivationHeight(BlockchainFeatures.CeaseXtnBuyback).getOrElse(Int.MaxValue)
 
     if (height >= blockRewardDistributionHeight) {
       val modifiedXtnBuybackAddress = xtnBuybackAddress.filter { _ =>

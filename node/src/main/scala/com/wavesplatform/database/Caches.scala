@@ -205,15 +205,15 @@ abstract class Caches extends Blockchain with Storage {
   protected def discardBlockHeight(blockId: ByteStr): Unit = blockHeightCache.invalidate(blockId)
 
   @volatile
-  protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
-  protected def loadApprovedFeatures(): Map[Short, Int]
-  override def approvedFeatures: Map[Short, Int] = approvedFeaturesCache
+  protected var approvedFeaturesCache: Map[Short, Height] = loadApprovedFeatures()
+  protected def loadApprovedFeatures(): Map[Short, Height]
+  override def approvedFeatures: Map[Short, Height] = approvedFeaturesCache
 
   // Also contains features those will be activated in the future (activationHeight > currentHeight), because they were approved now or before.
   @volatile
-  protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
-  protected def loadActivatedFeatures(): Map[Short, Int]
-  override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
+  protected var activatedFeaturesCache: Map[Short, Height] = loadActivatedFeatures()
+  protected def loadActivatedFeatures(): Map[Short, Height]
+  override def activatedFeatures: Map[Short, Height] = activatedFeaturesCache
 
   @volatile
   private var currentGeneratorBalancesCache = Option.empty[Seq[(Address, Long)]]

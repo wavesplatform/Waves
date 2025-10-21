@@ -49,7 +49,7 @@ package object appender {
         .toRight(s"height: history does not contain parent ${block.header.reference}")
 
       blockHeight            = Height(parentHeight + 1)
-      committedOnBlockHeight = blockchain.committedGenerators(blockchain.generationPeriodOf(blockHeight))
+      committedOnBlockHeight = blockchain.generationPeriodOf(blockHeight).fold(Nil)(blockchain.committedGenerators)
       minerAddress           = block.header.generator.toAddress
       // TODO: allow if all generators have less than required balance
       // If no one commited, fallback to classic

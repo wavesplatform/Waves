@@ -64,16 +64,21 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
     }
   }
 
-  private val sender = TxHelpers.defaultSigner
+  private val sender                 = TxHelpers.defaultSigner
+  private val generationPeriodLength = 8
+  private val defaultSettings        = DeterministicFinality.configure(_.copy(generationPeriodLength = generationPeriodLength))
 
-  "Accepted after the feature activation" in withDomain(
-    DeterministicFinality.setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 3),
-    AddrWithBalance.enoughBalances(sender)
-  ) { d =>
-    val tx = TxHelpers.commitToGeneration(Height(3000), sender)
-    d.appendBlockE(tx) should produce("Deterministic Finality & RIDE V9 feature has not been activated yet")
-    d.appendBlock()
-    d.appendBlock(tx)
+  "Accepted on the feature activation height, first period starts at activation_height+generation_period+1" in {
+    val activationHeight = Height(3)
+    withDomain(
+      defaultSettings.setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> activationHeight),
+      AddrWithBalance.enoughBalances(sender)
+    ) { d =>
+      val tx = TxHelpers.commitToGeneration(activationHeight + generationPeriodLength + 1, sender)
+      d.appendBlockE(tx) should produce("Deterministic Finality & RIDE V9 feature has not been activated yet")
+      d.appendBlock()
+      d.appendBlock(tx)
+    }
   }
 
   "Generator deposit taken and returned" in withDomain(

@@ -609,7 +609,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 
-    def currentGenerationPeriod: GenerationPeriod = GenerationPeriod.from(sync(async(n).height), n.settings)
+    // TODO:
+    def currentGenerationPeriod: GenerationPeriod = GenerationPeriod.from(sync(async(n).height), sync(async(n).activationStatus), n.settings)
 
     def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Int =
       waitForHeight(p.start, requestAwaitTime)
