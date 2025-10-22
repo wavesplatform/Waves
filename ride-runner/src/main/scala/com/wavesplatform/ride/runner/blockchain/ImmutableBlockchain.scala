@@ -112,7 +112,8 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override def finalizedHeightAt(at: Height): Option[Height] = ???
 
-  override val activatedFeatures: ActivatedFeatures = settings.functionalitySettings.preActivatedFeatures ++ input.features.map(id => id -> height)
+  override val activatedFeatures: ActivatedFeatures =
+    (settings.functionalitySettings.preActivatedFeatures ++ input.features.map(id => id -> height)).map((k, v) => k -> Height(v))
 
   private val assets = mkCache[IssuedAsset, Option[AssetDescription]] { assetId =>
     input.assets.get(assetId).map { info =>

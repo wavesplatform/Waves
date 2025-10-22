@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.blockchain
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.{AssetScriptInfo, Blockchain, LeaseDetails, TxMeta, VolumeAndFee}
+import com.wavesplatform.state.{AssetScriptInfo, Blockchain, Height, LeaseDetails, TxMeta, VolumeAndFee}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
@@ -71,9 +71,9 @@ trait SupportedBlockchain extends Blockchain with ScorexLogging {
   override def heightOf(blockId: ByteStr): Option[Int] = kill("heightOf")
 
   /** Features related */
-  override def approvedFeatures: Map[Short, Int] = kill("approvedFeatures")
+  override def approvedFeatures: Map[Short, Height] = kill("approvedFeatures")
 
-  override def featureVotes(height: Int): Map[Short, Int] = kill("featureVotes")
+  override def featureVotes(height: Height): Map[Short, Int] = kill("featureVotes")
 
   override def containsTransaction(tx: Transaction): Boolean = kill("containsTransaction")
 
