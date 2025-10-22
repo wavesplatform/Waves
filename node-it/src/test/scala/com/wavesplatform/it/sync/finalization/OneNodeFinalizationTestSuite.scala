@@ -126,9 +126,9 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec with OptionValues {
     step("Force rollback")
     val startHeight = waitingFinalizedHeight + 2
     node.waitForHeight(startHeight)
-    node.height should be > startHeight
 
     val currentFinalizedHeight = node.finalizedHeight
+    currentFinalizedHeight should be >= finalizedHeight1
     node.rollback(currentFinalizedHeight - 1, returnToUTX = false)
     node.waitFor("finalizedHeight decreased")(_.finalizedHeight, _ < currentFinalizedHeight, 1.second)
   }
