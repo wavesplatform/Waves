@@ -28,7 +28,7 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
     val miner2Addr           = miner2Acc.toAddress.toString
     val miner3Addr           = miner3Acc.toAddress.toString
 
-    val period1 = node.currentGenerationPeriod.next
+    val period1 = node.currentGenerationPeriod.value.next
 
     val commitTxn1 = node.sign(CommitToGenerationRequest(sender = Some(miner1Addr)))
     commitTxn1.generationPeriodStart.value shouldBe period1.start

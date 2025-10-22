@@ -611,9 +611,10 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 
     def currentGenerationPeriod: Option[GenerationPeriod] = for {
-      activationStatus <- sync(async(n).activationStatus).features.find(_.id == BlockchainFeatures.DeterministicFinality)
+      activationStatus <- sync(async(n).activationStatus).features.find(_.id == BlockchainFeatures.DeterministicFinality.id)
       activation       <- activationStatus.activationHeight
-    } yield GenerationPeriod.from(sync(async(n).height), Height(activation), n.settings)
+      r                <- GenerationPeriod.from(sync(async(n).height), Height(activation), n.settings)
+    } yield r
 
     def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Int =
       waitForHeight(p.start, requestAwaitTime)
