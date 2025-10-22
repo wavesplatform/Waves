@@ -15,7 +15,7 @@ case class FinalizationVoting(
 
   def withConflict(v: BlockEndorsement.Conflict): FinalizationVoting = copy(conflict = conflict :+ v)
 
-  def hasUpdates: Boolean = endorserIndexes.nonEmpty || conflict.nonEmpty
+  def nonEmpty: Boolean = endorserIndexes.nonEmpty || conflict.nonEmpty
 
   override def toString: String =
     s"Voting(i={${endorserIndexes.mkString(",")}}, c={${conflict.mkString(", ")}}, s=$aggregatedEndorsement)"

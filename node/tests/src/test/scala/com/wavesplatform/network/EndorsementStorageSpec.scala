@@ -4,7 +4,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.crypto.bls.BlsKeyPair
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.state.EndorsementStorage.EndorsementFilter
 import com.wavesplatform.state.{EndorsementStorage, Height}
 import com.wavesplatform.test.{FreeSpec, produce}
@@ -23,16 +23,16 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
   "tryAddVote" - {
     "rebroadcast if valid" in {
-      val s = started
+      val s = started()
 
-      info("on endorsement")
+      log.info("on endorsement")
       val endorsement1 = BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, finalizedHeight, endorsedId)
       s.tryAddVote(EndorseBlock.from(endorsement1)).value shouldBe true
     }
 
     "ignore if" - {
       "an endorsement with" - {
-        def test(msg: EndorseBlock, error: String): Unit = started.tryAddVote(msg) should produce(error)
+        def test(msg: EndorseBlock, error: String): Unit = started().tryAddVote(msg) should produce(error)
 
         "a wrong signature" in test(
           EndorseBlock(activeEndorserIndex, finalizedId, finalizedHeight, endorsedId, ByteStr.empty),
@@ -61,13 +61,13 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
       }
 
       "already seen" in {
-        val s = started
+        val s = started()
 
-        info("on endorsement")
+        log.info("on endorsement")
         val endorsement1 = BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, finalizedHeight, endorsedId)
         s.tryAddVote(EndorseBlock.from(endorsement1))
 
-        info("on same endorsement")
+        log.info("on same endorsement")
         s.tryAddVote(EndorseBlock.from(endorsement1)).value shouldBe false
       }
     }
@@ -75,38 +75,78 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
   "tryCollectAndClear" - {
     "returns None if no updates" in {
-      val s = started
+      val s = started()
 
-      info("on start")
-      s.tryCollectAndClear(endorsedId) shouldBe empty
+      log.info("after start")
+      s.checkTryCollect(endorsedId)
 
-      info("on endorsement")
+      log.info("after endorsement")
       val endorsement1 = BlockEndorsement.full(activeGenerator, activeEndorserIndex, finalizedId, finalizedHeight, endorsedId)
       s.tryAddVote(EndorseBlock.from(endorsement1))
-      s.tryCollectAndClear(endorsedId) should not be empty
+      s.checkTryCollect(endorsedId, Seq(activeEndorserIndex))
 
-      info("on same endorsement")
+      log.info("after same endorsement")
       s.tryAddVote(EndorseBlock.from(endorsement1))
-      s.tryCollectAndClear(endorsedId) shouldBe empty
+      s.checkTryCollect(endorsedId)
 
-      info("no new endorsements")
-      s.tryCollectAndClear(endorsedId) shouldBe empty
+      log.info("after new endorsements")
+      s.checkTryCollect(endorsedId)
+    }
+
+    // TODO: tests for conflicts
+    "returns an updated voting information" - {
+      val generators = (0 to 3).map(i => BlsKeyPair(TxHelpers.signer(i).privateKey)) // miner is #3
+
+      def addVote(s: EndorsementStorage, generatorIndex: Int): Unit = {
+        val endorsement = BlockEndorsement.full(generators(generatorIndex), generatorIndex, finalizedId, finalizedHeight, endorsedId)
+        s.tryAddVote(EndorseBlock.from(endorsement))
+      }
+
+      "if updated and None if reached 2/3 with miner" in {
+        val s = started(isMiner = true, generators.map(_.publicKey))
+
+        log.info("after endorsement #0")
+        addVote(s, 0) // 0 and miner
+        s.checkTryCollect(endorsedId, Seq(0))
+
+        log.info("after endorsement #1")
+        addVote(s, 1) // 0, 1 and miner, reached 2/3
+        s.checkTryCollect(endorsedId, Seq(0, 1))
+
+        log.info("after endorsement #2")
+        addVote(s, 1) // 0, 1, 2 and miner, already reached 2/3
+        s.checkTryCollect(endorsedId)
+      }
+
+      "returns if got 2/3 in first time" in {
+        val s = started(isMiner = true, generators.map(_.publicKey))
+
+        log.info("after endorsement #0 and #1")
+        addVote(s, 0) // 0 and miner
+        addVote(s, 1) // 0, 1 and miner, reached 2/3
+        s.checkTryCollect(endorsedId, Seq(0, 1))
+
+        log.info("no new endorsements")
+        s.checkTryCollect(endorsedId)
+      }
     }
   }
 
-  private def started: EndorsementStorage = {
+  private def started(
+      isMiner: Boolean = false,
+      endorsers: Seq[BlsPublicKey] = Seq(committedGenerator.publicKey, activeGenerator.publicKey)
+  ): EndorsementStorage = {
     val r = new EndorsementStorage.InMemory
-    r.startVoting(
-      EndorsementFilter(
-        miner = false,
-        finalizedId,
-        finalizedHeight,
-        endorsedId,
-        expectedEndorsers = Vector(committedGenerator.publicKey, activeGenerator.publicKey)
-      )
-    ) shouldBe true
+    r.startVoting(EndorsementFilter(miner = isMiner, finalizedId, finalizedHeight, endorsedId, endorsers)) shouldBe true
     r
   }
 
   private def mkRandomBlockId: BlockId = ByteStr(Array.fill(SignatureLength)(ThreadLocalRandom.current().nextInt(Byte.MaxValue).toByte))
+
+  extension (s: EndorsementStorage) {
+    def checkTryCollect(endorsedId: BlockId, endorserIndexes: Seq[Int] = Nil): Unit = {
+      val xs = s.tryCollectAndClear(endorsedId)
+      xs.fold(Nil)(_.endorserIndexes) should contain theSameElementsInOrderAs endorserIndexes
+    }
+  }
 }

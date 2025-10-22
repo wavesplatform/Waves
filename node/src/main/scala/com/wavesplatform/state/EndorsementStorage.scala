@@ -55,6 +55,7 @@ object EndorsementStorage {
     private var currentFilter = Option.empty[EndorsementFilter]
     private var currentVoting = FinalizationVoting()
     private val processed     = mutable.HashSet.empty[EndorseBlock]
+    private var hasChanges    = true
 
     private val monitor            = new Object()
     private def synced[T](f: => T) = monitor.synchronized(f)
@@ -78,6 +79,7 @@ object EndorsementStorage {
             else currentVoting.withConflict(toConflict(msg, sig))
 
           processed += msg
+          hasChanges = true
 
           !filter.miner // Share with neighbours only if this node isn't a miner
         }
@@ -98,6 +100,7 @@ object EndorsementStorage {
       if (isNewVoting) {
         currentVoting = FinalizationVoting()
         processed.clear()
+        hasChanges = true
 
         currentFilter = if (filter.expectedEndorsers.isEmpty) {
           logger.info("No committed generators, don't collect endorsements")
@@ -113,10 +116,11 @@ object EndorsementStorage {
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = synced {
       for {
         currentFilter <- currentFilter
-        if currentFilter.endorsedId == endorsedId && currentVoting.hasUpdates
+        if currentFilter.endorsedId == endorsedId && currentVoting.nonEmpty && hasChanges
       } yield {
         val r = currentVoting
-        currentVoting = currentVoting.copy(endorserIndexes = Seq.empty, conflict = Seq.empty)
+        currentVoting = currentVoting.copy(conflict = Seq.empty)
+        hasChanges = false
         r
       }
     }
