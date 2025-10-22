@@ -326,7 +326,7 @@ object UtilApp {
           if (tpe == TransactionType.CommitToGeneration.id)
             currentPeriod.toRight("Finality activation height is required for signing CommitToGeneration transaction")
           else Right(GenerationPeriod(Height(1), Height(1), 1))
-        factory = TransactionFactory(ns.wallet, ns.time, Some(currentPeriod), ns.settings.blockchainSettings.functionalitySettings)
+        factory = TransactionFactory(ns.wallet, ns.time, Some(currentPeriod))
         signedTx <- factory.parseRequestAndSign(c.signTxOptions.signerAddress, unsignedTx)
       } yield signedTx
 

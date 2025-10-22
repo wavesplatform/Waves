@@ -11,8 +11,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{GenerationPeriod, Height}
+import com.wavesplatform.state.GenerationPeriod
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.*
@@ -24,7 +23,7 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsObject, JsValue}
 
-class TransactionFactory(wallet: Wallet, time: Time, currentPeriod: Option[GenerationPeriod], functionalitySettings: FunctionalitySettings) {
+class TransactionFactory(wallet: Wallet, time: Time, currentPeriod: Option[GenerationPeriod]) {
   def transferAsset(request: TransferRequest): Either[ValidationError, TransferTransaction] =
     for {
       _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
