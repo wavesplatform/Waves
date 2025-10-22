@@ -480,8 +480,7 @@ class BlockchainUpdaterImpl(
     val votingHeight   = Height(votingBlockchain.height)
     val endorsedHeight = Height(votingHeight - 1) // Will be finalized or not
 
-    def shouldFinalizeByVoting(): Boolean = {
-      val votingPeriod      = votingBlockchain.generationPeriodOf(votingHeight)
+    def shouldFinalizeByVoting(): Boolean = votingBlockchain.generationPeriodOf(votingHeight).fold(false) { votingPeriod =>
       val logPrefix         = s"Finalization of $endorsedHeight:"
       val generatorBalances = votingBlockchain.currentGeneratorBalances()
       if (generatorBalances.isEmpty) {
@@ -514,10 +513,8 @@ class BlockchainUpdaterImpl(
       }
     }
 
-    for {
-      finalityActivationHeight <- votingBlockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality)
-      if votingHeight > GenesisBlockHeight && votingHeight >= finalityActivationHeight && shouldFinalizeByVoting()
-    } yield endorsedHeight
+    if (votingHeight > GenesisBlockHeight && shouldFinalizeByVoting()) endorsedHeight.some
+    else none
   }
 
   private def collectLeasesToCancel(newHeight: Int): Map[ByteStr, LeaseDetails] =
