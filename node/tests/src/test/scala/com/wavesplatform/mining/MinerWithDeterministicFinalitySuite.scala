@@ -33,7 +33,7 @@ class MinerWithDeterministicFinalitySuite extends FreeSpec with WithDomain with 
       minerSettings = baseSettings.minerSettings.copy(quorum = 0),
       walletSettings = baseSettings.walletSettings.copy(seed = Some(seed))
     )
-    .configure(_.copy(generationPeriodLength = 3))
+    .configure(_.copy(generationPeriodLength = 2))
 
   "If account not committed, its attempt to forge doesn't stop current mining of other account on same node" ignore {}
 

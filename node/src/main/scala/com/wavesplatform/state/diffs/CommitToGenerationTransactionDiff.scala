@@ -14,11 +14,6 @@ object CommitToGenerationTransactionDiff {
       current <- blockchain.currentGenerationPeriod.toRight(ActivationError("DeterministicFinality is not yet activated"))
       next = current.next
       // TODO: Check BLS signature
-      _ <- Either.raiseUnless(tx.generationPeriodStart % current.length == 0) {
-        GenericError(
-          s"Generation period start ${tx.generationPeriodStart} must be a multiple of ${current.length}. Allowed height is $next"
-        )
-      }
       _ <- Either.raiseUnless(tx.generationPeriodStart == next.start) {
         GenericError(s"Expected the next period start height (${next.start}), got ${tx.generationPeriodStart}")
       }

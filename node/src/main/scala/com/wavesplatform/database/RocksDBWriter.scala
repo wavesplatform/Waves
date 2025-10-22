@@ -733,7 +733,10 @@ class RocksDBWriter(
       // TODO: Option to not store
       rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances.map { case (_, b) => b }))
 
-      if (nextCommittedGenerators.nonEmpty) this.generationPeriodOf(h).foreach { period =>
+      if (nextCommittedGenerators.nonEmpty) {
+        val period = this
+          .generationPeriodOf(h)
+          .getOrElse(throw new IllegalStateException(s"No generation period at $h, but have next committed generators"))
         val nextPeriod = period.next
 
         val (committedGenerators, commitmentTxnIds) = nextCommittedGenerators.unzip(using

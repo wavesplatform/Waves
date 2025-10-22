@@ -65,7 +65,7 @@ class BalanceDiffValidationTest extends PropSpec with WithState {
   }
 
   property("commit to generation") {
-    val settings = DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(generationPeriodLength = 4)
+    val settings = DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(generationPeriodLength = 3)
 
     val notBlockedAmount = 100_000.waves
     val initBalance      = notBlockedAmount + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee
@@ -80,7 +80,7 @@ class BalanceDiffValidationTest extends PropSpec with WithState {
   }
 
   property("cannot transfer more than own-generationDeposit") {
-    val settings = DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(generationPeriodLength = 4)
+    val settings = DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(generationPeriodLength = 3)
 
     val notBlockedAmount = 100_000.waves
     val initBalance =

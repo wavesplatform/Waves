@@ -82,25 +82,32 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
   }
 
   "Generator deposit taken and returned" in withDomain(
-    DeterministicFinality.configure(x => x.copy(generationPeriodLength = 3)),
+    DeterministicFinality.configure(x => x.copy(generationPeriodLength = 2)), // Periods in test: [3, 4], [5, 6], [7, 8]
     AddrWithBalance.enoughBalances(sender)
   ) { d =>
-    info("Deposit for one period")
+    log.info("No deposits")
+    d.blockchain.wavesPortfolio(sender.toAddress).generationDeposit shouldBe 0L
+
+    log.info("Deposit for one next period")
     val currPeriodTx = TxHelpers.commitToGeneration(Height(3), sender)
     d.appendBlock(currPeriodTx)
+    d.blockchain.height shouldBe 2
     d.blockchain.wavesPortfolio(sender.toAddress).generationDeposit shouldBe CommitToGenerationTransaction.DepositInWavelets
 
+    log.info("Deposit for one current period")
     d.appendBlock()
     d.blockchain.height shouldBe 3
+    d.blockchain.wavesPortfolio(sender.toAddress).generationDeposit shouldBe CommitToGenerationTransaction.DepositInWavelets
 
-    info("Deposit for two periods")
-    val nextPeriodTx = TxHelpers.commitToGeneration(Height(6), sender)
+    log.info("Deposit for two periods")
+    val nextPeriodTx = TxHelpers.commitToGeneration(Height(5), sender)
     d.appendBlock(nextPeriodTx)
     val wavesPortfolio = d.blockchain.wavesPortfolio(sender.toAddress)
     wavesPortfolio.generationDeposit shouldBe 2 * CommitToGenerationTransaction.DepositInWavelets
     wavesPortfolio.spendableBalance shouldBe (wavesPortfolio.balance - wavesPortfolio.generationDeposit)
 
-    (5 to 6).foreach(_ => d.appendBlock())
+    d.appendBlock()
+    d.blockchain.height shouldBe 5
 
     info("Deposit for one period if not committed for next")
     d.blockchain.wavesPortfolio(sender.toAddress).generationDeposit shouldBe CommitToGenerationTransaction.DepositInWavelets
@@ -108,9 +115,9 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
 
   "Can't commit twice" in withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender)) { d =>
     info("First")
-    d.appendBlock(TxHelpers.commitToGeneration(Height(3000), sender))
+    d.appendBlock(TxHelpers.commitToGeneration(Height(3001), sender))
 
     info("Second")
-    d.appendBlockE(TxHelpers.commitToGeneration(Height(3000), sender)) should produce("is already committed")
+    d.appendBlockE(TxHelpers.commitToGeneration(Height(3001), sender)) should produce("is already committed")
   }
 }

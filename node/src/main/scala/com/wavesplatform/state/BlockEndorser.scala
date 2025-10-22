@@ -2,7 +2,6 @@ package com.wavesplatform.state
 
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.crypto.bls.BlsKeyPair
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.{ChannelGroupExt, EndorseBlock}
 import com.wavesplatform.state.EndorsementStorage.EndorsementFilter
 import com.wavesplatform.wallet.Wallet

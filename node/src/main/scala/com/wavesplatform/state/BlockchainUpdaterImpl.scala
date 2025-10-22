@@ -276,7 +276,7 @@ class BlockchainUpdaterImpl(
                       val newFinalizedHeight = calculateFinalizationHeight(rocksdb).getOrElse {
                         Blockchain.finalizedHeightOrFallback(
                           at = Height(updatedBlockchain.height + 1),
-                          latestFinalized = rocksdb.finalizedHeightAt(Height(rocksdb.height)),
+                          latestFinalized = rocksdb.finalizedHeightAt(),
                           maxRollbackLength = wavesSettings.synchronizationSettings.maxRollback
                         )
                       }
@@ -414,7 +414,7 @@ class BlockchainUpdaterImpl(
                         val newFinalizedHeight = calculateFinalizationHeight(rocksdb).getOrElse {
                           Blockchain.finalizedHeightOrFallback(
                             at = Height(rocksdb.height + 1),
-                            latestFinalized = rocksdb.finalizedHeightAt(Height(rocksdb.height)),
+                            latestFinalized = rocksdb.finalizedHeightAt(),
                             maxRollbackLength = wavesSettings.synchronizationSettings.maxRollback
                           )
                         }
@@ -889,8 +889,8 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.wavesBalances(addresses)
   }
 
-  override def generationDeposit(address: Address): Long = readLock {
-    snapshotBlockchain.generationDeposit(address)
+  override def generationDeposit(address: Address, period: GenerationPeriod): Long = readLock {
+    snapshotBlockchain.generationDeposit(address, period)
   }
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = readLock {

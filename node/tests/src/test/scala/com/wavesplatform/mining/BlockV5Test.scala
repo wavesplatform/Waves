@@ -129,7 +129,6 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
       blockchain.processBlock(genesis, genesis.header.generationSignature, snapshot = None, generatorBalances = Seq.empty) should beRight
       withMiner(blockchain, testTime, testSettings) { case (miner, append) =>
         for (h <- 2 until BlockV5ActivationHeight) {
-
           shiftTime(miner, minerAcc1)
 
           val forge = miner.forgeBlock(minerAcc1).toEither
@@ -222,7 +221,6 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
         append(oldVersionBlock).left.value
 
         for (h <- blockchain.height to 110) {
-
           shiftTime(miner, minerAcc1)
 
           val forged = miner.forgeBlock(minerAcc1).toEither
@@ -253,7 +251,6 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
       blockchain.processBlock(genesis, genesis.header.generationSignature, snapshot = None, generatorBalances = Seq.empty) should beRight
       withMiner(blockchain, testTime, testSettings) { case (miner, append) =>
         for (h <- blockchain.height to 110) {
-
           shiftTime(miner, minerAcc1)
 
           val forged = miner.forgeBlock(minerAcc1).toEither

@@ -182,32 +182,35 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
         d.appender.appendBlock(block)
       }
 
+      appendBlock() // 2
+
       val generationPeriod1 = d.rocksDBWriter.currentGenerationPeriod.value.next
-      appendBlock( // 2
+      appendBlock( // 3
         commitToGeneration(generationPeriodStart = generationPeriod1.start, sender = account1),
         commitToGeneration(generationPeriodStart = generationPeriod1.start, sender = account2)
       )
-      appendBlock() // 3
+      appendBlock() // 4
 
       val generationPeriod2 = generationPeriod1.next
-      appendBlock( // 4
+      appendBlock( // 5
         commitToGeneration(generationPeriodStart = generationPeriod2.start, sender = account1),
         commitToGeneration(generationPeriodStart = generationPeriod2.start, sender = account2)
       )
-      (5 to 7).foreach(_ => appendBlock()) // 7 in memory
+      (6 to 8).foreach(_ => appendBlock()) // 8 in memory
 
       val inDB = Seq(
-        bs(height = 6, regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 1), // Released the first deposit
-        // 5 - Not changed
-        bs(height = 4, regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 2), // CommitToGenerationTransaction
-        // 3 - A first block of a new epoch, not changed
-        bs(height = 2, regularBalance = initBalance - TestValues.commitToGenerationFee, deposits = 1), // CommitToGenerationTransaction
-        bs(height = 1, regularBalance = initBalance)                                                   // Genesis
+        bs(height = 7, regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 1), // Released the first deposit
+        // 6 - Not changed
+        bs(height = 5, regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 2), // CommitToGenerationTransaction
+        // 4 - A first block of a new epoch, not changed
+        bs(height = 3, regularBalance = initBalance - TestValues.commitToGenerationFee, deposits = 1), // CommitToGenerationTransaction
+        // 2 - Empty block
+        bs(height = 1, regularBalance = initBalance) // Genesis
       )
 
       d.rocksDBWriter.balanceSnapshots(address1, 1, None) shouldBe inDB
       d.blockchain.balanceSnapshots(address1, 1, None) shouldBe
-        bs(height = 7, regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 1) +: // Same as on 6
+        bs(height = 8, regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 1) +: // Same as on 7
         inDB
     }
   }

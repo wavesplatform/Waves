@@ -53,6 +53,7 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
     val block1 = domain.createBlock(Block.PlainBlockVersion, Seq(txn), strictTime = true) // defaultSigner
 
     domain.appender.appendBlock(block1)
+    domain.appendBlock()
     Get(routePath(s"/at/${domain.blockchain.height}")) ~> route ~> check {
       responseAs[JsValue] shouldBe Json.arr()
     }

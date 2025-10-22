@@ -26,7 +26,7 @@ trait Blockchain {
   def height: Int
 
   def finalizedHeight: Option[Height]
-  def finalizedHeightAt(at: Height): Option[Height]
+  def finalizedHeightAt(at: Height = Height(height)): Option[Height]
 
   def score: BigInt
 
@@ -93,9 +93,9 @@ trait Blockchain {
 
   // TODO: not efficient? See RocksDBWriter.balanceSnapshots
   // TODO: optimize
-  def generationDeposit(address: Address): Long = this.currentGenerationPeriod.fold(0L) { currentPeriod =>
-    val committedOnCurrent = committedGenerators(currentPeriod).exists { case (currentAddress, _) => currentAddress == address }
-    val committedOnNext    = committedGenerators(currentPeriod.next).exists { case (currentAddress, _) => currentAddress == address }
+  def generationDeposit(address: Address, period: GenerationPeriod): Long = {
+    val committedOnCurrent = committedGenerators(period).exists { case (currentAddress, _) => currentAddress == address }
+    val committedOnNext    = committedGenerators(period.next).exists { case (currentAddress, _) => currentAddress == address }
 
     val committedTimes = Numbers.when(committedOnCurrent)(1) + Numbers.when(committedOnNext)(1)
     committedTimes * CommitToGenerationTransaction.DepositInWavelets
@@ -188,7 +188,7 @@ object Blockchain {
     def wavesPortfolio(address: Address): Portfolio = Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
-      generationDeposit = blockchain.generationDeposit(address)
+      generationDeposit = blockchain.currentGenerationPeriod.fold(0L)(blockchain.generationDeposit(address, _))
     )
 
     def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
@@ -233,11 +233,9 @@ object Blockchain {
       else if (blockchain.approvedFeatures.get(feature).exists(_ <= height)) BlockchainFeatureStatus.Approved
       else BlockchainFeatureStatus.Undefined
 
-    def isCommitted(height: Int, miner: Address): Boolean = blockchain.generationPeriodOf(Height(height)).fold(false) { p =>
+    def isCommitted(height: Int, miner: Address): Boolean = blockchain.generationPeriodOf(Height(height)).fold(true) { p =>
       lazy val committed = blockchain.committedGenerators(p)
-      !blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality, height)
-      || committed.isEmpty
-      || committed.exists { case (address, _) => address == miner }
+      committed.isEmpty || committed.exists { case (address, _) => address == miner }
     }
 
     def currentBlockVersion: Byte = blockVersionAt(blockchain.height)

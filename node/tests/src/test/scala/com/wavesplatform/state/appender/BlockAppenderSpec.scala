@@ -325,22 +325,24 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         )
       ) { d =>
         d.wallet.generateNewAccounts(3)
-        val generationPeriod1 = d.blockchain.generationPeriodOf(Height(1)).value.next
-        generationPeriod1.start shouldBe 3
+        d.appender.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
 
-        log.info("block2")
+        val generationPeriod1 = d.blockchain.generationPeriodOf(Height(1)).value.next
+        generationPeriod1.start shouldBe 4
+
+        log.info("block3")
         val txs    = Seq(generator2, generator3).map(TxHelpers.commitToGeneration(generationPeriod1.start, _))
-        val block2 = d.createBlock(Block.ProtoBlockVersion, txs, generator = generator1, strictTime = true)
-        d.appender.appendBlock(block2)
+        val block3 = d.createBlock(Block.ProtoBlockVersion, txs, generator = generator1, strictTime = true)
+        d.appender.appendBlock(block3)
 
         d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value) shouldBe empty
         d.blockchain.currentGeneratorBalances() shouldBe empty
         d.generatorsApi.generators(Height(d.blockchain.height)) shouldBe empty
 
-        log.info("block3, first period with committed generators")
+        log.info("block4, first period with committed generators")
         val transfer = TxHelpers.transfer(generator2, generator3.toAddress, amount = 4_000.waves, fee = 1_000.waves)
-        val block3   = d.createBlock(Block.ProtoBlockVersion, Seq(transfer), generator = generator3, strictTime = true)
-        d.appender.appendBlock(block3)
+        val block4   = d.createBlock(Block.ProtoBlockVersion, Seq(transfer), generator = generator3, strictTime = true)
+        d.appender.appendBlock(block4)
 
         d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map { case (addr, _) => addr } shouldBe
           Seq(generator2, generator3).map(_.toAddress)
@@ -356,9 +358,9 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
           GeneratorEntry(generator3.toAddress, miner2BalanceBeforeBlock3, TransactionId(txs(1).id()))
         )
 
-        log.info("block4")
-        val block4 = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator3, strictTime = true)
-        d.appender.appendBlock(block4)
+        log.info("block5")
+        val block5 = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator3, strictTime = true)
+        d.appender.appendBlock(block5)
 
         val miner1BalanceBeforeBlock4 = miner1BalanceBeforeBlock3 - transfer.amount.value - transfer.fee.value
         val miner2BalanceBeforeBlock4 = miner2BalanceBeforeBlock3
