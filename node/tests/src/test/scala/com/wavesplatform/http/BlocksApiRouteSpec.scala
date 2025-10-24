@@ -103,7 +103,7 @@ class BlocksApiRouteSpec
           FinalizationVoting(
             endorserIndexes = Seq(1, 0),
             aggregatedEndorsement = BlsSignature.NonEmpty(Array.fill[Byte](BlsSignature.SizeInBytes)(1)),
-            conflict = Seq(
+            conflict = Vector(
               BlockEndorsement.Conflict(
                 endorserIndex = 0,
                 finalizedId = testBlock2.id(),

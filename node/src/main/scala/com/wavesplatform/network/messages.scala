@@ -115,7 +115,7 @@ object MicroBlockSnapshotResponse {
     MicroBlockSnapshotResponse(snapshot.totalBlockId.toByteStr, snapshot.snapshots)
 }
 
-case class EndorseBlock(endorserIndex: Int, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, signature: BlockId) extends Message {
+case class EndorseBlock(endorserIndex: Int, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, signature: ByteStr) extends Message {
   def toProtobuf: PBEndorseBlock = PBEndorseBlock(
     endorserIndex,
     finalizedId.toByteString,

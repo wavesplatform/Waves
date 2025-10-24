@@ -31,6 +31,7 @@ private[bls] object BlsUtils {
     ctx.finalverify()
   }
 
+  // TODO: without empty?
   def aggSign(baseSig: Array[Byte], appendSig: Array[Byte]): Array[Byte] =
     new blst.P2().add(new blst.P2(baseSig)).add(new blst.P2(appendSig)).compress()
 
@@ -38,10 +39,10 @@ private[bls] object BlsUtils {
     *   https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05#name-fastaggregateverify
     */
   def verifyAgg(aggSig: Array[Byte], message: Array[Byte], blsPks: Iterable[Array[Byte]]): Either[String, Boolean] = {
-    val aggPk           = blsPks.map(new blst.P1(_)).reduceLeft(_.add(_))
-    val ctx             = new blst.Pairing(true, BlsDomainSeparationTag)
-    val aggregateResult = ctx.aggregate(new blst.P1_Affine(aggPk), new blst.P2_Affine(aggSig), message)
-    if (aggregateResult != BLST_ERROR.BLST_SUCCESS) Left(s"Can't aggregate during verification of BLS signature: $aggregateResult")
+    val aggPk     = blsPks.map(new blst.P1(_)).reduceLeft(_.add(_))
+    val ctx       = new blst.Pairing(true, BlsDomainSeparationTag)
+    val aggResult = ctx.aggregate(new blst.P1_Affine(aggPk), new blst.P2_Affine(aggSig), message)
+    if (aggResult != BLST_ERROR.BLST_SUCCESS) Left(s"Can't aggregate during verification of BLS signature: $aggResult")
     else {
       ctx.commit()
       Right(ctx.finalverify())

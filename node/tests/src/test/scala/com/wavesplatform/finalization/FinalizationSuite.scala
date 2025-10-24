@@ -65,7 +65,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           FinalizationVoting(
             endorserIndexes = Seq(1),
             aggregatedEndorsement = aggSig,
-            conflict = Nil
+            conflict = Vector.empty
           )
         )
       )
@@ -117,7 +117,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
             FinalizationVoting(
               endorserIndexes = Seq(2),
               aggregatedEndorsement = aggSig,
-              conflict = Nil
+              conflict = Vector.empty
             )
           )
         )

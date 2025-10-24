@@ -14,16 +14,17 @@ trait BlockEndorser {
     *   with finalizedBlock at votingHeight
     *   by generators, committed on votingHeight
     */
-  def vote(votingHeight: Height): Unit
+  def vote(): Unit
 }
 
 object BlockEndorser {
   object Disabled extends BlockEndorser {
-    override def vote(votingHeight: Height): Unit = {}
+    override def vote(): Unit = {}
   }
 
   class InMemory(blockchain: Blockchain, wallet: Wallet, endorsementStorage: EndorsementStorage, allChannels: ChannelGroup) extends BlockEndorser {
-    override def vote(votingHeight: Height): Unit = {
+    override def vote(): Unit = {
+      val votingHeight   = Height(blockchain.height)
       val endorsedHeight = Height(votingHeight - 1)
       if (endorsedHeight > GenesisBlockHeight) for {
         votingPeriod <- blockchain.generationPeriodOf(votingHeight).toSeq
@@ -45,8 +46,22 @@ object BlockEndorser {
 
         committed        = blockchain.committedGenerators(votingPeriod)
         votingBlockMiner = votingBlockHeader.header.generator.toAddress
-        isMiner          = wallet.privateKeyAccount(votingBlockMiner).isRight
-        filter           = EndorsementFilter(isMiner, finalizedId, finalizedHeight, endorsedId, committed.map { case (_, blsPk) => blsPk })
+        filter = {
+          val isMiner  = wallet.privateKeyAccount(votingBlockMiner).isRight
+          val balances = blockchain.currentGeneratorBalances()
+          require(committed.size == balances.size, s"committed.size=${committed.size} == balances.size=${balances.size}")
+
+          val minerIndex = if (isMiner) committed.indexWhere { case (addr, _) => addr == votingBlockMiner } else -1
+          val endorsers = committed
+            .zip(balances)
+            .map { case ((addr1, blsPk), (addr2, balance)) =>
+              require(addr1 == addr2, s"addr1=$addr1 == addr2=$addr2")
+              blsPk -> balance
+            }
+            .to(Vector)
+
+          EndorsementFilter(if (minerIndex < 0) None else Some(minerIndex), finalizedId, finalizedHeight, endorsedId, endorsers)
+        }
         if endorsementStorage.startVoting(filter)
 
         (account, idx) <- for {

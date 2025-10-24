@@ -17,7 +17,11 @@ object BlsSignature {
     override def toString: String = "empty"
   }
 
-  case class NonEmpty private (override val byteStr: ByteStr) extends BlsSignature(byteStr)
+  case class NonEmpty private (override val byteStr: ByteStr) extends BlsSignature(byteStr) {
+    def verifyAgg(message: Array[Byte], blsPks: Iterable[BlsPublicKey]): Either[String, Boolean] =
+      BlsUtils.verifyAgg(byteStr.arr, message, blsPks.map(_.arr))
+  }
+
   object NonEmpty {
     // TODO: check size and add def unsafe for append
     def apply(arr: Array[Byte]): NonEmpty               = new NonEmpty(ByteStr(arr))

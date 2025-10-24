@@ -6,14 +6,12 @@ import com.wavesplatform.crypto.bls.BlsSignature
 case class FinalizationVoting(
     endorserIndexes: Seq[Int] = Seq.empty,
     aggregatedEndorsement: BlsSignature = BlsSignature.Empty,
-    conflict: Seq[BlockEndorsement.Conflict] = Seq.empty
+    conflict: IndexedSeq[BlockEndorsement.Conflict] = IndexedSeq.empty
 ) {
-  def withValid(endorserIndex: Int, signature: BlsSignature.NonEmpty): FinalizationVoting = copy(
+  def withConsistent(endorserIndex: Int, signature: BlsSignature.NonEmpty): FinalizationVoting = copy(
     endorserIndexes = endorserIndexes :+ endorserIndex,
     aggregatedEndorsement = aggregatedEndorsement.append(signature)
   )
-
-  def withConflict(v: BlockEndorsement.Conflict): FinalizationVoting = copy(conflict = conflict :+ v)
 
   def nonEmpty: Boolean = endorserIndexes.nonEmpty || conflict.nonEmpty
 
