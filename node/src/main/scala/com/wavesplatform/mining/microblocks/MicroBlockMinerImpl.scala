@@ -1,6 +1,5 @@
 package com.wavesplatform.mining.microblocks
 
-import cats.kernel.Monoid
 import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
@@ -176,7 +175,7 @@ class MicroBlockMinerImpl(
             rewardVote = accumulatedBlock.header.rewardVote,
             stateHash = if (blockchainUpdater.supportsLightNodeBlockFields()) stateHash else None,
             challengedHeader = None,
-            finalizationVoting = Monoid.combine(accumulatedBlock.header.finalizationVoting, currentFinalizationVoting)
+            finalizationVoting = currentFinalizationVoting.orElse(accumulatedBlock.header.finalizationVoting)
           )
           .leftMap(BlockBuildError.apply)
         microBlock <- MicroBlock

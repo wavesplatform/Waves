@@ -1,6 +1,5 @@
 package com.wavesplatform.state
 
-import cats.Monoid
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias, PublicKey}
@@ -631,7 +630,7 @@ class BlockchainUpdaterImpl(
                       accumulatedBlock.transactionData ++ microBlock.transactionData,
                       microBlock.totalResBlockSig,
                       microBlock.stateHash,
-                      Monoid.combine(accumulatedBlock.header.finalizationVoting, microBlock.finalizationVoting)
+                      microBlock.finalizationVoting.orElse(accumulatedBlock.header.finalizationVoting)
                     )
                     .signatureValid() -> computedStateHash
                 }

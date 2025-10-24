@@ -1,6 +1,5 @@
 package com.wavesplatform.block
 
-import cats.kernel.Monoid
 import com.wavesplatform.crypto.bls.BlsSignature
 
 case class FinalizationVoting(
@@ -17,15 +16,4 @@ case class FinalizationVoting(
 
   override def toString: String =
     s"Voting(i={${endorserIndexes.mkString(",")}}, c={${conflict.mkString(", ")}}, s=$aggregatedEndorsement)"
-}
-
-object FinalizationVoting {
-  given Monoid[FinalizationVoting] = new Monoid[FinalizationVoting] {
-    override val empty: FinalizationVoting = FinalizationVoting()
-    override def combine(x: FinalizationVoting, y: FinalizationVoting): FinalizationVoting = FinalizationVoting(
-      endorserIndexes = x.endorserIndexes ++ y.endorserIndexes,
-      aggregatedEndorsement = y.aggregatedEndorsement,
-      conflict = x.conflict ++ y.conflict
-    )
-  }
 }
