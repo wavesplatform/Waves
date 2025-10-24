@@ -8,6 +8,7 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success}
 
 @Sharable
@@ -37,7 +38,7 @@ class HistoryReplierL1(score: => BigInt, history: History, settings: Synchroniza
           .map {
             case Some((blockVersion, bytes)) =>
               RawBytes(if (blockVersion < Block.ProtoBlockVersion) BlockSpec.messageCode else PBBlockSpec.messageCode, bytes)
-            case _ => throw new NoSuchElementException(s"Error loading block $sig")
+            case _ => throw new NoSuchElementException(s"Error loading block $sig") with NoStackTrace
           }
       )
 
@@ -46,7 +47,7 @@ class HistoryReplierL1(score: => BigInt, history: History, settings: Synchroniza
         ctx,
         Future(history.loadMicroBlock(microBlockId)).map {
           case Some(microBlock) => RawBytes.fromMicroBlock(MicroBlockResponse(microBlock, microBlockId))
-          case _                => throw new NoSuchElementException(s"Error loading microblock $microBlockId")
+          case _                => throw new NoSuchElementException(s"Error loading microblock $microBlockId") with NoStackTrace
         }
       )
 
@@ -55,7 +56,7 @@ class HistoryReplierL1(score: => BigInt, history: History, settings: Synchroniza
         ctx,
         Future(history.loadBlockSnapshots(id)).map {
           case Some(snapshots) => BlockSnapshotResponse(id, snapshots)
-          case _               => throw new NoSuchElementException(s"Error loading snapshots for block $id")
+          case _               => throw new NoSuchElementException(s"Error loading snapshots for block $id") with NoStackTrace
         }
       )
 
@@ -64,7 +65,7 @@ class HistoryReplierL1(score: => BigInt, history: History, settings: Synchroniza
         ctx,
         Future(history.loadMicroBlockSnapshots(id)).map {
           case Some(snapshots) => MicroBlockSnapshotResponse(id, snapshots)
-          case _               => throw new NoSuchElementException(s"Error loading snapshots for microblock $id")
+          case _               => throw new NoSuchElementException(s"Error loading snapshots for microblock $id") with NoStackTrace
         }
       )
 
