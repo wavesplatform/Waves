@@ -1,30 +1,75 @@
 package com.wavesplatform.state
 
+import cats.syntax.option.*
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
+import com.wavesplatform.state.GenerationPeriod.*
 
-case class GenerationPeriod(start: Height, length: Int) {
-  def next: GenerationPeriod = move(start + length)
+case class GenerationPeriod(activation: Height, start: Height, length: Int) {
+  require(start >= activation, s"GenerationPeriod: $start >= $activation")
 
-  def prevOrThis: GenerationPeriod = {
-    val prevStart = start - length
-    if (prevStart >= 0) move(prevStart) else this
+  def end: Height = {
+    val offset = if (isZero) 0 else -1
+    Height(start + length + offset)
+  }
+
+  def next: GenerationPeriod = move(end + 1)
+
+  def prev: Option[GenerationPeriod] = {
+    if (isZero) none
+    else {
+      val prevStart = start - length
+      if (prevStart < activation + length) zeroPeriod(activation, length).some
+      else move(prevStart).some
+    }
   }
 
   def max(other: GenerationPeriod): GenerationPeriod = if (start < other.start) other else this
 
-  private def move(newStart: Int): GenerationPeriod = GenerationPeriod(Height(newStart), length)
+  private def isZero: Boolean = activation == start
 
-  override def toString: String = s"GenerationPeriod(s=$start, l=$length)"
+  private def move(newStart: Int): GenerationPeriod = GenerationPeriod(activation, Height(newStart), length)
+
+  override def toString: String = s"[$start, $end]"
 }
 
 object GenerationPeriod {
-  def from(h: Height, wavesSettings: WavesSettings): GenerationPeriod = from(h, wavesSettings.blockchainSettings.functionalitySettings)
+  def from(h: Height, activation: Height, wavesSettings: WavesSettings): Option[GenerationPeriod] =
+    from(h, activation, wavesSettings.blockchainSettings.functionalitySettings)
 
-  def from(h: Height, functionalitySettings: FunctionalitySettings): GenerationPeriod = {
-    val l = functionalitySettings.generationPeriodLength
-    GenerationPeriod(
-      start = Height((h / l) * l),
-      length = l
-    )
+  def from(h: Height, activation: Height, functionalitySettings: FunctionalitySettings): Option[GenerationPeriod] =
+    from(h, activation, functionalitySettings.generationPeriodLength)
+
+  /** First period starts from: activation + generationPeriodLength + [1; generationPeriodLength] */
+  def from(h: Height, activation: Height, generationPeriodLength: Int): Option[GenerationPeriod] =
+    if (h < activation) none
+    else {
+      val blockAfterActivation = h - activation
+      val periodIndex          = (blockAfterActivation - 1) / generationPeriodLength
+      GenerationPeriod(
+        activation,
+        start = Height {
+          if (periodIndex == 0) activation
+          else activation + periodIndex * generationPeriodLength + 1
+        },
+        length = generationPeriodLength
+      ).some
+    }
+
+  def zeroPeriod(activation: Height, generationPeriodLength: Int): GenerationPeriod = GenerationPeriod(activation, activation, generationPeriodLength)
+
+  def enclosedPeriods(
+      activation: Height,
+      generationPeriodLength: Int,
+      start: Height,
+      end: Height
+  ): Option[(start: GenerationPeriod, end: GenerationPeriod)] = {
+    val fromGenerationPeriod =
+      from(start, activation, generationPeriodLength).flatMap(_.prev).getOrElse(zeroPeriod(activation, generationPeriodLength))
+
+    if (fromGenerationPeriod.start > end) none
+    else
+      from(end, activation, generationPeriodLength).map { endPeriod =>
+        (fromGenerationPeriod, endPeriod.next.max(fromGenerationPeriod.next))
+      }
   }
 }

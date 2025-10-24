@@ -1,6 +1,5 @@
 package com.wavesplatform.http
 
-import org.apache.pekko.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
@@ -24,12 +23,13 @@ import com.wavesplatform.lang.{Global, contract}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.settings.TestSettings
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import monix.execution.schedulers.SchedulerService
+import org.apache.pekko.http.scaladsl.testkit.RouteTestTimeout
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Inside
@@ -39,7 +39,7 @@ import play.api.libs.json.*
 import scala.concurrent.duration.*
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory with Inside with WithDomain {
-  private val estimator = ScriptEstimatorV2
+  private val estimator                                              = ScriptEstimatorV2
   protected override implicit val routeTestTimeout: RouteTestTimeout = RouteTestTimeout(20.seconds)
 
   private val timeBounded: SchedulerService = Schedulers.timeBoundedFixedPool(
@@ -620,10 +620,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
   }
 
-  routePath(s"/script/compileCode after ${BlockchainFeatures.SynchronousCalls}") in {
+  routePath(s"/script/compileCode after SynchronousCalls") in {
     val blockchain = stub[Blockchain]("blockchain")
     val route      = seal(utilsApi.copy(blockchain = blockchain).route)
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> Height(0)))
     (() => blockchain.settings).when().returning(TestSettings.Default.blockchainSettings)
 
     Post(routePath("/script/compileCode"), dAppWithoutVerifier) ~> route ~> check {
@@ -657,13 +657,15 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
   }
 
-  routePath(s"/script/compileCode after ${BlockchainFeatures.ContinuationTransaction}") in {
+  routePath(s"/script/compileCode after ContinuationTransaction") in {
     val blockchain = stub[Blockchain]("blockchain")
     val route      = seal(utilsApi.copy(blockchain = blockchain).route)
     (() => blockchain.activatedFeatures)
       .when()
       .returning(
-        Map(BlockchainFeatures.SynchronousCalls.id -> 0, BlockchainFeatures.RideV6.id -> 0, BlockchainFeatures.ContinuationTransaction.id -> 0)
+        Seq(BlockchainFeatures.SynchronousCalls, BlockchainFeatures.RideV6, BlockchainFeatures.ContinuationTransaction)
+          .map(x => x.id -> Height(0))
+          .toMap
       )
 
     Post(routePath("/script/compileCode"), freeCall) ~> route ~> check {
@@ -781,10 +783,12 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
   }
 
-  routePath(s"/script/estimate after ${BlockchainFeatures.RideV6}") in {
+  routePath(s"/script/estimate after RideV6") in {
     val blockchain = stub[Blockchain]("blockchain")
     val route      = seal(utilsApi.copy(blockchain = blockchain).route)
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0, BlockchainFeatures.RideV6.id -> 0))
+    (() => blockchain.activatedFeatures)
+      .when()
+      .returning(Map(BlockchainFeatures.SynchronousCalls.id -> Height(0), BlockchainFeatures.RideV6.id -> Height(0)))
 
     Post(routePath("/script/estimate"), freeCallExpr) ~> route ~> check {
       val json = responseAs[JsValue]

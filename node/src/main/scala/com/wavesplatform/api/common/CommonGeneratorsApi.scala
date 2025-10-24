@@ -18,9 +18,7 @@ object CommonGeneratorsApi {
   def apply(rdb: RDB, blockchain: Blockchain & NG): CommonGeneratorsApi = new CommonGeneratorsApi with ScorexLogging {
     private val approxGenerators = blockchain.settings.functionalitySettings.maxEndorsements // Rough buffer size
 
-    override def generators(at: Height): Seq[GeneratorEntry] = {
-      val period = blockchain.generationPeriodOf(at)
-
+    override def generators(at: Height): Seq[GeneratorEntry] = blockchain.generationPeriodOf(at).fold(Nil) { period =>
       val (addressIds, addresses, blsPks, txIds, balances) = rdb.db.readOnly { ro =>
         // TODO: Use Blockchain for this? NG.committed?
         //  Technically this works, because generators committed on a previous period

@@ -55,11 +55,15 @@ case class SnapshotBlockchain(
     inner.wavesBalances(innerBalances) ++ snapshotBalances
   }
 
-  override def deposit(address: Address): Long = {
-    val isCommitted = snapshot.nextCommittedGenerators.exists { case (pk, _) => pk.toAddress == address }
-    val inSnapshot  = Numbers.when(isCommitted)(CommitToGenerationTransaction.DepositInWavelets)
+  override def generationDeposit(address: Address, period: GenerationPeriod): Long = {
+    // TODO: refactor: add GenerationPeriod.method to compare with curr and curr.next?
+    val includeSnapshot = this.currentGenerationPeriod.forall(curr => period == curr || period == curr.next)
+    val inSnapshot = Numbers.when(includeSnapshot) {
+      val isCommitted = snapshot.nextCommittedGenerators.exists { case (pk, _) => pk.toAddress == address }
+      Numbers.when(isCommitted)(CommitToGenerationTransaction.DepositInWavelets)
+    }
 
-    inner.deposit(address) + inSnapshot
+    inner.generationDeposit(address, period) + inSnapshot
   }
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = {
@@ -172,7 +176,7 @@ case class SnapshotBlockchain(
       val h          = Height(height)
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
-      val deposit    = this.deposit(address)
+      val deposit    = this.currentGenerationPeriod.fold(0L)(this.generationDeposit(address, _))
       val bs         = BalanceSnapshot(h, Portfolio(balance, lease, generationDeposit = deposit))
       val height2Fix = h == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
       if (inner.height > 0 && (from1 < h - 1 || height2Fix))
@@ -219,11 +223,11 @@ case class SnapshotBlockchain(
   override def heightOf(blockId: ByteStr): Option[Int] = blockMeta.filter(_._1.id() == blockId).map(_ => height) orElse inner.heightOf(blockId)
 
   /** Features related */
-  override def approvedFeatures: Map[Short, Int] = inner.approvedFeatures
+  override def approvedFeatures: Map[Short, Height] = inner.approvedFeatures
 
-  override def activatedFeatures: Map[Short, Int] = inner.activatedFeatures
+  override def activatedFeatures: Map[Short, Height] = inner.activatedFeatures
 
-  override def featureVotes(height: Int): Map[Short, Int] = inner.featureVotes(height)
+  override def featureVotes(height: Height): Map[Short, Int] = inner.featureVotes(height)
 
   /** Block reward related */
   override def blockReward(height: Int): Option[Long] = reward.filter(_ => this.height == height) orElse inner.blockReward(height)
@@ -246,8 +250,9 @@ case class SnapshotBlockchain(
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
   override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = {
-    val base = inner.committedGenerators(at)
-    if (at == this.currentGenerationPeriod.next) base ++ snapshot.nextCommittedGenerators.map { case (pk, blsPk) => pk.toAddress -> blsPk } else base
+    val base   = inner.committedGenerators(at)
+    val atNext = this.currentGenerationPeriod.exists(_.next == at)
+    if (atNext) base ++ snapshot.nextCommittedGenerators.map { case (pk, blsPk) => pk.toAddress -> blsPk } else base
   }
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] =

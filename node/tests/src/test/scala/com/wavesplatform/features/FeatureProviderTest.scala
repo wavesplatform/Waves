@@ -2,7 +2,7 @@ package com.wavesplatform.features
 
 import com.wavesplatform.block.Block
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.test.FlatSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -10,9 +10,9 @@ import org.scalamock.scalatest.MockFactory
 class FeatureProviderTest extends FlatSpec with MockFactory {
   "blockVersionAt" should "return valid version" in {
     val fs                 = FunctionalitySettings.MAINNET
-    val v3ActivationHeight = fs.blockVersion3AfterHeight
-    val v4ActivationHeight = 1740000
-    val v5ActivationHeight = 2000000
+    val v3ActivationHeight = Height(fs.blockVersion3AfterHeight)
+    val v4ActivationHeight = Height(1740000)
+    val v5ActivationHeight = Height(2000000)
 
     val genesisAt = 1
     val plainAt   = (2 to fs.blockVersion3AfterHeight + 1).toSet

@@ -99,7 +99,7 @@ class BlockChallengeTest
   property("NODE-884. Challenging miner should have correct balances") {
     val challengedMiner = TxHelpers.signer(1)
     val testSettings = settings
-      .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 1001)
+      .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 999)
       .configure(_.copy(generationPeriodLength = 2))
 
     withDomain(testSettings, balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
@@ -418,7 +418,7 @@ class BlockChallengeTest
   property("NODE-895. Challenged miner should have correct balances") {
     val challengedMiner = TxHelpers.signer(1)
     val testSettings = settings
-      .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 1001)
+      .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 999)
       .configure(_.copy(generationPeriodLength = 2))
 
     withDomain(testSettings, balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>

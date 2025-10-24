@@ -10,7 +10,7 @@ import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.network.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
-import com.wavesplatform.state.{BlockEndorser, Blockchain, Height}
+import com.wavesplatform.state.{BlockEndorser, Blockchain}
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature, InvalidStateHash}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -45,7 +45,7 @@ object BlockAppender extends ScorexLogging {
           appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
         } else {
           appendKeyBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot).tap {
-            case Right(_: Applied) => blockEndorser.vote(Height(blockchainUpdater.height))
+            case Right(_: Applied) => blockEndorser.vote()
             case _                 =>
           }
         }

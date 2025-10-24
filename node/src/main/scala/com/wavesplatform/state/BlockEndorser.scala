@@ -2,7 +2,6 @@ package com.wavesplatform.state
 
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.crypto.bls.BlsKeyPair
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.{ChannelGroupExt, EndorseBlock}
 import com.wavesplatform.state.EndorsementStorage.EndorsementFilter
 import com.wavesplatform.wallet.Wallet
@@ -15,50 +14,67 @@ trait BlockEndorser {
     *   with finalizedBlock at votingHeight
     *   by generators, committed on votingHeight
     */
-  def vote(votingHeight: Height): Unit
+  def vote(): Unit
 }
 
 object BlockEndorser {
   object Disabled extends BlockEndorser {
-    override def vote(votingHeight: Height): Unit = {}
+    override def vote(): Unit = {}
   }
 
   class InMemory(blockchain: Blockchain, wallet: Wallet, endorsementStorage: EndorsementStorage, allChannels: ChannelGroup) extends BlockEndorser {
-    override def vote(votingHeight: Height): Unit = {
+    override def vote(): Unit = {
+      val votingHeight   = Height(blockchain.height)
       val endorsedHeight = Height(votingHeight - 1)
-      if (endorsedHeight > GenesisBlockHeight && blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality))
-        for {
-          votingBlockHeader <- blockchain
-            .blockHeader(votingHeight)
-            .toSeq
+      if (endorsedHeight > GenesisBlockHeight) for {
+        votingPeriod <- blockchain.generationPeriodOf(votingHeight).toSeq
 
-          endorsedBlockHeader <- blockchain
-            .blockHeader(endorsedHeight)
-            .toSeq
+        votingBlockHeader <- blockchain
+          .blockHeader(votingHeight)
+          .toSeq
 
-          finalizedHeight = blockchain.finalizedHeightAtOrFallback(votingHeight)
-          finalizedId <- blockchain
-            .blockId(finalizedHeight)
-            .toSeq
+        endorsedBlockHeader <- blockchain
+          .blockHeader(endorsedHeight)
+          .toSeq
 
-          endorsedId       = endorsedBlockHeader.id()
-          committed        = blockchain.committedGenerators(blockchain.generationPeriodOf(votingHeight))
-          votingBlockMiner = votingBlockHeader.header.generator.toAddress
-          isMiner          = wallet.privateKeyAccount(votingBlockMiner).isRight
-          filter           = EndorsementFilter(isMiner, finalizedId, finalizedHeight, endorsedId, committed.map { case (_, blsPk) => blsPk })
-          if endorsementStorage.startVoting(filter)
+        finalizedHeight = blockchain.finalizedHeightAtOrFallback(votingHeight)
+        finalizedId <- blockchain
+          .blockId(finalizedHeight)
+          .toSeq
 
-          (account, idx) <- for {
-            ((committedAddr, _), idx) <- committed.zipWithIndex
-            if committedAddr != votingBlockMiner // A miner doesn’t need to endorse its own blocks - a mining is already an endorsement
-            pk <- wallet.privateKeyAccount(committedAddr).toSeq
-          } yield (pk, idx)
+        endorsedId = endorsedBlockHeader.id()
 
-          endorsement = BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
-          networkMsg  = EndorseBlock.from(endorsement)
-          broadcast <- endorsementStorage.tryAddVote(networkMsg).toSeq
-          if broadcast
-        } allChannels.broadcast(networkMsg)
+        committed        = blockchain.committedGenerators(votingPeriod)
+        votingBlockMiner = votingBlockHeader.header.generator.toAddress
+        filter = {
+          val isMiner  = wallet.privateKeyAccount(votingBlockMiner).isRight
+          val balances = blockchain.currentGeneratorBalances()
+          require(committed.size == balances.size, s"committed.size=${committed.size} == balances.size=${balances.size}")
+
+          val minerIndex = if (isMiner) committed.indexWhere { case (addr, _) => addr == votingBlockMiner } else -1
+          val endorsers = committed
+            .zip(balances)
+            .map { case ((addr1, blsPk), (addr2, balance)) =>
+              require(addr1 == addr2, s"addr1=$addr1 == addr2=$addr2")
+              blsPk -> balance
+            }
+            .to(Vector)
+
+          EndorsementFilter(if (minerIndex < 0) None else Some(minerIndex), finalizedId, finalizedHeight, endorsedId, endorsers)
+        }
+        if endorsementStorage.startVoting(filter)
+
+        (account, idx) <- for {
+          ((committedAddr, _), idx) <- committed.zipWithIndex
+          if committedAddr != votingBlockMiner // A miner doesn’t need to endorse its own blocks - a mining is already an endorsement
+          pk <- wallet.privateKeyAccount(committedAddr).toSeq
+        } yield (pk, idx)
+
+        endorsement = BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
+        networkMsg  = EndorseBlock.from(endorsement)
+        broadcast <- endorsementStorage.tryAddVote(networkMsg).toSeq
+        if broadcast
+      } allChannels.broadcast(networkMsg)
     }
   }
 }

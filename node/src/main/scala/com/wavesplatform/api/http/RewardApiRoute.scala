@@ -27,7 +27,7 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
     for {
       _ <- Either.cond(height <= blockchain.height, (), GenericError(s"Invalid height: $height"))
       activatedAt <- blockchain
-        .featureActivationHeight(BlockchainFeatures.BlockReward.id)
+        .featureActivationHeight(BlockchainFeatures.BlockReward)
         .filter(_ <= height)
         .toRight(GenericError("Block reward feature is not activated yet"))
       reward <- blockchain.blockReward(height).toRight(GenericError(s"No information about rewards at height = $height"))

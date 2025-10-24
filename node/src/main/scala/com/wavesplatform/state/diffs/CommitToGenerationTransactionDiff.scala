@@ -4,21 +4,16 @@ import cats.syntax.either.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.CommitToGenerationTransaction
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.{ActivationError, GenericError}
 
 object CommitToGenerationTransactionDiff {
   def apply(blockchain: Blockchain)(tx: CommitToGenerationTransaction): Either[ValidationError, StateSnapshot] = {
-    val current = blockchain.currentGenerationPeriod
-    val next    = current.next
-    val sender  = tx.sender.toAddress
+    val sender = tx.sender.toAddress
 
     for {
+      current <- blockchain.currentGenerationPeriod.toRight(ActivationError("DeterministicFinality is not yet activated"))
+      next = current.next
       // TODO: Check BLS signature
-      _ <- Either.raiseUnless(tx.generationPeriodStart % current.length == 0) {
-        GenericError(
-          s"Generation period start ${tx.generationPeriodStart} must be a multiple of ${current.length}. Allowed height is $next"
-        )
-      }
       _ <- Either.raiseUnless(tx.generationPeriodStart == next.start) {
         GenericError(s"Expected the next period start height (${next.start}), got ${tx.generationPeriodStart}")
       }

@@ -6,7 +6,6 @@ import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto.bls.BlsPublicKey
-import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ContractScript
@@ -27,7 +26,7 @@ trait Blockchain {
   def height: Int
 
   def finalizedHeight: Option[Height]
-  def finalizedHeightAt(at: Height): Option[Height]
+  def finalizedHeightAt(at: Height = Height(height)): Option[Height]
 
   def score: BigInt
 
@@ -39,9 +38,9 @@ trait Blockchain {
   def heightOf(blockId: ByteStr): Option[Int]
 
   /** Features related */
-  def approvedFeatures: Map[Short, Int]
-  def activatedFeatures: Map[Short, Int]
-  def featureVotes(height: Int): Map[Short, Int]
+  def approvedFeatures: Map[Short, Height]
+  def activatedFeatures: Map[Short, Height]
+  def featureVotes(height: Height): Map[Short, Int]
 
   /** Block reward related */
   def blockReward(height: Int): Option[Long]
@@ -92,12 +91,11 @@ trait Blockchain {
 
   def wavesBalances(addresses: Seq[Address]): Map[Address, Long]
 
+  // TODO: not efficient? See RocksDBWriter.balanceSnapshots
   // TODO: optimize
-  def deposit(address: Address): Long = {
-    val currentPeriod = this.currentGenerationPeriod
-
-    val committedOnCurrent = committedGenerators(currentPeriod).exists { case (currentAddress, _) => currentAddress == address }
-    val committedOnNext    = committedGenerators(currentPeriod.next).exists { case (currentAddress, _) => currentAddress == address }
+  def generationDeposit(address: Address, period: GenerationPeriod): Long = {
+    val committedOnCurrent = committedGenerators(period).exists { case (currentAddress, _) => currentAddress == address }
+    val committedOnNext    = committedGenerators(period.next).exists { case (currentAddress, _) => currentAddress == address }
 
     val committedTimes = Numbers.when(committedOnCurrent)(1) + Numbers.when(committedOnNext)(1)
     committedTimes * CommitToGenerationTransaction.DepositInWavelets
@@ -190,22 +188,8 @@ object Blockchain {
     def wavesPortfolio(address: Address): Portfolio = Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
-      generationDeposit = this.generationDeposit(address)
+      generationDeposit = blockchain.currentGenerationPeriod.fold(0L)(blockchain.generationDeposit(address, _))
     )
-
-    // TODO: not efficient? See RocksDBWriter.balanceSnapshots
-    def generationDeposit(address: Address): Long = {
-      val curr = blockchain.currentGenerationPeriod
-
-      val allCommittedOnCurr = blockchain.committedGenerators(curr)
-      val allCommittedOnNext = blockchain.committedGenerators(curr.next)
-
-      val committedOnCurr = allCommittedOnCurr.exists { case (generatorAddress, _) => generatorAddress == address }
-      val committedOnNext = allCommittedOnNext.exists { case (generatorAddress, _) => generatorAddress == address }
-
-      val committedTimes = Numbers.when(committedOnCurr)(1) + Numbers.when(committedOnNext)(1)
-      committedTimes * CommitToGenerationTransaction.DepositInWavelets
-    }
 
     def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
@@ -249,18 +233,17 @@ object Blockchain {
       else if (blockchain.approvedFeatures.get(feature).exists(_ <= height)) BlockchainFeatureStatus.Approved
       else BlockchainFeatureStatus.Undefined
 
-    def isCommitted(height: Int, miner: Address): Boolean = {
-      lazy val committed = blockchain.committedGenerators(blockchain.generationPeriodOf(Height(height)))
-      !blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality, height)
-      || committed.isEmpty
-      || committed.exists { case (address, _) => address == miner }
+    def isCommitted(height: Int, miner: Address): Boolean = blockchain.generationPeriodOf(Height(height)).fold(true) { p =>
+      lazy val committed = blockchain.committedGenerators(p)
+      committed.isEmpty || committed.exists { case (address, _) => address == miner }
     }
 
     def currentBlockVersion: Byte = blockVersionAt(blockchain.height)
     def nextBlockVersion: Byte    = blockVersionAt(blockchain.height + 1)
 
-    def featureActivationHeight(feature: Short): Option[Int] = blockchain.activatedFeatures.get(feature)
-    def featureApprovalHeight(feature: Short): Option[Int]   = blockchain.approvedFeatures.get(feature)
+    def featureActivationHeight(feature: BlockchainFeature): Option[Height] = featureActivationHeight(feature.id)
+    def featureActivationHeight(feature: Short): Option[Height]             = blockchain.activatedFeatures.get(feature)
+    def featureApprovalHeight(feature: Short): Option[Height]               = blockchain.approvedFeatures.get(feature)
 
     def blockVersionAt(height: Int): Byte =
       if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
@@ -289,19 +272,23 @@ object Blockchain {
 
     def supportsLightNodeBlockFields(height: Int = blockchain.height): Boolean =
       blockchain
-        .featureActivationHeight(LightNode.id)
+        .featureActivationHeight(BlockchainFeatures.LightNode)
         .exists(height >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
 
     def blockRewardBoost(height: Int): Int =
       blockchain
-        .featureActivationHeight(BlockchainFeatures.BoostBlockReward.id)
+        .featureActivationHeight(BlockchainFeatures.BoostBlockReward)
         .filter { boostHeight =>
           boostHeight <= height && height < boostHeight + blockchain.settings.functionalitySettings.blockRewardBoostPeriod
         }
         .fold(1)(_ => BlockRewardCalculator.RewardBoost)
 
-    def generationPeriodOf(h: Height): GenerationPeriod = GenerationPeriod.from(h, blockchain.settings.functionalitySettings)
-    def currentGenerationPeriod: GenerationPeriod       = this.generationPeriodOf(Height(blockchain.height))
+    def generationPeriodOf(h: Height): Option[GenerationPeriod] = for {
+      activation <- blockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality)
+      p          <- GenerationPeriod.from(h, activation, blockchain.settings.functionalitySettings)
+    } yield p
+
+    def currentGenerationPeriod: Option[GenerationPeriod] = this.generationPeriodOf(Height(blockchain.height))
   }
 
   def finalizedHeightOrFallback(at: Height, latestFinalized: Option[Height], maxRollbackLength: Int): Height = {

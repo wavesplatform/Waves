@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import cats.implicits.catsSyntaxSemigroup
-import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
@@ -58,7 +57,7 @@ case class NgState(
     hitSource: ByteStr,
     leasesToCancel: Map[ByteStr, StateSnapshot],
     microSnapshots: Map[BlockId, CachedMicroDiff] = Map.empty,
-    microBlocks: List[MicroBlockInfo] = List.empty,
+    microBlocks: List[MicroBlockInfo] = List.empty, // Recent in the head
     internalCaches: NgStateCaches = new NgStateCaches,
     latestFinalizedHeight: Height = GenesisBlockHeight,
     latestGeneratorBalances: GeneratorBalances = Seq.empty
@@ -102,8 +101,11 @@ case class NgState(
   def transactions: Seq[Transaction] =
     base.transactionData.toVector ++ microBlocks.view.map(_.microBlock.transactionData).reverse.flatten
 
-  def finalizationVoting: Seq[Option[FinalizationVoting]] =
-    base.header.finalizationVoting +: microBlocks.view.map(_.microBlock.finalizationVoting).reverse.toSeq
+  private def bestFinalizationVoting: Option[FinalizationVoting] =
+    microBlocks.view
+      .flatMap(_.microBlock.finalizationVoting)
+      .find(_.nonEmpty)
+      .orElse(base.header.finalizationVoting)
 
   def bestLiquidBlock: Block =
     if (microBlocks.isEmpty)
@@ -119,7 +121,7 @@ case class NgState(
             transactions,
             microBlocks.head.microBlock.totalResBlockSig,
             microBlocks.head.microBlock.stateHash,
-            Monoid.combineAll(finalizationVoting)
+            bestFinalizationVoting
           )
           internalCaches.bestBlockCache = Some(block)
           block
@@ -180,7 +182,7 @@ case class NgState(
 
   def createBlockId(microBlock: MicroBlock): BlockId = {
     val newTransactions = this.transactions ++ microBlock.transactionData
-    val newVoting       = this.finalizationVoting :+ microBlock.finalizationVoting
+    val newVoting       = microBlock.finalizationVoting.orElse(this.bestFinalizationVoting)
     val fullBlock =
       base.copy(
         transactionData = newTransactions,
@@ -188,7 +190,7 @@ case class NgState(
         header = base.header.copy(
           transactionsRoot = createTransactionsRoot(microBlock),
           stateHash = microBlock.stateHash,
-          finalizationVoting = Monoid.combineAll(newVoting)
+          finalizationVoting = newVoting
         )
       )
     fullBlock.id()
@@ -219,24 +221,24 @@ case class NgState(
         else {
           val init = (
             base.transactionData,
-            Seq(base.header.finalizationVoting),
+            base.header.finalizationVoting,
             Option.empty[(ByteStr, Option[ByteStr], DiscardedMicroBlocks)] // sig, stateHash, discarded
           )
           val (txs, voting, maybeFound) = microBlocksAsc.foldLeft(init) {
             case ((txs, voting, Some((sig, stateHash, discarded))), MicroBlockInfo(mbId, micro)) =>
               val discDiff = microSnapshots(mbId).snapshot
-              (txs, voting :+ micro.finalizationVoting, Some((sig, stateHash, discarded :+ (micro -> discDiff))))
+              (txs, micro.finalizationVoting.orElse(voting), Some((sig, stateHash, discarded :+ (micro -> discDiff))))
 
             case ((txs, voting, None), mb) if mb.idEquals(blockId) =>
               val found = Some((mb.microBlock.totalResBlockSig, mb.microBlock.stateHash, Seq.empty[(MicroBlock, StateSnapshot)]))
-              (txs ++ mb.microBlock.transactionData, voting :+ mb.microBlock.finalizationVoting, found)
+              (txs ++ mb.microBlock.transactionData, mb.microBlock.finalizationVoting.orElse(voting), found)
 
             case ((txs, voting, None), MicroBlockInfo(_, mb)) =>
-              (txs ++ mb.transactionData, voting :+ mb.finalizationVoting, None)
+              (txs ++ mb.transactionData, mb.finalizationVoting.orElse(voting), None)
           }
 
           maybeFound.map { case (sig, stateHash, discarded) =>
-            (Block.create(base, txs, sig, stateHash, Monoid.combineAll(voting)), discarded)
+            (Block.create(base, txs, sig, stateHash, voting), discarded)
           }
         }
       }

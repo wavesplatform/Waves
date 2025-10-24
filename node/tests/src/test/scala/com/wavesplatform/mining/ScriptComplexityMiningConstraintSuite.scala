@@ -7,7 +7,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, LeaseBalance}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, LeaseBalance}
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
@@ -28,7 +28,7 @@ class ScriptComplexityMiningConstraintSuite extends FlatSpec with PathMockFactor
       val blockchain = stub[Blockchain]
       (() => blockchain.settings).when().returning(settings.blockchainSettings)
       (() => blockchain.height).when().returning(1)
-      (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.DataTransaction.id -> 0))
+      (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.DataTransaction.id -> Height(0)))
 
       val txDiffer = (tx: Transaction) => {
         val time = System.currentTimeMillis()

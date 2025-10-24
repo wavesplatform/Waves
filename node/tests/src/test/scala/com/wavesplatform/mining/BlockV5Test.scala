@@ -14,7 +14,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG, diffs}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, NG, diffs}
 import com.wavesplatform.test.{FlatSpec, *}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -129,7 +129,6 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
       blockchain.processBlock(genesis, genesis.header.generationSignature, snapshot = None, generatorBalances = Seq.empty) should beRight
       withMiner(blockchain, testTime, testSettings) { case (miner, append) =>
         for (h <- 2 until BlockV5ActivationHeight) {
-
           shiftTime(miner, minerAcc1)
 
           val forge = miner.forgeBlock(minerAcc1).toEither
@@ -222,7 +221,6 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
         append(oldVersionBlock).left.value
 
         for (h <- blockchain.height to 110) {
-
           shiftTime(miner, minerAcc1)
 
           val forged = miner.forgeBlock(minerAcc1).toEither
@@ -253,7 +251,6 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
       blockchain.processBlock(genesis, genesis.header.generationSignature, snapshot = None, generatorBalances = Seq.empty) should beRight
       withMiner(blockchain, testTime, testSettings) { case (miner, append) =>
         for (h <- blockchain.height to 110) {
-
           shiftTime(miner, minerAcc1)
 
           val forged = miner.forgeBlock(minerAcc1).toEither
@@ -449,7 +446,7 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
     withRocksDBWriter(settings.blockchainSettings) { blockchain =>
       val bcu: BlockchainUpdaterImpl =
         new BlockchainUpdaterImpl(blockchain, settings, time, ignoreBlockchainUpdateTriggers, (_, _) => Map.empty) {
-          override def activatedFeatures: Map[Short, Int] = super.activatedFeatures -- disabledFeatures.get()
+          override def activatedFeatures: Map[Short, Height] = super.activatedFeatures -- disabledFeatures.get()
         }
       try f(bcu)
       finally bcu.shutdown()

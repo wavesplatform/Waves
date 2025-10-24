@@ -31,7 +31,7 @@ object PBFinalizationVotings {
           case Left(e)  => throw new IllegalArgumentException(s"Error during parsing $i conflict endorsement: $e")
           case Right(r) => r
         }
-      }
+      }.toVector
     )
   }
 

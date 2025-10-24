@@ -11,10 +11,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{GenerationPeriod, Height}
+import com.wavesplatform.state.GenerationPeriod
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxValidationError.{GenericError, UnsupportedTransactionType, UnsupportedTypeAndVersion, WrongChain}
+import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -24,7 +23,7 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsObject, JsValue}
 
-class TransactionFactory(wallet: Wallet, time: Time, currentHeight: Height, functionalitySettings: FunctionalitySettings) {
+class TransactionFactory(wallet: Wallet, time: Time, currentPeriod: Option[GenerationPeriod]) {
   def transferAsset(request: TransferRequest): Either[ValidationError, TransferTransaction] =
     for {
       _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
@@ -281,8 +280,9 @@ class TransactionFactory(wallet: Wallet, time: Time, currentHeight: Height, func
     }
 
   def commitToGeneration(request: CommitToGenerationRequest, signerAddress: String): Either[ValidationError, CommitToGenerationTransaction] = {
-    val defaultPeriod = GenerationPeriod.from(currentHeight, functionalitySettings).next
     for {
+      currentPeriod <- currentPeriod.toRight(ActivationError("DeterministicFinality is not yet activated"))
+      defaultPeriod = currentPeriod.next
       sender <- request.sender match {
         case Some(sender) => wallet.findPrivateKey(sender)
         case None         => Left(GenericError("invalid.sender"))

@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.finalization
 
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.requests.CommitToGenerationRequest
@@ -11,7 +11,7 @@ import org.scalatest.OptionValues
 
 import scala.concurrent.duration.DurationInt
 
-class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
+class OneNodeFinalizationTestSuite extends BaseFreeSpec with OptionValues {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
@@ -28,7 +28,8 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
     val miner2Addr           = miner2Acc.toAddress.toString
     val miner3Addr           = miner3Acc.toAddress.toString
 
-    val period1 = node.currentGenerationPeriod.next
+    step("Commit to generation")
+    val period1 = node.currentGenerationPeriod.value.next
 
     val commitTxn1 = node.sign(CommitToGenerationRequest(sender = Some(miner1Addr)))
     commitTxn1.generationPeriodStart.value shouldBe period1.start
@@ -67,7 +68,9 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
     while (!done && deadline.hasTimeLeft()) {
       val currHeight = node.height
       if (currHeight > waitingFinalizedHeight + 2)
-        fail(s"Finalization height doesn't rise: height=$currHeight, waiting for finalized height=$waitingFinalizedHeight")
+        fail(
+          s"Finalization height doesn't rise: height=$currHeight, waiting for finalized height=$waitingFinalizedHeight, last finalized height=$finalizedHeight1"
+        )
 
       // We need at least one transaction, otherwise there won't be a microblock, thus no voting, no finalization
       node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true)
@@ -79,7 +82,7 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
         log.debug(s"New finalized height: $finalizedHeight1 -> $updatedFinalizedHeight")
 
       finalizedHeight1 = updatedFinalizedHeight
-      done = finalizedHeight1 > waitingFinalizedHeight
+      done = finalizedHeight1 >= waitingFinalizedHeight
     }
 
     step("Survives restart")
@@ -123,9 +126,9 @@ class FinalizationTestSuite extends BaseFreeSpec with OptionValues {
     step("Force rollback")
     val startHeight = waitingFinalizedHeight + 2
     node.waitForHeight(startHeight)
-    node.height should be > startHeight
 
     val currentFinalizedHeight = node.finalizedHeight
+    currentFinalizedHeight should be >= finalizedHeight1
     node.rollback(currentFinalizedHeight - 1, returnToUTX = false)
     node.waitFor("finalizedHeight decreased")(_.finalizedHeight, _ < currentFinalizedHeight, 1.second)
   }

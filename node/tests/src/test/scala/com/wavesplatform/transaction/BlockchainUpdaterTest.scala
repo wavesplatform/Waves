@@ -338,19 +338,19 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
 
     b.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
 
-    b.featureActivationHeight(1) shouldBe None
+    b.featureActivationHeight(1.toShort) shouldBe None
 
     (1 until ApprovalPeriod).foreach { _ =>
       b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     }
 
-    b.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
+    b.featureActivationHeight(1.toShort) shouldBe Some(Height(ApprovalPeriod * 2))
 
     (1 to ApprovalPeriod).foreach { _ =>
       b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     }
 
-    b.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
+    b.featureActivationHeight(1.toShort) shouldBe Some(Height(ApprovalPeriod * 2))
   }
 
   "feature activated only by 90% of blocks" - {
@@ -396,19 +396,19 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
 
     b.processBlock(genesisBlock)
 
-    b.featureVotes(b.height) shouldBe Map.empty
+    b.featureVotes(Height(b.height)) shouldBe Map.empty
 
     b.featureStatus(1, b.height) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { i =>
       b.processBlock(getNextTestBlockWithVotes(b, Seq(1)))
-      b.featureVotes(b.height) shouldBe Map(1.toShort -> i)
+      b.featureVotes(Height(b.height)) shouldBe Map(1.toShort -> i)
     }
 
     b.featureStatus(1, b.height) shouldBe BlockchainFeatureStatus.Approved
 
     b.processBlock(getNextTestBlockWithVotes(b, Seq(1)))
-    b.featureVotes(b.height) shouldBe Map(1.toShort -> 1)
+    b.featureVotes(Height(b.height)) shouldBe Map(1.toShort -> 1)
 
     b.featureStatus(1, b.height) shouldBe BlockchainFeatureStatus.Approved
   }

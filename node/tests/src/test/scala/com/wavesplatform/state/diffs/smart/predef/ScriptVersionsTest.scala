@@ -14,10 +14,10 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.state.{BinaryDataEntry, Blockchain, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, BooleanDataEntry, EmptyDataEntry, Height, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{Transaction, TxHelpers}
 import com.wavesplatform.transaction.smart.script.{ScriptCompiler, ScriptRunner}
+import com.wavesplatform.transaction.{Transaction, TxHelpers}
 import com.wavesplatform.utils.EmptyBlockchain
 
 class ScriptVersionsTest extends FreeSpec {
@@ -148,7 +148,7 @@ class ScriptVersionsTest extends FreeSpec {
         )
 
       val fixedBlockchain = new EmptyBlockchain {
-        override def activatedFeatures: Map[Short, Int] = Map(BlockchainFeatures.SynchronousCalls.id -> 0)
+        override def activatedFeatures: Map[Short, Height] = Map(BlockchainFeatures.SynchronousCalls.id -> Height(0))
       }
 
       for {

@@ -6,7 +6,7 @@ import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.{GenesisBlockHeight, Height}
+import com.wavesplatform.state.{Blockchain, GenesisBlockHeight, Height}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{FreeSpec, NumericExt}
 import com.wavesplatform.transaction.TxHelpers
@@ -33,24 +33,28 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       AddrWithBalance.enoughBalances(otherNode1Acc, thisNodeAcc)
     ) { d =>
       val genesisBlockId = d.blockchain.lastBlockId.value
-      d.blockchain.finalizedHeightAt(Height(d.blockchain.height)).value shouldBe GenesisBlockHeight
+      d.blockchain.finalizedHeightAt().value shouldBe GenesisBlockHeight
+      d.blockchain.finalizedHeight.value shouldBe GenesisBlockHeight
 
-      log.debug(s"Append block 2 with commitments")
+      d.appendBlock()
+      d.blockchain.checkExpectedFinalizedHeight()
+
+      log.debug(s"Append block 3 with commitments")
       val endorsers = Seq(otherNode1Acc, thisNodeAcc)
-      val block2 = d.createBlock(
+      val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 3, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
         generator = otherNode1Acc
       )
-      d.appendBlock(block2)
-      d.blockchain.finalizedHeightAt(Height(d.blockchain.height)).value shouldBe GenesisBlockHeight
+      d.appendBlock(block3)
+      d.blockchain.checkExpectedFinalizedHeight()
 
-      log.debug(s"Append block 3 with votes")
+      log.debug(s"Append block 4 with votes")
       val aggSig = BlockEndorsement.sign(
         BlsKeyPair(thisNodeAcc.privateKey),
         finalizedId = genesisBlockId,
         finalizedHeight = GenesisBlockHeight,
-        endorsedId = block2.id()
+        endorsedId = block3.id()
       )
       val votingBlock = d.createBlock(
         version = Block.ProtoBlockVersion,
@@ -61,16 +65,16 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           FinalizationVoting(
             endorserIndexes = Seq(1),
             aggregatedEndorsement = aggSig,
-            conflict = Nil
+            conflict = Vector.empty
           )
         )
       )
       d.appender.appendBlock(votingBlock)
-      d.blockchain.finalizedHeightAt(Height(d.blockchain.height)).value shouldBe GenesisBlockHeight
+      d.blockchain.checkExpectedFinalizedHeight()
 
-      log.debug("Append block 4")
+      log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.blockchain.finalizedHeightAt(Height(d.blockchain.height)).value shouldBe Height(2)
+      d.blockchain.checkExpectedFinalizedHeight(3)
     }
 
     "spending balance after voting doesn't affect finalization" in withDomain(
@@ -78,22 +82,23 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       AddrWithBalance.enoughBalances(otherNode1Acc, otherNode2Acc, thisNodeAcc)
     ) { d =>
       val genesisBlockId = d.blockchain.lastBlockId.value
+      d.appendBlock()
 
-      log.debug(s"Append block 2 with commitments")
+      log.debug(s"Append block 3 with commitments")
       val endorsers = Seq(otherNode1Acc, otherNode2Acc, thisNodeAcc)
-      val block2 = d.createBlock(
+      val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 3, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
         generator = otherNode1Acc
       )
-      d.appendBlock(block2)
+      d.appendBlock(block3)
 
-      log.debug(s"Append block 3 with votes and spending")
+      log.debug(s"Append block 4 with votes and spending")
       val aggSig = BlockEndorsement.sign(
         BlsKeyPair(thisNodeAcc.privateKey),
         finalizedId = genesisBlockId,
         finalizedHeight = GenesisBlockHeight,
-        endorsedId = block2.id()
+        endorsedId = block3.id()
       )
       d.appender.appendBlock(
         d.createBlock(
@@ -112,31 +117,33 @@ class FinalizationSuite extends FreeSpec with WithDomain {
             FinalizationVoting(
               endorserIndexes = Seq(2),
               aggregatedEndorsement = aggSig,
-              conflict = Nil
+              conflict = Vector.empty
             )
           )
         )
       )
 
-      log.debug("Append block 4")
+      log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.blockchain.finalizedHeightAt(Height(d.blockchain.height)).value shouldBe Height(2)
+      d.blockchain.checkExpectedFinalizedHeight(3)
     }
 
     "same finalized height if not voted" in withDomain(
       defaultSettings,
       AddrWithBalance.enoughBalances(otherNode1Acc, thisNodeAcc)
     ) { d =>
-      log.debug(s"Append block 2 with commitments")
+      d.appendBlock()
+
+      log.debug(s"Append block 3 with commitments")
       val endorsers = Seq(otherNode1Acc, thisNodeAcc)
-      val block2 = d.createBlock(
+      val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 3, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
         generator = otherNode1Acc
       )
-      d.appendBlock(block2)
+      d.appendBlock(block3)
 
-      log.debug(s"Append block 3 without votes (only miner committed)")
+      log.debug(s"Append block 4 without votes (only miner committed)")
       d.appender.appendBlock(
         d.createBlock(
           version = Block.ProtoBlockVersion,
@@ -147,25 +154,27 @@ class FinalizationSuite extends FreeSpec with WithDomain {
         )
       )
 
-      log.debug("Append block 4")
+      log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.blockchain.finalizedHeightAt(Height(d.blockchain.height)).value shouldBe GenesisBlockHeight
+      d.blockchain.checkExpectedFinalizedHeight()
     }
 
     "increased if surpass maxRollback blocks even no votes" in withDomain(
       defaultSettings.copy(synchronizationSettings = defaultSettings.synchronizationSettings.copy(maxRollback = 2)),
       AddrWithBalance.enoughBalances(otherNode1Acc, thisNodeAcc)
     ) { d =>
-      log.debug(s"Append block 2 with commitments")
+      d.appendBlock()
+      
+      log.debug(s"Append block 3 with commitments")
       val endorsers = Seq(otherNode1Acc, thisNodeAcc)
-      val block2 = d.createBlock(
+      val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 3, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
         generator = otherNode1Acc
       )
-      d.appendBlock(block2)
+      d.appendBlock(block3)
 
-      log.debug(s"Append block 3 without votes (only miner committed)")
+      log.debug(s"Append block 4 without votes (only miner committed)")
       d.appender.appendBlock(
         d.createBlock(
           version = Block.ProtoBlockVersion,
@@ -176,9 +185,16 @@ class FinalizationSuite extends FreeSpec with WithDomain {
         )
       )
 
-      log.debug("Append block 4")
+      log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.blockchain.finalizedHeightAt(Height(d.blockchain.height)).value shouldBe Height(2) // 4 - maxRollback
+      d.blockchain.checkExpectedFinalizedHeight(3) // 5 - maxRollback = 3
+    }
+  }
+
+  extension (self: Blockchain) {
+    def checkExpectedFinalizedHeight(h: Int = GenesisBlockHeight): Unit = {
+      self.finalizedHeightAt().value shouldBe Height(h)
+      self.finalizedHeight.value shouldBe Height(h)
     }
   }
 }

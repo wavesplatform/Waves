@@ -31,6 +31,6 @@ abstract class PatchAtHeight(chainIdToHeight: (Char, Int)*) extends PatchDataLoa
 abstract class PatchOnFeature(feature: BlockchainFeature, networks: Set[Char] = Set.empty) extends PatchDataLoader with DiffPatchFactory {
   override def isDefinedAt(blockchain: Blockchain): Boolean = {
     (networks.isEmpty || networks.contains(blockchain.settings.addressSchemeCharacter)) &&
-    blockchain.featureActivationHeight(feature.id).contains(blockchain.height)
+    blockchain.featureActivationHeight(feature).contains(blockchain.height)
   }
 }

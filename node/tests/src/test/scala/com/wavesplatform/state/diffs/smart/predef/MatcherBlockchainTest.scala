@@ -34,9 +34,9 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def hitSource(height: Int): Option[ByteStr]                                                  = ???
       override def carryFee(refId: Option[ByteStr]): Long                                                   = ???
       override def heightOf(blockId: ByteStr): Option[Int]                                                  = ???
-      override def approvedFeatures: Map[Short, Int]                                                        = ???
-      override def activatedFeatures: Map[Short, Int]                                                       = ???
-      override def featureVotes(height: Int): Map[Short, Int]                                               = ???
+      override def approvedFeatures: Map[Short, Height]                                                     = ???
+      override def activatedFeatures: Map[Short, Height]                                                    = ???
+      override def featureVotes(height: Height): Map[Short, Int]                                            = ???
       override def blockReward(height: Int): Option[Long]                                                   = ???
       override def blockRewardVotes(height: Int): Seq[Long]                                                 = ???
       override def wavesAmount(height: Int): BigInt                                                         = ???

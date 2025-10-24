@@ -6,6 +6,7 @@ import com.wavesplatform.api.http.requests.{CommitToGenerationRequest, IssueRequ
 import com.wavesplatform.api.http.{ApiError, DebugMessage}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.*
@@ -609,7 +610,11 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 
-    def currentGenerationPeriod: GenerationPeriod = GenerationPeriod.from(sync(async(n).height), n.settings)
+    def currentGenerationPeriod: Option[GenerationPeriod] = for {
+      activationStatus <- sync(async(n).activationStatus).features.find(_.id == BlockchainFeatures.DeterministicFinality.id)
+      activation       <- activationStatus.activationHeight
+      r                <- GenerationPeriod.from(sync(async(n).height), Height(activation), n.settings)
+    } yield r
 
     def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Int =
       waitForHeight(p.start, requestAwaitTime)
