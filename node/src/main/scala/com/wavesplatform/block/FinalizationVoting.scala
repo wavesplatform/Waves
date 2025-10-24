@@ -7,7 +7,7 @@ case class FinalizationVoting(
     aggregatedEndorsement: BlsSignature = BlsSignature.Empty,
     conflict: IndexedSeq[BlockEndorsement.Conflict] = IndexedSeq.empty
 ) {
-  def withConsistent(endorserIndex: Int, signature: BlsSignature.NonEmpty): FinalizationVoting = copy(
+  def withValid(endorserIndex: Int, signature: BlsSignature.NonEmpty): FinalizationVoting = copy(
     endorserIndexes = endorserIndexes :+ endorserIndex,
     aggregatedEndorsement = aggregatedEndorsement.append(signature)
   )

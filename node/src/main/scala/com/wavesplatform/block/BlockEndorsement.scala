@@ -9,7 +9,7 @@ enum BlockEndorsement {
   case Full(endorserIndex: Int, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, signature: BlsSignature.NonEmpty)
   case Conflict(endorserIndex: Int, finalizedId: BlockId, signature: BlsSignature.NonEmpty)
   // TODO: do we need finalizedId?
-  case Consistent(endorserIndex: Int, finalizedId: BlockId, signature: BlsSignature.NonEmpty)
+  case Valid(endorserIndex: Int, finalizedId: BlockId, signature: BlsSignature.NonEmpty)
 }
 
 object BlockEndorsement {

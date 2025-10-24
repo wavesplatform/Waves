@@ -9,7 +9,7 @@ object PBEndorseBlocks {
   // TODO:
   def vanilla(x: PBEndorseBlock, sig: BlsSignature.NonEmpty): BlockEndorsement = {
     if (x.endorsedBlockId.isEmpty && x.finalizedBlockHeight == 0)
-      BlockEndorsement.Consistent(x.endorserIndex, x.finalizedBlockId.toByteStr, sig)
+      BlockEndorsement.Valid(x.endorserIndex, x.finalizedBlockId.toByteStr, sig)
     else if (x.finalizedBlockHeight == 0)
       BlockEndorsement.Conflict(
         x.endorserIndex,
