@@ -78,7 +78,7 @@ object EndorsementStorage {
   }
 
   object EndorsementFilter {
-    case class SimulationResult(complete: Boolean = false, chosenConsistent: IndexedSeq[Int] = Vector.empty)
+    case class SimulationResult(complete: Boolean = false, chosenValid: IndexedSeq[Int] = Vector.empty)
   }
 
   object Disabled extends EndorsementStorage {
@@ -90,9 +90,9 @@ object EndorsementStorage {
   class InMemory extends EndorsementStorage with StrictLogging {
     private var currentFilter = none[EndorsementFilter]
 
-    private val processed  = mutable.HashSet.empty[EndorseBlock]
-    private var consistent = immutable.IntMap.empty[BlsSignature.NonEmpty]
-    private var conflict   = immutable.IntMap.empty[BlockEndorsement.Conflict]
+    private val processed = mutable.HashSet.empty[EndorseBlock]
+    private var valid     = immutable.IntMap.empty[BlsSignature.NonEmpty]
+    private var conflict  = immutable.IntMap.empty[BlockEndorsement.Conflict]
 
     private case class ResultType(simulation: SimulationResult, voting: FinalizationVoting) // TODO: move
     private var latestResult = ResultType(SimulationResult(), FinalizationVoting())
@@ -114,13 +114,13 @@ object EndorsementStorage {
         if (processed.contains(msg)) false
         else {
           // TODO: Do we need this if not mine now?
-          val isConsistent = msg.finalizedId == filter.finalizedId
+          val isValid = msg.finalizedId == filter.finalizedId
 
-          if (isConsistent && !conflict.isDefinedAt(msg.endorserIndex)) {
-            consistent = consistent.updated(msg.endorserIndex, sig)
+          if (isValid && !conflict.isDefinedAt(msg.endorserIndex)) {
+            valid = valid.updated(msg.endorserIndex, sig)
           } else {
             conflict = conflict.updated(msg.endorserIndex, toConflict(msg, sig))
-            consistent = consistent.removed(msg.endorserIndex)
+            valid = valid.removed(msg.endorserIndex)
           }
 
           processed += msg
@@ -135,7 +135,7 @@ object EndorsementStorage {
       val isNewVoting = !currentFilter.exists(_.sameVoting(filter))
       if (isNewVoting) {
         processed.clear()
-        consistent = consistent.empty
+        valid = valid.empty
         conflict = conflict.empty
         hasChanges = true
 
@@ -157,10 +157,10 @@ object EndorsementStorage {
       } yield {
         hasChanges = false
 
-        val moreConflict   = conflict.size > latestResult.voting.conflict.size
-        val moreConsistent = consistent.size > latestResult.voting.endorserIndexes.size
-        if (moreConflict || !latestResult.simulation.complete && moreConsistent) {
-          val simulation = currentFilter.simulate(consistent.keys)
+        val moreConflict = conflict.size > latestResult.voting.conflict.size
+        val moreValid    = valid.size > latestResult.voting.endorserIndexes.size
+        if (moreConflict || !latestResult.simulation.complete && moreValid) {
+          val simulation = currentFilter.simulate(valid.keys)
 
           val origResult = latestResult
           latestResult = ResultType(simulation, createVoting(simulation))
@@ -173,8 +173,8 @@ object EndorsementStorage {
     }
 
     private def createVoting(simulationResult: SimulationResult): FinalizationVoting =
-      simulationResult.chosenConsistent.foldLeft(FinalizationVoting(conflict = conflict.values.toIndexedSeq)) { case (r, idx) =>
-        r.withConsistent(idx, consistent(idx))
+      simulationResult.chosenValid.foldLeft(FinalizationVoting(conflict = conflict.values.toIndexedSeq)) { case (r, idx) =>
+        r.withValid(idx, valid(idx))
       }
 
     private def verifySig(msg: EndorseBlock, pk: BlsPublicKey): Option[BlsSignature.NonEmpty] =

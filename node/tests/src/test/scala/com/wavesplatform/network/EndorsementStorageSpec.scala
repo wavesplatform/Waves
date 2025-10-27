@@ -25,7 +25,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
   private val endorsedId            = mkRandomBlockId
 
   "tryAddVote" - {
-    "rebroadcast if consistent" in {
+    "rebroadcast if valid" in {
       val s = started()
 
       log.info("on endorsement")
@@ -84,7 +84,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
     }
 
     extension (s: EndorsementStorage) {
-      private def addConsistentVote(generatorIndex: Int): Either[String, Boolean] = {
+      private def addValidVote(generatorIndex: Int): Either[String, Boolean] = {
         val endorsement = BlockEndorsement.full(generators(generatorIndex).blsKp, generatorIndex, expectedFinalizedId, finalizedHeight, endorsedId)
         s.tryAddVote(EndorseBlock.from(endorsement))
       }
@@ -94,26 +94,26 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         s.tryAddVote(EndorseBlock.from(endorsement))
       }
 
-      private def checkTryCollect(endorsedId: BlockId, consistent: Seq[Int] = Nil, conflict: Seq[Int] = Nil): Unit =
+      private def checkTryCollect(endorsedId: BlockId, valid: Seq[Int] = Nil, conflict: Seq[Int] = Nil): Unit =
         s.tryCollectAndClear(endorsedId) match {
-          case None if consistent.nonEmpty || conflict.nonEmpty =>
-            fail(s"Expected consistent endorsers [${consistent.mkString(", ")}], conflict endorsers [${conflict.mkString(", ")}], got None")
+          case None if valid.nonEmpty || conflict.nonEmpty =>
+            fail(s"Expected valid endorsers [${valid.mkString(", ")}], conflict endorsers [${conflict.mkString(", ")}], got None")
           case Some(v) =>
-            withClue("consistent: ") {
-              v.endorserIndexes should contain theSameElementsAs consistent
+            withClue("valid: ") {
+              v.endorserIndexes should contain theSameElementsAs valid
             }
             withClue("conflict: ") {
               v.conflict.map(_.endorserIndex) should contain theSameElementsAs conflict
             }
             v.aggregatedEndorsement match {
               case BlsSignature.Empty =>
-                if (consistent.nonEmpty) fail(s"Signature can't be empty for endorsers [${consistent.mkString(", ")}]")
+                if (valid.nonEmpty) fail(s"Signature can't be empty if endorsers nonempty: [${valid.mkString(", ")}]")
               case aggEnd: BlsSignature.NonEmpty =>
                 withClue("signature: ") {
                   aggEnd
                     .verifyAgg(
                       BlockEndorsement.mkMessage(expectedFinalizedId, finalizedHeight, endorsedId),
-                      consistent.map(generators(_).blsKp.publicKey)
+                      valid.map(generators(_).blsKp.publicKey)
                     )
                     .value shouldBe true
                 }
@@ -131,42 +131,42 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         s.checkTryCollect(endorsedId)
 
         log.info("after endorsement #0")
-        s.addConsistentVote(0) // 0 and miner
+        s.addValidVote(0) // 0 and miner
         s.checkTryCollect(endorsedId)
       }
 
-      "on second request if we already reached finalization even we have a new consistent vote" in {
+      "on second request if we already reached finalization even we have a new valid vote" in {
         val s = started(minerIndex = 3, generators)
 
         log.info("reached")
-        s.addConsistentVote(0)
-        s.addConsistentVote(1) // 0, 1 and miner, reached finalization
+        s.addValidVote(0)
+        s.addValidVote(1) // 0, 1 and miner, reached finalization
         s.checkTryCollect(endorsedId, Seq(0, 1))
 
         log.info("second request")
         s.checkTryCollect(endorsedId)
 
         log.info("new vote")
-        s.addConsistentVote(2)
+        s.addValidVote(2)
         s.checkTryCollect(endorsedId)
       }
     }
 
     "returns Some" - {
-      "with only either consistent, or conflict vote from one endorser" - {
-        "consistent, then conflict" in {
+      "with only either valid, or conflict vote from one endorser" - {
+        "valid, then conflict" in {
           val s = started(minerIndex = 3, generators)
 
-          s.addConsistentVote(2)
+          s.addValidVote(2)
           s.addConflictVote(2)
           s.checkTryCollect(endorsedId, conflict = Seq(2))
         }
 
-        "conflict, then consistent" in {
+        "conflict, then valid" in {
           val s = started(minerIndex = 3, generators)
 
           s.addConflictVote(2)
-          s.addConsistentVote(2)
+          s.addValidVote(2)
           s.checkTryCollect(endorsedId, conflict = Seq(2))
         }
       }
@@ -175,50 +175,50 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         val s = started(minerIndex = 3, generators)
 
         log.debug("reached finalization")
-        s.addConsistentVote(0)
-        s.addConsistentVote(1) // 0, 1 and miner, reached 2/3
+        s.addValidVote(0)
+        s.addValidVote(1) // 0, 1 and miner, reached 2/3
         s.checkTryCollect(endorsedId, Seq(0, 1))
 
-        log.debug("lost finalization, removes from consistent")
+        log.debug("lost finalization, removes from valid")
         s.addConflictVote(0)
-        s.checkTryCollect(endorsedId, consistent = Seq(1), conflict = Seq(0))
+        s.checkTryCollect(endorsedId, valid = Seq(1), conflict = Seq(0))
       }
 
       "if have a new conflict vote" - {
-        "even no consistent votes" in {
+        "even no valid votes" in {
           val s = started(minerIndex = 3, generators)
 
           s.addConflictVote(2)
           s.checkTryCollect(endorsedId, conflict = Seq(2))
         }
 
-        "even insufficient consistent votes" in {
+        "even insufficient valid votes" in {
           val s = started(minerIndex = 3, generators)
 
-          s.addConsistentVote(0)
+          s.addValidVote(0)
           s.addConflictVote(2)
-          s.checkTryCollect(endorsedId, consistent = Seq(0), conflict = Seq(2))
+          s.checkTryCollect(endorsedId, valid = Seq(0), conflict = Seq(2))
         }
 
         "if finalized" in {
           val s = started(minerIndex = 3, generators)
 
-          s.addConsistentVote(0)
-          s.addConsistentVote(1) // 0, 1 and miner, reached 2/3
+          s.addValidVote(0)
+          s.addValidVote(1) // 0, 1 and miner, reached 2/3
           s.addConflictVote(2)
-          s.checkTryCollect(endorsedId, consistent = Seq(0, 1), conflict = Seq(2))
+          s.checkTryCollect(endorsedId, valid = Seq(0, 1), conflict = Seq(2))
         }
 
         "after finalization" in {
           val s = started(minerIndex = 3, generators)
 
-          s.addConsistentVote(0)
-          s.addConsistentVote(1) // 0, 1 and miner, reached 2/3
-          s.checkTryCollect(endorsedId, consistent = Seq(0, 1))
+          s.addValidVote(0)
+          s.addValidVote(1) // 0, 1 and miner, reached 2/3
+          s.checkTryCollect(endorsedId, valid = Seq(0, 1))
 
           log.debug("after finalization")
           s.addConflictVote(2)
-          s.checkTryCollect(endorsedId, consistent = Seq(0, 1), conflict = Seq(2))
+          s.checkTryCollect(endorsedId, valid = Seq(0, 1), conflict = Seq(2))
         }
       }
     }
