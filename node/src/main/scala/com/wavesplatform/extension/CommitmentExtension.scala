@@ -54,7 +54,7 @@ class CommitmentExtension(context: Context) extends Extension with ScorexLogging
                 .create(
                   sender = account.publicKey,
                   endorserPublicKey = blsKP.publicKey,
-                  generationPeriodStart = generationPeriodStart,
+                  generationPeriodStart = generationPeriodStart.next,
                   timestamp = timestamp,
                   feeInWaves = fee,
                   commitmentSignature = blsSig,
