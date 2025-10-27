@@ -21,7 +21,7 @@ import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{Blockchain, StateHash}
+import com.wavesplatform.state.{Blockchain, StateHash, Height}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.OrderType
@@ -169,8 +169,8 @@ class DebugApiRouteSpec
         }
 
         val lastButOneHeight    = domain.blockchain.height - 1
-        val lastButOneHeader    = domain.blockchain.blockHeader(lastButOneHeight).value
-        val lastButOneStateHash = domain.rocksDBWriter.loadStateHash(lastButOneHeight).value
+        val lastButOneHeader    = domain.blockchain.blockHeader(lastButOneHeight.toInt).value
+        val lastButOneStateHash = domain.rocksDBWriter.loadStateHash(Height(lastButOneHeight)).value
         val expectedResponse = Json.toJson(lastButOneStateHash).as[JsObject] ++ Json.obj(
           "snapshotHash" -> domain.rocksDBWriter.snapshotStateHash(lastButOneHeight),
           "blockId"      -> lastButOneHeader.id().toString,

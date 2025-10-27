@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import play.api.libs.json.JsonConfiguration.Aux
 import play.api.libs.json.{Format, Json, JsonConfiguration, OptionHandlers}
@@ -45,7 +45,7 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
     } yield RewardStatus(
       height,
       amount,
-      reward * blockchain.blockRewardBoost(height),
+      reward * blockchain.blockRewardBoost(Height(height)),
       rewardsSettings.minIncrement,
       term,
       nextCheck,

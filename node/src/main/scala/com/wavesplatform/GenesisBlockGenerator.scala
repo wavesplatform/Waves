@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair, SeedKeyPair}
+import com.wavesplatform.account.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -71,8 +71,8 @@ object GenesisBlockGenerator {
       seedText: SeedText,
       seed: ByteStr,
       accountSeed: ByteStr,
-      accountPrivateKey: ByteStr,
-      accountPublicKey: ByteStr,
+      accountPrivateKey: PrivateKey,
+      accountPublicKey: PublicKey,
       accountAddress: Address,
       account: SeedKeyPair,
       miner: Boolean

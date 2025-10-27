@@ -13,6 +13,7 @@ import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 
 import java.util.concurrent.atomic.AtomicReference
+import scala.math.Ordered.orderingToOrdered
 
 trait Processor {
 
@@ -54,7 +55,7 @@ class BlockchainProcessor(blockchain: LazyBlockchain[RideScriptRunRequest], requ
         }
 
       case _: Update.Rollback =>
-        lastLiquidBlockEvents = lastLiquidBlockEvents.dropWhile(x => x.height >= height && x.id != event.id)
+        lastLiquidBlockEvents = lastLiquidBlockEvents.dropWhile(x => Height(x.height) >= height && x.id != event.id)
 
       case Update.Empty => // Ignore
     }
@@ -102,14 +103,14 @@ class BlockchainProcessor(blockchain: LazyBlockchain[RideScriptRunRequest], requ
 }
 
 case class ProcessResult[TagT](
-    newHeight: Int = 0,
+    newHeight: Height = Height(0),
     affected: AffectedTags[TagT] = AffectedTags.empty[TagT]
 ) {
   def isEmpty: Boolean = affected.isEmpty
 
   def withoutAffectedTags: ProcessResult[TagT] = copy(affected = AffectedTags.empty[TagT])
   def combine(x: ProcessResult[TagT]): ProcessResult[TagT] = copy(
-    newHeight = math.max(newHeight, x.newHeight),
+    newHeight = newHeight.max(x.newHeight),
     affected = affected ++ x.affected
   )
 }

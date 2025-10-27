@@ -36,6 +36,6 @@ object SignedReissueV2Request {
       (JsPath \ "reissuable").read[Boolean] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "proofs").read[List[ProofStr]]
+      (JsPath \ "proofs").read[List[String]]
   )(SignedReissueV2Request.apply)
 }

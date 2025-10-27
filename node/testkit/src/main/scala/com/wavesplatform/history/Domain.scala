@@ -155,7 +155,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   }
 
   def solidStateHeight: Int = {
-    rdb.db.get(Keys.height)
+    rdb.db.get(Keys.height).toInt
   }
 
   def solidStateSnapshot(): SortedMap[String, String] = {
@@ -525,11 +525,11 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   }
 
   val blocksApi: CommonBlocksApi = {
-    def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
+    def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Height): Option[BlockMeta] =
       Application.loadBlockMetaAt(db, blockchainUpdater)(height)
 
     def loadBlockInfoAt(db: RDB, blockchainUpdater: BlockchainUpdaterImpl)(
-        height: Int
+        height: Height
     ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       Application.loadBlockInfoAt(db, blockchainUpdater)(height)
 

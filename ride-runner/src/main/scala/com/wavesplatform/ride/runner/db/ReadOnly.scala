@@ -8,6 +8,7 @@ import com.wavesplatform.state.Height
 import org.rocksdb.ColumnFamilyHandle
 
 import scala.annotation.unused
+import scala.math.Ordered.orderingToOrdered
 
 trait ReadOnly {
 

@@ -34,7 +34,7 @@ object SignedBurnV2Request {
       (JsPath \ "amount").read[Long] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "proofs").read[List[ProofStr]]
+      (JsPath \ "proofs").read[List[String]]
   )(SignedBurnV2Request.apply)
 
   implicit val writes: Writes[SignedBurnV2Request] =

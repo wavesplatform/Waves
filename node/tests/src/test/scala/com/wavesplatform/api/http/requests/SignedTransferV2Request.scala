@@ -23,7 +23,7 @@ object SignedTransferV2Request {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "attachment").readNullable[String] and
-      (JsPath \ "proofs").read[List[ProofStr]]
+      (JsPath \ "proofs").read[List[String]]
   )(SignedTransferV2Request.apply)
 }
 

@@ -78,7 +78,7 @@ package object common {
       }
   }
 
-  def loadTransactionMeta(rdb: RDB, maybeSnapshot: => Option[(Int, StateSnapshot)])(
+  def loadTransactionMeta(rdb: RDB, maybeSnapshot: => Option[(Height, StateSnapshot)])(
       tuple: (TxMeta, Transaction)
   ): TransactionMeta = {
     val (meta, transaction) = tuple

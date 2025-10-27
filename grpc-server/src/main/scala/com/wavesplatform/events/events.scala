@@ -195,19 +195,19 @@ object StateUpdate {
 
       def detailsFromPB(v: PBAssetDetails): AssetDescription = {
         AssetDescription(
-          v.assetId.toByteStr,
+          TransactionId(v.assetId.toByteStr),
           v.issuer.toPublicKey,
           ByteString.copyFromUtf8(v.name),
           ByteString.copyFromUtf8(v.description),
           v.decimals,
           v.reissuable,
           BigInt(v.safeVolume.toByteArray),
-          Height @@ v.lastUpdated,
+          Height(v.lastUpdated),
           v.scriptInfo.map(fromPBScriptInfo),
           v.sponsorship,
           v.nft,
           v.sequenceInBlock,
-          Height @@ v.issueHeight
+          Height(v.issueHeight)
         )
       }
 
@@ -232,9 +232,9 @@ object StateUpdate {
           sponsorship = v.sponsorship,
           nft = v.nft,
           safeVolume = ByteString.copyFrom(v.totalVolume.toByteArray),
-          lastUpdated = v.lastUpdatedAt,
+          lastUpdated = v.lastUpdatedAt.toInt,
           sequenceInBlock = v.sequenceInBlock,
-          issueHeight = v.issueHeight
+          issueHeight = v.issueHeight.toInt
         )
       }
 
@@ -430,7 +430,7 @@ object StateUpdate {
           staticInfo.amount.value,
           staticInfo.sender,
           staticInfo.recipientAddress,
-          staticInfo.sourceId
+          staticInfo.sourceId.byteStr
         )
     }
 
@@ -442,7 +442,7 @@ object StateUpdate {
         si.fold(0L)(_.amount.value),
         si.fold(PublicKey(new Array[Byte](32)))(_.sender),
         si.fold(PublicKey(new Array[Byte](32)).toAddress)(_.recipientAddress),
-        si.fold(ByteStr.empty)(_.sourceId)
+        si.fold(ByteStr.empty)(_.sourceId.byteStr)
       )
     }
 
@@ -622,8 +622,9 @@ object BlockAppended {
       StateUpdate.container(blockchainBeforeWithReward, snapshot)
 
     // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
-    val wavesAmount        = blockchainBeforeWithReward.wavesAmount(height).toLong
-    val updatedWavesAmount = wavesAmount + reward.filter(_ => height > 0).getOrElse(0L) * blockchainBeforeWithReward.blockRewardBoost(height + 1)
+    val wavesAmount = blockchainBeforeWithReward.wavesAmount(height).toLong
+    val updatedWavesAmount =
+      wavesAmount + reward.filter(_ => height > 0).getOrElse(0L) * blockchainBeforeWithReward.blockRewardBoost(Height(height + 1))
     val activatedFeatures = blockchainBeforeWithReward.activatedFeatures.collect {
       case (id, activationHeight) if activationHeight == height + 1 => id.toInt
     }.toSeq

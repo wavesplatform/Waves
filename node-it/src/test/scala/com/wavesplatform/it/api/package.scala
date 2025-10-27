@@ -113,12 +113,6 @@ package object api {
     }
   }
 
-  implicit val distributionReads: Reads[AssetDistribution] = Reads { json =>
-    json
-      .validate[Map[com.wavesplatform.account.Address, Long]]
-      .map(dst => AssetDistribution(dst))
-  }
-
   implicit def pagedReads[C: Reads, R: Reads]: Reads[Paged[C, R]] =
     (
       (JsPath \ "hasNext").read[Boolean] and

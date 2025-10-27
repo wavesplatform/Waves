@@ -20,7 +20,7 @@ object SignedExchangeRequestV2 {
       (JsPath \ "sellMatcherFee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "version").read[Byte] and
-      (JsPath \ "proofs").read[List[ProofStr]]
+      (JsPath \ "proofs").read[List[String]]
   )(SignedExchangeRequestV2.apply)
 }
 

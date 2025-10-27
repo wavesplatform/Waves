@@ -2,14 +2,7 @@ package com.wavesplatform.api.grpc.test
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.grpc.{
-  ApplicationStatus,
-  TransactionResponse,
-  TransactionSnapshotResponse,
-  TransactionSnapshotsRequest,
-  TransactionsApiGrpcImpl,
-  TransactionsRequest
-}
+import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionResponse, TransactionSnapshotResponse, TransactionSnapshotsRequest, TransactionsApiGrpcImpl, TransactionsRequest}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -18,9 +11,9 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
-import com.wavesplatform.protobuf.{ByteStrExt, PBSnapshots}
+import com.wavesplatform.protobuf.{PBSnapshots, toByteString}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{StateSnapshot, TxMeta}
+import com.wavesplatform.state.{StateSnapshot, TxMeta, Height}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
@@ -115,7 +108,7 @@ class TransactionsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffM
       val request              = TransactionSnapshotsRequest.of(txs.map(_.id().toByteString))
       val (observer, response) = createObserver[TransactionSnapshotResponse]
       getGrpcApi(d).getTransactionSnapshots(request, observer)
-      response.runSyncUnsafe().flatMap(_.snapshot).map(PBSnapshots.fromProtobuf(_, ByteStr.empty, 0)._1)
+      response.runSyncUnsafe().flatMap(_.snapshot).map(PBSnapshots.fromProtobuf(_, ByteStr.empty, Height(0))._1)
     }
 
     d.appendBlock(txs(0), txs(1))

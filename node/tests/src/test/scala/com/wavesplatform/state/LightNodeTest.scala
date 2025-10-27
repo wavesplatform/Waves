@@ -158,7 +158,7 @@ class LightNodeTest extends PropSpec with WithDomain {
         appender(extensionBlocks).runSyncUnsafe() should beRight
         d.lastBlock.header.stateHash shouldBe expectedStateHash
         d.blockchain.height shouldBe chainSize + 1
-        d.blocksApi.blocksRange(2, d.blockchain.height).toListL.runSyncUnsafe().map(_._1.header) shouldBe betterBlocks.map(_._1.header)
+        d.blocksApi.blocksRange(Height(2), Height(d.blockchain.height)).toListL.runSyncUnsafe().map(_._1.header) shouldBe betterBlocks.map(_._1.header)
       }
     }
   }

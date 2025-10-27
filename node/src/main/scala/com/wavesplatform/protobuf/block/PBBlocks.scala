@@ -6,8 +6,7 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.{BlockHeader, ChallengedHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.protobuf.ByteStrExt
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.{toPublicKey, toByteStr, toByteString}
 import com.wavesplatform.protobuf.block.Block.Header as PBHeader
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction

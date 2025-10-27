@@ -4,7 +4,7 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.state.{AssetDescription, Height}
+import com.wavesplatform.state.{AssetDescription, Height, TransactionId}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit, ScriptExtraFee}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{TransactionType, TxHelpers}
@@ -60,7 +60,7 @@ object TestValues {
     .explicitGet()
 
   val assetDescription: AssetDescription = AssetDescription(
-    asset.id,
+    TransactionId(asset.id),
     TxHelpers.defaultSigner.publicKey,
     null,
     null,

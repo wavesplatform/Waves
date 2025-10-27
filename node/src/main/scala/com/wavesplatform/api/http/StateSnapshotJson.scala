@@ -93,12 +93,12 @@ object StateSnapshotJson {
     implicit val writes: OWrites[SponsorshipJson] = Json.writes
   }
 
-  case class NewLeaseJson(id: ByteStr, sender: PublicKey, recipient: Address, amount: Long, txId: ByteStr, height: Int)
+  case class NewLeaseJson(id: ByteStr, sender: PublicKey, recipient: Address, amount: Long, txId: TransactionId, height: Height)
   object NewLeaseJson {
     implicit val writes: OWrites[NewLeaseJson] = Json.writes
   }
 
-  case class CancelledLeaseJson(id: ByteStr, txId: ByteStr, height: Int)
+  case class CancelledLeaseJson(id: ByteStr, txId: TransactionId, height: Height)
   object CancelledLeaseJson {
     implicit val writes: OWrites[CancelledLeaseJson] = Json.writes
   }

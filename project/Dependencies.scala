@@ -130,9 +130,6 @@ object Dependencies {
   lazy val node = Def.setting(
     Seq(
       rocksdb,
-      ("org.rudogma" %%% "supertagged" % "2.0-RC2")
-        .exclude("org.scala-js", "scalajs-library_2.13")
-        .cross(CrossVersion.for3Use2_13),
       "commons-net"            % "commons-net"               % "3.12.0",
       "commons-io"             % "commons-io"                % "2.20.0",
       "com.github.pureconfig" %% "pureconfig-core"           % "0.17.9",

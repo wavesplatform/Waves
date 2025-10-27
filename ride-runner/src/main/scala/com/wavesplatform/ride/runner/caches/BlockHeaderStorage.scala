@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.ride.runner.caches.BlockHeaderStorage.BlockInfo
 import com.wavesplatform.ride.runner.caches.disk.BlockDiskCache
@@ -16,6 +16,7 @@ import com.wavesplatform.state.Height
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 
 import scala.util.chaining.scalaUtilChainingOps
+import scala.math.Ordered.orderingToOrdered
 
 class BlockHeaderStorage(blockchainApi: BlockchainApi, diskCache: BlockDiskCache) extends OptimisticLockable with ScorexLogging {
   // head contains the latest
@@ -101,7 +102,7 @@ class BlockHeaderStorage(blockchainApi: BlockchainApi, diskCache: BlockDiskCache
         liquidBlocks = preserved match {
           case Nil =>
             log.debug(s"Remove from ${toHeight + 1}")
-            diskCache.removeFrom(Height(toHeight + 1))
+            diskCache.removeFrom(toHeight + 1)
             diskCache.setLastHeight(toHeight)
             val header = getFromDiskOrFetch(toHeight).getOrElse(throw new RuntimeException(s"Can't get block at $toHeight"))
             BlockInfo(toHeight, header.header.id(), header) :: Nil
@@ -117,7 +118,7 @@ class BlockHeaderStorage(blockchainApi: BlockchainApi, diskCache: BlockDiskCache
 
   def removeFrom(height: Height)(implicit ctx: ReadWrite): Unit = writeLock {
     diskCache.removeFrom(height)
-    diskCache.setLastHeight(Height(height - 1))
+    diskCache.setLastHeight(height - 1)
     liquidBlocks = liquidBlocks.dropWhile(_.height >= height)
   }
 }

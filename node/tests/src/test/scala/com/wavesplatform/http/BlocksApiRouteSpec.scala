@@ -15,7 +15,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.state.{BlockRewardCalculator, Blockchain}
+import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, Height}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
@@ -30,6 +30,7 @@ import play.api.libs.json.*
 
 import scala.concurrent.duration.*
 import scala.util.Random
+import scala.math.Ordered.orderingToOrdered
 
 class BlocksApiRouteSpec
     extends RouteSpec("/blocks")
@@ -77,8 +78,8 @@ class BlocksApiRouteSpec
   (blocksApi.meta).expects(invalidBlockId).returning(None).anyNumberOfTimes()
 
   routePath("/last") in {
-    (() => blocksApi.currentHeight).expects().returning(2).once()
-    (blocksApi.blockAtHeight).expects(2).returning(Some(testBlock2Meta -> Seq.empty)).once()
+    (() => blocksApi.currentHeight).expects().returning(Height(2)).once()
+    (blocksApi.blockAtHeight).expects(Height(2)).returning(Some(testBlock2Meta -> Seq.empty)).once()
     Get(routePath("/last")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
@@ -86,19 +87,19 @@ class BlocksApiRouteSpec
   }
 
   routePath("/at/{height}") in {
-    (blocksApi.blockAtHeight).expects(1).returning(Some(testBlock1Meta -> Seq.empty)).once()
+    (blocksApi.blockAtHeight).expects(Height(1)).returning(Some(testBlock1Meta -> Seq.empty)).once()
     Get(routePath("/at/1")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1Json
     }
 
-    (blocksApi.blockAtHeight).expects(2).returning(Some(testBlock2Meta -> Seq.empty)).once()
+    (blocksApi.blockAtHeight).expects(Height(2)).returning(Some(testBlock2Meta -> Seq.empty)).once()
     Get(routePath("/at/2")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
     }
 
-    (blocksApi.blockAtHeight).expects(3).returning(None).once()
+    (blocksApi.blockAtHeight).expects(Height(3)).returning(None).once()
     Get(routePath("/at/3")) ~> route ~> check {
       response.status shouldBe StatusCodes.NotFound
       responseAs[String] should include("block does not exist")
@@ -127,8 +128,8 @@ class BlocksApiRouteSpec
 
   routePath("/seq/{from}/{to}") in {
     (blocksApi
-      .blocksRange(_: Int, _: Int))
-      .expects(1, 2)
+      .blocksRange(_: Height, _: Height))
+      .expects(Height(1), Height(2))
       .returning(
         Observable.fromIterable(
           Seq(
@@ -144,8 +145,8 @@ class BlocksApiRouteSpec
   }
 
   routePath("/headers/last") in {
-    (() => blocksApi.currentHeight).expects().returning(2).once()
-    (blocksApi.metaAtHeight).expects(2).returning(Some(testBlock2Meta)).once()
+    (() => blocksApi.currentHeight).expects().returning(Height(2)).once()
+    (blocksApi.metaAtHeight).expects(Height(2)).returning(Some(testBlock2Meta)).once()
     Get(routePath("/headers/last")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2HeaderJson
@@ -174,9 +175,9 @@ class BlocksApiRouteSpec
   }
 
   routePath("/headers/at/{height}") in {
-    (blocksApi.metaAtHeight).expects(1).returning(Some(testBlock1Meta)).once()
-    (blocksApi.metaAtHeight).expects(2).returning(Some(testBlock2Meta)).once()
-    (blocksApi.metaAtHeight).expects(3).returning(None).once()
+    (blocksApi.metaAtHeight).expects(Height(1)).returning(Some(testBlock1Meta)).once()
+    (blocksApi.metaAtHeight).expects(Height(2)).returning(Some(testBlock2Meta)).once()
+    (blocksApi.metaAtHeight).expects(Height(3)).returning(None).once()
 
     Get(routePath("/headers/at/1")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -196,7 +197,7 @@ class BlocksApiRouteSpec
 
   routePath("/headers/seq/{from}/{to}") in {
     (blocksApi.metaRange)
-      .expects(1, 2)
+      .expects(Height(1), Height(2))
       .returning(
         Observable.fromIterable(
           Seq(
@@ -233,9 +234,9 @@ class BlocksApiRouteSpec
     val blockchain = stub[Blockchain]
     (blockchain.heightOf).when(blocks.last.id()).returning(Some(3))
 
-    def metaAt(height: Int): Option[BlockMeta] =
-      if (height >= 1 && height <= 3)
-        Some(BlockMeta(blocks(height - 1).header, ByteStr.empty, None, 1, 0, 0, 0, None, Seq.empty, None))
+    def metaAt(height: Height): Option[BlockMeta] =
+      if (height >= Height(1) && height <= Height(3))
+        Some(BlockMeta(blocks(height.toInt - 1).header, ByteStr.empty, None, 1, 0, 0, 0, None, Seq.empty, None))
       else None
 
     val blocksApi = CommonBlocksApi(blockchain, metaAt, _ => None)
@@ -266,7 +267,7 @@ class BlocksApiRouteSpec
     def emulateBlocks(blocks: IndexedSeq[Block]): CommonBlocksApi = {
       require(blocks.nonEmpty)
       val blocksApi = stub[CommonBlocksApi]
-      (() => blocksApi.currentHeight).when().returning(blocks.length)
+      (() => blocksApi.currentHeight).when().returning(Height(blocks.length))
       (blocksApi.metaAtHeight)
         .when(*)
         .onCall { (height: Int) =>
@@ -280,8 +281,8 @@ class BlocksApiRouteSpec
     }
 
     "missing blocks" in {
-      (blocksApi.metaAtHeight).expects(1).returning(None).repeat(2)
-      (() => blocksApi.currentHeight).expects().returning(5).repeat(2)
+      (blocksApi.metaAtHeight).expects(Height(1)).returning(None).repeat(2)
+      (() => blocksApi.currentHeight).expects().returning(Height(5)).repeat(2)
       Get(routePath(s"/heightByTimestamp/1")) ~> route ~> check {
         responseAs[JsObject] shouldBe Json.parse("{\"error\":199,\"message\":\"State was altered\"}")
       }

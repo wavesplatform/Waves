@@ -603,25 +603,25 @@ object Application extends ScorexLogging {
   }
 
   private[wavesplatform] def loadBlockAt(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl)(
-      height: Int
+      height: Height
   ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
     loadBlockInfoAt(rdb, blockchainUpdater)(height)
 
   private[wavesplatform] def loadBlockInfoAt(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl)(
-      height: Int
+      height: Height
   ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
     loadBlockMetaAt(rdb.db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
-        .getOrElse(database.loadTransactions(Height(height), rdb))
+        .getOrElse(database.loadTransactions(height, rdb))
     }
 
-  private[wavesplatform] def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
+  private[wavesplatform] def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Height): Option[BlockMeta] =
     blockchainUpdater.liquidBlockMeta
-      .filter(_ => blockchainUpdater.height == height)
-      .orElse(db.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb))
+      .filter(_ => blockchainUpdater.height == height.toInt)
+      .orElse(db.get(Keys.blockMetaAt(height)).flatMap(BlockMeta.fromPb))
       .map { blockMeta =>
-        val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height, blockMeta.header.generator.toAddress, blockchainUpdater)
+        val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height.toInt, blockMeta.header.generator.toAddress, blockchainUpdater)
         blockMeta.copy(
           rewardShares = rewardShares,
           reward = blockMeta.reward.map(_ * blockchainUpdater.blockRewardBoost(height))

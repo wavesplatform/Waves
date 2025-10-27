@@ -30,13 +30,14 @@ import monix.reactive.subjects.ReplaySubject
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 import scala.collection.immutable.VectorMap
+import scala.math.Ordered.orderingToOrdered
 
 class BlockchainUpdaterImpl(
     val rocksdb: RocksDBWriter,
     wavesSettings: WavesSettings,
     time: Time,
     blockchainUpdateTriggers: BlockchainUpdateTriggers,
-    collectActiveLeases: (Int, Int) => Map[ByteStr, LeaseDetails],
+    collectActiveLeases: (Height, Height) => Map[ByteStr, LeaseDetails],
     miner: Miner = _ => ()
 ) extends Blockchain
     with BlockchainUpdater
@@ -430,7 +431,7 @@ class BlockchainUpdaterImpl(
                     featuresApprovedWithBlock(block),
                     reward,
                     hitSource,
-                    cancelLeases(collectLeasesToCancel(newHeight), newHeight)
+                    cancelLeases(collectLeasesToCancel(newHeight), Height(newHeight))
                   )
                 )
 
@@ -451,11 +452,11 @@ class BlockchainUpdaterImpl(
 
   private def collectLeasesToCancel(newHeight: Int): Map[ByteStr, LeaseDetails] =
     if (rocksdb.isFeatureActivated(BlockchainFeatures.LeaseExpiration, newHeight)) {
-      val toHeight = newHeight - rocksdb.settings.functionalitySettings.leaseExpiration
+      val toHeight = Height(newHeight - rocksdb.settings.functionalitySettings.leaseExpiration)
       val fromHeight = rocksdb.featureActivationHeight(BlockchainFeatures.LeaseExpiration.id) match {
         case Some(`newHeight`) =>
           log.trace(s"Collecting leases created up till height $toHeight")
-          1
+          Height(1)
         case _ =>
           log.trace(s"Collecting leases created at height $toHeight")
           toHeight
@@ -463,7 +464,7 @@ class BlockchainUpdaterImpl(
       collectActiveLeases(fromHeight, toHeight)
     } else Map.empty
 
-  private def cancelLeases(leaseDetails: Map[ByteStr, LeaseDetails], height: Int): Map[ByteStr, StateSnapshot] =
+  private def cancelLeases(leaseDetails: Map[ByteStr, LeaseDetails], height: Height): Map[ByteStr, StateSnapshot] =
     for {
       (id, ld) <- leaseDetails
     } yield id -> StateSnapshot
@@ -492,12 +493,12 @@ class BlockchainUpdaterImpl(
         for {
           height <- rocksdb.heightOf(blockId).toRight(GenericError(s"No such block $blockId"))
           _ <- Either.cond(
-            height >= rocksdb.safeRollbackHeight,
+            Height(height) >= rocksdb.safeRollbackHeight,
             (),
             GenericError(s"Rollback is possible only to the block at the height ${rocksdb.safeRollbackHeight}")
           )
           _ = blockchainUpdateTriggers.onRollback(this, blockId, height)
-          blocks <- rocksdb.rollbackTo(height).leftMap(GenericError(_))
+          blocks <- rocksdb.rollbackTo(Height(height)).leftMap(GenericError(_))
         } yield {
           ngState = None
           val liquidBlockData = {
@@ -659,7 +660,7 @@ class BlockchainUpdaterImpl(
     ngState match {
       case Some(ng) if this.height == height =>
         rocksdb.wavesAmount(height - 1) +
-          BigInt(ng.reward.getOrElse(0L)) * this.blockRewardBoost(height)
+          BigInt(ng.reward.getOrElse(0L)) * this.blockRewardBoost(Height(height))
       case _ =>
         rocksdb.wavesAmount(height)
     }

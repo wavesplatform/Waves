@@ -28,7 +28,7 @@ package object appender {
     813207 -> ByteStr.decodeBase58("5uZoDnRKeWZV9Thu2nvJVZ5dBvPB7k2gvpzFD618FMXCbBVBMN2rRyvKBZBhAGnGdgeh2LXEeSr9bJqruJxngsE7").get
   )
 
-  private def responseToSnapshot(block: Block, height: Int)(s: BlockSnapshotResponse): BlockSnapshot =
+  private def responseToSnapshot(block: Block, height: Height)(s: BlockSnapshotResponse): BlockSnapshot =
     BlockSnapshot(
       block.id(),
       block.transactionData.zip(s.snapshots).map { case (tx, pbs) => PBSnapshots.fromProtobuf(pbs, tx.id(), height) }
@@ -49,7 +49,14 @@ package object appender {
         metrics.appendBlock
           .measureSuccessful(
             blockchainUpdater
-              .processBlock(block, hitSource, snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)), None, verify, txSignParCheck)
+              .processBlock(
+                block,
+                hitSource,
+                snapshot.map(responseToSnapshot(block, Height(blockchainUpdater.height + 1))),
+                None,
+                verify,
+                txSignParCheck
+              )
           )
           .map {
             case res @ Applied(discardedDiffs, _) =>
@@ -83,7 +90,7 @@ package object appender {
           blockchainUpdater.processBlock(
             block,
             hitSource,
-            snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)),
+            snapshot.map(responseToSnapshot(block, Height(blockchainUpdater.height + 1))),
             None,
             verify,
             txSignParCheck
@@ -134,7 +141,7 @@ package object appender {
             blockchainUpdater.processBlock(
               block,
               hitSource,
-              snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)),
+              snapshot.map(responseToSnapshot(block, Height(blockchainUpdater.height + 1))),
               Some(challengedHitSource),
               verify,
               txSignParCheck

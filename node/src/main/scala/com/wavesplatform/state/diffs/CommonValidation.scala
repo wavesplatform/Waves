@@ -25,6 +25,7 @@ import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{Asset, *}
 
 import scala.util.{Left, Right}
+import scala.math.Ordered.orderingToOrdered
 
 object CommonValidation {
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
@@ -116,8 +117,8 @@ object CommonValidation {
     } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = tx match {
-    case _: PaymentTransaction                                                          => Right(tx)
-    case _: CreateAliasTransaction if blockchain.height < DisableHijackedAliases.height => Right(tx)
+    case _: PaymentTransaction                                                                  => Right(tx)
+    case _: CreateAliasTransaction if Height(blockchain.height) < DisableHijackedAliases.height => Right(tx)
     case _ =>
       val id = tx.id()
       Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionMeta(id).get.height))

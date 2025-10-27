@@ -13,7 +13,7 @@ import com.wavesplatform.database.{protobuf as pb, *}
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
+import com.wavesplatform.protobuf.{toByteStr, toByteString, toPublicKey}
 import com.wavesplatform.ride.runner.caches.disk.AsBytes.*
 import com.wavesplatform.ride.runner.caches.disk.syntax.*
 import com.wavesplatform.ride.runner.caches.{WeighedAccountScriptInfo, WeighedAssetDescription}
@@ -131,7 +131,7 @@ object KvPairs {
 
       val script = from.readOpt(readAssetScript(from.readWithIntLen()))
       AssetDescription(
-        staticInfo.sourceId.toByteStr,
+        TransactionId(staticInfo.sourceId.toByteStr),
         staticInfo.issuerPublicKey.toPublicKey,
         assetInfo.name,
         assetInfo.description,
@@ -143,7 +143,7 @@ object KvPairs {
         sponsorship,
         staticInfo.isNft,
         staticInfo.sequenceInBlock,
-        state.Height @@ staticInfo.height
+        state.Height(staticInfo.height)
       )
     }
 
@@ -195,8 +195,9 @@ object KvPairs {
   object AccountLeaseBalancesHistory extends KvHistoryPair[AddressId, LeaseBalance](101, AccountLeaseBalances)
   object AccountLeaseBalances        extends KvPair[(state.Height, AddressId), LeaseBalance](102)
 
-  implicit val transactionIdAsBytes: AsBytes[TransactionId]       = AsBytes.byteArrayAsBytes.consumeAll.toByteStr.transform(TransactionId(_), x => x)
-  private val transactionIdWithLenAsBytes: AsBytes[TransactionId] = AsBytes.byteArrayAsBytes.withIntLen.toByteStr.transform(TransactionId(_), x => x)
+  implicit val transactionIdAsBytes: AsBytes[TransactionId] = AsBytes.byteArrayAsBytes.consumeAll.toByteStr.transform(TransactionId(_), _.byteStr)
+  private val transactionIdWithLenAsBytes: AsBytes[TransactionId] =
+    AsBytes.byteArrayAsBytes.withIntLen.toByteStr.transform(TransactionId(_), _.byteStr)
   object TransactionsByHeight
       extends KvPair[state.Height, List[TransactionId]](109)(using implicitly, AsBytes.listAsBytes.consumeAll(using transactionIdWithLenAsBytes))
   object Transactions extends KvPair[TransactionId, Option[state.Height]](110)

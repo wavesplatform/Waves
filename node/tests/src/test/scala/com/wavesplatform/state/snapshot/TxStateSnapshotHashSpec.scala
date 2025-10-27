@@ -303,7 +303,7 @@ class TxStateSnapshotHashSpec extends PropSpec {
       withClue(clue) {
         TSS.parseFrom(Base64.decode(b64str)) shouldEqual pbSnapshot
 
-        val (snapshot, meta) = PBSnapshots.fromProtobuf(pbSnapshot, txId, 10)
+        val (snapshot, meta) = PBSnapshots.fromProtobuf(pbSnapshot, txId, Height(10))
         val raw = Hex.toHexString(
           TxStateSnapshotHashBuilder
             .createHashFromSnapshot(snapshot, Some(TxStateSnapshotHashBuilder.TxStatusInfo(txId, meta)))

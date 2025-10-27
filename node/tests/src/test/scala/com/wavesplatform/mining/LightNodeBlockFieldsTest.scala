@@ -9,6 +9,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint.Unlimited
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.TxHelpers
@@ -59,7 +60,7 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
       ) {
         override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = Right((defaultSigner, 0))
       }
-      def block(height: Int) = d.blocksApi.blockAtHeight(height).get._1.header
+      def block(height: Int) = d.blocksApi.blockAtHeight(Height(height)).get._1.header
       def appendBlock()      = append(miner.forgeBlock(defaultSigner).explicitGet()._1).explicitGet()
       def appendMicro() = {
         d.utxPool.putIfNew(transfer()).resultE.explicitGet()

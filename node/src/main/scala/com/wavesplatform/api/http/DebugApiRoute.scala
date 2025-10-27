@@ -256,7 +256,7 @@ case class DebugApiRoute(
 
   private def stateHashAt(height: Int): Route = {
     val result = for {
-      sh <- db.loadStateHash(height)
+      sh <- db.loadStateHash(Height(height))
       h  <- blockchain.blockHeader(height)
     } yield Json.toJson(sh).as[JsObject] ++ Json.obj(
       "snapshotHash" -> db.snapshotStateHash(height),

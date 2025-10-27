@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory
 import java.lang.Long as JLong
 import java.util.concurrent.atomic.AtomicLong
 import scala.util.chaining.scalaUtilChainingOps
+import scala.math.Ordered.orderingToOrdered
 
 class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastHeight: Option[Height]) extends DiskCaches with ScorexLogging {
   override val addressIds: AddressIdDiskCache = new AddressIdDiskCache {
@@ -373,7 +374,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
     override def removeFrom(fromHeight: Height)(implicit ctx: ReadWrite): Unit = {
       ctx.iterateOverPrefix(Key.at(fromHeight)) { x => ctx.delete(x.getKey, Key.columnFamilyHandle) }
 
-      val newLastHeight = Height(fromHeight - 1)
+      val newLastHeight = fromHeight - 1
       lastHeight = if (ctx.has(Key.at(newLastHeight))) {
         ctx.put(KvPairs.Height.Key, newLastHeight)
         Some(newLastHeight)

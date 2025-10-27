@@ -157,7 +157,7 @@ case class SnapshotBlockchain(
     } else {
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
-      val bs         = BalanceSnapshot(height, Portfolio(balance, lease))
+      val bs         = BalanceSnapshot(Height(height), Portfolio(balance, lease))
       val height2Fix = this.height == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
       if (inner.height > 0 && (from1 < this.height - 1 || height2Fix))
         bs +: inner.balanceSnapshots(address, from1, to)
@@ -284,7 +284,7 @@ object SnapshotBlockchain {
           sponsorship.getOrElse(0),
           static.nft,
           assetNum,
-          Height @@ height
+          Height(height)
         )
       }
       .orElse(

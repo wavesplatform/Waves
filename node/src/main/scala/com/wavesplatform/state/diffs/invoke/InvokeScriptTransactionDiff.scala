@@ -27,7 +27,7 @@ import com.wavesplatform.lang.v1.evaluator.*
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{Recipient as RideRecipient, *}
 import com.wavesplatform.metrics.TxProcessingStats as Stats
-import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
+import com.wavesplatform.metrics.TxProcessingStats.measureForType
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
@@ -259,9 +259,9 @@ object InvokeScriptTransactionDiff {
           invocation = ContractEvaluator.Invocation(
             funcCall,
             invoker,
-            tx.sender,
+            tx.sender.byteStr,
             invoker,
-            tx.sender,
+            tx.sender.byteStr,
             payments,
             tx.id(),
             tx.fee,

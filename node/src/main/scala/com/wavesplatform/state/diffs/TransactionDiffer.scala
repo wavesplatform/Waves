@@ -11,7 +11,7 @@ import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
-import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
+import com.wavesplatform.metrics.TxProcessingStats.measureForType
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff

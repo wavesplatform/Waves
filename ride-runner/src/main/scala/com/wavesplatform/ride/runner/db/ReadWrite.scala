@@ -1,6 +1,5 @@
 package com.wavesplatform.ride.runner.db
 
-import com.google.common.primitives.Ints
 import com.wavesplatform.database.Key
 import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.caches.disk.KvHistoryPair
@@ -10,6 +9,8 @@ import org.rocksdb.ColumnFamilyHandle
 
 import scala.annotation.unused
 import scala.collection.mutable
+
+import scala.math.Ordered.orderingToOrdered
 
 trait ReadWrite extends ReadOnly {
   def put[V](key: Key[V], value: V): Int
@@ -69,7 +70,7 @@ trait ReadWrite extends ReadOnly {
     val affectedEntryKeys = mutable.Set.empty[K]
     val entriesKey        = historyKey.kvPairAtHeight
 
-    iterateOverPrefix(entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight), entriesKey.columnFamilyHandle) { e =>
+    iterateOverPrefix(entriesKey.prefixBytes ++ fromHeight.toByteArray, entriesKey.columnFamilyHandle) { e =>
       val rawKey        = e.getKey
       val keyWithHeight = entriesKey.parseKey(rawKey)
       val (_, key)      = keyWithHeight

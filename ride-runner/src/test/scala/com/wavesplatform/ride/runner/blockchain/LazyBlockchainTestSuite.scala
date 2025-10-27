@@ -14,7 +14,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.block.{Block, MicroBlock, SignedMicroBlock}
 import com.wavesplatform.protobuf.transaction.PBAmounts.toPBAssetId
 import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, SetScriptTransactionData, SignedTransaction, Transaction}
-import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
+import com.wavesplatform.protobuf.{Amount, toByteString}
 import com.wavesplatform.ride.runner.caches.*
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.mem.{MemBlockchainDataCache, MemCacheKey}
@@ -295,7 +295,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
 
   private val asset = Asset.IssuedAsset(ByteStr(Array.fill[Byte](AssetIdLength)(2)))
   private val assetDescription = AssetDescription(
-    originTransactionId = asset.id,
+    originTransactionId = TransactionId(asset.id),
     issuer = alice.publicKey,
     name = "name".toByteString,
     description = "description".toByteString,
@@ -424,7 +424,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
         modAppend(
           BlockchainUpdated
             .Append()
-            .withBlock(BlockchainUpdated.Append.BlockAppend().withBlock(modBlock(mkPbBlock(height))))
+            .withBlock(BlockchainUpdated.Append.BlockAppend().withBlock(modBlock(mkPbBlock(Height(height)))))
         )
       )
     )

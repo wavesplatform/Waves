@@ -2,13 +2,11 @@ package com.wavesplatform
 
 import cats.Id
 import cats.implicits.*
-import cats.kernel.Monoid
-import com.wavesplatform.account.Address
+import com.google.common.primitives.Ints
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.utils.Paged
 import play.api.libs.json.*
-import supertagged.TaggedType
 
+import scala.annotation.targetName
 import scala.reflect.ClassTag
 import scala.util.Try
 
@@ -28,51 +26,54 @@ package object state {
     }
   }
 
-  object AssetDistribution extends TaggedType[Map[Address, Long]]
-  type AssetDistribution = AssetDistribution.Type
+  object Height {
+    def apply(h: Int): Height = h
 
-  implicit val dstMonoid: Monoid[AssetDistribution] = new Monoid[AssetDistribution] {
-    override def empty: AssetDistribution = AssetDistribution(Map.empty[Address, Long])
+    extension (h: Height) {
+      def toInt: Int               = h
+      def toByteArray: Array[Byte] = Ints.toByteArray(h)
+      def +(that: Int): Height     = h + that
+      def -(that: Int): Height     = h - that
 
-    override def combine(x: AssetDistribution, y: AssetDistribution): AssetDistribution = {
-      AssetDistribution(x ++ y)
+      @targetName("minusHeight")
+      def -(that: Height): Int = h - that
+
+      infix def to(end: Height): Range.Inclusive = Range.inclusive(h, end)
+
+      def max(that: Int): Height = that.max(h)
+      @targetName("maxHeight")
+      def max(that: Height): Height = that.max(h)
     }
+
+    given Ordering[Height] = Ordering[Int]
+
+    given Writes[Height] = Writes.IntWrites
+  }
+  opaque type Height = Int
+
+  object TxNum {
+    def apply(s: Short): TxNum = s
+    extension (n: TxNum) {
+      def toShort: Short  = n
+      def unary_- : TxNum = (-n).toShort
+    }
+    given Ordering[TxNum] = Ordering[Short]
   }
 
-  implicit val dstWrites: Writes[AssetDistribution] = Writes { dst =>
-    Json
-      .toJson(dst.map { case (addr, balance) =>
-        addr.toString -> balance
-      })
-  }
+  opaque type TxNum = Short
 
-  object AssetDistributionPage extends TaggedType[Paged[Address, AssetDistribution]]
-  type AssetDistributionPage = AssetDistributionPage.Type
+  object TransactionId {
+    def apply(bs: ByteStr): TransactionId = bs
 
-  implicit val dstPageWrites: Writes[AssetDistributionPage] = Writes { page =>
-    Json.obj(
-      "hasNext"  -> JsBoolean(page.hasNext),
-      "lastItem" -> Json.toJson(page.lastItem.map(_.toString)),
-      "items"    -> Json.toJson(page.items)
-    )
-  }
-
-  object Height extends TaggedType[Int] {
-    implicit val format: Format[Height] = implicitly[Format[Int]].bimap(Height(_), identity)
-  }
-  type Height = Height.Type
-
-  object TxNum extends TaggedType[Short]
-  type TxNum = TxNum.Type
-
-  object AssetNum extends TaggedType[Int]
-  type AssetNum = AssetNum.Type
-
-  object TransactionId extends TaggedType[ByteStr] {
     implicit val format: Format[TransactionId] = Format[TransactionId](
       com.wavesplatform.utils.byteStrFormat.map(this(_)),
       Writes(com.wavesplatform.utils.byteStrFormat.writes)
     )
+
+    extension (txId: TransactionId) {
+      def arr: Array[Byte] = txId.arr
+      def byteStr: ByteStr = txId
+    }
   }
-  type TransactionId = TransactionId.Type
+  opaque type TransactionId = ByteStr
 }

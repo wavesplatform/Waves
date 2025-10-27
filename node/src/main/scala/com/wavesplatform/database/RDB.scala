@@ -43,12 +43,15 @@ object RDB extends StrictLogging {
     val dbDir     = file.getAbsoluteFile
     dbDir.getParentFile.mkdirs()
 
-    val handles             = new util.ArrayList[ColumnFamilyHandle]()
-    val defaultCfOptions    = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
-    val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-    val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-    val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-    val apiCfOptions        = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.apiCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val handles = new util.ArrayList[ColumnFamilyHandle]()
+    val defaultCfOptions =
+      newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize.longValue, 0.6, settings.rocksdb.writeBufferSize.longValue)
+    val txMetaCfOptions =
+      newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize.longValue, 0.9, settings.rocksdb.writeBufferSize.longValue)
+    val txCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize.longValue, 0.9, settings.rocksdb.writeBufferSize.longValue)
+    val txSnapshotCfOptions =
+      newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize.longValue, 0.9, settings.rocksdb.writeBufferSize.longValue)
+    val apiCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.apiCacheSize.longValue, 0.9, settings.rocksdb.writeBufferSize.longValue)
     val db = RocksDB.open(
       dbOptions.options,
       settings.directory,

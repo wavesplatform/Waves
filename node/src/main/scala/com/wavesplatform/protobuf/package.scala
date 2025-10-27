@@ -8,22 +8,24 @@ import com.wavesplatform.state.TransactionId
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
+import scala.annotation.targetName
+
 package object protobuf {
-  implicit final class ByteStrExt(private val bs: ByteStr) extends AnyVal {
-    def toByteString: ByteString = ByteString.copyFrom(bs.arr)
+  extension (bs: ByteStr) def toByteString: ByteString = ByteString.copyFrom(bs.arr)
+
+  extension (txId: TransactionId) {
+    @targetName("txIdToByteString") def toByteString: ByteString = ByteString.copyFrom(txId.arr)
   }
 
-  implicit final class AddressExt(private val a: Address) extends AnyVal {
-    def toByteString: ByteString = ByteString.copyFrom(a.bytes)
+  extension (a: Address) def toByteString: ByteString = ByteString.copyFrom(a.bytes)
+
+  extension (pk: PublicKey) {
+    @targetName("publicKeyToByteString") def toByteString: ByteString = ByteString.copyFrom(pk.arr)
   }
 
-  implicit final class PublicKeyExt(private val pk: PublicKey) extends AnyVal {
-    def toByteString: ByteString = ByteString.copyFrom(pk.arr)
-  }
-
-  implicit final class ByteStringExt(private val bs: ByteString) extends AnyVal {
+  extension (bs: ByteString) {
     def toByteStr: ByteStr           = ByteStr(bs.toByteArray)
-    def toTxId: TransactionId        = TransactionId @@ toByteStr
+    def toTxId: TransactionId        = TransactionId(toByteStr)
     def toIssuedAssetId: IssuedAsset = IssuedAsset(ByteStr(bs.toByteArray))
     def toAssetId: Asset             = if (bs.isEmpty) Waves else toIssuedAssetId
     def toPublicKey: PublicKey       = PublicKey(bs.toByteArray)

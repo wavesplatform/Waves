@@ -6,9 +6,9 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.network.message.MessageSpec
-import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
 import com.wavesplatform.transaction.{Signed, Transaction}
+import com.wavesplatform.protobuf.{toByteString, toByteStr}
 import monix.eval.Coeval
 
 import java.net.InetSocketAddress

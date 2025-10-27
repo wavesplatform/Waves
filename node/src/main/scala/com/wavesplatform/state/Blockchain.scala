@@ -18,6 +18,7 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
+import scala.math.Ordered.orderingToOrdered
 
 trait Blockchain {
   def settings: BlockchainSettings
@@ -229,11 +230,11 @@ object Blockchain {
         .featureActivationHeight(LightNode.id)
         .exists(height >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
 
-    def blockRewardBoost(height: Int): Int =
+    def blockRewardBoost(height: Height): Int =
       blockchain
         .featureActivationHeight(BlockchainFeatures.BoostBlockReward.id)
         .filter { boostHeight =>
-          boostHeight <= height && height < boostHeight + blockchain.settings.functionalitySettings.blockRewardBoostPeriod
+          Height(boostHeight) <= height && height < Height(boostHeight + blockchain.settings.functionalitySettings.blockRewardBoostPeriod)
         }
         .fold(1)(_ => BlockRewardCalculator.RewardBoost)
 

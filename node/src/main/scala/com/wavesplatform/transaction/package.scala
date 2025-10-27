@@ -14,8 +14,6 @@ import com.wavesplatform.utils.{EthEncoding, base58Length}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.{Interval, NonNegative, Positive}
 import play.api.libs.json.*
-import supertagged.*
-import supertagged.postfix.*
 
 package object transaction {
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength
@@ -102,18 +100,21 @@ package object transaction {
     def signWith(privateKey: PrivateKey)(implicit sign: (T, PrivateKey) => T): T = sign(tx, privateKey)
   }
 
-  object ERC20Address extends TaggedType[ByteStr] {
+  object ERC20Address {
     def apply(bs: ByteStr): ERC20Address = {
       require(bs.arr.length == 20, "ERC20 token address length must be 20 bytes")
-      bs @@ this
+      bs
     }
 
     def apply(ia: IssuedAsset): ERC20Address = apply(ia.id.take(20))
 
-    implicit val jsonFormat: Format[ERC20Address] = Format(
+    given Format[ERC20Address] = Format(
       implicitly[Reads[String]].map(str => ERC20Address(ByteStr(EthEncoding.toBytes(str)))),
       implicitly[Writes[String]].contramap((addr: ERC20Address) => EthEncoding.toHexString(addr.arr))
     )
+
+    extension (ea: ERC20Address) def arr: Array[Byte] = ea.arr
   }
-  type ERC20Address = ERC20Address.Type
+  opaque type ERC20Address = ByteStr
+
 }

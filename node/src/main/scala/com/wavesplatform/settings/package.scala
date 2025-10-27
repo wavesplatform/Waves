@@ -7,7 +7,6 @@ import pureconfig.*
 import pureconfig.ConvertHelpers.catchReadError
 import pureconfig.configurable.genericMapReader
 import pureconfig.error.{CannotConvert, ConfigReaderFailures}
-import supertagged.TaggedType
 
 import scala.util.Try
 
@@ -26,18 +25,15 @@ package object settings {
 
   implicit val privateKeyReader: ConfigReader[PrivateKey] = ConfigReader[ByteStr].map(PrivateKey(_))
 
-  object SizeInBytes extends TaggedType[Long]
-  type SizeInBytes = SizeInBytes.Type
+  opaque type SizeInBytes = Long
 
-  implicit val sizeInBytesConfigReader: ConfigReader[SizeInBytes] = ConfigReader.fromCursor(cur =>
-    for {
-      configValue <- cur.asConfigValue
-    } yield {
-      val config      = ConfigFactory.empty().withValue("stubKey", configValue)
-      val bytes: Long = config.getBytes("stubKey")
-      SizeInBytes(bytes)
-    }
-  )
+  object SizeInBytes {
+    def apply(l: Long): SizeInBytes = l
+
+    given ConfigReader[SizeInBytes] = ConfigReader.fromCursor(_.asConfigValue.map(v => SizeInBytes(v.atKey("stub").getBytes("stub"))))
+
+    extension (sb: SizeInBytes) def longValue: Long = sb
+  }
 
   def loadConfig(userConfig: Config): Config = {
     loadConfig(Some(userConfig))

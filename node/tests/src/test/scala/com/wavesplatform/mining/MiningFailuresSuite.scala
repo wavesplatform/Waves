@@ -9,7 +9,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
-import com.wavesplatform.state.{BalanceSnapshot, BlockMinerInfo, Blockchain, NG}
+import com.wavesplatform.state.{BalanceSnapshot, BlockMinerInfo, Blockchain, Height, NG}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.BlockchainUpdater
@@ -107,7 +107,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
         Right(Applied(Nil, 0))
       }
       .once()
-    (blockchainUpdater.balanceSnapshots).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0)))
+    (blockchainUpdater.balanceSnapshots).when(*, *, *).returning(Seq(BalanceSnapshot(Height(1), ENOUGH_AMT, 0, 0)))
 
     val account       = accountGen.sample.get
     val generateBlock = generateBlockTask(miner)(account)

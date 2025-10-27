@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state.{Portfolio, StateSnapshot}
+import com.wavesplatform.state.{Height, Portfolio, StateSnapshot}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
@@ -108,7 +108,7 @@ object RollbackBenchmark extends ScorexLogging {
 
     log.info("Rolling back")
     val start = System.nanoTime()
-    rocksDBWriter.rollbackTo(1)
+    rocksDBWriter.rollbackTo(Height(1))
     val end = System.nanoTime()
     log.info(f"Rollback took ${(end - start) * 1e-6}%.3f ms")
     rocksDBWriter.close()

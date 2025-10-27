@@ -9,7 +9,7 @@ import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.PBBlock
-import com.wavesplatform.state.TxMeta
+import com.wavesplatform.state.{Height, TxMeta}
 import com.wavesplatform.transaction.Transaction
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
@@ -20,18 +20,18 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
   import BlocksApiGrpcImpl.*
 
   override def getCurrentHeight(request: Empty): Future[Int] = {
-    Future.successful(commonApi.currentHeight)
+    Future.successful(commonApi.currentHeight.toInt)
   }
 
   override def getBlockRange(request: BlockRangeRequest, responseObserver: StreamObserver[BlockWithHeight]): Unit = responseObserver.interceptErrors {
     val stream =
       if (request.includeTransactions)
         commonApi
-          .blocksRange(request.fromHeight, request.toHeight)
+          .blocksRange(Height(request.fromHeight), Height(request.toHeight))
           .map(toBlockWithHeight)
       else
         commonApi
-          .metaRange(request.fromHeight, request.toHeight)
+          .metaRange(Height(request.fromHeight), Height(request.toHeight))
           .map(toBlockWithHeight)
 
     responseObserver.completeWith(request.filter match {
@@ -51,7 +51,7 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
         else commonApi.meta(blockId.toByteStr).map(toBlockWithHeight)
 
       case Request.Height(height) =>
-        val actualHeight = if (height > 0) height else commonApi.currentHeight + height
+        val actualHeight = if (height > 0) Height(height) else commonApi.currentHeight + height
         if (request.includeTransactions)
           commonApi
             .blockAtHeight(actualHeight)

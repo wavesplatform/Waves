@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{GenesisTransactionSettings, WavesSettings}
 import com.wavesplatform.state.TxMeta.Status
+import com.wavesplatform.state.Height as H
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
@@ -26,20 +27,20 @@ import scala.util.{Random, Using}
 class RocksDBWriterSpec extends FreeSpec with WithDomain {
   "Slice" - {
     "drops tail" in {
-      RocksDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
+      RocksDBWriter.slice(Seq(H(10), H(7), H(4)), H(7), H(10)) shouldEqual Seq(10, 7).map(H.apply)
     }
     "drops head" in {
-      RocksDBWriter.slice(Seq(10, 7, 4), 4, 8) shouldEqual Seq(7, 4)
+      RocksDBWriter.slice(Seq(10, 7, 4).map(H.apply), H(4), H(8)) shouldEqual Seq(7, 4).map(H.apply)
     }
     "includes Genesis" in {
-      RocksDBWriter.slice(Seq(10, 7), 5, 11) shouldEqual Seq(10, 7, 1)
+      RocksDBWriter.slice(Seq(H(10), H(7)), H(5), H(11)) shouldEqual Seq(10, 7, 1).map(H.apply)
     }
   }
   "Merge" - {
     "correctly joins height ranges" in {
-      RocksDBWriter.merge(Seq(15, 12, 3), Seq(12, 5)) shouldEqual Seq((15, 12), (12, 12), (3, 5))
-      RocksDBWriter.merge(Seq(12, 5), Seq(15, 12, 3)) shouldEqual Seq((12, 15), (12, 12), (5, 3))
-      RocksDBWriter.merge(Seq(8, 4), Seq(8, 4)) shouldEqual Seq((8, 8), (4, 4))
+      RocksDBWriter.merge(Seq(15, 12, 3).map(H.apply), Seq(12, 5).map(H.apply)) shouldEqual Seq((H(15), H(12)), (H(12), H(12)), (H(3), H(5)))
+      RocksDBWriter.merge(Seq(12, 5).map(H.apply), Seq(15, 12, 3).map(H.apply)) shouldEqual Seq((H(12), H(15)), (H(12), H(12)), (H(5), H(3)))
+      RocksDBWriter.merge(Seq(8, 4).map(H.apply), Seq(8, 4).map(H.apply)) shouldEqual Seq((H(8), H(8)), (H(4), H(4)))
     }
   }
 
@@ -202,7 +203,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       (3 to 10).foreach(_ => d.appendBlock())
       d.blockchain.height shouldBe 10
 
-      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 0
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe H(0)
       withClue("All data exists: ") {
         checkHistoricalDataOnlySinceHeight(d, allAddresses, 1)
       }
@@ -215,7 +216,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       (3 to 11).foreach(_ => d.appendBlock())
       d.blockchain.height shouldBe 11
 
-      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 4
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe H(4)
       withClue("No data before: ") {
         checkHistoricalDataOnlySinceHeight(d, userAddresses, 2)
         checkHistoricalDataOnlySinceHeight(d, minerAddresses, 4) // Updated on each height
@@ -237,7 +238,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       (5 to 11).foreach(_ => d.appendBlock())
       d.blockchain.height shouldBe 11
 
-      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 4
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe H(4)
       withClue("No data before: ") {
         checkHistoricalDataOnlySinceHeight(d, allAddresses, 4)
       }
@@ -266,7 +267,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       (7 to 15).foreach(_ => d.appendBlock())
       d.blockchain.height shouldBe 15
 
-      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 8
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe H(8)
       withClue("No data before: ") {
         checkHistoricalDataOnlySinceHeight(d, userAddresses, 6)
         checkHistoricalDataOnlySinceHeight(d, minerAddresses, 8) // Updated on each height

@@ -38,8 +38,8 @@ object UtilApp {
   }
 
   case class CompileOptions(assetScript: Boolean = false)
-  case class SignOptions(privateKey: PrivateKey = null)
-  case class VerifyOptions(publicKey: PublicKey = null, signature: ByteStr = ByteStr.empty, checkWeakPk: Boolean = false)
+  case class SignOptions(privateKey: PrivateKey = null.asInstanceOf[PrivateKey])
+  case class VerifyOptions(publicKey: PublicKey = null.asInstanceOf[PublicKey], signature: ByteStr = ByteStr.empty, checkWeakPk: Boolean = false)
   case class HashOptions(mode: String = "fast")
   case class SignTxOptions(signerAddress: String = "")
   case class KeyPairOptions(seedType: String = "account", nonce: Int = 0)

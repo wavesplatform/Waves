@@ -20,6 +20,7 @@ import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.StreamSerializerUtils.*
 import com.wavesplatform.api.http.assets.AssetsApiRoute.*
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.{TransactionId, Height}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, TxMeta}
@@ -325,7 +326,7 @@ object AssetsApiRoute {
       }
     }
 
-    getTimestamps(assets.map { case (_, description) => description.originTransactionId }).map { infos =>
+    getTimestamps(assets.map { case (_, description) => description.originTransactionId.byteStr }).map { infos =>
       assets.zip(infos).map { case ((id, description), timestamp) =>
         AssetDetails(
           assetId = id.id.toString,
@@ -359,10 +360,10 @@ object AssetsApiRoute {
 
   def jsonDetails(blockchain: Blockchain)(id: IssuedAsset, description: AssetDescription, full: Boolean): Either[String, JsObject] = {
     // (timestamp, height)
-    def additionalInfo(id: ByteStr): Either[String, Long] =
+    def additionalInfo(id: TransactionId): Either[String, Long] =
       for {
         (_, tx) <- blockchain
-          .transactionInfo(id)
+          .transactionInfo(id.byteStr)
           .filter { case (tm, _) => tm.status == TxMeta.Status.Succeeded }
           .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
         timestamp <- (tx match {
@@ -382,7 +383,7 @@ object AssetsApiRoute {
     } yield JsObject(
       Seq(
         "assetId"         -> JsString(id.id.toString),
-        "issueHeight"     -> JsNumber(description.issueHeight),
+        "issueHeight"     -> JsNumber(description.issueHeight.toInt),
         "issueTimestamp"  -> JsNumber(timestamp),
         "issuer"          -> JsString(description.issuer.toAddress.toString),
         "issuerPublicKey" -> JsString(description.issuer.toString),
@@ -416,7 +417,7 @@ object AssetsApiRoute {
 
   case class AssetDetails(
       assetId: String,
-      issueHeight: Int,
+      issueHeight: Height,
       issueTimestamp: Long,
       issuer: String,
       issuerPublicKey: String,
@@ -461,7 +462,7 @@ object AssetsApiRoute {
     (details: AssetDetails, gen: JsonGenerator, serializers: SerializerProvider) => {
       gen.writeStartObject()
       gen.writeStringField("assetId", details.assetId)
-      gen.writeNumberField("issueHeight", details.issueHeight, numbersAsString)
+      gen.writeNumberField("issueHeight", details.issueHeight.toInt, numbersAsString)
       gen.writeNumberField("issueTimestamp", details.issueTimestamp, numbersAsString)
       gen.writeStringField("issuer", details.issuer)
       gen.writeStringField("issuerPublicKey", details.issuerPublicKey)

@@ -13,7 +13,7 @@ import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.Block
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.protobuf.serde.*
 import com.wavesplatform.events.repo.LiquidState
-import com.wavesplatform.state.{Blockchain, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, Height, StateSnapshot}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
@@ -25,6 +25,7 @@ import org.rocksdb.RocksDB
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
+import scala.math.Ordered.orderingToOrdered
 import scala.util.Using
 import scala.util.control.Exception
 
@@ -73,7 +74,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
     )
 
     liquidState.foreach(ls =>
-      db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
+      db.put(keyForHeight(Height(ls.keyBlock.height)), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
     )
 
     val ba = BlockAppended.from(block, snapshot, blockchainBeforeWithReward, reward, hitSource)
@@ -100,7 +101,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
     handlers.forEach(_.handleUpdate(mba))
   }
 
-  def rollbackData(toHeight: Int): Seq[BlockAppended] =
+  def rollbackData(toHeight: Height): Seq[BlockAppended] =
     db.readWrite { rw =>
       log.debug(s"Rolling back to $toHeight")
       var buf: List[BlockAppended] = Nil
@@ -108,7 +109,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
         iter.seek(keyForHeight(toHeight + 1))
         while (iter.isValid) {
           val height      = Ints.fromByteArray(iter.key())
-          val stateUpdate = Loader.parseUpdate(iter.value(), blocksApi, height).vanillaAppend
+          val stateUpdate = Loader.parseUpdate(iter.value(), blocksApi, Height(height)).vanillaAppend
           buf = stateUpdate :: buf
           iter.next()
         }
@@ -161,9 +162,9 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
           ls.microBlocks.reverse.map(revertMicroBlock(_, blockchainBefore)) -> Seq(revertBlock(ls.keyBlock, blockchainBefore))
         } else {
           ls.microBlocks.reverse.map(revertMicroBlock(_, blockchainBefore)) ->
-            (ls.keyBlock +: rollbackData(toHeight)).map(revertBlock(_, blockchainBefore))
+            (ls.keyBlock +: rollbackData(Height(toHeight))).map(revertBlock(_, blockchainBefore))
         }
-      case None => Seq.empty -> rollbackData(toHeight).map(revertBlock(_, blockchainBefore))
+      case None => Seq.empty -> rollbackData(Height(toHeight)).map(revertBlock(_, blockchainBefore))
     }
 
     liquidState = None
@@ -212,25 +213,25 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
     }
   }
 
-  def getBlockUpdate(height: Int): GetBlockUpdateResponse = liquidState match {
-    case Some(ls) if ls.keyBlock.height == height => GetBlockUpdateResponse(Some(ls.solidify().protobuf))
-    case Some(ls) if ls.keyBlock.height < height  => throw new IllegalArgumentException()
+  def getBlockUpdate(height: Height): GetBlockUpdateResponse = liquidState match {
+    case Some(ls) if Height(ls.keyBlock.height) == height => GetBlockUpdateResponse(Some(ls.solidify().protobuf))
+    case Some(ls) if Height(ls.keyBlock.height) < height  => throw new IllegalArgumentException()
     case _ =>
       db.withResource { res =>
         GetBlockUpdateResponse(Some(Loader.loadUpdate(res, blocksApi, height)))
       }
   }
 
-  override def getBlockUpdate(request: GetBlockUpdateRequest): Future[GetBlockUpdateResponse] = Future(getBlockUpdate(request.height))
+  override def getBlockUpdate(request: GetBlockUpdateRequest): Future[GetBlockUpdateResponse] = Future(getBlockUpdate(Height(request.height)))
 
   override def getBlockUpdatesRange(request: GetBlockUpdatesRangeRequest): Future[GetBlockUpdatesRangeResponse] =
-    stream(request.fromHeight, request.toHeight, Integer.toString(request.##, 16)).toListL.runToFuture
+    stream(Height(request.fromHeight), Height(request.toHeight), Integer.toString(request.##, 16)).toListL.runToFuture
       .map(updates => GetBlockUpdatesRangeResponse(updates))
 
-  private def stream(fromHeight: Int, toHeight: Int, streamId: String): Observable[PBBlockchainUpdated] = {
+  private def stream(fromHeight: Height, toHeight: Height, streamId: String): Observable[PBBlockchainUpdated] = {
     require(fromHeight <= blocksApi.currentHeight, "Requested start height exceeds current blockchain height")
-    require(fromHeight > 0, "fromHeight must be > 0")
-    require(toHeight == 0 || toHeight >= fromHeight, "fromHeight must not exceed toHeight")
+    require(fromHeight > Height(0), "fromHeight must be > 0")
+    require(toHeight == Height(0) || toHeight >= fromHeight, "fromHeight must not exceed toHeight")
     monitor.synchronized {
       val subject = PublishToOneSubject[BlockchainUpdated]()
       val handler = newHandler(streamId, liquidState, subject, 250)
@@ -248,7 +249,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
         streamId
       ).loadUpdates(fromHeight) ++
         subject.map(_.protobuf))
-        .takeWhile(u => toHeight == 0 || u.height <= toHeight)
+        .takeWhile(u => toHeight == Height(0) || Height(u.height) <= toHeight)
         .doOnComplete(removeHandler)
         .doOnError(t => Task(log.error(s"[$streamId] Subscriber error", t)).flatMap(_ => removeHandler))
         .doOnEarlyStop(removeHandler)
@@ -259,12 +260,12 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
   override def subscribe(request: SubscribeRequest, responseObserver: StreamObserver[SubscribeEvent]): Unit = {
     responseObserver.interceptErrors(
       responseObserver.completeWith(
-        stream(request.fromHeight, request.toHeight, responseObserver.id).map(bu => SubscribeEvent(Some(bu)))
+        stream(Height(request.fromHeight), Height(request.toHeight), responseObserver.id).map(bu => SubscribeEvent(Some(bu)))
       )
     )
   }
 }
 
 object Repo {
-  def keyForHeight(height: Int): Array[Byte] = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN).putInt(height).array()
+  def keyForHeight(height: Height): Array[Byte] = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN).putInt(height.toInt).array()
 }

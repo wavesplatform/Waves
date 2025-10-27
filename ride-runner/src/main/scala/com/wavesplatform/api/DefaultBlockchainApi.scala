@@ -27,15 +27,14 @@ import com.wavesplatform.api.observers.{ManualGrpcObserver, MonixWrappedDownstre
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.collections.syntax.*
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
-import com.wavesplatform.protobuf.{AddressExt, ByteStrExt, ByteStringExt}
-import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height}
+import com.wavesplatform.protobuf.{toByteStr, toByteString, toPublicKey}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height, TransactionId}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{ScorexLogging, StringBytes}
 import io.grpc.*
@@ -100,7 +99,7 @@ class DefaultBlockchainApi(
         // Works only once, see publish > unsafeMulticast > ConnectableObservable.unsafeMulticast
         connectableDownstream.connect()
 
-        ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer)
+        ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight.toInt, toHeight = toHeight.toInt), observer)
       }
 
       override def close(): Unit = if (working.compareAndSet(true, false)) {
@@ -128,7 +127,7 @@ class DefaultBlockchainApi(
     ClientCalls
       .blockingUnaryCall(
         grpcApiChannel.newCall(BlockchainApiGrpc.METHOD_GET_ACTIVATION_STATUS, CallOptions.DEFAULT),
-        ActivationStatusRequest(height)
+        ActivationStatusRequest(height.toInt)
       )
       .features
       .flatMap { x =>
@@ -174,7 +173,7 @@ class DefaultBlockchainApi(
   override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] = {
     val x = ClientCalls.blockingUnaryCall(
       grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK, CallOptions.DEFAULT),
-      BlockRequest(request = BlockRequest.Request.Height(height))
+      BlockRequest(request = BlockRequest.Request.Height(height.toInt))
     )
 
     toVanilla(x).tap(r => log.trace(s"getBlockHeader($height): ${r.toFoundStr("id", _.header.id())}"))
@@ -183,7 +182,7 @@ class DefaultBlockchainApi(
   override def getBlockHeaderRange(fromHeight: Height, toHeight: Height): List[SignedBlockHeaderWithVrf] = ClientCalls
     .blockingServerStreamingCall(
       grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK_RANGE, CallOptions.DEFAULT),
-      BlockRangeRequest(fromHeight = fromHeight, toHeight = toHeight)
+      BlockRangeRequest(fromHeight = fromHeight.toInt, toHeight = toHeight.toInt)
     )
     .asScala
     .flatMap(toVanilla)
@@ -205,7 +204,7 @@ class DefaultBlockchainApi(
 
     val r = xs.map { x =>
       AssetDescription(
-        originTransactionId = asset.id,
+        originTransactionId = TransactionId(asset.id),
         issuer = x.issuer.toPublicKey,
         name = x.name.toByteString,
         description = x.description.toByteString,
@@ -218,10 +217,10 @@ class DefaultBlockchainApi(
         } yield AssetScriptInfo(script, pbScript.complexity),
         sponsorship = x.sponsorship,
         // All next fields are not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
-        lastUpdatedAt = Height @@ 0,
+        lastUpdatedAt = Height(0),
         nft = false,
         sequenceInBlock = 0,
-        issueHeight = Height @@ 0
+        issueHeight = Height(0)
       )
     }
 
@@ -280,7 +279,7 @@ class DefaultBlockchainApi(
       )
     ).map(_.balance)
 
-  override def getTransactionHeight(id: ByteStr): Option[Height] = {
+  override def getTransactionHeight(id: TransactionId): Option[Height] = {
     val ths = firstOf(
       ClientCalls.blockingServerStreamingCall(
         grpcApiChannel.newCall(TransactionsApiGrpc.METHOD_GET_STATUSES, CallOptions.DEFAULT),

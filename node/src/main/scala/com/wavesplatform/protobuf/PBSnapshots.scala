@@ -74,7 +74,7 @@ object PBSnapshots {
     )
   }
 
-  def fromProtobuf(pbSnapshot: TransactionStateSnapshot, txId: ByteStr, height: Int): (StateSnapshot, TxMeta.Status) = {
+  def fromProtobuf(pbSnapshot: TransactionStateSnapshot, txId: ByteStr, height: Height): (StateSnapshot, TxMeta.Status) = {
     val balances: VectorMap[(Address, Asset), Long] =
       VectorMap() ++ pbSnapshot.balances.map(b => (b.address.toAddress(), b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
 
@@ -109,7 +109,7 @@ object PBSnapshots {
 
     val assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] =
       pbSnapshot.assetNamesAndDescriptions
-        .map(i => i.assetId.toIssuedAssetId -> AssetInfo(i.name, i.description, Height @@ height))
+        .map(i => i.assetId.toIssuedAssetId -> AssetInfo(i.name, i.description, height))
         .toMap
 
     val sponsorships: Map[IssuedAsset, SponsorshipValue] =
@@ -119,11 +119,17 @@ object PBSnapshots {
 
     val newLeases = pbSnapshot.newLeases.map { l =>
       l.leaseId.toByteStr ->
-        LeaseStaticInfo(l.senderPublicKey.toPublicKey, l.recipientAddress.toAddress(), TxPositiveAmount.unsafeFrom(l.amount), txId, height)
+        LeaseStaticInfo(
+          l.senderPublicKey.toPublicKey,
+          l.recipientAddress.toAddress(),
+          TxPositiveAmount.unsafeFrom(l.amount),
+          TransactionId(txId),
+          height
+        )
     }.toMap
 
     val cancelledLeases = pbSnapshot.cancelledLeases.map { cl =>
-      cl.leaseId.toByteStr -> LeaseDetails.Status.Cancelled(height, Some(txId))
+      cl.leaseId.toByteStr -> LeaseDetails.Status.Cancelled(height, Some(TransactionId(txId)))
     }.toMap
 
     val aliases: Map[Alias, Address] =

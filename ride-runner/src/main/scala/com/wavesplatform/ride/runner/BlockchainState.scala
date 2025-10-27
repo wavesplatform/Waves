@@ -6,7 +6,7 @@ import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -15,6 +15,7 @@ import monix.eval.Task
 import monix.execution.exceptions.UpstreamTimeoutException
 
 import scala.concurrent.duration.FiniteDuration
+import scala.math.Ordered.orderingToOrdered
 
 sealed trait BlockchainState extends Product with Serializable {
   def processedHeight: Height
@@ -65,12 +66,12 @@ object BlockchainState extends ScorexLogging {
       ResolvingFork(
         processedHeight = rollbackHeight,
         processedMicroBlockNumber = 0,
-        minResolveHeight = Height(origForkHeight + 1) // A new fork can't have a lesser height
+        minResolveHeight = origForkHeight + 1 // A new fork can't have a lesser height
       )
 
     def forceRollBackOne(processedHeight: Height, workingStateHeight: Height): ResolvingFork =
       ResolvingFork(
-        processedHeight = Height(processedHeight - 1), // Drop one block, because it could be updated (liquid)
+        processedHeight = processedHeight - 1, // Drop one block, because it could be updated (liquid)
         processedMicroBlockNumber = 0,
         minResolveHeight = workingStateHeight
       )
@@ -97,7 +98,7 @@ object BlockchainState extends ScorexLogging {
       }
 
       // Almost impossible on MainNet and TestNet, so we can neglect this
-      require(currHeight > 1, "Uncaught case. Check a connectivity to gRPC servers, remove all caches and restart the service")
+      require(currHeight > Height(1), "Uncaught case. Check a connectivity to gRPC servers, remove all caches and restart the service")
 
       processor.forceRollbackLiquid()
       val r = ResolvingFork.forceRollBackOne(currHeight, workingStateHeight)
@@ -105,7 +106,7 @@ object BlockchainState extends ScorexLogging {
       log.warn(s"Closed by a remote part, restarting. Reason: $event")
 
       Task {
-        val startHeight = Height(r.processedHeight + 1)
+        val startHeight = r.processedHeight + 1
         blockchainUpdatesStream.start(startHeight)
         r
       }.delayExecution(settings.delayBeforeForceRestartBlockchainUpdates)
@@ -141,7 +142,7 @@ object BlockchainState extends ScorexLogging {
   def apply(processor: Processor, orig: BlockchainState, event: SubscribeEvent): BlockchainState = {
     val update = event.getUpdate.update
     val h      = Height(event.getUpdate.height)
-    RideRunnerStats.lastKnownHeight.update(h)
+    RideRunnerStats.lastKnownHeight.update(h.toInt)
 
     val currBlockId = event.getUpdate.id.toByteStr
     val updateType  = UpdateType.from(update)

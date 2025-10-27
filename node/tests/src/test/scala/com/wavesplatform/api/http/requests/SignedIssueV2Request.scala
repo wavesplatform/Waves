@@ -21,7 +21,7 @@ object SignedIssueV2Request {
         (JsPath \ "reissuable").read[Boolean] and
         (JsPath \ "fee").read[Long] and
         (JsPath \ "timestamp").read[Long] and
-        (JsPath \ "proofs").read[List[ProofStr]] and
+        (JsPath \ "proofs").read[List[String]] and
         (JsPath \ "script").readNullable[String]
     )(SignedIssueV2Request.apply)
   }

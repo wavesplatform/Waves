@@ -7,9 +7,9 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.database.protobuf.{BlockMeta as PBBlockMeta, BlockMetaExt}
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.database.protobuf.{BlockMetaExt, BlockMeta as PBBlockMeta}
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -22,9 +22,10 @@ import java.{lang, util}
 import scala.collection.immutable.VectorMap
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
+import scala.math.Ordered.orderingToOrdered
 import scala.reflect.ClassTag
 
-abstract class Caches extends Blockchain with Storage {
+abstract class Caches extends Blockchain, Storage {
   import Caches.*
 
   val dbSettings: DBSettings
@@ -41,17 +42,17 @@ abstract class Caches extends Blockchain with Storage {
   protected def loadBlockMeta(height: Height): Option[PBBlockMeta]
   protected def loadTxs(height: Height): Seq[Transaction]
 
-  override def height: Int = current.height
+  override def height: Int = current.height.toInt
 
   override def score: BigInt = current.score
 
   override def lastBlock: Option[Block] = current.block
 
   override def blockHeader(height: Int): Option[SignedBlockHeader] =
-    if (current.height == height) current.signedHeader else loadBlockMeta(Height(height)).map(toSignedHeader)
+    if (current.height == Height(height)) current.signedHeader else loadBlockMeta(Height(height)).map(toSignedHeader)
 
   override def hitSource(height: Int): Option[ByteStr] =
-    if (current.height == height) current.hitSource else loadBlockMeta(Height(height)).map(toHitSource)
+    if (current.height == Height(height)) current.hitSource else loadBlockMeta(Height(height)).map(toHitSource)
 
   def loadHeightOf(blockId: ByteStr): Option[Int]
 
@@ -238,7 +239,7 @@ abstract class Caches extends Blockchain with Storage {
       Some(PBBlocks.protobuf(block.header)),
       ByteString.copyFrom(block.signature.arr),
       if (block.header.version >= Block.ProtoBlockVersion) ByteString.copyFrom(block.id().arr) else ByteString.EMPTY,
-      newHeight,
+      newHeight.toInt,
       block.bytes().length,
       block.transactionData.size,
       totalFee,
@@ -248,7 +249,7 @@ abstract class Caches extends Blockchain with Storage {
       current.meta.fold(settings.genesisSettings.initialBalance)(_.totalWavesAmount) +
         (reward.getOrElse(0L) * this.blockRewardBoost(newHeight))
     )
-    current = CurrentBlockInfo(Height(newHeight), Some(newMeta), block.transactionData)
+    current = CurrentBlockInfo(newHeight, Some(newMeta), block.transactionData)
 
     val newAddresses =
       mutable.Set[Address]() ++
@@ -368,9 +369,9 @@ abstract class Caches extends Blockchain with Storage {
     accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
   }
 
-  protected def doRollback(targetHeight: Int): DiscardedBlocks
+  protected def doRollback(targetHeight: Height): DiscardedBlocks
 
-  override def rollbackTo(height: Int): Either[String, DiscardedBlocks] = {
+  override def rollbackTo(height: Height): Either[String, DiscardedBlocks] = {
     for {
       _ <- Either
         .cond(

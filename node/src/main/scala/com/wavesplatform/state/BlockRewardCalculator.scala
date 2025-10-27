@@ -57,7 +57,7 @@ object BlockRewardCalculator {
         calculateRewards(fullBlockReward, CurrentBlockRewardPart.apply(fullBlockReward), daoAddress, modifiedXtnBuybackAddress)
       }
     } else BlockRewardShares(fullBlockReward, 0, 0)
-  }.multiply(blockchain.blockRewardBoost(height))
+  }.multiply(blockchain.blockRewardBoost(Height(height)))
 
   def getSortedBlockRewardShares(height: Int, fullBlockReward: Long, generator: Address, blockchain: Blockchain): Seq[(Address, Long)] = {
     val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten

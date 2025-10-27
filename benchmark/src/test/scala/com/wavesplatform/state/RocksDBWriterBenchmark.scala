@@ -90,12 +90,12 @@ object RocksDBWriterBenchmark {
 
     val db = RocksDBWriter(rawDB, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
 
-    def loadBlockInfoAt(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
+    def loadBlockInfoAt(height: Height): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       loadBlockMetaAt(height).map { meta =>
-        meta -> database.loadTransactions(Height(height), rawDB)
+        meta -> database.loadTransactions(height, rawDB)
       }
 
-    def loadBlockMetaAt(height: Int): Option[BlockMeta] = rawDB.db.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb)
+    def loadBlockMetaAt(height: Height): Option[BlockMeta] = rawDB.db.get(Keys.blockMetaAt(height)).flatMap(BlockMeta.fromPb)
 
     val cba = CommonBlocksApi(db, loadBlockMetaAt, loadBlockInfoAt)
 
