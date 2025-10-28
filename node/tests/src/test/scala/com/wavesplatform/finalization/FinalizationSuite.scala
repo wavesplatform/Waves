@@ -2,7 +2,7 @@ package com.wavesplatform.finalization
 
 import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.bls.BlsKeyPair
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -12,12 +12,12 @@ import com.wavesplatform.test.{FreeSpec, NumericExt}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.wallet.Wallet
 
-// TODO: Merge with BlockAppenderSpec tests?
 class FinalizationSuite extends FreeSpec with WithDomain {
   private val seed          = ByteStr("finality-test".getBytes())
   private val thisNodeAcc   = Wallet.generateNewAccount(seed.arr, nonce = 0)
-  private val otherNode1Acc = TxHelpers.defaultSigner
-  private val otherNode2Acc = TxHelpers.secondSigner
+  private val otherNode1Acc = TxHelpers.signer(0)
+  private val otherNode2Acc = TxHelpers.signer(1)
+  private val otherNode3Acc = TxHelpers.signer(2)
 
   private val baseSettings = DomainPresets.DeterministicFinality.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
   private val defaultSettings = baseSettings
@@ -164,7 +164,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       AddrWithBalance.enoughBalances(otherNode1Acc, thisNodeAcc)
     ) { d =>
       d.appendBlock()
-      
+
       log.debug(s"Append block 3 with commitments")
       val endorsers = Seq(otherNode1Acc, thisNodeAcc)
       val block3 = d.createBlock(
@@ -182,6 +182,66 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           generator = otherNode1Acc,
           strictTime = true,
           voting = None
+        )
+      )
+
+      log.debug("Append block 5")
+      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
+      d.blockchain.checkExpectedFinalizedHeight(3) // 5 - maxRollback = 3
+    }
+
+    "increased with less votes after conflict endorsement" in withDomain(
+      defaultSettings,
+      Seq(otherNode1Acc, otherNode2Acc, otherNode3Acc, thisNodeAcc).map(kp => AddrWithBalance(kp.toAddress, 200_100.1.waves))
+    ) { d =>
+      val genesisBlockId = d.blockchain.lastBlockId.value
+      d.appendBlock()
+
+      log.debug(s"Append block 3 with commitments")
+      val endorsers = Seq(otherNode1Acc, otherNode2Acc, otherNode3Acc, thisNodeAcc)
+      val block3 = d.createBlock(
+        version = Block.ProtoBlockVersion,
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
+        generator = otherNode1Acc
+      )
+      d.appendBlock(block3)
+      val endorsedBlockId = block3.id()
+
+      log.debug(s"Append block 4 with conflict vote")
+      val aggSig = Seq(otherNode2Acc).foldLeft(BlsSignature.Empty: BlsSignature) { case (r, kp) =>
+        val sig = BlockEndorsement.sign(
+          BlsKeyPair(kp.privateKey),
+          finalizedId = genesisBlockId,
+          finalizedHeight = GenesisBlockHeight,
+          endorsedId = endorsedBlockId
+        )
+        r.append(sig)
+      }
+      val otherFinalizedBlockId = TxHelpers.randomBlockId
+      d.appender.appendBlock(
+        d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = otherNode3Acc,
+          strictTime = true,
+          voting = Some(
+            FinalizationVoting(
+              endorserIndexes = Seq(1),
+              aggregatedEndorsement = aggSig,
+              conflict = Vector(
+                BlockEndorsement.Conflict(
+                  endorserIndex = 0,
+                  finalizedId = otherFinalizedBlockId,
+                  signature = BlockEndorsement.sign(
+                    kp = BlsKeyPair(otherNode1Acc.privateKey),
+                    finalizedId = otherFinalizedBlockId,
+                    finalizedHeight = GenesisBlockHeight,
+                    endorsedId = endorsedBlockId
+                  )
+                )
+              )
+            )
+          )
         )
       )
 

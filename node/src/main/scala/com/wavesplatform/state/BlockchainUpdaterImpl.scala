@@ -486,26 +486,33 @@ class BlockchainUpdaterImpl(
         log.debug(s"$logPrefix no committed generators on $votingPeriod")
         false
       } else {
-        val votingBlockMinerAddress = votingBlock.header.generator.toAddress
-        val votedEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Set.empty)(_.endorserIndexes.toSet)
-        val (totalBalance, endorsedBalance, endorsedGeneratorIdxs, minerIdx) =
-          generatorBalances.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0), List.empty[Int], -1)) {
-            case ((totalBalance, endorsedBalance, endorserIdxs, minerIdx), ((endorserAddress, endorserBalance), i)) =>
-              val isMiner    = endorserAddress == votingBlockMinerAddress
-              val isEndorser = votedEndorserIndexes.contains(i)
-              (
-                totalBalance + endorserBalance,
-                if (isEndorser || isMiner) endorsedBalance + endorserBalance else endorsedBalance,
-                if (isEndorser) i :: endorserIdxs else endorserIdxs,
-                if (isMiner) i else minerIdx
-              )
-          }
+        val votedEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Seq.empty)(_.endorserIndexes)
+        val conflictEndorserIndexes = votingBlock.header.finalizationVoting.fold(Seq.empty)(_.conflict.map(_.endorserIndex))
 
-        val balanceToFinalize = totalBalance * 2 / 3
-        val finalized         = endorsedBalance * 3 >= totalBalance * 2 // Same: endorsedBalance >= totalBalance * 2/3
+        val (totalBalance, endorsedBalance, minerIdx) = {
+          val votedIndexes            = votedEndorserIndexes.toSet
+          val conflictIndexes         = conflictEndorserIndexes.toSet
+          val votingBlockMinerAddress = votingBlock.header.generator.toAddress
+          generatorBalances.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0), -1)) {
+            case (orig @ (totalBalance, endorsedBalance, minerIdx), ((endorserAddress, endorserBalance), i)) =>
+              if (conflictIndexes.contains(i)) orig
+              else {
+                val isMiner    = endorserAddress == votingBlockMinerAddress
+                val isEndorser = votedIndexes.contains(i)
+                (
+                  totalBalance + endorserBalance,
+                  if (isEndorser || isMiner) endorsedBalance + endorserBalance else endorsedBalance,
+                  if (isMiner) i else minerIdx
+                )
+              }
+          }
+        }
+
+        val finalized = isFinalized(endorsedBalance, totalBalance)
         log.debug(
-          s"$logPrefix ${if (finalized) "" else "not "}finalized, voted: $endorsedBalance, " +
-            s"min: $balanceToFinalize, total: $totalBalance, endorsers: [${endorsedGeneratorIdxs.sorted.mkString(", ")}], miner: $minerIdx"
+          s"$logPrefix ${if (finalized) "" else "not "}finalized, voted: $endorsedBalance, total: $totalBalance, " +
+            s"endorsers: [${votedEndorserIndexes.mkString(", ")}], miner: $minerIdx" +
+            (if (conflictEndorserIndexes.isEmpty) "" else s", conflict: [${conflictEndorserIndexes.mkString(", ")}]")
         )
 
         finalized
@@ -514,6 +521,14 @@ class BlockchainUpdaterImpl(
 
     if (votingHeight > GenesisBlockHeight && shouldFinalizeByVoting()) endorsedHeight.some
     else none
+  }
+
+  private def isFinalized(endorsedBalance: BigInt, totalBalance: BigInt): Boolean = {
+    // Same as: endorsedBalance >= totalBalance * 2/3
+    // But solves a fraction issue:
+    //  endorsed=7, total=11, required=7.(3), 7 < 7.(3) - not finalized with BigDecimal, finalized with BigInt (drops fraction part)
+    //  endorsed * 3=21, total * 2=22, 21 < 22 - not finalized
+    endorsedBalance * 3 >= totalBalance * 2
   }
 
   private def collectLeasesToCancel(newHeight: Int): Map[ByteStr, LeaseDetails] =

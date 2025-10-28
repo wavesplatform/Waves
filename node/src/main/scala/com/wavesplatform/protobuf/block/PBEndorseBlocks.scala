@@ -3,28 +3,18 @@ package com.wavesplatform.protobuf.block
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.protobuf.*
-import com.wavesplatform.state.Height
 
 object PBEndorseBlocks {
-  // TODO:
-  def vanilla(x: PBEndorseBlock, sig: BlsSignature.NonEmpty): BlockEndorsement = {
-    if (x.endorsedBlockId.isEmpty && x.finalizedBlockHeight == 0)
-      BlockEndorsement.Valid(x.endorserIndex, x.finalizedBlockId.toByteStr, sig)
-    else if (x.finalizedBlockHeight == 0)
+  def vanillaConflict(x: PBEndorseBlock, sig: BlsSignature.NonEmpty): Either[String, BlockEndorsement.Conflict] =
+    Either.cond(
+      x.endorsedBlockId.isEmpty && x.finalizedBlockHeight == 0,
       BlockEndorsement.Conflict(
         x.endorserIndex,
         x.finalizedBlockId.toByteStr,
         sig
-      )
-    else
-      BlockEndorsement.Full(
-        x.endorserIndex,
-        x.finalizedBlockId.toByteStr,
-        Height(x.finalizedBlockHeight),
-        x.endorsedBlockId.toByteStr,
-        signature = sig
-      )
-  }
+      ),
+      "Expected a conflict endorsement"
+    )
 
   def protobuf(x: BlockEndorsement.Full): PBEndorseBlock =
     new PBEndorseBlock(

@@ -16,13 +16,12 @@ import java.util.concurrent.ThreadLocalRandom
 class EndorsementStorageSpec extends FreeSpec with EitherValues {
   private type GeneratorBalance = (blsKp: BlsKeyPair, balance: Long)
 
-  private val activeGenerator       = BlsKeyPair(TxHelpers.signer(0).privateKey)
-  private val committedGenerator    = BlsKeyPair(TxHelpers.signer(1).privateKey)
-  private val activeEndorserIndex   = 1
-  private val finalizedHeight       = Height(5)
-  private val expectedFinalizedId   = mkRandomBlockId
-  private val unexpectedFinalizedId = mkRandomBlockId
-  private val endorsedId            = mkRandomBlockId
+  private val activeGenerator     = BlsKeyPair(TxHelpers.signer(0).privateKey)
+  private val committedGenerator  = BlsKeyPair(TxHelpers.signer(1).privateKey)
+  private val activeEndorserIndex = 1
+  private val finalizedHeight     = Height(5)
+
+  private val expectedFinalizedId, unexpectedFinalizedId, endorsedId = TxHelpers.randomBlockId
 
   "tryAddVote" - {
     "rebroadcast if valid" in {
@@ -241,6 +240,4 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
     ) shouldBe true
     r
   }
-
-  private def mkRandomBlockId: BlockId = ByteStr(Array.fill(SignatureLength)(ThreadLocalRandom.current().nextInt(Byte.MaxValue).toByte))
 }

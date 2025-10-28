@@ -20,15 +20,12 @@ object PBFinalizationVotings {
       aggSig,
       pb.conflictEndorsements.zipWithIndex.map { case (x, i) =>
         val r = for {
-          sig <- BlsSignature(pb.aggregatedEndorsementSignature.toByteArray)
-          x <- PBEndorseBlocks.vanilla(x, sig) match {
-            case x: BlockEndorsement.Conflict => x.asRight
-            case x                            => GenericError(s"Expected a conflict endorsement, got $x").asLeft
-          }
-        } yield x
+          sig <- BlsSignature(x.signature.toByteArray)
+          r   <- PBEndorseBlocks.vanillaConflict(x, sig).leftMap(GenericError(_))
+        } yield r
 
         r match {
-          case Left(e)  => throw new IllegalArgumentException(s"Error during parsing $i conflict endorsement: $e")
+          case Left(e)  => throw new IllegalArgumentException(s"Error during parsing conflict endorsement #$i: $e")
           case Right(r) => r
         }
       }.toVector

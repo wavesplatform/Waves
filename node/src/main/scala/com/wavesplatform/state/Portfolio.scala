@@ -35,7 +35,7 @@ case class Portfolio(
       generationDeposit <- safeSum(this.generationDeposit, that.generationDeposit, "Generation deposit")
     } yield Portfolio(balance, LeaseBalance(leaseIn, leaseOut), assets, generationDeposit)
 
-  override def toString: String = s"PF($balance,${assets.mkString("[", ",", "]")})"
+  override def toString: String = s"PF($balance,${assets.mkString("[", ",", "]")}${if (generationDeposit > 0) s",g=$generationDeposit" else ""})"
 }
 
 object Portfolio {

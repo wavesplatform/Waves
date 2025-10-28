@@ -8,8 +8,6 @@ import com.wavesplatform.state.Height
 enum BlockEndorsement {
   case Full(endorserIndex: Int, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, signature: BlsSignature.NonEmpty)
   case Conflict(endorserIndex: Int, finalizedId: BlockId, signature: BlsSignature.NonEmpty)
-  // TODO: do we need finalizedId?
-  case Valid(endorserIndex: Int, finalizedId: BlockId, signature: BlsSignature.NonEmpty)
 }
 
 object BlockEndorsement {

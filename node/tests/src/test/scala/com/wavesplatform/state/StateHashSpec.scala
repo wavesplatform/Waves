@@ -148,8 +148,7 @@ class StateHashSpec extends FreeSpec {
         Sponsorship,
         Alias,
         NextCommittedGenerators
-      )
-        .map(sect)
+      ).map(sect)
 
       val testPrevHash = sect(SectionId.Alias)
       result.createStateHash(testPrevHash).totalHash shouldBe hash((testPrevHash.arr +: allHashes.map(_.arr))*)
