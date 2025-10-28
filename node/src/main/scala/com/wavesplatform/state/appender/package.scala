@@ -40,8 +40,7 @@ package object appender {
       pos: PoSSelector,
       time: Time,
       log: LoggerFacade,
-      verify: Boolean,
-      txSignParCheck: Boolean
+      verify: Boolean
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] =
     for {
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
@@ -49,7 +48,7 @@ package object appender {
         metrics.appendBlock
           .measureSuccessful(
             blockchainUpdater
-              .processBlock(block, hitSource, snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)), None, verify, txSignParCheck)
+              .processBlock(block, hitSource, snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)), None, verify)
           )
           .map {
             case res @ Applied(discardedDiffs, _) =>
@@ -71,11 +70,10 @@ package object appender {
       blockchainUpdater: BlockchainUpdater & Blockchain,
       pos: PoSSelector,
       time: Time,
-      verify: Boolean,
-      txSignParCheck: Boolean
+      verify: Boolean
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, (BlockApplyResult, Int)] = {
     if (block.header.challengedHeader.nonEmpty) {
-      processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block, snapshot)
+      processBlockWithChallenge(blockchainUpdater, pos, time, verify)(block, snapshot)
     } else {
       for {
         hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
@@ -85,8 +83,7 @@ package object appender {
             hitSource,
             snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)),
             None,
-            verify,
-            txSignParCheck
+            verify
           )
         )
       } yield applyResult -> blockchainUpdater.height
@@ -99,10 +96,9 @@ package object appender {
       pos: PoSSelector,
       time: Time,
       log: LoggerFacade,
-      verify: Boolean,
-      txSignParCheck: Boolean
+      verify: Boolean
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] =
-    processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block, snapshot).map {
+    processBlockWithChallenge(blockchainUpdater, pos, time, verify)(block, snapshot).map {
       case (res @ Applied(discardedDiffs, _), _) =>
         if (block.transactionData.nonEmpty) {
           utx.removeAll(block.transactionData)
@@ -120,8 +116,7 @@ package object appender {
       blockchainUpdater: BlockchainUpdater & Blockchain,
       pos: PoSSelector,
       time: Time,
-      verify: Boolean,
-      txSignParCheck: Boolean
+      verify: Boolean
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, (BlockApplyResult, Int)] = {
     val challengedBlock = block.toOriginal
     for {
@@ -136,8 +131,7 @@ package object appender {
               hitSource,
               snapshot.map(responseToSnapshot(block, blockchainUpdater.height + 1)),
               Some(challengedHitSource),
-              verify,
-              txSignParCheck
+              verify
             )
           )
     } yield applyResult -> blockchainUpdater.height

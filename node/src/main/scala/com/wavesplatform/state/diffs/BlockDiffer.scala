@@ -52,8 +52,7 @@ object BlockDiffer {
       challengedHitSource: Option[ByteStr] = None,
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
       verify: Boolean = true,
-      enableExecutionLog: Boolean = false,
-      txSignParCheck: Boolean = true
+      enableExecutionLog: Boolean = false
   ): Either[ValidationError, Result] = {
     challengedHitSource match {
       case Some(hs) if snapshot.isEmpty =>
@@ -66,8 +65,7 @@ object BlockDiffer {
           hs,
           loadCacheData,
           verify,
-          enableExecutionLog,
-          txSignParCheck
+          enableExecutionLog
         ).resultE match {
           case Left(_: InvalidStateHash) =>
             fromBlockTraced(
@@ -79,8 +77,7 @@ object BlockDiffer {
               hitSource,
               loadCacheData,
               verify,
-              enableExecutionLog,
-              txSignParCheck
+              enableExecutionLog
             ).resultE
           case Left(err) => Left(GenericError(s"Invalid block challenge: $err"))
           case _         => Left(GenericError("Invalid block challenge"))
@@ -95,8 +92,7 @@ object BlockDiffer {
           hitSource,
           loadCacheData,
           verify,
-          enableExecutionLog,
-          txSignParCheck
+          enableExecutionLog
         ).resultE
     }
   }
@@ -110,8 +106,7 @@ object BlockDiffer {
       hitSource: ByteStr,
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
       verify: Boolean,
-      enableExecutionLog: Boolean,
-      txSignParCheck: Boolean
+      enableExecutionLog: Boolean
   ): TracedResult[ValidationError, Result] = {
     val stateHeight        = blockchain.height
     val heightWithNewBlock = stateHeight + 1
@@ -201,8 +196,7 @@ object BlockDiffer {
             block.transactionData,
             loadCacheData,
             verify = verify,
-            enableExecutionLog = enableExecutionLog,
-            txSignParCheck = txSignParCheck
+            enableExecutionLog = enableExecutionLog
           )
       }
       _ <- checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.computedStateHash)
@@ -268,8 +262,7 @@ object BlockDiffer {
             micro.transactionData,
             loadCacheData,
             verify = verify,
-            enableExecutionLog = enableExecutionLog,
-            txSignParCheck = true
+            enableExecutionLog = enableExecutionLog
           )
       }
       _ <- checkStateHash(blockchain, micro.stateHash, r.computedStateHash)
@@ -333,8 +326,7 @@ object BlockDiffer {
       txs: Seq[Transaction],
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
       verify: Boolean,
-      enableExecutionLog: Boolean,
-      txSignParCheck: Boolean
+      enableExecutionLog: Boolean
   ): TracedResult[ValidationError, Result] = {
     val timestamp       = blockchain.lastBlockTimestamp.get
     val blockGenerator  = blockchain.lastBlockHeader.get.header.generator.toAddress
@@ -342,7 +334,7 @@ object BlockDiffer {
 
     val txDiffer = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog)
 
-    if (verify && txSignParCheck)
+    if (verify)
       ParSignatureChecker.checkTxSignatures(txs, rideV6Activated)
 
     prepareCaches(blockGenerator, txs, loadCacheData)

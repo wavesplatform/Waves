@@ -180,8 +180,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         b.header.generationSignature,
         (_, _) => (),
         verify = true,
-        enableExecutionLog = enableExecutionLog,
-        txSignParCheck = true
+        enableExecutionLog = enableExecutionLog
       )
 
     preconditions.foreach { precondition =>
