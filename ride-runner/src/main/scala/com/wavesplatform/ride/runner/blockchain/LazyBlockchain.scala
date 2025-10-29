@@ -31,6 +31,7 @@ import com.wavesplatform.state.{
   AssetDescription,
   AssetScriptInfo,
   BalanceSnapshot,
+  ConflictGenerators,
   DataEntry,
   GenerationPeriod,
   Height,
@@ -215,7 +216,9 @@ class LazyBlockchain[TagT] private (
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
     getTransactionHeight(TransactionId(id)).map(TxMeta(_, TxMeta.Status.Succeeded, 0)) // Other information not used
 
-  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = Seq.empty
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
+
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = ConflictGenerators.empty
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 

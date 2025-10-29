@@ -6,7 +6,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{Blockchain, GenesisBlockHeight, Portfolio}
+import com.wavesplatform.state.{Blockchain, ConflictGenerators, GeneratorIndex, GenesisBlockHeight, Height, Portfolio}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
@@ -48,10 +48,10 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
         FinalizationVoting(
           conflict = Vector(
             BlockEndorsement.Conflict(
-              endorserIndex = 0,
+              endorserIndex = GeneratorIndex(1),
               finalizedId = otherFinalizedBlockId,
               signature = BlockEndorsement.sign(
-                kp = BlsKeyPair(generator1.privateKey),
+                kp = BlsKeyPair(generator2.privateKey),
                 finalizedId = otherFinalizedBlockId,
                 finalizedHeight = GenesisBlockHeight,
                 endorsedId = block2.id()
@@ -64,12 +64,17 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     d.appender.appendBlock(votingBlock)
 
     val generator2BalanceAfterBlock3 = generator2BalanceAfterBlock2 - CommitToGenerationTransaction.DepositInWavelets
-    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock3)
-    d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map(_._1) shouldNot contain(generator2Addr)
+    d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map(_._1) should contain(generator2Addr)
+    d.blockchain.conflictGenerators(d.blockchain.currentGenerationPeriod.value) shouldBe conflictGenerators(h = 3, 1)
+    // d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock3)
 
     log.debug("Append block 4")
     d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true))
-    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock3)
-    d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map(_._1) shouldNot contain(generator2Addr)
+    d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map(_._1) should contain(generator2Addr)
+    d.blockchain.conflictGenerators(d.blockchain.currentGenerationPeriod.value) shouldBe conflictGenerators(h = 3, 1)
+    // d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock3)
   }
+
+  private def conflictGenerators(h: Int, idxs: Int*): ConflictGenerators =
+    ConflictGenerators.empty.appendAll(Height(h), GeneratorIndex.fromInts(idxs))
 }

@@ -3,11 +3,11 @@ package com.wavesplatform.block
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
-import com.wavesplatform.state.Height
+import com.wavesplatform.state.{GeneratorIndex, Height}
 
 enum BlockEndorsement {
-  case Full(endorserIndex: Int, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, signature: BlsSignature.NonEmpty)
-  case Conflict(endorserIndex: Int, finalizedId: BlockId, signature: BlsSignature.NonEmpty)
+  case Full(endorserIndex: GeneratorIndex, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, signature: BlsSignature.NonEmpty)
+  case Conflict(endorserIndex: GeneratorIndex, finalizedId: BlockId, signature: BlsSignature.NonEmpty)
 }
 
 object BlockEndorsement {
@@ -19,7 +19,7 @@ object BlockEndorsement {
 
   def full(
       endorserAccount: BlsKeyPair,
-      endorserIndex: Int,
+      endorserIndex: GeneratorIndex,
       finalizedId: BlockId,
       finalizedHeight: Height,
       endorsedId: BlockId

@@ -486,8 +486,8 @@ class BlockchainUpdaterImpl(
         log.debug(s"$logPrefix no committed generators on $votingPeriod")
         false
       } else {
-        val votedEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Seq.empty)(_.endorserIndexes)
-        val conflictEndorserIndexes = votingBlock.header.finalizationVoting.fold(Seq.empty)(_.conflict.map(_.endorserIndex))
+        val votedEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Seq.empty)(_.valid)
+        val conflictEndorserIndexes = conflictGenerators(votingPeriod).upTo(votingHeight)
 
         val (totalBalance, endorsedBalance, minerIdx) = {
           val votedIndexes            = votedEndorserIndexes.toSet
@@ -495,10 +495,11 @@ class BlockchainUpdaterImpl(
           val votingBlockMinerAddress = votingBlock.header.generator.toAddress
           generatorBalances.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0), -1)) {
             case (orig @ (totalBalance, endorsedBalance, minerIdx), ((endorserAddress, endorserBalance), i)) =>
-              if (conflictIndexes.contains(i)) orig
+              val gi = GeneratorIndex(i)
+              if (conflictIndexes.contains(gi)) orig
               else {
                 val isMiner    = endorserAddress == votingBlockMinerAddress
-                val isEndorser = votedIndexes.contains(i)
+                val isEndorser = votedIndexes.contains(gi)
                 (
                   totalBalance + endorserBalance,
                   if (isEndorser || isMiner) endorsedBalance + endorserBalance else endorsedBalance,
@@ -935,8 +936,12 @@ class BlockchainUpdaterImpl(
       .getOrElse(rocksdb.lastStateHash(None))
   }
 
-  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = readLock {
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = readLock {
     snapshotBlockchain.committedGenerators(at)
+  }
+
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = readLock {
+    snapshotBlockchain.conflictGenerators(at)
   }
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] = readLock {

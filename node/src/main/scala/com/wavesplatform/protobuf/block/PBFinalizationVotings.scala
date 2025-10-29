@@ -5,6 +5,7 @@ import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.protobuf.*
+import com.wavesplatform.state.GeneratorIndex
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 import scala.util.Try
@@ -16,7 +17,7 @@ object PBFinalizationVotings {
       else BlsSignature(pb.aggregatedEndorsementSignature.toByteArray).explicitGet()
 
     VanillaFinalizationVoting(
-      pb.endorserIndexes,
+      GeneratorIndex.fromInts(pb.endorserIndexes),
       aggSig,
       pb.conflictEndorsements.zipWithIndex.map { case (x, i) =>
         val r = for {
@@ -34,11 +35,11 @@ object PBFinalizationVotings {
 
   def protobuf(v: VanillaFinalizationVoting): PBFinalizationVoting =
     new PBFinalizationVoting(
-      v.endorserIndexes,
+      GeneratorIndex.toInts(v.valid),
       v.aggregatedEndorsement.byteStr.toByteString,
       v.conflict.map { x =>
         PBEndorseBlock(
-          x.endorserIndex,
+          x.endorserIndex.toInt,
           x.finalizedId.toByteString,
           signature = x.signature.byteStr.toByteString
         )

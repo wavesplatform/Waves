@@ -321,6 +321,7 @@ abstract class Caches extends Blockchain with Storage {
       }
     }
 
+    // TODO: here?
     val updatedBalanceNodes = for {
       case ((address, asset), amount) <- snapshot.balances
       key         = (address, asset)

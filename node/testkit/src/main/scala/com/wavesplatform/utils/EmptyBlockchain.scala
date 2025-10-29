@@ -99,6 +99,8 @@ trait EmptyBlockchain extends Blockchain {
 
   override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
 
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = ConflictGenerators.empty
+
   override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 }
 

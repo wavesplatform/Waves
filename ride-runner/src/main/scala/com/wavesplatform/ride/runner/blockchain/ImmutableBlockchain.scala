@@ -22,6 +22,7 @@ import com.wavesplatform.state.{
   AssetDescription,
   AssetScriptInfo,
   BalanceSnapshot,
+  ConflictGenerators,
   DataEntry,
   GenerationPeriod,
   Height,
@@ -209,7 +210,9 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = Seq.empty
 
-  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = Seq.empty
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
+
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = ConflictGenerators.empty
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 

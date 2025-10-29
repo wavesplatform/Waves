@@ -9,7 +9,7 @@ import com.wavesplatform.network.message.MessageSpec
 import com.wavesplatform.protobuf.block.EndorseBlock as PBEndorseBlock
 import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
-import com.wavesplatform.state.Height
+import com.wavesplatform.state.{GeneratorIndex, Height}
 import com.wavesplatform.transaction.{Signed, Transaction}
 import monix.eval.Coeval
 
@@ -124,13 +124,18 @@ case class EndorseBlock(endorserIndex: Int, finalizedId: BlockId, finalizedHeigh
     signature.toByteString
   )
 
-  override def toString: String = s"EndorseBlock(e=$endorserIndex, f=$finalizedId, fh=$finalizedHeight, b=$endorsedId, s=$signature)"
+  override def toString: String = s"EndorseBlock(i=$endorserIndex, f=$finalizedId, fh=$finalizedHeight, e=$endorsedId, s=$signature)"
 }
 
 object EndorseBlock {
-  def fromProtobuf(x: PBEndorseBlock): EndorseBlock =
-    EndorseBlock(x.endorserIndex, x.finalizedBlockId.toByteStr, Height(x.finalizedBlockHeight), x.endorsedBlockId.toByteStr, x.signature.toByteStr)
+  def fromProtobuf(x: PBEndorseBlock): EndorseBlock = EndorseBlock(
+    x.endorserIndex,
+    x.finalizedBlockId.toByteStr,
+    Height(x.finalizedBlockHeight),
+    x.endorsedBlockId.toByteStr,
+    x.signature.toByteStr
+  )
 
   def from(x: BlockEndorsement.Full): EndorseBlock =
-    EndorseBlock(x.endorserIndex, x.finalizedId, x.finalizedHeight, x.endorsedId, x.signature.byteStr)
+    EndorseBlock(x.endorserIndex.toInt, x.finalizedId, x.finalizedHeight, x.endorsedId, x.signature.byteStr)
 }

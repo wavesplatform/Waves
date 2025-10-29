@@ -62,6 +62,7 @@ enum KeyTag {
     FinalizedBlockHeight,
     FinalizedBlockHeightAt,
     CommittedGenerators,
+    ConflictGenerators,
     CommitmentTransactions,
     GeneratorBalances
 

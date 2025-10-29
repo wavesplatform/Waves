@@ -13,7 +13,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, Height}
+import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, GeneratorIndex, Height}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
@@ -101,11 +101,11 @@ class BlocksApiRouteSpec
       header = orig.header.copy(
         finalizationVoting = Some(
           FinalizationVoting(
-            endorserIndexes = Seq(1, 0),
+            valid = GeneratorIndex.fromInts(Seq(1, 0)),
             aggregatedEndorsement = BlsSignature.NonEmpty(Array.fill[Byte](BlsSignature.SizeInBytes)(1)),
             conflict = Vector(
               BlockEndorsement.Conflict(
-                endorserIndex = 0,
+                endorserIndex = GeneratorIndex(0),
                 finalizedId = testBlock2.id(),
                 signature = BlsSignature.NonEmpty(Array.fill[Byte](BlsSignature.SizeInBytes)(2))
               )

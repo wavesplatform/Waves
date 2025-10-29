@@ -249,10 +249,25 @@ case class SnapshotBlockchain(
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
-  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = {
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
     val base   = inner.committedGenerators(at)
     val atNext = this.currentGenerationPeriod.exists(_.next == at)
     if (atNext) base ++ snapshot.nextCommittedGenerators.map { case (pk, blsPk) => pk.toAddress -> blsPk } else base
+  }
+
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = {
+    val base   = inner.conflictGenerators(at)
+    val atCurr = this.currentGenerationPeriod.contains(at)
+    if (atCurr) {
+      val extraConflictIndexes = for {
+        (blockMeta, _) <- blockMeta.toSeq
+        v              <- blockMeta.header.finalizationVoting.toSeq
+        c              <- v.conflict
+      } yield c.endorserIndex
+
+      if (extraConflictIndexes.isEmpty) base
+      else base.appendAll(Height(height), extraConflictIndexes)
+    } else base
   }
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] =

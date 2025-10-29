@@ -105,7 +105,9 @@ trait Blockchain {
 
   // TODO: cached
   // TODO: named?
-  def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)]
+  def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)]
+
+  def conflictGenerators(at: GenerationPeriod): ConflictGenerators
 
   /** @return Before applying transactions of this block, in commitment order */
   def currentGeneratorBalances(): Seq[(Address, Long)]

@@ -733,22 +733,34 @@ class RocksDBWriter(
       // TODO: Option to not store
       rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances.map { case (_, b) => b }))
 
-      if (nextCommittedGenerators.nonEmpty) {
-        val period = this
-          .generationPeriodOf(h)
-          .getOrElse(throw new IllegalStateException(s"No generation period at $h, but have next committed generators"))
-        val nextPeriod = period.next
+      val conflictGenerators = for {
+        header <- blockMeta.header.toSeq
+        v      <- header.finalizationVoting.toSeq
+        e      <- v.conflictEndorsements
+      } yield GeneratorIndex(e.endorserIndex)
 
-        val (committedGenerators, commitmentTxnIds) = nextCommittedGenerators.unzip(using
-          { case (addressId, blsPk, txnId) =>
-            ((addressId, blsPk), txnId)
+      this.generationPeriodOf(h) match {
+        case None =>
+          require(
+            nextCommittedGenerators.isEmpty && conflictGenerators.isEmpty,
+            s"Expected empty conflict and next committed generators, got: nextCommittedGenerators=$nextCommittedGenerators, conflictGenerators=$conflictGenerators"
+          )
+
+        case Some(currPeriod) =>
+          if (nextCommittedGenerators.nonEmpty) {
+            val nextPeriod = currPeriod.next
+
+            val (committedGenerators, commitmentTxnIds) = nextCommittedGenerators.unzip(using
+              { case (addressId, blsPk, txnId) => ((addressId, blsPk), txnId) }
+            )
+
+            rw.put(Keys.committedGenerators(nextPeriod, h), Some(committedGenerators))
+
+            // TODO: Option to not store
+            rw.put(Keys.commitmentTransactions(nextPeriod, h), commitmentTxnIds)
           }
-        )
 
-        rw.put(Keys.committedGenerators(nextPeriod, h), Some(committedGenerators))
-
-        // TODO: Option to not store
-        rw.put(Keys.commitmentTransactions(nextPeriod, h), Some(commitmentTxnIds))
+          if (conflictGenerators.nonEmpty) rw.put(Keys.conflictGenerators(currPeriod, h), conflictGenerators)
       }
 
       rw.put(Keys.issuedAssets(height), snapshot.assetStatics.keySet.toSeq)
@@ -1023,7 +1035,7 @@ class RocksDBWriter(
         val aliasesToInvalidate      = Seq.newBuilder[Alias]
         val blockHeightsToInvalidate = Seq.newBuilder[ByteStr]
 
-        val nextPeriod = this.generationPeriodOf(currentHeight).map(_.next)
+        val currentPeriod = this.generationPeriodOf(currentHeight)
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
           rw.delete(Keys.finalizedHeightAt(currentHeight))
@@ -1146,7 +1158,10 @@ class RocksDBWriter(
           }
 
           rw.delete(Keys.generatorBalances(currentHeight, rdb.apiHandle))
-          nextPeriod.foreach { nextPeriod =>
+          currentPeriod.foreach { currentPeriod =>
+            rw.delete(Keys.conflictGenerators(currentPeriod, currentHeight)) // TODO: test
+
+            val nextPeriod = currentPeriod.next
             rw.delete(Keys.committedGenerators(nextPeriod, currentHeight))
             rw.delete(Keys.commitmentTransactions(nextPeriod, currentHeight))
           }
@@ -1624,6 +1639,18 @@ class RocksDBWriter(
   //     }
   //     r
   //   }
+
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = {
+    val key = Keys.conflictGenerators(at, at.start)
+    rdb.db.readOnly { ro =>
+      var r = ConflictGenerators.empty
+      ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
+        val h = Height(Ints.fromByteArray(dbEntry.getKey.takeRight(Ints.BYTES)))
+        r = r.appendAll(h, key.parse(dbEntry.getValue))
+      }
+      r
+    }
+  }
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))

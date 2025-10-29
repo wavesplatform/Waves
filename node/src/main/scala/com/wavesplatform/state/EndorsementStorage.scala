@@ -33,37 +33,35 @@ trait EndorsementStorage {
 
 object EndorsementStorage {
 
-  /** @param minerIndex
-    *   True if this node is a miner
-    */
   case class EndorsementFilter(
-      minerIndex: Option[Int],
+      miner: Option[GeneratorIndex],
       finalizedId: BlockId,
       finalizedHeight: Height,
       endorsedId: BlockId,
-      endorsers: IndexedSeq[(BlsPublicKey, Long)]
+      endorsers: IndexedSeq[(BlsPublicKey, Long)],
+      conflict: Set[GeneratorIndex]
   ) {
-    private val minerBalance        = minerIndex.fold(0L)(endorsers(_)._2)
+    private val minerBalance        = miner.fold(0L)(i => endorsers(i.toInt)._2)
     private val doubledTotalBalance = endorsers.foldLeft(BigInt(0L)) { case (r, (_, b)) => r + b } * 2
 
     override def toString: String =
-      s"EndorsementFilter(${minerIndex.fold("")(i => s"m=$i, ")}fid=$finalizedId, fh=$finalizedHeight, eid=$endorsedId, e={${endorsers.mkString(", ")}})"
+      s"EndorsementFilter(${miner.fold("")(i => s"m=$i, ")}fid=$finalizedId, fh=$finalizedHeight, eid=$endorsedId, e={${endorsers.mkString(", ")}})"
 
     def sameVoting(other: EndorsementFilter): Boolean =
       finalizedId == other.finalizedId && finalizedHeight == other.finalizedHeight && endorsedId == other.endorsedId
 
     def simulate(voterIndexes: Iterable[Int]): SimulationResult = {
-      type Item = (idx: Int, blsPk: BlsPublicKey, balance: Long)
+      type Item = (idx: GeneratorIndex, blsPk: BlsPublicKey, balance: Long)
       val lifted = endorsers.lift
       val items = for {
         idx              <- voterIndexes.view
         (blsPk, balance) <- lifted(idx)
-      } yield (idx, blsPk, balance): Item
+      } yield (GeneratorIndex(idx), blsPk, balance): Item
 
       val richest = mutable.PriorityQueue.empty[Item](using Ordering.by(-_.balance))
       richest.addAll(items)
 
-      var endorserIndexes = Vector.empty[Int]
+      var endorserIndexes = Vector.empty[GeneratorIndex]
       var endorsedBalance = BigInt(minerBalance)
       var complete        = false
       while (richest.nonEmpty && !complete) {
@@ -78,7 +76,7 @@ object EndorsementStorage {
   }
 
   object EndorsementFilter {
-    case class SimulationResult(complete: Boolean = false, chosenValid: IndexedSeq[Int] = Vector.empty)
+    case class SimulationResult(complete: Boolean = false, chosenValid: IndexedSeq[GeneratorIndex] = Vector.empty)
   }
 
   object Disabled extends EndorsementStorage {
@@ -119,14 +117,17 @@ object EndorsementStorage {
           if (isValid && !conflict.isDefinedAt(msg.endorserIndex)) {
             valid = valid.updated(msg.endorserIndex, sig)
           } else {
-            conflict = conflict.updated(msg.endorserIndex, toConflict(msg, sig))
+            conflict = conflict.updated(
+              msg.endorserIndex,
+              BlockEndorsement.Conflict(GeneratorIndex(msg.endorserIndex), msg.finalizedId, sig)
+            )
             valid = valid.removed(msg.endorserIndex)
           }
 
           processed += msg
           hasChanges = true
 
-          filter.minerIndex.isEmpty // Share with neighbours only if this node isn't a miner
+          filter.miner.isEmpty // Share with neighbours only if this node isn't a miner
         }
     }
 
@@ -158,7 +159,7 @@ object EndorsementStorage {
         hasChanges = false
 
         val moreConflict = conflict.size > latestResult.voting.conflict.size
-        val moreValid    = valid.size > latestResult.voting.endorserIndexes.size
+        val moreValid    = valid.size > latestResult.voting.valid.size
         if (moreConflict || !latestResult.simulation.complete && moreValid) {
           val simulation = currentFilter.simulate(valid.keys)
 
@@ -174,7 +175,7 @@ object EndorsementStorage {
 
     private def createVoting(simulationResult: SimulationResult): FinalizationVoting =
       simulationResult.chosenValid.foldLeft(FinalizationVoting(conflict = conflict.values.toIndexedSeq)) { case (r, idx) =>
-        r.withValid(idx, valid(idx))
+        r.withValid(idx, valid(idx.toInt))
       }
 
     private def verifySig(msg: EndorseBlock, pk: BlsPublicKey): Option[BlsSignature.NonEmpty] =
@@ -182,8 +183,5 @@ object EndorsementStorage {
         sig <- BlsSignature(msg.signature).toOption
         _   <- Option.when(pk.verify(BlockEndorsement.mkMessage(msg.finalizedId, msg.finalizedHeight, msg.endorsedId), sig))(sig)
       } yield sig
-
-    private def toConflict(msg: EndorseBlock, verifiedSig: BlsSignature.NonEmpty): BlockEndorsement.Conflict =
-      BlockEndorsement.Conflict(msg.endorserIndex, msg.finalizedId, verifiedSig)
   }
 }

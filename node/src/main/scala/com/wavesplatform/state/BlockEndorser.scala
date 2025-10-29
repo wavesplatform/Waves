@@ -29,13 +29,8 @@ object BlockEndorser {
       if (endorsedHeight > GenesisBlockHeight) for {
         votingPeriod <- blockchain.generationPeriodOf(votingHeight).toSeq
 
-        votingBlockHeader <- blockchain
-          .blockHeader(votingHeight)
-          .toSeq
-
-        endorsedBlockHeader <- blockchain
-          .blockHeader(endorsedHeight)
-          .toSeq
+        votingBlockHeader   <- blockchain.blockHeader(votingHeight).toSeq
+        endorsedBlockHeader <- blockchain.blockHeader(endorsedHeight).toSeq
 
         finalizedHeight = blockchain.finalizedHeightAtOrFallback(votingHeight)
         finalizedId <- blockchain
@@ -60,7 +55,8 @@ object BlockEndorser {
             }
             .to(Vector)
 
-          EndorsementFilter(if (minerIndex < 0) None else Some(minerIndex), finalizedId, finalizedHeight, endorsedId, endorsers)
+          val conflict = blockchain.conflictGenerators(votingPeriod).upTo(votingHeight)
+          EndorsementFilter(GeneratorIndex.checked(minerIndex), finalizedId, finalizedHeight, endorsedId, endorsers, conflict)
         }
         if endorsementStorage.startVoting(filter)
 
@@ -68,7 +64,7 @@ object BlockEndorser {
           ((committedAddr, _), idx) <- committed.zipWithIndex
           if committedAddr != votingBlockMiner // A miner doesn’t need to endorse its own blocks - a mining is already an endorsement
           pk <- wallet.privateKeyAccount(committedAddr).toSeq
-        } yield (pk, idx)
+        } yield (pk, GeneratorIndex(idx))
 
         endorsement = BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
         networkMsg  = EndorseBlock.from(endorsement)

@@ -277,8 +277,16 @@ object Keys {
       writeCommittedGenerators
     )
 
-  def commitmentTransactions(committedPeriod: GenerationPeriod, commitmentHeight: Height): Key[Option[Seq[TransactionId]]] =
-    Key.opt(
+  def conflictGenerators(committedPeriod: GenerationPeriod, conflictEndorsementHeight: Height): Key[Seq[GeneratorIndex]] =
+    Key(
+      ConflictGenerators,
+      h(committedPeriod.start) ++ h(conflictEndorsementHeight),
+      readConflictGenerators,
+      writeConflictGenerators
+    )
+
+  def commitmentTransactions(committedPeriod: GenerationPeriod, commitmentHeight: Height): Key[Seq[TransactionId]] =
+    Key(
       CommitmentTransactions,
       h(committedPeriod.start) ++ h(commitmentHeight),
       readCommitmentTransactions,

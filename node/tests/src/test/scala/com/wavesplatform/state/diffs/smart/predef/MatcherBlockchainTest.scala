@@ -66,6 +66,7 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset]                    = ???
       override def lastStateHash(refId: Option[ByteStr]): BlockId                                           = ???
       override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)]           = ???
+      override def conflictGenerators(at: GenerationPeriod): ConflictGenerators                             = ???
       override def currentGeneratorBalances(): Seq[(Address, Long)]                                         = ???
     }
 

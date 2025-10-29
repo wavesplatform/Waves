@@ -6,7 +6,7 @@ import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.{Blockchain, GenesisBlockHeight, Height}
+import com.wavesplatform.state.{Blockchain, GeneratorIndex, GenesisBlockHeight, Height}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{FreeSpec, NumericExt}
 import com.wavesplatform.transaction.TxHelpers
@@ -63,7 +63,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
         strictTime = true,
         voting = Some(
           FinalizationVoting(
-            endorserIndexes = Seq(1),
+            valid = Seq(GeneratorIndex(1)),
             aggregatedEndorsement = aggSig,
             conflict = Vector.empty
           )
@@ -115,7 +115,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           strictTime = true,
           voting = Some(
             FinalizationVoting(
-              endorserIndexes = Seq(2),
+              valid = Seq(GeneratorIndex(2)),
               aggregatedEndorsement = aggSig,
               conflict = Vector.empty
             )
@@ -226,11 +226,11 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           strictTime = true,
           voting = Some(
             FinalizationVoting(
-              endorserIndexes = Seq(1),
+              valid = Seq(GeneratorIndex(1)),
               aggregatedEndorsement = aggSig,
               conflict = Vector(
                 BlockEndorsement.Conflict(
-                  endorserIndex = 0,
+                  endorserIndex = GeneratorIndex(0),
                   finalizedId = otherFinalizedBlockId,
                   signature = BlockEndorsement.sign(
                     kp = BlsKeyPair(otherNode1Acc.privateKey),

@@ -3,22 +3,19 @@ package com.wavesplatform.network
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.state.EndorsementStorage.EndorsementFilter
-import com.wavesplatform.state.{EndorsementStorage, Height}
+import com.wavesplatform.state.{EndorsementStorage, GeneratorIndex, Height}
 import com.wavesplatform.test.{FreeSpec, NumericExt, produce}
 import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.EitherValues
-
-import java.util.concurrent.ThreadLocalRandom
 
 class EndorsementStorageSpec extends FreeSpec with EitherValues {
   private type GeneratorBalance = (blsKp: BlsKeyPair, balance: Long)
 
   private val activeGenerator     = BlsKeyPair(TxHelpers.signer(0).privateKey)
   private val committedGenerator  = BlsKeyPair(TxHelpers.signer(1).privateKey)
-  private val activeEndorserIndex = 1
+  private val activeEndorserIndex = GeneratorIndex(1)
   private val finalizedHeight     = Height(5)
 
   private val expectedFinalizedId, unexpectedFinalizedId, endorsedId = TxHelpers.randomBlockId
@@ -32,12 +29,20 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
       s.tryAddVote(EndorseBlock.from(endorsement1)).value shouldBe true
     }
 
+    "don't rebroadcast if miner" in {
+      val s = started(minerIndex = 1)
+
+      log.info("on endorsement")
+      val endorsement1 = BlockEndorsement.full(activeGenerator, activeEndorserIndex, expectedFinalizedId, finalizedHeight, endorsedId)
+      s.tryAddVote(EndorseBlock.from(endorsement1)).value shouldBe false
+    }
+
     "ignore if" - {
       "an endorsement with" - {
         def test(msg: EndorseBlock, error: String): Unit = started().tryAddVote(msg) should produce(error)
 
         "a wrong signature" in test(
-          EndorseBlock(activeEndorserIndex, expectedFinalizedId, finalizedHeight, endorsedId, ByteStr.empty),
+          EndorseBlock(activeEndorserIndex.toInt, expectedFinalizedId, finalizedHeight, endorsedId, ByteStr.empty),
           "Invalid signature"
         )
 
@@ -52,7 +57,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         )
 
         "an unexpected endorser" in test(
-          EndorseBlock.from(BlockEndorsement.full(committedGenerator, 2, expectedFinalizedId, finalizedHeight, endorsedId)),
+          EndorseBlock.from(BlockEndorsement.full(committedGenerator, GeneratorIndex(2), expectedFinalizedId, finalizedHeight, endorsedId)),
           "There are only"
         )
 
@@ -60,6 +65,10 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
           EndorseBlock.from(BlockEndorsement.full(activeGenerator, activeEndorserIndex, expectedFinalizedId, finalizedHeight, expectedFinalizedId)),
           "Expected block"
         )
+
+        "a second conflict endorsement from the same endorser" in {
+          // TODO:
+        }
       }
 
       "already seen" in {
@@ -83,13 +92,11 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
     }
 
     extension (s: EndorsementStorage) {
-      private def addValidVote(generatorIndex: Int): Either[String, Boolean] = {
-        val endorsement = BlockEndorsement.full(generators(generatorIndex).blsKp, generatorIndex, expectedFinalizedId, finalizedHeight, endorsedId)
-        s.tryAddVote(EndorseBlock.from(endorsement))
-      }
-
-      private def addConflictVote(generatorIndex: Int): Either[String, Boolean] = {
-        val endorsement = BlockEndorsement.full(generators(generatorIndex).blsKp, generatorIndex, unexpectedFinalizedId, finalizedHeight, endorsedId)
+      private def addValidVote(generatorIndex: Int): Either[String, Boolean]    = s.addVote(generatorIndex, expectedFinalizedId)
+      private def addConflictVote(generatorIndex: Int): Either[String, Boolean] = s.addVote(generatorIndex, unexpectedFinalizedId)
+      private def addVote(generatorIndex: Int, finalizedId: BlockId): Either[String, Boolean] = {
+        val endorsement = BlockEndorsement
+          .full(generators(generatorIndex).blsKp, GeneratorIndex(generatorIndex), finalizedId, finalizedHeight, endorsedId)
         s.tryAddVote(EndorseBlock.from(endorsement))
       }
 
@@ -99,7 +106,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
             fail(s"Expected valid endorsers [${valid.mkString(", ")}], conflict endorsers [${conflict.mkString(", ")}], got None")
           case Some(v) =>
             withClue("valid: ") {
-              v.endorserIndexes should contain theSameElementsAs valid
+              v.valid should contain theSameElementsAs valid
             }
             withClue("conflict: ") {
               v.conflict.map(_.endorserIndex) should contain theSameElementsAs conflict
@@ -225,17 +232,19 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
   private def started(
       minerIndex: Int = -1,
-      endorsers: IndexedSeq[GeneratorBalance] = IndexedSeq(committedGenerator -> 100_000.waves, activeGenerator -> 100_000.waves)
+      endorsers: IndexedSeq[GeneratorBalance] = IndexedSeq(committedGenerator -> 100_000.waves, activeGenerator -> 100_000.waves),
+      conflict: Set[GeneratorIndex] = Set.empty
   ): EndorsementStorage = {
     require(minerIndex == -1 || minerIndex >= 0 && minerIndex < endorsers.size, "Invalid miner index")
     val r = new EndorsementStorage.InMemory
     r.startVoting(
       EndorsementFilter(
-        minerIndex = if (minerIndex < 0) None else Some(minerIndex),
+        miner = GeneratorIndex.checked(minerIndex),
         expectedFinalizedId,
         finalizedHeight,
         endorsedId,
-        endorsers.map(x => (x.blsKp.publicKey, x.balance))
+        endorsers.map(x => (x.blsKp.publicKey, x.balance)),
+        conflict
       )
     ) shouldBe true
     r

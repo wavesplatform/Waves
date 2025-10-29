@@ -384,6 +384,13 @@ package object database {
   def writeCommittedGenerators(data: Seq[(AddressId, BlsPublicKey)]): Array[Byte] =
     data.view.flatMap { (addressId, blsPublicKey) => Longs.toByteArray(addressId) ++ blsPublicKey.arr }.toArray
 
+  def readConflictGenerators(data: Array[Byte]): Seq[GeneratorIndex] = data
+    .grouped(Ints.BYTES)
+    .map { bytes => GeneratorIndex(Ints.fromByteArray(bytes)) }
+    .toSeq
+
+  def writeConflictGenerators(data: Seq[GeneratorIndex]): Array[Byte] = data.view.flatMap(i => Ints.toByteArray(i.toInt)).toArray
+
   def readCommitmentTransactions(data: Array[Byte]): Seq[TransactionId] = {
     val transactionSize = DigestLength
     data
