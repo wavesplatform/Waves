@@ -841,7 +841,6 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.filledVolumeAndFee(orderId)
   }
 
-  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceAtHeight(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = readLock {
     snapshotBlockchain.balanceAtHeight(address, h, assetId)
   }

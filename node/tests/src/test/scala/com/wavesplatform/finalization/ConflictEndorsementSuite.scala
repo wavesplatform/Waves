@@ -77,8 +77,9 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     val generator2BalanceAfterBlock3 = generator2BalanceAfterBlock2
     d.blockchain.checkCommitted(endorserAddrs*)
     d.blockchain.checkHasConflict(h = 3, 1)
-    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock3)
     d.blockchain.checkWavesAmount(wavesAmountBeforeVoting + d.blockchain.lastBlockReward.getOrElse(0L))
+    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock3)
+    d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (2, generator2BalanceAfterBlock2)
 
     log.debug("Append block 4")
     val wavesAmountBeforeCalculation = d.blockchain.wavesAmount(d.blockchain.height)
@@ -87,10 +88,11 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     val generator2BalanceAfterBlock4 = generator2BalanceAfterBlock3 - DepositInWavelets
     d.blockchain.checkCommitted(endorserAddrs*)
     d.blockchain.checkHasConflict(h = 3, 1)
-    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
     withClue("WAVES burnt: ") {
       d.blockchain.checkWavesAmount(wavesAmountBeforeCalculation + d.blockchain.lastBlockReward.getOrElse(0L) - DepositInWavelets)
     }
+    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
+    d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (4, generator2BalanceAfterBlock4)
 
     log.debug("Append block 5 of new epoch, data preserved")
     val wavesAmountBeforeNewEpoch = d.blockchain.wavesAmount(d.blockchain.height)
@@ -99,8 +101,9 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     val generator2BalanceAfterBlock5 = generator2BalanceAfterBlock4
     d.blockchain.checkCommitted()
     d.blockchain.checkHasConflict(h = 3, 1)
-    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock5)
     d.blockchain.checkWavesAmount(wavesAmountBeforeNewEpoch + d.blockchain.lastBlockReward.getOrElse(0L))
+    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock5)
+    d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (4, generator2BalanceAfterBlock4)
   }
 
   extension (self: Blockchain) {
