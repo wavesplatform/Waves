@@ -37,61 +37,70 @@ class MinerWithDeterministicFinalitySuite extends FreeSpec with WithDomain with 
 
   "If account not committed, its attempt to forge doesn't stop current mining of other account on same node" ignore {}
 
-  "Mining starts on new epoch even committed after scheduled time" ignore {}
+  "Mining starts on new epoch" - {
+    "even committed after scheduled time" ignore {}
 
-  "Mining starts on new epoch even committed in the last block of epoch" in Using.Manager { manager =>
-    val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    manager.acquire(channels)(using _.close())
+    "even committed in the last block of epoch" in Using.Manager { manager =>
+      val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+      manager.acquire(channels)(using _.close())
 
-    var miner: Miner = Miner.Disabled
-    withDomain(
-      defaultSettings,
-      AddrWithBalance.enoughBalances(otherNodeAcc) ++ Seq(
-        AddrWithBalance(
-          thisNodeAcc.toAddress,
-          MinimalEffectiveBalanceForGenerator2 + TestValues.commitToGenerationFee + CommitToGenerationTransaction.DepositInWavelets
-        )
-      ),
-      miner = x => miner.scheduleMining(x)
-    ) { d =>
-      val minerScheduler    = TestScheduler()
-      val appenderScheduler = TestScheduler()
+      var miner: Miner = Miner.Disabled
+      withDomain(
+        defaultSettings,
+        AddrWithBalance.enoughBalances(otherNodeAcc) ++ Seq(
+          AddrWithBalance(
+            thisNodeAcc.toAddress,
+            MinimalEffectiveBalanceForGenerator2 + TestValues.commitToGenerationFee + CommitToGenerationTransaction.DepositInWavelets
+          )
+        ),
+        miner = x => miner.scheduleMining(x)
+      ) { d =>
+        val minerScheduler    = TestScheduler()
+        val appenderScheduler = TestScheduler()
 
-      d.wallet.generateNewAccounts(1).map(_.toAddress)
+        d.wallet.generateNewAccounts(1).map(_.toAddress)
 
-      val minerImpl = new MinerImpl(
-        channels,
-        d.blockchain,
-        d.settings,
-        d.testTime,
-        d.utxPool,
-        BlockEndorser.Disabled,
-        EndorsementStorage.Disabled,
-        d.wallet,
-        d.posSelector,
-        minerScheduler,
-        appenderScheduler,
-        Observable.empty
-      ) with CatchLogs
-      miner = minerImpl
+        val minerImpl = new MinerImpl(
+          channels,
+          d.blockchain,
+          d.settings,
+          d.testTime,
+          d.utxPool,
+          BlockEndorser.Disabled,
+          EndorsementStorage.Disabled,
+          d.wallet,
+          d.posSelector,
+          minerScheduler,
+          appenderScheduler,
+          Observable.empty
+        ) with CatchLogs
+        miner = minerImpl
 
-      log.debug("Append block2")
-      val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = Seq.empty, generator = otherNodeAcc, strictTime = true)
-      d.appender.appendBlock(block2)
-      d.appendMicroBlock(TxHelpers.commitToGeneration(generationPeriodStart = 3, sender = thisNodeAcc))
-      d.utxPool.cleanUnconfirmed()
+        log.debug("Append block2")
+        val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = Seq.empty, generator = otherNodeAcc, strictTime = true)
+        d.appender.appendBlock(block2)
+        d.appendMicroBlock(TxHelpers.commitToGeneration(generationPeriodStart = 3, sender = thisNodeAcc))
+        d.utxPool.cleanUnconfirmed()
 
-      log.debug("Trigger thisNode forging")
-      val nextBlockIn = (d.nextBlockTime(thisNodeAcc) - d.testTime.getTimestamp()).millis
-      d.testTime.advance(nextBlockIn)
-      appenderScheduler.tickNext("appender-1")
-      minerScheduler.tickNext("miner-1")
-      appenderScheduler.tickNext("appender-2")
+        log.debug("Trigger thisNode forging")
+        val nextBlockIn = (d.nextBlockTime(thisNodeAcc) - d.testTime.getTimestamp()).millis
+        d.testTime.advance(nextBlockIn)
+        appenderScheduler.tickNext("appender-1")
+        minerScheduler.tickNext("miner-1")
+        appenderScheduler.tickNext("appender-2")
 
-      d.blockchain.lastBlockHeader.value.header.generator.toAddress shouldBe thisNodeAcc.toAddress
-      minerImpl.inMemoryLog.getMessages.find(_.contains("is not committed on 3")) shouldBe empty
+        d.blockchain.lastBlockHeader.value.header.generator.toAddress shouldBe thisNodeAcc.toAddress
+        minerImpl.inMemoryLog.getMessages.find(_.contains("is not committed on 3")) shouldBe empty
+      }
+    }.get
+
+    // TODO:
+    "even all generators have no right to mine" - {
+      "some conflict, some have no required balance" in {}
+
+      "all have no required balance" in {}
     }
-  }.get
+  }
 
   "Mining doesn't start on new epoch if not committed" in Using.Manager { manager =>
     val minerScheduler    = TestScheduler()
