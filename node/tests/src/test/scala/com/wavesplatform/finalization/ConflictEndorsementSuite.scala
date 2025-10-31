@@ -84,13 +84,23 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     val wavesAmountBeforeCalculation = d.blockchain.wavesAmount(d.blockchain.height)
     d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
 
-    val generator2BalanceAfterBlock4 = generator2BalanceAfterBlock2 - DepositInWavelets
+    val generator2BalanceAfterBlock4 = generator2BalanceAfterBlock3 - DepositInWavelets
     d.blockchain.checkCommitted(endorserAddrs*)
     d.blockchain.checkHasConflict(h = 3, 1)
     d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
     withClue("WAVES burnt: ") {
       d.blockchain.checkWavesAmount(wavesAmountBeforeCalculation + d.blockchain.lastBlockReward.getOrElse(0L) - DepositInWavelets)
     }
+
+    log.debug("Append block 5 of new epoch, data preserved")
+    val wavesAmountBeforeNewEpoch = d.blockchain.wavesAmount(d.blockchain.height)
+    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+
+    val generator2BalanceAfterBlock5 = generator2BalanceAfterBlock4
+    d.blockchain.checkCommitted()
+    d.blockchain.checkHasConflict(h = 3, 1)
+    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock5)
+    d.blockchain.checkWavesAmount(wavesAmountBeforeNewEpoch + d.blockchain.lastBlockReward.getOrElse(0L))
   }
 
   extension (self: Blockchain) {
@@ -99,7 +109,7 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     }
 
     def checkHasConflict(h: Int, idx: Int)(using Position): Unit = {
-      self.conflictGenerators(self.currentGenerationPeriod.value) shouldBe mkConflictGenerators(h, idx)
+      self.conflictGenerators(self.generationPeriodOf(Height(h)).value) shouldBe mkConflictGenerators(h, idx)
     }
 
     def checkWavesAmount(x: BigInt)(using Position): Unit = {
