@@ -71,26 +71,26 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
       )
     )
 
-    // val wavesAmountBeforeVoting = d.blockchain.wavesAmount(d.blockchain.height)
+    val wavesAmountBeforeVoting = d.blockchain.wavesAmount(d.blockchain.height)
     d.appender.appendBlock(votingBlock)
 
     val generator2BalanceAfterBlock3 = generator2BalanceAfterBlock2
     d.blockchain.checkCommitted(endorserAddrs*)
     d.blockchain.checkHasConflict(h = 3, 1)
     d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock3)
-    // d.blockchain.checkWavesAmount(wavesAmountBeforeVoting + d.blockchain.lastBlockReward.getOrElse(0L))
+    d.blockchain.checkWavesAmount(wavesAmountBeforeVoting + d.blockchain.lastBlockReward.getOrElse(0L))
 
     log.debug("Append block 4")
-    // val wavesAmountBeforeCalculation = d.blockchain.wavesAmount(d.blockchain.height)
+    val wavesAmountBeforeCalculation = d.blockchain.wavesAmount(d.blockchain.height)
     d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
 
     val generator2BalanceAfterBlock4 = generator2BalanceAfterBlock2 - DepositInWavelets
     d.blockchain.checkCommitted(endorserAddrs*)
     d.blockchain.checkHasConflict(h = 3, 1)
     d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
-    // withClue("WAVES burnt: ") {
-    //   d.blockchain.checkWavesAmount(wavesAmountBeforeCalculation + d.blockchain.lastBlockReward.getOrElse(0L) - DepositInWavelets)
-    // }
+    withClue("WAVES burnt: ") {
+      d.blockchain.checkWavesAmount(wavesAmountBeforeCalculation + d.blockchain.lastBlockReward.getOrElse(0L) - DepositInWavelets)
+    }
   }
 
   extension (self: Blockchain) {
