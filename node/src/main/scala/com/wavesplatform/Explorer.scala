@@ -40,7 +40,7 @@ object Explorer extends ScorexLogging {
       blockchain.balance(address),
       blockchain.leaseBalance(address),
       db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, StateSnapshot.empty, _ => true).flatten.to(VectorMap)),
-      blockchain.currentGenerationPeriod.fold(0L)(blockchain.generationDeposit(address, _))
+      blockchain.generationDeposit(address)
     )
 
   def main(argsRaw: Array[String]): Unit = {

@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.implicits.{catsSyntaxOption, catsSyntaxSemigroup, toFoldableOps}
 import cats.syntax.either.*
 import com.wavesplatform.account.Address
-import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot}
+import com.wavesplatform.block.{Block, BlockSnapshot, FinalizationVoting, MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
@@ -20,7 +20,15 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Authorized, BlockchainUpdater, GenesisTransaction, PaymentTransaction, Transaction}
+import com.wavesplatform.transaction.{
+  Asset,
+  Authorized,
+  BlockchainUpdater,
+  CommitToGenerationTransaction,
+  GenesisTransaction,
+  PaymentTransaction,
+  Transaction
+}
 
 import scala.collection.immutable.VectorMap
 
@@ -175,8 +183,12 @@ object BlockDiffer {
         totalMinerPortfolio = Map(block.sender.toAddress -> totalMinerReward)
         nonMinerRewardPortfolios <- Portfolio.combine(daoPortfolio, xtnBuybackPortfolio)
         totalRewardPortfolios    <- Portfolio.combine(totalMinerPortfolio, nonMinerRewardPortfolios)
+        withPenaltiesPortfolios <- Portfolio.combine(
+          calculatePenalties(blockchain, maybePrevBlock.flatMap(_.header.finalizationVoting)),
+          totalRewardPortfolios
+        )
         patchesSnapshot = leasePatchesSnapshot(blockchainWithNewBlock)
-        resultSnapshot <- patchesSnapshot.addBalances(totalRewardPortfolios, blockchainWithNewBlock)
+        resultSnapshot <- patchesSnapshot.addBalances(withPenaltiesPortfolios, blockchainWithNewBlock)
       } yield resultSnapshot
 
     for {
@@ -276,6 +288,19 @@ object BlockDiffer {
     } yield r
   }
 
+  private def calculatePenalties(blockchain: Blockchain, finalizationVoting: Option[FinalizationVoting]): Map[Address, Portfolio] =
+    blockchain.currentGenerationPeriod.fold(Map.empty) { currPeriod =>
+      lazy val committed = blockchain.committedGenerators(currPeriod)
+      val conflictEndorsers = for {
+        v <- finalizationVoting.toSeq.view
+        c <- v.conflict
+      } yield committed(c.endorserIndex.toInt)._1
+
+      conflictEndorsers.foldLeft(Map.empty) { case (r, addr) =>
+        r.updated(addr, Portfolio.waves(-CommitToGenerationTransaction.DepositInWavelets))
+      }
+    }
+
   def maybeApplySponsorship(blockchain: Blockchain, sponsorshipEnabled: Boolean, transactionFee: (Asset, Long)): (Asset, Long) =
     transactionFee match {
       case (ia: IssuedAsset, fee) if sponsorshipEnabled =>
@@ -302,17 +327,17 @@ object BlockDiffer {
       blockchain
     )
 
-    Portfolio
-      .waves(rewardShares.miner)
-      .combine(feeFromPreviousBlock)
-      .leftMap(GenericError(_))
-      .flatMap { minerReward =>
-        val resultPf = Map(miner -> minerReward) ++
-          daoAddress.map(_ -> Portfolio.waves(rewardShares.daoAddress)) ++
-          xtnBuybackAddress.map(_ -> Portfolio.waves(rewardShares.xtnBuybackAddress))
+    for {
+      minerReward <- Portfolio.waves(rewardShares.miner).combine(feeFromPreviousBlock).leftMap(GenericError(_))
+      resultPf = Map(miner -> minerReward) ++
+        daoAddress.map(_ -> Portfolio.waves(rewardShares.daoAddress)) ++
+        xtnBuybackAddress.map(_ -> Portfolio.waves(rewardShares.xtnBuybackAddress))
+      withRewards <- StateSnapshot.build(blockchain, portfolios = resultPf.filterNot(_._2.isEmpty))
 
-        StateSnapshot.build(blockchain, portfolios = resultPf.filter(!_._2.isEmpty))
-      }
+      lastBlockHeader <- blockchain.lastBlockHeader.toRight("No last block").leftMap(GenericError(_))
+      penaltiesPf = calculatePenalties(blockchain, lastBlockHeader.header.finalizationVoting)
+      withPenalties <- withRewards.addBalances(penaltiesPf, blockchain).leftMap(GenericError(_))
+    } yield withPenalties
   }
 
   def computeInitialStateHash(blockchain: Blockchain, initSnapshot: StateSnapshot, prevStateHash: ByteStr): ByteStr = {

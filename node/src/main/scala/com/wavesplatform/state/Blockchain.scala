@@ -91,16 +91,6 @@ trait Blockchain {
 
   def wavesBalances(addresses: Seq[Address]): Map[Address, Long]
 
-  // TODO: not efficient? See RocksDBWriter.balanceSnapshots
-  // TODO: optimize
-  def generationDeposit(address: Address, period: GenerationPeriod): Long = {
-    val committedOnCurrent = committedGenerators(period).exists { case (currentAddress, _) => currentAddress == address }
-    val committedOnNext    = committedGenerators(period.next).exists { case (currentAddress, _) => currentAddress == address }
-
-    val committedTimes = Numbers.when(committedOnCurrent)(1) + Numbers.when(committedOnNext)(1)
-    committedTimes * CommitToGenerationTransaction.DepositInWavelets
-  }
-
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
   // TODO: cached
@@ -190,8 +180,24 @@ object Blockchain {
     def wavesPortfolio(address: Address): Portfolio = Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
-      generationDeposit = blockchain.currentGenerationPeriod.fold(0L)(blockchain.generationDeposit(address, _))
+      generationDeposit = blockchain.generationDeposit(address)
     )
+
+    // TODO: lock?
+    // TODO: not efficient? See RocksDBWriter.balanceSnapshots
+    // TODO: optimize
+    def generationDeposit(address: Address, at: Height = Height(blockchain.height)): Long = blockchain.generationPeriodOf(at).fold(0L) { currPeriod =>
+      val committedOnCurrent = blockchain.committedGenerators(currPeriod)
+      val conflictOnCurrent  = blockchain.conflictGenerators(currPeriod)
+      val idxOnCurrent = committedOnCurrent.zipWithIndex
+        .collectFirst { case ((currentAddress, _), i) if currentAddress == address => GeneratorIndex(i) }
+        .filterNot { idx => conflictOnCurrent.hasInUpTo(at, idx) }
+
+      val hasOnNext = blockchain.committedGenerators(currPeriod.next).exists { case (currentAddress, _) => currentAddress == address }
+
+      val committedTimes = idxOnCurrent.size + Numbers.when(hasOnNext)(1)
+      committedTimes * CommitToGenerationTransaction.DepositInWavelets
+    }
 
     def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
@@ -285,6 +291,8 @@ object Blockchain {
         }
         .fold(1)(_ => BlockRewardCalculator.RewardBoost)
 
+    /** @return None, if DeterministicFinality is not activated for provided height
+      */
     def generationPeriodOf(h: Height): Option[GenerationPeriod] = for {
       activation <- blockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality)
       p          <- GenerationPeriod.from(h, activation, blockchain.settings.functionalitySettings)

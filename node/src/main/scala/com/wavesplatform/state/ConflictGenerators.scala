@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import com.wavesplatform.state
 
 import scala.collection.Searching.*
+import scala.collection.View
 
 case class ConflictGenerators private (private val heights: Vector[Height], private val generators: Vector[Seq[GeneratorIndex]]) {
   def append(h: Height, idx: GeneratorIndex): ConflictGenerators = {
@@ -12,7 +13,8 @@ case class ConflictGenerators private (private val heights: Vector[Height], priv
 
   def appendAll(h: Height, idxs: Seq[GeneratorIndex]): ConflictGenerators = {
     require(heights.isEmpty || implicitly[Ordering[Height]].lt(heights.last, h), s"height $h must increase, last height: ${heights.last}")
-    appendAllUnsafe(h, idxs)
+    if (idxs.isEmpty) this
+    else appendAllUnsafe(h, idxs)
   }
 
   private def appendAllUnsafe(h: Height, idxs: Seq[GeneratorIndex]): ConflictGenerators = copy(
@@ -22,13 +24,18 @@ case class ConflictGenerators private (private val heights: Vector[Height], priv
       else generators.init :+ (generators.last ++ idxs)
   )
 
-  def upTo(h: Height): Set[GeneratorIndex] = {
+  def isEmpty: Boolean = generators.isEmpty
+
+  def upTo(h: Height): Set[GeneratorIndex]               = upToView(h).toSet
+  def hasInUpTo(h: Height, idx: GeneratorIndex): Boolean = upToView(h).exists(_ == idx)
+
+  private def upToView(h: Height): View[GeneratorIndex] = {
     val idx = heights.search(h) match {
       case Found(i)          => i
       case InsertionPoint(i) => i - 1
     }
-    if (idx < 0) Set.empty
-    else generators.view.take(idx + 1).flatten.toSet
+    if (idx < 0) View.empty
+    else generators.view.take(idx + 1).flatten
   }
 
   def deleteLastIf(expected: Height): ConflictGenerators =

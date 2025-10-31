@@ -8,6 +8,7 @@ import com.wavesplatform.state.EndorsementStorage.EndorsementFilter
 import com.wavesplatform.state.{EndorsementStorage, GeneratorIndex, Height}
 import com.wavesplatform.test.{FreeSpec, NumericExt, produce}
 import com.wavesplatform.transaction.TxHelpers
+import org.scalactic.source.Position
 import org.scalatest.EitherValues
 
 class EndorsementStorageSpec extends FreeSpec with EitherValues {
@@ -100,7 +101,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         s.tryAddVote(EndorseBlock.from(endorsement))
       }
 
-      private def checkTryCollect(endorsedId: BlockId, valid: Seq[Int] = Nil, conflict: Seq[Int] = Nil): Unit =
+      private def checkTryCollect(endorsedId: BlockId, valid: Seq[Int] = Nil, conflict: Seq[Int] = Nil)(using Position): Unit =
         s.tryCollectAndClear(endorsedId) match {
           case None if valid.nonEmpty || conflict.nonEmpty =>
             fail(s"Expected valid endorsers [${valid.mkString(", ")}], conflict endorsers [${conflict.mkString(", ")}], got None")

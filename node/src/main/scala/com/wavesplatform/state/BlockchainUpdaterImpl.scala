@@ -901,10 +901,6 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.wavesBalances(addresses)
   }
 
-  override def generationDeposit(address: Address, period: GenerationPeriod): Long = readLock {
-    snapshotBlockchain.generationDeposit(address, period)
-  }
-
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = readLock {
     snapshotBlockchain.effectiveBalanceBanHeights(address)
   }

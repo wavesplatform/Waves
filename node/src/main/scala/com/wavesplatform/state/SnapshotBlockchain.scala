@@ -13,8 +13,7 @@ import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
-import com.wavesplatform.transaction.{Asset, CommitToGenerationTransaction, ERC20Address, Transaction}
-import com.wavesplatform.utils.Numbers
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 case class SnapshotBlockchain(
     inner: Blockchain,
@@ -53,17 +52,6 @@ case class SnapshotBlockchain(
           )(balance => (innerBalances, snapshotBalances + (address -> balance)))
       }
     inner.wavesBalances(innerBalances) ++ snapshotBalances
-  }
-
-  override def generationDeposit(address: Address, period: GenerationPeriod): Long = {
-    // TODO: refactor: add GenerationPeriod.method to compare with curr and curr.next?
-    val includeSnapshot = this.currentGenerationPeriod.forall(curr => period == curr || period == curr.next)
-    val inSnapshot = Numbers.when(includeSnapshot) {
-      val isCommitted = snapshot.nextCommittedGenerators.exists { case (pk, _) => pk.toAddress == address }
-      Numbers.when(isCommitted)(CommitToGenerationTransaction.DepositInWavelets)
-    }
-
-    inner.generationDeposit(address, period) + inSnapshot
   }
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = {
@@ -176,7 +164,7 @@ case class SnapshotBlockchain(
       val h          = Height(height)
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
-      val deposit    = this.currentGenerationPeriod.fold(0L)(this.generationDeposit(address, _))
+      val deposit    = this.generationDeposit(address, h)
       val bs         = BalanceSnapshot(h, Portfolio(balance, lease, generationDeposit = deposit))
       val height2Fix = h == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
       if (inner.height > 0 && (from1 < h - 1 || height2Fix))
@@ -265,8 +253,7 @@ case class SnapshotBlockchain(
         c              <- v.conflict
       } yield c.endorserIndex
 
-      if (extraConflictIndexes.isEmpty) base
-      else base.appendAll(Height(height), extraConflictIndexes)
+      base.appendAll(Height(height), extraConflictIndexes)
     } else base
   }
 
