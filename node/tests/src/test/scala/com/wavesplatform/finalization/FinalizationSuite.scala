@@ -6,6 +6,7 @@ import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain
 import com.wavesplatform.state.{Blockchain, GeneratorIndex, GenesisBlockHeight, Height}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{FreeSpec, NumericExt}
@@ -38,7 +39,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       d.blockchain.finalizedHeight.value shouldBe GenesisBlockHeight
 
       d.appendBlock()
-      d.blockchain.checkFinalizedHeight()
+      d.checkFinalizedHeight()
 
       log.debug(s"Append block 3 with commitments")
       val endorsers = Seq(otherNode1Acc, thisNodeAcc)
@@ -48,7 +49,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
-      d.blockchain.checkFinalizedHeight()
+      d.checkFinalizedHeight()
 
       log.debug(s"Append block 4 with votes")
       val aggSig = BlockEndorsement.sign(
@@ -71,11 +72,11 @@ class FinalizationSuite extends FreeSpec with WithDomain {
         )
       )
       d.appender.appendBlock(votingBlock)
-      d.blockchain.checkFinalizedHeight()
+      d.checkFinalizedHeight()
 
       log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.blockchain.checkFinalizedHeight(3)
+      d.checkFinalizedHeight(3)
     }
 
     "spending balance after voting doesn't affect finalization" in withDomain(
@@ -126,7 +127,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
 
       log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.blockchain.checkFinalizedHeight(3)
+      d.checkFinalizedHeight(3)
     }
 
     "same finalized height if not voted" in withDomain(
@@ -157,7 +158,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
 
       log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.blockchain.checkFinalizedHeight()
+      d.checkFinalizedHeight()
     }
 
     "increased if surpass maxRollback blocks even no votes" in withDomain(
@@ -188,7 +189,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
 
       log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.blockchain.checkFinalizedHeight(3) // 5 - maxRollback = 3
+      d.checkFinalizedHeight(3) // 5 - maxRollback = 3
     }
 
     "increased with less votes after conflict endorsement" in withDomain(
@@ -248,14 +249,14 @@ class FinalizationSuite extends FreeSpec with WithDomain {
 
       log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.blockchain.checkFinalizedHeight(3) // 5 - maxRollback = 3
+      d.checkFinalizedHeight(3) // 5 - maxRollback = 3
     }
   }
 
-  extension (self: Blockchain) {
+  extension (d: Domain) {
     def checkFinalizedHeight(h: Int = GenesisBlockHeight)(using Position): Unit = {
-      self.finalizedHeightAt().value shouldBe Height(h)
-      self.finalizedHeight.value shouldBe Height(h)
+      d.blockchain.finalizedHeightAt().value shouldBe Height(h)
+      d.blockchain.finalizedHeight.value shouldBe Height(h)
     }
   }
 }

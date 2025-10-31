@@ -26,6 +26,8 @@ case class ConflictGenerators private (private val heights: Vector[Height], priv
 
   def isEmpty: Boolean = generators.isEmpty
 
+  def heightOf(idx: GeneratorIndex): Option[Height] = heights.view.zip(generators).collectFirst { case (h, idxs) if idxs.contains(idx) => h }
+
   def upTo(h: Height): Set[GeneratorIndex]               = upToView(h).toSet
   def hasInUpTo(h: Height, idx: GeneratorIndex): Boolean = upToView(h).exists(_ == idx)
 

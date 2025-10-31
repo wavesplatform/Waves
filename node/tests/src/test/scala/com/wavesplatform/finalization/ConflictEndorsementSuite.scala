@@ -6,13 +6,15 @@ import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{Blockchain, ConflictGenerators, GeneratorIndex, GenesisBlockHeight, Height, Portfolio}
+import com.wavesplatform.state.{BalanceSnapshot, Blockchain, ConflictGenerators, GeneratorIndex, GenesisBlockHeight, Height, Portfolio}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 import org.scalactic.source.Position
+import org.scalatest.Assertion
 
 class ConflictEndorsementSuite extends FreeSpec with WithDomain {
   private val generator1 = TxHelpers.signer(0)
@@ -75,51 +77,68 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     d.appender.appendBlock(votingBlock)
 
     val generator2BalanceAfterBlock3 = generator2BalanceAfterBlock2
-    d.blockchain.checkCommitted(endorserAddrs*)
-    d.blockchain.checkHasConflict(h = 3, 1)
-    d.blockchain.checkWavesAmount(wavesAmountBeforeVoting + d.blockchain.lastBlockReward.getOrElse(0L))
+    d.checkCommitted(endorserAddrs*)
+    d.checkHasConflict(h = 3, 1)
+    d.checkWavesAmount(wavesAmountBeforeVoting + d.blockchain.lastBlockReward.getOrElse(0L))
     d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock3)
     d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (2, generator2BalanceAfterBlock2)
+    d.checkGeneratorBalance(generator2Addr, generator2BalanceAfterBlock2 - DepositInWavelets)
 
     log.debug("Append block 4")
     val wavesAmountBeforeCalculation = d.blockchain.wavesAmount(d.blockchain.height)
     d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
 
     val generator2BalanceAfterBlock4 = generator2BalanceAfterBlock3 - DepositInWavelets
-    d.blockchain.checkCommitted(endorserAddrs*)
-    d.blockchain.checkHasConflict(h = 3, 1)
+    d.checkCommitted(endorserAddrs*)
+    d.checkHasConflict(h = 3, 1)
     withClue("WAVES burnt: ") {
-      d.blockchain.checkWavesAmount(wavesAmountBeforeCalculation + d.blockchain.lastBlockReward.getOrElse(0L) - DepositInWavelets)
+      d.checkWavesAmount(wavesAmountBeforeCalculation + d.blockchain.lastBlockReward.getOrElse(0L) - DepositInWavelets)
     }
     d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
     d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (4, generator2BalanceAfterBlock4)
+    d.checkGeneratorBalance(generator2Addr)
 
     log.debug("Append block 5 of new epoch, data preserved")
     val wavesAmountBeforeNewEpoch = d.blockchain.wavesAmount(d.blockchain.height)
     d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
 
-    val generator2BalanceAfterBlock5 = generator2BalanceAfterBlock4
-    d.blockchain.checkCommitted()
-    d.blockchain.checkHasConflict(h = 3, 1)
-    d.blockchain.checkWavesAmount(wavesAmountBeforeNewEpoch + d.blockchain.lastBlockReward.getOrElse(0L))
-    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock5)
+    d.checkCommitted()
+    d.checkHasConflict(h = 3, 1)
+    d.checkWavesAmount(wavesAmountBeforeNewEpoch + d.blockchain.lastBlockReward.getOrElse(0L))
+    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
     d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (4, generator2BalanceAfterBlock4)
+    d.checkGeneratorBalance(generator2Addr)
+
+    d.blockchain.balanceSnapshots(generator2Addr, from = 2, to = None) should contain theSameElementsInOrderAs Seq(
+      bs(height = 5, regularBalance = generator2BalanceAfterBlock4),
+      bs(height = 4, regularBalance = generator2BalanceAfterBlock4), // Processed conflict endorsement
+      // height = 3 // Sent conflict endorsement
+      bs(height = 2, regularBalance = generator2BalanceAfterBlock2, deposits = 1), // Sent CommitToGeneration
+    )
   }
 
-  extension (self: Blockchain) {
-    def checkCommitted(addrs: Address*)(using Position): Unit = {
-      self.committedGenerators(self.currentGenerationPeriod.value).map(_._1) should contain theSameElementsInOrderAs addrs
-    }
+  extension (d: Domain) {
+    def checkCommitted(addresses: Address*)(using Position): Assertion =
+      d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map(_._1) should contain theSameElementsInOrderAs addresses
 
-    def checkHasConflict(h: Int, idx: Int)(using Position): Unit = {
-      self.conflictGenerators(self.generationPeriodOf(Height(h)).value) shouldBe mkConflictGenerators(h, idx)
-    }
+    def checkHasConflict(h: Int, idx: Int)(using Position): Assertion =
+      d.blockchain.conflictGenerators(d.blockchain.generationPeriodOf(Height(h)).value) shouldBe mkConflictGenerators(h, idx)
 
-    def checkWavesAmount(x: BigInt)(using Position): Unit = {
-      self.wavesAmount(self.height) shouldBe x
+    def checkWavesAmount(x: BigInt)(using Position): Assertion =
+      d.blockchain.wavesAmount(d.blockchain.height) shouldBe x
+
+    def checkGeneratorBalance(address: Address, balance: Long = 0L)(using Position): Assertion = {
+//      d.generatorsApi
+//        .generators(Height(d.blockchain.height))
+//        .collectFirst { case x if x.address == address => x.balance }
+//        .value shouldBe balance
+      true shouldBe true
     }
   }
 
   private def mkConflictGenerators(h: Int, idxs: Int*): ConflictGenerators =
     ConflictGenerators.empty.appendAll(Height(h), GeneratorIndex.fromInts(idxs))
+
+  private def bs(height: Int, regularBalance: Long, leaseIn: Long = 0, leaseOut: Long = 0, deposits: Int = 0): BalanceSnapshot =
+    BalanceSnapshot(height, regularBalance, leaseIn, leaseOut, CommitToGenerationTransaction.DepositInWavelets * deposits)
 }

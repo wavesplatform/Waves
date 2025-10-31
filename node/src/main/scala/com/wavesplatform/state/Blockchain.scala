@@ -66,10 +66,9 @@ trait Blockchain {
 
   def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
 
-  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive). Used only for getting a regular balance with confirmations and effective
-    * balance calculations
-    * @return
-    *   Balance snapshots from most recent to oldest.
+  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive).
+    * Used only for getting a regular balance with confirmations and effective balance calculations.
+    * @return Balance snapshots from most recent to oldest. May contain consecutive duplicate values
     */
   def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
 
