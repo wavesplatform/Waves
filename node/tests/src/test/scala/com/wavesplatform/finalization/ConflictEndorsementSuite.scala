@@ -84,6 +84,7 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock3)
     d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (2, generator2BalanceAfterBlock2)
     d.checkGeneratorBalance(generator2Addr, generator2BalanceAfterBlock2 - DepositInWavelets)
+    d.checkGeneratorBalanceFromApi(generator2Addr, generator2BalanceAfterBlock2 - DepositInWavelets)
 
     log.debug("Append block 4")
     val wavesAmountBeforeCalculation = d.blockchain.wavesAmount(d.blockchain.height)
@@ -97,7 +98,8 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     }
     d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
     d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (4, generator2BalanceAfterBlock4)
-    d.checkGeneratorBalance(generator2Addr)
+    d.checkGeneratorBalance(generator2Addr)                                                          // Collected after applying block #4
+    d.checkGeneratorBalanceFromApi(generator2Addr, generator2BalanceAfterBlock2 - DepositInWavelets) // Collected before applying block #4
 
     log.debug("Append block 5 of new epoch, data preserved")
     val wavesAmountBeforeNewEpoch = d.blockchain.wavesAmount(d.blockchain.height)
@@ -109,6 +111,7 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
     d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (4, generator2BalanceAfterBlock4)
     d.checkGeneratorBalance(generator2Addr)
+    // d.checkGeneratorBalanceFromApi(generator2Addr) // Not checking, because no one committed
 
     d.blockchain.balanceSnapshots(generator2Addr, from = 2, to = None) should contain theSameElementsInOrderAs Seq(
       bs(height = 5, regularBalance = generator2BalanceAfterBlock4),
