@@ -26,11 +26,11 @@ object GeneratingBalanceProvider {
         .get(BlockchainFeatures.SmallerMinimalGeneratingBalance.id)
         .exists(height >= _) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2
 
-  def unchallengedBalance(blockchain: Blockchain, account: Address, blockId: Option[BlockId] = None): Long = {
+  def generatorBalance(blockchain: Blockchain, account: Address, blockId: Option[BlockId] = None): Long = {
     val height = blockId.flatMap(blockchain.heightOf).getOrElse(blockchain.height)
     val depth  = if (height >= blockchain.settings.functionalitySettings.generationBalanceDepthFrom50To1000AfterHeight) SecondDepth else FirstDepth
 
-    blockchain.unbannedEffectiveBalance(account, depth, blockId)
+    blockchain.generatorBalance(account, depth, blockId)
   }
 
   def balance(blockchain: Blockchain, account: Address, blockId: Option[BlockId] = None): Long = {

@@ -2,6 +2,7 @@ package com.wavesplatform.finalization
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -111,9 +112,9 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
 
     d.blockchain.balanceSnapshots(generator2Addr, from = 2, to = None) should contain theSameElementsInOrderAs Seq(
       bs(height = 5, regularBalance = generator2BalanceAfterBlock4),
-      bs(height = 4, regularBalance = generator2BalanceAfterBlock4), // Processed conflict endorsement
+      bs(height = 4, regularBalance = generator2BalanceAfterBlock4, punished = true), // Processed conflict endorsement
       // height = 3 // Sent conflict endorsement
-      bs(height = 2, regularBalance = generator2BalanceAfterBlock2, deposits = 1), // Sent CommitToGeneration
+      bs(height = 2, regularBalance = generator2BalanceAfterBlock2, deposits = 1) // Sent CommitToGeneration
     )
   }
 
@@ -127,18 +128,19 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     def checkWavesAmount(x: BigInt)(using Position): Assertion =
       d.blockchain.wavesAmount(d.blockchain.height) shouldBe x
 
-    def checkGeneratorBalance(address: Address, balance: Long = 0L)(using Position): Assertion = {
-//      d.generatorsApi
-//        .generators(Height(d.blockchain.height))
-//        .collectFirst { case x if x.address == address => x.balance }
-//        .value shouldBe balance
-      true shouldBe true
-    }
+    def checkGeneratorBalance(address: Address, balance: Long = 0L)(using Position): Assertion =
+      GeneratingBalanceProvider.generatorBalance(d.blockchain, address) shouldBe balance
+
+    def checkGeneratorBalanceFromApi(address: Address, balance: Long = 0L)(using Position): Assertion =
+      d.generatorsApi
+        .generators(Height(d.blockchain.height))
+        .collectFirst { case x if x.address == address => x.balance }
+        .value shouldBe balance
   }
 
   private def mkConflictGenerators(h: Int, idxs: Int*): ConflictGenerators =
     ConflictGenerators.empty.appendAll(Height(h), GeneratorIndex.fromInts(idxs))
 
-  private def bs(height: Int, regularBalance: Long, leaseIn: Long = 0, leaseOut: Long = 0, deposits: Int = 0): BalanceSnapshot =
-    BalanceSnapshot(height, regularBalance, leaseIn, leaseOut, CommitToGenerationTransaction.DepositInWavelets * deposits)
+  private def bs(height: Int, regularBalance: Long, deposits: Int = 0, punished: Boolean = false): BalanceSnapshot =
+    BalanceSnapshot(height, regularBalance, 0L, 0L, CommitToGenerationTransaction.DepositInWavelets * deposits, punished)
 }

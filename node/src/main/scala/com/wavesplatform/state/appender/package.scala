@@ -48,8 +48,13 @@ package object appender {
         .map(Height(_))
         .toRight(s"height: history does not contain parent ${block.header.reference}")
 
-      blockHeight            = Height(parentHeight + 1)
-      committedOnBlockHeight = blockchain.generationPeriodOf(blockHeight).fold(Nil)(blockchain.committedGenerators)
+      blockHeight   = Height(parentHeight + 1)
+      currentPeriod = blockchain.generationPeriodOf(blockHeight)
+
+      // TODO:
+      // conflictedGenerators   = currentPeriod.fold(ConflictGenerators.empty)(blockchain.conflictGenerators)
+
+      committedOnBlockHeight = currentPeriod.fold(Nil)(blockchain.committedGenerators)
       minerAddress           = block.header.generator.toAddress
       // TODO: allow if all generators have less than required balance
       // If no one commited, fallback to classic
@@ -197,7 +202,7 @@ package object appender {
   private def getGeneratorBalances(blockchain: Blockchain, newBlock: Block, generators: Seq[(Address, BlsPublicKey)]): GeneratorBalances = {
     val parentBlockId = newBlock.header.reference
     generators.map { case (addr, blsPk) =>
-      val balance = GeneratingBalanceProvider.unchallengedBalance(blockchain, addr, Some(parentBlockId))
+      val balance = GeneratingBalanceProvider.generatorBalance(blockchain, addr, Some(parentBlockId))
       (addr, blsPk, balance)
     }
   }

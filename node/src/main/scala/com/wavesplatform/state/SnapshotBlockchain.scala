@@ -161,11 +161,18 @@ case class SnapshotBlockchain(
     if (maybeSnapshot.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
       inner.balanceSnapshots(address, from1, to)
     } else {
-      val h          = Height(height)
-      val balance    = this.balance(address)
-      val lease      = this.leaseBalance(address)
-      val deposit    = this.generationDeposit(address, h)
-      val bs         = BalanceSnapshot(h, Portfolio(balance, lease, generationDeposit = deposit))
+      val h       = Height(height)
+      val balance = this.balance(address)
+      val lease   = this.leaseBalance(address)
+      val deposit = this.generationDeposit(address, h)
+
+      val punished = for {
+        p <- inner.generationPeriodOf(h)
+        idx = inner.committedGenerators(p).indexWhere { case (generatorAddress, _) => generatorAddress == address }
+        idx <- GeneratorIndex.checked(idx)
+      } yield inner.conflictGenerators(p).hasInUpTo(h, idx)
+
+      val bs         = BalanceSnapshot(h, Portfolio(balance, lease, generationDeposit = deposit), punished.getOrElse(false))
       val height2Fix = h == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
       if (inner.height > 0 && (from1 < h - 1 || height2Fix))
         bs +: inner.balanceSnapshots(address, from1, to)
