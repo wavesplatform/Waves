@@ -12,6 +12,7 @@ trait BaseSuite
     with ShrinkLowPriority
     with TransactionGen
     with EitherMatchers
+    with EitherValues
     with OptionValues
     with ScorexLogging {
   this: Suite =>

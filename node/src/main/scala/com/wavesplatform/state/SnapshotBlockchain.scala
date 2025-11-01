@@ -13,7 +13,7 @@ import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
+import com.wavesplatform.transaction.{Asset, CommitToGenerationTransaction, ERC20Address, Transaction}
 
 case class SnapshotBlockchain(
     inner: Blockchain,
@@ -229,7 +229,21 @@ case class SnapshotBlockchain(
 
   override def blockRewardVotes(height: Int): Seq[Long] = inner.blockRewardVotes(height)
 
-  override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height) + BigInt(reward.getOrElse(0L))
+  override def wavesAmount(height: Int): BigInt = {
+    val parentBlockHeader = blockMeta match {
+      case None => inner.blockHeader(height - 1)
+      case _    => inner.lastBlockHeader
+    }
+
+    val parentConflictEndorsements = for {
+      parentBlockHeader <- parentBlockHeader
+      voting            <- parentBlockHeader.header.finalizationVoting
+    } yield voting.conflict.size
+
+    inner.wavesAmount(height) +
+      BigInt(reward.getOrElse(0L)) -
+      parentConflictEndorsements.getOrElse(0) * CommitToGenerationTransaction.DepositInWavelets
+  }
 
   override def hitSource(height: Int): Option[ByteStr] =
     blockMeta

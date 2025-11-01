@@ -256,9 +256,16 @@ abstract class Caches extends Blockchain with Storage {
   ): Unit = {
     val newHeight = Height(current.height + 1)
     val newScore  = block.blockScore() + current.score
+
+    val parentConflictEndorsements = for {
+      parentBlock <- lastBlock
+      voting      <- parentBlock.header.finalizationVoting
+    } yield voting.conflict.size
+
     val totalWavesAmount = current.meta.fold(settings.genesisSettings.initialBalance)(_.totalWavesAmount) +
-      (reward.getOrElse(0L) * this.blockRewardBoost(newHeight)) -
-      (block.header.finalizationVoting.fold(0)(_.conflict.size) * CommitToGenerationTransaction.DepositInWavelets)
+      reward.getOrElse(0L) * this.blockRewardBoost(newHeight) -
+      parentConflictEndorsements.getOrElse(0) * CommitToGenerationTransaction.DepositInWavelets
+
     val newMeta = PBBlockMeta(
       Some(PBBlocks.protobuf(block.header)),
       ByteString.copyFrom(block.signature.arr),

@@ -33,25 +33,27 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     defaultSettings,
     AddrWithBalance.enoughBalances(generator1, generator2)
   ) { d =>
-    val generator2Addr        = generator2.toAddress
-    val generator2InitBalance = ENOUGH_AMT
+    val generator2Addr               = generator2.toAddress
+    val generator2WavesBalanceAfter1 = ENOUGH_AMT
 
     log.debug(s"Append block 2 with commitments")
     val endorsers     = Seq(generator1, generator2)
     val endorserAddrs = endorsers.map(_.toAddress)
     val txs           = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 3, x))
-    val block2        = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
-    d.appender.appendBlock(block2)
 
-    val generator2BalanceAfterBlock2 = generator2InitBalance - txs(1).fee.value
+    val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
+    d.appender.appendBlock(block2WithCommitments)
+
+    val wavesAmountAfter2       = d.blockchain.wavesAmount(d.blockchain.height)
+    val generator2BalanceAfter2 = generator2WavesBalanceAfter1 - txs(1).fee.value
     d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(
-      balance = generator2BalanceAfterBlock2,
+      balance = generator2BalanceAfter2,
       generationDeposit = DepositInWavelets
     )
 
     log.debug(s"Append block 3 with votes")
     val otherFinalizedBlockId = TxHelpers.randomBlockId
-    val votingBlock = d.createBlock(
+    val block3WithVotes = d.createBlock(
       version = Block.ProtoBlockVersion,
       txs = Nil,
       generator = generator1,
@@ -66,48 +68,56 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
                 kp = BlsKeyPair(generator2.privateKey),
                 finalizedId = otherFinalizedBlockId,
                 finalizedHeight = GenesisBlockHeight,
-                endorsedId = block2.id()
+                endorsedId = block2WithCommitments.id()
               )
             )
           )
         )
       )
     )
+    d.appender.appendBlock(block3WithVotes)
 
-    val wavesAmountBeforeVoting = d.blockchain.wavesAmount(d.blockchain.height)
-    d.appender.appendBlock(votingBlock)
+    val wavesAmountAfter3                = wavesAmountAfter2 + d.blockchain.lastBlockReward.getOrElse(0L)
+    val generator2WavesBalanceAfter3     = generator2BalanceAfter2
+    val generator2GeneratorBalanceAfter3 = generator2BalanceAfter2 - DepositInWavelets
 
-    val generator2BalanceAfterBlock3 = generator2BalanceAfterBlock2
-    d.checkCommitted(endorserAddrs*)
-    d.checkHasConflict(h = 3, 1)
-    d.checkWavesAmount(wavesAmountBeforeVoting + d.blockchain.lastBlockReward.getOrElse(0L))
-    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock3)
-    d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (2, generator2BalanceAfterBlock2)
-    d.checkGeneratorBalance(generator2Addr, generator2BalanceAfterBlock2 - DepositInWavelets)
-    d.checkGeneratorBalanceFromApi(generator2Addr, generator2BalanceAfterBlock2 - DepositInWavelets)
-
-    log.debug("Append block 4")
-    val wavesAmountBeforeCalculation = d.blockchain.wavesAmount(d.blockchain.height)
-    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
-
-    val generator2BalanceAfterBlock4 = generator2BalanceAfterBlock3 - DepositInWavelets
-    d.checkCommitted(endorserAddrs*)
-    d.checkHasConflict(h = 3, 1)
-    withClue("WAVES burnt: ") {
-      d.checkWavesAmount(wavesAmountBeforeCalculation + d.blockchain.lastBlockReward.getOrElse(0L) - DepositInWavelets)
+    def checkAfter3()(using Position): Unit = {
+      d.checkCommitted(endorserAddrs*)
+      d.checkHasConflict(h = 3, 1)
+      d.checkWavesAmount(wavesAmountAfter3)
+      d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2WavesBalanceAfter3)
+      d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (2, generator2BalanceAfter2)
+      d.checkGeneratorBalance(generator2Addr, generator2GeneratorBalanceAfter3)
+      d.checkGeneratorBalanceFromApi(generator2Addr, generator2GeneratorBalanceAfter3)
     }
-    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
-    d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (4, generator2BalanceAfterBlock4)
-    d.checkGeneratorBalance(generator2Addr)                                                          // Collected after applying block #4
-    d.checkGeneratorBalanceFromApi(generator2Addr, generator2BalanceAfterBlock2 - DepositInWavelets) // Collected before applying block #4
+    checkAfter3()
 
-    log.debug("Append block 5 of new epoch, data preserved")
-    val wavesAmountBeforeNewEpoch = d.blockchain.wavesAmount(d.blockchain.height)
+    log.debug("Append block 4 with punishment")
+    val block4WithPunishment = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
+    d.appender.appendBlock(block4WithPunishment)
+
+    val wavesAmountAfter4            = wavesAmountAfter3 + d.blockchain.lastBlockReward.getOrElse(0L) - DepositInWavelets
+    val generator2BalanceAfterBlock4 = generator2WavesBalanceAfter3 - DepositInWavelets
+
+    def checkAfter4()(using Position): Unit = {
+      d.checkCommitted(endorserAddrs*)
+      d.checkHasConflict(h = 3, 1)
+      withClue("WAVES burnt: ") {
+        d.checkWavesAmount(wavesAmountAfter4)
+      }
+      d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
+      d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (4, generator2BalanceAfterBlock4)
+      d.checkGeneratorBalance(generator2Addr)                                          // Collected after applying block #4
+      d.checkGeneratorBalanceFromApi(generator2Addr, generator2GeneratorBalanceAfter3) // Collected before applying block #4
+    }
+    checkAfter4()
+
+    log.debug("Append block 5 of new epoch")
     d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
 
     d.checkCommitted()
     d.checkHasConflict(h = 3, 1)
-    d.checkWavesAmount(wavesAmountBeforeNewEpoch + d.blockchain.lastBlockReward.getOrElse(0L))
+    d.checkWavesAmount(wavesAmountAfter4 + d.blockchain.lastBlockReward.getOrElse(0L))
     d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
     d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (4, generator2BalanceAfterBlock4)
     d.checkGeneratorBalance(generator2Addr)
@@ -117,8 +127,16 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
       bs(height = 5, regularBalance = generator2BalanceAfterBlock4),
       bs(height = 4, regularBalance = generator2BalanceAfterBlock4, punished = true), // Processed conflict endorsement
       // height = 3 // Sent conflict endorsement
-      bs(height = 2, regularBalance = generator2BalanceAfterBlock2, deposits = 1) // Sent CommitToGeneration
+      bs(height = 2, regularBalance = generator2BalanceAfter2, deposits = 1) // Sent CommitToGeneration
     )
+
+    log.debug("Rollback to 4")
+    d.blockchain.removeAfter(block4WithPunishment.id()) should beRight
+    checkAfter4()
+
+    log.debug("Rollback to 3")
+    d.blockchain.removeAfter(block3WithVotes.id()) should beRight
+    checkAfter3()
   }
 
   extension (d: Domain) {

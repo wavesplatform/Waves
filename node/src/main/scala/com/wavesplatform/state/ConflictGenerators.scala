@@ -12,7 +12,10 @@ case class ConflictGenerators private (private val heights: Vector[Height], priv
   }
 
   def appendAll(h: Height, idxs: Seq[GeneratorIndex]): ConflictGenerators = {
-    require(heights.isEmpty || implicitly[Ordering[Height]].lt(heights.last, h), s"height $h must increase, last height: ${heights.last}")
+    require(
+      idxs.isEmpty || heights.isEmpty || implicitly[Ordering[Height]].lt(heights.last, h),
+      s"height $h must increase, last height: ${heights.last}"
+    )
     if (idxs.isEmpty) this
     else appendAllUnsafe(h, idxs)
   }
