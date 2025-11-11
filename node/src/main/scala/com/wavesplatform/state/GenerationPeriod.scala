@@ -4,7 +4,7 @@ import cats.syntax.option.*
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.GenerationPeriod.*
 
-case class GenerationPeriod(activation: Height, start: Height, length: Int) {
+case class GenerationPeriod(activation: Height, start: Height, length: Int) extends Ordered[GenerationPeriod] {
   require(start >= activation, s"GenerationPeriod: $start >= $activation")
 
   def end: Height = {
@@ -28,6 +28,8 @@ case class GenerationPeriod(activation: Height, start: Height, length: Int) {
   private def isZero: Boolean = activation == start
 
   private def move(newStart: Int): GenerationPeriod = GenerationPeriod(activation, Height(newStart), length)
+
+  override def compare(that: GenerationPeriod): Int = start compare that.start
 
   override def toString: String = s"[$start, $end]"
 }

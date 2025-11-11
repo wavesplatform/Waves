@@ -343,7 +343,7 @@ class RocksDBWriter(
           val currentBlock  = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight"))
           val parentBlockId = currentBlock.header.reference
 
-          // Use parentBlockId, because this is how it works in appender/minerBalance, we don't count transactions in this block
+          // Use parentBlockId, because this is how it works in appender/minerBalance: we don't count transactions in current block
           generatorBalances(currentCommGens, parentBlockId)
         }
       }
@@ -517,7 +517,9 @@ class RocksDBWriter(
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
       generatorBalances: Seq[(Address, Long)],
-      nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
+      nextCommittedGenerators: Seq[(AddressId, BlsPublicKey)],
+      commitmentTransactionIds: Seq[TransactionId],
+      conflictGenerators: Seq[GeneratorIndex],
       stateHash: StateHashBuilder.Result
   ): Unit = {
     log.trace(s"Persisting block ${blockMeta.id} at height $height")
@@ -730,38 +732,21 @@ class RocksDBWriter(
         }
       }
 
+      this.generationPeriodOf(h).foreach { currPeriod => // None checked in Caches
+        if (nextCommittedGenerators.nonEmpty) {
+          val nextPeriod = currPeriod.next
+
+          rw.put(Keys.committedGenerators(nextPeriod, h), Some(nextCommittedGenerators))
+
+          // TODO: Option to not store
+          rw.put(Keys.commitmentTransactions(nextPeriod, h), commitmentTransactionIds)
+        }
+
+        if (conflictGenerators.nonEmpty) rw.put(Keys.conflictGenerators(currPeriod, h), conflictGenerators)
+      }
+
       // TODO: Option to not store
       rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances.map { case (_, b) => b }))
-
-      val conflictGenerators = for {
-        header <- blockMeta.header.toSeq
-        v      <- header.finalizationVoting.toSeq
-        e      <- v.conflictEndorsements
-      } yield GeneratorIndex(e.endorserIndex)
-
-      this.generationPeriodOf(h) match {
-        case None =>
-          require(
-            nextCommittedGenerators.isEmpty && conflictGenerators.isEmpty,
-            s"Expected empty conflict and next committed generators, got: nextCommittedGenerators=$nextCommittedGenerators, conflictGenerators=$conflictGenerators"
-          )
-
-        case Some(currPeriod) =>
-          if (nextCommittedGenerators.nonEmpty) {
-            val nextPeriod = currPeriod.next
-
-            val (committedGenerators, commitmentTxnIds) = nextCommittedGenerators.unzip(using
-              { case (addressId, blsPk, txnId) => ((addressId, blsPk), txnId) }
-            )
-
-            rw.put(Keys.committedGenerators(nextPeriod, h), Some(committedGenerators))
-
-            // TODO: Option to not store
-            rw.put(Keys.commitmentTransactions(nextPeriod, h), commitmentTxnIds)
-          }
-
-          if (conflictGenerators.nonEmpty) rw.put(Keys.conflictGenerators(currPeriod, h), conflictGenerators)
-      }
 
       rw.put(Keys.issuedAssets(height), snapshot.assetStatics.keySet.toSeq)
       rw.put(Keys.updatedAssets(height), updatedAssetSet.toSeq)
@@ -1623,7 +1608,7 @@ class RocksDBWriter(
     readOnly(_.get(Keys.maliciousMinerBanHeights(address.bytes)))
 
   // TODO: use rawCommittedGenerators?
-  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
+  override def loadCommittedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
     val approxGenerators = settings.functionalitySettings.maxEndorsements // Rough buffer size
     val rawGenerators    = new mutable.ArrayBuffer[BlsPublicKey](approxGenerators)
     val addressIds       = new mutable.ArrayBuffer[AddressId](approxGenerators)
@@ -1664,7 +1649,7 @@ class RocksDBWriter(
   //     r
   //   }
 
-  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = {
+  override def loadConflictGenerators(at: GenerationPeriod): ConflictGenerators = {
     val key = Keys.conflictGenerators(at, at.start)
     rdb.db.readOnly { ro =>
       var r = ConflictGenerators.empty

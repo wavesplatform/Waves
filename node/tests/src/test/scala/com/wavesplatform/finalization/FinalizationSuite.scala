@@ -253,8 +253,8 @@ class FinalizationSuite extends FreeSpec with WithDomain {
     }
   }
 
-  extension (d: Domain) {
-    def checkFinalizedHeight(h: Int = GenesisBlockHeight)(using Position): Unit = {
+  extension (d: Domain)(using Position) {
+    def checkFinalizedHeight(h: Int = GenesisBlockHeight): Unit = {
       d.blockchain.finalizedHeightAt().value shouldBe Height(h)
       d.blockchain.finalizedHeight.value shouldBe Height(h)
     }

@@ -36,20 +36,31 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     val generator2Addr               = generator2.toAddress
     val generator2WavesBalanceAfter1 = ENOUGH_AMT
 
-    log.debug(s"Append block 2 with commitments")
     val endorsers     = Seq(generator1, generator2)
     val endorserAddrs = endorsers.map(_.toAddress)
-    val txs           = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 3, x))
 
+    log.debug(s"Append block 2 with commitments")
+    val txs                   = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 3, x))
     val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
     d.appender.appendBlock(block2WithCommitments)
 
-    val wavesAmountAfter2       = d.blockchain.wavesAmount(d.blockchain.height)
-    val generator2BalanceAfter2 = generator2WavesBalanceAfter1 - txs(1).fee.value
-    d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(
-      balance = generator2BalanceAfter2,
-      generationDeposit = DepositInWavelets
-    )
+    val wavesAmountAfter2                = d.blockchain.wavesAmount(d.blockchain.height)
+    val generator2WavesBalanceAfter2     = generator2WavesBalanceAfter1 - txs(1).fee.value
+    val generator2GeneratorBalanceAfter2 = generator2WavesBalanceAfter2 - DepositInWavelets
+
+    def checkAfter2()(using Position): Unit = {
+      d.checkCommitted()
+      Seq(3, 5, 7).foreach(h => d.checkHasNoConflict(h = h))
+      d.checkWavesAmount(wavesAmountAfter2)
+      d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(
+        balance = generator2WavesBalanceAfter2,
+        generationDeposit = DepositInWavelets
+      )
+      d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (2, generator2WavesBalanceAfter2)
+      d.checkGeneratorBalance(generator2Addr, generator2GeneratorBalanceAfter2)
+      d.checkGeneratorBalanceFromApi(generator2Addr, h = 2)
+    }
+    checkAfter2()
 
     log.debug(s"Append block 3 with votes")
     val otherFinalizedBlockId = TxHelpers.randomBlockId
@@ -78,15 +89,16 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     d.appender.appendBlock(block3WithVotes)
 
     val wavesAmountAfter3                = wavesAmountAfter2 + d.blockchain.lastBlockReward.getOrElse(0L)
-    val generator2WavesBalanceAfter3     = generator2BalanceAfter2
-    val generator2GeneratorBalanceAfter3 = generator2BalanceAfter2 - DepositInWavelets
+    val generator2WavesBalanceAfter3     = generator2WavesBalanceAfter2
+    val generator2GeneratorBalanceAfter3 = generator2WavesBalanceAfter2 - DepositInWavelets
 
     def checkAfter3()(using Position): Unit = {
       d.checkCommitted(endorserAddrs*)
       d.checkHasConflict(h = 3, 1)
+      Seq(5, 7).foreach(h => d.checkHasNoConflict(h = h))
       d.checkWavesAmount(wavesAmountAfter3)
       d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2WavesBalanceAfter3)
-      d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (2, generator2BalanceAfter2)
+      d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (2, generator2WavesBalanceAfter2)
       d.checkGeneratorBalance(generator2Addr, generator2GeneratorBalanceAfter3)
       d.checkGeneratorBalanceFromApi(generator2Addr, generator2GeneratorBalanceAfter3)
     }
@@ -102,6 +114,7 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     def checkAfter4()(using Position): Unit = {
       d.checkCommitted(endorserAddrs*)
       d.checkHasConflict(h = 3, 1)
+      Seq(5, 7).foreach(h => d.checkHasNoConflict(h = h))
       withClue("WAVES burnt: ") {
         d.checkWavesAmount(wavesAmountAfter4)
       }
@@ -117,6 +130,7 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
 
     d.checkCommitted()
     d.checkHasConflict(h = 3, 1)
+    Seq(5, 7).foreach(h => d.checkHasNoConflict(h = h))
     d.checkWavesAmount(wavesAmountAfter4 + d.blockchain.lastBlockReward.getOrElse(0L))
     d.blockchain.wavesPortfolio(generator2Addr) shouldBe Portfolio(balance = generator2BalanceAfterBlock4)
     d.blockchain.balanceAtHeight(generator2Addr, d.blockchain.height).value shouldBe (4, generator2BalanceAfterBlock4)
@@ -127,7 +141,7 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
       bs(height = 5, regularBalance = generator2BalanceAfterBlock4),
       bs(height = 4, regularBalance = generator2BalanceAfterBlock4, punished = true), // Processed conflict endorsement
       // height = 3 // Sent conflict endorsement
-      bs(height = 2, regularBalance = generator2BalanceAfter2, deposits = 1) // Sent CommitToGeneration
+      bs(height = 2, regularBalance = generator2WavesBalanceAfter2, deposits = 1) // Sent CommitToGeneration
     )
 
     log.debug("Rollback to 4")
@@ -137,26 +151,39 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     log.debug("Rollback to 3")
     d.blockchain.removeAfter(block3WithVotes.id()) should beRight
     checkAfter3()
+
+    log.debug("Rollback to 2")
+    d.blockchain.removeAfter(block2WithCommitments.id()) should beRight
+    checkAfter2()
   }
 
-  extension (d: Domain) {
-    def checkCommitted(addresses: Address*)(using Position): Assertion =
+  extension (d: Domain)(using Position) {
+    def checkCommitted(addresses: Address*): Assertion = withClue(s"addresses=$addresses: ") {
       d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map(_._1) should contain theSameElementsInOrderAs addresses
+    }
 
-    def checkHasConflict(h: Int, idx: Int)(using Position): Assertion =
+    def checkHasConflict(h: Int, idx: Int): Assertion = withClue(s"h=$h, idx=$idx: ") {
       d.blockchain.conflictGenerators(d.blockchain.generationPeriodOf(Height(h)).value) shouldBe mkConflictGenerators(h, idx)
+    }
 
-    def checkWavesAmount(x: BigInt)(using Position): Assertion =
+    def checkHasNoConflict(h: Int): Assertion = withClue(s"h=$h: ") {
+      d.blockchain.conflictGenerators(d.blockchain.generationPeriodOf(Height(h)).value) shouldBe ConflictGenerators.empty
+    }
+
+    def checkWavesAmount(x: BigInt): Assertion =
       d.blockchain.wavesAmount(d.blockchain.height) shouldBe x
 
-    def checkGeneratorBalance(address: Address, balance: Long = 0L)(using Position): Assertion =
+    def checkGeneratorBalance(address: Address, balance: Long = 0L): Assertion = withClue(s"address=$address: ") {
       GeneratingBalanceProvider.generatorBalance(d.blockchain, address) shouldBe balance
+    }
 
-    def checkGeneratorBalanceFromApi(address: Address, balance: Long = 0L)(using Position): Assertion =
-      d.generatorsApi
-        .generators(Height(d.blockchain.height))
-        .collectFirst { case x if x.address == address => x.balance }
-        .value shouldBe balance
+    def checkGeneratorBalanceFromApi(address: Address, balance: Long = 0L, h: Int = d.blockchain.height): Assertion =
+      withClue(s"h=$h, address=$address: ") {
+        d.generatorsApi
+          .generators(Height(h))
+          .collectFirst { case x if x.address == address => x.balance }
+          .getOrElse(0L) shouldBe balance
+      }
   }
 
   private def mkConflictGenerators(h: Int, idxs: Int*): ConflictGenerators =

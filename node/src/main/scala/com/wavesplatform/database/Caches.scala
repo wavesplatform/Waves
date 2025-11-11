@@ -216,6 +216,38 @@ abstract class Caches extends Blockchain with Storage {
   override def activatedFeatures: Map[Short, Height] = activatedFeaturesCache
 
   @volatile
+  private var committedGeneratorsCache = Map.empty[GenerationPeriod, IndexedSeq[(Address, BlsPublicKey)]]
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] =
+    this.currentGenerationPeriod.fold(Vector.empty) { curr =>
+      if (at == curr || at == curr.next) {
+        committedGeneratorsCache.getOrElse(
+          at, {
+            val r = loadCommittedGenerators(at)
+            committedGeneratorsCache = committedGeneratorsCache.updated(at, r)
+            r
+          }
+        )
+      } else loadCommittedGenerators(at)
+    }
+  protected def loadCommittedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)]
+
+  @volatile
+  private var conflictGeneratorsCache = Map.empty[GenerationPeriod, ConflictGenerators]
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators =
+    this.currentGenerationPeriod.fold(ConflictGenerators.empty) { curr =>
+      if (at == curr || at == curr.next) {
+        conflictGeneratorsCache.getOrElse(
+          at, {
+            val r = loadConflictGenerators(at)
+            conflictGeneratorsCache = conflictGeneratorsCache.updated(at, r)
+            r
+          }
+        )
+      } else loadConflictGenerators(at)
+    }
+  protected def loadConflictGenerators(at: GenerationPeriod): ConflictGenerators
+
+  @volatile
   private var currentGeneratorBalancesCache = Option.empty[Seq[(Address, Long)]]
   override def currentGeneratorBalances(): Seq[(Address, Long)] =
     currentGeneratorBalancesCache.getOrElse {
@@ -239,7 +271,9 @@ abstract class Caches extends Blockchain with Storage {
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
       generatorBalances: Seq[(Address, Long)],
-      nextCommittedGenerators: Seq[(AddressId, BlsPublicKey, TransactionId)],
+      nextCommittedGenerators: Seq[(AddressId, BlsPublicKey)],
+      commitmentTransactionIds: Seq[TransactionId],
+      conflictGenerators: Seq[GeneratorIndex],
       stateHash: StateHashBuilder.Result
   ): Unit
 
@@ -282,9 +316,6 @@ abstract class Caches extends Blockchain with Storage {
     current = CurrentBlockInfo(newHeight, Some(newMeta), block.transactionData)
     currentFinalizedHeight = Some(newFinalizedHeight)
 
-    val updatedCurrentGeneratorBalances = generatorBalances.map { case (addr, _, balance) => addr -> balance }
-    currentGeneratorBalancesCache = Some(updatedCurrentGeneratorBalances)
-
     val newAddresses =
       mutable.Set[Address]() ++
         (snapshot.balances.map(_._1._1) ++ snapshot.leaseBalances.keys)
@@ -316,19 +347,51 @@ abstract class Caches extends Blockchain with Storage {
       (address, balance)
     }
 
-    val addressTransactions        = ArrayListMultimap.create[AddressId, TransactionId]()
-    var nextCommittedGeneratorsRev = List[(AddressId, BlsPublicKey, TransactionId)]()
+    val addressTransactions             = ArrayListMultimap.create[AddressId, TransactionId]()
+    var nextCommittedGeneratorsWithAddr = Vector.empty[(Address, BlsPublicKey)]
+    var nextCommittedGenerators         = Vector.empty[(AddressId, BlsPublicKey)]
+    var commitmentTransactionIds        = Vector.empty[TransactionId]
     for ((_, nti) <- snapshot.transactions) {
       for (addr <- nti.affected)
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
 
       nti.transaction match {
         case txn: CommitToGenerationTransaction =>
-          val addressId = addressIdWithFallback(txn.sender.toAddress, newAddressIds)
-          nextCommittedGeneratorsRev ::= (addressId, txn.endorserPublicKey, TransactionId(txn.id()))
+          val address   = txn.sender.toAddress
+          val addressId = addressIdWithFallback(address, newAddressIds)
+          nextCommittedGeneratorsWithAddr = nextCommittedGeneratorsWithAddr.appended(address -> txn.endorserPublicKey)
+          nextCommittedGenerators = nextCommittedGenerators.appended(addressId -> txn.endorserPublicKey)
+          commitmentTransactionIds = commitmentTransactionIds.appended(TransactionId(txn.id()))
         case _ =>
       }
     }
+
+    val conflictGenerators = for {
+      v <- block.header.finalizationVoting.toSeq
+      e <- v.conflict
+    } yield e.endorserIndex
+
+    this.generationPeriodOf(current.height) match {
+      case None =>
+        require(
+          nextCommittedGenerators.isEmpty && conflictGenerators.isEmpty,
+          s"Expected empty conflict and next committed generators, got: nextCommittedGenerators=$nextCommittedGenerators, conflictGenerators=$conflictGenerators"
+        )
+
+      case Some(currPeriod) =>
+        if (nextCommittedGenerators.nonEmpty)
+          committedGeneratorsCache = committedGeneratorsCache.updatedWith(currPeriod.next) { orig =>
+            Some(orig.getOrElse(Vector.empty) ++ nextCommittedGeneratorsWithAddr)
+          }
+
+        if (conflictGenerators.nonEmpty)
+          conflictGeneratorsCache = conflictGeneratorsCache.updatedWith(currPeriod) { orig =>
+            Some(orig.getOrElse(ConflictGenerators.empty).appendAll(current.height, conflictGenerators))
+          }
+    }
+
+    val updatedCurrentGeneratorBalances = generatorBalances.map { case (addr, _, balance) => addr -> balance }
+    currentGeneratorBalancesCache = Some(updatedCurrentGeneratorBalances)
 
     // TODO: here?
     val updatedBalanceNodes = for {
@@ -395,7 +458,9 @@ abstract class Caches extends Blockchain with Storage {
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       newFinalizedHeight,
       updatedCurrentGeneratorBalances,
-      nextCommittedGeneratorsRev.reverse,
+      nextCommittedGenerators,
+      commitmentTransactionIds,
+      conflictGenerators,
       stateHash.result()
     )
 
@@ -415,6 +480,11 @@ abstract class Caches extends Blockchain with Storage {
     scriptCache.putAll(snapshot.accountScriptsByAddress.asJava)
     assetScriptCache.putAll(snapshot.assetScripts.view.mapValues(Some(_)).toMap.asJava)
     accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
+
+    this.generationPeriodOf(current.height).foreach { currPeriod =>
+      committedGeneratorsCache = committedGeneratorsCache.view.filterKeys(_ >= currPeriod).toMap
+      conflictGeneratorsCache = conflictGeneratorsCache.view.filterKeys(_ >= currPeriod).toMap
+    }
   }
 
   protected def doRollback(targetHeight: Int): DiscardedBlocks
@@ -436,6 +506,8 @@ abstract class Caches extends Blockchain with Storage {
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()
 
+      committedGeneratorsCache = Map.empty
+      conflictGeneratorsCache = Map.empty
       currentGeneratorBalancesCache = None
 
       discardedBlocks
