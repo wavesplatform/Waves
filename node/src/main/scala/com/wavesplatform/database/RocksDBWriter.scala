@@ -1469,22 +1469,57 @@ class RocksDBWriter(
     }
   }
 
-  // TODO: extract committed generators walker and use here to get readable code
   private def collectGenerationDepositChanges(
       db: ReadOnlyDB,
       addressId: AddressId,
       fromIncl: GenerationPeriod,
       toIncl: GenerationPeriod
   ): (changedHeights: Seq[Height], depositSize: Map[Height, Long], punishmentHeights: Set[Height]) = {
-    val toInclCommitted = toIncl.next // A generator commits to a next period, this is what we see in DB
+    val depositDiffHeights = mutable.Map.empty[Height, Int] // +1 - added a deposit, -1 - released
+    var punishmentHeights  = Set.empty[Height]
 
+    val toInclCommitted = toIncl.next // A generator commits to a next period, this is what we see in DB
+    committedHeights(db, addressId, fromIncl, toInclCommitted).foreach { committed =>
+      val punishmentHeight = conflictGenerators(committed.period).heightOf(committed.index).map(_.next)
+      val releaseHeight    = punishmentHeight.getOrElse(committed.period.next.start)
+
+      depositDiffHeights.updateWith(committed.height)(orig => Some(orig.getOrElse(0) + 1))
+      depositDiffHeights.put(releaseHeight, -1)
+      punishmentHeights = punishmentHeight.foldLeft(punishmentHeights)(_ + _)
+    }
+
+    if (depositDiffHeights.isEmpty) (Seq(Height(0)), Map(Height(0) -> 0L), punishmentHeights)
+    else {
+      val sortedDiffHeights = depositDiffHeights.toList.sortBy { case (h, _) => h }
+      val (_, changedHeights, depositSize) = sortedDiffHeights.foldLeft((0L, List.empty[Height], Map.empty[Height, Long])) {
+        case ((currentDeposit, changedHeights, depositSize), (depositHeight, diffN)) =>
+          val updatedDeposit = currentDeposit + diffN * DepositInWavelets
+          (updatedDeposit, depositHeight :: changedHeights, depositSize.updated(depositHeight, updatedDeposit))
+      }
+
+      (changedHeights, depositSize, punishmentHeights)
+    }
+  }
+
+  private type CommittedHeightsResult = (period: GenerationPeriod, height: Height, index: GeneratorIndex)
+  private def committedHeights(
+      db: ReadOnlyDB,
+      addressId: AddressId,
+      fromIncl: GenerationPeriod,
+      toIncl: GenerationPeriod
+  ): Seq[CommittedHeightsResult] = {
     val committedGeneratorsKey = Keys.committedGenerators(fromIncl, Height(0))
     def getSeekBytes(at: GenerationPeriod): Array[Byte] =
       Keys.committedGenerators(at, Height(0)).keyBytes.dropRight(Ints.BYTES) // Drop height
 
-    val depositDiffHeights = mutable.Map.empty[Height, Int] // +1 - added a deposit, -1 - released
-    var punishmentHeights  = Set.empty[Height]
-
+    var r = Seq.empty[CommittedHeightsResult]
+    /* Because a generator can commit once in epoch, we can skip all heights in epoch, those are after committed.
+     How it works for a generator with addressId. E.g. it is g1:
+     periods:    |     p2     |      p3    |
+     heights:    |  h1   | h2 |   h3  | h4 |
+     generators: | g2,g1 | g3 | g3,g2 | g1 |
+     iterator    |  s,^  |    |   s   | ^  | s - seek
+     */
     Using.resource(db.newIterator) { committedIter =>
       committedIter.seek(getSeekBytes(fromIncl))
 
@@ -1497,11 +1532,11 @@ class RocksDBWriter(
         val committedPeriodStartBytes = committedIter.key().slice(prefixLen, prefixLen + Ints.BYTES)
         val committedPeriodStart      = Height(Ints.fromByteArray(committedPeriodStartBytes))
 
-        continue = committedPeriodStart <= toInclCommitted.start
+        continue = committedPeriodStart <= toIncl.start
         if (continue) {
           if (currentCommittedPeriodStart != committedPeriodStart) {
             currentCommittedPeriodStart = committedPeriodStart
-            currentGeneratorIndex = 0
+            currentGeneratorIndex = 0 // Reset index on new period
           }
 
           val committedGenerators = committedGeneratorsKey.parse(committedIter.value()).getOrElse(Seq.empty)
@@ -1528,43 +1563,17 @@ class RocksDBWriter(
 
               val depositHeightBytes = committedIter.key().takeRight(Ints.BYTES)
               val depositHeight      = Height(Ints.fromByteArray(depositHeightBytes))
-              val punishmentHeight   = conflictGenerators(committedPeriod).heightOf(generatorIndex).map(_.next)
-              val releaseHeight      = punishmentHeight.getOrElse(nextPeriod.start)
 
-              depositDiffHeights.updateWith(depositHeight)(orig => Some(orig.getOrElse(0) + 1))
-              depositDiffHeights.put(releaseHeight, -1)
-              punishmentHeights = punishmentHeight.foldLeft(punishmentHeights)(_ + _)
+              r = r.appended((committedPeriod, depositHeight, generatorIndex))
 
-              // It can't register twice on a generation period
-              if (nextPeriod.start <= toInclCommitted.start) committedIter.seek(getSeekBytes(nextPeriod))
+              // It can't committ twice in a generation period
+              if (nextPeriod.start <= toIncl.start) committedIter.seek(getSeekBytes(nextPeriod))
               else continue = false
           }
         }
       }
     }
-
-    if (depositDiffHeights.isEmpty) (Seq(Height(0)), Map(Height(0) -> 0L), punishmentHeights)
-    else {
-      @tailrec
-      def process(
-          depositDiffHeights: List[(Height, Int)],
-          currentDeposit: Long,
-          changedHeights: List[Height],
-          depositSize: Map[Height, Long]
-      ): (List[Height], Map[Height, Long], Set[Height]) = depositDiffHeights match {
-        case Nil => (changedHeights, depositSize, punishmentHeights)
-        case (height, diff) :: tail =>
-          val updated = currentDeposit + diff * DepositInWavelets
-          process(
-            tail,
-            updated,
-            height :: changedHeights,
-            depositSize.updated(height, updated)
-          )
-      }
-
-      process(depositDiffHeights.toList.sortBy { case (h, _) => h }, 0L, List.empty, Map.empty)
-    }
+    r
   }
 
   override def loadHeightOf(blockId: ByteStr): Option[Int] = blockHeightCache.get(blockId)
