@@ -334,8 +334,9 @@ object BlockDiffer {
         xtnBuybackAddress.map(_ -> Portfolio.waves(rewardShares.xtnBuybackAddress))
       withRewards <- StateSnapshot.build(blockchain, portfolios = resultPf.filterNot(_._2.isEmpty))
 
-      lastBlockHeader <- blockchain.lastBlockHeader.toRight("No last block").leftMap(GenericError(_))
-      penaltiesPf = calculatePenalties(blockchain, lastBlockHeader.header.finalizationVoting)
+      penaltiesPf = blockchain.lastBlockHeader.fold(Map.empty) { lastBlockHeader =>
+        calculatePenalties(blockchain, lastBlockHeader.header.finalizationVoting)
+      }
       withPenalties <- withRewards.addBalances(penaltiesPf, blockchain).leftMap(GenericError(_))
     } yield withPenalties
   }
