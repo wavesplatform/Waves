@@ -3,22 +3,21 @@ package com.wavesplatform
 import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.{Bytes, Ints}
 import com.google.protobuf.{ByteString, CodedInputStream}
+import com.wavesplatform.block.serialization.{BlockSerializer, mkTxsCountBytes}
 import com.wavesplatform.block.{Block, BlockHeader}
-import com.wavesplatform.block.serialization.{BlockSerializer, mkTxsCountBytes, writeTransactionData}
 import com.wavesplatform.database.protobuf.BlockMeta
-import com.wavesplatform.database.{Caches, KeyTag, RDB, createBlock, readBlockMeta, readTransaction}
+import com.wavesplatform.database.{Caches, KeyTag, Keys, RDB, readBlockMeta}
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.metrics.Metrics
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks.protobuf
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks}
 import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction}
 import com.wavesplatform.protobuf.utils.PBUtils
-import com.wavesplatform.state.Height
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.state.{Height, TxNum}
+import com.wavesplatform.transaction.TransactionParsers
 import com.wavesplatform.utils.*
+import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
 import kamon.Kamon
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB}
 import scopt.OParser
@@ -26,6 +25,8 @@ import scopt.OParser
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import java.nio.ByteBuffer
 import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -67,15 +68,18 @@ object Exporter extends ScorexLogging {
             snapshotsOutputFilename.map(createOutputFile),
             rdbWriter
           ) { case (blocksOutput, snapshotsOutput, _) =>
-            Using.resources(createBufferedOutputStream(blocksOutput, 10), snapshotsOutput.map(createBufferedOutputStream(_, 100))) {
-              case (blocksStream, snapshotsStream) =>
+            Using.resources(createBufferedOutputStream(blocksOutput, 100), snapshotsOutput.map(createBufferedOutputStream(_, 100))) {
+              case (blocksStream, _) =>
                 var exportedBlocksBytes    = 0L
                 var exportedSnapshotsBytes = 0L
                 val start                  = System.currentTimeMillis()
 
                 val txIterator = new DataIterator[ByteString | SignedTransaction](
-                  rdb.db, rdb.txHandle.handle, KeyTag.NthTransactionInfoAtHeight.prefixBytes, _.slice(2, 6),
-                  height => bytes => readTx(CodedInputStream.newInstance(bytes))
+                  rdb.db,
+                  rdb.txHandle.handle,
+                  KeyTag.NthTransactionInfoAtHeight.prefixBytes,
+                  _.slice(2, 6),
+                  _ => bytes => readTx(CodedInputStream.newInstance(bytes))
                 )
 
                 var counter = 0
@@ -89,35 +93,54 @@ object Exporter extends ScorexLogging {
                     _ => readBlockMeta
                   )
 
-                while (blockMetaIterator.hasNext) {
-                  val meta = blockMetaIterator.next()._2
-                  val txCount = meta.transactionCount
-                  val txs = txIterator.asScala.take(txCount).toSeq
-                  val signedHeader = Caches.toSignedHeader(meta)
-                  val blockBytes = if (signedHeader.header.version >= Block.ProtoBlockVersion)
-                    PBUtils.encodeDeterministic(new PBBlock(
-                      Some(protobuf(signedHeader.header)),
-                      ByteString.copyFrom(signedHeader.signature.arr),
-                      txs.map(_._2 match {
-                        case s: SignedTransaction => s
-                        case bs: ByteString => PBTransactions.protobuf(TransactionParsers.parseBytes(bs.toByteArray).get)
-                      }).toSeq
-                    ))
-                  else {
-                    Bytes.concat(
-                      BlockSerializer.mkPrefixBytes(signedHeader.header),
-                      mkTxsDataBytes(signedHeader.header, txs.map(_._2.asInstanceOf[ByteString].toByteArray).toSeq),
-                      BlockSerializer.mkSuffixBytes(signedHeader.header, signedHeader.signature)
-                    )
-                  }
-                  blocksStream.write(Ints.toByteArray(blockBytes.length))
-                  blocksStream.write(blockBytes)
-                  exportedBlocksBytes += blockBytes.length
+                var cumBlockSize  = 0
+                val headers       = ArrayBuffer[BlockMeta]()
+                val heightsAndNum = ArrayBuffer[(Height, TxNum)]()
 
-                  if ((counter + txCount) / 1_000_000 - (counter / 1_000_000) > 0) {
-                    log.info(f"Exported ${counter + txCount}%,d transactions, written $exportedBlocksBytes%,d bytes")
+                while (blockMetaIterator.hasNext) {
+                  val thisBlockMeta = blockMetaIterator.next()._2
+                  headers += thisBlockMeta
+                  heightsAndNum += ((Height(thisBlockMeta.height), TxNum(thisBlockMeta.transactionCount.toShort)))
+                  cumBlockSize += thisBlockMeta.size
+
+                  if (cumBlockSize >= 50_000_000) {
+                    val txs = readTransactionBatch(heightsAndNum.toSeq, rdb)
+
+                    txs.zip(headers).foreach { case (txs, metaForTxs) =>
+                      val signedHeader = Caches.toSignedHeader(metaForTxs)
+                      val blockBytes =
+                        if (signedHeader.header.version >= Block.ProtoBlockVersion)
+                          PBUtils.encodeDeterministic(
+                            new PBBlock(
+                              Some(protobuf(signedHeader.header)),
+                              ByteString.copyFrom(signedHeader.signature.arr),
+                              txs.map {
+                                case s: SignedTransaction => s
+                                case bs: ByteString       => PBTransactions.protobuf(TransactionParsers.parseBytes(bs.toByteArray).get)
+                              }.toSeq
+                            )
+                          )
+                        else {
+                          Bytes.concat(
+                            BlockSerializer.mkPrefixBytes(signedHeader.header),
+                            mkTxsDataBytes(signedHeader.header, txs.map(_.asInstanceOf[ByteString].toByteArray)),
+                            BlockSerializer.mkSuffixBytes(signedHeader.header, signedHeader.signature)
+                          )
+                        }
+                      blocksStream.write(Ints.toByteArray(blockBytes.length))
+                      blocksStream.write(blockBytes)
+                      exportedBlocksBytes += blockBytes.length
+                    }
+
+                    cumBlockSize = 0
+                    headers.clear()
+                    heightsAndNum.clear()
+                    if ((counter + txs.size) / 1_000_000 - (counter / 1_000_000) > 0) {
+                      log.info(f"Exported ${counter + txs.size}%,d transactions, written $exportedBlocksBytes%,d bytes")
+                    }
+                    counter += txs.size
                   }
-                  counter += txCount
+
                 }
                 val duration = System.currentTimeMillis() - start
                 log
@@ -164,7 +187,7 @@ object Exporter extends ScorexLogging {
       }
     }
 
-    def closeResources(): Unit = {
+    private def closeResources(): Unit = {
       snapshot.close()
       readOptions.close()
       dbIterator.close()
@@ -236,10 +259,6 @@ object Exporter extends ScorexLogging {
         .text("Export to height")
         .action((h, c) => c.copy(exportHeight = Some(h)))
         .validate(h => if (h > 0) success else failure("Export height must be > 0")),
-      opt[Int]('h', "height")
-        .text("Export to height")
-        .action((h, c) => c.copy(exportHeight = Some(h)))
-        .validate(h => if (h > 0) success else failure("Export height must be > 0")),
       help("help").hidden()
     )
   }
@@ -263,7 +282,7 @@ object Exporter extends ScorexLogging {
   @tailrec
   private final def readTx(in: CodedInputStream): ByteString | SignedTransaction =
     in.readTag() match {
-      case 0 => throw new IllegalArgumentException("no tx found")
+      case 0  => throw new IllegalArgumentException("no tx found")
       case 42 => SignedTransaction(SignedTransaction.Transaction.EthereumTransaction(in.readBytes()))
       case 18 => scalapb.LiteParser.readMessage[SignedTransaction](in)
       case 10 => in.readBytes()
@@ -274,10 +293,10 @@ object Exporter extends ScorexLogging {
         in.readInt64()
         readTx(in)
       case tag =>
-        throw new IllegalArgumentException("unexpected field")
+        throw new IllegalArgumentException(s"unexpected field $tag")
     }
 
-  def mkTxsDataBytes(header: BlockHeader, transactions: Seq[Array[Byte]]): Array[Byte] = {
+  def mkTxsDataBytes(header: BlockHeader, transactions: Iterable[Array[Byte]]): Array[Byte] = {
     val transactionsDataBytes = writeTransactionData(header.version, transactions)
     Bytes.concat(
       Ints.toByteArray(transactionsDataBytes.length),
@@ -285,11 +304,38 @@ object Exporter extends ScorexLogging {
     )
   }
 
-  def writeTransactionData(version: Byte, txsBytes: Seq[Array[Byte]]): Array[Byte] = {
+  def writeTransactionData(version: Byte, txsBytes: Iterable[Array[Byte]]): Array[Byte] = {
     val txsBytesSize = txsBytes.map(_.length + Ints.BYTES).sum
-    val txsBuf = ByteBuffer.allocate(txsBytesSize)
+    val txsBuf       = ByteBuffer.allocate(txsBytesSize)
     txsBytes.foreach(tx => txsBuf.putInt(tx.length).put(tx))
 
     Bytes.concat(mkTxsCountBytes(version, txsBytes.size), txsBuf.array())
+  }
+
+  def readTransactionBatch(heightsAndCount: Seq[(Height, TxNum)], rdb: RDB): Iterable[Iterable[ByteString | SignedTransaction]] = {
+    val (_, idx, cfHandles, allKeys, valueBufferB) =
+      heightsAndCount.foldLeft((0, mutable.Buffer.empty[(Int, Int)], Vector.newBuilder[ColumnFamilyHandle], Vector.newBuilder[ByteBuffer], Vector.newBuilder[ByteBuf])) {
+        case ((prev, indices, cfhs, keys, vbufs), (height, txNum)) =>
+          keys ++= Vector.tabulate(txNum)(i => ByteBuffer.wrap(Keys.transactionAt(height, TxNum(i.toShort), rdb.txHandle).keyBytes))
+          cfhs ++= Iterator.fill(txNum)(rdb.txHandle.handle)
+          vbufs ++= Iterator.fill(txNum)(PooledByteBufAllocator.DEFAULT.buffer(5*1024))
+          indices += (prev -> (prev + txNum))
+          (prev + txNum, indices, cfhs, keys, vbufs)
+      }
+
+    log.info(s"multiGet from ${heightsAndCount.head._1} to ${heightsAndCount.last._1}, total of ${allKeys.result().length} txs")
+    
+    val valueBuffers = valueBufferB.result()
+
+    val allTransactions = rdb.db
+      .multiGetByteBuffers(new ReadOptions(false, false), cfHandles.result().asJava, allKeys.result().asJava, valueBuffers.map(_.nioBuffer()).asJava)
+      .asScala
+      .zip(valueBuffers)
+      .map()
+
+    idx.view.map { case (from, until) =>
+      if (from == until) Seq.empty[ByteString | SignedTransaction]
+      else allTransactions.view.slice(from, until)
+    }
   }
 }
