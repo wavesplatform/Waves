@@ -4,9 +4,8 @@ import cats.implicits.catsSyntaxOption
 import cats.syntax.apply.*
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.{Block, BlockHeader, mkMerkleTree}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{DBExt, KeyTag, RDB}
@@ -21,9 +20,8 @@ import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
-import com.wavesplatform.state.ParSignatureChecker.sigverify
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, ParSignatureChecker}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -54,8 +52,8 @@ object Importer extends ScorexLogging {
       blockchainFile: String = "blockchain",
       snapshotsFile: Option[String] = None,
       importHeight: Int = Int.MaxValue,
-      format: String = Formats.Binary,
       verify: Boolean = true,
+      dryRun: Boolean = false,
       maxQueueSize: Int = 100
   )
 
@@ -83,18 +81,12 @@ object Importer extends ScorexLogging {
           .text("Import to height")
           .action((h, c) => c.copy(importHeight = h))
           .validate(h => if (h > 0) success else failure("Import height must be > 0")),
-        opt[String]('f', "format")
-          .hidden()
-          .text("Blockchain data file format")
-          .action((f, c) => c.copy(format = f))
-          .valueName(s"<${Formats.list.mkString("|")}> (default is ${Formats.default})")
-          .validate {
-            case f if Formats.isSupported(f) => success
-            case f                           => failure(s"Unsupported format: $f")
-          },
         opt[Unit]('n', "no-verify")
           .text("Disable signatures verification")
           .action((_, c) => c.copy(verify = false)),
+        opt[Unit]("dry-run")
+          .text("Do not import, only verify signatures")
+          .action((_, c) => c.copy(dryRun = true)),
         opt[Int]('q', "max-queue-size")
           .text("Max size of blocks' queue")
           .action((maxSize, c) => c.copy(maxQueueSize = maxSize))
@@ -179,8 +171,9 @@ object Importer extends ScorexLogging {
       }
     }
 
-  @volatile private var quit = false
-  private val lock           = new Object
+  @volatile private var quit      = false
+  @volatile private var prevBlock = ByteStr(new Array[Byte](crypto.DigestLength))
+  private val lock                = new Object
 
   // noinspection UnstableApiUsage
   def startImport(
@@ -266,7 +259,7 @@ object Importer extends ScorexLogging {
                 )
               }
 
-              ParSignatureChecker.checkBlockAndTxSignatures(block, blockSnapshot.isEmpty, rideV6)
+//              ParSignatureChecker.checkBlockAndTxSignatures(block, blockSnapshot.isEmpty, rideV6)
 
               queue.enqueue(block -> blockSnapshot)
             }
@@ -299,14 +292,18 @@ object Importer extends ScorexLogging {
       } else {
         lock.synchronized {
           val (block, snapshot) = queue.dequeue()
-          if (blockchain.lastBlockId.contains(block.header.reference)) {
+          if (blockchain.lastBlockId.contains(block.header.reference) || prevBlock == block.header.reference) {
             Await.result(appendBlock(block, snapshot).runAsyncLogErr(using appender), Duration.Inf) match {
               case Left(ve) =>
                 log.error(s"Error appending block: $ve")
                 queue.clear()
                 quit = true
               case _ =>
+                prevBlock = block.id()
                 counter = counter + 1
+                if (counter % 1000 == 0) {
+                  log.info(s"New height: $counter, block $prevBlock, queue size ${queue.size}")
+                }
             }
           } else if (!quit) {
             log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
@@ -353,25 +350,39 @@ object Importer extends ScorexLogging {
     val extAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]] =
       BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify, txSignParCheck = false)
 
+    def nullAppender(b: Block, s: Option[BlockSnapshotResponse]): Task[Either[ValidationError, BlockApplyResult]] =
+      Task.now {
+        if (!crypto.verify(b.signature, b.bodyBytes(), b.header.generator, checkWeakPk = true)) Left(GenericError("Invalid header signature"))
+        else if (b.header.version > Block.ProtoBlockVersion && mkMerkleTree(b.transactionData) != b.header.transactionsRoot)
+          Left(GenericError("Invalid tx merkle root"))
+        else if (
+          b.header.challengedHeader.exists(ch =>
+            !crypto.verify(
+              ch.headerSignature,
+              PBBlocks.protobuf(b.originalHeader()).toByteArray,
+              ch.generator,
+              checkWeakPk = true
+            )
+          )
+        ) Left(GenericError("Invalid original header signature"))
+        else Right(BlockApplyResult.Ignored)
+      }
+
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
-    val blocksFileOffset =
-      importOptions.format match {
-        case Formats.Binary =>
-          var blocksOffset = 0L
-          rdb.db.iterateOver(KeyTag.BlockInfoAtHeight) { e =>
-            e.getKey match {
-              case Array(_, _, 0, 0, 0, 1) => // Skip genesis
-              case _ =>
-                val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
-                blocksOffset += meta.size + 4
-            }
-          }
-          blocksOffset
-        case _ =>
-          0
+    val blocksFileOffset = {
+      var blocksOffset = 0L
+      rdb.db.iterateOver(KeyTag.BlockInfoAtHeight) { e =>
+        e.getKey match {
+          case Array(_, _, 0, 0, 0, 1) => // Skip genesis
+          case _ =>
+            val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
+            blocksOffset += meta.size + 4
+        }
       }
+      blocksOffset
+    }
     val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)
     val snapshotsInputStream =
       importOptions.snapshotsFile
@@ -417,6 +428,7 @@ object Importer extends ScorexLogging {
         scheduler.awaitTermination(10 seconds)
 
         // Terminate extensions
+        import scala.concurrent.ExecutionContext.Implicits.global
         Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
 
         utxPool.close()
@@ -432,7 +444,7 @@ object Importer extends ScorexLogging {
       blocksInputStream,
       snapshotsInputStream,
       blockchainUpdater,
-      extAppender,
+      if (importOptions.dryRun) nullAppender else extAppender,
       importOptions,
       blocksFileOffset == 0,
       scheduler
