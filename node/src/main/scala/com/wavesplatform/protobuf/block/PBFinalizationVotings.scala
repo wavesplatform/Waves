@@ -18,6 +18,7 @@ object PBFinalizationVotings {
 
     VanillaFinalizationVoting(
       GeneratorIndex.fromInts(pb.endorserIndexes),
+      pb.finalizedBlockHeight,
       aggSig,
       pb.conflictEndorsements.zipWithIndex.map { case (x, i) =>
         val r = for {
@@ -36,6 +37,7 @@ object PBFinalizationVotings {
   def protobuf(v: VanillaFinalizationVoting): PBFinalizationVoting =
     new PBFinalizationVoting(
       GeneratorIndex.toInts(v.valid),
+      v.finalizedHeight,
       v.aggregatedEndorsement.byteStr.toByteString,
       v.conflict.map { x =>
         PBEndorseBlock(

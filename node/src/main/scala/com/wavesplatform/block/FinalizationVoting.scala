@@ -5,6 +5,7 @@ import com.wavesplatform.state.GeneratorIndex
 
 case class FinalizationVoting(
     valid: Seq[GeneratorIndex] = Seq.empty,
+    finalizedHeight: Int = 0,
     aggregatedEndorsement: BlsSignature = BlsSignature.Empty,
     conflict: IndexedSeq[BlockEndorsement.Conflict] = IndexedSeq.empty
 ) {
@@ -16,5 +17,5 @@ case class FinalizationVoting(
   def nonEmpty: Boolean = valid.nonEmpty || conflict.nonEmpty
 
   override def toString: String =
-    s"Voting(v=[${valid.mkString(",")}], c=[${conflict.mkString(", ")}], s=$aggregatedEndorsement)"
+    s"Voting(v=[${valid.mkString(",")}], h=$finalizedHeight, c=[${conflict.mkString(", ")}], s=$aggregatedEndorsement)"
 }

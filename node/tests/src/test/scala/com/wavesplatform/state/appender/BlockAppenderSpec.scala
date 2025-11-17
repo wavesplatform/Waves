@@ -236,7 +236,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
         channels,
         PeerDatabase.NoOp,
         blockChallenger = None,
-        d.createBlockEndorser(channels, new EndorsementStorage.InMemory()),
+        d.createBlockEndorser(channels, new EndorsementStorage.InMemory((_, _) => true)),
         appenderScheduler
       )(channel2, _, None)
 
@@ -294,7 +294,7 @@ class BlockAppenderSpec extends FreeSpec with WithDomain with BeforeAndAfterAll 
           channels,
           PeerDatabase.NoOp,
           blockChallenger = None,
-          d.createBlockEndorser(channels, new EndorsementStorage.InMemory()),
+          d.createBlockEndorser(channels, new EndorsementStorage.InMemory((_, _) => true)),
           appenderScheduler
         )(channel2, _, None)
 

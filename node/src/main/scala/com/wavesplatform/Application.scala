@@ -144,7 +144,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
-    val endorsementStorage = EndorsementStorage.InMemory()
+    val endorsementStorage = EndorsementStorage.InMemory((blockId, height) => blockchainUpdater.blockId(height).contains(blockId))
     val blockEndorser      = new BlockEndorser.InMemory(blockchainUpdater, wallet, endorsementStorage, allChannels)
 
     if (settings.minerSettings.enable)
@@ -320,7 +320,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     )
 
     messageObserver.endorseBlocks.foreach { case (ch, x) =>
-      endorsementStorage.tryAddVote(x) match {
+      endorsementStorage.tryAdd(x) match {
         case Left(err)   => log.trace(s"Unexpected $x: $err")
         case Right(true) => allChannels.broadcast(x, Some(ch))
         case _           =>
