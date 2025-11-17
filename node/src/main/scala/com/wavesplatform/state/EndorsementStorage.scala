@@ -108,8 +108,8 @@ object EndorsementStorage {
         endorserIndex <- GeneratorIndex.checked(msg.endorserIndex).toRight(s"Invalid endorser index: ${msg.endorserIndex}")
         (endorserPk, _) = filter.endorsers(msg.endorserIndex)
         sig <- verifySig(msg, endorserPk).toRight("Invalid signature")
-      } yield {
-        if (sharedWithNeighbors.contains(msg) || conflict.isDefinedAt(msg.endorserIndex)) false
+      } yield
+        if (sharedWithNeighbors.contains(msg) || conflict.isDefinedAt(msg.endorserIndex) || filter.conflict.contains(endorserIndex)) false
         else {
           val isValid = msg.finalizedHeight == filter.finalizedHeight && msg.finalizedId == filter.finalizedId
           val isConflict = !isValid && {
@@ -139,7 +139,6 @@ object EndorsementStorage {
 
           share && filter.miner.isEmpty
         }
-      }
     }
 
     // TODO: if not activated

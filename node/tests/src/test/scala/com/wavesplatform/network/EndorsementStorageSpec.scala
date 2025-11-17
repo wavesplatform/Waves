@@ -80,7 +80,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
       }
 
       "known as sender of conflict endorsements before" in {
-        
+        started(conflict = Set(activeGeneratorIndex)).tryAddEndorsement(mk()).value shouldBe false
       }
 
       "already seen" - {
