@@ -1,18 +1,16 @@
 package com.wavesplatform.lagonaki.unit
 
-import com.google.protobuf.CodedInputStream
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.mining.Miner
-import com.wavesplatform.protobuf.block.{PBFinalizationVoting, PBFinalizationVotings}
+import com.wavesplatform.protobuf.block.PBFinalizationVotings
 import com.wavesplatform.protobuf.utils.PBUtils
-import com.wavesplatform.protobuf.transaction.{PBTransactions, PBSignedTransaction}
 import com.wavesplatform.state.{GeneratorIndex, Height}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.*
@@ -103,12 +101,37 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
   }
 
+  test("FinalizationVoting serialization matches Go reference output") {
+    def decode(s: String): ByteStr = ByteStr.decodeBase58(s).get
 
-  test("Go FinalizationVoting parsed successfully") {
-    val goString =
-      "CgMBAgMSYIMo5F9oE9mJs6Kk/oAmO84HcXie+UmvhLWI0Muqnw3yCi5yekgkQgvH7A/AvPsAIhZneJFnHEX1/KZP9TxYFIxmbX5hcCECeRuKVXscQ1EZLvM+Hr13LHuuL1dly8W+ixrrAQgBEkBpxb4/AhKzhetm0OirYRJGCyY8B3xEfe5k8p5MnRx3OP7JzJFk/gUjXZ4pbUbVtuKfNhmGchlmxT3RNQEZ0YCAGLlgIkDVwvFq3zo0CKVUNrgbDbDy+ROY88ZTY/KfNW7693dcDyhYxOKyXOAEl1eT2pZyBB7k/mAeXwKUnXx7+pUTFOeDKmBGvXB/FKFQiVKk6CpaNmqoerGF2G/U8xmGKYdXA67G3dyA2VqjRKtIJa27xHSsSKFvtch7FrMyokkDABL8a6bH8nYej4RjrxGA5Qd2Gb+PVYZo/Fq/GTZ1PAh6r9EY59M="
-    val res = PBFinalizationVoting.parseFrom(CodedInputStream.newInstance(Base64.decode(goString)))
-    println(s"res: $res}")
+    val referenceId = decode("37ex9gonRZtUddDHgSzSes5Ds9UeQyS74DyAXtGFrDpJnEg7sjGdi2ncaV4rVpZnLboQmid3whcbZUWS49FV3ZCs")
+    val endorsedId  = decode("5GszB5vY2KTxLvYq4zAFQvRkJxv5Rt5BcuTGHZrxgSLTzPtni7eY5k1DN1mJ7mY4ixP5fiHD9z1AfM99AA8yxhjg")
+    val aggregatedSig = BlsSignature.NonEmpty(
+      decode("nBWfaRLW7EdcwxhDMaXuZZFMhHyowAxY7476rkBsUUeguTXrMSNuTVkuWLmZjRmRfgMXEGuvdHiu1V7joRFSLz3X6MQBF8m88kHJEj6Tc2ktBnMTzihh2JMGpuuWBLSK8rv")
+    )
+    val conflictSig = BlsSignature.NonEmpty(
+      decode("RNMTkL736x3TmXfjQufKnxSgySaaoec3WYnxmujcum9BHEmCdjmwvjoUehghqYCWJcNj5CNfb9QdnujV9o2DRitbLgq2bnLdTU5s1DLBWBkVx8mBayvdfx7rPZ3mtUWeh5L")
+    )
+
+    val conflictFinalizedHeight = 12345
+    val conflictEndorsement = BlockEndorsement(
+      endorserIndex = GeneratorIndex(1),
+      finalizedId = referenceId,
+      finalizedHeight = Height(conflictFinalizedHeight),
+      endorsedId = endorsedId,
+      signature = conflictSig
+    )
+
+    val finalization = FinalizationVoting(
+      valid = Seq(GeneratorIndex(1), GeneratorIndex(2), GeneratorIndex(3)),
+      aggregatedEndorsement = aggregatedSig,
+      conflict = IndexedSeq(conflictEndorsement)
+    )
+
+    val serialized = PBUtils.encodeDeterministic(PBFinalizationVotings.protobuf(finalization))
+    val goFinalizationVotingBase64 =
+      "CgMBAgMaYIMo5F9oE9mJs6Kk/oAmO84HcXie+UmvhLWI0Muqnw3yCi5yekgkQgvH7A/AvPsAIhZneJFnHEX1/KZP9TxYFIxmbX5hcCECeRuKVXscQ1EZLvM+Hr13LHuuL1dly8W+iyLrAQgBEkBpxb4/AhKzhetm0OirYRJGCyY8B3xEfe5k8p5MnRx3OP7JzJFk/gUjXZ4pbUbVtuKfNhmGchlmxT3RNQEZ0YCAGLlgIkDVwvFq3zo0CKVUNrgbDbDy+ROY88ZTY/KfNW7693dcDyhYxOKyXOAEl1eT2pZyBB7k/mAeXwKUnXx7+pUTFOeDKmBGvXB/FKFQiVKk6CpaNmqoerGF2G/U8xmGKYdXA67G3dyA2VqjRKtIJa27xHSsSKFvtch7FrMyokkDABL8a6bH8nYej4RjrxGA5Qd2Gb+PVYZo/Fq/GTZ1PAh6r9EY59M="
+    Base64.encode(serialized) shouldBe goFinalizationVotingBase64
   }
 
   test("MicroBlock cannot be created with zero transactions") {
