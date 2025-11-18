@@ -30,7 +30,6 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Try, Using}
-import scala.Ordered.orderingToOrdered
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {

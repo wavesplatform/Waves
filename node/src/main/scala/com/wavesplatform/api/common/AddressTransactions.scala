@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTr
 import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.RocksDB
-import Ordered.orderingToOrdered
 
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*

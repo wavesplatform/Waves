@@ -3,8 +3,6 @@ package com.wavesplatform.ride.runner.entrypoints
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Height
 
-import scala.math.Ordered.orderingToOrdered
-
 case class Heights(lastKnownHardened: Height, working: Height)
 
 object Heights {

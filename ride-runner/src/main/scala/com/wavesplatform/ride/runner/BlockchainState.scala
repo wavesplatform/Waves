@@ -15,7 +15,6 @@ import monix.eval.Task
 import monix.execution.exceptions.UpstreamTimeoutException
 
 import scala.concurrent.duration.FiniteDuration
-import scala.math.Ordered.orderingToOrdered
 
 sealed trait BlockchainState extends Product with Serializable {
   def processedHeight: Height

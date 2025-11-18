@@ -5,7 +5,6 @@ import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite}
 import com.wavesplatform.state.Height
 
 import scala.collection.concurrent.TrieMap
-import scala.math.Ordered.orderingToOrdered
 
 class InMemWithoutHeightDiskCache[KeyT, ValueT] extends DiskCache[KeyT, ValueT] {
   private val entries = new TrieMap[KeyT, (Height, RemoteData[ValueT])]()

@@ -46,6 +46,7 @@ package object state {
     }
 
     given Ordering[Height] = Ordering[Int]
+    given Conversion[Height, Ordered[Height]] = scala.math.Ordered.orderingToOrdered(_)
 
     given Writes[Height] = Writes.IntWrites
   }
@@ -58,6 +59,7 @@ package object state {
       def unary_- : TxNum = (-n).toShort
     }
     given Ordering[TxNum] = Ordering[Short]
+    given Conversion[TxNum, Ordered[TxNum]] = scala.math.Ordered.orderingToOrdered(_)
   }
 
   opaque type TxNum = Short

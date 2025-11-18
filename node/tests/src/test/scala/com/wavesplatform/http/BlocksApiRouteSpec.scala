@@ -30,7 +30,6 @@ import play.api.libs.json.*
 
 import scala.concurrent.duration.*
 import scala.util.Random
-import scala.math.Ordered.orderingToOrdered
 
 class BlocksApiRouteSpec
     extends RouteSpec("/blocks")

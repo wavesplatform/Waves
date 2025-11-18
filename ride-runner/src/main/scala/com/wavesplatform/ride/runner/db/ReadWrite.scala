@@ -10,8 +10,6 @@ import org.rocksdb.ColumnFamilyHandle
 import scala.annotation.unused
 import scala.collection.mutable
 
-import scala.math.Ordered.orderingToOrdered
-
 trait ReadWrite extends ReadOnly {
   def put[V](key: Key[V], value: V): Int
   def put(key: Array[Byte], value: Array[Byte], cfh: Option[ColumnFamilyHandle]): Unit

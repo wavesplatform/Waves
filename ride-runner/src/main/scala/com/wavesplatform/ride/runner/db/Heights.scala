@@ -2,8 +2,6 @@ package com.wavesplatform.ride.runner.db
 
 import com.wavesplatform.state.Height
 
-import scala.math.Ordered.orderingToOrdered
-
 object Heights {
   val MaxRollbackSize  = 100
   val SafeHeightOffset = MaxRollbackSize + 1

@@ -16,8 +16,6 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
 import play.api.libs.json.*
 
-import scala.math.Ordered.orderingToOrdered
-
 case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, time: Time, routeTimeout: RouteTimeout) extends ApiRoute {
   import BlocksApiRoute.*
 

@@ -30,7 +30,6 @@ import monix.reactive.subjects.ReplaySubject
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 import scala.collection.immutable.VectorMap
-import scala.math.Ordered.orderingToOrdered
 
 class BlockchainUpdaterImpl(
     val rocksdb: RocksDBWriter,

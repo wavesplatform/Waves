@@ -15,7 +15,6 @@ import monix.reactive.Observable
 import org.rocksdb.RocksDB
 
 import scala.collection.mutable.ArrayBuffer
-import scala.math.Ordered.orderingToOrdered
 import scala.util.{Failure, Success, Try}
 
 class Loader(db: RocksDB, blocksApi: CommonBlocksApi, target: Option[(Int, ByteStr)], streamId: String) extends ScorexLogging {

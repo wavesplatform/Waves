@@ -13,7 +13,6 @@ import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.math.Ordered.orderingToOrdered
 
 trait Processor {
 

@@ -16,7 +16,6 @@ import com.wavesplatform.state.Height
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 
 import scala.util.chaining.scalaUtilChainingOps
-import scala.math.Ordered.orderingToOrdered
 
 class BlockHeaderStorage(blockchainApi: BlockchainApi, diskCache: BlockDiskCache) extends OptimisticLockable with ScorexLogging {
   // head contains the latest

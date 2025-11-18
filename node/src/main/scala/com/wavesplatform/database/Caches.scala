@@ -22,7 +22,6 @@ import java.{lang, util}
 import scala.collection.immutable.VectorMap
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
-import scala.math.Ordered.orderingToOrdered
 import scala.reflect.ClassTag
 
 abstract class Caches extends Blockchain, Storage {

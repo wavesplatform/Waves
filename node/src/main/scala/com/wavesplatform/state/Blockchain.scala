@@ -18,7 +18,6 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
-import scala.math.Ordered.orderingToOrdered
 
 trait Blockchain {
   def settings: BlockchainSettings

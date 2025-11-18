@@ -36,7 +36,6 @@ import org.github.jamm.Unmetered
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
 import scala.util.chaining.scalaUtilChainingOps
-import scala.math.Ordered.orderingToOrdered
 
 @Unmetered
 class LazyBlockchain[TagT] private (

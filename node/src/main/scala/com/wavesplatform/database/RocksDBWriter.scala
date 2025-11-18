@@ -48,7 +48,6 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Using
 import scala.util.Using.Releasable
 import scala.util.control.NonFatal
-import scala.math.Ordered.orderingToOrdered
 
 object RocksDBWriter extends ScorexLogging {
 

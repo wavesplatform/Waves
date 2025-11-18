@@ -25,7 +25,6 @@ import org.rocksdb.RocksDB
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
-import scala.math.Ordered.orderingToOrdered
 import scala.util.Using
 import scala.util.control.Exception
 

@@ -25,7 +25,6 @@ import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{Asset, *}
 
 import scala.util.{Left, Right}
-import scala.math.Ordered.orderingToOrdered
 
 object CommonValidation {
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =

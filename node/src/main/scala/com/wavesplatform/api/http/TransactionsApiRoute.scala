@@ -26,8 +26,6 @@ import monix.eval.Task
 import monix.reactive.Observable
 import play.api.libs.json.*
 
-import scala.math.Ordered.orderingToOrdered
-
 case class TransactionsApiRoute(
     settings: RestAPISettings,
     commonApi: CommonTransactionsApi,

@@ -8,8 +8,6 @@ import com.wavesplatform.state.{Blockchain, Height, TxMeta}
 import com.wavesplatform.transaction.Transaction
 import monix.reactive.Observable
 
-import scala.math.Ordered.orderingToOrdered
-
 trait CommonBlocksApi {
   def blockDelay(blockId: BlockId, blockNum: Int): Option[Long]
 

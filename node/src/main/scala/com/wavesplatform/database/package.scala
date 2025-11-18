@@ -36,7 +36,6 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{View, mutable}
 import scala.jdk.CollectionConverters.*
-import scala.math.Ordered.orderingToOrdered
 
 //noinspection UnstableApiUsage
 package object database {

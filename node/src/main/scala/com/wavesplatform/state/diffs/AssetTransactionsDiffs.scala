@@ -18,7 +18,6 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.*
 
 import scala.collection.immutable.VectorMap
-import scala.math.Ordered.orderingToOrdered
 import scala.util.Either.cond
 
 object AssetTransactionsDiffs {
