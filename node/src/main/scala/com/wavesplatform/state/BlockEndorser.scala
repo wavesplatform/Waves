@@ -66,7 +66,7 @@ object BlockEndorser {
           pk <- wallet.privateKeyAccount(committedAddr).toSeq
         } yield (pk, GeneratorIndex(idx))
 
-        endorsement = BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
+        endorsement = BlockEndorsement.signed(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
         networkMsg  = EndorseBlock.from(endorsement)
         broadcast <- endorsementStorage.tryAdd(networkMsg).toSeq
         if broadcast

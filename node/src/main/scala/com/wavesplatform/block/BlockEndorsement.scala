@@ -5,24 +5,27 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.state.{GeneratorIndex, Height}
 
-enum BlockEndorsement {
-  case Full(endorserIndex: GeneratorIndex, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, signature: BlsSignature.NonEmpty)
-  case Conflict(endorserIndex: GeneratorIndex, finalizedId: BlockId, signature: BlsSignature.NonEmpty)
-}
+case class BlockEndorsement(
+    endorserIndex: GeneratorIndex,
+    finalizedId: BlockId,
+    finalizedHeight: Height,
+    endorsedId: BlockId,
+    signature: BlsSignature.NonEmpty
+)
 
 object BlockEndorsement {
-  def sign(kp: BlsKeyPair, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId): BlsSignature.NonEmpty =
-    kp.sign(mkMessage(finalizedId, finalizedHeight, endorsedId))
-
-  def mkMessage(finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId): Array[Byte] =
-    finalizedId.arr ++ Ints.toByteArray(finalizedHeight) ++ endorsedId.arr
-
-  def full(
+  def signed(
       endorserAccount: BlsKeyPair,
       endorserIndex: GeneratorIndex,
       finalizedId: BlockId,
       finalizedHeight: Height,
       endorsedId: BlockId
-  ): BlockEndorsement.Full =
-    BlockEndorsement.Full(endorserIndex, finalizedId, finalizedHeight, endorsedId, sign(endorserAccount, finalizedId, finalizedHeight, endorsedId))
+  ): BlockEndorsement =
+    BlockEndorsement(endorserIndex, finalizedId, finalizedHeight, endorsedId, sign(endorserAccount, finalizedId, finalizedHeight, endorsedId))
+
+  def sign(kp: BlsKeyPair, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId): BlsSignature.NonEmpty =
+    kp.sign(mkMessage(finalizedId, finalizedHeight, endorsedId))
+
+  def mkMessage(finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId): Array[Byte] =
+    finalizedId.arr ++ Ints.toByteArray(finalizedHeight) ++ endorsedId.arr
 }

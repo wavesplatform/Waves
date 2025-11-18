@@ -72,15 +72,12 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
       voting = Some(
         FinalizationVoting(
           conflict = Vector(
-            BlockEndorsement.Conflict(
-              endorserIndex = GeneratorIndex(1),
-              finalizedId = otherFinalizedBlockId,
-              signature = BlockEndorsement.sign(
-                kp = BlsKeyPair(generator2.privateKey),
-                finalizedId = otherFinalizedBlockId,
-                finalizedHeight = GenesisBlockHeight,
-                endorsedId = block2WithCommitments.id()
-              )
+            BlockEndorsement.signed(
+              BlsKeyPair(generator2.privateKey),
+              GeneratorIndex(1),
+              otherFinalizedBlockId,
+              finalizedHeight = GenesisBlockHeight,
+              endorsedId = block2WithCommitments.id()
             )
           )
         )

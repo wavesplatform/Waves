@@ -136,6 +136,6 @@ object EndorseBlock {
     x.signature.toByteStr
   )
 
-  def from(x: BlockEndorsement.Full): EndorseBlock =
+  def from(x: BlockEndorsement): EndorseBlock =
     EndorseBlock(x.endorserIndex.toInt, x.finalizedId, x.finalizedHeight, x.endorsedId, x.signature.byteStr)
 }

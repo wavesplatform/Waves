@@ -44,7 +44,7 @@ object EndorsementStorage {
     private val processedValidEndorsers = mutable.HashSet.empty[GeneratorIndex]
 
     private var valid    = immutable.IntMap.empty[BlsSignature.NonEmpty]
-    private var conflict = immutable.IntMap.empty[BlockEndorsement.Conflict]
+    private var conflict = immutable.IntMap.empty[BlockEndorsement]
 
     private var latestResult = FinalizationResult(reachedFinalization = false, FinalizationVoting())
     private var hasChanges   = true
@@ -72,7 +72,7 @@ object EndorsementStorage {
           val share = if (isConflict) {
             conflict = conflict.updated(
               msg.endorserIndex,
-              BlockEndorsement.Conflict(GeneratorIndex(msg.endorserIndex), msg.finalizedId, sig)
+              BlockEndorsement(GeneratorIndex(msg.endorserIndex), msg.finalizedId, msg.finalizedHeight, msg.endorsedId, sig)
             )
             valid = valid.removed(msg.endorserIndex)
 

@@ -104,9 +104,11 @@ class BlocksApiRouteSpec
             valid = GeneratorIndex.fromInts(Seq(1, 0)),
             aggregatedEndorsement = BlsSignature.NonEmpty(Array.fill[Byte](BlsSignature.SizeInBytes)(1)),
             conflict = Vector(
-              BlockEndorsement.Conflict(
+              BlockEndorsement(
                 endorserIndex = GeneratorIndex(0),
                 finalizedId = testBlock2.id(),
+                finalizedHeight = Height(1),
+                endorsedId = testBlock1.id(),
                 signature = BlsSignature.NonEmpty(Array.fill[Byte](BlsSignature.SizeInBytes)(2))
               )
             )

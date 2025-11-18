@@ -1,12 +1,9 @@
 package com.wavesplatform.protobuf.block
 
-import cats.syntax.either.*
-import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.state.GeneratorIndex
-import com.wavesplatform.transaction.TxValidationError.GenericError
 
 import scala.util.Try
 
@@ -21,12 +18,7 @@ object PBFinalizationVotings {
       pb.finalizedBlockHeight,
       aggSig,
       pb.conflictEndorsements.zipWithIndex.map { case (x, i) =>
-        val r = for {
-          sig <- BlsSignature(x.signature.toByteArray)
-          r   <- PBEndorseBlocks.vanillaConflict(x, sig).leftMap(GenericError(_))
-        } yield r
-
-        r match {
+        BlsSignature(x.signature.toByteArray).map(PBEndorseBlocks.vanilla(x, _)) match {
           case Left(e)  => throw new IllegalArgumentException(s"Error during parsing conflict endorsement #$i: $e")
           case Right(r) => r
         }

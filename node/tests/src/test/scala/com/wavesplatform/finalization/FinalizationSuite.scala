@@ -231,15 +231,12 @@ class FinalizationSuite extends FreeSpec with WithDomain {
               valid = Seq(GeneratorIndex(1)),
               aggregatedEndorsement = aggSig,
               conflict = Vector(
-                BlockEndorsement.Conflict(
-                  endorserIndex = GeneratorIndex(0),
-                  finalizedId = otherFinalizedBlockId,
-                  signature = BlockEndorsement.sign(
-                    kp = BlsKeyPair(otherNode1Acc.privateKey),
-                    finalizedId = otherFinalizedBlockId,
-                    finalizedHeight = GenesisBlockHeight,
-                    endorsedId = endorsedBlockId
-                  )
+                BlockEndorsement.signed(
+                  BlsKeyPair(otherNode1Acc.privateKey),
+                  GeneratorIndex(0),
+                  otherFinalizedBlockId,
+                  finalizedHeight = GenesisBlockHeight,
+                  endorsedId = endorsedBlockId,
                 )
               )
             )

@@ -3,26 +3,22 @@ package com.wavesplatform.protobuf.block
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.protobuf.*
-import com.wavesplatform.state.GeneratorIndex
+import com.wavesplatform.state.{GeneratorIndex, Height}
 
 object PBEndorseBlocks {
-  def vanillaConflict(x: PBEndorseBlock, sig: BlsSignature.NonEmpty): Either[String, BlockEndorsement.Conflict] =
-    Either.cond(
-      x.endorsedBlockId.isEmpty && x.finalizedBlockHeight == 0,
-      BlockEndorsement.Conflict(
-        GeneratorIndex(x.endorserIndex),
-        x.finalizedBlockId.toByteStr,
-        sig
-      ),
-      "Expected a conflict endorsement"
-    )
+  def vanilla(x: PBEndorseBlock, sig: BlsSignature.NonEmpty): BlockEndorsement = BlockEndorsement(
+    GeneratorIndex(x.endorserIndex),
+    x.finalizedBlockId.toByteStr,
+    Height(x.finalizedBlockHeight),
+    x.endorsedBlockId.toByteStr,
+    sig
+  )
 
-  def protobuf(x: BlockEndorsement.Full): PBEndorseBlock =
-    new PBEndorseBlock(
-      endorserIndex = x.endorserIndex.toInt,
-      finalizedBlockId = x.finalizedId.toByteString,
-      finalizedBlockHeight = x.finalizedHeight,
-      endorsedBlockId = x.endorsedId.toByteString,
-      signature = x.signature.byteStr.toByteString
-    )
+  def protobuf(x: BlockEndorsement): PBEndorseBlock = new PBEndorseBlock(
+    endorserIndex = x.endorserIndex.toInt,
+    finalizedBlockId = x.finalizedId.toByteString,
+    finalizedBlockHeight = x.finalizedHeight,
+    endorsedBlockId = x.endorsedId.toByteString,
+    signature = x.signature.byteStr.toByteString
+  )
 }

@@ -37,7 +37,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         finalizedId: BlockId = expectedFinalizedId,
         finalizedHeight: Height = expectedFinalizedHeight,
         endorsedId: BlockId = expectedEndorsedId
-    ): BlockEndorsement.Full = BlockEndorsement.full(endorserAccount, endorserIndex, finalizedId, finalizedHeight, endorsedId)
+    ): BlockEndorsement = BlockEndorsement.signed(endorserAccount, endorserIndex, finalizedId, finalizedHeight, endorsedId)
 
     "rebroadcast if" - {
       "valid" in {
@@ -247,10 +247,10 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
     def addVote(generatorIndex: Int, finalizedId: BlockId): Either[String, Boolean] = tryAddEndorsement(
       BlockEndorsement
-        .full(generators(generatorIndex).blsKp, GeneratorIndex(generatorIndex), finalizedId, expectedFinalizedHeight, expectedEndorsedId)
+        .signed(generators(generatorIndex).blsKp, GeneratorIndex(generatorIndex), finalizedId, expectedFinalizedHeight, expectedEndorsedId)
     )
 
-    def tryAddEndorsement(msg: BlockEndorsement.Full): Either[String, Boolean] = inner.tryAdd(EndorseBlock.from(msg))
+    def tryAddEndorsement(msg: BlockEndorsement): Either[String, Boolean] = inner.tryAdd(EndorseBlock.from(msg))
 
     def checkTryCollect(endorsedId: BlockId, valid: Seq[Int] = Nil, conflict: Seq[Int] = Nil)(using Position): Unit =
       inner.tryCollectAndClear(endorsedId) match {
