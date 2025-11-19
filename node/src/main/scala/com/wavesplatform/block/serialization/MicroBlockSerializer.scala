@@ -5,7 +5,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.{DigestLength, SignatureLength}
-import com.wavesplatform.protobuf.block.{PBFinalizationVoting, PBFinalizationVotings}
+import com.wavesplatform.protobuf.block.PBFinalizationVotings
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
 
