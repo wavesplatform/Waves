@@ -58,7 +58,7 @@ object EndorsementStorage {
         _             <- Either.raiseWhen(msg.finalizedHeight > filter.finalizedHeight)(s"Expected finalized height <= ${filter.finalizedHeight}")
         _             <- Either.raiseWhen(msg.endorserIndex >= filter.endorsers.size)(s"There are only ${filter.endorsers.size} endorsers")
         endorserIndex <- GeneratorIndex.checked(msg.endorserIndex).toRight(s"Invalid endorser index: ${msg.endorserIndex}")
-        (endorserPk, _) = filter.endorsers(msg.endorserIndex)
+        (_, endorserPk, _) = filter.endorsers(msg.endorserIndex)
         sig <- verifySig(msg, endorserPk).toRight("Invalid signature")
       } yield
         if (sharedWithNeighbors.contains(msg) || conflict.isDefinedAt(msg.endorserIndex) || filter.conflict.contains(endorserIndex)) false

@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
 import cats.syntax.traverse.*
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.common.state.ByteStr
@@ -12,11 +13,11 @@ import org.scalactic.source.Position
 import org.scalatest.EitherValues
 
 class EndorsementStorageSpec extends FreeSpec with EitherValues {
-  private type GeneratorBalance = (blsKp: BlsKeyPair, balance: Long)
+  private type GeneratorBalance = (addr: Address, blsKp: BlsKeyPair, balance: Long)
 
-  private val committedGenerator = BlsKeyPair(TxHelpers.signer(1).privateKey) // GeneratorIndex(0)
+  private val committedGenerator = BlsKeyPair(TxHelpers.signer(0).privateKey) // GeneratorIndex(0)
 
-  private val activeGenerator      = BlsKeyPair(TxHelpers.signer(0).privateKey)
+  private val activeGenerator      = BlsKeyPair(TxHelpers.signer(1).privateKey)
   private val activeGeneratorIndex = GeneratorIndex(1)
 
   private val expectedFinalizedHeight = Height(5)
@@ -24,8 +25,9 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
   private val expectedFinalizedId, unexpectedFinalizedId, expectedEndorsedId = TxHelpers.randomBlockId
 
   private def mkGenerators(n: Int): IndexedSeq[GeneratorBalance] = (0 until n).map { i =>
-    val blsKp = BlsKeyPair(TxHelpers.signer(i).privateKey)
-    (blsKp, 100_000.waves)
+    val wavesKp = TxHelpers.signer(i)
+    val blsKp   = BlsKeyPair(wavesKp.privateKey)
+    (wavesKp.toAddress, blsKp, 100_000.waves)
   }
 
   private val defaultGenerators: IndexedSeq[GeneratorBalance] = mkGenerators(4)
@@ -219,7 +221,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
   private def started(
       minerIndex: Int = -1,
-      generators: IndexedSeq[GeneratorBalance] = IndexedSeq(committedGenerator -> 100_000.waves, activeGenerator -> 100_000.waves),
+      generators: IndexedSeq[GeneratorBalance] = mkGenerators(2),
       conflict: Set[GeneratorIndex] = Set.empty,
       hasSameBlockBeforeFinalizationHeight: Boolean = true
   ): ExtendedEndorsementStorage = {
@@ -231,7 +233,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         expectedFinalizedId,
         expectedFinalizedHeight,
         expectedEndorsedId,
-        generators.map(x => (x.blsKp.publicKey, x.balance)),
+        generators.map(x => (x.addr, x.blsKp.publicKey, x.balance)),
         conflict
       )
     ) shouldBe true

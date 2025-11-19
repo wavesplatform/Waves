@@ -51,7 +51,7 @@ object BlockEndorser {
             .zip(balances)
             .map { case ((addr1, blsPk), (addr2, balance)) =>
               require(addr1 == addr2, s"addr1=$addr1 == addr2=$addr2")
-              blsPk -> balance
+              (addr1, blsPk, balance)
             }
             .to(Vector)
 
