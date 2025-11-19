@@ -1,5 +1,6 @@
 package com.wavesplatform.state
 
+import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.network.{ChannelGroupExt, EndorseBlock}
@@ -22,7 +23,9 @@ object BlockEndorser {
     override def vote(): Unit = {}
   }
 
-  class InMemory(blockchain: Blockchain, wallet: Wallet, endorsementStorage: EndorsementStorage, allChannels: ChannelGroup) extends BlockEndorser {
+  class InMemory(blockchain: Blockchain, wallet: Wallet, endorsementStorage: EndorsementStorage, allChannels: ChannelGroup)
+      extends BlockEndorser
+      with StrictLogging {
     override def vote(): Unit = {
       val votingHeight   = Height(blockchain.height)
       val endorsedHeight = Height(votingHeight - 1)
@@ -62,13 +65,15 @@ object BlockEndorser {
 
         (account, idx) <- for {
           ((committedAddr, _), idx) <- committed.zipWithIndex
-          if committedAddr != votingBlockMiner // A miner doesn’t need to endorse its own blocks - a mining is already an endorsement
+          if !filter.miner.contains(idx) // A miner doesn’t need to endorse its own blocks - a mining is already an endorsement
           pk <- wallet.privateKeyAccount(committedAddr).toSeq
         } yield (pk, GeneratorIndex(idx))
+        _ = logger.debug(s"Found ${account.toAddress} in generator set") // TODO: remove from prod
 
         endorsement = BlockEndorsement.signed(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
         networkMsg  = EndorseBlock.from(endorsement)
         broadcast <- endorsementStorage.tryAdd(networkMsg).toSeq
+        _ = logger.debug(s"Will ${if (broadcast) "" else "not "}broadcast endorsement from ${account.toAddress}") // TODO: remove from prod
         if broadcast
       } allChannels.broadcast(networkMsg)
     }
