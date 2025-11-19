@@ -134,8 +134,8 @@ object EndorsementStorage {
             s"Finalization simulation: ${if (simulation.reachedFinalization) "" else "not "}reached, " +
               s"endorsed=${simulation.endorsedBalance}, total=${simulation.totalBalance}, " +
               s"miner=${currentFilter.miner.getOrElse("?")}" +
-              (if (valid.isEmpty) "" else s", valid: [${valid.keys.mkString(", ")}]") +
-              (if (conflict.isEmpty) "" else s", conflict: [${conflict.keys.mkString(", ")}]")
+              (if (valid.isEmpty) "" else s", valid=[${valid.keys.mkString(", ")}]") +
+              (if (conflict.isEmpty) "" else s", conflict=[${conflict.keys.mkString(", ")}]")
           )
           latestResult = createVoting(currentFilter, simulation)
         }
