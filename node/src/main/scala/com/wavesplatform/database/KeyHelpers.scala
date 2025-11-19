@@ -21,7 +21,7 @@ object KeyHelpers {
   def hNum(height: Height, num: TxNum): Array[Byte] = Bytes.concat(Ints.toByteArray(height.toInt), Shorts.toByteArray(num.toShort))
 
   def historyKey(keyTag: KeyTag, suffix: Array[Byte]): Key[Seq[Height]] =
-    Key(keyTag, suffix, bs => readIntSeq(bs).map(Height.apply), hs => writeIntSeq(hs.map(_.toInt)))
+    Key(keyTag, suffix, bs => Height.seq(readIntSeq(bs)), hs => writeIntSeq(Height.ints(hs)))
 
   def intKey(keyTag: KeyTag, default: Int = 0): Key[Int] =
     Key(keyTag, Array.emptyByteArray, v => if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else default, Ints.toByteArray)

@@ -27,7 +27,9 @@ package object state {
   }
 
   object Height {
-    def apply(h: Int): Height = h
+    def apply(h: Int): Height                = h
+    def seq(ints: Seq[Int]): Seq[Height]     = ints
+    def ints(heights: Seq[Height]): Seq[Int] = heights
 
     extension (h: Height) {
       def toInt: Int               = h
@@ -45,7 +47,7 @@ package object state {
       def max(that: Height): Height = that.max(h)
     }
 
-    given Ordering[Height] = Ordering[Int]
+    given Ordering[Height]                    = Ordering[Int]
     given Conversion[Height, Ordered[Height]] = scala.math.Ordered.orderingToOrdered(_)
 
     given Writes[Height] = Writes.IntWrites
@@ -58,7 +60,7 @@ package object state {
       def toShort: Short  = n
       def unary_- : TxNum = (-n).toShort
     }
-    given Ordering[TxNum] = Ordering[Short]
+    given Ordering[TxNum]                   = Ordering[Short]
     given Conversion[TxNum, Ordered[TxNum]] = scala.math.Ordered.orderingToOrdered(_)
   }
 
