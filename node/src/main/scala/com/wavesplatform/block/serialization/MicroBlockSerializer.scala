@@ -46,13 +46,8 @@ object MicroBlockSerializer {
       val generator       = buf.getPublicKey
       val signature       = ByteStr(buf.getByteArray(SignatureLength))
       val stateHash       = buf.getByteArrayOpt(DigestLength).map(ByteStr(_))
-      val finalizationVoting =
-        if (buf.hasRemaining) {
-          val serializedVoting = buf.getByteArray(buf.remaining())
-          val pbVoting =
-            PBUtils.decode(serializedVoting, PBFinalizationVoting).fold(throw _, identity)
-          Some(PBFinalizationVotings.vanilla(pbVoting).get)
-        } else None
-      MicroBlock(version, generator, transactionData, reference, totalResBlockSig, signature, stateHash, finalizationVoting)
+      // We don't use this parsing since protobuf, no new bytes parsing is needed
+
+      MicroBlock(version, generator, transactionData, reference, totalResBlockSig, signature, stateHash, finalizationVoting = None)
     }
 }
