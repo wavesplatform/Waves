@@ -99,6 +99,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
     assert(microBlock.reference == parsedBlock.reference)
     assert(microBlock.transactionData == parsedBlock.transactionData)
     assert(microBlock.stateHash == parsedBlock.stateHash)
+    assert(microBlock.finalizationVoting == parsedBlock.finalizationVoting)
     assert(microBlock == parsedBlock)
   }
 
