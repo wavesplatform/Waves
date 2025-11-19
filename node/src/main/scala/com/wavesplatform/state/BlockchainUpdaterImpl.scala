@@ -491,7 +491,7 @@ class BlockchainUpdaterImpl(
 
         val (totalBalance, endorsedBalance, minerIdx) = {
           val votedIndexes            = validEndorserIndexes.toSet
-          val conflictIndexes         = conflictEndorserIndexes.toSet
+          val conflictIndexes         = conflictEndorserIndexes
           val votingBlockMinerAddress = votingBlock.header.generator.toAddress
           generatorBalances.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0), -1)) {
             case (orig @ (totalBalance, endorsedBalance, minerIdx), ((endorserAddress, endorserBalance), i)) =>
