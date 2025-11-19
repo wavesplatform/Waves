@@ -31,12 +31,6 @@ object PBFinalizationVotings {
       GeneratorIndex.toInts(v.valid),
       v.finalizedHeight,
       v.aggregatedEndorsement.byteStr.toByteString,
-      v.conflict.map { x =>
-        PBEndorseBlock(
-          x.endorserIndex.toInt,
-          x.finalizedId.toByteString,
-          signature = x.signature.byteStr.toByteString
-        )
-      }
+      v.conflict.map(PBEndorseBlocks.protobuf)
     )
 }
