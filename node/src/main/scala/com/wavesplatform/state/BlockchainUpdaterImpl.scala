@@ -486,11 +486,11 @@ class BlockchainUpdaterImpl(
         log.debug(s"$logPrefix no committed generators on $votingPeriod")
         false
       } else {
-        val votedEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Seq.empty)(_.valid)
+        val validEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Seq.empty)(_.valid)
         val conflictEndorserIndexes = conflictGenerators(votingPeriod).upTo(votingHeight)
 
         val (totalBalance, endorsedBalance, minerIdx) = {
-          val votedIndexes            = votedEndorserIndexes.toSet
+          val votedIndexes            = validEndorserIndexes.toSet
           val conflictIndexes         = conflictEndorserIndexes.toSet
           val votingBlockMinerAddress = votingBlock.header.generator.toAddress
           generatorBalances.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0), -1)) {
@@ -511,9 +511,10 @@ class BlockchainUpdaterImpl(
 
         val finalized = isFinalized(endorsedBalance, totalBalance)
         log.debug(
-          s"$logPrefix ${if (finalized) "" else "not "}finalized, voted: $endorsedBalance, total: $totalBalance, " +
-            s"endorsers: [${votedEndorserIndexes.mkString(", ")}], miner: $minerIdx" +
-            (if (conflictEndorserIndexes.isEmpty) "" else s", conflict: [${conflictEndorserIndexes.mkString(", ")}]")
+          s"$logPrefix ${if (finalized) "" else "not "}reached, endorsed=$endorsedBalance, total=$totalBalance, " +
+            s"miner=$minerIdx" +
+            (if (validEndorserIndexes.isEmpty) "" else s", valid=[${validEndorserIndexes.mkString(", ")}]") +
+            (if (conflictEndorserIndexes.isEmpty) "" else s", conflict=[${conflictEndorserIndexes.mkString(", ")}]")
         )
 
         finalized

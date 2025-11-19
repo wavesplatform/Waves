@@ -16,6 +16,8 @@ object GeneratorIndex {
     def toInt: Int = self
   }
 
-  def toInts(xs: Seq[GeneratorIndex]): Seq[Int]   = xs
-  def fromInts(xs: Seq[Int]): Seq[GeneratorIndex] = xs
+  def toInts(xs: Seq[GeneratorIndex]): Seq[Int] = xs
+
+  def fromInts(xs: Seq[Int]): Seq[GeneratorIndex]       = xs.map(apply)
+  def unsafeFromInts(xs: Seq[Int]): Seq[GeneratorIndex] = xs
 }

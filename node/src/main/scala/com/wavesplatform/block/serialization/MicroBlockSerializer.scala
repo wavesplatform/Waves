@@ -9,7 +9,6 @@ import com.wavesplatform.serialization.ByteBufferOps
 
 import scala.util.Try
 
-// Legacy
 object MicroBlockSerializer {
   def toBytes(microBlock: MicroBlock): Array[Byte] = {
     val transactionDataBytes = writeTransactionData(microBlock.version, microBlock.transactionData)
@@ -25,6 +24,7 @@ object MicroBlockSerializer {
     )
   }
 
+  // Legacy
   def parseBytes(bytes: Array[Byte]): Try[MicroBlock] =
     Try {
       val buf = ByteBuffer.wrap(bytes).asReadOnlyBuffer()

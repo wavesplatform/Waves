@@ -16,7 +16,8 @@ case class EndorsementFilter(
     conflict: Set[GeneratorIndex]
 ) {
   private val minerBalance        = miner.fold(0L)(i => endorsers(i.toInt)._2)
-  private val doubledTotalBalance = endorsers.foldLeft(BigInt(0L)) { case (r, (_, b)) => r + b } * 2
+  private val totalBalance        = endorsers.foldLeft(BigInt(0L)) { case (r, (_, b)) => r + b }
+  private val doubledTotalBalance = totalBalance * 2
 
   override def toString: String =
     s"EndorsementFilter(${miner.fold("")(i => s"m=$i, ")}fid=$finalizedId, fh=$finalizedHeight, eid=$endorsedId, e={${endorsers.mkString(", ")}})"
@@ -48,10 +49,15 @@ case class EndorsementFilter(
       reached = endorsedBalance * 3 >= doubledTotalBalance // Same as endorsedBalance >= totalBalance * 2 / 3, but with precision
     }
 
-    SimulationResult(reached, endorserIndexes)
+    SimulationResult(reached, endorsedBalance, totalBalance, endorserIndexes)
   }
 }
 
 object EndorsementFilter {
-  case class SimulationResult(reachedFinalization: Boolean = false, chosenValid: IndexedSeq[GeneratorIndex] = Vector.empty)
+  case class SimulationResult(
+      reachedFinalization: Boolean = false,
+      endorsedBalance: BigInt,
+      totalBalance: BigInt,
+      chosenValid: IndexedSeq[GeneratorIndex] = Vector.empty
+  )
 }
