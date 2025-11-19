@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.mining.Miner
-import com.wavesplatform.protobuf.block.PBFinalizationVotings
+import com.wavesplatform.protobuf.block.{PBFinalizationVotings, PBMicroBlocks, SignedMicroBlock}
 import com.wavesplatform.protobuf.transaction.{PBTransactions, PBSignedTransaction}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state.{GeneratorIndex, Height}
@@ -86,7 +86,9 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
     val microBlock =
       MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig, Some(stateHash), finalizationVoting).explicitGet()
-    val parsedBlock = MicroBlock.parseBytes(MicroBlockSerializer.toBytes(microBlock)).get
+    val totalBlockId       = ByteStr(Array.fill(Block.BlockIdLength)(1.toByte))
+    val signedMicroBlockPb = PBMicroBlocks.protobuf(microBlock, totalBlockId)
+    val parsedBlock        = PBMicroBlocks.vanilla(SignedMicroBlock.parseFrom(signedMicroBlockPb.toByteArray)).get.microblock
 
     assert(microBlock.signaturesValid().isRight)
     assert(parsedBlock.signaturesValid().isRight)
@@ -97,9 +99,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
     assert(microBlock.reference == parsedBlock.reference)
     assert(microBlock.transactionData == parsedBlock.transactionData)
     assert(microBlock.stateHash == parsedBlock.stateHash)
-    assert(microBlock.finalizationVoting == parsedBlock.finalizationVoting)
     assert(microBlock == parsedBlock)
-
   }
 
   test("FinalizationVoting serialization matches Go reference output") {
@@ -164,10 +164,10 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
     val txBytesBase64 =
       "ClcIVBIg7FlNNgjs8B4KV3mLFwdyeS2xRTKEN3fgrPVEXywc8wQaBBCgjQYgydOsyLgtKAHCBiEKFgoUflp9MfPSElPDgt8e0bJfEbpsP6wSBxCA7oO7rwESQEz8sQx7qThcCFVSdgGm5Dk0VKETkPcJXXJYxnt70rxfsarlD7D4gHB5yTXdDzfndnHAyXH7NwZfzy8YR/CizgY="
-    val transaction = PBTransactions.vanillaUnsafe(PBSignedTransaction.parseFrom(Base64.decode(txBytesBase64)))
-    val senderPublicKey = PublicKey(ByteStr(Base64.decode("xJSp5EjVj+mv4H1T062etqFbqsDYN+7U+sYuhC6feGI=")))
+    val transaction        = PBTransactions.vanillaUnsafe(PBSignedTransaction.parseFrom(Base64.decode(txBytesBase64)))
+    val senderPublicKey    = PublicKey(ByteStr(Base64.decode("xJSp5EjVj+mv4H1T062etqFbqsDYN+7U+sYuhC6feGI=")))
     val referenceSignature = decode("37ex9gonRZtUddDHgSzSes5Ds9UeQyS74DyAXtGFrDpJnEg7sjGdi2ncaV4rVpZnLboQmid3whcbZUWS49FV3ZCs")
-    val totalResSignature = decode("3ta68P5LdLHWKuKcDvASsjcCMEQsm1ySrpxYZwqmzCHiAWHgrYJE1ZmaTsh3ytPqY73545EUPDaGfVdrguTqVTHg")
+    val totalResSignature  = decode("3ta68P5LdLHWKuKcDvASsjcCMEQsm1ySrpxYZwqmzCHiAWHgrYJE1ZmaTsh3ytPqY73545EUPDaGfVdrguTqVTHg")
 
     val microBlock = MicroBlock(
       version = 5.toByte,
