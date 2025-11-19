@@ -46,8 +46,8 @@ object EndorsementStorage {
     private var valid    = immutable.IntMap.empty[BlsSignature.NonEmpty]
     private var conflict = immutable.IntMap.empty[BlockEndorsement]
 
-    private var latestResult = FinalizationResult(reachedFinalization = false, FinalizationVoting())
-    private var hasChanges   = true
+    private var latestResult = FinalizationResult.empty
+    private var hasChanges   = false
 
     private val monitor            = new Object()
     private def synced[T](f: => T) = monitor.synchronized(f)
@@ -98,9 +98,13 @@ object EndorsementStorage {
       val isNewVoting = !currentFilter.exists(_.sameVoting(filter))
       if (isNewVoting) {
         sharedWithNeighbors.clear()
+        processedValidEndorsers.clear()
+
         valid = valid.empty
         conflict = conflict.empty
-        hasChanges = true
+
+        latestResult = FinalizationResult.empty
+        hasChanges = false
 
         currentFilter = if (filter.endorsers.isEmpty) {
           logger.info("No committed generators, don't collect endorsements")
@@ -162,5 +166,8 @@ object EndorsementStorage {
 
   object InMemory {
     private case class FinalizationResult(reachedFinalization: Boolean, voting: FinalizationVoting)
+    private object FinalizationResult {
+      val empty = FinalizationResult(false, FinalizationVoting())
+    }
   }
 }
