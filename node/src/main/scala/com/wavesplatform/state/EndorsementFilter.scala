@@ -8,6 +8,8 @@ import com.wavesplatform.state.Height
 
 import scala.collection.mutable
 
+/** @param endorsers All, including conflict
+  */
 case class EndorsementFilter(
     miner: Option[GeneratorIndex],
     finalizedId: BlockId,
@@ -16,9 +18,9 @@ case class EndorsementFilter(
     endorsers: IndexedSeq[(Address, BlsPublicKey, Long)],
     conflict: Set[GeneratorIndex]
 ) {
-  private val minerBalance        = miner.fold(0L)(i => endorsers(i.toInt)._3)
-  private val totalBalance        = endorsers.foldLeft(BigInt(0L)) { case (r, (_, _, b)) => r + b }
-  private val doubledTotalBalance = totalBalance * 2
+  private val minerBalance = miner.fold(0L)(i => endorsers(i.toInt)._3)
+  private val totalBalance = endorsers.foldLeft(BigInt(0L)) { case (r, (_, _, b)) => r + b } -
+    conflict.view.map(i => endorsers(i.toInt)._3).sum
 
   override def toString: String = {
     val endorsersStr = endorsers.view.map { case (addr, _, b) => s"($addr, $b)" }.mkString(", ")
@@ -38,6 +40,9 @@ case class EndorsementFilter(
       gi = GeneratorIndex(i)
       if !(conflict.contains(gi) || newConflictIndexes.contains(i))
     } yield (GeneratorIndex(i), blsPk, balance): Item
+
+    val totalBalanceWithoutNewConflict = totalBalance - newConflictIndexes.view.map(endorsers(_)._3).sum
+    val doubledTotalBalance            = totalBalanceWithoutNewConflict * 2
 
     val richest = mutable.PriorityQueue.empty[Item](using Ordering.by(-_.balance))
     richest.addAll(items)

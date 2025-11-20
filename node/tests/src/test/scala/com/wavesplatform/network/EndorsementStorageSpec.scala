@@ -177,16 +177,29 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         }
       }
 
-      "when reached or lost finalization due to conflict vote" in {
-        val s = started(minerIndex = 3, defaultGenerators)
+      "when reached finalization" - {
+        "because of conflict vote" in {
+          val s = started(minerIndex = 3, defaultGenerators)
 
-        log.debug("reached finalization")
-        s.addValidVote(0, 1)
-        s.checkTryCollect(expectedEndorsedId, Seq(0, 1))
+          log.debug("conflict votes reduce required balance to finalization")
+          s.addConflictVote(1, 2)
 
-        log.debug("lost finalization, removes from valid")
-        s.addConflictVote(0)
-        s.checkTryCollect(expectedEndorsedId, conflict = Seq(0))
+          log.debug("reached finalization")
+          s.addValidVote(0) // and 3
+          s.checkTryCollect(expectedEndorsedId, valid = Seq(0), conflict = Seq(1, 2))
+        }
+
+        "and lost finalization because of conflict votes" in {
+          val s = started(minerIndex = 3, defaultGenerators)
+
+          log.debug("reached finalization because of valid votes")
+          s.addValidVote(0, 1)
+          s.checkTryCollect(expectedEndorsedId, Seq(0, 1))
+
+          log.debug("lost finalization, removes from valid")
+          s.addConflictVote(0, 1)
+          s.checkTryCollect(expectedEndorsedId, conflict = Seq(0, 1))
+        }
       }
 
       "when got a new conflict vote" - {
@@ -198,7 +211,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         }
 
         "even insufficient valid votes" in {
-          val s = started(minerIndex = 3, defaultGenerators)
+          val s = started(minerIndex = 3, mkGenerators(5))
 
           s.addValidVote(0)
           s.addConflictVote(2)
@@ -209,11 +222,13 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
           val s = started(minerIndex = 3, defaultGenerators)
 
           s.addValidVote(0, 1)
-          s.checkTryCollect(expectedEndorsedId, valid = Seq(0, 1)) // Resets "hasChanges"
+          s.checkTryCollect(expectedEndorsedId, valid = Seq(0, 1))
 
           log.debug("after finalization")
           s.addConflictVote(2)
-          s.checkTryCollect(expectedEndorsedId, valid = Seq(0, 1), conflict = Seq(2))
+
+          // 0 and 3 enough for finalization, because generator set is: 0, 1, 3
+          s.checkTryCollect(expectedEndorsedId, valid = Seq(0), conflict = Seq(2))
         }
       }
     }
@@ -243,11 +258,13 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
   class ExtendedEndorsementStorage(inner: EndorsementStorage, generators: IndexedSeq[GeneratorBalance]) {
     export inner.*
 
-    def addValidVote(generatorIndex: Int*): Either[String, Boolean] = generatorIndex.traverse(addVote(_, expectedFinalizedId)).map(_.last)
+    def addValidVote(generatorIndexes: Int*): Either[String, Boolean]    = addVotes(expectedFinalizedId, generatorIndexes)
+    def addConflictVote(generatorIndexes: Int*): Either[String, Boolean] = addVotes(unexpectedFinalizedId, generatorIndexes)
 
-    def addConflictVote(generatorIndex: Int): Either[String, Boolean] = addVote(generatorIndex, unexpectedFinalizedId)
+    def addVotes(finalizedId: BlockId, generatorIndexes: Seq[Int]): Either[String, Boolean] =
+      generatorIndexes.traverse((generatorIndex: Int) => addVote(finalizedId, generatorIndex)).map(_.last)
 
-    def addVote(generatorIndex: Int, finalizedId: BlockId): Either[String, Boolean] = tryAddEndorsement(
+    def addVote(finalizedId: BlockId, generatorIndex: Int): Either[String, Boolean] = tryAddEndorsement(
       BlockEndorsement
         .signed(generators(generatorIndex).blsKp, GeneratorIndex(generatorIndex), finalizedId, expectedFinalizedHeight, expectedEndorsedId)
     )
