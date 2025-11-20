@@ -184,7 +184,7 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
   }
 
   private def mkConflictGenerators(h: Int, idxs: Int*): ConflictGenerators =
-    ConflictGenerators.empty.appendAll(Height(h), GeneratorIndex.fromInts(idxs))
+    ConflictGenerators.empty.appendAll(Height(h), GeneratorIndex.seq(idxs)*)
 
   private def bs(height: Int, regularBalance: Long, deposits: Int = 0, punished: Boolean = false): BalanceSnapshot =
     BalanceSnapshot(height, regularBalance, 0L, 0L, CommitToGenerationTransaction.DepositInWavelets * deposits, punished)

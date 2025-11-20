@@ -5,13 +5,9 @@ import com.wavesplatform.state
 import scala.collection.Searching.*
 import scala.collection.View
 
+/** Stores indexes of conflict generators by height in one generation epoch */
 case class ConflictGenerators private (private val heights: Vector[Height], private val generators: Vector[Seq[GeneratorIndex]]) {
-  def append(h: Height, idx: GeneratorIndex): ConflictGenerators = {
-    require(heights.isEmpty || implicitly[Ordering[Height]].lt(heights.last, h), s"height $h must increase, last height: ${heights.last}")
-    appendAllUnsafe(h, Seq(idx))
-  }
-
-  def appendAll(h: Height, idxs: Seq[GeneratorIndex]): ConflictGenerators = {
+  def appendAll(h: Height, idxs: GeneratorIndex*): ConflictGenerators = {
     require(
       idxs.isEmpty || heights.isEmpty || implicitly[Ordering[Height]].lt(heights.last, h),
       s"height $h must increase, last height: ${heights.last}"
@@ -22,9 +18,7 @@ case class ConflictGenerators private (private val heights: Vector[Height], priv
 
   private def appendAllUnsafe(h: Height, idxs: Seq[GeneratorIndex]): ConflictGenerators = copy(
     heights = heights :+ h,
-    generators =
-      if (generators.isEmpty) Vector(idxs)
-      else generators.init :+ (generators.last ++ idxs)
+    generators = generators :+ idxs
   )
 
   def isEmpty: Boolean = generators.isEmpty

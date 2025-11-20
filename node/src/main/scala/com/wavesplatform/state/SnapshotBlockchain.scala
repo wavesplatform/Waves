@@ -274,7 +274,7 @@ case class SnapshotBlockchain(
         c              <- v.conflict
       } yield c.endorserIndex
 
-      base.appendAll(Height(height), extraConflictIndexes)
+      base.appendAll(Height(height), extraConflictIndexes*)
     } else base
   }
 

@@ -101,7 +101,7 @@ class BlocksApiRouteSpec
       header = orig.header.copy(
         finalizationVoting = Some(
           FinalizationVoting(
-            valid = GeneratorIndex.unsafeFromInts(Seq(1, 0)),
+            valid = GeneratorIndex.unsafeSeq(Seq(1, 0)),
             aggregatedEndorsement = BlsSignature.NonEmpty(Array.fill[Byte](BlsSignature.SizeInBytes)(1)),
             conflict = Vector(
               BlockEndorsement(

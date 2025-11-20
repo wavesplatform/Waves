@@ -14,7 +14,7 @@ object PBFinalizationVotings {
       else BlsSignature(pb.aggregatedEndorsementSignature.toByteArray).explicitGet()
 
     VanillaFinalizationVoting(
-      GeneratorIndex.fromInts(pb.endorserIndexes),
+      GeneratorIndex.seq(pb.endorserIndexes),
       pb.finalizedBlockHeight,
       aggSig,
       pb.conflictEndorsements.zipWithIndex.map { case (x, i) =>

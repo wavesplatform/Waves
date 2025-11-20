@@ -1655,7 +1655,7 @@ class RocksDBWriter(
       var r = ConflictGenerators.empty
       ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
         val h = Height(Ints.fromByteArray(dbEntry.getKey.takeRight(Ints.BYTES)))
-        r = r.appendAll(h, key.parse(dbEntry.getValue))
+        r = r.appendAll(h, key.parse(dbEntry.getValue)*)
       }
       r
     }

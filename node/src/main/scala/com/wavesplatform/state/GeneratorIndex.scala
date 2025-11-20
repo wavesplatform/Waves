@@ -12,12 +12,12 @@ object GeneratorIndex {
     Option.when(x >= 0)(x)
   }
 
+  def seq(xs: Seq[Int]): Seq[GeneratorIndex]       = xs.map(apply)
+  def unsafeSeq(xs: Seq[Int]): Seq[GeneratorIndex] = xs
+
   extension (self: GeneratorIndex) {
     def toInt: Int = self
   }
 
   def toInts(xs: Seq[GeneratorIndex]): Seq[Int] = xs
-
-  def fromInts(xs: Seq[Int]): Seq[GeneratorIndex]       = xs.map(apply)
-  def unsafeFromInts(xs: Seq[Int]): Seq[GeneratorIndex] = xs
 }

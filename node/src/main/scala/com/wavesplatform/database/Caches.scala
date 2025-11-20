@@ -386,7 +386,7 @@ abstract class Caches extends Blockchain with Storage {
 
         if (conflictGenerators.nonEmpty)
           conflictGeneratorsCache = conflictGeneratorsCache.updatedWith(currPeriod) { orig =>
-            Some(orig.getOrElse(ConflictGenerators.empty).appendAll(current.height, conflictGenerators))
+            Some(orig.getOrElse(ConflictGenerators.empty).appendAll(current.height, conflictGenerators*))
           }
     }
 
