@@ -72,7 +72,7 @@ object CommonAccountsApi {
           BalanceDetails(
             portfolio.balance,
             blockchain.generatingBalance(address),
-            portfolio.balance - portfolio.lease.out,
+            portfolio.balance - portfolio.generationDeposit - portfolio.lease.out,
             effectiveBalance,
             portfolio.lease.in,
             portfolio.lease.out

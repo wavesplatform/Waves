@@ -167,7 +167,7 @@ class WavesEnvironment(
       isBanned  = currentBlockchain().hasBannedEffectiveBalance(address)
       effectiveBalance <- portfolio.effectiveBalance(isBanned)
     } yield Environment.BalanceDetails(
-      portfolio.balance - portfolio.lease.out,
+      portfolio.balance - portfolio.lease.out - portfolio.generationDeposit,
       portfolio.balance,
       if (blockchain.isFeatureActivated(LightNode))
         currentBlockchain().generatingBalance(address)

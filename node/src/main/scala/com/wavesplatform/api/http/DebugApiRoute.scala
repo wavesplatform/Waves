@@ -326,9 +326,10 @@ object DebugApiRoute {
     Writes { pf =>
       JsObject(
         Map(
-          "balance" -> JsNumber(pf.balance),
-          "lease"   -> Json.toJson(pf.lease),
-          "assets"  -> Json.toJson(pf.assets)
+          "balance"           -> JsNumber(pf.balance),
+          "lease"             -> Json.toJson(pf.lease),
+          "assets"            -> Json.toJson(pf.assets),
+          "generationDeposit" -> JsNumber(pf.generationDeposit)
         )
       )
     }
