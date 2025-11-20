@@ -183,10 +183,8 @@ object BlockDiffer {
         totalMinerPortfolio = Map(block.sender.toAddress -> totalMinerReward)
         nonMinerRewardPortfolios <- Portfolio.combine(daoPortfolio, xtnBuybackPortfolio)
         totalRewardPortfolios    <- Portfolio.combine(totalMinerPortfolio, nonMinerRewardPortfolios)
-        withPenaltiesPortfolios <- Portfolio.combine(
-          calculatePenalties(blockchain, maybePrevBlock.flatMap(_.header.finalizationVoting)),
-          totalRewardPortfolios
-        )
+        penalties                <- calculatePenalties(blockchain, maybePrevBlock.flatMap(_.header.finalizationVoting))
+        withPenaltiesPortfolios  <- Portfolio.combine(penalties, totalRewardPortfolios)
         patchesSnapshot = leasePatchesSnapshot(blockchainWithNewBlock)
         resultSnapshot <- patchesSnapshot.addBalances(withPenaltiesPortfolios, blockchainWithNewBlock)
       } yield resultSnapshot
@@ -288,18 +286,24 @@ object BlockDiffer {
     } yield r
   }
 
-  private def calculatePenalties(blockchain: Blockchain, finalizationVoting: Option[FinalizationVoting]): Map[Address, Portfolio] =
-    blockchain.currentGenerationPeriod.fold(Map.empty) { currPeriod =>
+  private def calculatePenalties(blockchain: Blockchain, finalizationVoting: Option[FinalizationVoting]): Either[String, Map[Address, Portfolio]] = {
+    val empty = Map.empty[Address, Portfolio].asRight[String]
+    blockchain.currentGenerationPeriod.fold(empty) { currPeriod =>
       lazy val committed = blockchain.committedGenerators(currPeriod)
       val conflictEndorsers = for {
-        v <- finalizationVoting.toSeq.view
+        v <- finalizationVoting.toSeq
         c <- v.conflict
       } yield committed(c.endorserIndex.toInt)._1
 
-      conflictEndorsers.foldLeft(Map.empty) { case (r, addr) =>
-        r.updated(addr, Portfolio.waves(-CommitToGenerationTransaction.DepositInWavelets))
+      conflictEndorsers.foldLeft(empty) {
+        case (r @ Left(_), _) => r
+        case (Right(r), addr) =>
+          val orig    = r.getOrElse(addr, Portfolio.empty)
+          val updated = orig.combine(Portfolio.waves(-CommitToGenerationTransaction.DepositInWavelets))
+          updated.map(r.updated(addr, _))
       }
     }
+  }
 
   def maybeApplySponsorship(blockchain: Blockchain, sponsorshipEnabled: Boolean, transactionFee: (Asset, Long)): (Asset, Long) =
     transactionFee match {
@@ -334,8 +338,9 @@ object BlockDiffer {
         xtnBuybackAddress.map(_ -> Portfolio.waves(rewardShares.xtnBuybackAddress))
       withRewards <- StateSnapshot.build(blockchain, portfolios = resultPf.filterNot(_._2.isEmpty))
 
-      penaltiesPf = blockchain.lastBlockHeader.fold(Map.empty) { lastBlockHeader =>
-        calculatePenalties(blockchain, lastBlockHeader.header.finalizationVoting)
+      penaltiesPf <- blockchain.lastBlockHeader match {
+        case None                  => Map.empty.asRight
+        case Some(lastBlockHeader) => calculatePenalties(blockchain, lastBlockHeader.header.finalizationVoting).leftMap(GenericError(_))
       }
       withPenalties <- withRewards.addBalances(penaltiesPf, blockchain).leftMap(GenericError(_))
     } yield withPenalties

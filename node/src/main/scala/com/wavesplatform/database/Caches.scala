@@ -216,7 +216,7 @@ abstract class Caches extends Blockchain with Storage {
   override def activatedFeatures: Map[Short, Height] = activatedFeaturesCache
 
   @volatile
-  private var committedGeneratorsCache = Map.empty[GenerationPeriod, IndexedSeq[(Address, BlsPublicKey)]]
+  private var committedGeneratorsCache = Map.empty[GenerationPeriod, IndexedSeq[(Address, BlsPublicKey)]] // Only this and next periods
   override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] =
     this.currentGenerationPeriod.fold(Vector.empty) { curr =>
       if (at == curr || at == curr.next) {
