@@ -36,7 +36,7 @@ class BlockchainUpdaterImpl(
     wavesSettings: WavesSettings,
     time: Time,
     blockchainUpdateTriggers: BlockchainUpdateTriggers,
-    collectActiveLeases: (Int, Int) => Map[ByteStr, LeaseDetails],
+    collectActiveLeases: (Height, Height) => Map[ByteStr, LeaseDetails],
     miner: Miner = _ => ()
 ) extends Blockchain
     with BlockchainUpdater
@@ -112,14 +112,14 @@ class BlockchainUpdaterImpl(
   override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo
 
   private def featuresApprovedWithBlock(block: Block): Set[Short] = {
-    val height = Height(rocksdb.height + 1)
+    val height = rocksdb.height + 1
 
     val featuresCheckPeriod        = functionalitySettings.activationWindowSize(height)
     val blocksForFeatureActivation = functionalitySettings.blocksForFeatureActivation(height)
 
     if (height % featuresCheckPeriod == 0) {
       val approvedFeatures = rocksdb
-        .featureVotes(height)
+        .featureVotes(Height(height))
         .map { case (feature, votes) => feature -> (if (block.header.featureVotes.contains(feature)) votes + 1 else votes) }
         .filter { case (_, votes) => votes >= blocksForFeatureActivation }
         .keySet
@@ -154,9 +154,9 @@ class BlockchainUpdaterImpl(
 
   def computeNextReward: Option[Long] = {
     val settings   = this.settings.rewardsSettings
-    val nextHeight = this.height + 1
+    val nextHeight = Height(this.height + 1)
 
-    if (height == 0 && rocksdb.featureActivationHeight(BlockchainFeatures.ConsensusImprovements).exists(_ <= 1))
+    if (height == 0 && rocksdb.featureActivationHeight(BlockchainFeatures.ConsensusImprovements).exists(_ <= Height(1)))
       None
     else
       rocksdb
@@ -337,7 +337,7 @@ class BlockchainUpdaterImpl(
                     if (!verify || referencedForgedBlock.signatureValid()) {
                       val referencedForgedBlockParentHeight = Height(rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0))
 
-                      val constraint = MiningConstraints(rocksdb, referencedForgedBlockParentHeight).total
+                      val constraint = MiningConstraints(rocksdb, referencedForgedBlockParentHeight.toInt).total
 
                       val prevReward = ng.reward
                       val reward     = computeNextReward
@@ -449,9 +449,9 @@ class BlockchainUpdaterImpl(
                     featuresApprovedWithBlock(block),
                     reward,
                     hitSource,
-                    cancelLeases(collectLeasesToCancel(newHeight), newHeight),
-                    latestFinalizedHeight = finalizedHeight,
-                    latestGeneratorBalances = generatorBalances
+                    cancelLeases(collectLeasesToCancel(newHeight), Height(newHeight)),
+                    finalizedHeight,
+                    generatorBalances
                   )
                 )
 
@@ -477,7 +477,7 @@ class BlockchainUpdaterImpl(
     */
   private def calculateFinalizationHeight(votingBlockchain: Blockchain): Option[Height] = votingBlockchain.lastBlockHeader.flatMap { votingBlock =>
     val votingHeight   = Height(votingBlockchain.height)
-    val endorsedHeight = Height(votingHeight - 1) // Will be finalized or not
+    val endorsedHeight = votingHeight - 1 // Will be finalized or not
 
     def shouldFinalizeByVoting(): Boolean = votingBlockchain.generationPeriodOf(votingHeight).fold(false) { votingPeriod =>
       val logPrefix         = s"Finalization of $endorsedHeight:"
@@ -535,11 +535,11 @@ class BlockchainUpdaterImpl(
 
   private def collectLeasesToCancel(newHeight: Int): Map[ByteStr, LeaseDetails] =
     if (rocksdb.isFeatureActivated(BlockchainFeatures.LeaseExpiration, newHeight)) {
-      val toHeight = newHeight - rocksdb.settings.functionalitySettings.leaseExpiration
+      val toHeight = Height(newHeight - rocksdb.settings.functionalitySettings.leaseExpiration)
       val fromHeight = rocksdb.featureActivationHeight(BlockchainFeatures.LeaseExpiration) match {
-        case Some(`newHeight`) =>
+        case Some(h) if Height(newHeight) == h =>
           log.trace(s"Collecting leases created up till height $toHeight")
-          1
+          Height(1)
         case _ =>
           log.trace(s"Collecting leases created at height $toHeight")
           toHeight
@@ -547,7 +547,7 @@ class BlockchainUpdaterImpl(
       collectActiveLeases(fromHeight, toHeight)
     } else Map.empty
 
-  private def cancelLeases(leaseDetails: Map[ByteStr, LeaseDetails], height: Int): Map[ByteStr, StateSnapshot] =
+  private def cancelLeases(leaseDetails: Map[ByteStr, LeaseDetails], height: Height): Map[ByteStr, StateSnapshot] =
     for {
       (id, ld) <- leaseDetails
     } yield id -> StateSnapshot
@@ -576,12 +576,12 @@ class BlockchainUpdaterImpl(
         for {
           height <- rocksdb.heightOf(blockId).toRight(GenericError(s"No such block $blockId"))
           _ <- Either.cond(
-            height >= rocksdb.safeRollbackHeight,
+            Height(height) >= rocksdb.safeRollbackHeight,
             (),
             GenericError(s"Rollback is possible only to the block at the height ${rocksdb.safeRollbackHeight}")
           )
           _ = blockchainUpdateTriggers.onRollback(this, blockId, height)
-          blocks <- rocksdb.rollbackTo(height).leftMap(GenericError(_))
+          blocks <- rocksdb.rollbackTo(Height(height)).leftMap(GenericError(_))
         } yield {
           ngState = None
           val liquidBlockData = maybeNg.map { ng =>
@@ -698,13 +698,13 @@ class BlockchainUpdaterImpl(
   }
 
   override def activatedFeatures: Map[Short, Height] = readLock {
-    (newlyApprovedFeatures.view.mapValues(h => Height(h + functionalitySettings.activationWindowSize(height))) ++ rocksdb.activatedFeatures).toMap
+    (newlyApprovedFeatures.view.mapValues(h => h + functionalitySettings.activationWindowSize(height)) ++ rocksdb.activatedFeatures).toMap
   }
 
   override def featureVotes(height: Height): Map[Short, Int] = readLock {
     val innerVotes = rocksdb.featureVotes(height)
     ngState match {
-      case Some(ng) if this.height <= height =>
+      case Some(ng) if Height(this.height) <= height =>
         val ngVotes = ng.base.header.featureVotes.map { featureId =>
           featureId -> (innerVotes.getOrElse(featureId, 0) + 1)
         }.toMap
@@ -723,13 +723,13 @@ class BlockchainUpdaterImpl(
 
   override def blockRewardVotes(height: Int): Seq[Long] = readLock {
     activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
-      case Some(activatedAt) if activatedAt <= height =>
+      case Some(activatedAt) if activatedAt <= Height(height) =>
         ngState match {
           case None => rocksdb.blockRewardVotes(height)
           case Some(ng) =>
             val innerVotes = rocksdb.blockRewardVotes(height)
-            val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= height)
-            if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt, height, modifyTerm).contains(height))
+            val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= Height(height))
+            if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt.toInt, height, modifyTerm).contains(height))
               innerVotes :+ ng.base.header.rewardVote
             else innerVotes
         }
@@ -742,7 +742,7 @@ class BlockchainUpdaterImpl(
       case Some(ng) if this.height == height =>
         val parentConflictEndorsements = rocksdb.lastBlockHeader.flatMap(_.header.finalizationVoting).fold(0)(_.conflict.size)
         rocksdb.wavesAmount(height - 1) +
-          BigInt(ng.reward.getOrElse(0L)) * this.blockRewardBoost(height) -
+          BigInt(ng.reward.getOrElse(0L)) * this.blockRewardBoost(Height(height)) -
           parentConflictEndorsements * CommitToGenerationTransaction.DepositInWavelets
       case _ =>
         rocksdb.wavesAmount(height)
@@ -759,7 +759,7 @@ class BlockchainUpdaterImpl(
 
   override def finalizedHeightAt(at: Height): Option[Height] = readLock {
     ngState
-      .filter(_ => at == height)
+      .filter(_ => at == Height(height))
       .map(_.latestFinalizedHeight)
       .orElse(rocksdb.finalizedHeightAt(at))
   }

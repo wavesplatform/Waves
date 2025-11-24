@@ -1,0 +1,63 @@
+name: Publish aptly repo
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  create-aptly-repo:
+    environment:
+      name: aptly-repo
+      url: https://apt.wavesplatform.com
+    env:
+      APTLY_VERSION: 1.6.2
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up cache path
+        id: cache-aptly-path
+        run: |
+          echo "aptly_toolpath=$RUNNER_TOOL_CACHE/aptly/$APTLY_VERSION" >> "$GITHUB_OUTPUT"
+          echo "aptly_downloadpath=$RUNNER_TEMP/aptly" >> "$GITHUB_OUTPUT"
+          echo "aptly_cachekey=aptly-$APTLY_VERSION" >> "$GITHUB_OUTPUT"
+      - name: Cache aptly
+        id: cache-aptly
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.cache-aptly-path.outputs.aptly_toolpath }}
+          key: ${{ steps.cache-aptly-path.outputs.aptly_cachekey }}
+      - name: Get aptly
+        if: steps.cache-aptly.outputs.cache-hit == 'false'
+        env:
+          APTLY_DOWNLOADPATH: ${{ steps.cache-aptly-path.outputs.aptly_downloadpath }}
+          APTLY_TOOLPATH: ${{ steps.cache-aptly-path.outputs.aptly_toolpath }}
+        run: |
+          mkdir -p "$APTLY_DOWNLOADPATH" "$APTLY_TOOLPATH"
+          wget -nv "https://github.com/aptly-dev/aptly/releases/download/v$APTLY_VERSION/aptly_${APTLY_VERSION}_linux_amd64.zip" -O "$APTLY_DOWNLOADPATH/aptly_${APTLY_VERSION}_linux_amd64.zip"
+          unzip "$APTLY_DOWNLOADPATH/aptly_${APTLY_VERSION}_linux_amd64.zip" -d "$APTLY_TOOLPATH"
+      - name: Setup PATH
+        env:
+          APTLY_TOOLPATH: ${{ steps.cache-aptly-path.outputs.aptly_toolpath }}
+        run: |
+          cd "$APTLY_TOOLPATH"
+          ls -la aptly_${APTLY_VERSION}_linux_amd64/aptly
+          echo "$PWD/aptly_${APTLY_VERSION}_linux_amd64" >> "$GITHUB_PATH"
+      - uses: actions/checkout@v4
+      - run: ./.github/workflows/create-aptly-repo.sh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: /home/runner/.aptly/public
+      - uses: actions/deploy-pages@v4

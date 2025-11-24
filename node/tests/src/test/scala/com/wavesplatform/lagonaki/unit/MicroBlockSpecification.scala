@@ -78,7 +78,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
     val finalizationVoting = Some(
       FinalizationVoting(
         valid = Seq(GeneratorIndex(1), GeneratorIndex(2), GeneratorIndex(3)),
-        finalizedHeight = finalizedHeight.toInt,
+        finalizedHeight = finalizedHeight,
         aggregatedEndorsement = aggregatedEndorsement,
         conflict = conflictEndorsements
       )

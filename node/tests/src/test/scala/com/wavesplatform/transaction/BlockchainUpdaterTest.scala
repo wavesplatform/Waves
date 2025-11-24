@@ -35,6 +35,8 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
     )
   )
 
+  private def fm(elems: (Int, Int)*): Map[Short, Height] = elems.map { case (id, h) => id.toShort -> Height(h)}.toMap
+  
   def appendBlock(block: Block, blockchainUpdater: BlockchainUpdater & Blockchain): Unit = {
     blockchainUpdater.processBlock(block)
   }
@@ -138,8 +140,8 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
     def check(
         b: CompleteBlockchainUpdater,
         height: Int,
-        approvedFeatures: Map[Int, Int] = Map.empty,
-        activatedFeatures: Map[Int, Int] = Map.empty
+        approvedFeatures: Map[Short, Height] = Map.empty,
+        activatedFeatures: Map[Short, Height] = Map.empty
     )(implicit pos: Position): Unit = {
       b.height shouldBe height
       withClue("approved:") {
@@ -161,8 +163,8 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
       check(
         b,
         ApprovalPeriod,
-        approvedFeatures = Map(1 -> ApprovalPeriod),
-        activatedFeatures = Map(1 -> ApprovalPeriod * 2)
+        approvedFeatures = fm(1 -> ApprovalPeriod),
+        activatedFeatures = fm(1 -> ApprovalPeriod * 2)
       )
 
       markup("Approving the second feature without voting for first feature")
@@ -170,8 +172,8 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
       check(
         b,
         ApprovalPeriod * 2,
-        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
-        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+        approvedFeatures = fm(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = fm(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
       )
 
       markup("Activating the second feature")
@@ -179,8 +181,8 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
       check(
         b,
         ApprovalPeriod * 3,
-        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
-        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+        approvedFeatures = fm(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = fm(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
       )
     }
 
@@ -196,8 +198,8 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
       check(
         b,
         ApprovalPeriod * 2,
-        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
-        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+        approvedFeatures = fm(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = fm(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
       )
 
       markup("Activating the second feature")
@@ -205,8 +207,8 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
       check(
         b,
         ApprovalPeriod * 3,
-        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
-        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+        approvedFeatures = fm(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = fm(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
       )
     }
 
@@ -228,13 +230,13 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
       check(
         b,
         ApprovalPeriod * 4,
-        approvedFeatures = Map(
+        approvedFeatures = fm(
           1 -> ApprovalPeriod,
           2 -> ApprovalPeriod * 2,
           3 -> ApprovalPeriod * 3,
           4 -> ApprovalPeriod * 4
         ),
-        activatedFeatures = Map(
+        activatedFeatures = fm(
           1 -> ApprovalPeriod * 2,
           2 -> ApprovalPeriod * 3,
           3 -> ApprovalPeriod * 4,
@@ -248,8 +250,8 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
       check(
         b,
         rollbackHeight,
-        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
-        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+        approvedFeatures = fm(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = fm(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
       )
 
       markup("Appending blocks without votes to reach the previous height")
@@ -257,8 +259,8 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
       check(
         b,
         ApprovalPeriod * 4,
-        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
-        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+        approvedFeatures = fm(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = fm(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
       )
     }
   }

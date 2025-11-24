@@ -638,6 +638,8 @@ object Docker {
     override def networkAddress: InetSocketAddress = nodeInfo.containerNetworkAddress
 
     def getConfig: Config = config
+
+    override def networkAddressAccessibleFromHost: InetSocketAddress = nodeInfo.hostNetworkAddress
   }
 
   private val debuggerPort            = new AtomicInteger(11000)

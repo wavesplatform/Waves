@@ -831,7 +831,6 @@ case class Block(
     version: Option[Byte] = None
 )
 object Block {
-  import PublicKey.*
 
   implicit val blockFormat: Format[Block] = Format(
     Reads(jsv =>

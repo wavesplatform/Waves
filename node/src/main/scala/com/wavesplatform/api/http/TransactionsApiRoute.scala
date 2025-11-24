@@ -15,7 +15,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.utils.Time
@@ -112,8 +112,8 @@ case class TransactionsApiRoute(
       case Some((tm, _)) =>
         Json.obj(
           "status"        -> Confirmed,
-          "height"        -> JsNumber(tm.height),
-          "confirmations" -> (blockchain.height - tm.height).max(0)
+          "height"        -> tm.height.toInt,
+          "confirmations" -> (blockchain.height - tm.height.toInt).max(0)
         ) ++ serializer.metaJson(tm)
       case None =>
         commonApi.unconfirmedTransactionById(id) match {

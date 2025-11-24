@@ -15,6 +15,7 @@ import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{TxExchangePrice, TxVersion}
@@ -71,9 +72,11 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   test("reject failed transaction before activation height") {
     overflowBlock()
     sender.waitForHeight(
-      sender
-        .waitForTransaction(sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false)).id)
-        .height + 1
+      Height(
+        sender
+          .waitForTransaction(sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false)).id)
+          .height + 1
+      )
     )
 
     assertApiErrorRaised(sender.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee))
@@ -85,7 +88,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     def check(): Unit = {
       val txInfo   = sender.transactionInfo[JsObject](tx)
-      val txHeight = (txInfo \ "height").as[Int]
+      val txHeight = (txInfo \ "height").as[Height]
       (txInfo \ "id").as[String] shouldBe tx
       txInfo.value.contains("applicationStatus") shouldBe false
       val block = sender.blockAt(txHeight)
@@ -98,7 +101,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     nodes.waitForHeightArise()
     check() // hardened
-    all(sender.blockSeqByAddress(sender.address, 1, sender.height).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
+    all(sender.blockSeqByAddress(sender.address, Height(1), sender.height).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
   }
 
   test("accept failed transaction after activation height") {
@@ -134,7 +137,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       val heightToId            = statuses.map(s => s.height.get -> s.id).toMap
       val idToApplicationStatus = statuses.map(s => s.id -> s.applicationStatus).toMap
       heightToId.keys.foreach { h =>
-        val block = sender.blockAt(h)
+        val block = sender.blockAt(Height(h))
         block.transactions.foreach { tx =>
           tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
           if (tx._type == InvokeScriptTransaction.typeId) {
@@ -145,7 +148,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
         }
 
-        sender.blockSeq(h - 1, h).flatMap(_.transactions).foreach { tx =>
+        sender.blockSeq(Height(h - 1), Height(h)).flatMap(_.transactions).foreach { tx =>
           tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
         }
       }
@@ -489,7 +492,7 @@ object AcceptFailedScriptActivationSuite {
       .overrideBase(_.quorum(0))
       .overrideBase(
         _.preactivatedFeatures(
-          (BlockchainFeatures.BlockV5.id, if (activate) 0 else 9999)
+          (BlockchainFeatures.BlockV5.id, Height(if (activate) 0 else 9999))
         )
       )
       .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $UpdateInterval"))

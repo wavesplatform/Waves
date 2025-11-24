@@ -1046,10 +1046,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     simpleTradePreconditions.foreach { case (genesis, issue1, issue2, exchange) =>
       val exchangeWithResignedOrder = (exchange: @unchecked) match {
         case e1 @ ExchangeTransaction(TxVersion.V1, bo, so, _, _, _, _, _, _, _, _) =>
-          val newSig = crypto.sign(PrivateKey(so.senderPublicKey), bo.bodyBytes())
+          val newSig = crypto.sign(PrivateKey(so.senderPublicKey.byteStr), bo.bodyBytes())
           e1.copy(order1 = bo.withProofs(Proofs(Seq(newSig))))
         case e2 @ ExchangeTransaction(TxVersion.V2, bo, so, _, _, _, _, _, _, _, _) =>
-          val newSig = crypto.sign(PrivateKey(bo.senderPublicKey), so.bodyBytes())
+          val newSig = crypto.sign(PrivateKey(bo.senderPublicKey.byteStr), so.bodyBytes())
           e2.copy(order2 = so.withProofs(Proofs(Seq(newSig))))
       }
 
@@ -1200,8 +1200,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     simpleTradePreconditions.foreach { case (genesis, issue1, issue2, exchange) =>
       val newProofs = Proofs(
         Seq(
-          crypto.sign(PrivateKey(exchange.sender), exchange.sellOrder.bodyBytes()),
-          crypto.sign(PrivateKey(exchange.sellOrder.senderPublicKey), exchange.sellOrder.bodyBytes())
+          crypto.sign(PrivateKey(exchange.sender.byteStr), exchange.sellOrder.bodyBytes()),
+          crypto.sign(PrivateKey(exchange.sellOrder.senderPublicKey.byteStr), exchange.sellOrder.bodyBytes())
         )
       )
 

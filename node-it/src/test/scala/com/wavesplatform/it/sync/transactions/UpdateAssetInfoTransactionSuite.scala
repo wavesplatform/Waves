@@ -14,6 +14,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.assets.IssueTransaction.{MaxAssetDescriptionLength, MaxAssetNameLength, MinAssetNameLength}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{TransactionType, TxVersion}
@@ -135,16 +136,16 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     fee.feeAssetId shouldBe None
   }
 
-  var updateAssetInfoTxHeight: Int = -1
+  var updateAssetInfoTxHeight = Height(-1)
 
   test("able to update name/description of issued asset") {
     val nextTerm = sender.transactionInfo[TransactionInfo](assetId).height + updateInterval + 1
-    nodes.waitForHeight(nextTerm)
+    nodes.waitForHeight(Height(nextTerm))
     val issuerBalance       = sender.balanceDetails(issuer.publicKey.toAddress.toString)
     val updateAssetInfoTxId = notMiner.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)._1.id
     checkUpdateAssetInfoTx(notMiner.utx().head, "updatedName", "updatedDescription")
     miner.waitForTransaction(updateAssetInfoTxId)
-    updateAssetInfoTxHeight = sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height
+    updateAssetInfoTxHeight = Height(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height)
     checkUpdateAssetInfoTx(sender.blockAt(updateAssetInfoTxHeight).transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(sender.lastBlock().transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(
@@ -209,7 +210,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     }
   }
 
-  var secondUpdateInfoHeight = 0
+  var secondUpdateInfoHeight = Height(0)
 
   test("able to update info of other asset after updating info of first asset") {
     nodes.waitForHeightArise()
@@ -217,7 +218,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.waitForUtxIncreased(0)
     checkUpdateAssetInfoTx(sender.utx().head, "secondUpdate", "secondUpdatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)
-    secondUpdateInfoHeight = sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height
+    secondUpdateInfoHeight = Height(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height)
     checkUpdateAssetInfoTx(sender.blockAt(secondUpdateInfoHeight).transactions.head, "secondUpdate", "secondUpdatedDescription")
     checkUpdateAssetInfoTx(sender.lastBlock().transactions.head, "secondUpdate", "secondUpdatedDescription")
     checkUpdateAssetInfoTx(
@@ -255,11 +256,11 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
     sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
     sender.updateAssetInfo(issuer, assetId, firstUpdatedName, firstUpdatedDescription, waitForTx = true)._1.id
-    nodes.rollback(issueHeight - 1, returnToUTX = true)
+    nodes.rollback(Height(issueHeight - 1), returnToUTX = true)
 
     sender.waitForTransaction(assetId)
     val newIssueHeight = sender.transactionInfo[TransactionInfo](assetId).height
-    sender.waitForHeight(newIssueHeight + updateInterval + 1, 3.minutes)
+    sender.waitForHeight(Height(newIssueHeight + updateInterval + 1), 3.minutes)
     sender.updateAssetInfo(issuer, assetId, secondUpdatedName, secondUpdatedDescription, waitForTx = true)
 
     sender.assetsDetails(assetId).name shouldBe secondUpdatedName
@@ -395,7 +396,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     val updateAssetInfoTxId = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee)._1.id
     checkUpdateAssetInfoTx(sender.utx().head, "updatedName", "updatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)
-    val updateAssetInfoTxHeight = sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height
+    val updateAssetInfoTxHeight = Height(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height)
     checkUpdateAssetInfoTx(sender.blockAt(updateAssetInfoTxHeight).transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(sender.lastBlock().transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(

@@ -3,7 +3,7 @@ package com.wavesplatform.protobuf.block
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.protobuf.*
-import com.wavesplatform.state.GeneratorIndex
+import com.wavesplatform.state.{GeneratorIndex, Height}
 
 import scala.util.Try
 
@@ -15,7 +15,7 @@ object PBFinalizationVotings {
 
     VanillaFinalizationVoting(
       GeneratorIndex.seq(pb.endorserIndexes),
-      pb.finalizedBlockHeight,
+      Height(pb.finalizedBlockHeight),
       aggSig,
       pb.conflictEndorsements.zipWithIndex.map { case (x, i) =>
         BlsSignature(x.signature.toByteArray).map(PBEndorseBlocks.vanilla(x, _)) match {
@@ -29,7 +29,7 @@ object PBFinalizationVotings {
   def protobuf(v: VanillaFinalizationVoting): PBFinalizationVoting =
     new PBFinalizationVoting(
       GeneratorIndex.toInts(v.valid),
-      v.finalizedHeight,
+      v.finalizedHeight.toInt,
       v.aggregatedEndorsement.byteStr.toByteString,
       v.conflict.map(PBEndorseBlocks.protobuf)
     )

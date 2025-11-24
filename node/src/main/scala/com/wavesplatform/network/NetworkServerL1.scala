@@ -13,9 +13,9 @@ object NetworkServerL1 {
   def apply(
       settings: WavesSettings,
       lastBlockInfos: Observable[LastBlockInfo],
-      historyReplier: HistoryReplierL1,
+      historyReplier: HistoryReplier,
       peerDatabase: PeerDatabase,
-      messageObserver: MessageObserverL1,
+      messageObserver: MessageObserver,
       allChannels: ChannelGroup,
       peerInfo: ConcurrentHashMap[Channel, PeerInfo]
   ): NetworkServer = {
@@ -26,8 +26,8 @@ object NetworkServerL1 {
     } else PeerSynchronizer.Disabled
     val trafficWatcher    = new TrafficWatcher
     val discardingHandler = new DiscardingHandler(lastBlockInfos.map(_.ready), settings.enableLightMode)
-    val messageCodec      = new MessageCodecL1(peerDatabase)
-    val trafficLogger     = new TrafficLoggerL1(settings.networkSettings.trafficLogger)
+    val messageCodec      = new MessageCodec(peerDatabase)
+    val trafficLogger     = new BasicMessagesRepo.MessageLogger(settings.networkSettings.trafficLogger)
 
     NetworkServer(
       applicationName,

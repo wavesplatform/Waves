@@ -173,8 +173,8 @@ case class SnapshotBlockchain(
       } yield inner.conflictGenerators(p).hasInUpTo(h, idx)
 
       val bs         = BalanceSnapshot(h, Portfolio(balance, lease, generationDeposit = deposit), punished.getOrElse(false))
-      val height2Fix = h == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
-      if (inner.height > 0 && (from1 < h - 1 || height2Fix))
+      val height2Fix = h.toInt == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
+      if (inner.height > 0 && (from1 < h.toInt - 1 || height2Fix))
         bs +: inner.balanceSnapshots(address, from1, to)
       else
         Seq(bs)
@@ -337,7 +337,7 @@ object SnapshotBlockchain {
           sponsorship.getOrElse(0),
           static.nft,
           assetNum,
-          Height @@ height
+          Height(height)
         )
       }
       .orElse(

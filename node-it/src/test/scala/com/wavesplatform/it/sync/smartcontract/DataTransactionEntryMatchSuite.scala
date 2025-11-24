@@ -7,15 +7,15 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.sync.{setScriptFee, *}
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.state.{Height, StringDataEntry}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
-  private val activationHeight = 5
+  private val activationHeight = Height(5)
 
   private def compile(scriptText: String) =
     ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64

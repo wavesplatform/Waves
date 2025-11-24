@@ -56,11 +56,11 @@ case class NgState(
     reward: Option[Long],
     hitSource: ByteStr,
     leasesToCancel: Map[ByteStr, StateSnapshot],
+    latestFinalizedHeight: Height = GenesisBlockHeight,
+    latestGeneratorBalances: GeneratorBalances = Seq.empty,
     microSnapshots: Map[BlockId, CachedMicroDiff] = Map.empty,
     microBlocks: List[MicroBlockInfo] = List.empty, // Recent in the head
-    internalCaches: NgStateCaches = new NgStateCaches,
-    latestFinalizedHeight: Height = GenesisBlockHeight,
-    latestGeneratorBalances: GeneratorBalances = Seq.empty
+    internalCaches: NgStateCaches = new NgStateCaches
 ) {
   def cancelExpiredLeases(snapshot: StateSnapshot): StateSnapshot =
     leasesToCancel

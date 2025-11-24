@@ -4,15 +4,15 @@ import cats.implicits.catsSyntaxSemigroup
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.state.{Blockchain, LeaseBalance, LeaseDetails, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, LeaseDetails, StateSnapshot}
 import play.api.libs.json.{Json, OFormat}
 
 case object CancelAllLeases extends PatchAtHeight('W' -> 462000, 'T' -> 51500) {
   private[patch] case class LeaseData(senderPublicKey: String, amount: Long, recipient: String, id: String)
 
   private[patch] case class CancelledLeases(balances: Map[Address, LeaseBalance], cancelledLeases: Seq[LeaseData]) {
-    private val height: Int = patchHeight.getOrElse(0)
-    val leaseStates: Map[ByteStr, LeaseDetails.Status.Inactive] = cancelledLeases.map { data =>
+    private val height = Height(patchHeight.getOrElse(0))
+    val leaseStates: Map[ByteStr, LeaseDetails.Status & LeaseDetails.Status.Inactive] = cancelledLeases.map { data =>
       (ByteStr.decodeBase58(data.id).get, LeaseDetails.Status.Expired(height))
     }.toMap
   }

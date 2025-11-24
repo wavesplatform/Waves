@@ -9,18 +9,19 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.smartcontract.RideV4ActivationSuite.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.state.Height
 import org.scalatest.{Assertion, CancelAfterFailure}
 
 import scala.concurrent.duration.DurationInt
 
 class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val activationHeight = 6
+  private val activationHeight = Height(6)
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.Ride4DApps.id, 0)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.Ride4DApps.id, Height(0))))
       .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, activationHeight - 1)))
       .buildNonConflicting()
 

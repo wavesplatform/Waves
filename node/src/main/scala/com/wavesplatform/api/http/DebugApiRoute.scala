@@ -1,8 +1,5 @@
 package com.wavesplatform.api.http
 
-import org.apache.pekko.http.scaladsl.model.StatusCodes
-import org.apache.pekko.http.scaladsl.model.headers.Accept
-import org.apache.pekko.http.scaladsl.server.Route
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.account.{Address, PKKeyPair}
@@ -26,6 +23,9 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.headers.Accept
+import org.apache.pekko.http.scaladsl.server.Route
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
@@ -49,7 +49,7 @@ case class DebugApiRoute(
     rollbackTask: (ByteStr, Boolean) => Task[Either[ValidationError, Unit]],
     utxStorage: UtxPool,
     miner: Miner & MinerDebugInfo,
-    historyReplier: HistoryReplierL1,
+    historyReplier: HistoryReplier,
     extLoaderStateReporter: Coeval[RxExtensionLoader.State],
     mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
     scoreReporter: Coeval[RxScoreObserver.Stats],
@@ -256,7 +256,7 @@ case class DebugApiRoute(
 
   private def stateHashAt(height: Int): Route = {
     val result = for {
-      sh <- db.loadStateHash(height)
+      sh <- db.loadStateHash(Height(height))
       h  <- blockchain.blockHeader(height)
     } yield Json.toJson(sh).as[JsObject] ++ Json.obj(
       "snapshotHash" -> db.snapshotStateHash(height),
@@ -301,7 +301,7 @@ object DebugApiRoute {
 
   implicit val addressWrites: Writes[Address] = Writes((a: Address) => JsString(a.toString))
 
-  implicit val hrCacheSizesFormat: Format[HistoryReplierL1.CacheSizes]        = Json.format
+  implicit val hrCacheSizesFormat: Format[HistoryReplier.CacheSizes]          = Json.format
   implicit val mbsCacheSizesFormat: Format[MicroBlockSynchronizer.CacheSizes] = Json.format
   implicit val BigIntWrite: Writes[BigInt]                                    = (bigInt: BigInt) => JsNumber(BigDecimal(bigInt))
   implicit val scoreReporterStatsWrite: Writes[RxScoreObserver.Stats]         = Json.writes[RxScoreObserver.Stats]

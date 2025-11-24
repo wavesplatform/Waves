@@ -12,9 +12,9 @@ import play.api.libs.json.{JsObject, JsValue}
 
 trait DiffXInstances {
   given Diff[ByteStr]                        = Diff[String].contramap(_.toString)
-  given Diff[StringOrBytesAsByteArray]       = Diff[ByteStr].contramap(ByteStr(_))
+  given Diff[StringOrBytesAsByteArray]       = Diff[ByteStr].contramap(s => ByteStr(s.arr))
   given Diff[Script]                         = Diff[ByteStr].contramap(_.bytes())
-  given Diff[PublicKey]                      = Diff[ByteStr].contramap(x => x)
+  given Diff[PublicKey]                      = Diff[ByteStr].contramap(_.byteStr)
   given Diff[JsValue]                        = Diff.derived[JsValue]
   given Diff[JsObject]                       = Diff.derived[JsObject]
   given Diff[Address]                        = Diff[ByteStr].contramap(a => ByteStr(a.bytes))

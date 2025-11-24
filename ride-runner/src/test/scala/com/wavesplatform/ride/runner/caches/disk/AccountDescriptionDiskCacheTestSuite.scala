@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.caches.disk
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.ride.runner.caches.WeighedAssetDescription
 import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, ReadWrite}
-import com.wavesplatform.state.{AssetDescription, Height}
+import com.wavesplatform.state.{AssetDescription, Height, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.utils.StringBytes
@@ -13,7 +13,7 @@ class AccountDescriptionDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite
   protected override val defaultValue = WeighedAssetDescription(
     scriptWeight = 0,
     assetDescription = AssetDescription(
-      originTransactionId = defaultKey.id,
+      originTransactionId = TransactionId(defaultKey.id),
       issuer = alice.publicKey,
       name = "name".toByteString,
       description = "description".toByteString,
@@ -25,7 +25,7 @@ class AccountDescriptionDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite
       sponsorship = 0,
       nft = false,
       sequenceInBlock = 0,
-      issueHeight = Height @@ 0
+      issueHeight = Height(0)
     )
   )
 

@@ -40,8 +40,8 @@ object UtilApp {
   }
 
   case class CompileOptions(assetScript: Boolean = false)
-  case class SignOptions(privateKey: PrivateKey = null)
-  case class VerifyOptions(publicKey: PublicKey = null, signature: ByteStr = ByteStr.empty, checkWeakPk: Boolean = false)
+  case class SignOptions(privateKey: PrivateKey = null.asInstanceOf[PrivateKey])
+  case class VerifyOptions(publicKey: PublicKey = null.asInstanceOf[PublicKey], signature: ByteStr = ByteStr.empty, checkWeakPk: Boolean = false)
   case class HashOptions(mode: String = "fast")
   case class SignTxOptions(signerAddress: String = "", currentHeight: Height = Height(1), finalityActivationHeight: Option[Height] = None)
   case class KeyPairOptions(seedType: String = "account", nonce: Int = 0)
@@ -316,8 +316,12 @@ object UtilApp {
 
       val currentPeriod = for {
         finalityActivationHeight <- c.signTxOptions.finalityActivationHeight
-          .orElse(ns.settings.blockchainSettings.functionalitySettings.preActivatedFeatures.get(BlockchainFeatures.DeterministicFinality.id))
-        currentPeriod <- GenerationPeriod.from(c.signTxOptions.currentHeight, Height(finalityActivationHeight), ns.settings)
+          .orElse(
+            ns.settings.blockchainSettings.functionalitySettings.preActivatedFeatures
+              .get(BlockchainFeatures.DeterministicFinality.id)
+              .map(Height.apply)
+          )
+        currentPeriod <- GenerationPeriod.from(c.signTxOptions.currentHeight, finalityActivationHeight, ns.settings)
       } yield currentPeriod
 
       val signedTx = for {

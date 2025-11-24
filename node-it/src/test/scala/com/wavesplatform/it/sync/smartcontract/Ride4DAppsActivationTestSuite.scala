@@ -12,6 +12,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
+import com.wavesplatform.state.Height
 
 import scala.concurrent.duration.*
 
@@ -179,7 +180,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
 }
 
 object Ride4DAppsActivationTestSuite {
-  val activationHeight = 15
+  val activationHeight = Height(15)
 
   val configWithRide4DAppsFeature = NodeConfigs.newBuilder
     .withDefault(1)

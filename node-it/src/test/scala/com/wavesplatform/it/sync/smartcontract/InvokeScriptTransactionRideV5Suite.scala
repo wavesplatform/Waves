@@ -7,6 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.smartcontract.RideV4ActivationSuite.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
@@ -33,9 +34,9 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
       .overrideBase(_.quorum(0))
       .overrideBase(
         _.preactivatedFeatures(
-          (BlockchainFeatures.Ride4DApps.id, 0),
-          (BlockchainFeatures.BlockV5.id, 0),
-          (BlockchainFeatures.SynchronousCalls.id, 0)
+          (BlockchainFeatures.Ride4DApps.id, Height(0)),
+          (BlockchainFeatures.BlockV5.id, Height(0)),
+          (BlockchainFeatures.SynchronousCalls.id, Height(0))
         )
       )
       .withDefault(1)

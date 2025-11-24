@@ -48,7 +48,7 @@ object FeeValidation {
   )
 
   def apply(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {
-    if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
+    if (Height(blockchain.height) >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
         feeDetails <- getMinFee(blockchain, tx)
         _ <- Either.cond(
@@ -120,7 +120,7 @@ object FeeValidation {
   }
 
   private def feeAfterSponsorship(txAsset: Asset, blockchain: Blockchain, tx: Transaction): Either[ValidationError, FeeInfo] = {
-    if (blockchain.height < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
+    if (Height(blockchain.height) < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       // This could be true for private blockchains
       feeInUnits(blockchain, tx).map(x => FeeInfo(None, Chain.empty, x * FeeUnit))
     } else {

@@ -41,7 +41,8 @@ import monix.eval.Coeval
 
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
-  import stats.TxTimerExt
+
+  import com.wavesplatform.metrics.TxProcessingStats.measureForType
 
   def apply(
       blockchain: Blockchain,
@@ -119,7 +120,7 @@ object InvokeScriptDiff {
                   tx.txId,
                   tx.timestamp,
                   RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
-                  tx.sender,
+                  tx.sender.byteStr,
                   RideRecipient.Address(ByteStr(tx.dApp.bytes)),
                   None,
                   Some(tx.funcCall.function.funcName),
@@ -130,7 +131,7 @@ object InvokeScriptDiff {
                 ScriptTransfer(
                   Some(assetId),
                   RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
-                  tx.sender,
+                  tx.sender.byteStr,
                   RideRecipient.Address(ByteStr(tx.dApp.bytes)),
                   amount,
                   tx.timestamp,

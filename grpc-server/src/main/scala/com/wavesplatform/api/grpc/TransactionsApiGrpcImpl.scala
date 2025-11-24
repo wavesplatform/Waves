@@ -122,7 +122,7 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
             commonApi.transactionById(txId.toByteStr).map { m =>
               val status = applicationStatusFromTxStatus(m.status)
 
-              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height, status)
+              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height.toInt, status)
             }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
@@ -153,7 +153,7 @@ private object TransactionsApiGrpcImpl {
       case _                                     => None
     }
 
-    TransactionResponse(transactionId, meta.height, Some(meta.transaction.toPB), status, invokeScriptResult)
+    TransactionResponse(transactionId, meta.height.toInt, Some(meta.transaction.toPB), status, invokeScriptResult)
   }
 
   def applicationStatusFromTxStatus(status: TxMeta.Status): ApplicationStatus.Recognized =

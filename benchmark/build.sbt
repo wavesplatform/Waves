@@ -3,9 +3,9 @@ enablePlugins(JmhPlugin)
 Jmh / version := "1.37"
 
 libraryDependencies ++= Seq(
-  "org.scodec"             %% "scodec-core"         % "2.3.2",
+  "org.scodec"             %% "scodec-core"         % "2.3.3",
   "org.eclipse.collections" % "eclipse-collections" % "13.0.0",
-  "commons-codec"           % "commons-codec"       % "1.18.0",
+  "commons-codec"           % "commons-codec"       % "1.20.0",
   "org.apache.commons"      % "commons-lang3"       % "3.18.0"
 ) ++ Dependencies.logDeps
 

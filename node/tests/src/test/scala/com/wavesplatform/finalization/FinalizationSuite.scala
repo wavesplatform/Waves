@@ -45,7 +45,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       val endorsers = Seq(otherNode1Acc, thisNodeAcc)
       val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
@@ -76,7 +76,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
 
       log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.checkFinalizedHeight(3)
+      d.checkFinalizedHeight(Height(3))
     }
 
     "spending balance after voting doesn't affect finalization" in withDomain(
@@ -90,7 +90,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       val endorsers = Seq(otherNode1Acc, otherNode2Acc, thisNodeAcc)
       val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
@@ -127,7 +127,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
 
       log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.checkFinalizedHeight(3)
+      d.checkFinalizedHeight(Height(3))
     }
 
     "same finalized height if not voted" in withDomain(
@@ -140,7 +140,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       val endorsers = Seq(otherNode1Acc, thisNodeAcc)
       val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
@@ -171,7 +171,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       val endorsers = Seq(otherNode1Acc, thisNodeAcc)
       val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
@@ -189,7 +189,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
 
       log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.checkFinalizedHeight(3) // 5 - maxRollback = 3
+      d.checkFinalizedHeight(Height(3)) // 5 - maxRollback = 3
     }
 
     "increased with less votes after conflict endorsement" in withDomain(
@@ -203,7 +203,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       val endorsers = Seq(otherNode1Acc, otherNode2Acc, otherNode3Acc, thisNodeAcc)
       val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
@@ -246,14 +246,14 @@ class FinalizationSuite extends FreeSpec with WithDomain {
 
       log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.checkFinalizedHeight(3) // 5 - maxRollback = 3
+      d.checkFinalizedHeight(Height(3)) // 5 - maxRollback = 3
     }
   }
 
   extension (d: Domain)(using Position) {
-    def checkFinalizedHeight(h: Int = GenesisBlockHeight): Unit = {
-      d.blockchain.finalizedHeightAt().value shouldBe Height(h)
-      d.blockchain.finalizedHeight.value shouldBe Height(h)
+    def checkFinalizedHeight(h: Height = GenesisBlockHeight): Unit = {
+      d.blockchain.finalizedHeightAt().value shouldBe h
+      d.blockchain.finalizedHeight.value shouldBe h
     }
   }
 }

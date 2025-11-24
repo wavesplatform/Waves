@@ -5,6 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.*
@@ -72,7 +73,7 @@ class BalanceDiffValidationTest extends PropSpec with WithState {
 
     assertDiffEi(
       Seq(TestBlock.create(Seq(TxHelpers.genesis(TxHelpers.defaultAddress, amount = initBalance)))),
-      TestBlock.create(Seq(TxHelpers.commitToGeneration(generationPeriodStart = 4))),
+      TestBlock.create(Seq(TxHelpers.commitToGeneration(Height(4)))),
       settings
     ) { snapshotEi =>
       snapshotEi.explicitGet()
@@ -90,7 +91,7 @@ class BalanceDiffValidationTest extends PropSpec with WithState {
     assertDiffEi(
       Seq(
         TestBlock.create(Seq(TxHelpers.genesis(TxHelpers.defaultAddress, amount = initBalance))),
-        TestBlock.create(Seq(TxHelpers.commitToGeneration(generationPeriodStart = 4)))
+        TestBlock.create(Seq(TxHelpers.commitToGeneration(Height(4))))
       ),
       TestBlock.create(Seq(TxHelpers.transfer(amount = transferAmount))),
       settings

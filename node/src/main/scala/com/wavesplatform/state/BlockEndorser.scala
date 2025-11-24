@@ -28,16 +28,16 @@ object BlockEndorser {
       with StrictLogging {
     override def vote(): Unit = {
       val votingHeight   = Height(blockchain.height)
-      val endorsedHeight = Height(votingHeight - 1)
+      val endorsedHeight = votingHeight - 1
       if (endorsedHeight > GenesisBlockHeight) for {
         votingPeriod <- blockchain.generationPeriodOf(votingHeight).toSeq
 
-        votingBlockHeader   <- blockchain.blockHeader(votingHeight).toSeq
-        endorsedBlockHeader <- blockchain.blockHeader(endorsedHeight).toSeq
+        votingBlockHeader   <- blockchain.blockHeader(votingHeight.toInt).toSeq
+        endorsedBlockHeader <- blockchain.blockHeader(endorsedHeight.toInt).toSeq
 
-        finalizedHeight = blockchain.finalizedHeightAtOrFallback(votingHeight)
+        finalizedHeight = blockchain.finalizedHeightAtOrFallback(votingHeight.toInt)
         finalizedId <- blockchain
-          .blockId(finalizedHeight)
+          .blockId(finalizedHeight.toInt)
           .toSeq
 
         endorsedId = endorsedBlockHeader.id()

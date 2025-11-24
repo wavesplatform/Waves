@@ -9,7 +9,7 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.ConcurrentSubject
 
 @Sharable
-class MessageObserverL1 extends ChannelInboundHandlerAdapter {
+class MessageObserver extends ChannelInboundHandlerAdapter {
 
   private implicit val scheduler: SchedulerService = Schedulers.fixedPool(2, "message-observer")
 
@@ -64,4 +64,17 @@ class MessageObserverL1 extends ChannelInboundHandlerAdapter {
     microblockSnapshotsSubj.onComplete()
     endorseBlocksSubj.onComplete()
   }
+}
+
+object MessageObserver {
+  type Messages = (
+      ChannelObservable[Signatures],
+      ChannelObservable[Block],
+      ChannelObservable[BigInt],
+      ChannelObservable[MicroBlockInv],
+      ChannelObservable[MicroBlockResponse],
+      ChannelObservable[Transaction],
+      ChannelObservable[BlockSnapshotResponse],
+      ChannelObservable[MicroBlockSnapshotResponse]
+  )
 }

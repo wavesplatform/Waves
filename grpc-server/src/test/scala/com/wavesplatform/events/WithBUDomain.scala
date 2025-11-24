@@ -9,6 +9,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdate
 import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, WavesSettings}
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.Schedulers
 import monix.execution.ExecutionModel.SynchronousExecution
@@ -76,7 +77,7 @@ trait WithBUDomain extends WithDomain { suite: Suite =>
     withDomainAndRepo(settings) { (d, repo) =>
       d.appendBlock(balances.map(awb => TxHelpers.genesis(awb.address, awb.balance))*)
       generateBlocks(d)
-      val getBlockUpdate = repo.getBlockUpdate(height)
+      val getBlockUpdate = repo.getBlockUpdate(Height(height))
       f(getBlockUpdate)
     }
   }

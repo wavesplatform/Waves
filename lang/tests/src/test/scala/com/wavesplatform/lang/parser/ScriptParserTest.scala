@@ -16,6 +16,8 @@ import fastparse.Parsed.{Failure, Success}
 import org.scalacheck.Gen
 import org.scalatest.exceptions.TestFailedException
 
+import java.lang
+
 class ScriptParserTest extends PropSpec with ScriptGenParser {
   implicit val offset: LibrariesOffset = NoLibraries
 
@@ -1347,13 +1349,12 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
 
   property("parser StackOverflow check") {
     val depth = 10000
-    val lastStmt = (1 to depth).foldLeft("i0") { (acc, i) =>
-      s"$acc + i$i"
-    }
-    val manyLets = (1 to depth).foldLeft("let i0 = 1") { (acc, i) =>
-      s"$acc\nlet i$i = 1"
-    }
-    val script = s"$manyLets\n$lastStmt"
+    val sb    = new lang.StringBuilder(depth * 10).append("let i0 = 1")
+    (1 to depth).foreach(i => sb.append("\nlet i").append(i).append(" = 1"))
+    sb.append("\ni0")
+    (1 to depth).foreach(i => sb.append(" + i").append(i))
+
+    val script = sb.toString
 
     Parser.parseExpr(script) shouldBe an[Success[?]]
   }

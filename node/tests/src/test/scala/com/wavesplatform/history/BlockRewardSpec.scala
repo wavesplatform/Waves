@@ -446,8 +446,8 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       d.blockchainUpdater.height shouldBe 15
 
       val calcSettings = calcRewardSettings.blockchainSettings.rewardsSettings
-      calcSettings.nearestTermEnd(4, 9, modifyTerm = false) shouldBe 15
-      calcSettings.nearestTermEnd(4, 10, modifyTerm = false) shouldBe 15
+      calcSettings.nearestTermEnd(Height(4), Height(9), modifyTerm = false) shouldBe Height(15)
+      calcSettings.nearestTermEnd(Height(4), Height(10), modifyTerm = false) shouldBe Height(15)
 
       val route = RewardApiRoute(d.blockchainUpdater)
 
@@ -457,8 +457,8 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       d.blockchainUpdater.processBlock(b4) should beRight
       d.blockchainUpdater.blockReward(16) shouldBe (7 * Constants.UnitsInWave).some
 
-      route.getRewards(9).explicitGet().votes.increase shouldBe 0
-      route.getRewards(10).explicitGet().votes.increase shouldBe 1
+      route.getRewards(Height(9)).explicitGet().votes.increase shouldBe 0
+      route.getRewards(Height(10)).explicitGet().votes.increase shouldBe 1
 
     }
   }

@@ -121,11 +121,11 @@ object BlockDiffer {
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
-    val stateHeight        = blockchain.height
+    val stateHeight        = Height(blockchain.height)
     val heightWithNewBlock = stateHeight + 1
 
     // height switch is next after activation
-    val ngHeight          = blockchain.featureActivationHeight(BlockchainFeatures.NG).getOrElse(Int.MaxValue)
+    val ngHeight          = blockchain.featureActivationHeight(BlockchainFeatures.NG).getOrElse(Height(Int.MaxValue))
     val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
     val feeFromPreviousBlockE =
@@ -324,7 +324,7 @@ object BlockDiffer {
     val xtnBuybackAddress = blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
 
     val rewardShares = BlockRewardCalculator.getBlockRewardShares(
-      blockchain.height + 1,
+      Height(blockchain.height + 1),
       blockchainUpdater.computeNextReward.getOrElse(0),
       daoAddress,
       xtnBuybackAddress,
@@ -468,7 +468,7 @@ object BlockDiffer {
   }
 
   private def computeTxFeeInfo(blockchain: Blockchain, tx: Transaction, hasNg: Boolean): TxFeeInfo = {
-    val hasSponsorship        = blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+    val hasSponsorship        = Height(blockchain.height) >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
     val (feeAsset, feeAmount) = maybeApplySponsorship(blockchain, hasSponsorship, tx.assetFee)
     val currentBlockFee       = CurrentBlockFeePart(feeAmount)
 

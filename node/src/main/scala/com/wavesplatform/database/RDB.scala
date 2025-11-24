@@ -2,7 +2,7 @@ package com.wavesplatform.database
 
 import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.database.RDB.{ApiHandle, TxHandle, TxMetaHandle, TxSnapshotHandle}
-import com.wavesplatform.settings.DBSettings
+import com.wavesplatform.settings.{DBSettings, SizeInBytes}
 import com.wavesplatform.utils.*
 import org.rocksdb.*
 
@@ -43,12 +43,15 @@ object RDB extends StrictLogging {
     val dbDir     = file.getAbsoluteFile
     dbDir.getParentFile.mkdirs()
 
-    val handles             = new util.ArrayList[ColumnFamilyHandle]()
-    val defaultCfOptions    = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
-    val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-    val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-    val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-    val apiCfOptions        = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.apiCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val handles = new util.ArrayList[ColumnFamilyHandle]()
+    val defaultCfOptions =
+      newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
+    val txMetaCfOptions =
+      newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val txCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val txSnapshotCfOptions =
+      newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val apiCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.apiCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val db = RocksDB.open(
       dbOptions.options,
       settings.directory,
@@ -98,12 +101,12 @@ object RDB extends StrictLogging {
   private def newColumnFamilyOptions(
       bitsPerKey: Double,
       blockSize: Long,
-      cacheCapacity: Long,
+      cacheCapacity: SizeInBytes,
       highPriPoolRatio: Double,
-      writeBufferSize: Long
+      writeBufferSize: SizeInBytes
   ): OptionsWithResources[ColumnFamilyOptions] = {
     val bloomFilter           = new BloomFilter(bitsPerKey)
-    val blockCache            = new LRUCache(cacheCapacity, -1, false, highPriPoolRatio)
+    val blockCache            = new LRUCache(cacheCapacity.longValue, -1, false, highPriPoolRatio)
     val sstPartitionerFactory = new SstPartitionerFixedPrefixFactory(2)
 
     val options = new ColumnFamilyOptions()
@@ -120,7 +123,7 @@ object RDB extends StrictLogging {
           .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
           .setDataBlockHashTableUtilRatio(0.5)
       )
-      .setWriteBufferSize(writeBufferSize)
+      .setWriteBufferSize(writeBufferSize.longValue)
       .setCompactionStyle(CompactionStyle.LEVEL)
       .setLevelCompactionDynamicLevelBytes(true)
       // Defines the prefix.

@@ -4,7 +4,7 @@ import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter, loadActiveLe
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.BlockchainUpdaterImpl
+import com.wavesplatform.state.{Height, BlockchainUpdaterImpl}
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import org.rocksdb.RocksDB
 
@@ -35,7 +35,7 @@ object StorageFactory extends ScorexLogging {
     val version = rw.get(Keys.version)
     val height  = rw.get(Keys.height)
     if (version != StorageVersion) {
-      if (height == 0) {
+      if (height == Height(0)) {
         // The storage is empty, set current version
         rw.put(Keys.version, StorageVersion)
       } else {

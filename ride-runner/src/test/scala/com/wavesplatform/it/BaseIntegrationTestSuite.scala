@@ -42,7 +42,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       override def getCurrentBlockchainHeight(): Height = Height(1)
 
       override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] =
-        toVanilla(BlockWithHeight(mkPbBlock(height).some, height))
+        toVanilla(BlockWithHeight(mkPbBlock(height).some, height.toInt))
 
       override def getBlockHeaderRange(fromHeight: Height, toHeight: Height): List[SignedBlockHeaderWithVrf] = ???
 

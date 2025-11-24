@@ -4,6 +4,7 @@ import cats.syntax.option.*
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.{Block, MicroBlock}
+import com.wavesplatform.state.Height
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import io.grpc.inprocess.{InProcessChannelBuilder, InProcessServerBuilder}
 import io.grpc.util.MutableHandlerRegistry
@@ -29,11 +30,11 @@ trait HasGrpc extends CommonGrpcConverters with HasTestAccounts { this: BaseTest
     }
   }
 
-  def mkPbBlock(height: Int) = Block(header =
+  def mkPbBlock(height: Height) = Block(header =
     Block
       .Header(
         generator = miner.publicKey.toByteString,
-        timestamp = height
+        timestamp = height.toInt
       )
       .some
   )

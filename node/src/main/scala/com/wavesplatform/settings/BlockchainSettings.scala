@@ -5,6 +5,7 @@ import cats.syntax.traverse.*
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.Height
 import pureconfig.*
 import pureconfig.generic.semiauto.deriveReader
 
@@ -28,7 +29,7 @@ case class RewardsSettings(
     s"voting-interval must be less than or equal to term-after-capped-reward-feature($termAfterCappedRewardFeature)"
   )
 
-  def nearestTermEnd(activatedAt: Int, height: Int, modifyTerm: Boolean): Int = {
+  def nearestTermEnd(activatedAt: Height, height: Height, modifyTerm: Boolean): Height = {
     require(height >= activatedAt)
     val diff         = height - activatedAt + 1
     val modifiedTerm = if (modifyTerm) termAfterCappedRewardFeature else term
@@ -37,9 +38,9 @@ case class RewardsSettings(
   }
 
   def votingWindow(activatedAt: Int, height: Int, modifyTerm: Boolean): Range = {
-    val end   = nearestTermEnd(activatedAt, height, modifyTerm)
+    val end   = nearestTermEnd(Height(activatedAt), Height(height), modifyTerm)
     val start = end - votingInterval + 1
-    if (height >= start) Range.inclusive(start, height)
+    if (Height(height) >= start) Range.inclusive(start.toInt, height)
     else Range(0, 0)
   }
 }

@@ -466,7 +466,7 @@ object TxHelpers {
   }
 
   def commitToGeneration(
-      generationPeriodStart: Int,
+      generationPeriodStart: Height,
       sender: KeyPair = defaultSigner,
       endorserPublicKey: BlsPublicKey = BlsKeyPair(defaultSigner.privateKey).publicKey,
       timestamp: TxTimestamp = timestamp,
@@ -476,7 +476,7 @@ object TxHelpers {
     .selfSigned(
       sender,
       endorserPublicKey,
-      Height(generationPeriodStart),
+      generationPeriodStart,
       timestamp,
       fee,
       chainId

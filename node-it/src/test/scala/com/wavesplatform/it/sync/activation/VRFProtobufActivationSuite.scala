@@ -13,13 +13,14 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.{TxExchangePrice, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.concurrent.duration.*
 
 class VRFProtobufActivationSuite extends BaseTransactionSuite {
-  val activationHeight = 9
+  val activationHeight = Height(9)
   val updateInterval   = 3
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
@@ -40,7 +41,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val (defaultName, defaultDescription) = ("asset", "description")
     assetId =
       sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, reissuable = true, script = None, waitForTx = true).id
-    sender.waitForHeight(7, 3.minutes)
+    sender.waitForHeight(Height(7), 3.minutes)
     otherAssetId =
       sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, reissuable = true, script = None, waitForTx = true).id
   }
@@ -129,7 +130,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
 
   test("able to broadcast UpdateAssetInfoTransaction after activation") {
     val nextTerm = sender.transactionInfo[TransactionInfo](otherAssetId).height + updateInterval + 1
-    sender.waitForHeight(nextTerm, 2.minutes)
+    sender.waitForHeight(Height(nextTerm), 2.minutes)
     secondUpdateAssetTxId = sender.updateAssetInfo(senderAcc, otherAssetId, "updatedName", "updatedDescription", minFee, waitForTx = true)._1.id
   }
 

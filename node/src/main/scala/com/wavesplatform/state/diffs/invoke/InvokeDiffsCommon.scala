@@ -542,7 +542,7 @@ object InvokeDiffsCommon {
                       val pseudoTx = ScriptTransfer(
                         asset,
                         actionSender,
-                        pk,
+                        pk.byteStr,
                         pseudoTxRecipient,
                         amount,
                         tx.timestamp,
@@ -596,9 +596,9 @@ object InvokeDiffsCommon {
               TracedResult(Left(FailOrRejectError(error)))
             }
           } else {
-            val staticInfo = AssetStaticInfo(asset.id, TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
+            val staticInfo = AssetStaticInfo(asset.id, TransactionId(itx.txId), pk, issue.decimals, blockchain.isNFT(issue))
             val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
-            val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height @@ blockchain.height)
+            val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height(blockchain.height))
             StateSnapshot.build(
               blockchain,
               portfolios = Map(pk.toAddress -> Portfolio(assets = VectorMap(asset -> issue.quantity))),
@@ -610,13 +610,13 @@ object InvokeDiffsCommon {
         def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[ValidationError, StateSnapshot] = {
           val reissueDiff =
             DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(FailedTransactionError.asFailedScriptError)
-          val pseudoTx = ReissuePseudoTx(reissue, actionSender, pk, tx.txId, tx.timestamp)
+          val pseudoTx = ReissuePseudoTx(reissue, actionSender, pk.byteStr, tx.txId, tx.timestamp)
           callAssetVerifierWithPseudoTx(reissueDiff, reissue.assetId, pseudoTx, AssetContext.Reissue)
         }
 
         def applyBurn(burn: Burn, pk: PublicKey): TracedResult[ValidationError, StateSnapshot] = {
           val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn).leftMap(FailedTransactionError.asFailedScriptError)
-          val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.txId, tx.timestamp)
+          val pseudoTx = BurnPseudoTx(burn, actionSender, pk.byteStr, tx.txId, tx.timestamp)
           callAssetVerifierWithPseudoTx(burnDiff, burn.assetId, pseudoTx, AssetContext.Burn)
         }
 
@@ -635,7 +635,7 @@ object InvokeDiffsCommon {
             sponsorDiff = DiffsCommon
               .processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee)
               .leftMap(FailedTransactionError.asFailedScriptError)
-            pseudoTx = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.txId, tx.timestamp)
+            pseudoTx = SponsorFeePseudoTx(sponsorFee, actionSender, pk.byteStr, tx.txId, tx.timestamp)
             r <- callAssetVerifierWithPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx, AssetContext.Sponsor)
           } yield r
 
@@ -644,7 +644,7 @@ object InvokeDiffsCommon {
             validAmount <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
             recipient   <- TracedResult(AddressOrAlias.fromRide(l.recipient))
             leaseId = Lease.calculateId(l, tx.txId)
-            diff <- DiffsCommon.processLease(blockchain, validAmount, pk, recipient, fee = 0, leaseId, tx.txId)
+            diff <- DiffsCommon.processLease(blockchain, validAmount, pk, recipient, fee = 0, leaseId, TransactionId(tx.txId))
           } yield diff
 
         def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, StateSnapshot] =

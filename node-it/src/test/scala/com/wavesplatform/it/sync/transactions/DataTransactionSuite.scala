@@ -12,6 +12,7 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{TransactionInfo, UnexpectedStatusCodeException}
 import com.wavesplatform.it.sync.{calcDataFee, minFee, *}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
@@ -29,7 +30,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       .overrideBase(_.quorum(0))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation = 1"))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period = 1"))
-      .overrideBase(_.preactivatedFeatures(15 -> 0))
+      .overrideBase(_.preactivatedFeatures(15 -> Height(0)))
       .withDefault(1)
       .withSpecial(1, _.nonMiner)
       .buildNonConflicting()

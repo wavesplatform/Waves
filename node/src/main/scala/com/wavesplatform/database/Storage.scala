@@ -18,6 +18,6 @@ trait Storage {
       generatorBalances: GeneratorBalances
   ): Unit
   def lastBlock: Option[Block]
-  def rollbackTo(height: Int): Either[String, DiscardedBlocks]
-  def safeRollbackHeight: Int
+  def rollbackTo(height: Height): Either[String, DiscardedBlocks]
+  def safeRollbackHeight: Height
 }

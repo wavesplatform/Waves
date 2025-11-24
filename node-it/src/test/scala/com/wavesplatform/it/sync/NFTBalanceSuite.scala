@@ -5,8 +5,9 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.*
-import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.api.*
+import com.wavesplatform.it.api.AsyncHttpApi.*
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
@@ -42,7 +43,7 @@ class NFTBalanceSuite extends BaseFreeSpec {
 
     val fundAndIssue =
       for {
-        _      <- traverse(nodes)(_.waitForHeight(2))
+        _      <- traverse(nodes)(_.waitForHeight(Height(2)))
         fundTx <- node.transfer(node.keyPair, issuer.toAddress.toString, 1000.waves, 0.001.waves)
         _      <- node.waitForTransaction(fundTx.id)
         _ <- Future.sequence((simple ++ nft) map { tx =>

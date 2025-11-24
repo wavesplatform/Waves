@@ -1,11 +1,11 @@
 package com.wavesplatform.block
 
 import com.wavesplatform.crypto.bls.BlsSignature
-import com.wavesplatform.state.GeneratorIndex
+import com.wavesplatform.state.{GeneratorIndex, Height}
 
 case class FinalizationVoting(
     valid: Seq[GeneratorIndex] = Seq.empty,
-    finalizedHeight: Int = 0,
+    finalizedHeight: Height = Height(0),
     aggregatedEndorsement: BlsSignature = BlsSignature.Empty,
     conflict: IndexedSeq[BlockEndorsement] = IndexedSeq.empty
 ) {

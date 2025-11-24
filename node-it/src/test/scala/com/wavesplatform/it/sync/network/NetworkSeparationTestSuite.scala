@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{issueAmount, issueFee, minFee}
 import com.wavesplatform.it.{BaseFreeSpec, Node, WaitForHeight2}
+import com.wavesplatform.state.Height
 
 import scala.concurrent.Await
 import scala.concurrent.duration.*
@@ -17,7 +18,7 @@ class NetworkSeparationTestSuite extends BaseFreeSpec with WaitForHeight2 {
   private def nodeB: Node = nodes.last
 
   "node should grow up to 10 blocks together and sync" in {
-    nodes.waitForSameBlockHeadersAt(10)
+    nodes.waitForSameBlockHeadersAt(Height(10))
   }
 
   // Doing all work in one step, because nodes will not be available for requests and ReportingTestName fails here

@@ -40,7 +40,7 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     val endorserAddrs = endorsers.map(_.toAddress)
 
     log.debug(s"Append block 2 with commitments")
-    val txs                   = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 3, x))
+    val txs                   = endorsers.map(x => TxHelpers.commitToGeneration(Height(3), x))
     val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
     d.appender.appendBlock(block2WithCommitments)
 
@@ -187,5 +187,5 @@ class ConflictEndorsementSuite extends FreeSpec with WithDomain {
     ConflictGenerators.empty.appendAll(Height(h), GeneratorIndex.seq(idxs)*)
 
   private def bs(height: Int, regularBalance: Long, deposits: Int = 0, punished: Boolean = false): BalanceSnapshot =
-    BalanceSnapshot(height, regularBalance, 0L, 0L, CommitToGenerationTransaction.DepositInWavelets * deposits, punished)
+    BalanceSnapshot(Height(height), regularBalance, 0L, 0L, CommitToGenerationTransaction.DepositInWavelets * deposits, punished)
 }

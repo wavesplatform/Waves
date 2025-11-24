@@ -12,6 +12,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.Height
 import org.scalatest.{Assertion, CancelAfterFailure}
 
 class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -19,7 +20,7 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((ContinuationTransaction.id, 0)))
+      .overrideBase(_.preactivatedFeatures((ContinuationTransaction.id, Height(0))))
       .buildNonConflicting()
 
   private val expr: ExprScript =
@@ -36,10 +37,10 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     val lastBlock = sender.lastBlock()
 
     val txFromLastBlock         = lastBlock.transactions.find(_.id == id).get
-    val txFromBlockByHeight     = sender.blockAt(lastBlock.height).transactions.find(_.id == id).get
+    val txFromBlockByHeight     = sender.blockAt(Height(lastBlock.height)).transactions.find(_.id == id).get
     val txFromBlockById         = sender.blockById(lastBlock.id).transactions.find(_.id == id).get
-    val txFromBlockSeq          = sender.blockSeq(1, 100).flatMap(_.transactions).find(_.id == id).get
-    val txFromBlockSeqByAddress = sender.blockSeqByAddress(sender.address, 1, 100).flatMap(_.transactions).find(_.id == id).get
+    val txFromBlockSeq          = sender.blockSeq(Height(1), Height(100)).flatMap(_.transactions).find(_.id == id).get
+    val txFromBlockSeqByAddress = sender.blockSeqByAddress(sender.address, Height(1), Height(100)).flatMap(_.transactions).find(_.id == id).get
     List(txFromLastBlock, txFromBlockByHeight, txFromBlockById, txFromBlockSeq, txFromBlockSeqByAddress).foreach(checkTx(_))
 
     val txFromInfoById  = sender.transactionInfo[TransactionInfo](id)

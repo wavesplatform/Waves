@@ -1,8 +1,6 @@
 package com.wavesplatform.network
 
 import com.google.common.cache.CacheBuilder
-
-import java.util
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.crypto
@@ -14,8 +12,9 @@ import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled.*
 import io.netty.channel.ChannelHandlerContext
-import io.netty.handler.codec.{ByteToMessageCodec, DecoderException}
+import io.netty.handler.codec.ByteToMessageCodec
 
+import java.util
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
@@ -26,13 +25,8 @@ abstract class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessag
   protected def messageToRawData(msg: Any): MessageRawData
   protected def rawDataToMessage(rawData: MessageRawData): AnyRef
 
-  override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = cause match {
-    case e: DecoderException => peerDatabase.blacklistAndClose(ctx.channel(), s"Corrupted message frame: $e")
-    case _                   => super.exceptionCaught(ctx, cause)
-  }
-
   override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit =
-    try {
+    if (!ctx.isRemoved && ctx.channel().isActive) try {
       require(in.readInt() == Magic, "invalid magic number")
 
       val code = in.readByte()
@@ -60,7 +54,6 @@ abstract class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessag
       case NonFatal(e) =>
         log.warn(s"${id(ctx)} Malformed network message", e)
         peerDatabase.blacklistAndClose(ctx.channel(), s"Malformed network message: $e")
-        in.resetReaderIndex() // Cancels subsequent read tries, see Netty decode() documentation
     }
 
   override def encode(ctx: ChannelHandlerContext, msg1: Any, out: ByteBuf): Unit = {
