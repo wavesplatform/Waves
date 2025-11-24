@@ -28,7 +28,11 @@
 
     <include optional="true" file="${waves.config.directory:-.}/logback.xml"/>
 
-    <if condition='property("logback.stdout.enabled").contains("true")'>
+    <condition class="ch.qos.logback.core.boolex.PropertyEqualityCondition">
+        <key>logback.stdout.enabled</key>
+        <value>true</value>
+    </condition>
+    <if>
         <then>
             <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
                 <target>System.out</target>
@@ -45,7 +49,11 @@
         </then>
     </if>
 
-    <if condition='property("logback.file.enabled").contains("true")'>
+    <condition class="ch.qos.logback.core.boolex.PropertyEqualityCondition">
+        <key>logback.file.enabled</key>
+        <value>true</value>
+    </condition>
+    <if>
         <then>
             <property name="appender.name" value="FILE"/>
             <property name="appender.file" value="waves"/>
@@ -59,7 +67,11 @@
         </then>
     </if>
 
-    <if condition='property("logback.utx-trace.enabled").contains("true")'>
+    <condition class="ch.qos.logback.core.boolex.PropertyEqualityCondition">
+        <key>logback.utx-trace.enabled</key>
+        <value>true</value>
+    </condition>
+    <if>
         <then>
             <property name="appender.name" value="UTX-TRACE"/>
             <property name="appender.file" value="utx-trace"/>

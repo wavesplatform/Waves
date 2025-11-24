@@ -35,7 +35,7 @@ jobs:
           path: ${{ steps.cache-aptly-path.outputs.aptly_toolpath }}
           key: ${{ steps.cache-aptly-path.outputs.aptly_cachekey }}
       - name: Get aptly
-        if: steps.cache-aptly.outputs.cache-hit == 'false'
+        if: steps.cache-aptly.outputs.cache-hit != 'true'
         env:
           APTLY_DOWNLOADPATH: ${{ steps.cache-aptly-path.outputs.aptly_downloadpath }}
           APTLY_TOOLPATH: ${{ steps.cache-aptly-path.outputs.aptly_toolpath }}
