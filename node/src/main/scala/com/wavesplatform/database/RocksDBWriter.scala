@@ -22,7 +22,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
-import com.wavesplatform.protobuf.{toByteString, toByteStr, toPublicKey, PBSnapshots}
+import com.wavesplatform.protobuf.{PBSnapshots, toByteStr, toByteString, toPublicKey}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -525,7 +525,7 @@ class RocksDBWriter(
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
       generatorBalances: Seq[(Address, Long)],
-      nextCommittedGenerators: Seq[(AddressId, BlsPublicKey)],
+      nextCommittedGenerators: Option[Seq[(AddressId, BlsPublicKey)]],
       commitmentTransactionIds: Seq[TransactionId],
       conflictGenerators: Seq[GeneratorIndex],
       stateHash: StateHashBuilder.Result
@@ -744,13 +744,16 @@ class RocksDBWriter(
       }
 
       this.generationPeriodOf(h).foreach { currPeriod => // None checked in Caches
-        if (nextCommittedGenerators.nonEmpty) {
-          val nextPeriod = currPeriod.next
+        nextCommittedGenerators match {
+          case Some(generators) =>
+            if (generators.nonEmpty) {
+              val nextPeriod = currPeriod.next
 
-          rw.put(Keys.committedGenerators(nextPeriod, h), Some(nextCommittedGenerators))
+              rw.put(Keys.committedGenerators(nextPeriod, h), Some(generators))
 
-          // TODO: Option to not store
-          rw.put(Keys.commitmentTransactions(nextPeriod, h), commitmentTransactionIds)
+              rw.put(Keys.commitmentTransactions(nextPeriod, h), commitmentTransactionIds)
+            }
+          case None => ()
         }
 
         if (conflictGenerators.nonEmpty) rw.put(Keys.conflictGenerators(currPeriod, h), conflictGenerators)
