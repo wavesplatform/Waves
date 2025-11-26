@@ -105,7 +105,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val (blockchainUpdater, rocksDB) =
     StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
-  private val messageObserver = new MessageObserverL1
+  private val messageObserver = new MessageObserver
 
   @volatile
   private var maybeUtx: Option[UtxPool] = None
@@ -144,7 +144,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
-    val endorsementStorage = EndorsementStorage.InMemory()
+    val endorsementStorage = EndorsementStorage.InMemory((blockId, height) => blockchainUpdater.blockId(height.toInt).contains(blockId))
     val blockEndorser      = new BlockEndorser.InMemory(blockchainUpdater, wallet, endorsementStorage, allChannels)
 
     if (settings.minerSettings.enable)
@@ -210,7 +210,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       rdb
     )
 
-    val historyReplier = new HistoryReplierL1(blockchainUpdater.score, history, settings.synchronizationSettings)(using historyRepliesScheduler)
+    val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(using historyRepliesScheduler)
 
     val transactionPublisher =
       TransactionPublisher.timeBounded(
@@ -320,7 +320,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     )
 
     messageObserver.endorseBlocks.foreach { case (ch, x) =>
-      endorsementStorage.tryAddVote(x) match {
+      endorsementStorage.tryAdd(x) match {
         case Left(err)   => log.trace(s"Unexpected $x: $err")
         case Right(true) => allChannels.broadcast(x, Some(ch))
         case _           =>
@@ -623,25 +623,25 @@ object Application extends ScorexLogging {
   }
 
   private[wavesplatform] def loadBlockAt(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater)(
-      height: Int
+      height: Height
   ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
     loadBlockInfoAt(rdb, blockchainUpdater)(height)
 
   private[wavesplatform] def loadBlockInfoAt(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater)(
-      height: Int
+      height: Height
   ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
     loadBlockMetaAt(rdb.db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
-        .getOrElse(database.loadTransactions(Height(height), rdb))
+        .getOrElse(database.loadTransactions(height, rdb))
     }
 
-  private[wavesplatform] def loadBlockMetaAt(db: RocksDB, blockchainUpdater: CompleteBlockchainUpdater)(height: Int): Option[BlockMeta] =
+  private[wavesplatform] def loadBlockMetaAt(db: RocksDB, blockchainUpdater: CompleteBlockchainUpdater)(height: Height): Option[BlockMeta] =
     blockchainUpdater.liquidBlockMeta
-      .filter(_ => blockchainUpdater.height == height)
-      .orElse(db.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb))
+      .filter(_ => blockchainUpdater.height == height.toInt)
+      .orElse(db.get(Keys.blockMetaAt(height)).flatMap(BlockMeta.fromPb))
       .map { blockMeta =>
-        val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height, blockMeta.header.generator.toAddress, blockchainUpdater)
+        val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height.toInt, blockMeta.header.generator.toAddress, blockchainUpdater)
         blockMeta.copy(
           rewardShares = rewardShares,
           reward = blockMeta.reward.map(_ * blockchainUpdater.blockRewardBoost(height))

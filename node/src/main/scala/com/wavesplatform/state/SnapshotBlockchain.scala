@@ -14,7 +14,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, CommitToGenerationTransaction, ERC20Address, Transaction}
-import com.wavesplatform.utils.Numbers
 
 case class SnapshotBlockchain(
     inner: Blockchain,
@@ -53,17 +52,6 @@ case class SnapshotBlockchain(
           )(balance => (innerBalances, snapshotBalances + (address -> balance)))
       }
     inner.wavesBalances(innerBalances) ++ snapshotBalances
-  }
-
-  override def generationDeposit(address: Address, period: GenerationPeriod): Long = {
-    // TODO: refactor: add GenerationPeriod.method to compare with curr and curr.next?
-    val includeSnapshot = this.currentGenerationPeriod.forall(curr => period == curr || period == curr.next)
-    val inSnapshot = Numbers.when(includeSnapshot) {
-      val isCommitted = snapshot.nextCommittedGenerators.exists { case (pk, _) => pk.toAddress == address }
-      Numbers.when(isCommitted)(CommitToGenerationTransaction.DepositInWavelets)
-    }
-
-    inner.generationDeposit(address, period) + inSnapshot
   }
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = {
@@ -173,13 +161,20 @@ case class SnapshotBlockchain(
     if (maybeSnapshot.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
       inner.balanceSnapshots(address, from1, to)
     } else {
-      val h          = Height(height)
-      val balance    = this.balance(address)
-      val lease      = this.leaseBalance(address)
-      val deposit    = this.currentGenerationPeriod.fold(0L)(this.generationDeposit(address, _))
-      val bs         = BalanceSnapshot(h, Portfolio(balance, lease, generationDeposit = deposit))
-      val height2Fix = h == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
-      if (inner.height > 0 && (from1 < h - 1 || height2Fix))
+      val h       = Height(height)
+      val balance = this.balance(address)
+      val lease   = this.leaseBalance(address)
+      val deposit = this.generationDeposit(address, h)
+
+      val punished = for {
+        p <- inner.generationPeriodOf(h)
+        idx = inner.committedGenerators(p).indexWhere { case (generatorAddress, _) => generatorAddress == address }
+        idx <- GeneratorIndex.checked(idx)
+      } yield inner.conflictGenerators(p).hasInUpTo(h, idx)
+
+      val bs         = BalanceSnapshot(h, Portfolio(balance, lease, generationDeposit = deposit), punished.getOrElse(false))
+      val height2Fix = h.toInt == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
+      if (inner.height > 0 && (from1 < h.toInt - 1 || height2Fix))
         bs +: inner.balanceSnapshots(address, from1, to)
       else
         Seq(bs)
@@ -234,7 +229,21 @@ case class SnapshotBlockchain(
 
   override def blockRewardVotes(height: Int): Seq[Long] = inner.blockRewardVotes(height)
 
-  override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height) + BigInt(reward.getOrElse(0L))
+  override def wavesAmount(height: Int): BigInt = {
+    val parentBlockHeader = blockMeta match {
+      case None => inner.blockHeader(height - 1)
+      case _    => inner.lastBlockHeader
+    }
+
+    val parentConflictEndorsements = for {
+      parentBlockHeader <- parentBlockHeader
+      voting            <- parentBlockHeader.header.finalizationVoting
+    } yield voting.conflict.size
+
+    inner.wavesAmount(height) +
+      BigInt(reward.getOrElse(0L)) -
+      parentConflictEndorsements.getOrElse(0) * CommitToGenerationTransaction.DepositInWavelets
+  }
 
   override def hitSource(height: Int): Option[ByteStr] =
     blockMeta
@@ -249,10 +258,24 @@ case class SnapshotBlockchain(
   override def lastStateHash(refId: Option[ByteStr]): BlockId =
     stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 
-  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = {
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
     val base   = inner.committedGenerators(at)
     val atNext = this.currentGenerationPeriod.exists(_.next == at)
     if (atNext) base ++ snapshot.nextCommittedGenerators.map { case (pk, blsPk) => pk.toAddress -> blsPk } else base
+  }
+
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = {
+    val base   = inner.conflictGenerators(at)
+    val atCurr = this.currentGenerationPeriod.contains(at)
+    if (atCurr) {
+      val extraConflictIndexes = for {
+        (blockMeta, _) <- blockMeta.toSeq
+        v              <- blockMeta.header.finalizationVoting.toSeq
+        c              <- v.conflict
+      } yield c.endorserIndex
+
+      base.appendAll(Height(height), extraConflictIndexes*)
+    } else base
   }
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] =
@@ -314,7 +337,7 @@ object SnapshotBlockchain {
           sponsorship.getOrElse(0),
           static.nft,
           assetNum,
-          Height @@ height
+          Height(height)
         )
       }
       .orElse(

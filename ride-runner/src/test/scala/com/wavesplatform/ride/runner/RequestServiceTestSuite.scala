@@ -202,7 +202,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       val blockchainApi = new TestBlockchainApi() {
         override def getCurrentBlockchainHeight(): Height = Height(2)
         override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] =
-          toVanilla(BlockWithHeight(mkPbBlock(height).some, height))
+          toVanilla(BlockWithHeight(mkPbBlock(height).some, height.toInt))
         override def getActivatedFeatures(height: Height): Map[Short, Height] =
           blockchainSettings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_)).toMap
         override def getAccountScript(address: Address): Option[(PublicKey, Script)] = accountScripts.get(address)

@@ -8,11 +8,12 @@ import com.wavesplatform.it.sync.{issueFee, scriptBase64, setAssetScriptFee, som
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class SetAssetScriptTxFeatureSuite extends BaseTransactionSuite {
 
-  private val featureActivationHeight = 8
+  private val featureActivationHeight = Height(8)
 
   private var assetId = ""
 

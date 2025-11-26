@@ -7,8 +7,8 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.network.EndorseBlock
-import com.wavesplatform.state.EndorsementStorage.EndorsementFilter
-import com.wavesplatform.state.EndorsementStorage.EndorsementFilter.SimulationResult
+import com.wavesplatform.state.EndorsementFilter.SimulationResult
+import com.wavesplatform.state.EndorsementStorage.InMemory.FinalizationResult
 import com.wavesplatform.state.Height
 
 import scala.collection.{immutable, mutable}
@@ -16,10 +16,9 @@ import scala.collection.{immutable, mutable}
 // TODO: .switch: use in appender when changed height
 trait EndorsementStorage {
 
-  /** Add a vote, preserves the order of voting.
-    * @return true, if it can be shared with neighbours
+  /** @return true, if it can be shared with neighbours
     */
-  def tryAddVote(msg: EndorseBlock): Either[String, Boolean]
+  def tryAdd(msg: EndorseBlock): Either[String, Boolean]
 
   /** @return true if it is a new voting */
   def startVoting(filter: EndorsementFilter): Boolean
@@ -32,101 +31,65 @@ trait EndorsementStorage {
 }
 
 object EndorsementStorage {
-
-  /** @param minerIndex
-    *   True if this node is a miner
-    */
-  case class EndorsementFilter(
-      minerIndex: Option[Int],
-      finalizedId: BlockId,
-      finalizedHeight: Height,
-      endorsedId: BlockId,
-      endorsers: IndexedSeq[(BlsPublicKey, Long)]
-  ) {
-    private val minerBalance        = minerIndex.fold(0L)(endorsers(_)._2)
-    private val doubledTotalBalance = endorsers.foldLeft(BigInt(0L)) { case (r, (_, b)) => r + b } * 2
-
-    override def toString: String =
-      s"EndorsementFilter(${minerIndex.fold("")(i => s"m=$i, ")}fid=$finalizedId, fh=$finalizedHeight, eid=$endorsedId, e={${endorsers.mkString(", ")}})"
-
-    def sameVoting(other: EndorsementFilter): Boolean =
-      finalizedId == other.finalizedId && finalizedHeight == other.finalizedHeight && endorsedId == other.endorsedId
-
-    def simulate(voterIndexes: Iterable[Int]): SimulationResult = {
-      type Item = (idx: Int, blsPk: BlsPublicKey, balance: Long)
-      val lifted = endorsers.lift
-      val items = for {
-        idx              <- voterIndexes.view
-        (blsPk, balance) <- lifted(idx)
-      } yield (idx, blsPk, balance): Item
-
-      val richest = mutable.PriorityQueue.empty[Item](using Ordering.by(-_.balance))
-      richest.addAll(items)
-
-      var endorserIndexes = Vector.empty[Int]
-      var endorsedBalance = BigInt(minerBalance)
-      var complete        = false
-      while (richest.nonEmpty && !complete) {
-        val x = richest.dequeue()
-        endorserIndexes = endorserIndexes.appended(x.idx)
-        endorsedBalance += x.balance
-        complete = endorsedBalance * 3 >= doubledTotalBalance // Same as endorsedBalance >= totalBalance * 2 / 3, but with precision
-      }
-
-      SimulationResult(complete, endorserIndexes)
-    }
-  }
-
-  object EndorsementFilter {
-    case class SimulationResult(complete: Boolean = false, chosenValid: IndexedSeq[Int] = Vector.empty)
-  }
-
   object Disabled extends EndorsementStorage {
-    override def tryAddVote(msg: EndorseBlock): Either[String, Boolean]              = true.asRight
+    override def tryAdd(msg: EndorseBlock): Either[String, Boolean]                  = true.asRight
     override def startVoting(filter: EndorsementFilter): Boolean                     = false
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = None
   }
 
-  class InMemory extends EndorsementStorage with StrictLogging {
-    private var currentFilter = none[EndorsementFilter]
+  class InMemory(blockAtHeight: (BlockId, Height) => Boolean) extends EndorsementStorage with StrictLogging {
+    private var currentFilter = none[EndorsementFilter] // TODO: remove option?
 
-    private val processed = mutable.HashSet.empty[EndorseBlock]
-    private var valid     = immutable.IntMap.empty[BlsSignature.NonEmpty]
-    private var conflict  = immutable.IntMap.empty[BlockEndorsement.Conflict]
+    private val sharedWithNeighbors     = mutable.HashSet.empty[EndorseBlock]
+    private val processedValidEndorsers = mutable.HashSet.empty[GeneratorIndex]
 
-    private case class ResultType(simulation: SimulationResult, voting: FinalizationVoting) // TODO: move
-    private var latestResult = ResultType(SimulationResult(), FinalizationVoting())
-    private var hasChanges   = true
+    private var valid    = immutable.IntMap.empty[BlsSignature.NonEmpty]
+    private var conflict = immutable.IntMap.empty[BlockEndorsement]
+
+    private var latestResult = FinalizationResult.empty
+    private var hasChanges   = false
 
     private val monitor            = new Object()
     private def synced[T](f: => T) = monitor.synchronized(f)
 
-    override def tryAddVote(msg: EndorseBlock): Either[String, Boolean] = synced {
+    override def tryAdd(msg: EndorseBlock): Either[String, Boolean] = synced {
       for {
-        filter <- currentFilter.toRight("Voting hasn't started")
-        _      <- Either.raiseUnless(msg.finalizedHeight == filter.finalizedHeight)(s"Expected finalized height ${filter.finalizedHeight}")
-        _      <- Either.raiseWhen(msg.endorserIndex < 0)(s"Invalid endorser index: ${msg.endorserIndex}")
-        _      <- Either.raiseWhen(msg.endorserIndex >= filter.endorsers.size)(s"There are only ${filter.endorsers.size} endorsers")
-        (endorserPk, _) = filter.endorsers(msg.endorserIndex)
+        filter        <- currentFilter.toRight("Voting hasn't started")
+        _             <- Either.raiseWhen(msg.finalizedHeight > filter.finalizedHeight)(s"Expected finalized height <= ${filter.finalizedHeight}")
+        _             <- Either.raiseWhen(msg.endorserIndex >= filter.endorsers.size)(s"There are only ${filter.endorsers.size} endorsers")
+        endorserIndex <- GeneratorIndex.checked(msg.endorserIndex).toRight(s"Invalid endorser index: ${msg.endorserIndex}")
+        (_, endorserPk, _) = filter.endorsers(msg.endorserIndex)
         sig <- verifySig(msg, endorserPk).toRight("Invalid signature")
-        _   <- Either.raiseUnless(msg.endorsedId == filter.endorsedId)(s"Expected block ${filter.endorsedId}") // Could be a switch to a better branch
       } yield
-        if (processed.contains(msg)) false
+        if (sharedWithNeighbors.contains(msg) || conflict.isDefinedAt(msg.endorserIndex) || filter.conflict.contains(endorserIndex)) false
         else {
-          // TODO: Do we need this if not mine now?
-          val isValid = msg.finalizedId == filter.finalizedId
-
-          if (isValid && !conflict.isDefinedAt(msg.endorserIndex)) {
-            valid = valid.updated(msg.endorserIndex, sig)
-          } else {
-            conflict = conflict.updated(msg.endorserIndex, toConflict(msg, sig))
-            valid = valid.removed(msg.endorserIndex)
+          val isValid = msg.finalizedHeight == filter.finalizedHeight && msg.finalizedId == filter.finalizedId
+          val isConflict = !isValid && {
+            msg.finalizedHeight == filter.finalizedHeight && msg.finalizedId != filter.finalizedId ||
+            msg.finalizedHeight < filter.finalizedHeight && !blockAtHeight(msg.finalizedId, msg.finalizedHeight)
           }
 
-          processed += msg
-          hasChanges = true
+          val share = if (isConflict) {
+            conflict = conflict.updated(
+              msg.endorserIndex,
+              BlockEndorsement(GeneratorIndex(msg.endorserIndex), msg.finalizedId, msg.finalizedHeight, msg.endorsedId, sig)
+            )
+            valid = valid.removed(msg.endorserIndex)
 
-          filter.minerIndex.isEmpty // Share with neighbours only if this node isn't a miner
+            true
+          } else if (isValid && msg.endorsedId == filter.endorsedId && !processedValidEndorsers.contains(endorserIndex)) {
+            valid = valid.updated(msg.endorserIndex, sig)
+            processedValidEndorsers.add(endorserIndex)
+
+            true
+          } else false
+
+          if (share) {
+            hasChanges = true
+            sharedWithNeighbors += msg
+          }
+
+          share && filter.miner.isEmpty
         }
     }
 
@@ -134,10 +97,14 @@ object EndorsementStorage {
     override def startVoting(filter: EndorsementFilter): Boolean = synced {
       val isNewVoting = !currentFilter.exists(_.sameVoting(filter))
       if (isNewVoting) {
-        processed.clear()
+        sharedWithNeighbors.clear()
+        processedValidEndorsers.clear()
+
         valid = valid.empty
         conflict = conflict.empty
-        hasChanges = true
+
+        latestResult = FinalizationResult.empty
+        hasChanges = false
 
         currentFilter = if (filter.endorsers.isEmpty) {
           logger.info("No committed generators, don't collect endorsements")
@@ -151,39 +118,56 @@ object EndorsementStorage {
     }
 
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = synced {
-      (for {
+      for {
         currentFilter <- currentFilter
         if currentFilter.endorsedId == endorsedId && hasChanges
-      } yield {
-        hasChanges = false
+        _ = {
+          hasChanges = false
+        }
 
-        val moreConflict = conflict.size > latestResult.voting.conflict.size
-        val moreValid    = valid.size > latestResult.voting.endorserIndexes.size
-        if (moreConflict || !latestResult.simulation.complete && moreValid) {
-          val simulation = currentFilter.simulate(valid.keys)
+        moreConflict   = conflict.size > latestResult.voting.conflict.size
+        moreValid      = valid.size > latestResult.voting.valid.size
+        couldFinalized = !latestResult.reachedFinalization && moreValid
+        if moreConflict || couldFinalized
 
-          val origResult = latestResult
-          latestResult = ResultType(simulation, createVoting(simulation))
+        origResult = latestResult
+        _ = {
+          val simulation = currentFilter.simulate(valid.keys, conflict.keySet)
 
-          Option.when(moreConflict || latestResult.simulation.complete != origResult.simulation.complete) {
-            latestResult.voting
-          }
-        } else none
-      }).flatten
+          logger.debug(
+            s"Finalization simulation: ${if (simulation.reachedFinalization) "" else "not "}reached, " +
+              s"endorsed=${simulation.endorsedBalance}, total=${simulation.totalBalance}, " +
+              s"miner=${currentFilter.miner.getOrElse("?")}" +
+              (if (valid.isEmpty) "" else s", valid=[${valid.keys.mkString(", ")}]") +
+              (if (conflict.isEmpty) "" else s", conflict=[${conflict.keys.mkString(", ")}]")
+          )
+          latestResult = createVoting(currentFilter, simulation)
+        }
+        changedFinalizationStatus = latestResult.reachedFinalization != origResult.reachedFinalization
+        if moreConflict || changedFinalizationStatus
+      } yield latestResult.voting
     }
 
-    private def createVoting(simulationResult: SimulationResult): FinalizationVoting =
-      simulationResult.chosenValid.foldLeft(FinalizationVoting(conflict = conflict.values.toIndexedSeq)) { case (r, idx) =>
-        r.withValid(idx, valid(idx))
-      }
+    private def createVoting(currentFilter: EndorsementFilter, simulationResult: SimulationResult): FinalizationResult = {
+      val votingWithoutValid = FinalizationVoting(finalizedHeight = currentFilter.finalizedHeight, conflict = conflict.values.toIndexedSeq)
+      val voting =
+        if (simulationResult.reachedFinalization)
+          simulationResult.chosenValid.foldLeft(votingWithoutValid) { case (r, idx) => r.withValid(idx, valid(idx.toInt)) }
+        else votingWithoutValid
+      FinalizationResult(simulationResult.reachedFinalization, voting)
+    }
 
     private def verifySig(msg: EndorseBlock, pk: BlsPublicKey): Option[BlsSignature.NonEmpty] =
       for {
         sig <- BlsSignature(msg.signature).toOption
         _   <- Option.when(pk.verify(BlockEndorsement.mkMessage(msg.finalizedId, msg.finalizedHeight, msg.endorsedId), sig))(sig)
       } yield sig
+  }
 
-    private def toConflict(msg: EndorseBlock, verifiedSig: BlsSignature.NonEmpty): BlockEndorsement.Conflict =
-      BlockEndorsement.Conflict(msg.endorserIndex, msg.finalizedId, verifiedSig)
+  object InMemory {
+    private case class FinalizationResult(reachedFinalization: Boolean, voting: FinalizationVoting)
+    private object FinalizationResult {
+      val empty = FinalizationResult(false, FinalizationVoting())
+    }
   }
 }

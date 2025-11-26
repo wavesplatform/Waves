@@ -16,7 +16,7 @@ class BlockDiskCacheTestSuite extends DiskTestSuite {
     "setLastHeight" in test { cache => implicit ctx =>
       cache.getLastHeight shouldBe empty
       cache.setLastHeight(Height(2))
-      cache.getLastHeight.value shouldBe 2
+      cache.getLastHeight.value shouldBe Height(2)
     }
 
     "set" - {

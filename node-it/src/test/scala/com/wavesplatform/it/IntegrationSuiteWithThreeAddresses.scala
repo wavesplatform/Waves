@@ -8,6 +8,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.*
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -37,7 +38,7 @@ trait IntegrationSuiteWithThreeAddresses extends BaseSuite with ScalaFutures wit
       val accounts = Seq(firstKeyPair, secondKeyPair, thirdKeyPair)
 
       withClue("waitForTxsToReachAllNodes") {
-        nodes.waitForHeight(makeTransfers(accounts).map(ts => nodes.waitForTransaction(ts).height).max + 1)
+        nodes.waitForHeight(Height(makeTransfers(accounts).map(ts => nodes.waitForTransaction(ts).height).max + 1))
       }
     }
 

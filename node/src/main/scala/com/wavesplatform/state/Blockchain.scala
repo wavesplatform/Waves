@@ -66,10 +66,9 @@ trait Blockchain {
 
   def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
 
-  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive). Used only for getting a regular balance with confirmations and effective
-    * balance calculations
-    * @return
-    *   Balance snapshots from most recent to oldest.
+  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive).
+    * Used only for getting a regular balance with confirmations and effective balance calculations.
+    * @return Balance snapshots from most recent to oldest. May contain consecutive duplicate values
     */
   def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
 
@@ -91,21 +90,13 @@ trait Blockchain {
 
   def wavesBalances(addresses: Seq[Address]): Map[Address, Long]
 
-  // TODO: not efficient? See RocksDBWriter.balanceSnapshots
-  // TODO: optimize
-  def generationDeposit(address: Address, period: GenerationPeriod): Long = {
-    val committedOnCurrent = committedGenerators(period).exists { case (currentAddress, _) => currentAddress == address }
-    val committedOnNext    = committedGenerators(period.next).exists { case (currentAddress, _) => currentAddress == address }
-
-    val committedTimes = Numbers.when(committedOnCurrent)(1) + Numbers.when(committedOnNext)(1)
-    committedTimes * CommitToGenerationTransaction.DepositInWavelets
-  }
-
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
   // TODO: cached
   // TODO: named?
-  def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)]
+  def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)]
+
+  def conflictGenerators(at: GenerationPeriod): ConflictGenerators
 
   /** @return Before applying transactions of this block, in commitment order */
   def currentGeneratorBalances(): Seq[(Address, Long)]
@@ -119,7 +110,7 @@ object Blockchain {
   implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
     def isEmpty: Boolean = blockchain.height == 0
 
-    def isSponsorshipActive: Boolean = blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+    def isSponsorshipActive: Boolean = Height(blockchain.height) >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
     def isNGActive: Boolean          = blockchain.isFeatureActivated(BlockchainFeatures.NG, blockchain.height - 1)
 
     def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader] =
@@ -145,7 +136,7 @@ object Blockchain {
     def lastBlockId: Option[BlockId]               = lastBlockHeader.map(_.id())
     def lastBlockTimestamp: Option[Long]           = lastBlockHeader.map(_.header.timestamp)
     def lastBlockIds(maxRollbackLength: Int): Seq[ByteStr] =
-      (blockchain.height to blockchain.finalizedHeightOrFallback(maxRollbackLength) by -1).flatMap(blockId)
+      (blockchain.height to blockchain.finalizedHeightOrFallback(maxRollbackLength).toInt by -1).flatMap(blockId)
 
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       (aoa: @unchecked) match {
@@ -158,11 +149,11 @@ object Blockchain {
       case _                          => false
     }
 
-    def unbannedEffectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long = {
-      val blockHeight = block.flatMap(b => blockchain.heightOf(b)).getOrElse(blockchain.height)
-      val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
-      val balances    = blockchain.balanceSnapshots(address, bottomLimit, block)
-      balances.view.map(_.effectiveBalance).min
+    def generatorBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long = {
+      val blockHeight = Height(block.flatMap(b => blockchain.heightOf(b)).getOrElse(blockchain.height))
+      val bottomLimit = (blockHeight - confirmations + 1).max(Height(1)).min(blockHeight)
+      val balances    = blockchain.balanceSnapshots(address, bottomLimit.toInt, block)
+      balances.view.map(_.generatorBalance).min
     }
 
     def effectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long = {
@@ -188,8 +179,24 @@ object Blockchain {
     def wavesPortfolio(address: Address): Portfolio = Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
-      generationDeposit = blockchain.currentGenerationPeriod.fold(0L)(blockchain.generationDeposit(address, _))
+      generationDeposit = blockchain.generationDeposit(address)
     )
+
+    // TODO: lock?
+    // TODO: not efficient? See RocksDBWriter.balanceSnapshots
+    // TODO: optimize
+    def generationDeposit(address: Address, at: Height = Height(blockchain.height)): Long = blockchain.generationPeriodOf(at).fold(0L) { currPeriod =>
+      val committedOnCurrent = blockchain.committedGenerators(currPeriod)
+      val conflictOnCurrent  = blockchain.conflictGenerators(currPeriod)
+      val idxOnCurrent = committedOnCurrent.zipWithIndex
+        .collectFirst { case ((currentAddress, _), i) if currentAddress == address => GeneratorIndex(i) }
+        .filterNot { idx => conflictOnCurrent.hasInUpTo(at, idx) }
+
+      val hasOnNext = blockchain.committedGenerators(currPeriod.next).exists { case (currentAddress, _) => currentAddress == address }
+
+      val committedTimes = idxOnCurrent.size + Numbers.when(hasOnNext)(1)
+      committedTimes * CommitToGenerationTransaction.DepositInWavelets
+    }
 
     def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
@@ -221,16 +228,16 @@ object Blockchain {
       isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && quantity == 1 && decimals == 0 && !reissuable
 
     def isFeatureActivated(feature: BlockchainFeature, height: Int = blockchain.height): Boolean =
-      blockchain.activatedFeatures.get(feature.id).exists(_ <= height)
+      blockchain.activatedFeatures.get(feature.id).exists(_ <= Height(height))
 
     def activatedFeaturesAt(height: Int): Set[Short] =
       blockchain.activatedFeatures.collect {
-        case (featureId, activationHeight) if height >= activationHeight => featureId
+        case (featureId, activationHeight) if Height(height) >= activationHeight => featureId
       }.toSet
 
     def featureStatus(feature: Short, height: Int): BlockchainFeatureStatus =
-      if (blockchain.activatedFeatures.get(feature).exists(_ <= height)) BlockchainFeatureStatus.Activated
-      else if (blockchain.approvedFeatures.get(feature).exists(_ <= height)) BlockchainFeatureStatus.Approved
+      if (blockchain.activatedFeatures.get(feature).exists(_ <= Height(height))) BlockchainFeatureStatus.Activated
+      else if (blockchain.approvedFeatures.get(feature).exists(_ <= Height(height))) BlockchainFeatureStatus.Approved
       else BlockchainFeatureStatus.Undefined
 
     def isCommitted(height: Int, miner: Address): Boolean = blockchain.generationPeriodOf(Height(height)).fold(true) { p =>
@@ -248,7 +255,7 @@ object Blockchain {
     def blockVersionAt(height: Int): Byte =
       if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
       else if (isFeatureActivated(BlockchainFeatures.BlockReward, height)) {
-        if (blockchain.activatedFeatures(BlockchainFeatures.BlockReward.id) == height) NgBlockVersion else RewardBlockVersion
+        if (blockchain.activatedFeatures(BlockchainFeatures.BlockReward.id) == Height(height)) NgBlockVersion else RewardBlockVersion
       } else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
@@ -273,9 +280,9 @@ object Blockchain {
     def supportsLightNodeBlockFields(height: Int = blockchain.height): Boolean =
       blockchain
         .featureActivationHeight(BlockchainFeatures.LightNode)
-        .exists(height >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
+        .exists(Height(height) >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
 
-    def blockRewardBoost(height: Int): Int =
+    def blockRewardBoost(height: Height): Int =
       blockchain
         .featureActivationHeight(BlockchainFeatures.BoostBlockReward)
         .filter { boostHeight =>
@@ -283,6 +290,8 @@ object Blockchain {
         }
         .fold(1)(_ => BlockRewardCalculator.RewardBoost)
 
+    /** @return None, if DeterministicFinality is not activated for provided height
+      */
     def generationPeriodOf(h: Height): Option[GenerationPeriod] = for {
       activation <- blockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality)
       p          <- GenerationPeriod.from(h, activation, blockchain.settings.functionalitySettings)
@@ -293,6 +302,6 @@ object Blockchain {
 
   def finalizedHeightOrFallback(at: Height, latestFinalized: Option[Height], maxRollbackLength: Int): Height = {
     val minFallbackHeight = at - maxRollbackLength
-    Height(latestFinalized.getOrElse(GenesisBlockHeight).max(minFallbackHeight)) // Compare with fallback in the end
+    latestFinalized.getOrElse(GenesisBlockHeight).max(minFallbackHeight) // Compare with fallback in the end
   }
 }

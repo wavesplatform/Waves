@@ -4,12 +4,12 @@ import cats.syntax.option.*
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.GenerationPeriod.*
 
-case class GenerationPeriod(activation: Height, start: Height, length: Int) {
+case class GenerationPeriod(activation: Height, start: Height, length: Int) extends Ordered[GenerationPeriod] {
   require(start >= activation, s"GenerationPeriod: $start >= $activation")
 
   def end: Height = {
     val offset = if (isZero) 0 else -1
-    Height(start + length + offset)
+    start + length + offset
   }
 
   def next: GenerationPeriod = move(end + 1)
@@ -27,7 +27,9 @@ case class GenerationPeriod(activation: Height, start: Height, length: Int) {
 
   private def isZero: Boolean = activation == start
 
-  private def move(newStart: Int): GenerationPeriod = GenerationPeriod(activation, Height(newStart), length)
+  private def move(newStart: Height): GenerationPeriod = GenerationPeriod(activation, newStart, length)
+
+  override def compare(that: GenerationPeriod): Int = start compare that.start
 
   override def toString: String = s"[$start, $end]"
 }
@@ -44,14 +46,11 @@ object GenerationPeriod {
     if (h < activation) none
     else {
       val blockAfterActivation = h - activation
-      val periodIndex          = (blockAfterActivation - 1) / generationPeriodLength
+      val periodIndex          = (blockAfterActivation.toInt - 1) / generationPeriodLength
       GenerationPeriod(
         activation,
-        start = Height {
-          if (periodIndex == 0) activation
-          else activation + periodIndex * generationPeriodLength + 1
-        },
-        length = generationPeriodLength
+        if (periodIndex == 0) activation else activation + periodIndex * generationPeriodLength + 1,
+        generationPeriodLength
       ).some
     }
 

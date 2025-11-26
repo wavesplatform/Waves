@@ -41,16 +41,12 @@ object CommonGeneratorsApi {
         val txnsKey       = Keys.commitmentTransactions(period, at)
         val txnsKeyPrefix = txnsKey.keyBytes.dropRight(Ints.BYTES) // Drop height
         ro.iterateOver(txnsKeyPrefix) { dbEntry =>
-          txnIds.appendAll(
-            txnsKey
-              .parse(dbEntry.getValue)
-              .getOrElse(Seq.empty)
-          )
+          txnIds.appendAll(txnsKey.parse(dbEntry.getValue))
         }
 
         val addresses = ro.multiGet(addressIds.map(Keys.idToAddress), Address.AddressLength)
         val balances =
-          if (at == blockchain.height) blockchain.currentGeneratorBalances().map { case (_, b) => b }
+          if (at.toInt == blockchain.height) blockchain.currentGeneratorBalances().map { case (_, b) => b }
           else ro.get(Keys.generatorBalances(at, rdb.apiHandle)).getOrElse(Seq.empty)
 
         (addressIds, addresses, blsPks, txnIds, balances)

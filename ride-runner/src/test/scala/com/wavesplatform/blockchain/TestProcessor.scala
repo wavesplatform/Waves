@@ -32,11 +32,11 @@ class TestProcessor extends Processor {
 
 sealed trait ProcessorAction extends Product with Serializable
 
-case class RemoveFrom(height: Int) extends ProcessorAction
+case class RemoveFrom(height: Height) extends ProcessorAction
 
 object RemoveFrom {
-  def apply(event: SubscribeEvent): RemoveFrom = RemoveFrom(event.getUpdate.height)
-  def next(event: SubscribeEvent): RemoveFrom  = RemoveFrom(event.getUpdate.height + 1)
+  def apply(event: SubscribeEvent): RemoveFrom = RemoveFrom(Height(event.getUpdate.height))
+  def next(event: SubscribeEvent): RemoveFrom  = RemoveFrom(Height(event.getUpdate.height + 1))
 }
 
 case class Process(updated: BlockchainUpdated) extends ProcessorAction

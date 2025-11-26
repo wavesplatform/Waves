@@ -4,11 +4,10 @@ import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.BlockchainApi.*
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.{AssetDescription, DataEntry, Height}
+import com.wavesplatform.state.{AssetDescription, DataEntry, Height, TransactionId}
 import com.wavesplatform.transaction.Asset
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -26,7 +25,7 @@ trait BlockchainApi {
   def resolveAlias(alias: Alias): Option[Address]
   def getBalance(address: Address, asset: Asset): Long
   def getLeaseBalance(address: Address): WavesBalances
-  def getTransactionHeight(id: ByteStr): Option[Height]
+  def getTransactionHeight(id: TransactionId): Option[Height]
 }
 
 object BlockchainApi {

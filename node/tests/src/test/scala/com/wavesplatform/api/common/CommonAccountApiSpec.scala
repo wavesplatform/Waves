@@ -9,7 +9,7 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.{DataEntry, EmptyDataEntry, StringDataEntry, diffs}
+import com.wavesplatform.state.{DataEntry, EmptyDataEntry, StringDataEntry, diffs, Height, TransactionId}
 import com.wavesplatform.test.DomainPresets.RideV4
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.TxHelpers.data
@@ -152,7 +152,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
           invoke.id()
         )
         d.accountsApi.leaseInfo(leaseId) shouldBe Some(
-          LeaseInfo(leaseId, invoke.id(), TxHelpers.secondAddress, TxHelpers.defaultAddress, 1, 2, LeaseInfo.Status.Active)
+          LeaseInfo(leaseId, TransactionId(invoke.id()), TxHelpers.secondAddress, TxHelpers.defaultAddress, 1, Height(2), LeaseInfo.Status.Active)
         )
       }
   }

@@ -66,7 +66,7 @@ object Address {
   val AddressLength: Int       = 1 + 1 + HashLength + ChecksumLength
   val AddressStringLength: Int = base58Length(AddressLength)
 
-  private val publicKeyBytesCache: Cache[(ByteStr, Byte), Address] = CacheBuilder
+  private val publicKeyBytesCache: Cache[(PublicKey, Byte), Address] = CacheBuilder
     .newBuilder()
     .softValues()
     .maximumSize(200000)

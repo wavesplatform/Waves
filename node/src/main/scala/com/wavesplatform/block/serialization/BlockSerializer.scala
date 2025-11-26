@@ -10,6 +10,7 @@ import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
+import com.wavesplatform.state.GeneratorIndex
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json.{JsArray, JsNumber, JsObject, Json}
@@ -90,11 +91,11 @@ object BlockHeaderSerializer {
       case None => JsObject.empty
       case Some(fh) =>
         val builder = Json.newBuilder
-        if (fh.endorserIndexes.nonEmpty) builder += "endorserIndexes" -> fh.endorserIndexes
-        builder += "aggregatedEndorsementSignature"                   -> fh.aggregatedEndorsement.base58
+        if (fh.valid.nonEmpty) builder += "endorserIndexes" -> GeneratorIndex.toInts(fh.valid)
+        builder += "aggregatedEndorsementSignature"         -> fh.aggregatedEndorsement.base58
         if (fh.conflict.nonEmpty) builder += "conflictEndorsements" -> fh.conflict.map { x =>
           Json.obj(
-            "endorserIndex"    -> x.endorserIndex,
+            "endorserIndex"    -> x.endorserIndex.toInt,
             "finalizedBlockId" -> x.finalizedId.toString,
             "signature"        -> x.signature.base58
           )

@@ -15,7 +15,18 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.traits.domain.*
-import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, LeaseBalance, LeaseDetails, LeaseStaticInfo, Portfolio, SponsorshipValue, StateSnapshot}
+import com.wavesplatform.state.{
+  AssetVolumeInfo,
+  Blockchain,
+  Height,
+  LeaseBalance,
+  LeaseDetails,
+  LeaseStaticInfo,
+  Portfolio,
+  SponsorshipValue,
+  StateSnapshot,
+  TransactionId
+}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxPositiveAmount
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -139,7 +150,7 @@ object DiffsCommon {
       recipient: AddressOrAlias,
       fee: Long,
       leaseId: ByteStr,
-      txId: ByteStr
+      txId: TransactionId
   ): Either[ValidationError, StateSnapshot] = {
     val senderAddress = sender.toAddress
     for {
@@ -169,7 +180,7 @@ object DiffsCommon {
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = portfolioDiff,
-        newLeases = Map(leaseId -> LeaseStaticInfo(sender, recipientAddress, amount, txId, blockchain.height))
+        newLeases = Map(leaseId -> LeaseStaticInfo(sender, recipientAddress, amount, txId, Height(blockchain.height)))
       )
     } yield snapshot
   }
@@ -204,7 +215,7 @@ object DiffsCommon {
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = portfolios,
-        cancelledLeases = Map(leaseId -> LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
+        cancelledLeases = Map(leaseId -> LeaseDetails.Status.Cancelled(Height(blockchain.height), Some(TransactionId(cancelTxId))))
       )
     } yield snapshot
   }

@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 trait EmptyBlockchain extends Blockchain {
   override lazy val settings: BlockchainSettings = BlockchainSettings.fromRootConfig(ConfigFactory.load())
 
-  override def height: Int = GenesisBlockHeight
+  override def height: Int = GenesisBlockHeight.toInt
 
   override def finalizedHeight: Option[Height] = None
 
@@ -98,6 +98,8 @@ trait EmptyBlockchain extends Blockchain {
   override def lastStateHash(refId: Option[ByteStr]): ByteStr = TxStateSnapshotHashBuilder.InitStateHash
 
   override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
+
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = ConflictGenerators.empty
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 }

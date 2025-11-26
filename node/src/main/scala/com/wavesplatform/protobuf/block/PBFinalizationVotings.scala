@@ -1,11 +1,9 @@
 package com.wavesplatform.protobuf.block
 
-import cats.syntax.either.*
-import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.protobuf.*
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.state.{GeneratorIndex, Height}
 
 import scala.util.Try
 
@@ -16,19 +14,12 @@ object PBFinalizationVotings {
       else BlsSignature(pb.aggregatedEndorsementSignature.toByteArray).explicitGet()
 
     VanillaFinalizationVoting(
-      pb.endorserIndexes,
+      GeneratorIndex.seq(pb.endorserIndexes),
+      Height(pb.finalizedBlockHeight),
       aggSig,
       pb.conflictEndorsements.zipWithIndex.map { case (x, i) =>
-        val r = for {
-          sig <- BlsSignature(pb.aggregatedEndorsementSignature.toByteArray)
-          x <- PBEndorseBlocks.vanilla(x, sig) match {
-            case x: BlockEndorsement.Conflict => x.asRight
-            case x                            => GenericError(s"Expected a conflict endorsement, got $x").asLeft
-          }
-        } yield x
-
-        r match {
-          case Left(e)  => throw new IllegalArgumentException(s"Error during parsing $i conflict endorsement: $e")
+        BlsSignature(x.signature.toByteArray).map(PBEndorseBlocks.vanilla(x, _)) match {
+          case Left(e)  => throw new IllegalArgumentException(s"Error during parsing conflict endorsement #$i: $e")
           case Right(r) => r
         }
       }.toVector
@@ -37,14 +28,9 @@ object PBFinalizationVotings {
 
   def protobuf(v: VanillaFinalizationVoting): PBFinalizationVoting =
     new PBFinalizationVoting(
-      v.endorserIndexes,
+      GeneratorIndex.toInts(v.valid),
+      v.finalizedHeight.toInt,
       v.aggregatedEndorsement.byteStr.toByteString,
-      v.conflict.map { x =>
-        PBEndorseBlock(
-          x.endorserIndex,
-          x.finalizedId.toByteString,
-          signature = x.signature.byteStr.toByteString
-        )
-      }
+      v.conflict.map(PBEndorseBlocks.protobuf)
     )
 }

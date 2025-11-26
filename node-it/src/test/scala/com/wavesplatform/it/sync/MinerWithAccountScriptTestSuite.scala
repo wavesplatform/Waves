@@ -4,18 +4,19 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.{BaseFunSuite, NodeConfigs}
 import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.{BaseFunSuite, NodeConfigs}
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.Height
 
 class MinerWithAccountScriptTestSuite extends BaseFunSuite {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
-      .overrideBase(_.preactivatedFeatures(Seq(BlockchainFeatures.RideV6.id.toInt -> 0)*))
+      .overrideBase(_.preactivatedFeatures(Seq(BlockchainFeatures.RideV6.id.toInt -> Height(0))*))
       .withDefault(1)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()
@@ -53,8 +54,8 @@ class MinerWithAccountScriptTestSuite extends BaseFunSuite {
         }
       }
 
-      notMiner.blockAt(transferTxInfo.height).generator shouldBe miner.address
-      miner.blockAt(transferTxInfo.height).generator shouldBe miner.address
+      notMiner.blockAt(Height(transferTxInfo.height)).generator shouldBe miner.address
+      miner.blockAt(Height(transferTxInfo.height)).generator shouldBe miner.address
     }
   }
 

@@ -3,10 +3,11 @@ package com.wavesplatform.transaction
 import com.google.common.primitives.Ints
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.*
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
+import com.wavesplatform.crypto.{DigestLength, SignatureLength}
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
@@ -465,7 +466,7 @@ object TxHelpers {
   }
 
   def commitToGeneration(
-      generationPeriodStart: Int,
+      generationPeriodStart: Height,
       sender: KeyPair = defaultSigner,
       endorserPublicKey: BlsPublicKey = BlsKeyPair(defaultSigner.privateKey).publicKey,
       timestamp: TxTimestamp = timestamp,
@@ -475,7 +476,7 @@ object TxHelpers {
     .selfSigned(
       sender,
       endorserPublicKey,
-      Height(generationPeriodStart),
+      generationPeriodStart,
       timestamp,
       fee,
       chainId
@@ -486,6 +487,7 @@ object TxHelpers {
     invokeFee(freeCall) + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeConstants(TransactionType.Issue) * FeeUnit
 
   def randomId: TransactionId = TransactionId(ByteStr(Array.fill(DigestLength)(ThreadLocalRandom.current().nextInt(Byte.MaxValue).toByte)))
+  def randomBlockId: BlockId  = ByteStr(Array.fill(SignatureLength)(ThreadLocalRandom.current().nextInt(Byte.MaxValue).toByte))
 
   private def invokeFee(freeCall: Boolean) =
     if (freeCall)

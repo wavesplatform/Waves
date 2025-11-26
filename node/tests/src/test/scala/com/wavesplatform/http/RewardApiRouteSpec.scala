@@ -7,6 +7,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxHelpers
@@ -144,9 +145,9 @@ class RewardApiRouteSpec extends RouteSpec("/blockchain") with WithDomain {
        |  "currentReward" : ${d.blockchain.settings.rewardsSettings.initial},
        |  "minIncrement" : ${d.blockchain.settings.rewardsSettings.minIncrement},
        |  "term" : ${d.blockchain.settings.rewardsSettings.term},
-       |  "nextCheck" : ${d.blockchain.settings.rewardsSettings.nearestTermEnd(0, 1, modifyTerm = false)},
+       |  "nextCheck" : ${d.blockchain.settings.rewardsSettings.nearestTermEnd(Height(0), Height(1), modifyTerm = false)},
        |  "votingIntervalStart" : ${d.blockchain.settings.rewardsSettings
-      .nearestTermEnd(0, 1, modifyTerm = false) - d.blockchain.settings.rewardsSettings.votingInterval + 1},
+      .nearestTermEnd(Height(0), Height(1), modifyTerm = false) - d.blockchain.settings.rewardsSettings.votingInterval + 1},
        |  "votingInterval" : ${d.blockchain.settings.rewardsSettings.votingInterval},
        |  "votingThreshold" : ${d.blockchain.settings.rewardsSettings.votingInterval / 2 + 1},
        |  "votes" : {

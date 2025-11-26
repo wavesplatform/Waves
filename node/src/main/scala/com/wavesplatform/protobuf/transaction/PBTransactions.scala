@@ -2,7 +2,7 @@ package com.wavesplatform.protobuf.transaction
 
 import cats.syntax.traverse.*
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
@@ -79,10 +79,6 @@ object PBTransactions {
       case SignedTransaction.Transaction.EthereumTransaction(value) => EthereumTransaction(value.toByteArray)
       case SignedTransaction.Transaction.WavesTransaction(parsedTx) =>
         val (feeAsset, feeAmount) = PBAmounts.toAssetAndAmount(parsedTx.fee.getOrElse(Amount.defaultInstance))
-        val sender = Option(parsedTx.senderPublicKey)
-          .filterNot(_.isEmpty)
-          .map(pk => PublicKey(pk.toByteArray))
-          .orNull
         for {
           tx <-
             if (unsafe)
@@ -90,7 +86,7 @@ object PBTransactions {
                 createVanillaUnsafe(
                   parsedTx.version,
                   parsedTx.chainId.toByte,
-                  sender,
+                  parsedTx.senderPublicKey,
                   feeAmount,
                   feeAsset,
                   parsedTx.timestamp,
@@ -104,7 +100,7 @@ object PBTransactions {
                 tx <- createVanilla(
                   parsedTx.version,
                   parsedTx.chainId.toByte,
-                  sender,
+                  parsedTx.senderPublicKey,
                   feeAmount,
                   feeAsset,
                   parsedTx.timestamp,
@@ -118,7 +114,7 @@ object PBTransactions {
   private def createVanilla(
       version: Int,
       chainId: Byte,
-      sender: PublicKey,
+      sender: ByteString,
       feeAmount: Long,
       feeAssetId: VanillaAssetId,
       timestamp: Long,
@@ -137,7 +133,7 @@ object PBTransactions {
       case Data.Payment(PaymentTransactionData(recipient, amount, `empty`)) =>
         for {
           addr <- PBRecipients.toAddress(recipient.toByteArray, chainId)
-          tx   <- vt.PaymentTransaction.create(sender, addr, amount, feeAmount, timestamp, signature)
+          tx   <- vt.PaymentTransaction.create(sender.toPublicKey, addr, amount, feeAmount, timestamp, signature)
         } yield tx
 
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment, `empty`)) =>
@@ -145,7 +141,7 @@ object PBTransactions {
           address <- recipient.toAddressOrAlias(chainId)
           tx <- vt.transfer.TransferTransaction.create(
             version.toByte,
-            sender,
+            sender.toPublicKey,
             address,
             amount.vanillaAssetId,
             amount.longAmount,
@@ -158,12 +154,12 @@ object PBTransactions {
         } yield tx
 
       case Data.CreateAlias(CreateAliasTransactionData(alias, _)) =>
-        vt.CreateAliasTransaction.create(version.toByte, sender, alias, feeAmount, timestamp, proofs, chainId)
+        vt.CreateAliasTransaction.create(version.toByte, sender.toPublicKey, alias, feeAmount, timestamp, proofs, chainId)
 
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script, `empty`)) =>
         vt.assets.IssueTransaction.create(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           name,
           description,
           quantity,
@@ -179,7 +175,7 @@ object PBTransactions {
       case Data.Reissue(ReissueTransactionData(Some(Amount(assetId, amount, `empty`)), reissuable, `empty`)) =>
         vt.assets.ReissueTransaction.create(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           IssuedAsset(assetId.toByteStr),
           amount,
           reissuable,
@@ -190,12 +186,21 @@ object PBTransactions {
         )
 
       case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount, `empty`)), `empty`)) =>
-        vt.assets.BurnTransaction.create(version.toByte, sender, IssuedAsset(assetId.toByteStr), amount, feeAmount, timestamp, proofs, chainId)
+        vt.assets.BurnTransaction.create(
+          version.toByte,
+          sender.toPublicKey,
+          IssuedAsset(assetId.toByteStr),
+          amount,
+          feeAmount,
+          timestamp,
+          proofs,
+          chainId
+        )
 
       case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script, `empty`)) =>
         vt.assets.SetAssetScriptTransaction.create(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           IssuedAsset(assetId.toByteStr),
           toVanillaScript(script),
           feeAmount,
@@ -207,7 +212,7 @@ object PBTransactions {
       case Data.SetScript(SetScriptTransactionData(script, `empty`)) =>
         vt.smart.SetScriptTransaction.create(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           toVanillaScript(script),
           feeAmount,
           timestamp,
@@ -218,11 +223,11 @@ object PBTransactions {
       case Data.Lease(LeaseTransactionData(Some(recipient), amount, `empty`)) =>
         for {
           address <- recipient.toAddressOrAlias(chainId)
-          tx      <- vt.lease.LeaseTransaction.create(version.toByte, sender, address, amount, feeAmount, timestamp, proofs)
+          tx      <- vt.lease.LeaseTransaction.create(version.toByte, sender.toPublicKey, address, amount, feeAmount, timestamp, proofs)
         } yield tx
 
       case Data.LeaseCancel(LeaseCancelTransactionData(leaseId, `empty`)) =>
-        vt.lease.LeaseCancelTransaction.create(version.toByte, sender, leaseId.toByteStr, feeAmount, timestamp, proofs, chainId)
+        vt.lease.LeaseCancelTransaction.create(version.toByte, sender.toPublicKey, leaseId.toByteStr, feeAmount, timestamp, proofs, chainId)
 
       case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(order1, order2), `empty`)) =>
         for {
@@ -244,7 +249,7 @@ object PBTransactions {
         } yield tx
 
       case Data.DataTransaction(dt) =>
-        vt.DataTransaction.create(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs, chainId)
+        vt.DataTransaction.create(version.toByte, sender.toPublicKey, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs, chainId)
 
       case Data.MassTransfer(mt) =>
         for {
@@ -256,7 +261,7 @@ object PBTransactions {
           }
           tx <- vt.transfer.MassTransferTransaction.create(
             version.toByte,
-            sender,
+            sender.toPublicKey,
             PBAmounts.toVanillaAssetId(mt.assetId),
             parsedTransfers,
             feeAmount,
@@ -270,7 +275,7 @@ object PBTransactions {
       case Data.SponsorFee(SponsorFeeTransactionData(Some(Amount(assetId, minFee, `empty`)), `empty`)) =>
         vt.assets.SponsorFeeTransaction.create(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           IssuedAsset(assetId.toByteStr),
           Option(minFee).filter(_ > 0),
           feeAmount,
@@ -295,7 +300,7 @@ object PBTransactions {
 
           tx <- vt.smart.InvokeScriptTransaction.create(
             version.toByte,
-            sender,
+            sender.toPublicKey,
             dApp,
             fcOpt,
             payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
@@ -310,7 +315,7 @@ object PBTransactions {
       case Data.UpdateAssetInfo(UpdateAssetInfoTransactionData(assetId, name, description, `empty`)) =>
         UpdateAssetInfoTransaction.create(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           assetId.toByteStr,
           name,
           description,
@@ -325,7 +330,7 @@ object PBTransactions {
         for {
           sig <- BlsSignature(commitmentSignature.toByteArray)
           tx <- CommitToGenerationTransaction.create(
-            sender,
+            sender.toPublicKey,
             BlsPublicKey(endorserPublicKey.toByteStr),
             Height(generationPeriodStart),
             timestamp,
@@ -345,7 +350,7 @@ object PBTransactions {
           }
           tx <- InvokeExpressionTransaction.create(
             version.toByte,
-            sender,
+            sender.toPublicKey,
             expression,
             feeAmount,
             feeAssetId,
@@ -365,7 +370,7 @@ object PBTransactions {
   private def createVanillaUnsafe(
       version: Int,
       chainId: Byte,
-      sender: PublicKey,
+      sender: ByteString,
       feeAmount: Long,
       feeAssetId: VanillaAssetId,
       timestamp: Long,
@@ -387,7 +392,7 @@ object PBTransactions {
 
       case Data.Payment(PaymentTransactionData(recipient, amount, `empty`)) =>
         vt.PaymentTransaction(
-          sender,
+          sender.toPublicKey,
           PBRecipients.toAddress(recipient.toByteArray, chainId).explicitGet(),
           TxPositiveAmount.unsafeFrom(amount),
           TxPositiveAmount.unsafeFrom(feeAmount),
@@ -399,7 +404,7 @@ object PBTransactions {
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment, `empty`)) =>
         vt.transfer.TransferTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           recipient.toAddressOrAlias(chainId).explicitGet(),
           amount.vanillaAssetId,
           TxPositiveAmount.unsafeFrom(amount.longAmount),
@@ -414,7 +419,7 @@ object PBTransactions {
       case Data.CreateAlias(CreateAliasTransactionData(alias, `empty`)) =>
         vt.CreateAliasTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           alias,
           TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
@@ -425,7 +430,7 @@ object PBTransactions {
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script, `empty`)) =>
         vt.assets.IssueTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           name.toByteString,
           description.toByteString,
           TxPositiveAmount.unsafeFrom(quantity),
@@ -441,7 +446,7 @@ object PBTransactions {
       case Data.Reissue(ReissueTransactionData(Some(Amount(assetId, amount, `empty`)), reissuable, `empty`)) =>
         vt.assets.ReissueTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           IssuedAsset(assetId.toByteStr),
           TxPositiveAmount.unsafeFrom(amount),
           reissuable,
@@ -454,7 +459,7 @@ object PBTransactions {
       case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount, `empty`)), `empty`)) =>
         vt.assets.BurnTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           IssuedAsset(assetId.toByteStr),
           TxNonNegativeAmount.unsafeFrom(amount),
           TxPositiveAmount.unsafeFrom(feeAmount),
@@ -466,7 +471,7 @@ object PBTransactions {
       case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script, `empty`)) =>
         vt.assets.SetAssetScriptTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           IssuedAsset(assetId.toByteStr),
           toVanillaScript(script),
           TxPositiveAmount.unsafeFrom(feeAmount),
@@ -478,7 +483,7 @@ object PBTransactions {
       case Data.SetScript(SetScriptTransactionData(script, `empty`)) =>
         vt.smart.SetScriptTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           toVanillaScript(script),
           TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
@@ -489,7 +494,7 @@ object PBTransactions {
       case Data.Lease(LeaseTransactionData(Some(recipient), amount, `empty`)) =>
         vt.lease.LeaseTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           recipient.toAddressOrAlias(chainId).explicitGet(),
           TxPositiveAmount.unsafeFrom(amount),
           TxPositiveAmount.unsafeFrom(feeAmount),
@@ -499,7 +504,15 @@ object PBTransactions {
         )
 
       case Data.LeaseCancel(LeaseCancelTransactionData(leaseId, `empty`)) =>
-        vt.lease.LeaseCancelTransaction(version.toByte, sender, leaseId.toByteStr, TxPositiveAmount.unsafeFrom(feeAmount), timestamp, proofs, chainId)
+        vt.lease.LeaseCancelTransaction(
+          version.toByte,
+          sender.toPublicKey,
+          leaseId.toByteStr,
+          TxPositiveAmount.unsafeFrom(feeAmount),
+          timestamp,
+          proofs,
+          chainId
+        )
 
       case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder), `empty`)) =>
         vt.assets.exchange.ExchangeTransaction(
@@ -519,7 +532,7 @@ object PBTransactions {
       case Data.DataTransaction(dt) =>
         vt.DataTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           dt.data.toList.map(toVanillaDataEntry),
           TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
@@ -530,7 +543,7 @@ object PBTransactions {
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           PBAmounts.toVanillaAssetId(mt.assetId),
           mt.transfers
             .flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, TxNonNegativeAmount.unsafeFrom(t.amount))))
@@ -545,7 +558,7 @@ object PBTransactions {
       case Data.SponsorFee(SponsorFeeTransactionData(Some(Amount(assetId, minFee, `empty`)), `empty`)) =>
         vt.assets.SponsorFeeTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           IssuedAsset(assetId.toByteStr),
           Some(minFee).filter(_ > 0).map(TxPositiveAmount.unsafeFrom),
           TxPositiveAmount.unsafeFrom(feeAmount),
@@ -557,7 +570,7 @@ object PBTransactions {
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments, `empty`)) =>
         vt.smart.InvokeScriptTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           PBRecipients.toAddressOrAlias(dappAddress, chainId).explicitGet(),
           Deser
             .parseOption(functionCall.asReadOnlyByteBuffer())(SerdeV1.deserializeFunctionCall)
@@ -573,7 +586,7 @@ object PBTransactions {
       case Data.UpdateAssetInfo(UpdateAssetInfoTransactionData(assetId, name, description, `empty`)) =>
         vt.assets.UpdateAssetInfoTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           IssuedAsset(assetId.toByteStr),
           name,
           description,
@@ -587,7 +600,7 @@ object PBTransactions {
       case Data.InvokeExpression(InvokeExpressionTransactionData(expressionBytes, `empty`)) =>
         InvokeExpressionTransaction(
           version.toByte,
-          sender,
+          sender.toPublicKey,
           toVanillaScript(expressionBytes).get.asInstanceOf[ExprScript],
           TxPositiveAmount.unsafeFrom(feeAmount),
           feeAssetId,
@@ -705,7 +718,7 @@ object PBTransactions {
         import tx.*
         val data = Data.CommitToGeneration(
           CommitToGenerationTransactionData(
-            generationPeriodStart,
+            generationPeriodStart.toInt,
             endorserPublicKey.byteStr.toByteString,
             commitmentSignature.byteStr.toByteString
           )

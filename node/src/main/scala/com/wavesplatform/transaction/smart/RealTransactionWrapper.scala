@@ -7,7 +7,7 @@ import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain.{Recipient as RideRecipient, *}
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.assets.*
@@ -36,7 +36,7 @@ object RealTransactionWrapper {
       header(tx, txIdOpt),
       RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
       if (emptyBodyBytes) ByteStr.empty else ByteStr(tx.bodyBytes()),
-      tx.sender,
+      tx.sender.byteStr,
       proofs
     )
   }
@@ -46,8 +46,8 @@ object RealTransactionWrapper {
     Ord(
       id = o.id(),
       sender = RideRecipient.Address(ByteStr(o.sender.toAddress.bytes)),
-      senderPublicKey = o.senderPublicKey,
-      matcherPublicKey = o.matcherPublicKey,
+      senderPublicKey = o.senderPublicKey.byteStr,
+      matcherPublicKey = o.matcherPublicKey.byteStr,
       assetPair = o.assetPair,
       orderType = o.orderType match {
         case BUY  => OrdType.Buy
@@ -134,7 +134,7 @@ object RealTransactionWrapper {
                 Header(ci.id(), ci.fee, ci.timestamp, version),
                 RideRecipient.Address(ByteStr(ci.sender.toAddress.bytes)),
                 ByteStr(bodyBytes),
-                ci.sender,
+                ci.sender.byteStr,
                 proofs.toIndexedSeq
               ),
               toRide(ci.dApp),
@@ -164,7 +164,7 @@ object RealTransactionWrapper {
         Header(t.id(), t.fee, t.timestamp, version),
         RideRecipient.Address(ByteStr(t.sender.toAddress.bytes)),
         ByteStr(bodyBytes),
-        t.sender,
+        t.sender.byteStr,
         proofs.toIndexedSeq
       ),
       feeAssetId = t.feeAssetId.compatId,

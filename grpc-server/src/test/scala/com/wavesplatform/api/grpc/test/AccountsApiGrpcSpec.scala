@@ -12,7 +12,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{DataEntry, Recipient}
-import com.wavesplatform.state.{BlockRewardCalculator, EmptyDataEntry, IntegerDataEntry}
+import com.wavesplatform.state.{Height, BlockRewardCalculator, EmptyDataEntry, IntegerDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
@@ -248,7 +248,7 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
   private def getLastBlockMinerReward(d: Domain): Long =
     BlockRewardCalculator
       .getBlockRewardShares(
-        d.blockchain.height,
+        Height(d.blockchain.height),
         d.blockchain.settings.rewardsSettings.initial,
         d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
         d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,

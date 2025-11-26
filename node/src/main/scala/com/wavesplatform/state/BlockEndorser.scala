@@ -1,9 +1,10 @@
 package com.wavesplatform.state
 
+import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.network.{ChannelGroupExt, EndorseBlock}
-import com.wavesplatform.state.EndorsementStorage.EndorsementFilter
+import com.wavesplatform.state.EndorsementFilter
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 
@@ -22,24 +23,21 @@ object BlockEndorser {
     override def vote(): Unit = {}
   }
 
-  class InMemory(blockchain: Blockchain, wallet: Wallet, endorsementStorage: EndorsementStorage, allChannels: ChannelGroup) extends BlockEndorser {
+  class InMemory(blockchain: Blockchain, wallet: Wallet, endorsementStorage: EndorsementStorage, allChannels: ChannelGroup)
+      extends BlockEndorser
+      with StrictLogging {
     override def vote(): Unit = {
       val votingHeight   = Height(blockchain.height)
-      val endorsedHeight = Height(votingHeight - 1)
+      val endorsedHeight = votingHeight - 1
       if (endorsedHeight > GenesisBlockHeight) for {
         votingPeriod <- blockchain.generationPeriodOf(votingHeight).toSeq
 
-        votingBlockHeader <- blockchain
-          .blockHeader(votingHeight)
-          .toSeq
+        votingBlockHeader   <- blockchain.blockHeader(votingHeight.toInt).toSeq
+        endorsedBlockHeader <- blockchain.blockHeader(endorsedHeight.toInt).toSeq
 
-        endorsedBlockHeader <- blockchain
-          .blockHeader(endorsedHeight)
-          .toSeq
-
-        finalizedHeight = blockchain.finalizedHeightAtOrFallback(votingHeight)
+        finalizedHeight = blockchain.finalizedHeightAtOrFallback(votingHeight.toInt)
         finalizedId <- blockchain
-          .blockId(finalizedHeight)
+          .blockId(finalizedHeight.toInt)
           .toSeq
 
         endorsedId = endorsedBlockHeader.id()
@@ -56,23 +54,26 @@ object BlockEndorser {
             .zip(balances)
             .map { case ((addr1, blsPk), (addr2, balance)) =>
               require(addr1 == addr2, s"addr1=$addr1 == addr2=$addr2")
-              blsPk -> balance
+              (addr1, blsPk, balance)
             }
             .to(Vector)
 
-          EndorsementFilter(if (minerIndex < 0) None else Some(minerIndex), finalizedId, finalizedHeight, endorsedId, endorsers)
+          val conflict = blockchain.conflictGenerators(votingPeriod).upTo(votingHeight)
+          EndorsementFilter(GeneratorIndex.checked(minerIndex), finalizedId, finalizedHeight, endorsedId, endorsers, conflict)
         }
         if endorsementStorage.startVoting(filter)
 
         (account, idx) <- for {
           ((committedAddr, _), idx) <- committed.zipWithIndex
-          if committedAddr != votingBlockMiner // A miner doesn’t need to endorse its own blocks - a mining is already an endorsement
+          if !filter.miner.contains(idx) // A miner doesn’t need to endorse its own blocks - a mining is already an endorsement
           pk <- wallet.privateKeyAccount(committedAddr).toSeq
-        } yield (pk, idx)
+        } yield (pk, GeneratorIndex(idx))
+        _ = logger.debug(s"Found ${account.toAddress} in generator set") // TODO: remove from prod
 
-        endorsement = BlockEndorsement.full(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
+        endorsement = BlockEndorsement.signed(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
         networkMsg  = EndorseBlock.from(endorsement)
-        broadcast <- endorsementStorage.tryAddVote(networkMsg).toSeq
+        broadcast <- endorsementStorage.tryAdd(networkMsg).toSeq
+        _ = logger.debug(s"Will ${if (broadcast) "" else "not "}broadcast endorsement from ${account.toAddress}") // TODO: remove from prod
         if broadcast
       } allChannels.broadcast(networkMsg)
     }

@@ -315,6 +315,53 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
     }
   }
 
+  property("test from ride-js") {
+    val message = "hello world".getBytes()
+    val signature = Base64.decode("Gnco0w3Kd19R6GiWU+ANsJoleurQ8sYQZWUfY+pst9u9m22FHmqnUgo7A22yyQHLBdeLAyPCqbMvFFMKlebnAiZWjbQsOClo8Ddv4avVJJdetSzjJO0QpoG/34/N+1Zmm0TKxDZG8+++hwR1JGsIRI5msT5/ZxW01Dzqaz+ErfNOt6NMAU37bCgdZoF6QxXg2SCLCfOwK31jMcFdBpMOFiKZDogBYl5GX2y2uf1jzUHSwzTr3GZAtMNMXDjZNOQOZ6SRo0SKuZ5nBS9jndAXliT0AMtg838YjCh8I+yNCT+4vnPMPMnot3ikMFORcKdHBhOpApV6K2FqydA7/NItQA==")
+    val pub = Base64.decode("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsoF++eHcQwJ6gtPcxHEMAmVTVmpyRrUrxsCQV3oeNu+EiMC45WTDHs5iTEaVgneDOhJ71CmgzJ1HvxRjSmuRtP29M/9HDQOtZjLDKGY+UvroJxjXQcJ/z/PDgTZv1pV6eX754vb+h1z600Vy8MNCoY1P2D36i9v4oN5vnVnHhdrT7h6zU7IyW4UW9arRBZe3K0JXzTLOx+nSxnoFuOb6e5Ruv7sRMZPIirLHM6hUx3eOJP3AWo/B6vRvqMNqXqpSiqDQazJqp8PVljOHsQUpHpx52+/+lzRGREERNirQF7Q+C8gUnFo9B2mRg02j0g8o2TFDBVn+HLQ0NFPQlrc2gQIDAQAB")
+    eval(
+      scriptSrc(SHA3256, message, signature, pub),
+      PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3, true)
+    ) shouldBe Right(CONST_BOOLEAN(true))
+  }
+  
+  ignore("test all hashes") {
+    val message = "hello world".getBytes()
+    val keyPair = keyPairGenerator.sample.get
+    val xpub = keyPair.getPublic
+    val xprv = keyPair.getPrivate
+    println(s"PUB=${Base64.encode(xpub.getEncoded)}")
+    println(s"MSG=${Base64.encode(message)}")
+    algs.foreach { alg =>
+      val prefix = RSA.digestAlgorithmPrefix(alg)
+
+      val privateSignature = Signature.getInstance(s"${prefix}withRSA", provider)
+      privateSignature.initSign(xprv)
+      privateSignature.update(message)
+
+      val signature = privateSignature.sign
+      println(s"$alg=${Base64.encode(signature)}")
+    }
+  }
+
+  property("sign from scala") {
+    val message = "hello world".getBytes()
+    val kp = keyPairGenerator.sample.get
+
+    val prefix = RSA.digestAlgorithmPrefix(SHA3256)
+
+    val privateSignature = Signature.getInstance(s"${prefix}withRSA", provider)
+    privateSignature.initSign(kp.getPrivate)
+    privateSignature.update(message)
+
+    val signature = privateSignature.sign
+
+    eval(
+      scriptSrc(SHA3256, message, signature, kp.getPublic.getEncoded),
+      PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3, true)
+    ) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
   property("false on incorrect signature") {
     forAll(keyPairGenerator, messageGenerator) { (keyPair, message) =>
       val xpub = keyPair.getPublic

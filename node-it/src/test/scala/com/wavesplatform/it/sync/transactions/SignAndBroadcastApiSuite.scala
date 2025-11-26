@@ -475,7 +475,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
             .json()
         }
 
-      val transactionHeight = sender.waitForTransaction(sender.signedBroadcast(tx).id).height
+      val transactionHeight = Height(sender.waitForTransaction(sender.signedBroadcast(tx).id).height)
       sender.waitForHeight(transactionHeight + 1)
       assertBadRequestAndMessage(sender.signedBroadcast(tx), "is already in the state on a height")
     }

@@ -6,6 +6,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.NumericExt
 import org.scalatest.OptionValues
 
@@ -15,7 +16,7 @@ class TwoNodesFinalizationTestSuite extends BaseFreeSpec with OptionValues {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, 0)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0))))
       .withDefault(2)
       .buildNonConflicting()
 

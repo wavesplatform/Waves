@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.wavesplatform.it.*
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry}
+import com.wavesplatform.state.{BooleanDataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.TxVersion
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -16,7 +16,7 @@ class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPr
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((14, 1000000)))
+      .overrideBase(_.preactivatedFeatures((14, Height(1000000))))
       .withDefault(1)
       .withSpecial(1, _.nonMiner)
       .buildNonConflicting()
@@ -38,7 +38,7 @@ class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPr
 
     nodes.rollback(startHeight)
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
-    val maxHeight = sender.transactionStatus(transactionIds).flatMap(_.height).max
+    val maxHeight = Height(sender.transactionStatus(transactionIds).flatMap(_.height).max)
     sender.waitForHeight(maxHeight + 2) // so that NG fees won't affect miner's balances
 
     val stateAfterSecondTry = nodes.head.debugStateAt(maxHeight + 1)
@@ -81,7 +81,7 @@ class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPr
 
     val txsBefore = sender.transactionsByAddress(notMinerAddress, 10)
 
-    val txHeight = sender.waitForTransaction(aliasTxId).height
+    val txHeight = Height(sender.waitForTransaction(aliasTxId).height)
 
     nodes.rollback(txHeight - 1, returnToUTX = false)
     nodes.waitForHeight(txHeight + 1)
@@ -103,7 +103,7 @@ class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPr
     nodes.waitForHeightAriseAndTxPresent(tx1)
     val txsBefore1 = sender.transactionsByAddress(notMinerAddress, 10)
 
-    val tx1height = sender.waitForTransaction(tx1).height
+    val tx1height = Height(sender.waitForTransaction(tx1).height)
 
     val tx2 = sender.putData(notMiner.keyPair, List(entry2, entry3), calcDataFee(List(entry2, entry3), TxVersion.V1)).id
     nodes.waitForHeightAriseAndTxPresent(tx2)
@@ -147,7 +147,7 @@ class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPr
     val sponsorSecondId = sender.sponsorAsset(notMiner.keyPair, sponsorAssetId, baseFee = 2 * 100L, fee = issueFee).id
     nodes.waitForHeightAriseAndTxPresent(sponsorSecondId)
 
-    nodes.rollback(height, returnToUTX = false)
+    nodes.rollback(Height(height), returnToUTX = false)
 
     nodes.waitForHeightArise()
 

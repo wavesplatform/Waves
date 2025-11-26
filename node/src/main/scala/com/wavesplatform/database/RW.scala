@@ -2,6 +2,7 @@ package com.wavesplatform.database
 
 import com.wavesplatform.metrics.RocksDBStats
 import com.wavesplatform.metrics.RocksDBStats.DbHistogramExt
+import com.wavesplatform.state.Height
 import org.rocksdb.{ReadOptions, RocksDB, WriteBatch}
 
 class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB(db, readOptions) {
@@ -28,7 +29,7 @@ class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadO
   // So fromInclusive=[0, ...] removes all keys, but [Byte.MinValue, ...] can skip some keys.
   def deleteRange(fromInclusive: Array[Byte], toExclusive: Array[Byte]): Unit = batch.deleteRange(fromInclusive, toExclusive)
 
-  def filterHistory(key: Key[Seq[Int]], heightToRemove: Int): Unit = {
+  def filterHistory(key: Key[Seq[Height]], heightToRemove: Height): Unit = {
     val newValue = get(key).filterNot(_ == heightToRemove)
     if (newValue.nonEmpty) put(key, newValue)
     else delete(key)

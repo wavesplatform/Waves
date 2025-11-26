@@ -10,7 +10,7 @@ import java.util
 import scala.util.{Failure, Success}
 
 @Sharable
-class MessageCodecL1(peerDatabase: PeerDatabase) extends MessageToMessageCodec[RawBytes, Message] with ScorexLogging {
+class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[RawBytes, Message] with ScorexLogging {
 
   import BasicMessagesRepo.specsByCodes
 

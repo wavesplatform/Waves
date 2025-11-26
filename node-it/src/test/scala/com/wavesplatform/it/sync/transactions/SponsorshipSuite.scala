@@ -10,6 +10,7 @@ import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.{BaseFreeSpec, IntegrationSuiteWithThreeAddresses, NodeConfigs}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.test.*
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
@@ -22,7 +23,7 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((14, 1000000)))
+      .overrideBase(_.preactivatedFeatures((14, Height(1000000))))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation=1"))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period=1"))
       .withDefault(1)
@@ -328,10 +329,9 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         val transferTxCustomFeeAlice1 = sender.transfer(alice, bobAddress, 1.waves, TinyFee, None, Some(firstSponsorAssetId)).id
         val transferTxCustomFeeAlice2 = sender.transfer(alice, bobAddress, 1.waves, TinyFee, None, Some(secondSponsorAssetId)).id
         nodes.waitForHeight(
-          math.max(
-            sender.waitForTransaction(transferTxCustomFeeAlice1).height,
+          Height(sender.waitForTransaction(transferTxCustomFeeAlice1).height.max(
             sender.waitForTransaction(transferTxCustomFeeAlice2).height
-          ) + 2
+          ) + 2)
         )
 
         val wavesFee = FeeValidation.FeeUnit * 2 * TinyFee / TinyFee

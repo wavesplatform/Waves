@@ -40,7 +40,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
     notMiner.utxSize shouldBe 5
 
-    val checkData = CheckData(notMiner.height, confirmedTxsInfo, unconfirmedTxs.map(_.id().toString), notFoundTxs.map(_.id().toString))
+    val checkData = CheckData(notMiner.height.toInt, confirmedTxsInfo, unconfirmedTxs.map(_.id().toString), notFoundTxs.map(_.id().toString))
 
     val postJsonResult = notMiner.transactionStatus(txIds)
     val postFormResult =

@@ -1,0 +1,14 @@
+{
+  "name": "@waves/ride-lang",
+  "version": "0.1.0",
+  "description": "RIDE Compiler and Evaluator",
+  "main": "dist/lang.js",
+  "module": "dist/lang.js",
+  "browser": "dist/lang.js",
+  "files": ["dist/"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wavesplatform/Waves"
+  }
+}

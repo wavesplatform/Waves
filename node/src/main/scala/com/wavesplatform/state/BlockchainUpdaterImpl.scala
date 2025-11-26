@@ -36,7 +36,7 @@ class BlockchainUpdaterImpl(
     wavesSettings: WavesSettings,
     time: Time,
     blockchainUpdateTriggers: BlockchainUpdateTriggers,
-    collectActiveLeases: (Int, Int) => Map[ByteStr, LeaseDetails],
+    collectActiveLeases: (Height, Height) => Map[ByteStr, LeaseDetails],
     miner: Miner = _ => ()
 ) extends Blockchain
     with BlockchainUpdater
@@ -112,14 +112,14 @@ class BlockchainUpdaterImpl(
   override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo
 
   private def featuresApprovedWithBlock(block: Block): Set[Short] = {
-    val height = Height(rocksdb.height + 1)
+    val height = rocksdb.height + 1
 
     val featuresCheckPeriod        = functionalitySettings.activationWindowSize(height)
     val blocksForFeatureActivation = functionalitySettings.blocksForFeatureActivation(height)
 
     if (height % featuresCheckPeriod == 0) {
       val approvedFeatures = rocksdb
-        .featureVotes(height)
+        .featureVotes(Height(height))
         .map { case (feature, votes) => feature -> (if (block.header.featureVotes.contains(feature)) votes + 1 else votes) }
         .filter { case (_, votes) => votes >= blocksForFeatureActivation }
         .keySet
@@ -154,9 +154,9 @@ class BlockchainUpdaterImpl(
 
   def computeNextReward: Option[Long] = {
     val settings   = this.settings.rewardsSettings
-    val nextHeight = this.height + 1
+    val nextHeight = Height(this.height + 1)
 
-    if (height == 0 && rocksdb.featureActivationHeight(BlockchainFeatures.ConsensusImprovements).exists(_ <= 1))
+    if (height == 0 && rocksdb.featureActivationHeight(BlockchainFeatures.ConsensusImprovements).exists(_ <= Height(1)))
       None
     else
       rocksdb
@@ -337,7 +337,7 @@ class BlockchainUpdaterImpl(
                     if (!verify || referencedForgedBlock.signatureValid()) {
                       val referencedForgedBlockParentHeight = Height(rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0))
 
-                      val constraint = MiningConstraints(rocksdb, referencedForgedBlockParentHeight).total
+                      val constraint = MiningConstraints(rocksdb, referencedForgedBlockParentHeight.toInt).total
 
                       val prevReward = ng.reward
                       val reward     = computeNextReward
@@ -449,9 +449,9 @@ class BlockchainUpdaterImpl(
                     featuresApprovedWithBlock(block),
                     reward,
                     hitSource,
-                    cancelLeases(collectLeasesToCancel(newHeight), newHeight),
-                    latestFinalizedHeight = finalizedHeight,
-                    latestGeneratorBalances = generatorBalances
+                    cancelLeases(collectLeasesToCancel(newHeight), Height(newHeight)),
+                    finalizedHeight,
+                    generatorBalances
                   )
                 )
 
@@ -477,7 +477,7 @@ class BlockchainUpdaterImpl(
     */
   private def calculateFinalizationHeight(votingBlockchain: Blockchain): Option[Height] = votingBlockchain.lastBlockHeader.flatMap { votingBlock =>
     val votingHeight   = Height(votingBlockchain.height)
-    val endorsedHeight = Height(votingHeight - 1) // Will be finalized or not
+    val endorsedHeight = votingHeight - 1 // Will be finalized or not
 
     def shouldFinalizeByVoting(): Boolean = votingBlockchain.generationPeriodOf(votingHeight).fold(false) { votingPeriod =>
       val logPrefix         = s"Finalization of $endorsedHeight:"
@@ -486,26 +486,35 @@ class BlockchainUpdaterImpl(
         log.debug(s"$logPrefix no committed generators on $votingPeriod")
         false
       } else {
-        val votingBlockMinerAddress = votingBlock.header.generator.toAddress
-        val votedEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Set.empty)(_.endorserIndexes.toSet)
-        val (totalBalance, endorsedBalance, endorsedGeneratorIdxs, minerIdx) =
-          generatorBalances.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0), List.empty[Int], -1)) {
-            case ((totalBalance, endorsedBalance, endorserIdxs, minerIdx), ((endorserAddress, endorserBalance), i)) =>
-              val isMiner    = endorserAddress == votingBlockMinerAddress
-              val isEndorser = votedEndorserIndexes.contains(i)
-              (
-                totalBalance + endorserBalance,
-                if (isEndorser || isMiner) endorsedBalance + endorserBalance else endorsedBalance,
-                if (isEndorser) i :: endorserIdxs else endorserIdxs,
-                if (isMiner) i else minerIdx
-              )
-          }
+        val validEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Seq.empty)(_.valid)
+        val conflictEndorserIndexes = conflictGenerators(votingPeriod).upTo(votingHeight)
 
-        val balanceToFinalize = totalBalance * 2 / 3
-        val finalized         = endorsedBalance * 3 >= totalBalance * 2 // Same: endorsedBalance >= totalBalance * 2/3
+        val (totalBalance, endorsedBalance, minerIdx) = {
+          val votedIndexes            = validEndorserIndexes.toSet
+          val conflictIndexes         = conflictEndorserIndexes
+          val votingBlockMinerAddress = votingBlock.header.generator.toAddress
+          generatorBalances.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0), -1)) {
+            case (orig @ (totalBalance, endorsedBalance, minerIdx), ((endorserAddress, endorserBalance), i)) =>
+              val gi = GeneratorIndex(i)
+              if (conflictIndexes.contains(gi)) orig
+              else {
+                val isMiner    = endorserAddress == votingBlockMinerAddress
+                val isEndorser = votedIndexes.contains(gi)
+                (
+                  totalBalance + endorserBalance,
+                  if (isEndorser || isMiner) endorsedBalance + endorserBalance else endorsedBalance,
+                  if (isMiner) i else minerIdx
+                )
+              }
+          }
+        }
+
+        val finalized = isFinalized(endorsedBalance, totalBalance)
         log.debug(
-          s"$logPrefix ${if (finalized) "" else "not "}finalized, voted: $endorsedBalance, " +
-            s"min: $balanceToFinalize, total: $totalBalance, endorsers: [${endorsedGeneratorIdxs.sorted.mkString(", ")}], miner: $minerIdx"
+          s"$logPrefix ${if (finalized) "" else "not "}reached, endorsed=$endorsedBalance, total=$totalBalance, " +
+            s"miner=$minerIdx" +
+            (if (validEndorserIndexes.isEmpty) "" else s", valid=[${validEndorserIndexes.mkString(", ")}]") +
+            (if (conflictEndorserIndexes.isEmpty) "" else s", conflict=[${conflictEndorserIndexes.mkString(", ")}]")
         )
 
         finalized
@@ -516,13 +525,21 @@ class BlockchainUpdaterImpl(
     else none
   }
 
+  private def isFinalized(endorsedBalance: BigInt, totalBalance: BigInt): Boolean = {
+    // Same as: endorsedBalance >= totalBalance * 2/3
+    // But solves a fraction issue:
+    //  endorsed=7, total=11, required=7.(3), 7 < 7.(3) - not finalized with BigDecimal, finalized with BigInt (drops fraction part)
+    //  endorsed * 3=21, total * 2=22, 21 < 22 - not finalized
+    endorsedBalance * 3 >= totalBalance * 2
+  }
+
   private def collectLeasesToCancel(newHeight: Int): Map[ByteStr, LeaseDetails] =
     if (rocksdb.isFeatureActivated(BlockchainFeatures.LeaseExpiration, newHeight)) {
-      val toHeight = newHeight - rocksdb.settings.functionalitySettings.leaseExpiration
+      val toHeight = Height(newHeight - rocksdb.settings.functionalitySettings.leaseExpiration)
       val fromHeight = rocksdb.featureActivationHeight(BlockchainFeatures.LeaseExpiration) match {
-        case Some(`newHeight`) =>
+        case Some(h) if Height(newHeight) == h =>
           log.trace(s"Collecting leases created up till height $toHeight")
-          1
+          Height(1)
         case _ =>
           log.trace(s"Collecting leases created at height $toHeight")
           toHeight
@@ -530,7 +547,7 @@ class BlockchainUpdaterImpl(
       collectActiveLeases(fromHeight, toHeight)
     } else Map.empty
 
-  private def cancelLeases(leaseDetails: Map[ByteStr, LeaseDetails], height: Int): Map[ByteStr, StateSnapshot] =
+  private def cancelLeases(leaseDetails: Map[ByteStr, LeaseDetails], height: Height): Map[ByteStr, StateSnapshot] =
     for {
       (id, ld) <- leaseDetails
     } yield id -> StateSnapshot
@@ -559,12 +576,12 @@ class BlockchainUpdaterImpl(
         for {
           height <- rocksdb.heightOf(blockId).toRight(GenericError(s"No such block $blockId"))
           _ <- Either.cond(
-            height >= rocksdb.safeRollbackHeight,
+            Height(height) >= rocksdb.safeRollbackHeight,
             (),
             GenericError(s"Rollback is possible only to the block at the height ${rocksdb.safeRollbackHeight}")
           )
           _ = blockchainUpdateTriggers.onRollback(this, blockId, height)
-          blocks <- rocksdb.rollbackTo(height).leftMap(GenericError(_))
+          blocks <- rocksdb.rollbackTo(Height(height)).leftMap(GenericError(_))
         } yield {
           ngState = None
           val liquidBlockData = maybeNg.map { ng =>
@@ -681,13 +698,13 @@ class BlockchainUpdaterImpl(
   }
 
   override def activatedFeatures: Map[Short, Height] = readLock {
-    (newlyApprovedFeatures.view.mapValues(h => Height(h + functionalitySettings.activationWindowSize(height))) ++ rocksdb.activatedFeatures).toMap
+    (newlyApprovedFeatures.view.mapValues(h => h + functionalitySettings.activationWindowSize(height)) ++ rocksdb.activatedFeatures).toMap
   }
 
   override def featureVotes(height: Height): Map[Short, Int] = readLock {
     val innerVotes = rocksdb.featureVotes(height)
     ngState match {
-      case Some(ng) if this.height <= height =>
+      case Some(ng) if Height(this.height) <= height =>
         val ngVotes = ng.base.header.featureVotes.map { featureId =>
           featureId -> (innerVotes.getOrElse(featureId, 0) + 1)
         }.toMap
@@ -706,13 +723,13 @@ class BlockchainUpdaterImpl(
 
   override def blockRewardVotes(height: Int): Seq[Long] = readLock {
     activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
-      case Some(activatedAt) if activatedAt <= height =>
+      case Some(activatedAt) if activatedAt <= Height(height) =>
         ngState match {
           case None => rocksdb.blockRewardVotes(height)
           case Some(ng) =>
             val innerVotes = rocksdb.blockRewardVotes(height)
-            val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= height)
-            if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt, height, modifyTerm).contains(height))
+            val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= Height(height))
+            if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt.toInt, height, modifyTerm).contains(height))
               innerVotes :+ ng.base.header.rewardVote
             else innerVotes
         }
@@ -723,8 +740,10 @@ class BlockchainUpdaterImpl(
   override def wavesAmount(height: Int): BigInt = readLock {
     ngState match {
       case Some(ng) if this.height == height =>
+        val parentConflictEndorsements = rocksdb.lastBlockHeader.flatMap(_.header.finalizationVoting).fold(0)(_.conflict.size)
         rocksdb.wavesAmount(height - 1) +
-          BigInt(ng.reward.getOrElse(0L)) * this.blockRewardBoost(height)
+          BigInt(ng.reward.getOrElse(0L)) * this.blockRewardBoost(Height(height)) -
+          parentConflictEndorsements * CommitToGenerationTransaction.DepositInWavelets
       case _ =>
         rocksdb.wavesAmount(height)
     }
@@ -740,7 +759,7 @@ class BlockchainUpdaterImpl(
 
   override def finalizedHeightAt(at: Height): Option[Height] = readLock {
     ngState
-      .filter(_ => at == height)
+      .filter(_ => at == Height(height))
       .map(_.latestFinalizedHeight)
       .orElse(rocksdb.finalizedHeightAt(at))
   }
@@ -825,7 +844,6 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.filledVolumeAndFee(orderId)
   }
 
-  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceAtHeight(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = readLock {
     snapshotBlockchain.balanceAtHeight(address, h, assetId)
   }
@@ -885,10 +903,6 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.wavesBalances(addresses)
   }
 
-  override def generationDeposit(address: Address, period: GenerationPeriod): Long = readLock {
-    snapshotBlockchain.generationDeposit(address, period)
-  }
-
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = readLock {
     snapshotBlockchain.effectiveBalanceBanHeights(address)
   }
@@ -920,8 +934,12 @@ class BlockchainUpdaterImpl(
       .getOrElse(rocksdb.lastStateHash(None))
   }
 
-  override def committedGenerators(at: GenerationPeriod): Seq[(Address, BlsPublicKey)] = readLock {
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = readLock {
     snapshotBlockchain.committedGenerators(at)
+  }
+
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = readLock {
+    snapshotBlockchain.conflictGenerators(at)
   }
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] = readLock {

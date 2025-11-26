@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair, SeedKeyPair}
+import com.wavesplatform.account.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -53,7 +53,10 @@ object GenesisBlockGenerator {
     val chainId: Byte = networkType.head.toByte
 
     private val features: Map[Short, Int] =
-      preActivatedFeatures.getOrElse(List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt)).map(f => f.toShort -> 0).toMap
+      preActivatedFeatures
+        .getOrElse(List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt))
+        .map(f => f.toShort -> 0)
+        .toMap
 
     val functionalitySettings: FunctionalitySettings = FunctionalitySettings(
       Int.MaxValue,
@@ -71,8 +74,8 @@ object GenesisBlockGenerator {
       seedText: SeedText,
       seed: ByteStr,
       accountSeed: ByteStr,
-      accountPrivateKey: ByteStr,
-      accountPublicKey: ByteStr,
+      accountPrivateKey: PrivateKey,
+      accountPublicKey: PublicKey,
       accountAddress: Address,
       account: SeedKeyPair,
       miner: Boolean

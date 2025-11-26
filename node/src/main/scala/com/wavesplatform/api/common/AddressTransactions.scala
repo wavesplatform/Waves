@@ -22,13 +22,13 @@ object AddressTransactions {
       nums: ArrayBuffer[TxNum],
       sizes: ArrayBuffer[Int],
       sender: Option[Address]
-  ): Seq[(TxMeta, Transaction, Option[TxNum])] =
+  ): Seq[(TxMeta, Transaction, TxNum)] =
     db.multiGet(keys, sizes)
       .zip(nums)
       .flatMap {
-        case (Some((m, tx: Authorized)), txNum) if sender.forall(_ == tx.sender.toAddress)         => Some((m, tx, Some(txNum)))
-        case (Some((m, gt: GenesisTransaction)), txNum) if sender.isEmpty                          => Some((m, gt, Some(txNum)))
-        case (Some((m, et: EthereumTransaction)), txNum) if sender.forall(_ == et.senderAddress()) => Some((m, et, Some(txNum)))
+        case (Some((m, tx: Authorized)), txNum) if sender.forall(_ == tx.sender.toAddress)         => Some((m, tx, txNum))
+        case (Some((m, gt: GenesisTransaction)), txNum) if sender.isEmpty                          => Some((m, gt, txNum))
+        case (Some((m, et: EthereumTransaction)), txNum) if sender.forall(_ == et.senderAddress()) => Some((m, et, txNum))
         case _                                                                                     => None
       }
       .toSeq
@@ -41,7 +41,7 @@ object AddressTransactions {
   ): Option[InvokeScriptResult] =
     for {
       tm           <- resource.get(Keys.transactionMetaById(TransactionId(txId), txMetaHandle))
-      scriptResult <- resource.get(Keys.invokeScriptResult(tm.height, TxNum(tm.num.toShort), apiHandle))
+      scriptResult <- resource.get(Keys.invokeScriptResult(Height(tm.height), TxNum(tm.num.toShort), apiHandle))
     } yield scriptResult
 
   def loadInvokeScriptResult(db: RocksDB, txMetaHandle: RDB.TxMetaHandle, apiHandle: RDB.ApiHandle, txId: ByteStr): Option[InvokeScriptResult] =
@@ -68,7 +68,7 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(TxMeta, Transaction, Option[TxNum])] = {
+  ): Observable[(TxMeta, Transaction, TxNum)] = {
     val diffTxs = transactionsFromSnapshot(maybeSnapshot, subject, sender, types, fromId)
 
     val dbTxs = transactionsFromDB(
@@ -91,11 +91,11 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(TxMeta, Transaction, Option[TxNum])] =
+  ): Observable[(TxMeta, Transaction, TxNum)] =
     rdb.db.resourceObservable(rdb.apiHandle.handle).flatMap { dbResource =>
       dbResource
         .get(Keys.addressId(subject))
-        .fold(Observable.empty[(TxMeta, Transaction, Option[TxNum])]) { addressId =>
+        .fold(Observable.empty[(TxMeta, Transaction, TxNum)]) { addressId =>
           val (maxHeight, maxTxNum) =
             fromId
               .flatMap(id => rdb.db.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle)))
@@ -117,31 +117,31 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Seq[(TxMeta, Transaction, Option[TxNum])] =
+  ): Seq[(TxMeta, Transaction, TxNum)] =
     (for {
       (height, snapshot) <- maybeSnapshot.toSeq
-      nti                <- snapshot.transactions.values.toSeq.reverse
+      (nti, idx)         <- snapshot.transactions.values.toSeq.zipWithIndex.reverse
       if nti.affected(subject)
-    } yield (TxMeta(height, nti.status, nti.spentComplexity), nti.transaction))
-      .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }
-      .dropWhile { case (_, tx) => fromId.contains(tx.id()) }
-      .filter { case (_, tx) => types.isEmpty || types.contains(tx.tpe) }
-      .collect { case (m, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => (m, tx, None) }
+    } yield (TxMeta(height, nti.status, nti.spentComplexity), nti.transaction, idx))
+      .dropWhile { case (_, tx, _) => fromId.isDefined && !fromId.contains(tx.id()) }
+      .dropWhile { case (_, tx, _) => fromId.contains(tx.id()) }
+      .filter { case (_, tx, _) => types.isEmpty || types.contains(tx.tpe) }
+      .collect { case (m, tx: Authorized, idx) if sender.forall(_ == tx.sender.toAddress) => (m, tx, TxNum(idx.toShort)) }
 
   private class TxByAddressIterator(
       db: DBResource,
       txHandle: RDB.TxHandle,
       apiHandle: RDB.ApiHandle,
       addressId: AddressId,
-      maxHeight: Int,
-      maxTxNum: Int,
+      maxHeight: Height,
+      maxTxNum: TxNum,
       sender: Option[Address],
       types: Set[Transaction.Type]
-  ) extends AbstractIterator[Seq[(TxMeta, Transaction, Option[TxNum])]] {
+  ) extends AbstractIterator[Seq[(TxMeta, Transaction, TxNum)]] {
     private val seqNr = db.get(Keys.addressTransactionSeqNr(addressId, apiHandle))
     db.withSafePrefixIterator(_.seekForPrev(Keys.addressTransactionHN(addressId, seqNr, apiHandle).keyBytes))(())
 
-    final override def computeNext(): Seq[(TxMeta, Transaction, Option[TxNum])] = db.withSafePrefixIterator { dbIterator =>
+    final override def computeNext(): Seq[(TxMeta, Transaction, TxNum)] = db.withSafePrefixIterator { dbIterator =>
       val keysBuffer  = new ArrayBuffer[Key[Option[(TxMeta, Transaction)]]]()
       val numsBuffer  = new ArrayBuffer[TxNum]()
       val sizesBuffer = new ArrayBuffer[Int]()

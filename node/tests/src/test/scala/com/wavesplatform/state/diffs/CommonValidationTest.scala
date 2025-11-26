@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.GenesisBlockHeight
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType
@@ -229,7 +230,7 @@ class CommonValidationTest extends PropSpec with WithState {
         TxHelpers.sponsor(asset, Some(amount), master, version = TxVersion.V2, chainId = invChainId),
         TxHelpers.updateAssetInfo(asset.id, sender = master, chainId = invChainId),
         TxHelpers.dataV2(master, Seq.empty, chainId = invChainId),
-        TxHelpers.commitToGeneration(3000, chainId = invChainId)
+        TxHelpers.commitToGeneration(Height(3000), chainId = invChainId)
       ).map(genesis -> _)
     }
 

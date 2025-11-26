@@ -14,6 +14,7 @@ import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.block.VanillaBlock
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
 import org.scalatest.{Assertion, CancelAfterFailure}
@@ -23,7 +24,7 @@ class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfte
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((ContinuationTransaction.id, 1)))
+      .overrideBase(_.preactivatedFeatures((ContinuationTransaction.id, Height(1))))
       .buildNonConflicting()
 
   private val expr: ExprScript =

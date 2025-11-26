@@ -12,6 +12,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{ExtractedFuncPostfix, ExtractedFuncPrefix}
 import monix.eval.Coeval
 
+import java.lang.StringBuilder
+import java.util
 import scala.util.Try
 
 object Decompiler {
@@ -26,23 +28,33 @@ object Decompiler {
 
   private[lang] def pure[A](a: A) = Coeval.evalOnce(a)
 
-  private def out(in: String, ident: Int): String =
-    Array.fill(4 * ident)(" ").mkString("") + in
+  private def out(in: String, indent: Int): StringBuilder = {
+    val c = new Array[Char](4 * indent)
+    util.Arrays.fill(c, ' ')
+    new StringBuilder(new String(c)).append(in)
+  }
 
-  private def pureOut(in: String, ident: Int): Coeval[String] = pure(out(in, ident))
+  private def out(in: StringBuilder, indent: Int): StringBuilder = {
+    val c = new Array[Char](4 * indent)
+    util.Arrays.fill(c, ' ')
+    new StringBuilder(c.length + in.length()).append(new String(c)).append(in)
+  }
+
+  private def pureOut(in: String, indent: Int): Coeval[StringBuilder] = pure(out(in, indent))
 
   private val NEWLINE = "\n"
 
-  private def decl(e: Coeval[DECLARATION], ctx: DecompilerContext): Coeval[String] =
+  private def decl(e: Coeval[DECLARATION], ctx: DecompilerContext): Coeval[StringBuilder] =
     e flatMap {
       case Terms.FUNC(name, args, body) =>
         expr(pure(body), ctx, BracesWhenNeccessary, DontIndentFirstLine).map(fb =>
-          out("func " + name + " (" + args.mkString(",") + ") = ", ctx.ident) +
-            out(fb + NEWLINE, ctx.ident)
+          out("func " + name + " (" + args.mkString(",") + ") = ", ctx.ident).append(
+            out(fb.append(NEWLINE), ctx.ident)
+          )
         )
       case Terms.LET(name, value) =>
         expr(pure(value), ctx, BracesWhenNeccessary, DontIndentFirstLine).map(e => out("let " + name + " = " + e, ctx.ident))
-      case _: FAILED_DEC => Coeval.now("FAILED_DEC")
+      case _: FAILED_DEC => Coeval.now(new StringBuilder("FAILED_DEC"))
     }
 
   private def extrTypes(Name: String, e: EXPR): Coeval[Option[List[String]]] = {
@@ -64,56 +76,56 @@ object Decompiler {
     }
   }
 
-  private def caseExpr(Name: String, e: EXPR, ctx: DecompilerContext): Coeval[(String, Option[EXPR])] = {
+  private def caseExpr(Name: String, e: EXPR, ctx: DecompilerContext): Coeval[(StringBuilder, Option[EXPR])] = {
     e match {
       case IF(tc, ANY_LET(name, REF(Name), cExpr), tailExpr) =>
         extrTypes(Name, tc) flatMap {
           case None =>
             expr(pure(e), ctx.incrementIdent(), NoBraces, IdentFirstLine) map { e =>
-              ("case _ => " ++ NEWLINE ++ e, None)
+              (new StringBuilder("case _ => ").append(NEWLINE).append(e), None)
             }
           case Some(tl) =>
             expr(pure(cExpr), ctx.incrementIdent(), NoBraces, IdentFirstLine) map { e =>
-              ("case " ++ name ++ ": " ++ tl.mkString("|") ++ " => " ++ NEWLINE ++ e, Some(tailExpr))
+              (new StringBuilder("case ").append(name).append(": ").append(tl.mkString("|")).append(" => ").append(NEWLINE).append(e), Some(tailExpr))
             }
         }
       case IF(tc, cExpr, tailExpr) =>
         extrTypes(Name, tc) flatMap {
           case None =>
             expr(pure(e), ctx.incrementIdent(), NoBraces, IdentFirstLine) map { e =>
-              ("case _ => " ++ NEWLINE ++ e, None)
+              (new StringBuilder("case _ => ").append(NEWLINE).append(e), None)
             }
           case Some(tl) =>
             expr(pure(cExpr), ctx.incrementIdent(), NoBraces, IdentFirstLine) map { e =>
-              ("case _: " ++ tl.mkString("|") ++ " => " ++ NEWLINE ++ e, Some(tailExpr))
+              (new StringBuilder("case _: ").append(tl.mkString("|")).append(" => ").append(NEWLINE).append(e), Some(tailExpr))
             }
         }
       case ANY_LET(name, REF(Name), e) =>
         expr(pure(e), ctx.incrementIdent(), NoBraces, IdentFirstLine) map { e =>
-          ("case " ++ name ++ " => " ++ NEWLINE ++ e, None)
+          (new StringBuilder("case ").append(name).append(" => ").append(NEWLINE).append(e), None)
         }
       case _ =>
         expr(pure(e), ctx.incrementIdent(), NoBraces, IdentFirstLine) map { e =>
-          ("case _ => " ++ NEWLINE ++ e, None)
+          (new StringBuilder("case _ => ").append(NEWLINE).append(e), None)
         }
     }
   }
 
-  private def matchBlock(name: String, body: Coeval[EXPR], ctx: DecompilerContext): Coeval[String] = {
+  private def matchBlock(name: String, body: Coeval[EXPR], ctx: DecompilerContext): Coeval[StringBuilder] = {
     for {
       e <- body
       p <- caseExpr(name, e, ctx)
-      c = p._1 ++ NEWLINE
+      c = p._1.append(NEWLINE)
       t <- p._2.fold(pure(Option.empty[String]))(e => matchBlock(name, pure(e), ctx).map(Some.apply))
     } yield {
-      t.fold(out(c, ctx.ident)) { t => out(c, ctx.ident) ++ t }
+      t.fold(out(c, ctx.ident)) { t => out(c, ctx.ident).append(t) }
     }
   }
 
   private val MatchRef        = """(\$match\d*)""".r
   private val EscapingSymbols = "[\\\\\"]".r
 
-  private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: BlockBraces, firstLinePolicy: FirstLinePolicy): Coeval[String] = {
+  private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: BlockBraces, firstLinePolicy: FirstLinePolicy): Coeval[StringBuilder] = {
     def checkBrackets(expr: EXPR) = expr match {
       // no need while all binaty ops is bracked. // case Terms.FUNCTION_CALL(FunctionHeader.Native(id), _) if ctx.binaryOps.contains(id) /* || ctx.unaryOps.contains(id) */ => ("(", ")")
       case Terms.IF(_, _, _)     => ("(", ")")
@@ -122,9 +134,18 @@ object Decompiler {
       case _                     => ("", "")
     }
 
-    def argsStr(args: List[EXPR])  = args.map(argStr).toVector.sequence[Coeval, String]
-    def listStr(elems: List[EXPR]) = argsStr(elems).map(_.mkString("[", ", ", "]"))
-    def argStr(elem: EXPR)         = expr(pure(elem), ctx, BracesWhenNeccessary, DontIndentFirstLine)
+    def argsStr(args: List[EXPR]) = args.map(argStr).toVector.sequence[Coeval, StringBuilder]
+    def listStr(elems: List[EXPR]) = argsStr(elems).map { l =>
+      if (elems.isEmpty) new StringBuilder("[]")
+      else {
+        val res = new StringBuilder("[").append(l.head)
+        if (l.tail.nonEmpty) {
+          l.tail.foreach(s => res.append(", ").append(s))
+        }
+        res.append("]")
+      }
+    }
+    def argStr(elem: EXPR) = expr(pure(elem), ctx, BracesWhenNeccessary, DontIndentFirstLine)
 
     val i = if (firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident
 
@@ -133,9 +154,13 @@ object Decompiler {
         case Terms.BLOCK(Terms.LET(MatchRef(name), e), body) =>
           matchBlock(name, pure(body), ctx.incrementIdent()) flatMap { b =>
             expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { ex =>
-              out("match " ++ ex ++ " {" ++ NEWLINE, ctx.ident) ++
-                out(b, 0) ++
-                out("}", ctx.ident)
+              out(new StringBuilder("match ").append(ex).append(" {\n"), ctx.ident)
+                .append(
+                  out(b, 0)
+                )
+                .append(
+                  out("}", ctx.ident)
+                )
             }
           }
         case Terms.BLOCK(declPar, body) =>
@@ -149,13 +174,11 @@ object Decompiler {
             b <- expr(pure(body), modifiedCtx, NoBraces, IdentFirstLine)
           } yield {
             if (braceThis)
-              out("{" + NEWLINE, ident = 0) +
-                out(d + NEWLINE, 0) +
-                out(b + NEWLINE, 0) +
-                out("}", ctx.ident + 1)
+              out("{\n", indent = 0).append(out(d.append(NEWLINE), 0)).append(out(b.append(NEWLINE), 0)).append(out("}", ctx.ident + 1))
             else
-              out(d + NEWLINE, 0) +
+              out(d.append(NEWLINE), 0).append(
                 out(b, 0)
+              )
           }
         case Terms.LET_BLOCK(let, exprPar) => expr(pure(Terms.BLOCK(let, exprPar)), ctx, braces, firstLinePolicy)
         case Terms.TRUE                    => pureOut("true", i)
@@ -172,24 +195,22 @@ object Decompiler {
         case Terms.REF(ref) => pureOut(ref, i)
         case Terms.GETTER(getExpr, fld) =>
           val (bs, be) = checkBrackets(getExpr)
-          expr(pure(getExpr), ctx, NoBraces, firstLinePolicy).map(a => s"$bs$a$be.$fld")
+          expr(pure(getExpr), ctx, NoBraces, firstLinePolicy).map(a => new StringBuilder(bs).append(a).append(be).append(".").append(fld))
         case Terms.IF(cond, it, iff) =>
           for {
             c   <- expr(pure(cond), ctx, BracesWhenNeccessary, DontIndentFirstLine)
             it  <- expr(pure(it), ctx.incrementIdent(), BracesWhenNeccessary, DontIndentFirstLine)
             iff <- expr(pure(iff), ctx.incrementIdent(), BracesWhenNeccessary, DontIndentFirstLine)
-          } yield out("if (" + c + ")" + NEWLINE, i) +
-            out("then " + it + NEWLINE, ctx.ident + 1) +
-            out("else " + iff, ctx.ident + 1)
+          } yield out("if (" + c + ")" + NEWLINE, i).append(out("then " + it + NEWLINE, ctx.ident + 1)).append(out("else " + iff, ctx.ident + 1))
         case FUNCTION_CALL(`cons`, args) =>
           collectListArgs(args) match {
             case (elems, None)               => listStr(elems)
-            case (List(elem), Some(listVar)) => argStr(elem).map(v => s"$v :: $listVar")
-            case (elems, Some(listVar))      => listStr(elems).map(v => s"$v :: $listVar")
+            case (List(elem), Some(listVar)) => argStr(elem).map(v => v.append(" :: ").append(listVar))
+            case (elems, Some(listVar))      => listStr(elems).map(v => v.append(" :: ").append(listVar))
           }
         case FUNCTION_CALL(`listElem`, List(list, index)) =>
           val (bs, be) = checkBrackets(list)
-          for (l <- argStr(list); i <- argStr(index)) yield s"$bs$l$be[$i]"
+          for (l <- argStr(list); i <- argStr(index)) yield new StringBuilder(bs).append(l).append(be).append("[").append(i).append("]")
         case Terms.FUNCTION_CALL(func, args) =>
           val argsCoeval = argsStr(args)
           func match {
@@ -203,7 +224,22 @@ object Decompiler {
                 case _                 => ("", "")
               }
 
-              argsCoeval.map(as => out(s"(${bs0}${as(0)}${be0} ${ctx.binaryOps(id)} ${bs1}${as(1)}${be1})", i))
+              argsCoeval.map { as =>
+                out(
+                  new StringBuilder("(")
+                    .append(bs0)
+                    .append(as(0))
+                    .append(be0)
+                    .append(" ")
+                    .append(ctx.binaryOps(id))
+                    .append(" ")
+                    .append(bs1)
+                    .append(as(1))
+                    .append(be1)
+                    .append(")"),
+                  i
+                )
+              }
 
             case FunctionHeader.User(internalName, _) if internalName == "!=" =>
               argsCoeval.map(as => out(s"(${as(0)} != ${as(1)})", i))
@@ -262,32 +298,38 @@ object Decompiler {
 
   def apply(e: DApp, ctx: DecompilerContext): String = {
 
-    def intersperse(s: Seq[Coeval[String]]): Coeval[String] = s.toVector.sequence[Coeval, String].map(v => v.mkString(NEWLINE + NEWLINE))
+    def intersperse(s: Seq[Coeval[StringBuilder]]): Coeval[StringBuilder] =
+      s.toVector.sequence[Coeval, StringBuilder].map { v =>
+        if (v.isEmpty) new StringBuilder("")
+        else if (v.size == 1) v.head
+        else
+          v.reduce(_.append(NEWLINE).append(NEWLINE).append(_))
+      }
 
     val dApp = ContractScriptCompactor.decompact(e)
 
     import dApp.*
 
-    val decls: Seq[Coeval[String]] = decs.map(expr => decl(pure(expr), ctx))
-    val callables: Seq[Coeval[String]] = callableFuncs
+    val decls: Seq[Coeval[StringBuilder]] = decs.map(expr => decl(pure(expr), ctx))
+    val callables: Seq[Coeval[StringBuilder]] = callableFuncs
       .map { case CallableFunction(annotation, u) =>
-        Decompiler.decl(pure(u), ctx).map(out(NEWLINE + "@Callable(" + annotation.invocationArgName + ")" + NEWLINE, 0) + _)
+        Decompiler.decl(pure(u), ctx).map(out(NEWLINE + "@Callable(" + annotation.invocationArgName + ")" + NEWLINE, 0).append(_))
       }
 
-    val verifier: Seq[Coeval[String]] = verifierFuncOpt.map { case VerifierFunction(annotation, u) =>
-      Decompiler.decl(pure(u), ctx).map(out(NEWLINE + "@Verifier(" + annotation.invocationArgName + ")" + NEWLINE, 0) + _)
+    val verifier: Seq[Coeval[StringBuilder]] = verifierFuncOpt.map { case VerifierFunction(annotation, u) =>
+      Decompiler.decl(pure(u), ctx).map(out(NEWLINE + "@Verifier(" + annotation.invocationArgName + ")" + NEWLINE, 0).append(_))
     }.toSeq
 
     val result = for {
       d <- intersperse(decls)
       c <- intersperse(callables)
       v <- intersperse(verifier)
-    } yield d + NEWLINE + c + NEWLINE + v
+    } yield d.append(NEWLINE).append(c).append(NEWLINE).append(v)
 
-    result()
+    result().toString
   }
 
   def apply(e0: EXPR, ctx: DecompilerContext): String =
-    expr(pure(e0), ctx, NoBraces, IdentFirstLine).apply()
+    expr(pure(e0), ctx, NoBraces, IdentFirstLine).apply().toString()
 
 }

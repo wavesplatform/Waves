@@ -274,11 +274,11 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       .base64
     sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    if (nodes.map(_.height).max % 2 != 0) nodes.waitForHeightArise()
+    if (nodes.map(_.height).max.toInt % 2 != 0) nodes.waitForHeightArise()
 
     sender.burn(firstKeyPair, asset, 10, smartMinFee, waitForTx = true)
 
-    if (nodes.map(_.height).max % 2 == 0) {
+    if (nodes.map(_.height).max.toInt % 2 == 0) {
       nodes.waitForHeightArise()
     }
 

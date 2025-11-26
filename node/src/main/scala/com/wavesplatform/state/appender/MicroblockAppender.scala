@@ -10,7 +10,7 @@ import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.network.*
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.protobuf.PBSnapshots
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{InvalidSignature, InvalidStateHash}
 import com.wavesplatform.utils.ScorexLogging
@@ -61,7 +61,7 @@ object MicroblockAppender extends ScorexLogging {
       microBlockSnapshot = snapshot
         .map { case (_, mbs) =>
           microBlock.transactionData.zip(mbs.snapshots).map { case (tx, pbs) =>
-            PBSnapshots.fromProtobuf(pbs, tx.id(), blockchainUpdater.height)
+            PBSnapshots.fromProtobuf(pbs, tx.id(), Height(blockchainUpdater.height))
           }
         }
         .map(ss => MicroBlockSnapshot(microblockTotalResBlockSig, ss))

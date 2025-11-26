@@ -25,14 +25,14 @@ import scala.concurrent.duration.*
 
 class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  val activationHeight = 8
+  val activationHeight = Height(8)
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(NodeConfigs.Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
       .overrideBase(
         _.preactivatedFeatures(
-          (BlockchainFeatures.Ride4DApps.id, 0),
+          (BlockchainFeatures.Ride4DApps.id, Height(0)),
           (BlockchainFeatures.BlockV5.id, activationHeight)
         )
       )

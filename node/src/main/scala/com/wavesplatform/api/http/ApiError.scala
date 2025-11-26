@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Transaction, *}
@@ -368,7 +369,7 @@ object ApiError {
     val Id = 117
   }
 
-  case class AlreadyInState(transactionId: ByteStr, height: Int) extends ApiError {
+  case class AlreadyInState(transactionId: ByteStr, height: Height) extends ApiError {
     override val id: Int          = 400
     override val code: StatusCode = StatusCodes.BadRequest
     override val message: String  = s"Transaction $transactionId is already in the state on a height of $height"

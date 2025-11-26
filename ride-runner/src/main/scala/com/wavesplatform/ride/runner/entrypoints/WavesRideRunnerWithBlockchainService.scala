@@ -155,7 +155,7 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
         Task {
           lastServiceStatus = ServiceStatus(
             maxObservedHeight = state.processedHeight,
-            lastProcessedHeight = math.max(lastServiceStatus.lastProcessedHeight, state.processedHeight),
+            lastProcessedHeight = state.processedHeight.max(lastServiceStatus.lastProcessedHeight),
             lastProcessedTimeMs = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS),
             healthy = state match {
               case _: BlockchainState.Working => true
@@ -173,7 +173,7 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
       .lastL
       .runToFuture(using blockchainEventsStreamScheduler)
 
-    blockchainUpdatesStream.start(Height(heights.lastKnownHardened + 1))
+    blockchainUpdatesStream.start(heights.lastKnownHardened + 1)
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
@@ -214,8 +214,8 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
       healthy: Boolean = false,
       nowTimeMs: Long = 0,
       lastProcessedTimeMs: Long = 0,
-      lastProcessedHeight: Int = 0,
+      lastProcessedHeight: Height = Height(0),
       idleTimeMs: Long = 0,
-      maxObservedHeight: Int = 0
+      maxObservedHeight: Height = Height(0)
   )
 }

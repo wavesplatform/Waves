@@ -14,6 +14,7 @@ import com.wavesplatform.it.{BaseFunSuite, Node, NodeConfigs, TransferSending}
 import com.wavesplatform.lang.directives.values.V8
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.RawBytes
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.{Transaction, TxHelpers}
@@ -29,10 +30,10 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
       .overrideBase(_.minAssetInfoUpdateInterval(0))
       .overrideBase(
         _.preactivatedFeatures(
-          BlockchainFeatures.SynchronousCalls.id.toInt      -> 0,
-          BlockchainFeatures.RideV6.id.toInt                -> 0,
-          BlockchainFeatures.ConsensusImprovements.id.toInt -> 0,
-          BlockchainFeatures.LightNode.id.toInt             -> 0
+          BlockchainFeatures.SynchronousCalls.id.toInt      -> Height(0),
+          BlockchainFeatures.RideV6.id.toInt                -> Height(0),
+          BlockchainFeatures.ConsensusImprovements.id.toInt -> Height(0),
+          BlockchainFeatures.LightNode.id.toInt             -> Height(0)
         )
       )
       .overrideBase(_.raw("waves.blockchain.custom.functionality.light-node-block-fields-absence-interval = 0"))
@@ -83,7 +84,7 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
     challengingBlock.transactions.map(_.id).toSet shouldBe txs.map(_.id().toString).toSet
   }
 
-  private def createBlockWithInvalidStateHash(lastBlock: ApiBlock, height: Int, signer: KeyPair, txs: Seq[Transaction]): Block = {
+  private def createBlockWithInvalidStateHash(lastBlock: ApiBlock, height: Height, signer: KeyPair, txs: Seq[Transaction]): Block = {
     val lastBlockVrfOrGenSig = lastBlock.vrf.orElse(lastBlock.generationSignature).map(str => ByteStr.decodeBase58(str).get).get.arr
     val genSig: ByteStr      = crypto.signVRF(signer.privateKey, lastBlockVrfOrGenSig)
 
@@ -103,7 +104,7 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
     val baseTarget: Long = posCalculator
       .calculateBaseTarget(
         10,
-        height,
+        height.toInt,
         lastBlock.baseTarget.get,
         lastBlock.timestamp,
         None,

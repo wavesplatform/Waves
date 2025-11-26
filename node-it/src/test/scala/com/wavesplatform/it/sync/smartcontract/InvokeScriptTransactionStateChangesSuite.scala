@@ -12,6 +12,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.scalactic.source.Position
 import org.scalatest.CancelAfterFailure
+import com.wavesplatform.state.Height
 
 class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -53,7 +54,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     val txInfo = sender.transactionInfo[TransactionInfo](id)
 
-    sender.waitForHeight(txInfo.height + 1)
+    sender.waitForHeight(Height(txInfo.height) + 1)
 
     val callerTxs      = sender.transactionsByAddress(callerAddress, 100)
     val dAppTxs        = sender.transactionsByAddress(contractAddress, 100)

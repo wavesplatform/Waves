@@ -17,7 +17,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
           val updatedState = BlockchainState(processor, BlockchainState.Starting(Height(9), Height(10)), event)
           updatedState shouldBe a[BlockchainState.Working]
-          processor.actions shouldBe Vector(RemoveFrom(10), Process(event))
+          processor.actions shouldBe Vector(RemoveFrom(Height(10)), Process(event))
         }
 
         "not reaching the blockchain height - still Starting" in {
@@ -31,7 +31,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
           val processor = new TestProcessor
 
           val _ = BlockchainState(processor, BlockchainState.Starting(Height(8), Height(10)), event)
-          processor.actions shouldBe Vector(RemoveFrom(9), Process(event))
+          processor.actions shouldBe Vector(RemoveFrom(Height(9)), Process(event))
         }
 
         "found the same block - ignore" in {

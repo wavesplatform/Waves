@@ -39,7 +39,7 @@ class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections:
         !isBlacklisted
 
       log.trace(
-        s"Check inbound connection from $remoteAddress: new inbound total = $newTotal, " +
+        s"${id(ctx)} Check inbound connection from $remoteAddress: new inbound total = $newTotal, " +
           s"connections with this host = $newCountPerHost, address ${if (isBlacklisted) "IS" else "is not"} blacklisted, " +
           s"${if (accepted) "is" else "is not"} accepted"
       )

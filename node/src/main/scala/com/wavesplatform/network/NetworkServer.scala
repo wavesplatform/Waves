@@ -8,7 +8,7 @@ import com.wavesplatform.utils.ScorexLogging
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel.*
 import io.netty.channel.group.ChannelGroup
-import io.netty.channel.nio.NioEventLoopGroup
+import io.netty.channel.nio.NioIoHandler
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.{DefaultThreadFactory, GenericFutureListener}
@@ -43,8 +43,8 @@ object NetworkServer extends ScorexLogging {
   ): NetworkServer = {
     @volatile var shutdownInitiated = false
 
-    val bossGroup   = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-boss-group", true))
-    val workerGroup = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-worker-group", true))
+    val bossGroup   = new MultiThreadIoEventLoopGroup(0, new DefaultThreadFactory("nio-boss-group", true), NioIoHandler.newFactory());
+    val workerGroup = new MultiThreadIoEventLoopGroup(0, new DefaultThreadFactory("nio-worker-group", true), NioIoHandler.newFactory());
     val handshake = Handshake(
       applicationName,
       Version.VersionTuple,

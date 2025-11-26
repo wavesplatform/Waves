@@ -5,6 +5,7 @@ import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs, ReportingTestName}
+import com.wavesplatform.state.Height
 
 class FeatureActivationTestSuite extends BaseFreeSpec with ActivationStatusRequest with ReportingTestName {
 
@@ -29,7 +30,7 @@ class FeatureActivationTestSuite extends BaseFreeSpec with ActivationStatusReque
   }
 
   "supported blocks increased when voting starts" in {
-    nodes.waitForHeight(votingInterval * 2 / 3)
+    nodes.waitForHeight(Height(votingInterval * 2 / 3))
     val status = nodes.map(_.featureActivationStatus(featureNum))
     status.foreach { s =>
       s.description shouldBe featureDescr
@@ -38,14 +39,14 @@ class FeatureActivationTestSuite extends BaseFreeSpec with ActivationStatusReque
   }
 
   "supported blocks counter resets on the next voting interval" in {
-    nodes.waitForHeight(votingInterval * 2 - blocksForActivation / 2)
+    nodes.waitForHeight(Height(votingInterval * 2 - blocksForActivation / 2))
     val info = nodes.map(_.featureActivationStatus(featureNum))
     info.foreach(i => i.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined)
   }
 
   "blockchain status is APPROVED in second voting interval" in {
     val checkHeight = votingInterval * 2
-    nodes.waitForHeight(checkHeight)
+    nodes.waitForHeight(Height(checkHeight))
     val statusInfo = nodes.map(_.featureActivationStatus(featureNum))
     statusInfo.foreach { si =>
       si.description shouldBe featureDescr
@@ -56,7 +57,7 @@ class FeatureActivationTestSuite extends BaseFreeSpec with ActivationStatusReque
 
   "blockchain status is ACTIVATED in third voting interval" in {
     val checkHeight = votingInterval * 3
-    nodes.waitForHeight(checkHeight)
+    nodes.waitForHeight(Height(checkHeight))
     val statusInfo = nodes.map(_.featureActivationStatus(featureNum))
     statusInfo.foreach { si =>
       si.description shouldBe featureDescr

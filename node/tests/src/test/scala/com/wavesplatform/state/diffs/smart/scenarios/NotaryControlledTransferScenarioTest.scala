@@ -63,7 +63,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
 
     val issue                   = TxHelpers.issue(company, 100, script = Some(typedScript))
     val assetId                 = IssuedAsset(issue.id())
-    val kingDataTransaction     = TxHelpers.data(king, Seq(BinaryDataEntry("notary1PK", notary.publicKey)))
+    val kingDataTransaction     = TxHelpers.data(king, Seq(BinaryDataEntry("notary1PK", notary.publicKey.byteStr)))
     val transferFromCompanyToA  = TxHelpers.transfer(company, accountA.toAddress, 1, assetId)
     val transferFromAToB        = TxHelpers.transfer(accountA, accountB.toAddress, 1, assetId)
     val notaryDataTransaction   = TxHelpers.data(notary, Seq(BooleanDataEntry(transferFromAToB.id().toString, true)))

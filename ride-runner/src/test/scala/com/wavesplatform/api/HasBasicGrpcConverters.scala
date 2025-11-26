@@ -3,6 +3,7 @@ package com.wavesplatform.api
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 import com.wavesplatform.protobuf.block.Block
+import com.wavesplatform.state.Height
 
 trait HasBasicGrpcConverters { this: HasGrpc =>
   def mkRollbackEvent(
@@ -60,7 +61,7 @@ trait HasBasicGrpcConverters { this: HasGrpc =>
             modAppend(
               BlockchainUpdated
                 .Append()
-                .withBlock(BlockchainUpdated.Append.BlockAppend().withBlock(modBlock(mkPbBlock(height))))
+                .withBlock(BlockchainUpdated.Append.BlockAppend().withBlock(modBlock(mkPbBlock(Height(height)))))
             )
           )
         )

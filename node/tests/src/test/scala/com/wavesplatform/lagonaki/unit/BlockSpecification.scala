@@ -56,7 +56,7 @@ class BlockSpecification extends PropSpec {
       )
       .explicitGet()
 
-  property(" block with txs bytes/parse roundtrip version 1,2") {
+  property("block with txs bytes/parse roundtrip version 1,2") {
     Seq[Byte](1, 2).foreach { version =>
       forAll(blockGen) { case (baseTarget, reference, generationSignature, recipient, transactionData) =>
         val block = Block
@@ -85,7 +85,7 @@ class BlockSpecification extends PropSpec {
     }
   }
 
-  property(" block version 1,2 could not contain feature votes") {
+  property("block version 1,2 could not contain feature votes") {
     Seq[Byte](1, 2).foreach { version =>
       forAll(blockGen) { case (baseTarget, reference, generationSignature, recipient, transactionData) =>
         Block.buildAndSign(
@@ -106,7 +106,7 @@ class BlockSpecification extends PropSpec {
     }
   }
 
-  property(s" feature flags limit is ${Block.MaxFeaturesInBlock}") {
+  property(s"feature flags limit is ${Block.MaxFeaturesInBlock}") {
     val version           = 3.toByte
     val supportedFeatures = (0 to Block.MaxFeaturesInBlock * 2).map(_.toShort)
 
@@ -127,12 +127,12 @@ class BlockSpecification extends PropSpec {
       ) should produce(s"Block could not contain more than ${Block.MaxFeaturesInBlock} feature votes")
     }
   }
-  property(" block with txs bytes/parse roundtrip version 3") {
+  property("block with txs bytes/parse roundtrip version 3") {
     val version = 3.toByte
 
-    val faetureSetGen: Gen[Seq[Short]] = Gen.choose(0, Block.MaxFeaturesInBlock).flatMap(fc => Gen.listOfN(fc, arbitrary[Short])).map(_.distinct)
+    val featureSetGen: Gen[Seq[Short]] = Gen.choose(0, Block.MaxFeaturesInBlock).flatMap(fc => Gen.listOfN(fc, arbitrary[Short])).map(_.distinct)
 
-    forAll(blockGen, faetureSetGen) { case ((baseTarget, reference, generationSignature, recipient, transactionData), featureVotes) =>
+    forAll(blockGen, featureSetGen) { case ((baseTarget, reference, generationSignature, recipient, transactionData), featureVotes) =>
       val block = Block
         .buildAndSign(
           version,

@@ -41,7 +41,7 @@ class StateHashSpec extends FreeSpec {
     stateHash.addAlias(address, "test1")
     stateHash.addAlias(address1, "test2")
     stateHash.addDataEntry(address, dataEntry)
-    stateHash.addLeaseStatus(TransactionId @@ assetId.id, isActive = true)
+    stateHash.addLeaseStatus(assetId.id, isActive = true)
     stateHash.addSponsorship(assetId, 1000)
     stateHash.addAssetBalance(address, assetId, 2000)
     stateHash.addAssetBalance(address1, assetId, 2000)
@@ -148,8 +148,7 @@ class StateHashSpec extends FreeSpec {
         Sponsorship,
         Alias,
         NextCommittedGenerators
-      )
-        .map(sect)
+      ).map(sect)
 
       val testPrevHash = sect(SectionId.Alias)
       result.createStateHash(testPrevHash).totalHash shouldBe hash((testPrevHash.arr +: allHashes.map(_.arr))*)

@@ -89,7 +89,7 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
               ByteString.copyFrom(sender.bytes),
               Some(PBRecipients.create(recipient)),
               amount,
-              height
+              height.toInt
             )
           }
       responseObserver.completeWith(result)
