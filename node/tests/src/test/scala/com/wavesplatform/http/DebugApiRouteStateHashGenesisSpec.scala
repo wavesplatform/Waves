@@ -81,7 +81,7 @@ class DebugApiRouteStateHashGenesisSpec
 
   routePath("/stateHash") - {
     "works" - {
-      "before and after DeterministicFinality activation" in {
+      "with DeterministicFinality activated on genesis block" in {
         // Append first block to be able to request stateHash
         domain.appendBlock()
 
