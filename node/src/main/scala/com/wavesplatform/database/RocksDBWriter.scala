@@ -525,7 +525,7 @@ class RocksDBWriter(
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
       generatorBalances: Seq[(Address, Long)],
-      nextCommittedGenerators: Option[Seq[(AddressId, BlsPublicKey)]],
+      nextCommittedGenerators: Seq[(AddressId, BlsPublicKey)],
       commitmentTransactionIds: Seq[TransactionId],
       conflictGenerators: Seq[GeneratorIndex],
       stateHash: StateHashBuilder.Result
@@ -744,16 +744,13 @@ class RocksDBWriter(
       }
 
       this.generationPeriodOf(h).foreach { currPeriod => // None checked in Caches
-        nextCommittedGenerators match {
-          case Some(generators) =>
-            if (generators.nonEmpty) {
-              val nextPeriod = currPeriod.next
+        if (nextCommittedGenerators.nonEmpty) {
+          val nextPeriod = currPeriod.next
 
-              rw.put(Keys.committedGenerators(nextPeriod, h), Some(generators))
+          rw.put(Keys.committedGenerators(nextPeriod, h), Some(nextCommittedGenerators))
 
-              rw.put(Keys.commitmentTransactions(nextPeriod, h), commitmentTransactionIds)
-            }
-          case None => ()
+          // TODO: Option to not store
+          rw.put(Keys.commitmentTransactions(nextPeriod, h), commitmentTransactionIds)
         }
 
         if (conflictGenerators.nonEmpty) rw.put(Keys.conflictGenerators(currPeriod, h), conflictGenerators)

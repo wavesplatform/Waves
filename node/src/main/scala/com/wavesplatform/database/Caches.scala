@@ -9,7 +9,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database.protobuf.{BlockMetaExt, BlockMeta as PBBlockMeta}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.settings.DBSettings
@@ -272,7 +271,7 @@ abstract class Caches extends Blockchain, Storage {
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
       generatorBalances: Seq[(Address, Long)],
-      nextCommittedGenerators: Option[Seq[(AddressId, BlsPublicKey)]],
+      nextCommittedGenerators: Seq[(AddressId, BlsPublicKey)],
       commitmentTransactionIds: Seq[TransactionId],
       conflictGenerators: Seq[GeneratorIndex],
       stateHash: StateHashBuilder.Result
@@ -316,7 +315,6 @@ abstract class Caches extends Blockchain, Storage {
     )
     current = CurrentBlockInfo(newHeight, Some(newMeta), block.transactionData)
     currentFinalizedHeight = Some(newFinalizedHeight)
-    val deterministicFinalityActivated = this.isFeatureActivated(BlockchainFeatures.DeterministicFinality, newHeight.toInt)
 
     val newAddresses =
       mutable.Set[Address]() ++
@@ -443,8 +441,7 @@ abstract class Caches extends Blockchain, Storage {
     for (leaseId <- snapshot.cancelledLeases.keys) stateHash.addLeaseStatus(leaseId, isActive = false)
     for ((assetId, sponsorship) <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
     for ((alias, address) <- snapshot.aliases) stateHash.addAlias(address, alias.name)
-    if (deterministicFinalityActivated)
-      snapshot.nextCommittedGenerators.foreach(stateHash.addNextCommittedGenerator)
+    snapshot.nextCommittedGenerators.foreach(stateHash.addNextCommittedGenerator)
 
     doAppend(
       newMeta,
@@ -460,7 +457,7 @@ abstract class Caches extends Blockchain, Storage {
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       newFinalizedHeight,
       updatedCurrentGeneratorBalances,
-      if deterministicFinalityActivated then Some(nextCommittedGenerators) else None,
+      nextCommittedGenerators,
       commitmentTransactionIds,
       conflictGenerators,
       stateHash.result()
