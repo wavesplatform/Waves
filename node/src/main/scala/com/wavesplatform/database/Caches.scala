@@ -393,7 +393,6 @@ abstract class Caches extends Blockchain, Storage {
     val updatedCurrentGeneratorBalances = generatorBalances.map { case (addr, _, balance) => addr -> balance }
     currentGeneratorBalancesCache = Some(updatedCurrentGeneratorBalances)
 
-    // TODO: here?
     val updatedBalanceNodes = for {
       case ((address, asset), amount) <- snapshot.balances
       key         = (address, asset)

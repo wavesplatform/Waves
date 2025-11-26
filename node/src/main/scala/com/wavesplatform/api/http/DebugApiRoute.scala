@@ -6,6 +6,7 @@ import com.wavesplatform.account.{Address, PKKeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.RocksDBWriter
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, *}
@@ -258,13 +259,20 @@ case class DebugApiRoute(
     val result = for {
       sh <- db.loadStateHash(Height(height))
       h  <- blockchain.blockHeader(height)
-    } yield Json.toJson(sh).as[JsObject] ++ Json.obj(
-      "snapshotHash" -> db.snapshotStateHash(height),
-      "blockId"      -> h.id().toString,
-      "baseTarget"   -> h.header.baseTarget,
-      "height"       -> height,
-      "version"      -> Version.VersionString
-    )
+    } yield {
+      val stateHashJson = Json.toJson(sh).as[JsObject]
+      val filteredStateHashJson =
+        if (blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality, height)) stateHashJson
+        else stateHashJson - "nextCommittedGeneratorsHash"
+
+      filteredStateHashJson ++ Json.obj(
+        "snapshotHash" -> db.snapshotStateHash(height),
+        "blockId"      -> h.id().toString,
+        "baseTarget"   -> h.header.baseTarget,
+        "height"       -> height,
+        "version"      -> Version.VersionString
+      )
+    }
 
     result match {
       case Some(value) => complete(value)
