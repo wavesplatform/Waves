@@ -47,14 +47,14 @@ class CommitmentExtension(context: Context) extends Extension with ScorexLogging
               val timestamp = context.time.getTimestamp()
 
               val blsKP      = BlsKeyPair(account.privateKey)
-              val blsMessage = blsKP.publicKey.arr ++ Ints.toByteArray(generationPeriodStart)
+              val blsMessage = blsKP.publicKey.arr ++ Ints.toByteArray(generationPeriodStart.toInt)
               val blsSig     = blsKP.sign(blsMessage)
 
               val commitToGenTxE = CommitToGenerationTransaction
                 .create(
                   sender = account.publicKey,
                   endorserPublicKey = blsKP.publicKey,
-                  generationPeriodStart = generationPeriodStart.next,
+                  generationPeriodStart = generationPeriodStart+1,
                   timestamp = timestamp,
                   feeInWaves = fee,
                   commitmentSignature = blsSig,
