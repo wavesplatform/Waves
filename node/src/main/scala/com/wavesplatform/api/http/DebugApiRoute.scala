@@ -261,7 +261,6 @@ case class DebugApiRoute(
       h  <- blockchain.blockHeader(height)
     } yield {
       val stateHashJson = Json.toJson(sh).as[JsObject]
-      println(s"stateHashJson: ${sh}")
       val filteredStateHashJson =
         if (blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality, height)) stateHashJson
         else stateHashJson - "nextCommittedGeneratorsHash"
