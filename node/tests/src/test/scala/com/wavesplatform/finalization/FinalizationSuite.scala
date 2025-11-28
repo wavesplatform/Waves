@@ -63,7 +63,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
         txs = Nil,
         generator = otherNode1Acc,
         strictTime = true,
-        voting = Some(
+        finalizationVoting = Some(
           FinalizationVoting(
             valid = Seq(GeneratorIndex(1)),
             aggregatedEndorsement = aggSig,
@@ -72,7 +72,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
         )
       )
       d.appender.appendBlock(votingBlock)
-      d.checkFinalizedHeight()
+      d.checkFinalizedHeight(3)
 
       log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
@@ -115,7 +115,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           ),
           generator = otherNode1Acc,
           strictTime = true,
-          voting = Some(
+          finalizationVoting = Some(
             FinalizationVoting(
               valid = Seq(GeneratorIndex(2)),
               aggregatedEndorsement = aggSig,
@@ -152,7 +152,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           txs = Nil,
           generator = otherNode1Acc,
           strictTime = true,
-          voting = None
+          finalizationVoting = None
         )
       )
 
@@ -183,7 +183,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           txs = Nil,
           generator = otherNode1Acc,
           strictTime = true,
-          voting = None
+          finalizationVoting = None
         )
       )
 
@@ -226,7 +226,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           txs = Nil,
           generator = otherNode3Acc,
           strictTime = true,
-          voting = Some(
+          finalizationVoting = Some(
             FinalizationVoting(
               valid = Seq(GeneratorIndex(1)),
               aggregatedEndorsement = aggSig,
@@ -236,7 +236,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
                   GeneratorIndex(0),
                   otherFinalizedBlockId,
                   finalizedHeight = GenesisBlockHeight,
-                  endorsedId = endorsedBlockId,
+                  endorsedId = endorsedBlockId
                 )
               )
             )
@@ -244,9 +244,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
         )
       )
 
-      log.debug("Append block 5")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.checkFinalizedHeight(3) // 5 - maxRollback = 3
+      d.checkFinalizedHeight(3)
     }
   }
 

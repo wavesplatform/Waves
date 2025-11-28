@@ -29,7 +29,7 @@ case class MicroBlock(
   override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature, bytesWithoutSignature(), sender))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
-  override def toString: String = s"MicroBlock(... -> ${reference.trim}, txs=${transactionData.size}"
+  override def toString: String = s"MicroBlock(... -> ${reference.trim}, txs=${transactionData.size}${finalizationVoting.fold("")(f => s", f=$f")})"
 
   def stringRepr(totalBlockId: ByteStr): String =
     s"MicroBlock(${totalBlockId.trim} -> ${reference.trim}, txs=${transactionData.size}${finalizationVoting.fold("")(f => s", f=$f")})"

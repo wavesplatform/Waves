@@ -179,7 +179,7 @@ class MinerImpl(
     metrics.blockBuildTimeStats.measureSuccessful {
       val stopReasons = for {
         _ <- isAllowedForMining(address, blockchainUpdater)
-        _ <- Either.raiseUnless(blockchainUpdater.isCommitted(height + 1, address)) {
+        _ <- Either.raiseUnless(blockchainUpdater.isCommitted(Height(height + 1), address)) {
           s"$address is not committed on ${height + 1}. Try to commit to generation on next period"
         }
       } yield ()

@@ -45,7 +45,6 @@ object NgState {
   private val MaxTotalDiffs = 15
 }
 
-// TODO: latestFinalizedHeight and latestGeneratorBalances in snapshot?
 case class NgState(
     base: Block,
     baseBlockSnapshot: StateSnapshot,
@@ -59,8 +58,7 @@ case class NgState(
     microSnapshots: Map[BlockId, CachedMicroDiff] = Map.empty,
     microBlocks: List[MicroBlockInfo] = List.empty, // Recent in the head
     internalCaches: NgStateCaches = new NgStateCaches,
-    latestFinalizedHeight: Height = GenesisBlockHeight,
-    latestGeneratorBalances: GeneratorBalances = Seq.empty
+    finalizationState: FinalizationState = FinalizationState()
 ) {
   def cancelExpiredLeases(snapshot: StateSnapshot): StateSnapshot =
     leasesToCancel
@@ -101,11 +99,7 @@ case class NgState(
   def transactions: Seq[Transaction] =
     base.transactionData.toVector ++ microBlocks.view.map(_.microBlock.transactionData).reverse.flatten
 
-  private def bestFinalizationVoting: Option[FinalizationVoting] =
-    microBlocks.view
-      .flatMap(_.microBlock.finalizationVoting)
-      .find(_.nonEmpty)
-      .orElse(base.header.finalizationVoting)
+  def bestFinalizationVoting: Option[FinalizationVoting] = finalizationState.finalizationVoting.get(bestLiquidBlockId)
 
   def bestLiquidBlock: Block =
     if (microBlocks.isEmpty)
@@ -168,13 +162,20 @@ case class NgState(
       computedStateHash: ByteStr,
       totalBlockId: Option[BlockId] = None
   ): NgState = {
-    val blockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
+    val fixedTotalBlockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
 
-    val microSnapshots =
-      this.microSnapshots + (blockId -> CachedMicroDiff(snapshot, microblockCarry, microblockTotalFee, computedStateHash, timestamp))
-    val microBlocks    = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
-    internalCaches.invalidate(blockId)
-    this.copy(microSnapshots = microSnapshots, microBlocks = microBlocks)
+    val microSnapshots = this.microSnapshots.updated(
+      fixedTotalBlockId,
+      CachedMicroDiff(snapshot, microblockCarry, microblockTotalFee, computedStateHash, timestamp)
+    )
+    val microBlocks = MicroBlockInfo(fixedTotalBlockId, microBlock) :: this.microBlocks
+    internalCaches.invalidate(fixedTotalBlockId)
+
+    this.copy(
+      microSnapshots = microSnapshots,
+      microBlocks = microBlocks,
+      finalizationState = finalizationState.append(base.header.generator.toAddress, fixedTotalBlockId, createFinalizationVoting(microBlock))
+    )
   }
 
   def carryFee: Long =
@@ -182,17 +183,16 @@ case class NgState(
 
   def createBlockId(microBlock: MicroBlock): BlockId = {
     val newTransactions = this.transactions ++ microBlock.transactionData
-    val newVoting       = microBlock.finalizationVoting.orElse(this.bestFinalizationVoting)
-    val fullBlock =
-      base.copy(
-        transactionData = newTransactions,
-        signature = microBlock.totalResBlockSig,
-        header = base.header.copy(
-          transactionsRoot = createTransactionsRoot(microBlock),
-          stateHash = microBlock.stateHash,
-          finalizationVoting = newVoting
-        )
+
+    val fullBlock = base.copy(
+      transactionData = newTransactions,
+      signature = microBlock.totalResBlockSig,
+      header = base.header.copy(
+        transactionsRoot = createTransactionsRoot(microBlock),
+        stateHash = microBlock.stateHash,
+        finalizationVoting = createFinalizationVoting(microBlock)
       )
+    )
     fullBlock.id()
   }
 
@@ -207,7 +207,7 @@ case class NgState(
       { () =>
         val microBlocksAsc = microBlocks.reverse
 
-        if (base.id() == blockId) {
+        if (base.id() == blockId)
           Some(
             (
               base,
@@ -217,7 +217,7 @@ case class NgState(
               }
             )
           )
-        } else if (!microBlocksAsc.exists(_.idEquals(blockId))) None
+        else if (!microBlocksAsc.exists(_.idEquals(blockId))) None
         else {
           val init = (
             base.transactionData,
@@ -225,16 +225,16 @@ case class NgState(
             Option.empty[(ByteStr, Option[ByteStr], DiscardedMicroBlocks)] // sig, stateHash, discarded
           )
           val (txs, voting, maybeFound) = microBlocksAsc.foldLeft(init) {
-            case ((txs, voting, Some((sig, stateHash, discarded))), MicroBlockInfo(mbId, micro)) =>
+            case ((txs, voting, Some((sig, stateHash, discarded))), MicroBlockInfo(mbId, mb)) =>
               val discDiff = microSnapshots(mbId).snapshot
-              (txs, micro.finalizationVoting.orElse(voting), Some((sig, stateHash, discarded :+ (micro -> discDiff))))
+              (txs, FinalizationVoting.combine(voting, mb.finalizationVoting), Some((sig, stateHash, discarded :+ (mb -> discDiff))))
 
             case ((txs, voting, None), mb) if mb.idEquals(blockId) =>
               val found = Some((mb.microBlock.totalResBlockSig, mb.microBlock.stateHash, Seq.empty[(MicroBlock, StateSnapshot)]))
-              (txs ++ mb.microBlock.transactionData, mb.microBlock.finalizationVoting.orElse(voting), found)
+              (txs ++ mb.microBlock.transactionData, FinalizationVoting.combine(voting, mb.microBlock.finalizationVoting), found)
 
             case ((txs, voting, None), MicroBlockInfo(_, mb)) =>
-              (txs ++ mb.transactionData, mb.finalizationVoting.orElse(voting), None)
+              (txs ++ mb.transactionData, FinalizationVoting.combine(voting, mb.finalizationVoting), None)
           }
 
           maybeFound.map { case (sig, stateHash, discarded) =>
@@ -243,4 +243,7 @@ case class NgState(
         }
       }
     )
+
+  private def createFinalizationVoting(microBlock: MicroBlock): Option[FinalizationVoting] =
+    FinalizationVoting.combine(bestFinalizationVoting, microBlock.finalizationVoting)
 }

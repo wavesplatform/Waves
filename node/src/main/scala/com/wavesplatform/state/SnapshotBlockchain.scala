@@ -166,13 +166,7 @@ case class SnapshotBlockchain(
       val lease   = this.leaseBalance(address)
       val deposit = this.generationDeposit(address, h)
 
-      val punished = for {
-        p <- inner.generationPeriodOf(h)
-        idx = inner.committedGenerators(p).indexWhere { case (generatorAddress, _) => generatorAddress == address }
-        idx <- GeneratorIndex.checked(idx)
-      } yield inner.conflictGenerators(p).hasInUpTo(h, idx)
-
-      val bs         = BalanceSnapshot(h, Portfolio(balance, lease, generationDeposit = deposit), punished.getOrElse(false))
+      val bs         = BalanceSnapshot(h, Portfolio(balance, lease, generationDeposit = deposit))
       val height2Fix = h == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
       if (inner.height > 0 && (from1 < h - 1 || height2Fix))
         bs +: inner.balanceSnapshots(address, from1, to)
@@ -265,17 +259,20 @@ case class SnapshotBlockchain(
   }
 
   override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = {
-    val base   = inner.conflictGenerators(at)
-    val atCurr = this.currentGenerationPeriod.contains(at)
-    if (atCurr) {
-      val extraConflictIndexes = for {
-        (blockMeta, _) <- blockMeta.toSeq
-        v              <- blockMeta.header.finalizationVoting.toSeq
-        c              <- v.conflict
-      } yield c.endorserIndex
+    lazy val base = inner.conflictGenerators(at)
+    this.currentGenerationPeriod.fold(ConflictGenerators.empty) { currPeriod =>
+      if (at < currPeriod) base
+      else if (at > currPeriod) ConflictGenerators.empty
+      else {
+        val extraConflictIndexes = for {
+          (blockMeta, _) <- blockMeta.toSeq
+          v              <- blockMeta.header.finalizationVoting.toSeq
+          c              <- v.conflict
+        } yield c.endorserIndex
 
-      base.appendAll(Height(height), extraConflictIndexes*)
-    } else base
+        base.appendAll(Height(height), extraConflictIndexes*)
+      }
+    }
   }
 
   override def currentGeneratorBalances(): Seq[(Address, Long)] =
@@ -291,7 +288,7 @@ object SnapshotBlockchain {
       ngState.carryFee,
       ngState.reward,
       Some(ngState.bestLiquidComputedStateHash),
-      Some(ngState.latestGeneratorBalances)
+      Some(ngState.finalizationState.generatorBalances)
     )
 
   def apply(inner: Blockchain, reward: Option[Long]): SnapshotBlockchain =

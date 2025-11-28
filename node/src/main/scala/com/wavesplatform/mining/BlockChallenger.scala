@@ -16,7 +16,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.MaxTimeDrift
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.{Blockchain, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, Height, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -128,7 +128,7 @@ class BlockChallengerImpl(
         pk -> blockchainUpdater.generatingBalance(pk.toAddress)
       }
       .filter { case (pk, balance) =>
-        blockchainUpdater.isCommitted(blockchainUpdater.height, pk.toAddress) // Only a committed generator can challenge on current height
+        blockchainUpdater.isCommitted(Height(blockchainUpdater.height), pk.toAddress) // Only a committed generator can challenge on current height
         && blockchainUpdater.isMiningAllowed(blockchainUpdater.height, balance)
       }
       .traverse { case (acc, initGenBalance) =>

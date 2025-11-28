@@ -6,13 +6,12 @@ import com.wavesplatform.api.common.CommonGeneratorsApi.GeneratorEntry
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
-import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.mining.BlockChallengerImpl
 import com.wavesplatform.network.{EndorseBlockSpec, MessageCodecL1, PeerDatabase, RawBytes}
-import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.*
+import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{FreeSpec, NumericExt, TestTime}
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
@@ -24,11 +23,10 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import monix.execution.schedulers.SchedulerService
-import org.scalatest.BeforeAndAfterAll
 
 import scala.jdk.CollectionConverters.*
 
-class BlockAppenderAfterFinalizationSpec extends FreeSpec with WithDomain with BeforeAndAfterAll {
+class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
   private val appenderScheduler: SchedulerService = Schedulers.singleThread("appender")
   private val testTime: TestTime                  = TestTime()
 
