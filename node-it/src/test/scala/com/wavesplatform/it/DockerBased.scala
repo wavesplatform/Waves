@@ -16,7 +16,7 @@ trait DockerBased extends BeforeAndAfterAll {
         docker.printThreadDump(node)
     }
     val r = super.runTest(testName, args)
-    if (!r.succeeds()) printThreadDump()
+    if (!r.succeeds() && Option(System.getenv("DISABLE_THREAD_DUMPS")).isEmpty) printThreadDump()
     r
   }
 

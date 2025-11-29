@@ -499,8 +499,7 @@ abstract class Caches extends Blockchain, Storage {
       discardedBlocks = doRollback(height)
     } yield {
       current = loadCurrentBlock()
-      if (currentFinalizedHeight.forall(_ < height)) // Happens only during a force rollback
-        currentFinalizedHeight = finalizedHeightAt(height)
+      currentFinalizedHeight = loadFinalizedHeight()
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()

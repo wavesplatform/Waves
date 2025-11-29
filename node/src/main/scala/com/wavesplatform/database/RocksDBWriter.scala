@@ -534,6 +534,7 @@ class RocksDBWriter(
       val h           = Height(height)
 
       rw.put(Keys.height, h)
+      rw.put(Keys.finalizedHeight, Some(newFinalizedHeight))
       rw.put(Keys.finalizedHeightAt(h), Some(newFinalizedHeight))
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
@@ -1032,7 +1033,13 @@ class RocksDBWriter(
 
         val currentPeriod = this.generationPeriodOf(currentHeight)
         val discardedBlock = readWrite { rw =>
-          rw.put(Keys.height, currentHeight - 1)
+          val blockchainHeight = currentHeight.prev
+          rw.put(Keys.height, blockchainHeight)
+
+          if (finalizedHeight.forall(blockchainHeight < _)) { // Happens only during a force rollback
+            val atBlockchainHeight = rw.get(Keys.finalizedHeightAt(blockchainHeight))
+            rw.put(Keys.finalizedHeight, atBlockchainHeight)
+          }
           rw.delete(Keys.finalizedHeightAt(currentHeight))
 
           val discardedMeta = rw

@@ -86,6 +86,8 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec with OptionValues {
       done = finalizedHeight1 >= waitingFinalizedHeight
     }
 
+    node.waitForHeight(node.height + 1) // Finalization happened in a microblock
+
     step("Survives restart")
     isolated {
       val height = node.height
