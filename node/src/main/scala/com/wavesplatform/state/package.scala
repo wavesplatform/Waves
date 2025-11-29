@@ -40,7 +40,9 @@ package object state {
       def toByteArray: Array[Byte] = Ints.toByteArray(h)
       def +(that: Int): Height     = h + that
       def -(that: Int): Height     = h - that
-      def prev: Height             = h - 1
+
+      def next: Height = h + 1
+      def prev: Height = h - 1
 
       @targetName("minusHeight")
       def -(that: Height): Int = h - that

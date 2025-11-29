@@ -48,16 +48,20 @@ package object appender {
         .map(Height(_))
         .toRight(s"height: history does not contain parent $parentBlockId")
 
-      blockHeight   = parentHeight + 1
+      blockHeight   = parentHeight.next
       currentPeriod = blockchain.generationPeriodOf(blockHeight)
 
       committedGenerators = currentPeriod.fold(Nil)(blockchain.committedGenerators)
       minerAddress        = newBlock.header.generator.toAddress
       // TODO: allow if all generators have less than required balance
       // If no one commited, fallback to classic
-      _ <- Either.raiseUnless(committedGenerators.isEmpty || committedGenerators.exists { case (addr, _) => addr == minerAddress }) {
+      idx = GeneratorIndex.checked(committedGenerators.indexWhere { case (addr, _) => addr == minerAddress })
+      _ <- Either.raiseWhen(committedGenerators.nonEmpty && idx.isEmpty) {
         s"$minerAddress is not allowed to generate a block, allowed: ${committedGenerators.map { case (addr, _) => addr }.mkString(", ")}. " +
           s"If it is your node: commit to generation for a next epoch"
+      }
+      _ <- Either.raiseWhen(blockchain.isConflict(blockHeight, minerAddress)) {
+        s"$minerAddress is not allowed to generate a block, because it is conflict"
       }
     } yield {
       val generatorBalances = committedGenerators.map { case (addr, blsPk) =>

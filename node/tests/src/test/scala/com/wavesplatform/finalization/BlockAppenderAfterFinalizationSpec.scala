@@ -3,10 +3,11 @@ package com.wavesplatform.finalization
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonGeneratorsApi.GeneratorEntry
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.mining.BlockChallengerImpl
 import com.wavesplatform.network.{EndorseBlockSpec, MessageCodec, PeerDatabase, RawBytes}
@@ -26,6 +27,7 @@ import monix.execution.schedulers.SchedulerService
 
 import scala.jdk.CollectionConverters.*
 
+// TODO: remove wrapBU
 class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
   private val appenderScheduler: SchedulerService = Schedulers.singleThread("appender")
   private val testTime: TestTime                  = TestTime()
@@ -34,67 +36,41 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
   private val sender = Wallet.generateNewAccount(seed.arr, nonce = 0)
 
   private val defaultSettings = DomainPresets.DeterministicFinality
+    .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
     .copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed)))
 
   private val generator1 = sender
   private val generator2 = Wallet.generateNewAccount(seed.arr, nonce = 1)
   private val generator3 = Wallet.generateNewAccount(seed.arr, nonce = 2)
 
-  "should not broadcast a block endorsement before the feature activation" in {
-    withDomain(DomainPresets.TransactionStateSnapshot, AddrWithBalance.enoughBalances(sender)) { d =>
-      val blockChallenger = new BlockChallengerImpl(
-        d.blockchain,
-        new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
-        d.wallet,
-        d.settings,
-        testTime,
-        d.posSelector,
-        _ => throw new RuntimeException("Unexpected call in block challenger")
-      )
-
-      val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-      val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
-      val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
-      channels.add(channel1)
-      channels.add(channel2)
-      val appender = BlockAppender(
-        d.blockchain,
-        testTime,
-        d.utxPool,
-        d.posSelector,
-        channels,
-        PeerDatabase.NoOp,
-        Some(blockChallenger),
-        d.createBlockEndorser(channels),
-        appenderScheduler
-      )(channel2, _, None)
-
-      val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
-
-      testTime.setTime(block.header.timestamp)
-      appender(block).runSyncUnsafe()
-
-      val endorsements = channel1.outboundMessages().asScala.count {
-        case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
-        case _                                                     => false
+  "should append a block" - {
+    "if no one committed" in {
+      def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
+        override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
       }
 
-      endorsements shouldBe 0
+      withDomain(
+        defaultSettings,
+        AddrWithBalance.enoughBalances(generator1),
+        wrapBU = wrapBU
+      ) { d =>
+        d.wallet.generateNewAccounts(1)
+
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
+        d.appender.appendBlock(block)
+
+        d.blockchain.isLastBlockId(block.id()) shouldBe true
+      }
     }
-  }
 
-  "should append a block if no one committed" in {
-    def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-      override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
+    "if committed" in testWithGenerator { d =>
+      val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
+      d.appender.appendBlock(block)
+
+      d.blockchain.isLastBlockId(block.id()) shouldBe true
     }
 
-    withDomain(
-      defaultSettings,
-      AddrWithBalance.enoughBalances(generator1),
-      wrapBU = wrapBU
-    ) { d =>
-      d.wallet.generateNewAccounts(1)
-
+    "if no one eligible committed" in testWithGenerator { d =>
       val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
       d.appender.appendBlock(block)
 
@@ -102,84 +78,167 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     }
   }
 
-  "should append a block if committed" in testWithGenerator { d =>
-    val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
-    d.appender.appendBlock(block)
+  "should reject a block" - {
+    "if not committed" in {
+      def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
+        private val blsKeyPair = BlsKeyPair(generator2.privateKey)
 
-    d.blockchain.isLastBlockId(block.id()) shouldBe true
-  }
-
-  "should append a block if no one eligible committed" in testWithGenerator { d =>
-    val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
-    d.appender.appendBlock(block)
-
-    d.blockchain.isLastBlockId(block.id()) shouldBe true
-  }
-
-  "should reject a block if not committed" in {
-    def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-      private val blsKeyPair = BlsKeyPair(generator2.privateKey)
-
-      override def committedGenerators(at: GenerationPeriod): Vector[(Address, BlsPublicKey)] =
-        Vector((generator2.toAddress, blsKeyPair.publicKey))
-    }
-
-    withDomain(
-      defaultSettings,
-      AddrWithBalance.enoughBalances(generator1, generator2),
-      wrapBU = wrapBU
-    ) { d =>
-      d.wallet.generateNewAccounts(1)
-
-      val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
-      d.appender.appendBlock(block, requireAppended = false)
-
-      d.blockchain.isLastBlockId(block.id()) shouldBe false
-    }
-  }
-
-  "miner should not broadcast a block endorsement" in testWithGenerator { d =>
-    val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
-    val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
-    channels.add(channel1)
-    channels.add(channel2)
-
-    def sentEndorsements: Long = {
-      val r = channel1.outboundMessages().asScala.count {
-        case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
-        case _                                                     => false
+        override def committedGenerators(at: GenerationPeriod): Vector[(Address, BlsPublicKey)] =
+          Vector((generator2.toAddress, blsKeyPair.publicKey))
       }
-      channel1.outboundMessages().clear()
-      r
+
+      withDomain(
+        defaultSettings,
+        AddrWithBalance.enoughBalances(generator1, generator2),
+        wrapBU = wrapBU
+      ) { d =>
+        d.wallet.generateNewAccounts(1)
+
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
+        d.appender.appendBlock(block, requireAppended = false)
+
+        d.blockchain.isLastBlockId(block.id()) shouldBe false
+      }
     }
 
-    val appender = BlockAppender(
-      d.blockchain,
-      testTime,
-      d.utxPool,
-      d.posSelector,
-      channels,
-      PeerDatabase.NoOp,
-      blockChallenger = None,
-      d.createBlockEndorser(channels, new EndorsementStorage.InMemory((_, _) => true)),
-      appenderScheduler
-    )(channel2, _, None)
+    "if conflict" in {
+      val validGenerator    = generator1
+      val conflictGenerator = generator2
+      val endorsers         = Seq(validGenerator, conflictGenerator)
 
-    val endorsedBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
-    testTime.setTime(endorsedBlock.header.timestamp)
-    appender(endorsedBlock).runSyncUnsafe()
-    if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply endorsedBlock $endorsedBlock, see logs")
-    sentEndorsements shouldBe 0
+      val settings = defaultSettings.configure(
+        _.copy(
+          generationPeriodLength = 2,
+          lightNodeBlockFieldsAbsenceInterval = 0
+        )
+      )
 
-    val nextBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator2, strictTime = true)
-    testTime.setTime(nextBlock.header.timestamp)
-    appender(nextBlock).runSyncUnsafe()
-    if (d.lastBlockId != nextBlock.id()) fail(s"Can't apply nextBlock $nextBlock, see logs")
-    sentEndorsements shouldBe 0
+      withDomain(settings, AddrWithBalance.enoughBalances(endorsers*)) { d =>
+        d.wallet.generateNewAccounts(1)
+
+        log.debug(s"Append block 2 with commitments")
+        val txs                   = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+        val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = validGenerator, strictTime = true)
+        d.appender.appendBlock(block2WithCommitments)
+
+        log.debug(s"Append block 2 with endorsements")
+        val otherFinalizedBlockId = TxHelpers.randomBlockId
+        val block3WithVotes = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = generator1,
+          strictTime = true,
+          finalizationVoting = Some(
+            FinalizationVoting(
+              conflict = Vector(
+                BlockEndorsement.signed(
+                  BlsKeyPair(conflictGenerator.privateKey),
+                  GeneratorIndex(1),
+                  otherFinalizedBlockId,
+                  finalizedHeight = GenesisBlockHeight,
+                  endorsedId = block2WithCommitments.id()
+                )
+              )
+            )
+          )
+        )
+        d.appender.appendBlock(block3WithVotes)
+
+        val blockFromConflict = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = conflictGenerator, strictTime = true)
+        d.appender.appendBlock(blockFromConflict, requireAppended = false)
+
+        d.blockchain.isLastBlockId(blockFromConflict.id()) shouldBe false
+      }
+    }
   }
 
-  "validator should broadcast a block endorsement" in {
+  "should not broadcast a block endorsement" - {
+    "before the feature activation" in {
+      withDomain(DomainPresets.TransactionStateSnapshot, AddrWithBalance.enoughBalances(sender)) { d =>
+        val blockChallenger = new BlockChallengerImpl(
+          d.blockchain,
+          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+          d.wallet,
+          d.settings,
+          testTime,
+          d.posSelector,
+          _ => throw new RuntimeException("Unexpected call in block challenger")
+        )
+
+        val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+        val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
+        val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
+        channels.add(channel1)
+        channels.add(channel2)
+        val appender = BlockAppender(
+          d.blockchain,
+          testTime,
+          d.utxPool,
+          d.posSelector,
+          channels,
+          PeerDatabase.NoOp,
+          Some(blockChallenger),
+          d.createBlockEndorser(channels),
+          appenderScheduler
+        )(channel2, _, None)
+
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
+
+        testTime.setTime(block.header.timestamp)
+        appender(block).runSyncUnsafe()
+
+        val endorsements = channel1.outboundMessages().asScala.count {
+          case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
+          case _                                                     => false
+        }
+
+        endorsements shouldBe 0
+      }
+    }
+
+    "if miner" in testWithGenerator { d =>
+      val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+      val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
+      val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
+      channels.add(channel1)
+      channels.add(channel2)
+
+      def sentEndorsements: Long = {
+        val r = channel1.outboundMessages().asScala.count {
+          case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
+          case _                                                     => false
+        }
+        channel1.outboundMessages().clear()
+        r
+      }
+
+      val appender = BlockAppender(
+        d.blockchain,
+        testTime,
+        d.utxPool,
+        d.posSelector,
+        channels,
+        PeerDatabase.NoOp,
+        blockChallenger = None,
+        d.createBlockEndorser(channels, new EndorsementStorage.InMemory((_, _) => true)),
+        appenderScheduler
+      )(channel2, _, None)
+
+      val endorsedBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
+      testTime.setTime(endorsedBlock.header.timestamp)
+      appender(endorsedBlock).runSyncUnsafe()
+      if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply endorsedBlock $endorsedBlock, see logs")
+      sentEndorsements shouldBe 0
+
+      val nextBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator2, strictTime = true)
+      testTime.setTime(nextBlock.header.timestamp)
+      appender(nextBlock).runSyncUnsafe()
+      if (d.lastBlockId != nextBlock.id()) fail(s"Can't apply nextBlock $nextBlock, see logs")
+      sentEndorsements shouldBe 0
+    }
+  }
+
+  "should broadcast a block endorsement if validator" in {
     val otherGenerator = Wallet.generateNewAccount(seed.arr :+ 1.toByte, nonce = 0)
 
     def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
@@ -238,6 +297,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     }
   }
 
+  // TODO: move to FinalizationSuite
   "committed generators and balances" in {
     val miner1InitBalance = 100_000.waves + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee
     val miner2InitBalance = 50_000.waves + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee

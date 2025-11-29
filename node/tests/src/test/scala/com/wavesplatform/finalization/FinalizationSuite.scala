@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.wallet.Wallet
 import org.scalactic.source.Position
 
+// TODO: move to valid
 class FinalizationSuite extends FreeSpec with WithDomain {
   private val seed          = ByteStr("finality-test".getBytes())
   private val thisNodeAcc   = Wallet.generateNewAccount(seed.arr, nonce = 0)
