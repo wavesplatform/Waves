@@ -4,7 +4,7 @@ import com.google.common.primitives.Ints
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.Address
 import com.wavesplatform.events.protobuf.StateUpdate
-import com.wavesplatform.protobuf.AddressExt
+import com.wavesplatform.protobuf.toByteString
 import com.wavesplatform.protobuf.transaction.DataEntry
 
 trait CommonGrpcConverters {

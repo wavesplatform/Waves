@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.TxMeta.Status
-import com.wavesplatform.state.{BinaryDataEntry, Blockchain, LeaseDetails, LeaseStaticInfo}
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, LeaseDetails, LeaseStaticInfo, Height, TransactionId}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.TxHelpers.signer
@@ -98,7 +98,7 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
 
   private def toDetails(lt: LeaseTransaction, blockchain: Blockchain) =
     LeaseDetails(
-      LeaseStaticInfo(lt.sender, blockchain.resolveAlias(lt.recipient).explicitGet(), lt.amount, lt.id(), blockchain.height),
+      LeaseStaticInfo(lt.sender, blockchain.resolveAlias(lt.recipient).explicitGet(), lt.amount, TransactionId(lt.id()), Height(blockchain.height)),
       LeaseDetails.Status.Active
     )
 
@@ -183,7 +183,7 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
         .value
       val expectedDetails = Seq(
         leaseId -> LeaseDetails(
-          LeaseStaticInfo(dappAddress.publicKey, leaseRecipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), invoke.id(), 1),
+          LeaseStaticInfo(dappAddress.publicKey, leaseRecipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), TransactionId(invoke.id()), Height(1)),
           LeaseDetails.Status.Active
         )
       )
@@ -217,7 +217,7 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
       val expectedDetails =
         Seq(
           leaseId -> LeaseDetails(
-            LeaseStaticInfo(dappAddress.publicKey, leaseRecipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), invoke.id(), 1),
+            LeaseStaticInfo(dappAddress.publicKey, leaseRecipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), TransactionId(invoke.id()), Height(1)),
             LeaseDetails.Status.Active
           )
         )
@@ -261,7 +261,7 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
       val expectedDetails =
         Seq(
           leaseId -> LeaseDetails(
-            LeaseStaticInfo(sender.publicKey, recipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), invoke.id(), 1),
+            LeaseStaticInfo(sender.publicKey, recipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), TransactionId(invoke.id()), Height(1)),
             LeaseDetails.Status.Active
           )
         )
@@ -314,7 +314,7 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
       val expectedDetails =
         Seq(
           leaseId -> LeaseDetails(
-            LeaseStaticInfo(dApp.publicKey, recipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), invoke.id(), 1),
+            LeaseStaticInfo(dApp.publicKey, recipient, TxPositiveAmount.unsafeFrom(10_000_00000000L), TransactionId(invoke.id()), Height(1)),
             LeaseDetails.Status.Active
           )
         )
@@ -381,7 +381,7 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
       val expectedDetails =
         Seq(
           leaseId -> LeaseDetails(
-            LeaseStaticInfo(target.publicKey, recipient.toAddress, TxPositiveAmount.unsafeFrom(10_000_00000000L), ist.id(), 1),
+            LeaseStaticInfo(target.publicKey, recipient.toAddress, TxPositiveAmount.unsafeFrom(10_000_00000000L), TransactionId(ist.id()), Height(1)),
             LeaseDetails.Status.Active
           )
         )
@@ -455,14 +455,14 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
       val lease1Id = getLeaseId(dApp1.toAddress)
       val leaseDetails1 = Seq(
         lease1Id -> LeaseDetails(
-          LeaseStaticInfo(dApp1.publicKey, leaseRecipient1.toAddress, TxPositiveAmount.unsafeFrom(leaseAmount1), invokeTx.id(), 3),
+          LeaseStaticInfo(dApp1.publicKey, leaseRecipient1.toAddress, TxPositiveAmount.unsafeFrom(leaseAmount1), TransactionId(invokeTx.id()), Height(3)),
           LeaseDetails.Status.Active
         )
       )
       val lease2Id = getLeaseId(dApp2.toAddress)
       val leaseDetails2 = Seq(
         lease2Id -> LeaseDetails(
-          LeaseStaticInfo(dApp2.publicKey, leaseRecipient2.toAddress, TxPositiveAmount.unsafeFrom(leaseAmount2), invokeTx.id(), 3),
+          LeaseStaticInfo(dApp2.publicKey, leaseRecipient2.toAddress, TxPositiveAmount.unsafeFrom(leaseAmount2), TransactionId(invokeTx.id()), Height(3)),
           LeaseDetails.Status.Active
         )
       )

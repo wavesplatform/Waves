@@ -1,22 +1,18 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.block.Block
-import com.wavesplatform.block.serialization.BlockHeaderSerializer
-import com.wavesplatform.network.BasicMessagesRepo.specsByCodes
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.network.message.Message as ScorexMessage
-import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.ScorexLogging
-import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
 import pureconfig.*
 
-abstract class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandler with ScorexLogging {
+abstract class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandler {
   protected def codeOf(msg: AnyRef): Option[Byte]
   protected def stringify(msg: Any): String
+  protected def logger: Logger
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = {
     codeOf(msg).filterNot(settings.ignoreTxMessages).foreach { code =>
-      log.trace(s"${id(ctx)} <-- transmitted($code): ${stringify(msg)}")
+      logger.trace(s"${id(ctx)} <-- transmitted($code): ${stringify(msg)}")
     }
 
     super.write(ctx, msg, promise)
@@ -24,36 +20,10 @@ abstract class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDu
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
     codeOf(msg).filterNot(settings.ignoreRxMessages).foreach { code =>
-      log.trace(s"${id(ctx)} --> received($code): ${stringify(msg)}")
+      logger.trace(s"${id(ctx)} --> received($code): ${stringify(msg)}")
     }
 
     super.channelRead(ctx, msg)
-  }
-}
-
-@Sharable
-class TrafficLoggerL1(settings: TrafficLogger.Settings) extends TrafficLogger(settings) {
-
-  import BasicMessagesRepo.specsByClasses
-
-  protected def codeOf(msg: AnyRef): Option[Byte] = {
-    val aux: PartialFunction[AnyRef, Byte] = {
-      case x: RawBytes                      => x.code
-      case _: Transaction                   => TransactionSpec.messageCode
-      case _: BigInt | _: LocalScoreChanged => ScoreSpec.messageCode
-      case _: Block | _: BlockForged        => BlockSpec.messageCode
-      case x: Message                       => specsByClasses(x.getClass).messageCode
-      case _: Handshake                     => HandshakeSpec.messageCode
-    }
-
-    aux.lift(msg)
-  }
-
-  protected def stringify(msg: Any): String = msg match {
-    case tx: Transaction => s"Transaction(${tx.id()})"
-    case b: Block => s"${b.id()}, header: ${BlockHeaderSerializer.toJson(b.header, b.bytes().length, b.transactionData.length, b.signature).toString}"
-    case RawBytes(code, data) => s"RawBytes(${specsByCodes(code).messageName}, ${data.length} bytes)"
-    case other                => other.toString
   }
 }
 

@@ -45,7 +45,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       val endorsers = Seq(otherNode1Acc, thisNodeAcc)
       val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
@@ -90,7 +90,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       val endorsers = Seq(otherNode1Acc, otherNode2Acc, thisNodeAcc)
       val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
@@ -140,7 +140,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       val endorsers = Seq(otherNode1Acc, thisNodeAcc)
       val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
@@ -171,7 +171,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       val endorsers = Seq(otherNode1Acc, thisNodeAcc)
       val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
@@ -203,7 +203,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
       val endorsers = Seq(otherNode1Acc, otherNode2Acc, otherNode3Acc, thisNodeAcc)
       val block3 = d.createBlock(
         version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 4, x)),
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
@@ -249,7 +249,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
   }
 
   extension (d: Domain)(using Position) {
-    def checkFinalizedHeight(h: Int = GenesisBlockHeight): Unit = {
+    def checkFinalizedHeight(h: Int = GenesisBlockHeight.toInt): Unit = {
       d.blockchain.finalizedHeightAt().value shouldBe Height(h)
       d.blockchain.finalizedHeight.value shouldBe Height(h)
     }

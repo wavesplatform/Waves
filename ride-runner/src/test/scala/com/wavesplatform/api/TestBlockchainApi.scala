@@ -3,11 +3,10 @@ package com.wavesplatform.api
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.grpc.BalanceResponse
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.{AssetDescription, DataEntry, Height}
+import com.wavesplatform.state.{AssetDescription, DataEntry, Height, TransactionId}
 import com.wavesplatform.transaction.Asset
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -39,7 +38,7 @@ class TestBlockchainApi(implicit val scheduler: Scheduler) extends BlockchainApi
   override def resolveAlias(alias: Alias): Option[Address]                             = kill(s"resolveAlias(alias=$alias)")
   override def getBalance(address: Address, asset: Asset): Long                        = kill(s"getBalance(address=$address, asset=$asset)")
   override def getLeaseBalance(address: Address): BalanceResponse.WavesBalances        = kill(s"getLeaseBalance(address=$address)")
-  override def getTransactionHeight(id: ByteStr): Option[Height]                       = kill(s"getTransactionHeight(id=$id)")
+  override def getTransactionHeight(id: TransactionId): Option[Height]                 = kill(s"getTransactionHeight(id=$id)")
 
   private def kill(call: String) = throw new RuntimeException(call)
 }

@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.*
 import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.util.*
+import com.wavesplatform.state.Height
 
 import java.util.concurrent.TimeoutException
 import scala.concurrent.Future.traverse
@@ -81,7 +82,7 @@ class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with Tra
   private def assertHasTxs(node: Node, txIds: Set[String]): Future[Unit] = {
     for {
       height <- node.height
-      blocks <- node.blockSeq(1, height)
+      blocks <- node.blockSeq(Height(1), height)
     } yield withClue(s"all transactions in node") {
       val txsInBlockchain = blocks.flatMap(_.transactions.map(_.id))
       txIds -- txsInBlockchain shouldBe empty
@@ -105,8 +106,8 @@ class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with Tra
     for {
       utxSize <- node.utxSize
       height  <- node.height
-      blockGroups <- traverse((2 to height).grouped(maxRequestSize).map { xs =>
-        (xs.head, xs.last, false)
+      blockGroups <- traverse((2 to height.toInt).grouped(maxRequestSize).map { xs =>
+        (Height(xs.head), Height(xs.last), false)
       })(Function.tupled(node.blockSeq))
     } yield {
       val blocks = blockGroups.flatten.toList

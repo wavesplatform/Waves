@@ -7,6 +7,7 @@ import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
+import com.wavesplatform.state.Height
 import org.scalatest.OptionValues
 
 import scala.concurrent.duration.*
@@ -16,12 +17,12 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  lazy val initMinerBalance: Long = miner.balanceAtHeight(miner.address, 1)
+  lazy val initMinerBalance: Long = miner.balanceAtHeight(miner.address, Height(1))
   val InitialAmount               = 6400000000000000L
 
   "reward changes accordingly node's votes and miner's balance changes by reward amount after block generation" - {
     "when miner votes for increase" in {
-      assertApiError(miner.rewardStatus(Some(1)), CustomValidationError("Block reward feature is not activated yet"))
+      assertApiError(miner.rewardStatus(Some(Height(1))), CustomValidationError("Block reward feature is not activated yet"))
       miner.waitForHeight(activationHeight - 1, 5.minutes)
       miner.balanceAtHeight(miner.address, activationHeight - 1) shouldBe initMinerBalance
       miner.waitForHeight(activationHeight)
@@ -104,7 +105,7 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
     }
     "when miner votes for decrease" in {
       docker.restartNode(dockerNodes().head, configWithDecreasedDesired)
-      if (miner.height != 1) nodes.rollback(2, false)
+      if (miner.height.toInt != 1) nodes.rollback(Height(2), false)
 
       miner.waitForHeight(activationHeight, 2.minutes)
       val minerBalanceAtActivationHeight = miner.balanceAtHeight(miner.address, activationHeight)
@@ -164,7 +165,7 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
 }
 
 object RewardsTestSuite {
-  private val activationHeight = 4
+  private val activationHeight = Height(4)
   private val increasedDesired = 750000000
   private val decreasedDesired = 450000000
   private val minIncrement     = 50000000

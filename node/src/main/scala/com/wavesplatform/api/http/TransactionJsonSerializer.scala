@@ -38,7 +38,7 @@ import com.wavesplatform.state.InvokeScriptResult.{
   Reissue,
   SponsorFee
 }
-import com.wavesplatform.state.{Blockchain, DataEntry, InvokeScriptResult, LeaseDetails, TxMeta}
+import com.wavesplatform.state.{Height, TransactionId, Blockchain, DataEntry, InvokeScriptResult, LeaseDetails, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -149,9 +149,9 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
       l.sender.fold(gen.writeNullField("sender"))(sender => gen.writeStringField("sender", sender.toString))
       l.recipient.fold(gen.writeNullField("recipient"))(recipient => gen.writeStringField("recipient", recipient.toString))
       l.amount.fold(gen.writeNullField("amount"))(amount => gen.writeNumberField("amount", amount, numbersAsString))
-      l.height.fold(gen.writeNullField("height"))(height => gen.writeNumberField("height", height, numbersAsString))
+      l.height.fold(gen.writeNullField("height"))(height => gen.writeNumberField("height", height.toInt, numbersAsString))
       gen.writeStringField("status", if (l.status == LeaseStatus.active) "active" else "canceled")
-      l.cancelHeight.fold(gen.writeNullField("cancelHeight"))(ch => gen.writeNumberField("cancelHeight", ch, numbersAsString))
+      l.cancelHeight.fold(gen.writeNullField("cancelHeight"))(ch => gen.writeNumberField("cancelHeight", ch.toInt, numbersAsString))
       l.cancelTransactionId.fold(gen.writeNullField("cancelTransactionId"))(cti => gen.writeStringField("cancelTransactionId", cti.toString))
       gen.writeEndObject()
     }
@@ -272,7 +272,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
       gen.writeEndObject()
     }
 
-  def txMetaJsonSerializer(address: Address, isBlockV5: Int => Boolean, numbersAsString: Boolean): JsonSerializer[TxMetaEnriched] =
+  def txMetaJsonSerializer(address: Address, isBlockV5: Height => Boolean, numbersAsString: Boolean): JsonSerializer[TxMetaEnriched] =
     (txMeta: TxMetaEnriched, gen: JsonGenerator, serializers: SerializerProvider) => {
       txMeta.meta match {
         case TransactionMeta.Invoke(height, tx: InvokeScriptTransaction, status, spentComplexity, invokeScriptResult) =>
@@ -465,7 +465,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
   def metaJson(m: TxMeta): JsObject =
     TransactionJsonSerializer.applicationStatus(isBlockV5(m.height), m.status) ++ Json.obj("spentComplexity" -> m.spentComplexity)
 
-  private def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
+  private def isBlockV5(height: Height): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height.toInt)
 
   // Extended lease format. Overrides default
   private def leaseIdToLeaseRef(
@@ -474,7 +474,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
       amountOpt: Option[Long] = None
   ): LeaseRef = {
     val detailsOpt           = blockchain.leaseDetails(leaseId)
-    val txMetaOpt            = detailsOpt.flatMap(d => blockchain.transactionMeta(d.sourceId))
+    val txMetaOpt            = detailsOpt.flatMap(d => blockchain.transactionMeta(d.sourceId.byteStr))
     val recipientOpt         = recipientParamOpt.orElse(detailsOpt.map(_.recipientAddress))
     val resolvedRecipientOpt = recipientOpt.flatMap(r => blockchain.resolveAlias(r).toOption)
 
@@ -534,19 +534,19 @@ object TransactionJsonSerializer {
       case TxMeta.Status.Elided    => ApplicationStatus.Elided
     }
 
-  def height(height: Int): JsObject =
-    Json.obj("height" -> height)
+  def height(height: Height): JsObject =
+    Json.obj("height" -> height.toInt)
 
   final case class LeaseRef(
       id: ByteStr,
-      originTransactionId: Option[ByteStr],
+      originTransactionId: Option[TransactionId],
       sender: Option[Address],
       recipient: Option[Address],
       amount: Option[Long],
-      height: Option[Int],
+      height: Option[Height],
       status: LeaseStatus,
-      cancelHeight: Option[Int],
-      cancelTransactionId: Option[ByteStr]
+      cancelHeight: Option[Height],
+      cancelTransactionId: Option[TransactionId]
   )
 
   object LeaseRef {

@@ -36,7 +36,7 @@ object Verifier extends ScorexLogging {
 
   private val stats = TxProcessingStats
 
-  import stats.TxTimerExt
+  import com.wavesplatform.metrics.TxProcessingStats.measureForType
 
   type ValidationResult[T] = Either[ValidationError, T]
 

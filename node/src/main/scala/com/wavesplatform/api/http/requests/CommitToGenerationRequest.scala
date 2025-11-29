@@ -16,7 +16,7 @@ object CommitToGenerationRequest {
 
 case class CommitToGenerationRequest(
     sender: Option[String],
-    generationPeriodStart: Option[Int] = None,
+    generationPeriodStart: Option[Height] = None,
     timestamp: Option[Long] = None,
     chainId: Option[Byte] = None
 ) {
@@ -25,7 +25,7 @@ case class CommitToGenerationRequest(
       tx <- CommitToGenerationTransaction.create(
         sender,
         BlsPublicKey(Array.emptyByteArray),
-        Height(generationPeriodStart.getOrElse(defaultGenerationPeriodStart)),
+        generationPeriodStart.getOrElse(defaultGenerationPeriodStart),
         timestamp.getOrElse(0L),
         FeeConstants(TransactionType.CommitToGeneration) * FeeUnit,
         commitmentSignature = BlsSignature.Empty,

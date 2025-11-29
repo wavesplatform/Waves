@@ -10,5 +10,5 @@ trait BaseFinalizationSpec extends FreeSpec, WithDomain {
     ConflictGenerators.empty.appendAll(Height(h), GeneratorIndex.seq(idxs)*)
 
   protected def bs(height: Int, regularBalance: Long, deposits: Int = 0): BalanceSnapshot =
-    BalanceSnapshot(height, regularBalance, 0L, 0L, CommitToGenerationTransaction.DepositInWavelets * deposits)
+    BalanceSnapshot(Height(height), regularBalance, 0L, 0L, CommitToGenerationTransaction.DepositInWavelets * deposits)
 }

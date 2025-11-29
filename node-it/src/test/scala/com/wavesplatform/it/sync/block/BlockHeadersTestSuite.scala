@@ -6,6 +6,7 @@ import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
+import com.wavesplatform.state.Height
 import org.scalactic.source.Position
 import org.scalatest.*
 
@@ -19,7 +20,7 @@ class BlockHeadersTestSuite
     with NodesFromDocker
     with matchers.should.Matchers {
 
-  private val activationHeight   = 4
+  private val activationHeight   = Height(4)
   private val minerDesiredReward = 750000000
   private val minIncrement       = 50000000
   private val initialReward      = 600000000
@@ -108,8 +109,8 @@ class BlockHeadersTestSuite
     val miner  = nodes.head
     val height = miner.height
 
-    val minerBlocks    = miner.blockSeqByAddress(miner.address, 1, height)
-    val nonMinerBlocks = notMiner.blockSeqByAddress(notMiner.address, 1, height)
+    val minerBlocks    = miner.blockSeqByAddress(miner.address, Height(1), height)
+    val nonMinerBlocks = notMiner.blockSeqByAddress(notMiner.address, Height(1), height)
 
     minerBlocks.size shouldEqual (height - 1)
     nonMinerBlocks shouldBe empty

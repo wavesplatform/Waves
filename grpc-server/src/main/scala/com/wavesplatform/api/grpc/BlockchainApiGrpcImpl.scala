@@ -38,7 +38,7 @@ class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSe
             case (_, true)  => FeatureActivationStatus.NodeFeatureStatus.VOTED
             case _          => FeatureActivationStatus.NodeFeatureStatus.IMPLEMENTED
           },
-          blockchain.featureActivationHeight(id).getOrElse(0),
+          blockchain.featureActivationHeight(id).getOrElse(Height(0)).toInt,
           if (status.isUndefined) blockchain.featureVotes(Height(request.height)).getOrElse(id, 0) else 0
         )
       })

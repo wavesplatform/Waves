@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
+import com.wavesplatform.state.Height
 
 object NodeConfigs {
 
@@ -63,7 +64,7 @@ object NodeConfigs {
   object Templates {
     def raw(x: String): String = x
     def quorum(n: Int): String = s"waves.miner.quorum = $n"
-    def preactivatedFeatures(f: (Int, Int)*): String = {
+    def preactivatedFeatures(f: (Int, Height)*): String = {
       s"""
          |waves.blockchain.custom.functionality.pre-activated-features {
          ${f.map { case (id, height) => s"|  $id = $height" }.mkString("\n")}

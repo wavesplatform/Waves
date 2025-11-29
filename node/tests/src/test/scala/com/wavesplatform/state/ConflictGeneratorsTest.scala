@@ -10,9 +10,9 @@ class ConflictGeneratorsTest extends FreeSpec {
 
     cg.isEmpty shouldBe false
 
-    cg.heightOf(0).value shouldBe 1
-    cg.heightOf(1).value shouldBe 3
-    cg.heightOf(2).value shouldBe 3
+    cg.heightOf(0).value shouldBe Height(1)
+    cg.heightOf(1).value shouldBe Height(3)
+    cg.heightOf(2).value shouldBe Height(3)
     cg.heightOf(3) shouldBe None
   }
 

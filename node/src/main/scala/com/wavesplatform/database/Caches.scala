@@ -9,8 +9,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database.protobuf.{BlockMetaExt, BlockMeta as PBBlockMeta}
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -25,7 +25,7 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
-abstract class Caches extends Blockchain with Storage {
+abstract class Caches extends Blockchain, Storage {
   import Caches.*
 
   val dbSettings: DBSettings
@@ -47,7 +47,7 @@ abstract class Caches extends Blockchain with Storage {
   protected def loadBlockMeta(height: Height): Option[PBBlockMeta]
   protected def loadTxs(height: Height): Seq[Transaction]
 
-  override def height: Int                     = current.height
+  override def height: Int                     = current.height.toInt
   override def finalizedHeight: Option[Height] = currentFinalizedHeight
 
   override def score: BigInt = current.score
@@ -55,10 +55,10 @@ abstract class Caches extends Blockchain with Storage {
   override def lastBlock: Option[Block] = current.block
 
   override def blockHeader(height: Int): Option[SignedBlockHeader] =
-    if (current.height == height) current.signedHeader else loadBlockMeta(Height(height)).map(toSignedHeader)
+    if (current.height == Height(height)) current.signedHeader else loadBlockMeta(Height(height)).map(toSignedHeader)
 
   override def hitSource(height: Int): Option[ByteStr] =
-    if (current.height == height) current.hitSource else loadBlockMeta(Height(height)).map(toHitSource)
+    if (current.height == Height(height)) current.hitSource else loadBlockMeta(Height(height)).map(toHitSource)
 
   def loadHeightOf(blockId: ByteStr): Option[Int]
 
@@ -288,7 +288,7 @@ abstract class Caches extends Blockchain with Storage {
       newFinalizedHeight: Height,
       generatorBalances: GeneratorBalances
   ): Unit = {
-    val newHeight = Height(current.height + 1)
+    val newHeight = current.height + 1
     val newScore  = block.blockScore() + current.score
 
     val conflictEndorsersInPastEpoch = this
@@ -304,7 +304,7 @@ abstract class Caches extends Blockchain with Storage {
       Some(PBBlocks.protobuf(block.header)),
       ByteString.copyFrom(block.signature.arr),
       if (block.header.version >= Block.ProtoBlockVersion) ByteString.copyFrom(block.id().arr) else ByteString.EMPTY,
-      newHeight,
+      newHeight.toInt,
       block.bytes().length,
       block.transactionData.size,
       totalFee,
@@ -393,7 +393,6 @@ abstract class Caches extends Blockchain with Storage {
     val updatedCurrentGeneratorBalances = generatorBalances.map { case (addr, _, balance) => addr -> balance }
     currentGeneratorBalancesCache = Some(updatedCurrentGeneratorBalances)
 
-    // TODO: here?
     val updatedBalanceNodes = for {
       case ((address, asset), amount) <- snapshot.balances
       key         = (address, asset)
@@ -487,9 +486,9 @@ abstract class Caches extends Blockchain with Storage {
     }
   }
 
-  protected def doRollback(targetHeight: Int): DiscardedBlocks
+  protected def doRollback(targetHeight: Height): DiscardedBlocks
 
-  override def rollbackTo(height: Int): Either[String, DiscardedBlocks] = {
+  override def rollbackTo(height: Height): Either[String, DiscardedBlocks] = {
     for {
       _ <- Either
         .cond(
@@ -501,7 +500,7 @@ abstract class Caches extends Blockchain with Storage {
     } yield {
       current = loadCurrentBlock()
       if (currentFinalizedHeight.forall(_ < height)) // Happens only during a force rollback
-        currentFinalizedHeight = finalizedHeightAt(Height(height))
+        currentFinalizedHeight = finalizedHeightAt(height)
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()

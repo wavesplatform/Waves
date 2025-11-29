@@ -19,7 +19,7 @@ import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
+import com.wavesplatform.protobuf.{PBSnapshots, toPublicKey, toByteStr, toByteString}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -117,7 +117,7 @@ package object database {
   else LeaseBalanceNode.Empty
 
   def writeLeaseBalanceNode(leaseBalanceNode: LeaseBalanceNode): Array[Byte] =
-    Longs.toByteArray(leaseBalanceNode.in) ++ Longs.toByteArray(leaseBalanceNode.out) ++ Ints.toByteArray(leaseBalanceNode.prevHeight)
+    Longs.toByteArray(leaseBalanceNode.in) ++ Longs.toByteArray(leaseBalanceNode.out) ++ leaseBalanceNode.prevHeight.toByteArray
 
   def readLeaseBalance(data: Array[Byte]): CurrentLeaseBalance = if (data != null && data.length == 24)
     CurrentLeaseBalance(
@@ -129,7 +129,7 @@ package object database {
   else CurrentLeaseBalance.Unavailable
 
   def writeLeaseBalance(lb: CurrentLeaseBalance): Array[Byte] =
-    Longs.toByteArray(lb.in) ++ Longs.toByteArray(lb.out) ++ Ints.toByteArray(lb.height) ++ Ints.toByteArray(lb.prevHeight)
+    Longs.toByteArray(lb.in) ++ Longs.toByteArray(lb.out) ++ lb.height.toByteArray ++ lb.prevHeight.toByteArray
 
   def writeLeaseDetails(ld: LeaseDetails): Array[Byte] =
     pb.LeaseDetails(
@@ -137,13 +137,13 @@ package object database {
       Some(PBRecipients.create(ld.recipientAddress)),
       ld.amount.value,
       ByteString.copyFrom(ld.sourceId.arr),
-      ld.height,
+      ld.height.toInt,
       ld.status match {
         case LeaseDetails.Status.Active => pb.LeaseDetails.CancelReason.Empty
         case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
           pb.LeaseDetails.CancelReason
-            .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
-        case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height))
+            .Cancelled(pb.LeaseDetails.Cancelled(height.toInt, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
+        case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height.toInt))
       }
     ).toByteArray
 
@@ -154,13 +154,13 @@ package object database {
         d.senderPublicKey.toPublicKey,
         PBRecipients.toAddress(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
         TxPositiveAmount.unsafeFrom(d.amount),
-        d.sourceId.toByteStr,
-        d.height
+        TransactionId(d.sourceId.toByteStr),
+        Height(d.height)
       ),
       d.cancelReason match {
-        case pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
+        case pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(Height(height))
         case pb.LeaseDetails.CancelReason.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
-          LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
+          LeaseDetails.Status.Cancelled(Height(height), Some(transactionId).collect { case id if !id.isEmpty => TransactionId(id.toByteStr) })
         case pb.LeaseDetails.CancelReason.Empty => LeaseDetails.Status.Active
       }
     )
@@ -171,7 +171,7 @@ package object database {
   else VolumeAndFeeNode.Empty
 
   def writeVolumeAndFeeNode(volumeAndFeeNode: VolumeAndFeeNode): Array[Byte] =
-    Longs.toByteArray(volumeAndFeeNode.volume) ++ Longs.toByteArray(volumeAndFeeNode.fee) ++ Ints.toByteArray(volumeAndFeeNode.prevHeight)
+    Longs.toByteArray(volumeAndFeeNode.volume) ++ Longs.toByteArray(volumeAndFeeNode.fee) ++ volumeAndFeeNode.prevHeight.toByteArray
 
   def readVolumeAndFee(data: Array[Byte]): CurrentVolumeAndFee = if (data != null && data.length == 24)
     CurrentVolumeAndFee(
@@ -183,7 +183,7 @@ package object database {
   else CurrentVolumeAndFee.Unavailable
 
   def writeVolumeAndFee(vf: CurrentVolumeAndFee): Array[Byte] =
-    Longs.toByteArray(vf.volume) ++ Longs.toByteArray(vf.fee) ++ Ints.toByteArray(vf.height) ++ Ints.toByteArray(vf.prevHeight)
+    Longs.toByteArray(vf.volume) ++ Longs.toByteArray(vf.fee) ++ vf.height.toByteArray ++ vf.prevHeight.toByteArray
 
   def readFeatureMap(data: Array[Byte]): Map[Short, Height] = Option(data).fold(Map.empty) { _ =>
     val b        = ByteBuffer.wrap(data)
@@ -198,7 +198,7 @@ package object database {
   def writeFeatureMap(features: Map[Short, Height]): Array[Byte] = {
     val b = ByteBuffer.allocate(features.size * 6)
     for ((featureId, height) <- features)
-      b.putShort(featureId).putInt(height)
+      b.putShort(featureId).putInt(height.toInt)
 
     b.array()
   }
@@ -230,7 +230,7 @@ package object database {
     pb.AssetDetails(
       info.name,
       info.description,
-      info.lastUpdatedAt,
+      info.lastUpdatedAt.toInt,
       volumeInfo.isReissuable,
       ByteString.copyFrom(volumeInfo.volume.toByteArray)
     ).toByteArray
@@ -263,11 +263,11 @@ package object database {
     val outputLength = 4 + 4 + numSeqLength * (1 + 2 + 4)
     val ndo          = newDataOutput(outputLength)
 
-    ndo.writeInt(height)
+    ndo.writeInt(height.toInt)
     ndo.writeInt(numSeqLength)
     numSeq.foreach { case (tp, num, size) =>
       ndo.writeByte(tp)
-      ndo.writeShort(num)
+      ndo.writeShort(num.toShort)
       ndo.writeInt(size)
     }
 
@@ -336,28 +336,28 @@ package object database {
     )
 
   def writeCurrentData(cdn: CurrentData): Array[Byte] =
-    Ints.toByteArray(cdn.height) ++ Ints.toByteArray(cdn.prevHeight) ++ writeDataEntry(cdn.entry)
+    cdn.height.toByteArray ++ cdn.prevHeight.toByteArray ++ writeDataEntry(cdn.entry)
 
   def readDataNode(key: String)(bs: Array[Byte]): DataNode = if (bs == null) DataNode.empty(key)
   else
     DataNode(readDataEntry(key)(bs.drop(4)), Height(Ints.fromByteArray(bs.take(4))))
 
   def writeDataNode(dn: DataNode): Array[Byte] =
-    Ints.toByteArray(dn.prevHeight) ++ writeDataEntry(dn.entry)
+    dn.prevHeight.toByteArray ++ writeDataEntry(dn.entry)
 
   def readCurrentBalance(bs: Array[Byte]): CurrentBalance = if (bs != null && bs.length == 16)
     CurrentBalance(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.slice(8, 12))), Height(Ints.fromByteArray(bs.takeRight(4))))
   else CurrentBalance.Unavailable
 
   def writeCurrentBalance(balance: CurrentBalance): Array[Byte] =
-    Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.height) ++ Ints.toByteArray(balance.prevHeight)
+    Longs.toByteArray(balance.balance) ++ balance.height.toByteArray ++ balance.prevHeight.toByteArray
 
   def readBalanceNode(bs: Array[Byte]): BalanceNode = if (bs != null && bs.length == BalanceNode.SizeInBytes)
     BalanceNode(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.takeRight(4))))
   else BalanceNode.Empty
 
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
-    Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
+    Longs.toByteArray(balance.balance) ++ balance.prevHeight.toByteArray
 
   def readGeneratorBalances(data: Array[Byte]): Seq[Long] =
     data
@@ -706,7 +706,7 @@ package object database {
 
   def loadTransactions(height: Height, rdb: RDB): Seq[(TxMeta, Transaction)] = {
     val transactions = Seq.newBuilder[(TxMeta, Transaction)]
-    rdb.db.iterateOver(KeyTag.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txHandle.handle)) { e =>
+    rdb.db.iterateOver(KeyTag.NthTransactionInfoAtHeight.prefixBytes ++ height.toByteArray, Some(rdb.txHandle.handle)) { e =>
       transactions += readTransaction(height)(e.getValue)
     }
     transactions.result()
@@ -714,7 +714,7 @@ package object database {
 
   def loadTxStateSnapshots(height: Height, rdb: RDB): Seq[TransactionStateSnapshot] = {
     val txSnapshots = Seq.newBuilder[TransactionStateSnapshot]
-    rdb.db.iterateOver(KeyTag.NthTransactionStateSnapshotAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txSnapshotHandle.handle)) { e =>
+    rdb.db.iterateOver(KeyTag.NthTransactionStateSnapshotAtHeight.prefixBytes ++ height.toByteArray, Some(rdb.txSnapshotHandle.handle)) { e =>
       txSnapshots += TransactionStateSnapshot.parseFrom(e.getValue)
     }
     txSnapshots.result()
@@ -729,7 +729,7 @@ package object database {
       block <- createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, loadTransactions(height, rdb).map(_._2)).toOption
     } yield block
 
-  def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
+  def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Height]], valueKey: Height => Key[A]): Option[A] =
     for {
       h <- resource.get(historyKey).headOption
     } yield resource.get(valueKey(h))
@@ -741,7 +741,7 @@ package object database {
       sponsorship = fromHistory(resource, Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
       script      = fromHistory(resource, Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
     } yield AssetDescription(
-      pbStaticInfo.sourceId.toByteStr,
+      TransactionId(pbStaticInfo.sourceId.toByteStr),
       PublicKey(pbStaticInfo.issuerPublicKey.toByteStr),
       info.name,
       info.description,
@@ -756,7 +756,7 @@ package object database {
       Height(pbStaticInfo.height)
     )
 
-  def loadActiveLeases(rdb: RDB, fromHeight: Int, toHeight: Int): Map[ByteStr, LeaseDetails] = rdb.db.withResource { r =>
+  def loadActiveLeases(rdb: RDB, fromHeight: Height, toHeight: Height): Map[ByteStr, LeaseDetails] = rdb.db.withResource { r =>
     (for {
       id         <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
       newDetails <- loadLease(r, id)
@@ -767,17 +767,17 @@ package object database {
   def loadLease(resource: DBResource, id: ByteStr): Option[LeaseDetails] =
     fromHistory(resource, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id)).flatten
 
-  def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
+  def loadLeaseIds(resource: DBResource, fromHeight: Height, toHeight: Height, includeCancelled: Boolean): Set[ByteStr] = {
     val leaseIds = mutable.Set.empty[ByteStr]
     val iterator = resource.fullIterator
 
     @inline
     def keyInRange(): Boolean = {
       val actualKey = iterator.key()
-      actualKey.startsWith(KeyTag.LeaseDetails.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
+      actualKey.startsWith(KeyTag.LeaseDetails.prefixBytes) && Height(Ints.fromByteArray(actualKey.slice(2, 6))) <= toHeight
     }
 
-    iterator.seek(KeyTag.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
+    iterator.seek(KeyTag.LeaseDetails.prefixBytes ++ fromHeight.toByteArray)
     while (iterator.isValid && keyInRange()) {
       val leaseId = ByteStr(iterator.key().drop(6))
       if (includeCancelled || readLeaseDetails(iterator.value()).isActive)

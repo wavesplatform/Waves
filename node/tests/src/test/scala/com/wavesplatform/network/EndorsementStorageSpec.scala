@@ -53,7 +53,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
         "smaller finalized height" in {
           started(hasSameBlockBeforeFinalizationHeight = false)
-            .tryAddEndorsement(mk(finalizedId = unexpectedFinalizedId, finalizedHeight = Height(expectedFinalizedHeight - 1)))
+            .tryAddEndorsement(mk(finalizedId = unexpectedFinalizedId, finalizedHeight = expectedFinalizedHeight - 1))
             .value shouldBe true
         }
       }

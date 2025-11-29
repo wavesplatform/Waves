@@ -13,6 +13,7 @@ import com.wavesplatform.it.{Node, NodeConfigs}
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -63,7 +64,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { matchers: Matchers =
 
       all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
 
-      val failedIdsByHeight = failed.groupBy(_.height.get).view.mapValues(_.map(_.id))
+      val failedIdsByHeight = failed.groupBy(_.height.get).map { case (h, txs) => Height(h) -> txs.map(_.id)}
 
       failedIdsByHeight.foreach { case (h, ids) =>
         sender.blockAt(h).transactions.map(_.id) should contain allElementsOf ids
@@ -73,7 +74,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { matchers: Matchers =
 
         val liquidBlock         = sender.lastBlock()
         val maxHeightWithFailed = failedIdsByHeight.keys.max
-        if (liquidBlock.height == maxHeightWithFailed) {
+        if (Height(liquidBlock.height) == maxHeightWithFailed) {
           liquidBlock.transactions.map(_.id) should contain allElementsOf failedIdsByHeight(maxHeightWithFailed)
         }
       }

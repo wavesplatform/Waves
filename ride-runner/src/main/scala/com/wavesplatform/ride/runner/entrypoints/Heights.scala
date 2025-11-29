@@ -12,16 +12,19 @@ object Heights {
     val (lastKnownHardenedHeight, workingHeight) = localHeight match {
       case Some(h) =>
         (
-          Height(math.max(0, h - 100 - 1)),
-          Height(math.max(h, lastHeightAtStart))
+          (h - 100 - 1).max(Height(0)),
+          lastHeightAtStart.max(h)
         )
 
       case None =>
-        val depth = settings.functionalitySettings.generatingBalanceDepth(lastHeightAtStart)
+        val depth = settings.functionalitySettings.generatingBalanceDepth(lastHeightAtStart.toInt)
         settings.onEmptyStartFrom match {
           case Some(onEmptyStartFrom) =>
             val maximumStartHeight = lastHeightAtStart - depth
-            require(onEmptyStartFrom < maximumStartHeight, s"onEmptyStartFrom=$onEmptyStartFrom should be < maximumStartHeight=$maximumStartHeight")
+            require(
+              Height(onEmptyStartFrom) < maximumStartHeight,
+              s"onEmptyStartFrom=$onEmptyStartFrom should be < maximumStartHeight=$maximumStartHeight"
+            )
             (
               Height(onEmptyStartFrom),
               lastHeightAtStart
@@ -30,7 +33,7 @@ object Heights {
           case None =>
             // to guarantee the right generatingBalance
             (
-              Height(math.max(0, lastHeightAtStart - depth - 1)),
+              (lastHeightAtStart - depth - 1).max(Height(0)),
               lastHeightAtStart
             )
         }

@@ -21,7 +21,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, BinaryDataEntry, Height}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, BinaryDataEntry, Height, TransactionId}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -112,7 +112,7 @@ class AssetsRouteSpec
       .explicitGet()
 
   private val assetDesc = AssetDescription(
-    ByteStr.empty,
+    TransactionId(ByteStr.empty),
     issuer = TxHelpers.defaultSigner.publicKey,
     name = ByteString.copyFromUtf8("test"),
     description = ByteString.copyFromUtf8("description"),
@@ -291,7 +291,7 @@ class AssetsRouteSpec
       checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i))
     }
     (7 to 10).foreach { i =>
-      checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i - 6, issueHeight = Height @@ 2))
+      checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i - 6, issueHeight = Height(2)))
     }
   }
 
@@ -371,7 +371,7 @@ class AssetsRouteSpec
         checkResponse(
           issueTransaction,
           AssetDescription(
-            issueTransaction.id(),
+            TransactionId(issueTransaction.id()),
             sender.publicKey,
             issueTransaction.name,
             issueTransaction.description,

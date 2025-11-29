@@ -87,7 +87,7 @@ object Evaluation {
 
 case class ExprEvaluation(blockchain: Blockchain, expr: Terms.EXPR, txLike: InvokeScriptTransactionLike) extends Evaluation {
   def dAppToExpr(dApp: DApp): Either[ValidationError, EXPR] =
-    Right(ContractEvaluator.buildSyntheticCall(dApp, expr, ByteStr(DefaultAddress.bytes), DefaultPublicKey))
+    Right(ContractEvaluator.buildSyntheticCall(dApp, expr, ByteStr(DefaultAddress.bytes), DefaultPublicKey.byteStr))
 }
 
 case class InvocationEvaluation(

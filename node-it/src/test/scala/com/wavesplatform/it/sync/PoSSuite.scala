@@ -14,6 +14,7 @@ import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFunSuite, NodeConfigs, WaitForHeight2}
 import com.wavesplatform.network.RawBytes
+import com.wavesplatform.state.Height
 import play.api.libs.json.{JsSuccess, Json, Reads}
 
 import scala.util.Random
@@ -35,7 +36,7 @@ class PoSSuite extends BaseFunSuite with WaitForHeight2 {
 
     for (h <- height to (height + 10)) {
 
-      val block = forgeBlock(h, signerPK)()
+      val block = forgeBlock(Height(h), signerPK)()
 
       nodes.waitForHeightArise()
 
@@ -141,7 +142,7 @@ class PoSSuite extends BaseFunSuite with WaitForHeight2 {
 
     for (h <- height to (height + 10)) {
 
-      val block = forgeBlock(h, signerPK)()
+      val block = forgeBlock(Height(h), signerPK)()
 
       nodes.waitForHeightArise()
 
@@ -248,7 +249,7 @@ class PoSSuite extends BaseFunSuite with WaitForHeight2 {
     if (timeout > 0) Thread.sleep(timeout)
   }
 
-  def blockInfo(height: Int): (Array[Byte], Long, NxtLikeConsensusBlockData, Option[ByteStr]) = {
+  def blockInfo(height: Height): (Array[Byte], Long, NxtLikeConsensusBlockData, Option[ByteStr]) = {
     val lastBlock      = Json.parse(nodes.head.get(s"/blocks/at/$height").getResponseBody)
     val lastBlockId    = Base58.tryDecodeWithLimit((lastBlock \ "signature").as[String]).get
     val lastBlockTS    = (lastBlock \ "timestamp").as[Long]
@@ -266,7 +267,7 @@ class PoSSuite extends BaseFunSuite with WaitForHeight2 {
     ) \ "timestamp").as[Long]
   }
 
-  def blockSignature(h: Int): Array[Byte] = {
+  def blockSignature(h: Height): Array[Byte] = {
     Base58
       .tryDecodeWithLimit(
         (Json.parse(
@@ -278,7 +279,7 @@ class PoSSuite extends BaseFunSuite with WaitForHeight2 {
       .get
   }
 
-  private val vrfActivationHeight = 20
+  private val vrfActivationHeight = Height(20)
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -320,12 +321,12 @@ class PoSSuite extends BaseFunSuite with WaitForHeight2 {
   }
 
   def forgeBlock(
-      height: Int,
+      height: Height,
       signerPK: KeyPair
   )(updateDelay: Long => Long = identity, updateBaseTarget: Long => Long = identity): Block = {
 
     val ggParentTS =
-      if (height >= 3)
+      if (height >= Height(3))
         Some(
           (Json
             .parse(nodes.head.get(s"/blocks/at/${height - 2}").getResponseBody) \ "timestamp").as[Long]
@@ -361,7 +362,7 @@ class PoSSuite extends BaseFunSuite with WaitForHeight2 {
       posCalculator
         .calculateBaseTarget(
           10,
-          height,
+          height.toInt,
           lastBlockCData.baseTarget,
           lastBlockTS,
           ggParentTS,

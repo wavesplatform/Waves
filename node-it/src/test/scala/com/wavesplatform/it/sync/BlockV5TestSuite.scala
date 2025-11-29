@@ -9,6 +9,7 @@ import com.wavesplatform.crypto.Blake2b256
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
+import com.wavesplatform.state.Height
 import org.scalatest.*
 
 import scala.concurrent.duration.*
@@ -22,7 +23,7 @@ class BlockV5TestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
       .withSpecial(1, _.nonMiner)
       .buildNonConflicting()
 
-  var currentHeight = 0
+  var currentHeight = Height(0)
 
   "block v5 appears and blockchain grows" - {
     "check block v5 at current height" in {

@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.lightnode
 import com.google.common.primitives.Ints
 import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.state.Height
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFunSuite, NodeConfigs, TransferSending}
 
@@ -10,7 +11,7 @@ class LightNodeBroadcastSuite extends BaseFunSuite with TransferSending {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((14, 1000000)))
+      .overrideBase(_.preactivatedFeatures((14, Height(1000000))))
       .withDefault(1)
       .withSpecial(2, _.lightNode)
       .buildNonConflicting()

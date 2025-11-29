@@ -3,11 +3,12 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{KeyPair, PrivateKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.test.*
-import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.BaseFunSuite
 import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.SeveralAccountMiningSuite.*
+import com.wavesplatform.state.Height
+import com.wavesplatform.test.*
 
 import scala.concurrent.duration.*
 
@@ -16,13 +17,13 @@ class SeveralAccountMiningSuite extends BaseFunSuite {
   override def nodeConfigs: Seq[Config] = Configs
 
   test("only private keys from config used for mining when specified") {
-    miner.waitForHeight(2, 1.minute)
+    miner.waitForHeight(Height(2), 1.minute)
     val minerBalance1 = miner.balance(MinerPk1.toAddress.toString).balance
     val fromHeight    = miner.height
     miner.waitForHeight(miner.height + 5, 2.minutes)
     val tx                  = miner.transfer(MinerPk1, notMiner.address, minerBalance1 - 10.waves, waitForTx = true)
     val minerTransferHeight = nodes.waitForTransaction(tx.id).height
-    nodes.waitForHeight(minerTransferHeight + 5)
+    nodes.waitForHeight(Height(minerTransferHeight) + 5)
     val pkMiners = Set(MinerPk1.toAddress.toString, MinerPk2.toAddress.toString)
     notMiner.blockSeq(fromHeight, notMiner.height).foreach { block =>
       if (block.height <= minerTransferHeight) {

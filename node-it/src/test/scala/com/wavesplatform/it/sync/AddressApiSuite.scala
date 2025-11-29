@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAl
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
-import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.state.{Height, StringDataEntry}
 import com.wavesplatform.transaction.TxVersion
 import play.api.libs.json.*
 
@@ -23,7 +23,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     nodes.waitForHeightArise()
 
     val Seq(_, h2, _)     = sender.debugBalanceHistory(address): @unchecked
-    val Seq((_, balance)) = sender.accountsBalances(Some(h2.height), Seq(address)): @unchecked
+    val Seq((_, balance)) = sender.accountsBalances(Some(Height(h2.height)), Seq(address)): @unchecked
     balance shouldBe 2
   }
 
@@ -99,7 +99,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
       CustomValidationError("Illegal height: -1")
     )
     assertApiError(
-      miner.accountsBalances(Some(-1), Seq("firstAddress")),
+      miner.accountsBalances(Some(Height(-1)), Seq("firstAddress")),
       CustomValidationError("Illegal height: -1")
     )
   }
@@ -121,11 +121,11 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     val requestedAddresses = addressesAndBalances.map(_._1) ++ illegalAddresses :+ firstAddresses.head._1 :+ secondAddresses.head._1
 
     // balances at the height before all transfers
-    checkBalances(addressesAndBalances.map { case (a, _) => (a, 0L) }, requestedAddresses, Some(heightBefore), asset)
+    checkBalances(addressesAndBalances.map { case (a, _) => (a, 0L) }, requestedAddresses, Some(Height(heightBefore)), asset)
     // balances at the height after the 2nd transfer
     checkBalances(firstAddresses ++ secondAddresses.map { case (a, _) => (a, 0L) }, requestedAddresses, Some(heightBetween), asset)
     // balances at the height after all transfers
-    checkBalances(addressesAndBalances, requestedAddresses, Some(heightAfter), asset)
+    checkBalances(addressesAndBalances, requestedAddresses, Some(Height(heightAfter)), asset)
     // balances at the current height
     checkBalances(addressesAndBalances, requestedAddresses, None, asset)
   }
@@ -135,7 +135,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     ids.map(id => miner.waitForTransaction(id).height)
   }
 
-  private def checkBalances(expected: List[(String, Long)], addresses: List[String], height: Option[Int], assetId: Option[String]): Unit = {
+  private def checkBalances(expected: List[(String, Long)], addresses: List[String], height: Option[Height], assetId: Option[String]): Unit = {
     val getResponse = miner.get(
       s"/addresses/balance?${height.fold("")(h => s"height=$h&")}${assetId.fold("")(a => s"asset=$a&")}${addresses.map(a => s"address=$a").mkString("&")}"
     )

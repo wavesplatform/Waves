@@ -1,4 +1,4 @@
-name: Publish Artifacts
+name: Publish snapshot JARs and dependency graph
 
 on:
   push:

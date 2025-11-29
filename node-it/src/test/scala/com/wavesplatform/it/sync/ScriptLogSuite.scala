@@ -85,7 +85,7 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
           1.toByte,
           firstKeyPair,
           List(
-            BinaryDataEntry("pk", firstKeyPair.publicKey),
+            BinaryDataEntry("pk", firstKeyPair.publicKey.byteStr),
             BinaryDataEntry("sig", ByteStr(signature))
           ),
           ENOUGH_FEE,

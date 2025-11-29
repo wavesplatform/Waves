@@ -9,7 +9,6 @@ import com.wavesplatform.transaction.TxValidationError.{GenericError, Validation
 import com.wavesplatform.transaction.{Asset, AssetIdStringLength, Proofs, TxValidationError, TxVersion}
 import com.wavesplatform.utils.base58Length
 import play.api.libs.json.*
-import supertagged.TaggedType
 
 package object requests {
   import cats.instances.list.*
@@ -36,7 +35,7 @@ package object requests {
       .map(IssuedAsset(_))
 
   def parseBase58ToAsset(v: Option[String], err: String): Validation[Asset] =
-    parseBase58ToOption(v.filter(_.length > 0), err, AssetIdStringLength)
+    parseBase58ToOption(v.filter(_.nonEmpty), err, AssetIdStringLength)
       .map {
         case Some(str) => IssuedAsset(str)
         case None      => Waves
@@ -84,17 +83,6 @@ package object requests {
   }
 
   implicit val byteStrFormat: Format[ByteStr] = com.wavesplatform.utils.byteStrFormat
-
-  object ProofStr extends TaggedType[String]
-  type ProofStr = ProofStr.Type
-
-  implicit object ProofStrReads extends Reads[ProofStr] {
-    override def reads(json: JsValue): JsResult[ProofStr] = json match {
-      case JsNull      => JsSuccess(ProofStr(""))
-      case JsString(s) => JsSuccess(ProofStr(s))
-      case _           => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.jsstring"))))
-    }
-  }
 
   private[requests] def defaultVersion   = TxVersion.V1
   private[requests] def defaultTimestamp = 0L

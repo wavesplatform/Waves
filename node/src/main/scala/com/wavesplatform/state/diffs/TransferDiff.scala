@@ -63,7 +63,7 @@ object TransferDiff {
         case Waves => Right(Map(senderAddress -> Portfolio(-fee)))
         case asset @ IssuedAsset(_) =>
           val senderPf = Map(senderAddress -> Portfolio.build(asset -> -fee))
-          if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
+          if (Height(blockchain.height) >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
             val sponsorPf = blockchain
               .assetDescription(asset)
               .collect {

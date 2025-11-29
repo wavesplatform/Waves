@@ -26,6 +26,7 @@ import com.wavesplatform.state.{
   BlockchainUpdaterImpl,
   CompleteBlockchainUpdater,
   GenesisBlockHeight,
+  Height,
   NgState,
   SnapshotBlockchain,
   StateSnapshot,
@@ -321,7 +322,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
 
       test { txs =>
         val nextHeight   = state.height + 1
-        val isProto      = state.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(nextHeight > 1 && nextHeight >= _)
+        val isProto      = state.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(nextHeight > 1 && Height(nextHeight) >= _)
         val block        = TestBlock.create(txs, if (isProto) Block.ProtoBlockVersion else Block.PlainBlockVersion)
         val checkedBlock = blockWithComputedStateHash(block.block, block.signer, bcu).resultE.explicitGet()
 

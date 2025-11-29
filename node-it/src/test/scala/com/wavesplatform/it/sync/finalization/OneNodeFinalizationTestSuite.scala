@@ -6,6 +6,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.NumericExt
 import org.scalatest.OptionValues
 
@@ -15,7 +16,7 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec with OptionValues {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, 0)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0))))
       .withDefault(1)
       .buildNonConflicting()
 
@@ -32,10 +33,10 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec with OptionValues {
     val period1 = node.currentGenerationPeriod.value.next
 
     val commitTxn1 = node.sign(CommitToGenerationRequest(sender = Some(miner1Addr)))
-    commitTxn1.generationPeriodStart.value shouldBe period1.start
+    commitTxn1.generationPeriodStart.value shouldBe period1.start.toInt
 
     val commitTxn2 = node.sign(CommitToGenerationRequest(sender = Some(miner2Addr)))
-    commitTxn2.generationPeriodStart.value shouldBe period1.start
+    commitTxn2.generationPeriodStart.value shouldBe period1.start.toInt
 
     node.broadcastRequest(commitTxn1)
     node.broadcastRequest(commitTxn2)

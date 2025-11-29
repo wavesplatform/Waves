@@ -52,7 +52,7 @@ object CommonTransactionsApi {
       utx: UtxPool,
       blockChallenger: Option[BlockChallenger],
       publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
-      blockAt: Int => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
+      blockAt: Height => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
   ): CommonTransactionsApi = new CommonTransactionsApi {
     override def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] =
       common.aliasesOfAddress(rdb, maybeDiff, address)

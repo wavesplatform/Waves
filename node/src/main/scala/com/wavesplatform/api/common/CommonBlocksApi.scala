@@ -11,7 +11,7 @@ import monix.reactive.Observable
 trait CommonBlocksApi {
   def blockDelay(blockId: BlockId, blockNum: Int): Option[Long]
 
-  def currentHeight: Int
+  def currentHeight: Height
 
   def currentFinalizedHeight: Height
 
@@ -19,40 +19,41 @@ trait CommonBlocksApi {
 
   def block(blockId: BlockId): Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
 
-  def blockAtHeight(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
+  def blockAtHeight(height: Height): Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
 
-  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(BlockMeta, Seq[(TxMeta, Transaction)])]
+  def blocksRange(fromHeight: Height, toHeight: Height): Observable[(BlockMeta, Seq[(TxMeta, Transaction)])]
 
-  def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(BlockMeta, Seq[(TxMeta, Transaction)])]
+  def blocksRange(fromHeight: Height, toHeight: Height, generatorAddress: Address): Observable[(BlockMeta, Seq[(TxMeta, Transaction)])]
 
   def meta(id: ByteStr): Option[BlockMeta]
 
-  def metaAtHeight(height: Int): Option[BlockMeta]
+  def metaAtHeight(height: Height): Option[BlockMeta]
 
-  def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta]
+  def metaRange(fromHeight: Height, toHeight: Height): Observable[BlockMeta]
 }
 
 object CommonBlocksApi {
   def apply(
       maxSyncRollbackLength: Int,
       blockchain: Blockchain,
-      metaAt: Int => Option[BlockMeta],
-      blockInfoAt: Int => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
+      metaAt: Height => Option[BlockMeta],
+      blockInfoAt: Height => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
   ): CommonBlocksApi = new CommonBlocksApi {
-    private def fixHeight(h: Int) = if (h <= 0) blockchain.height + h else h
+    private def fixHeight(h: Height) = if (h <= Height(0)) h + blockchain.height else h
 
-    def blocksRange(fromHeight: Int, toHeight: Int): Observable[(BlockMeta, Seq[(TxMeta, Transaction)])] =
+    def blocksRange(fromHeight: Height, toHeight: Height): Observable[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       Observable
         .fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
+        .map(Height.apply)
         .map(blockInfoAt)
         .takeWhile(_.isDefined)
-        .flatMap(Observable.fromIterable(_))
+        .flatMap(Observable.fromIterable)
 
-    def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(BlockMeta, Seq[(TxMeta, Transaction)])] =
+    def blocksRange(fromHeight: Height, toHeight: Height, generatorAddress: Address): Observable[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       for {
-        height <- Observable.fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
+        height <- Observable.fromIterable(fixHeight(fromHeight) to fixHeight(toHeight)).map(Height.apply)
         meta   <- Observable.fromIterable(metaAt(height)) if meta.header.generator.toAddress == generatorAddress
-        block  <- Observable.fromIterable(blockInfoAt(meta.height))
+        block  <- Observable.fromIterable(blockInfoAt(Height(meta.height)))
       } yield block
 
     def blockDelay(blockId: BlockId, blockNum: Int): Option[Long] =
@@ -60,7 +61,7 @@ object CommonBlocksApi {
         .heightOf(blockId)
         .map { maxHeight =>
           val minHeight  = maxHeight - blockNum.max(1)
-          val allHeaders = (minHeight to maxHeight).flatMap(h => metaAt(h))
+          val allHeaders = (minHeight to maxHeight).flatMap(h => metaAt(Height(h)))
           val totalPeriod = allHeaders
             .sliding(2)
             .map { pair =>
@@ -70,24 +71,24 @@ object CommonBlocksApi {
           totalPeriod / (allHeaders.size - 1).max(1)
         }
 
-    def currentHeight: Int = blockchain.height
+    def currentHeight: Height = Height(blockchain.height)
 
     def currentFinalizedHeight: Height = blockchain.finalizedHeightOrFallback(maxSyncRollbackLength)
 
     def finalizedHeightAt(at: Height): Option[Height] = blockchain.finalizedHeightAt(at)
 
-    def blockAtHeight(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = blockInfoAt(height)
+    def blockAtHeight(height: Height): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = blockInfoAt(height)
 
-    def metaAtHeight(height: Int): Option[BlockMeta] = metaAt(height)
+    def metaAtHeight(height: Height): Option[BlockMeta] = metaAt(height)
 
-    def meta(id: ByteStr): Option[BlockMeta] = blockchain.heightOf(id).flatMap(metaAt)
+    def meta(id: ByteStr): Option[BlockMeta] = blockchain.heightOf(id).flatMap(h => metaAt(Height(h)))
 
-    def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta] =
+    def metaRange(fromHeight: Height, toHeight: Height): Observable[BlockMeta] =
       for {
         height <- Observable.fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
-        meta   <- Observable.fromIterable(metaAt(height))
+        meta   <- Observable.fromIterable(metaAt(Height(height)))
       } yield meta
 
-    def block(blockId: BlockId): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = blockchain.heightOf(blockId).flatMap(h => blockInfoAt(h))
+    def block(blockId: BlockId): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = blockchain.heightOf(blockId).flatMap(h => blockInfoAt(Height(h)))
   }
 }

@@ -9,7 +9,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock.create as block
 import com.wavesplatform.settings.TestFunctionalitySettings.Enabled
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.*
-import com.wavesplatform.state.{BalanceSnapshot, LeaseBalance}
+import com.wavesplatform.state.{BalanceSnapshot, LeaseBalance, Height}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, Transaction, TxHelpers}
@@ -64,7 +64,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
       withDomain(settings) { d =>
         d.appendBlock()
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
-          bs(height = 1, regularBalance = 600000000)
+          bs(Height(1), regularBalance = 600000000)
         )
 
         d.appendMicroBlock(transfer(amount = 1))
@@ -72,45 +72,45 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe (
           if (fixed)
             List(
-              bs(height = 2, regularBalance = 1199999999),
-              bs(height = 1, regularBalance = 599399999)
+              bs(Height(2), regularBalance = 1199999999),
+              bs(Height(1), regularBalance = 599399999)
             )
           else
-            List(bs(height = 2, regularBalance = 1199999999))
+            List(bs(Height(2), regularBalance = 1199999999))
         )
         d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
-          bs(height = 2, regularBalance = 1199999999)
+          bs(Height(2), regularBalance = 1199999999)
         )
 
         d.appendMicroBlock(transfer(amount = 1))
         d.appendKeyBlock()
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
-          bs(height = 3, regularBalance = 1799999998),
-          bs(height = 2, regularBalance = 1199399998),
-          bs(height = 1, regularBalance = 599399999)
+          bs(Height(3), regularBalance = 1799999998),
+          bs(Height(2), regularBalance = 1199399998),
+          bs(Height(1), regularBalance = 599399999)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
-          bs(height = 3, regularBalance = 1799999998)
+          bs(Height(3), regularBalance = 1799999998)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 3, None) shouldBe List(
-          bs(height = 3, regularBalance = 1799999998)
+          bs(Height(3), regularBalance = 1799999998)
         )
 
         d.appendMicroBlock(transfer(amount = 1))
         d.appendKeyBlock()
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
-          bs(height = 4, regularBalance = 2399999997L),
-          bs(height = 3, regularBalance = 1799399997),
-          bs(height = 2, regularBalance = 1199399998),
-          bs(height = 1, regularBalance = 599399999)
+          bs(Height(4), regularBalance = 2399999997L),
+          bs(Height(3), regularBalance = 1799399997),
+          bs(Height(2), regularBalance = 1199399998),
+          bs(Height(1), regularBalance = 599399999)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
-          bs(height = 4, regularBalance = 2399999997L),
-          bs(height = 3, regularBalance = 1799399997),
-          bs(height = 2, regularBalance = 1199399998)
+          bs(Height(4), regularBalance = 2399999997L),
+          bs(Height(3), regularBalance = 1799399997),
+          bs(Height(2), regularBalance = 1199399998)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 3, None) shouldBe List(
-          bs(height = 4, regularBalance = 2399999997L)
+          bs(Height(4), regularBalance = 2399999997L)
         )
       }
 
@@ -131,12 +131,12 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
       d.appendBlock(transferTx, leaseTx)
       d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe Seq(
         bs(
-          height = 2,
+          height = Height(2),
           regularBalance = startBalance + 6.waves + feeReward - feeCost - transferTx.amount.value,
           leaseOut = leaseTx.amount.value
         ),
         bs(
-          height = 1,
+          height = Height(1),
           regularBalance = startBalance
         )
       )
@@ -149,17 +149,17 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
         d.appendBlock(leaseTx)
         d.blockchain.balanceSnapshots(defaultAddress, from, None) shouldBe Seq(
           bs(
-            height = 3,
+            height = Height(3),
             regularBalance = startBalance + 12.waves + leaseTx.fee.value * 2 / 5 - leaseTx.fee.value - transferTx.amount.value,
             // leaseIn = 0, transfer fee is fully compensated by reward ↑
             leaseOut = leaseTx.amount.value
           ),
           bs(
-            height = 2,
+            height = Height(2),
             regularBalance = startBalance + 6.waves + transferTx.fee.value * 2 / 5 - transferTx.fee.value - transferTx.amount.value
           ),
           bs(
-            height = 1,
+            height = Height(1),
             regularBalance = startBalance
           )
         )
@@ -199,22 +199,22 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
       (6 to 8).foreach(_ => appendBlock()) // 8 in memory
 
       val inDB = Seq(
-        bs(height = 7, regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 1), // Released the first deposit
+        bs(Height(7), regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 1), // Released the first deposit
         // 6 - Not changed
-        bs(height = 5, regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 2), // CommitToGenerationTransaction
+        bs(Height(5), regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 2), // CommitToGenerationTransaction
         // 4 - A first block of a new epoch, not changed
-        bs(height = 3, regularBalance = initBalance - TestValues.commitToGenerationFee, deposits = 1), // CommitToGenerationTransaction
+        bs(Height(3), regularBalance = initBalance - TestValues.commitToGenerationFee, deposits = 1), // CommitToGenerationTransaction
         // 2 - Empty block
-        bs(height = 1, regularBalance = initBalance) // Genesis
+        bs(Height(1), regularBalance = initBalance) // Genesis
       )
 
       d.rocksDBWriter.balanceSnapshots(address1, 1, None) shouldBe inDB
       d.blockchain.balanceSnapshots(address1, 1, None) shouldBe
-        bs(height = 8, regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 1) +: // Same as on 7
+        bs(Height(8), regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 1) +: // Same as on 7
         inDB
     }
   }
 
-  private def bs(height: Int, regularBalance: Long, leaseIn: Long = 0, leaseOut: Long = 0, deposits: Int = 0): BalanceSnapshot =
+  private def bs(height: Height, regularBalance: Long, leaseIn: Long = 0, leaseOut: Long = 0, deposits: Int = 0): BalanceSnapshot =
     BalanceSnapshot(height, regularBalance, leaseIn, leaseOut, CommitToGenerationTransaction.DepositInWavelets * deposits)
 }

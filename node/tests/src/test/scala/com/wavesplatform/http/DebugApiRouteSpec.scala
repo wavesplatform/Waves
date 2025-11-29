@@ -20,7 +20,7 @@ import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{Blockchain, StateHash}
+import com.wavesplatform.state.{Blockchain, Height, StateHash}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.OrderType
@@ -173,15 +173,28 @@ class DebugApiRouteSpec
           domain.appendBlock()
         }
 
-        val lastButOneHeight    = domain.blockchain.height - 1
-        val lastButOneHeader    = domain.blockchain.blockHeader(lastButOneHeight).value
-        val lastButOneStateHash = domain.rocksDBWriter.loadStateHash(lastButOneHeight).value
-        val expectedResponse = Json.toJson(lastButOneStateHash).as[JsObject] ++ Json.obj(
-          "snapshotHash" -> domain.rocksDBWriter.snapshotStateHash(lastButOneHeight),
-          "blockId"      -> lastButOneHeader.id().toString,
-          "baseTarget"   -> lastButOneHeader.header.baseTarget,
-          "height"       -> lastButOneHeight,
-          "version"      -> Version.VersionString
+        val lastButOneHeight        = domain.blockchain.height - 1
+        val lastButOneHeader        = domain.blockchain.blockHeader(lastButOneHeight.toInt).value
+        val lastButOneStateHash     = domain.rocksDBWriter.loadStateHash(Height(lastButOneHeight)).value
+        val lastButOneStateHashJson = Json.toJson(lastButOneStateHash).as[JsObject]
+        def field(name: String)     = (lastButOneStateHashJson \ name).as[String]
+
+        val expectedResponse = Json.obj(
+          "stateHash"         -> field("stateHash"),
+          "wavesBalanceHash"  -> field("wavesBalanceHash"),
+          "assetBalanceHash"  -> field("assetBalanceHash"),
+          "dataEntryHash"     -> field("dataEntryHash"),
+          "accountScriptHash" -> field("accountScriptHash"),
+          "assetScriptHash"   -> field("assetScriptHash"),
+          "leaseBalanceHash"  -> field("leaseBalanceHash"),
+          "leaseStatusHash"   -> field("leaseStatusHash"),
+          "sponsorshipHash"   -> field("sponsorshipHash"),
+          "aliasHash"         -> field("aliasHash"),
+          "snapshotHash"      -> domain.rocksDBWriter.snapshotStateHash(lastButOneHeight),
+          "blockId"           -> lastButOneHeader.id().toString,
+          "baseTarget"        -> lastButOneHeader.header.baseTarget,
+          "height"            -> lastButOneHeight,
+          "version"           -> Version.VersionString
         )
 
         Get(routePath(s"/stateHash/last")) ~> route ~> check {

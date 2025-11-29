@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTES
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{BinaryDataEntry, EmptyDataEntry, InvokeScriptResult, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, EmptyDataEntry, Height, InvokeScriptResult, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, setScript, transfer}
@@ -1061,7 +1061,7 @@ class TransactionsRouteSpec
     }
 
     "CommitToGeneration transaction" in {
-      val txn = TxHelpers.commitToGeneration(settings.blockchainSettings.functionalitySettings.generationPeriodLength + 1)
+      val txn = TxHelpers.commitToGeneration(Height(settings.blockchainSettings.functionalitySettings.generationPeriodLength + 1))
       Post(routePath("/broadcast"), txn.json()) ~> route ~> check {
         status shouldEqual StatusCodes.OK
       }
@@ -1127,7 +1127,7 @@ class TransactionsRouteSpec
     }
 
     "returns error in case of all transactions are filtered" in {
-      val genesisTransactions = domain.blocksApi.blockAtHeight(1).value._2.collect { case (_, tx) => tx.id() }
+      val genesisTransactions = domain.blocksApi.blockAtHeight(Height(1)).value._2.collect { case (_, tx) => tx.id() }
 
       val queryParams = genesisTransactions.map(id => s"id=$id").mkString("?", "&", "")
       val requestBody = Json.obj("ids" -> genesisTransactions)

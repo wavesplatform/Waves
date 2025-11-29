@@ -3,6 +3,7 @@ package com.wavesplatform.it.async
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs, TransferSending}
+import com.wavesplatform.state.Height
 
 import scala.concurrent.Await.result
 import scala.concurrent.duration.*
@@ -18,8 +19,8 @@ class MicroblocksGenerationSuite extends BaseFreeSpec with TransferSending {
   s"Generate transactions and wait for one block with $maxTxs txs" in result(
     for {
       uploadedTxs <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses))
-      _           <- miner.waitForHeight(3)
-      block       <- miner.blockAt(2)
+      _           <- miner.waitForHeight(Height(3))
+      block       <- miner.blockAt(Height(2))
     } yield {
       block.transactions.size shouldBe maxTxs
       block.transactions.map(_.id) should contain theSameElementsAs uploadedTxs.map(_.id).toSet

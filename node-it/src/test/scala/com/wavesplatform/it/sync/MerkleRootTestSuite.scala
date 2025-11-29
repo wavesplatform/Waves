@@ -9,6 +9,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
+import com.wavesplatform.state.Height
 import org.scalatest.*
 
 import scala.concurrent.duration.*
@@ -113,7 +114,7 @@ object MerkleRootTestSuite {
 
   val MicroblockActivationHeight = 0
   val FairPosActivationHeight    = 0
-  val ActivationHeight           = 3
+  val ActivationHeight           = Height(3)
 
   val Config: Config = ConfigFactory.parseString(
     s"""

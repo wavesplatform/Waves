@@ -36,7 +36,7 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
 
   "punished and committed to next" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(validGenerator, conflictGenerator)) { d =>
     log.debug(s"Append block 2 with commitments")
-    val block2Txs             = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 3, x))
+    val block2Txs             = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
     val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = block2Txs, generator = validGenerator, strictTime = true)
     d.appender.appendBlock(block2WithCommitments)
 
@@ -66,7 +66,7 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
     )
     d.appender.appendBlock(block3WithVotes)
 
-    val block4Txs             = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 5, x))
+    val block4Txs             = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(5), x))
     val block4WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = block4Txs, generator = validGenerator, strictTime = true)
     d.appender.appendBlock(block4WithCommitments)
 

@@ -247,19 +247,19 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       case (blockDiff, newState) =>
         newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
           AssetDescription(
-            issue.assetId,
+            TransactionId(issue.assetId),
             issue.sender,
             issue.name,
             issue.description,
             issue.decimals.value,
             issue.reissuable,
             BigInt(issue.quantity.value),
-            Height @@ 2,
+            Height(2),
             issue.script.map(AssetScriptInfo(_, 0)),
             0L,
             issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable,
             1,
-            Height @@ 2
+            Height(2)
           )
         )
         blockDiff.transactions.get(issue.id()) shouldBe defined
@@ -361,8 +361,8 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
         desc1.name.toStringUtf8 shouldBe update1.name
         desc1.description.toStringUtf8 shouldBe update1.description
 
-        desc.lastUpdatedAt shouldBe 1
-        desc1.lastUpdatedAt shouldBe blockchain.height
+        desc.lastUpdatedAt shouldBe Height(1)
+        desc1.lastUpdatedAt shouldBe Height(blockchain.height)
       }
 
       d.appendKeyBlock()
@@ -376,8 +376,8 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
         desc1.name.toStringUtf8 shouldBe update1.name
         desc1.description.toStringUtf8 shouldBe update1.description
 
-        desc.lastUpdatedAt shouldBe 1
-        desc1.lastUpdatedAt shouldBe (blockchain.height - 1)
+        desc.lastUpdatedAt shouldBe Height(1)
+        desc1.lastUpdatedAt shouldBe Height((blockchain.height - 1))
       }
     }
   }

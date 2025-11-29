@@ -30,9 +30,9 @@ object AssetTransactionsDiffs {
         .toRight(GenericError("Asset doesn't exist"))
       minUpdateInfoInterval = blockchain.settings.functionalitySettings.minAssetInfoUpdateInterval
       updateAllowedHeight   = lastUpdateHeight + minUpdateInfoInterval
-      updatedInfo           = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
+      updatedInfo           = AssetInfo(tx.name, tx.description, Height(blockchain.height))
       _ <- cond(
-        blockchain.height >= updateAllowedHeight,
+        Height(blockchain.height) >= updateAllowedHeight,
         (),
         GenericError(
           s"Can't update info of asset with id=${tx.assetId.id} before $updateAllowedHeight block, " +
@@ -109,9 +109,9 @@ object AssetTransactionsDiffs {
       (isValid(tx.name) && isValid(tx.description)) || !blockchain.isFeatureActivated(BlockV5)
     }
 
-    val assetInfo   = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
+    val assetInfo   = AssetInfo(tx.name, tx.description, Height(blockchain.height))
     val assetVolume = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity.value))
-    val assetStatic = AssetStaticInfo(TransactionId @@ tx.id(), TransactionId @@ tx.id(), tx.sender, tx.decimals.value, blockchain.isNFT(tx))
+    val assetStatic = AssetStaticInfo(tx.id(), TransactionId(tx.id()), tx.sender, tx.decimals.value, blockchain.isNFT(tx))
     val asset       = IssuedAsset(tx.id())
 
     for {

@@ -7,14 +7,14 @@ import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.state.BinaryDataEntry
+import com.wavesplatform.state.{BinaryDataEntry, Height}
 import com.wavesplatform.test.*
 import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.duration.*
 
 class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val featureHeight = 8
+  private val featureHeight = Height(8)
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs

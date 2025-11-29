@@ -9,7 +9,7 @@ import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.mining.BlockChallengerImpl
-import com.wavesplatform.network.{EndorseBlockSpec, MessageCodecL1, PeerDatabase, RawBytes}
+import com.wavesplatform.network.{EndorseBlockSpec, MessageCodec, PeerDatabase, RawBytes}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
@@ -53,8 +53,8 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       )
 
       val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-      val channel1 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
-      val channel2 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
+      val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
+      val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
       channels.add(channel1)
       channels.add(channel2)
       val appender = BlockAppender(
@@ -140,8 +140,8 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
   "miner should not broadcast a block endorsement" in testWithGenerator { d =>
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val channel1 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
-    val channel2 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
+    val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
+    val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
     channels.add(channel1)
     channels.add(channel2)
 
@@ -198,8 +198,8 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       d.wallet.generateNewAccounts(1)
 
       val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-      val channel1 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
-      val channel2 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
+      val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
+      val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
       channels.add(channel1)
       channels.add(channel2)
 
@@ -254,7 +254,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       d.appender.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
 
       val generationPeriod1 = d.blockchain.generationPeriodOf(Height(1)).value.next
-      generationPeriod1.start shouldBe 4
+      generationPeriod1.start shouldBe Height(4)
 
       log.info("block3")
       val txs    = Seq(generator2, generator3).map(TxHelpers.commitToGeneration(generationPeriod1.start, _))

@@ -59,6 +59,6 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
       },
       d.sponsorship,
       sequenceInBlock = d.sequenceInBlock,
-      issueHeight = d.issueHeight
+      issueHeight = d.issueHeight.toInt
     )
 }

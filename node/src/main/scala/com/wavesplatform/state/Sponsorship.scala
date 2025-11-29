@@ -32,11 +32,11 @@ object Sponsorship {
       amountInWaves
   }
 
-  def sponsoredFeesSwitchHeight(blockchain: Blockchain): Int =
+  def sponsoredFeesSwitchHeight(blockchain: Blockchain): Height =
     blockchain
       .featureActivationHeight(BlockchainFeatures.FeeSponsorship)
-      .map(h => h + blockchain.settings.functionalitySettings.activationWindowSize(h))
-      .getOrElse(Int.MaxValue)
+      .map(h => h + blockchain.settings.functionalitySettings.activationWindowSize(h.toInt))
+      .getOrElse(Height(Int.MaxValue))
 
   def toWaves(assetFee: Long, sponsorship: Long): Long =
     if (sponsorship == 0) Long.MaxValue

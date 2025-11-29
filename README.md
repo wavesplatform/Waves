@@ -13,9 +13,6 @@
 
   <br/>
 
-  <a href="https://twitter.com/wavesprotocol" target="_blank">
-    <img alt="Twitter: Waves Tech" src="https://badgen.net/twitter/follow/wavesprotocol?icon=twitter&label=follow%20on%20Twitter" />
-  </a>
   <a href="https://medium.com/wavesprotocol" target="_blank">
     <img alt="Medium: Waves Tech" src="https://badgen.net/runkit/msmolyakov/get-medium-followers?icon=medium&cache=86400" />
   </a>
@@ -196,7 +193,7 @@ Keep up with the latest news and articles, and find out all about events happeni
 ## ⛓ Links
 
 - [Documentation](https://docs.waves.tech/)
-- Blockchain clients for Mainnet: [Waves Exchange](https://waves.exchange/), [Waves FX](https://github.com/wavesfx), [SIGN app](https://www.sign-web.app/)
+- Blockchain clients for Mainnet: [Waves Exchange](https://waves.exchange/)
 - Blockchain clients for Testnet: [Waves Exchange](https://testnet.waves.exchange/)
 - Blockchain Explorer: [Mainnet](https://wavesexplorer.com/), [Testnet](https://testnet.wavesexplorer.com/), [Stagenet](https://stagenet.wavesexplorer.com/) 
 - [Ride Online IDE](https://waves-ide.com/)

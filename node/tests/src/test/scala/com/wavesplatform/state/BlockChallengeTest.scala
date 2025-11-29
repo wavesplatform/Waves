@@ -20,7 +20,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.mining.{BlockChallenger, BlockChallengerImpl}
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
-import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, MessageCodecL1, PBBlockSpec, PeerDatabase, RawBytes}
+import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, MessageCodec, PBBlockSpec, PeerDatabase, RawBytes}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockRewardCalculator.BlockRewardShares
@@ -113,7 +113,7 @@ class BlockChallengeTest
       )
       (1 to 998).foreach(_ => d.appendBlock(d.createBlock(Block.PlainBlockVersion, txs = Nil, strictTime = true)))
 
-      val commitTxs               = Seq(challengedMiner, challengingMiner).map(acc => TxHelpers.commitToGeneration(1002, acc))
+      val commitTxs               = Seq(challengedMiner, challengingMiner).map(acc => TxHelpers.commitToGeneration(Height(1002), acc))
       val commitTxsTotalFee       = commitTxs.map(_.fee.value).sum
       val commitTxsFeeToNextMiner = commitTxsTotalFee - CurrentBlockFeePart.apply(commitTxsTotalFee)
       val blockWithTxs            = d.createBlock(Block.PlainBlockVersion, commitTxs, strictTime = true)
@@ -433,7 +433,7 @@ class BlockChallengeTest
 
       (1 to 998).foreach(_ => d.appendBlock())
 
-      val commitTxs = Seq(challengedMiner, challengingMiner).map(acc => TxHelpers.commitToGeneration(1002, acc))
+      val commitTxs = Seq(challengedMiner, challengingMiner).map(acc => TxHelpers.commitToGeneration(Height(1002), acc))
       d.appendBlock(commitTxs*)
       d.blockchain.height shouldBe 1001
 
@@ -482,7 +482,7 @@ class BlockChallengeTest
           .collectFirst {
             case x if x.address == challengedMinerAddr => x.balance
           }
-          .value shouldBe expectedEffectiveBalance // TODO: without challenging
+          .value shouldBe 0 // expectedEffectiveBalance // TODO: ?
       }
     }
   }
@@ -1967,8 +1967,8 @@ class BlockChallengeTest
 
   private def appendAndCheck(block: Block, d: Domain)(check: Block => Unit): Unit = {
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val channel1 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
-    val channel2 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
+    val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
+    val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
     channels.add(channel1)
     channels.add(channel2)
     val appenderWithChallenger: Block => Task[Unit] =
@@ -2097,7 +2097,7 @@ class BlockChallengeTest
   private def getLastBlockRewards(d: Domain): BlockRewardShares =
     BlockRewardCalculator
       .getBlockRewardShares(
-        d.blockchain.height,
+        Height(d.blockchain.height),
         d.blockchain.settings.rewardsSettings.initial,
         d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
         d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,

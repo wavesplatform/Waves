@@ -19,7 +19,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.mining.{BlockChallenger, BlockChallengerImpl}
-import com.wavesplatform.network.{MessageCodecL1, PeerDatabase}
+import com.wavesplatform.network.{MessageCodec, PeerDatabase}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
@@ -177,7 +177,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
   }
 
   def solidStateHeight: Int = {
-    rdb.db.get(Keys.height)
+    rdb.db.get(Keys.height).toInt
   }
 
   def solidStateSnapshot(): SortedMap[String, String] = {
@@ -563,11 +563,11 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
   }
 
   val blocksApi: CommonBlocksApi = {
-    def loadBlockMetaAt(db: RocksDB, blockchainUpdater: CompleteBlockchainUpdater)(height: Int): Option[BlockMeta] =
+    def loadBlockMetaAt(db: RocksDB, blockchainUpdater: CompleteBlockchainUpdater)(height: Height): Option[BlockMeta] =
       Application.loadBlockMetaAt(db, blockchainUpdater)(height)
 
     def loadBlockInfoAt(db: RDB, blockchainUpdater: CompleteBlockchainUpdater)(
-        height: Int
+        height: Height
     ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       Application.loadBlockInfoAt(db, blockchainUpdater)(height)
 
@@ -712,7 +712,7 @@ class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
     Some(blockChallenger),
     blockEndorser,
     appenderScheduler
-  )(new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp)), _, snapshot = None)
+  )(new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp)), _, snapshot = None)
 
   def appendBlock(b: Block, requireAppended: Boolean = true, adjustTestTime: Boolean = true): Unit = {
     if (adjustTestTime) {

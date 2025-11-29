@@ -79,7 +79,7 @@ class MinerWithDeterministicFinalitySuite extends FreeSpec with WithDomain with 
         log.debug("Append block2")
         val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = Seq.empty, generator = otherNodeAcc, strictTime = true)
         d.appender.appendBlock(block2)
-        d.appendMicroBlock(TxHelpers.commitToGeneration(generationPeriodStart = 3, sender = thisNodeAcc))
+        d.appendMicroBlock(TxHelpers.commitToGeneration(Height(3), sender = thisNodeAcc))
         d.utxPool.cleanUnconfirmed()
 
         log.debug("Trigger thisNode forging")
@@ -141,7 +141,7 @@ class MinerWithDeterministicFinalitySuite extends FreeSpec with WithDomain with 
       log.debug("Append block2")
       val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = Seq.empty, generator = otherNodeAcc, strictTime = true)
       d.appender.appendBlock(block2)
-      val lastBlockId = d.appendMicroBlock(TxHelpers.commitToGeneration(generationPeriodStart = 3, sender = otherNodeAcc))
+      val lastBlockId = d.appendMicroBlock(TxHelpers.commitToGeneration(Height(3), sender = otherNodeAcc))
 
       log.debug("Trigger thisNode forging")
       val nextBlockIn = (d.nextBlockTime(thisNodeAcc) - d.testTime.getTimestamp()).millis

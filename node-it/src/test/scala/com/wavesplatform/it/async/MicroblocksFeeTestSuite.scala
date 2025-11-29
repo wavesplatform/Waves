@@ -5,6 +5,7 @@ import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.test.*
+import com.wavesplatform.state.Height
 
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration.*
@@ -78,7 +79,7 @@ class MicroblocksFeeTestSuite extends BaseFreeSpec {
     Await.result(f, 5.minute)
   }
 
-  private val microblockActivationHeight = 10
+  private val microblockActivationHeight = Height(10)
   private val minerConfig = ConfigFactory.parseString(
     s"""waves {
        |  blockchain.custom.functionality.pre-activated-features.2 = $microblockActivationHeight

@@ -1,12 +1,12 @@
 package com.wavesplatform.api.http
 
-import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import org.apache.pekko.http.scaladsl.server.Route
 import play.api.libs.json.JsonConfiguration.Aux
-import play.api.libs.json.{Format, Json, JsonConfiguration, OptionHandlers}
+import play.api.libs.json.{Json, JsonConfiguration, OptionHandlers, Writes}
 
 case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
   import RewardApiRoute.*
@@ -16,36 +16,36 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
   }
 
   def rewards(): Route = (get & pathEndOrSingleSlash) {
-    complete(getRewards(blockchain.height))
+    complete(getRewards(Height(blockchain.height)))
   }
 
   def rewardsAtHeight(): Route = (get & path(IntNumber)) { height =>
-    complete(getRewards(height))
+    complete(getRewards(Height(height)))
   }
 
-  def getRewards(height: Int): Either[ValidationError, RewardStatus] =
+  def getRewards(height: Height): Either[ValidationError, RewardStatus] =
     for {
-      _ <- Either.cond(height <= blockchain.height, (), GenericError(s"Invalid height: $height"))
+      _ <- Either.cond(height.toInt <= blockchain.height, (), GenericError(s"Invalid height: $height"))
       activatedAt <- blockchain
         .featureActivationHeight(BlockchainFeatures.BlockReward)
         .filter(_ <= height)
         .toRight(GenericError("Block reward feature is not activated yet"))
-      reward <- blockchain.blockReward(height).toRight(GenericError(s"No information about rewards at height = $height"))
-      amount          = blockchain.wavesAmount(height)
+      reward <- blockchain.blockReward(height.toInt).toRight(GenericError(s"No information about rewards at height = $height"))
+      amount          = blockchain.wavesAmount(height.toInt)
       rewardsSettings = blockchain.settings.rewardsSettings
       funcSettings    = blockchain.settings.functionalitySettings
-      nextCheck       = rewardsSettings.nearestTermEnd(activatedAt, height, blockchain.isFeatureActivated(BlockchainFeatures.CappedReward, height))
+      nextCheck = rewardsSettings.nearestTermEnd(activatedAt, height, blockchain.isFeatureActivated(BlockchainFeatures.CappedReward, height.toInt))
       votingIntervalStart = nextCheck - rewardsSettings.votingInterval + 1
       votingThreshold     = rewardsSettings.votingInterval / 2 + 1
-      votes               = blockchain.blockRewardVotes(height).filter(_ >= 0)
+      votes               = blockchain.blockRewardVotes(height.toInt).filter(_ >= 0)
       term =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.CappedReward, height))
+        if (blockchain.isFeatureActivated(BlockchainFeatures.CappedReward, height.toInt))
           rewardsSettings.termAfterCappedRewardFeature
         else rewardsSettings.term
     } yield RewardStatus(
       height,
       amount,
-      reward * blockchain.blockRewardBoost(height),
+      reward * blockchain.blockRewardBoost(Height(height.toInt)),
       rewardsSettings.minIncrement,
       term,
       nextCheck,
@@ -60,13 +60,13 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
 
 object RewardApiRoute {
   final case class RewardStatus(
-      height: Int,
+      height: Height,
       totalWavesAmount: BigInt,
       currentReward: Long,
       minIncrement: Long,
       term: Int,
-      nextCheck: Int,
-      votingIntervalStart: Int,
+      nextCheck: Height,
+      votingIntervalStart: Height,
       votingInterval: Int,
       votingThreshold: Int,
       votes: RewardVotes,
@@ -76,8 +76,8 @@ object RewardApiRoute {
 
   final case class RewardVotes(increase: Int, decrease: Int)
 
-  implicit val config: Aux[Json.MacroOptions] = JsonConfiguration(optionHandlers = OptionHandlers.WritesNull)
+  given Aux[Json.MacroOptions] = JsonConfiguration(optionHandlers = OptionHandlers.WritesNull)
 
-  implicit val rewardVotesFormat: Format[RewardVotes] = Json.format
-  implicit val rewardFormat: Format[RewardStatus]     = Json.format
+  given Writes[RewardVotes]  = Json.writes
+  given Writes[RewardStatus] = Json.writes
 }

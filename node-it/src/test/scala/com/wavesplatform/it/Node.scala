@@ -47,8 +47,12 @@ abstract class Node(val config: Config) extends AutoCloseable {
   def nodeApiEndpoint: URL
   def apiKey: String
 
-  /** An address which can be reached from the host running IT (may not match the declared address) */
+  /** An address which can be reached from other containers connected to the same network (may not match the declared address). This address is
+    * inaccessible from the host.
+    */
   def networkAddress: InetSocketAddress
+  
+  def networkAddressAccessibleFromHost: InetSocketAddress
 
   override def close(): Unit = client.close()
 }

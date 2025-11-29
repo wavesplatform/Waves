@@ -6,6 +6,7 @@ import com.wavesplatform.features.api.{FeatureActivationStatus, NodeFeatureStatu
 import com.wavesplatform.it.api.BlockHeader
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
+import com.wavesplatform.state.Height
 
 class NotActivateFeatureTestSuite extends BaseFreeSpec with ActivationStatusRequest {
 
@@ -40,14 +41,14 @@ class NotActivateFeatureTestSuite extends BaseFreeSpec with ActivationStatusRequ
   private var activationStatusInfoAfter  = Seq.empty[FeatureActivationStatus]
 
   "get activation status info" in {
-    nodes.waitForHeight(votingInterval - 1)
+    nodes.waitForHeight(Height(votingInterval - 1))
     activationStatusInfoBefore = nodes.map(_.featureActivationStatus(votingFeatureNum))
-    nodes.waitForHeight(votingInterval + 1)
+    nodes.waitForHeight(Height(votingInterval + 1))
     activationStatusInfoAfter = nodes.map(_.featureActivationStatus(votingFeatureNum))
   }
 
   "supported blocks is not increased when nobody votes for feature" in {
-    val generatedBlocks: Seq[BlockHeader] = nodes.head.blockHeadersSeq(1, votingInterval - 1)
+    val generatedBlocks: Seq[BlockHeader] = nodes.head.blockHeadersSeq(Height(1), Height(votingInterval - 1))
     val featuresMapInGeneratedBlocks      = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
     val votesForFeature1                  = featuresMapInGeneratedBlocks.getOrElse(votingFeatureNum, Seq.empty).length
 

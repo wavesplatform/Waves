@@ -179,7 +179,7 @@ class WavesEnvironment(
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     // There are no new transactions in currentBlockchain
-    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.status == TxMeta.Status.Succeeded => tm.height.toLong }
+    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.status == TxMeta.Status.Succeeded => tm.height.toInt }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
@@ -192,7 +192,7 @@ class WavesEnvironment(
         quantity = assetDesc.totalVolume.toLong,
         decimals = assetDesc.decimals,
         issuer = Address(ByteStr(assetDesc.issuer.toAddress.bytes)),
-        issuerPk = assetDesc.issuer,
+        issuerPk = assetDesc.issuer.byteStr,
         reissuable = assetDesc.reissuable,
         scripted = assetDesc.script.nonEmpty,
         minSponsoredFee = Some(assetDesc.sponsorship).filter(_ != 0)
@@ -219,7 +219,7 @@ class WavesEnvironment(
       baseTarget = blockH.baseTarget,
       generationSignature = blockH.generationSignature,
       generator = ByteStr(blockH.generator.toAddress.bytes),
-      generatorPublicKey = blockH.generator,
+      generatorPublicKey = blockH.generator.byteStr,
       if (blockchainForRuntime.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
       if (blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution))
         getRewards(blockH.generator, bHeight)

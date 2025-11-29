@@ -11,6 +11,7 @@ import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
@@ -124,7 +125,7 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
   }
 
   test("can check UpdateAssetInfo tx from contracts") {
-    val asset2Height = sender.transactionInfo[TransactionInfo](asset2.id.toString).height
+    val asset2Height = Height(sender.transactionInfo[TransactionInfo](asset2.id.toString).height)
     nodes.waitForHeight(asset2Height + 2)
 
     sender.updateAssetInfo(dApp, asset1.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)

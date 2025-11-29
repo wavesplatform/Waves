@@ -71,7 +71,7 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
   "Accepted on the feature activation height, first period starts at activation_height+generation_period+1" in {
     val activationHeight = Height(3)
     withDomain(
-      defaultSettings.setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> activationHeight),
+      defaultSettings.setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> activationHeight.toInt),
       AddrWithBalance.enoughBalances(sender)
     ) { d =>
       val tx = TxHelpers.commitToGeneration(activationHeight + generationPeriodLength + 1, sender)

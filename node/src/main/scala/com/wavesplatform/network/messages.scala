@@ -8,9 +8,9 @@ import com.wavesplatform.crypto
 import com.wavesplatform.network.message.MessageSpec
 import com.wavesplatform.protobuf.block.EndorseBlock as PBEndorseBlock
 import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
-import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.{GeneratorIndex, Height}
 import com.wavesplatform.transaction.{Signed, Transaction}
+import com.wavesplatform.protobuf.{toByteString, toByteStr}
 import monix.eval.Coeval
 
 import java.net.InetSocketAddress
@@ -119,7 +119,7 @@ case class EndorseBlock(endorserIndex: Int, finalizedId: BlockId, finalizedHeigh
   def toProtobuf: PBEndorseBlock = PBEndorseBlock(
     endorserIndex,
     finalizedId.toByteString,
-    finalizedHeight,
+    finalizedHeight.toInt,
     endorsedId.toByteString,
     signature.toByteString
   )

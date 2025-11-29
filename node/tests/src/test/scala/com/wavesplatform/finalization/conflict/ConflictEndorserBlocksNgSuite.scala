@@ -8,7 +8,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
 import com.wavesplatform.history.Domain
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BalanceSnapshot, Blockchain, GeneratorIndex, GenesisBlockHeight, Portfolio}
+import com.wavesplatform.state.{BalanceSnapshot, Blockchain, GeneratorIndex, GenesisBlockHeight, Height, Portfolio}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
@@ -41,14 +41,14 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
   private val endorsers              = Seq(validGenerator, conflictGenerator)
   private val conflictGeneratorIndex = GeneratorIndex(1)
 
-  "finalization happens after microblock" in new Scenario[Int] {
+  "finalization happens after microblock" in new Scenario[Height] {
     override def getData = d => d.blockchain.finalizedHeight.value
 
-    override def after2WithCommitmentsCheck                   = _ shouldBe 1
-    override def after3KeyBlockWithNewEpochCheck              = _ shouldBe 1
-    override def after3MicroBlockWithConflictEndorsementCheck = _ shouldBe 2
-    override def after4EmptyCheck                             = _ shouldBe 2
-    override def after5WithNewEpochAndPunishmentCheck         = _ shouldBe 2
+    override def after2WithCommitmentsCheck                   = _ shouldBe Height(1)
+    override def after3KeyBlockWithNewEpochCheck              = _ shouldBe Height(1)
+    override def after3MicroBlockWithConflictEndorsementCheck = _ shouldBe Height(2)
+    override def after4EmptyCheck                             = _ shouldBe Height(2)
+    override def after5WithNewEpochAndPunishmentCheck         = _ shouldBe Height(2)
   }.run()
 
   "removed from generator set" in new Scenario[Set[GeneratorIndex]] {
@@ -161,7 +161,7 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
       def data(using Position) = getData(d)
 
       log.debug(s"Append block 2 with commitments")
-      val txs                   = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 3, x))
+      val txs                   = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
       val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = validGenerator, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
       after2WithCommitmentsCheck(data)

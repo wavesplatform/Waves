@@ -156,7 +156,7 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
       def data(using Position) = getData(d)
 
       log.debug(s"Append block 2 with commitments")
-      val txs                   = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = 3, x))
+      val txs                   = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
       val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = validGenerator, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
       after2WithCommitmentsCheck(data)

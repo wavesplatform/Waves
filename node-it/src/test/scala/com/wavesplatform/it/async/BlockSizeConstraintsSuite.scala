@@ -3,6 +3,7 @@ package com.wavesplatform.it.async
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.*
 import com.wavesplatform.it.api.AsyncHttpApi.*
+import com.wavesplatform.state.Height
 
 import scala.concurrent.Await.result
 import scala.concurrent.Future
@@ -21,11 +22,11 @@ class BlockSizeConstraintsSuite extends BaseFreeSpec with TransferSending {
   s"Block is limited by size after activation" in result(
     for {
       _                 <- Future.sequence((0 to maxGroups).map(_ => processRequests(transfers, includeAttachment = true)))
-      _                 <- miner.waitForHeight(3)
+      _                 <- miner.waitForHeight(Height(3))
       _                 <- Future.sequence((0 to maxGroups).map(_ => processRequests(transfers, includeAttachment = true)))
-      blockHeaderBefore <- miner.blockHeaderAt(2)
-      _                 <- miner.waitForHeight(4)
-      blockHeaderAfter  <- miner.blockHeaderAt(3)
+      blockHeaderBefore <- miner.blockHeaderAt(Height(2))
+      _                 <- miner.waitForHeight(Height(4))
+      blockHeaderAfter  <- miner.blockHeaderAt(Height(3))
     } yield {
       val maxSizeInBytesAfterActivation = (1.1d * 1024 * 1024).toInt // including headers
       val blockSizeInBytesBefore        = blockHeaderBefore.blocksize

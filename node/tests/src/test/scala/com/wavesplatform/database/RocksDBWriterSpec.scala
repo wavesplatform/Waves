@@ -15,6 +15,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{GenesisTransactionSettings, WavesSettings}
 import com.wavesplatform.state.TxMeta.Status
+import com.wavesplatform.state.Height as H
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
@@ -27,43 +28,43 @@ import scala.util.{Random, Using}
 class RocksDBWriterSpec extends FreeSpec with WithDomain {
   "Slice" - {
     "drops tail" in {
-      slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
+      slice(H.seq(10, 7, 4), H(7), H(10)) shouldEqual H.seq(10, 7)
     }
     "drops head" in {
-      slice(Seq(10, 7, 4), 4, 8) shouldEqual Seq(7, 4)
+      slice(H.seq(10, 7, 4), H(4), H(8)) shouldEqual H.seq(7, 4)
     }
     "includes Genesis" in {
-      slice(Seq(10, 7), 5, 11) shouldEqual Seq(10, 7, 1)
+      slice(H.seq(10, 7), H(5), H(11)) shouldEqual H.seq(10, 7, 1)
     }
     "with zero" in {
-      slice(Seq(10, 7, 0), 5, 11) shouldEqual Seq(10, 7, 0)
+      slice(H.seq(10, 7, 0), H(5), H(11)) shouldEqual H.seq(10, 7, 0)
     }
   }
   "Merge" - {
     "correctly joins height ranges" in {
-      merge3(Seq(15, 12, 3), Seq(12, 5), Seq(3, 1)) shouldEqual Seq((15, 12, 3), (12, 12, 3), (3, 5, 3), (3, 5, 1))
-      merge3(Seq(12, 5), Seq(15, 12, 3), Seq(9, 6)) shouldEqual Seq((12, 15, 9), (12, 12, 9), (5, 3, 9), (5, 3, 6))
-      merge3(Seq(8, 4), Seq(8, 4), Seq(1)) shouldEqual Seq((8, 8, 1), (4, 4, 1))
+      merge3(H.seq(15, 12, 3), H.seq(12, 5), H.seq(3, 1)) shouldEqual Seq(H.tuple(15, 12, 3), H.tuple(12, 12, 3), H.tuple(3, 5, 3), H.tuple(3, 5, 1))
+      merge3(H.seq(12, 5), H.seq(15, 12, 3), H.seq(9, 6)) shouldEqual Seq(H.tuple(12, 15, 9), H.tuple(12, 12, 9), H.tuple(5, 3, 9), H.tuple(5, 3, 6))
+      merge3(H.seq(8, 4), H.seq(8, 4), H.seq(1)) shouldEqual Seq(H.tuple(8, 8, 1), H.tuple(4, 4, 1))
     }
 
     "zeroes" in {
-      merge3(Seq(1), Seq(0), Seq(0)) shouldEqual Seq((1, 0, 0))
-      merge3(Seq(0), Seq(0), Seq(0)) shouldEqual Seq((0, 0, 0))
-      merge3(Seq(0), Seq(2), Seq(0)) shouldEqual Seq((0, 2, 0))
-      merge3(Seq(4, 2, 1), Seq(0), Seq(0)) shouldEqual Seq((4, 0, 0), (2, 0, 0), (1, 0, 0))
-      merge3(Seq(4, 2, 1), Seq(0), Seq(6, 4, 2)) shouldEqual Seq((4, 0, 6), (4, 0, 4), (2, 0, 2), (1, 0, 2))
+      merge3(H.seq(1), H.seq(0), H.seq(0)) shouldEqual Seq(H.tuple(1, 0, 0))
+      merge3(H.seq(0), H.seq(0), H.seq(0)) shouldEqual Seq(H.tuple(0, 0, 0))
+      merge3(H.seq(0), H.seq(2), H.seq(0)) shouldEqual Seq(H.tuple(0, 2, 0))
+      merge3(H.seq(4, 2, 1), H.seq(0), H.seq(0)) shouldEqual Seq(H.tuple(4, 0, 0), H.tuple(2, 0, 0), H.tuple(1, 0, 0))
+      merge3(H.seq(4, 2, 1), H.seq(0), H.seq(6, 4, 2)) shouldEqual Seq(H.tuple(4, 0, 6), H.tuple(4, 0, 4), H.tuple(2, 0, 2), H.tuple(1, 0, 2))
     }
 
     "one sequence longer than others, exhausted sequences keep head steady" in {
-      merge3(Seq(9, 8), Seq(3), Seq(2)) shouldBe Seq((9, 3, 2), (8, 3, 2))
+      merge3(H.seq(9, 8), H.seq(3), H.seq(2)) shouldBe Seq(H.tuple(9, 3, 2), H.tuple(8, 3, 2))
     }
 
     "all heads equal but only some have tails" in {
-      merge3(Seq(5, 4), Seq(5), Seq(5, 1)) shouldBe Seq((5, 5, 5), (4, 5, 1))
+      merge3(H.seq(5, 4), H.seq(5), H.seq(5, 1)) shouldBe Seq(H.tuple(5, 5, 5), H.tuple(4, 5, 1))
     }
 
     "strictly descending and all tails exhausted at different times" in {
-      merge3(Seq(4, 2, 1), Seq(6, 3), Seq(5)) shouldBe Seq((4, 6, 5), (4, 3, 5), (2, 3, 5), (1, 3, 5))
+      merge3(H.seq(4, 2, 1), H.seq(6, 3), H.seq(5)) shouldBe Seq(H.tuple(4, 6, 5), H.tuple(4, 3, 5), H.tuple(2, 3, 5), H.tuple(1, 3, 5))
     }
   }
 
@@ -226,7 +227,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       (3 to 10).foreach(_ => d.appendBlock())
       d.blockchain.height shouldBe 10
 
-      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 0
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe H(0)
       withClue("All data exists: ") {
         checkHistoricalDataOnlySinceHeight(d, allAddresses, 1)
       }
@@ -239,7 +240,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       (3 to 11).foreach(_ => d.appendBlock())
       d.blockchain.height shouldBe 11
 
-      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 4
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe H(4)
       withClue("No data before: ") {
         checkHistoricalDataOnlySinceHeight(d, userAddresses, 2)
         checkHistoricalDataOnlySinceHeight(d, minerAddresses, 4) // Updated on each height
@@ -261,7 +262,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       (5 to 11).foreach(_ => d.appendBlock())
       d.blockchain.height shouldBe 11
 
-      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 4
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe H(4)
       withClue("No data before: ") {
         checkHistoricalDataOnlySinceHeight(d, allAddresses, 4)
       }
@@ -290,7 +291,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       (7 to 15).foreach(_ => d.appendBlock())
       d.blockchain.height shouldBe 15
 
-      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 8
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe H(8)
       withClue("No data before: ") {
         checkHistoricalDataOnlySinceHeight(d, userAddresses, 6)
         checkHistoricalDataOnlySinceHeight(d, minerAddresses, 8) // Updated on each height

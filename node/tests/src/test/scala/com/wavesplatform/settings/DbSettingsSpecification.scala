@@ -30,6 +30,7 @@ class DbSettingsSpecification extends FlatSpec {
                                                         |  max-cache-size = 100000
                                                         |  max-rollback-depth = 2000
                                                         |  cleanup-interval = 500
+                                                        |  tx-bloom-filter-size = 23000
                                                         |  rocksdb {
                                                         |    main-cache-size = 512M
                                                         |    tx-cache-size = 16M
@@ -55,6 +56,7 @@ class DbSettingsSpecification extends FlatSpec {
       maxCacheSize = 100000,
       maxRollbackDepth = 2000,
       cleanupInterval = Some(500),
+      txBloomFilterSize = 23000,
       rocksdb = RocksDBSettings(
         mainCacheSize = SizeInBytes(512L * 1024 * 1024),
         txCacheSize = SizeInBytes(16L * 1024 * 1024),

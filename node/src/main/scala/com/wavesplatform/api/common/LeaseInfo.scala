@@ -3,7 +3,7 @@ package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.LeaseInfo.Status
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.LeaseDetails
+import com.wavesplatform.state.{Height, LeaseDetails, TransactionId}
 
 object LeaseInfo {
   type Status = Status.Value
@@ -34,12 +34,12 @@ object LeaseInfo {
 
 case class LeaseInfo(
     id: ByteStr,
-    originTransactionId: ByteStr,
+    originTransactionId: TransactionId,
     sender: Address,
     recipient: Address,
     amount: Long,
-    height: Int,
+    height: Height,
     status: Status,
-    cancelHeight: Option[Int] = None,
-    cancelTransactionId: Option[ByteStr] = None
+    cancelHeight: Option[Height] = None,
+    cancelTransactionId: Option[TransactionId] = None
 )

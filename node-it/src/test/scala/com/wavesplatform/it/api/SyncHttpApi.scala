@@ -182,7 +182,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def activationStatus: ActivationStatus =
       sync(async(n).activationStatus)
 
-    def rewardStatus(height: Option[Int] = None, amountsAsStrings: Boolean = false): RewardStatus =
+    def rewardStatus(height: Option[Height] = None, amountsAsStrings: Boolean = false): RewardStatus =
       sync(async(n).rewardStatus(height, amountsAsStrings))
 
     def seed(address: String): String =
@@ -196,7 +196,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def finalizedBlockHeader(amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).finalizedBlockHeader(amountsAsStrings))
 
-    def blockHeaderAt(height: Int, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeaderAt(height, amountsAsStrings))
+    def blockHeaderAt(height: Height, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeaderAt(height, amountsAsStrings))
 
     def blockHeaderForId(id: String, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeaderForId(id, amountsAsStrings))
 
@@ -218,10 +218,10 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def accountBalances(acc: String): (Long, Long) =
       sync(async(n).accountBalances(acc))
 
-    def balanceAtHeight(address: String, height: Int): Long =
+    def balanceAtHeight(address: String, height: Height): Long =
       sync(async(n).balanceAtHeight(address, height))
 
-    def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String] = None): Seq[(String, Long)] =
+    def accountsBalances(height: Option[Height], accounts: Seq[String], asset: Option[String] = None): Seq[(String, Long)] =
       sync(async(n).accountsBalances(height, accounts, asset))
 
     def balance(address: String, confirmations: Option[Int] = None, amountsAsStrings: Boolean = false): Balance =
@@ -258,7 +258,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def assetDistributionAtHeight(
         asset: String,
-        height: Int,
+        height: Height,
         limit: Int,
         maybeAfter: Option[String] = None,
         amountsAsStrings: Boolean = false
@@ -607,16 +607,16 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def waitForTransaction(txId: String, timeout: FiniteDuration = 2.minutes): TransactionInfo =
       sync(async(n).waitForTransaction(txId), timeout)
 
-    def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
+    def waitForHeight(expectedHeight: Height, requestAwaitTime: FiniteDuration = RequestAwaitTime): Height =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 
     def currentGenerationPeriod: Option[GenerationPeriod] = for {
       activationStatus <- sync(async(n).activationStatus).features.find(_.id == BlockchainFeatures.DeterministicFinality.id)
       activation       <- activationStatus.activationHeight
-      r                <- GenerationPeriod.from(sync(async(n).height), Height(activation), n.settings)
+      r                <- GenerationPeriod.from(sync(async(n).height), activation, n.settings)
     } yield r
 
-    def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Int =
+    def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Height =
       waitForHeight(p.start, requestAwaitTime)
 
     def blacklist(address: InetSocketAddress): Unit =
@@ -630,7 +630,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def transactionSerializer(body: JsObject): TransactionSerialize = sync(async(n).transactionSerializer(body))
 
-    def debugStateAt(height: Long): Map[String, Long] = sync(async(n).debugStateAt(height))
+    def debugStateAt(height: Height): Map[String, Long] = sync(async(n).debugStateAt(height))
 
     def debugBalanceHistory(address: String, amountsAsStrings: Boolean = false): Seq[BalanceHistory] =
       sync(async(n).debugBalanceHistory(address, amountsAsStrings))
@@ -639,24 +639,24 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def finalizedHeight: Height = sync(async(n).finalizedHeight)
 
-    def finalizedHeightAt(at: Int): Height = sync(async(n).finalizedHeightAt(at))
+    def finalizedHeightAt(at: Height): Height = sync(async(n).finalizedHeightAt(at))
 
-    def blockAt(height: Int, amountsAsStrings: Boolean = false): Block = sync(async(n).blockAt(height, amountsAsStrings))
+    def blockAt(height: Height, amountsAsStrings: Boolean = false): Block = sync(async(n).blockAt(height, amountsAsStrings))
 
-    def blockSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[Block] =
+    def blockSeq(fromHeight: Height, toHeight: Height, amountsAsStrings: Boolean = false): Seq[Block] =
       sync(async(n).blockSeq(fromHeight, toHeight, amountsAsStrings))
 
-    def blockSeqByAddress(address: String, from: Int, to: Int, amountsAsStrings: Boolean = false): Seq[Block] =
+    def blockSeqByAddress(address: String, from: Height, to: Height, amountsAsStrings: Boolean = false): Seq[Block] =
       sync(async(n).blockSeqByAddress(address, from, to, amountsAsStrings))
 
-    def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
+    def blockHeadersSeq(fromHeight: Height, toHeight: Height, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
       sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
 
-    def generators(atHeight: Int, amountsAsStrings: Boolean = false): Seq[GeneratorsResponse.Entry] = sync(
+    def generators(atHeight: Height, amountsAsStrings: Boolean = false): Seq[GeneratorsResponse.Entry] = sync(
       async(n).generators(atHeight, amountsAsStrings)
     )
 
-    def rollback(to: Int, returnToUTX: Boolean = true): Unit =
+    def rollback(to: Height, returnToUTX: Boolean = true): Unit =
       sync(async(n).rollback(to, returnToUTX))
 
     def findTransactionInfo(txId: String): Option[TransactionInfo] = sync(async(n).findTransactionInfo(txId))
@@ -787,7 +787,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       try f
       catch { case NonFatal(cause) => throw new RuntimeException(s"Error awaiting transaction: $transactionId", cause) }
 
-    def height: Seq[Int] =
+    def height: Seq[Height] =
       sync(async(nodes).height, TxInBlockchainAwaitTime)
 
     def waitForHeightAriseAndTxPresent(transactionId: String): Unit =
@@ -796,11 +796,11 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def waitForTransaction(transactionId: String): TransactionInfo =
       withTxIdMessage(transactionId)(sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime))
 
-    def waitForHeightArise(): Int =
+    def waitForHeightArise(): Height =
       sync(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)
 
     def waitForSameBlockHeadersAt(
-        height: Int,
+        height: Height,
         retryInterval: FiniteDuration = 5.seconds,
         conditionAwaitTime: FiniteDuration = ConditionAwaitTime
     ): Boolean =
@@ -815,7 +815,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def waitForEmptyUtx(): Unit =
       waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
 
-    def rollbackWithoutBlacklisting(height: Int, returnToUTX: Boolean = true): Unit = {
+    def rollbackWithoutBlacklisting(height: Height, returnToUTX: Boolean = true): Unit = {
       sync(
         Future.traverse(nodes) { node =>
           com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollback(height, returnToUTX)
@@ -824,7 +824,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       )
     }
 
-    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+    def rollback(height: Height, returnToUTX: Boolean = true): Unit = {
       val combinations = nodes.combinations(2).toSeq
       combinations.foreach { ns =>
         ns.head.blacklist(ns(1).networkAddress)
@@ -839,7 +839,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       }
     }
 
-    def waitForHeight(height: Int): Unit = {
+    def waitForHeight(height: Height): Unit = {
       sync(
         Future.traverse(nodes) { node =>
           com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).waitForHeight(height)

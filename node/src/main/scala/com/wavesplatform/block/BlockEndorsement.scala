@@ -1,6 +1,5 @@
 package com.wavesplatform.block
 
-import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.state.{GeneratorIndex, Height}
@@ -27,5 +26,5 @@ object BlockEndorsement {
     kp.sign(mkMessage(finalizedId, finalizedHeight, endorsedId))
 
   def mkMessage(finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId): Array[Byte] =
-    finalizedId.arr ++ Ints.toByteArray(finalizedHeight) ++ endorsedId.arr
+    finalizedId.arr ++ finalizedHeight.toByteArray ++ endorsedId.arr
 }

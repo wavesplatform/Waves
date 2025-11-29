@@ -5,7 +5,7 @@ import com.wavesplatform.events.api.grpc.protobuf.{SubscribeEvent, SubscribeRequ
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.serde.BlockchainUpdatedVanilla
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.Schedulers
 import io.grpc.stub.{CallStreamObserver, StreamObserver}

@@ -7,6 +7,7 @@ import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.test.*
+import com.wavesplatform.state.Height
 
 trait ScriptAssetActionLimitsSuite extends BaseFreeSpec {
 
@@ -16,7 +17,7 @@ trait ScriptAssetActionLimitsSuite extends BaseFreeSpec {
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((SynchronousCalls.id, 0), (RideV6.id, 0)))
+      .overrideBase(_.preactivatedFeatures((SynchronousCalls.id, Height(0)), (RideV6.id, Height(0))))
       .buildNonConflicting()
 
   protected val initialWavesBalance: Long  = 1000.waves

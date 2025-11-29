@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.{Blockchain, LeaseBalance, LeaseDetails, Portfolio, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, LeaseDetails, Portfolio, StateSnapshot}
 import play.api.libs.json.{Json, Reads}
 
 case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatures.SynchronousCalls, Set('W')) {
@@ -44,7 +44,7 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
         (
           pf,
           StateSnapshot(
-            cancelledLeases = Map(id -> LeaseDetails.Status.Expired(blockchain.height))
+            cancelledLeases = Map(id -> LeaseDetails.Status.Expired(Height(blockchain.height)))
           )
         )
       }.unzip

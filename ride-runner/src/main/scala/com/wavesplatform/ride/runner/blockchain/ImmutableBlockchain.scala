@@ -17,19 +17,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.ride.runner.*
 import com.wavesplatform.ride.runner.input.RideRunnerBlockchainState
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetScriptInfo,
-  BalanceSnapshot,
-  ConflictGenerators,
-  DataEntry,
-  GenerationPeriod,
-  Height,
-  LeaseBalance,
-  StateSnapshot,
-  TxMeta
-}
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
@@ -119,10 +107,10 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   private val assets = mkCache[IssuedAsset, Option[AssetDescription]] { assetId =>
     input.assets.get(assetId).map { info =>
       AssetDescription(
-        originTransactionId = assetId.id,
+        originTransactionId = TransactionId(assetId.id),
         issuer = info.issuerPublicKey,
-        name = UnsafeByteOperations.unsafeWrap(info.name),
-        description = UnsafeByteOperations.unsafeWrap(info.description),
+        name = UnsafeByteOperations.unsafeWrap(info.name.arr),
+        description = UnsafeByteOperations.unsafeWrap(info.description.arr),
         decimals = info.decimals,
         reissuable = info.reissuable,
         totalVolume = info.quantity,
@@ -171,14 +159,14 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
       .flatMap { addressState => addressState.generatingBalance.map(_.value).orElse(addressState.balance(Waves)) }
       .getOrElse(0L)
 
-    Seq(BalanceSnapshot(height, generatingBalance, 0, 0, 0))
+    Seq(BalanceSnapshot(Height(height), generatingBalance, 0, 0, 0))
   }
 
   // Ride: wavesBalance (specifies to=None)
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
     // "to" always None
-    balanceSnapshotsCache.get(address).filter(_.height >= from)
+    balanceSnapshotsCache.get(address).filter(_.height >= Height(from))
 
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] =
     if (height < this.height) None
@@ -230,12 +218,12 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
         amount = TxPositiveAmount.from(inputTx.amount).explicitGet(),
         feeAssetId = inputTx.feeAssetId,
         fee = TxPositiveAmount.from(inputTx.fee).explicitGet(),
-        attachment = ByteStr(inputTx.attachment),
+        attachment = ByteStr(inputTx.attachment.arr),
         timestamp = inputTx.timestamp,
-        proofs = Proofs(inputTx.proofs.map(ByteStr(_))),
+        proofs = Proofs(inputTx.proofs.map(p => ByteStr(p.arr))),
         chainId = chainId
       )
-      (meta.height, tx)
+      (meta.height.toInt, tx)
     }
 
   private def mkCache[K, V](f: K => V): LoadingCache[K, V] = Caffeine

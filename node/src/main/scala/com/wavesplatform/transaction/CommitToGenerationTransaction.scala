@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import com.google.common.primitives.Ints
 import com.wavesplatform.account.*
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
@@ -46,7 +45,7 @@ object CommitToGenerationTransaction {
 
   implicit def signed(tx: CommitToGenerationTransaction, privateKey: PrivateKey): CommitToGenerationTransaction = {
     val blsKP      = BlsKeyPair(privateKey)
-    val blsMessage = blsKP.publicKey.arr ++ Ints.toByteArray(tx.generationPeriodStart)
+    val blsMessage = blsKP.publicKey.arr ++ tx.generationPeriodStart.toByteArray
     val blsSig     = blsKP.sign(blsMessage)
 
     val txWithBlsSig = tx.copy(endorserPublicKey = blsKP.publicKey, commitmentSignature = blsSig)

@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.state.{Blockchain, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, Height, StateSnapshot}
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.grpc.netty.NettyServerBuilder
 import io.grpc.protobuf.services.ProtoReflectionServiceV1
@@ -65,10 +65,10 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
     if (extensionHeight > nodeHeight) {
       log.info(s"Rolling back from $extensionHeight to node height $nodeHeight")
-      repo.rollbackData(nodeHeight)
+      repo.rollbackData(Height(nodeHeight))
     }
 
-    val lastUpdateId = Try(ByteStr(repo.getBlockUpdate(nodeHeight).getUpdate.id.toByteArray)).toOption
+    val lastUpdateId = Try(ByteStr(repo.getBlockUpdate(Height(nodeHeight)).getUpdate.id.toByteArray)).toOption
     val lastBlockId  = context.blockchain.blockHeader(nodeHeight).map(_.id())
 
     if (lastUpdateId != lastBlockId)
