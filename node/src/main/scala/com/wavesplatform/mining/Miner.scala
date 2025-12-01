@@ -179,8 +179,11 @@ class MinerImpl(
     metrics.blockBuildTimeStats.measureSuccessful {
       val stopReasons = for {
         _ <- isAllowedForMining(address, blockchainUpdater)
-        _ <- Either.raiseUnless(blockchainUpdater.isCommitted(height + 1, address)) {
+        _ <- Either.raiseUnless(blockchainUpdater.isCommitted(Height(height + 1), address)) {
           s"$address is not committed on ${height + 1}. Try to commit to generation on next period"
+        }
+        _ <- Either.raiseWhen(blockchainUpdater.isConflict(Height(height + 1), address)) {
+          s"$address is conflict on ${height + 1}. Try to commit to generation on next period"
         }
       } yield ()
 
@@ -327,7 +330,6 @@ class MinerImpl(
           elapsed <- waitBlockAppendedTask.timed.map(_._1)
           newOffset = (offset - elapsed).max(Duration.Zero)
 
-          // _      <- Task(microBlockAttempt := SerialCancelable()).delayExecution(newOffset)
           _      <- Task.sleep(newOffset)
           result <- Task(forgeBlock(account)).executeOn(minerScheduler)
 

@@ -5,7 +5,6 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
-import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
@@ -36,36 +35,45 @@ package object appender {
       block.transactionData.zip(s.snapshots).map { case (tx, pbs) => PBSnapshots.fromProtobuf(pbs, tx.id(), height) }
     )
 
-  /** @return generatorBalances before block
+  /** @return generatorBalances before newBlock
     */
   def findBlockAndGetGenerators(
       blockchain: Blockchain,
-      block: Block
-  ): Either[ValidationError, (parentHeight: Height, generatorBalances: GeneratorBalances)] =
-    (for {
+      newBlock: Block
+  ): Either[ValidationError, (parentHeight: Height, generatorBalances: GeneratorBalances)] = {
+    val parentBlockId = newBlock.header.reference
+    val r = for {
       parentHeight <- blockchain
-        .heightOf(block.header.reference)
+        .heightOf(parentBlockId)
         .map(Height(_))
-        .toRight(s"height: history does not contain parent ${block.header.reference}")
+        .toRight(s"height: history does not contain parent $parentBlockId")
 
-      blockHeight   = parentHeight + 1
+      blockHeight   = parentHeight.next
       currentPeriod = blockchain.generationPeriodOf(blockHeight)
 
-      // TODO:
-      // conflictedGenerators   = currentPeriod.fold(ConflictGenerators.empty)(blockchain.conflictGenerators)
-
-      committedOnBlockHeight = currentPeriod.fold(Nil)(blockchain.committedGenerators)
-      minerAddress           = block.header.generator.toAddress
+      committedGenerators = currentPeriod.fold(Nil)(blockchain.committedGenerators)
+      minerAddress        = newBlock.header.generator.toAddress
       // TODO: allow if all generators have less than required balance
       // If no one commited, fallback to classic
-      _ <- Either.raiseUnless(committedOnBlockHeight.isEmpty || committedOnBlockHeight.exists { case (addr, _) => addr == minerAddress }) {
-        s"$minerAddress is not allowed to generate a block, allowed: ${committedOnBlockHeight.map { case (addr, _) => addr }.mkString(", ")}. " +
+      idx = GeneratorIndex.checked(committedGenerators.indexWhere { case (addr, _) => addr == minerAddress })
+      _ <- Either.raiseWhen(committedGenerators.nonEmpty && idx.isEmpty) {
+        s"$minerAddress is not allowed to generate a block, allowed: ${committedGenerators.map { case (addr, _) => addr }.mkString(", ")}. " +
           s"If it is your node: commit to generation for a next epoch"
       }
+      _ <- Either.raiseWhen(blockchain.isConflict(blockHeight, minerAddress)) {
+        s"$minerAddress is not allowed to generate a block, because it is conflict"
+      }
     } yield {
-      val generatorBalances = getGeneratorBalances(blockchain, block, committedOnBlockHeight)
+      val generatorBalances = committedGenerators.map { case (addr, blsPk) =>
+        val balance = GeneratingBalanceProvider.balance(blockchain, addr, Some(parentBlockId))
+        (addr, blsPk, balance)
+      }
+
       (parentHeight, generatorBalances)
-    }).leftMap(GenericError(_))
+    }
+
+    r.leftMap(GenericError(_))
+  }
 
   private[appender] def appendKeyBlock(
       blockchainUpdater: BlockchainUpdater & Blockchain,
@@ -197,14 +205,6 @@ package object appender {
             )
           )
     } yield applyResult -> blockchainUpdater.height
-  }
-
-  private def getGeneratorBalances(blockchain: Blockchain, newBlock: Block, generators: Seq[(Address, BlsPublicKey)]): GeneratorBalances = {
-    val parentBlockId = newBlock.header.reference
-    generators.map { case (addr, blsPk) =>
-      val balance = GeneratingBalanceProvider.generatorBalance(blockchain, addr, Some(parentBlockId))
-      (addr, blsPk, balance)
-    }
   }
 
   /** @return

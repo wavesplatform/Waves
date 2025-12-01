@@ -149,13 +149,6 @@ object Blockchain {
       case _                          => false
     }
 
-    def generatorBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long = {
-      val blockHeight = Height(block.flatMap(b => blockchain.heightOf(b)).getOrElse(blockchain.height))
-      val bottomLimit = (blockHeight - confirmations + 1).max(Height(1)).min(blockHeight)
-      val balances    = blockchain.balanceSnapshots(address, bottomLimit.toInt, block)
-      balances.view.map(_.generatorBalance).min
-    }
-
     def effectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long = {
       val blockHeight = block.flatMap(b => blockchain.heightOf(b)).getOrElse(blockchain.height)
       val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
@@ -164,7 +157,10 @@ object Blockchain {
       if (balances.isEmpty || isBanned) 0L else balances.view.map(_.effectiveBalance).min
     }
 
-    def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
+    def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
+      GeneratingBalanceProvider.balance(blockchain, account, blockId)
+
+    def regularBalance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
       val blockId     = blockchain.blockHeader(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight")).id()
       val balances    = blockchain.balanceSnapshots(address, bottomLimit, Some(blockId))
@@ -187,10 +183,8 @@ object Blockchain {
     // TODO: optimize
     def generationDeposit(address: Address, at: Height = Height(blockchain.height)): Long = blockchain.generationPeriodOf(at).fold(0L) { currPeriod =>
       val committedOnCurrent = blockchain.committedGenerators(currPeriod)
-      val conflictOnCurrent  = blockchain.conflictGenerators(currPeriod)
       val idxOnCurrent = committedOnCurrent.zipWithIndex
         .collectFirst { case ((currentAddress, _), i) if currentAddress == address => GeneratorIndex(i) }
-        .filterNot { idx => conflictOnCurrent.hasInUpTo(at, idx) }
 
       val hasOnNext = blockchain.committedGenerators(currPeriod.next).exists { case (currentAddress, _) => currentAddress == address }
 
@@ -203,9 +197,6 @@ object Blockchain {
 
     def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
-
-    def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
-      GeneratingBalanceProvider.balance(blockchain, account, blockId)
 
     def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
 
@@ -240,9 +231,19 @@ object Blockchain {
       else if (blockchain.approvedFeatures.get(feature).exists(_ <= Height(height))) BlockchainFeatureStatus.Approved
       else BlockchainFeatureStatus.Undefined
 
-    def isCommitted(height: Int, miner: Address): Boolean = blockchain.generationPeriodOf(Height(height)).fold(true) { p =>
+    def isCommitted(height: Height, miner: Address): Boolean = blockchain.generationPeriodOf(height).fold(true) { p =>
       lazy val committed = blockchain.committedGenerators(p)
       committed.isEmpty || committed.exists { case (address, _) => address == miner }
+    }
+
+    def isConflict(height: Height, generator: Address): Boolean = {
+      val maybeConflict = for {
+        period <- blockchain.generationPeriodOf(height)
+        idx <- GeneratorIndex.checked {
+          blockchain.committedGenerators(period).indexWhere { case (addr, _) => addr == generator }
+        }
+      } yield blockchain.conflictGenerators(period).hasInUpTo(height, idx)
+      maybeConflict.getOrElse(false)
     }
 
     def currentBlockVersion: Byte = blockVersionAt(blockchain.height)

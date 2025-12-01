@@ -22,7 +22,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
-import com.wavesplatform.protobuf.{toByteString, toByteStr, toPublicKey, PBSnapshots}
+import com.wavesplatform.protobuf.{PBSnapshots, toByteStr, toByteString, toPublicKey}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -352,14 +352,12 @@ class RocksDBWriter(
           val parentBlockId = currentBlock.header.reference
 
           // Use parentBlockId, because this is how it works in appender/minerBalance: we don't count transactions in current block
-          generatorBalances(currentCommGens, parentBlockId)
+          currentCommGens.map { case (addr, _) =>
+            addr -> GeneratingBalanceProvider.balance(this, addr, Some(parentBlockId))
+          }
         }
       }
     }
-  }
-
-  private def generatorBalances(generators: Seq[(Address, BlsPublicKey)], at: BlockId): Seq[(Address, Long)] = generators.map { case (addr, _) =>
-    addr -> GeneratingBalanceProvider.balance(this, addr, Some(at))
   }
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
@@ -536,6 +534,7 @@ class RocksDBWriter(
       val h           = Height(height)
 
       rw.put(Keys.height, h)
+      rw.put(Keys.finalizedHeight, Some(newFinalizedHeight))
       rw.put(Keys.finalizedHeightAt(h), Some(newFinalizedHeight))
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
@@ -759,6 +758,7 @@ class RocksDBWriter(
       // TODO: Option to not store
       rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances.map { case (_, b) => b }))
 
+      // TODO: height
       rw.put(Keys.issuedAssets(Height(height)), snapshot.assetStatics.keySet.toSeq)
       rw.put(Keys.updatedAssets(Height(height)), updatedAssetSet.toSeq)
       rw.put(Keys.sponsorshipAssets(Height(height)), snapshot.sponsorships.keySet.toSeq)
@@ -1033,7 +1033,13 @@ class RocksDBWriter(
 
         val currentPeriod = this.generationPeriodOf(currentHeight)
         val discardedBlock = readWrite { rw =>
-          rw.put(Keys.height, currentHeight - 1)
+          val blockchainHeight = currentHeight.prev
+          rw.put(Keys.height, blockchainHeight)
+
+          if (finalizedHeight.forall(blockchainHeight < _)) { // Happens only during a force rollback
+            val atBlockchainHeight = rw.get(Keys.finalizedHeightAt(blockchainHeight))
+            rw.put(Keys.finalizedHeight, atBlockchainHeight)
+          }
           rw.delete(Keys.finalizedHeightAt(currentHeight))
 
           val discardedMeta = rw
@@ -1439,7 +1445,7 @@ class RocksDBWriter(
           collectLeaseBalanceHistory(newAcc, lbn.prevHeight)
         }
 
-      val collectedDeposits = depositPeriods.fold((Nil, Map.empty, Set.empty)) { depositPeriods =>
+      val collectedDeposits = depositPeriods.fold((Nil, Map.empty)) { depositPeriods =>
         collectGenerationDepositChanges(db, addressId, depositPeriods.start, depositPeriods.end)
       }
       val slidedDepositHeights = slice(collectedDeposits.changedHeights, Height(from), toHeight)
@@ -1450,16 +1456,13 @@ class RocksDBWriter(
       val clbh = collectLeaseBalanceHistory(Vector.empty, lastLeaseBalance.height)
       val lbh  = slice(clbh, Height(from), toHeight)
       for {
-        (wh_, lh_, dh_) <- merge3(wbh, lbh, slidedDepositHeights)
-        wh = wh_
-        lh = lh_
-        dh = dh_
+        (wh, lh, dh) <- merge3(wbh, lbh, slidedDepositHeights)
         wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, wh)))
         lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, lh)))
         d  = collectedDeposits.depositSize.getOrElse(dh, 0L)
       } yield {
         val maxHeight = wh.max(lh).max(dh)
-        BalanceSnapshot(maxHeight, wb.balance, lb.in, lb.out, d, collectedDeposits.punishmentHeights.contains(dh))
+        BalanceSnapshot(maxHeight, wb.balance, lb.in, lb.out, d)
       }
     }
   }
@@ -1469,21 +1472,18 @@ class RocksDBWriter(
       addressId: AddressId,
       fromIncl: GenerationPeriod,
       toIncl: GenerationPeriod
-  ): (changedHeights: Seq[Height], depositSize: Map[Height, Long], punishmentHeights: Set[Height]) = {
+  ): (changedHeights: Seq[Height], depositSize: Map[Height, Long]) = {
     val depositDiffHeights = mutable.Map.empty[Height, Int] // +1 - added a deposit, -1 - released
-    var punishmentHeights  = Set.empty[Height]
 
     val toInclCommitted = toIncl.next // A generator commits to a next period, this is what we see in DB
     committedHeights(db, addressId, fromIncl, toInclCommitted).foreach { committed =>
-      val punishmentHeight = conflictGenerators(committed.period).heightOf(committed.index).map(_ + 1)
-      val releaseHeight    = punishmentHeight.getOrElse(committed.period.next.start)
+      val releaseHeight = committed.period.next.start
 
       depositDiffHeights.updateWith(committed.height)(orig => Some(orig.getOrElse(0) + 1))
       depositDiffHeights.put(releaseHeight, -1)
-      punishmentHeights = punishmentHeight.foldLeft(punishmentHeights)(_ + _)
     }
 
-    if (depositDiffHeights.isEmpty) (Seq(Height(0)), Map(Height(0) -> 0L), punishmentHeights)
+    if (depositDiffHeights.isEmpty) (Seq(Height(0)), Map(Height(0) -> 0L))
     else {
       val sortedDiffHeights = depositDiffHeights.toList.sortBy { case (h, _) => h }
       val (_, changedHeights, depositSize) = sortedDiffHeights.foldLeft((0L, List.empty[Height], Map.empty[Height, Long])) {
@@ -1492,7 +1492,7 @@ class RocksDBWriter(
           (updatedDeposit, depositHeight :: changedHeights, depositSize.updated(depositHeight, updatedDeposit))
       }
 
-      (changedHeights, depositSize, punishmentHeights)
+      (changedHeights, depositSize)
     }
   }
 

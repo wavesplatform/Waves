@@ -291,14 +291,14 @@ abstract class Caches extends Blockchain, Storage {
     val newHeight = current.height + 1
     val newScore  = block.blockScore() + current.score
 
-    val parentConflictEndorsements = for {
-      parentBlock <- lastBlock
-      voting      <- parentBlock.header.finalizationVoting
-    } yield voting.conflict.size
+    val conflictEndorsersInPastEpoch = this
+      .generationPeriodOf(current.height)
+      .filter(p => newHeight == p.next.start) // Starting new epoch
+      .fold(0)(p => this.conflictGenerators(p).all.size)
 
     val totalWavesAmount = current.meta.fold(settings.genesisSettings.initialBalance)(_.totalWavesAmount) +
       reward.getOrElse(0L) * this.blockRewardBoost(newHeight) -
-      parentConflictEndorsements.getOrElse(0) * CommitToGenerationTransaction.DepositInWavelets
+      conflictEndorsersInPastEpoch * CommitToGenerationTransaction.DepositInWavelets
 
     val newMeta = PBBlockMeta(
       Some(PBBlocks.protobuf(block.header)),
@@ -393,7 +393,6 @@ abstract class Caches extends Blockchain, Storage {
     val updatedCurrentGeneratorBalances = generatorBalances.map { case (addr, _, balance) => addr -> balance }
     currentGeneratorBalancesCache = Some(updatedCurrentGeneratorBalances)
 
-    // TODO: here?
     val updatedBalanceNodes = for {
       case ((address, asset), amount) <- snapshot.balances
       key         = (address, asset)
@@ -500,8 +499,7 @@ abstract class Caches extends Blockchain, Storage {
       discardedBlocks = doRollback(height)
     } yield {
       current = loadCurrentBlock()
-      if (currentFinalizedHeight.forall(_ < height)) // Happens only during a force rollback
-        currentFinalizedHeight = finalizedHeightAt(height)
+      currentFinalizedHeight = loadFinalizedHeight()
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()

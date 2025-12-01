@@ -1,12 +1,14 @@
-package com.wavesplatform.mining
+package com.wavesplatform.finalization
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
@@ -22,7 +24,7 @@ import org.scalatest.time.SpanSugar.convertLongToGrainOfTime
 
 import scala.util.Using
 
-class MinerWithDeterministicFinalitySuite extends FreeSpec with WithDomain with TestSchedulerOps with EitherValues {
+class MinerWithFinalitySuite extends FreeSpec with WithDomain with TestSchedulerOps with EitherValues {
   private val seed         = ByteStr("finality-test".getBytes())
   private val thisNodeAcc  = Wallet.generateNewAccount(seed.arr, nonce = 0)
   private val otherNodeAcc = TxHelpers.defaultSigner
@@ -37,10 +39,10 @@ class MinerWithDeterministicFinalitySuite extends FreeSpec with WithDomain with 
 
   "If account not committed, its attempt to forge doesn't stop current mining of other account on same node" ignore {}
 
-  "Mining starts on new epoch" - {
-    "even committed after scheduled time" ignore {}
+  "Mining works on new epoch even" - {
+    "committed after scheduled time" ignore {}
 
-    "even committed in the last block of epoch" in Using.Manager { manager =>
+    "committed in the last block of epoch" in Using.Manager { manager =>
       val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       manager.acquire(channels)(using _.close())
 
@@ -95,14 +97,93 @@ class MinerWithDeterministicFinalitySuite extends FreeSpec with WithDomain with 
     }.get
 
     // TODO:
-    "even all generators have no right to mine" - {
-      "some conflict, some have no required balance" in {}
+    "all generators have no right to mine" - {
+      "some conflict, some have no required balance" ignore {}
 
-      "all have no required balance" in {}
+      "all have no required balance" ignore {}
     }
+
+    "was conflict in previous epoch" ignore {}
   }
 
-  "Mining doesn't start on new epoch if not committed" in Using.Manager { manager =>
+  // TODO: Move to conflict
+  "Mining doesn't work if conflict" in Using.Manager { manager =>
+    val minerScheduler    = TestScheduler()
+    val appenderScheduler = TestScheduler()
+
+    val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+    manager.acquire(channels)(using _.close())
+
+    var miner: Miner = Miner.Disabled
+    withDomain(
+      defaultSettings,
+      AddrWithBalance.enoughBalances(otherNodeAcc) ++ Seq(
+        AddrWithBalance(
+          thisNodeAcc.toAddress,
+          MinimalEffectiveBalanceForGenerator2 + TestValues.commitToGenerationFee + CommitToGenerationTransaction.DepositInWavelets
+        )
+      ),
+      miner = x => miner.scheduleMining(x)
+    ) { d =>
+      d.wallet.generateNewAccounts(1).map(_.toAddress)
+
+      val minerImpl = new MinerImpl(
+        channels,
+        d.blockchain,
+        d.settings,
+        d.testTime,
+        d.utxPool,
+        BlockEndorser.Disabled,
+        EndorsementStorage.Disabled,
+        d.wallet,
+        d.posSelector,
+        minerScheduler,
+        appenderScheduler,
+        Observable.empty
+      ) with CatchLogs
+      miner = minerImpl
+
+      log.debug("Append block2 with commitments")
+      val txs                   = Seq(otherNodeAcc, thisNodeAcc).map(x => TxHelpers.commitToGeneration(Height(3), sender = x))
+      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = otherNodeAcc, strictTime = true)
+      d.appender.appendBlock(block2WithCommitments)
+
+      log.debug("Append block3 with conflict")
+      val otherFinalizedBlockId = TxHelpers.randomBlockId
+      val block3WithVotes = d.createBlock(
+        version = Block.ProtoBlockVersion,
+        txs = Nil,
+        generator = otherNodeAcc,
+        strictTime = true,
+        finalizationVoting = Some(
+          FinalizationVoting(
+            conflict = Vector(
+              BlockEndorsement.signed(
+                BlsKeyPair(thisNodeAcc.privateKey),
+                GeneratorIndex(1),
+                otherFinalizedBlockId,
+                finalizedHeight = GenesisBlockHeight,
+                endorsedId = block2WithCommitments.id()
+              )
+            )
+          )
+        )
+      )
+      d.appender.appendBlock(block3WithVotes)
+
+      log.debug("Trigger thisNode forging")
+      val nextBlockIn = (d.nextBlockTime(thisNodeAcc) - d.testTime.getTimestamp()).millis
+      d.testTime.advance(nextBlockIn)
+      appenderScheduler.tickNext("appender-1")
+      minerScheduler.tickNext("miner-1")
+      appenderScheduler.tickNext("appender-2")
+
+      d.blockchain.lastBlockId.value shouldBe block3WithVotes.id() // Not changed
+      minerImpl.inMemoryLog.getMessages.find(_.contains("is conflict on 4")) should not be empty
+    }
+  }.get
+
+  "Mining doesn't work on new epoch if not committed" in Using.Manager { manager =>
     val minerScheduler    = TestScheduler()
     val appenderScheduler = TestScheduler()
 

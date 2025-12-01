@@ -27,7 +27,7 @@ object PBFinalizationVotings {
   }
 
   def protobuf(v: VanillaFinalizationVoting): PBFinalizationVoting =
-    new PBFinalizationVoting(
+    PBFinalizationVoting.of(
       GeneratorIndex.toInts(v.valid),
       v.finalizedHeight.toInt,
       v.aggregatedEndorsement.byteStr.toByteString,

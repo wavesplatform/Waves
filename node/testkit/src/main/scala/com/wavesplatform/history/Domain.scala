@@ -315,9 +315,12 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
   def appendMicroBlockE(txs: Transaction*): Either[Throwable, BlockId] =
     Try(appendMicroBlock(txs*)).toEither
 
-  def createMicroBlockE(stateHash: Option[ByteStr] = None, signer: Option[KeyPair] = None, ref: Option[ByteStr] = None)(
-      txs: Transaction*
-  ): Either[ValidationError, MicroBlock] = {
+  def createMicroBlockE(
+      stateHash: Option[ByteStr] = None,
+      signer: Option[KeyPair] = None,
+      ref: Option[ByteStr] = None,
+      finalizationVoting: Option[FinalizationVoting] = None
+  )(txs: Transaction*): Either[ValidationError, MicroBlock] = {
     val lastBlock   = this.lastBlock
     val blockSigner = signer.getOrElse(defaultSigner)
     val stateHashE = if (blockchain.supportsLightNodeBlockFields()) {
@@ -342,38 +345,38 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
 
     for {
       sh <- stateHashE
-      block <- Block
-        .buildAndSign(
-          lastBlock.header.version,
-          lastBlock.header.timestamp,
-          lastBlock.header.reference,
-          lastBlock.header.baseTarget,
-          lastBlock.header.generationSignature,
-          lastBlock.transactionData ++ txs,
-          blockSigner,
-          lastBlock.header.featureVotes,
-          lastBlock.header.rewardVote,
-          sh,
-          challengedHeader = None,
-          finalizationVoting = None
-        )
-      microblock <- MicroBlock
-        .buildAndSign(
-          lastBlock.header.version,
-          generator = blockSigner,
-          transactionData = txs,
-          reference = ref.getOrElse(blockchainUpdater.lastBlockId.get),
-          totalResBlockSig = block.signature,
-          stateHash = block.header.stateHash,
-          finalizationVoting = None // TODO: endorsements
-        )
+      block <- Block.buildAndSign(
+        lastBlock.header.version,
+        lastBlock.header.timestamp,
+        lastBlock.header.reference,
+        lastBlock.header.baseTarget,
+        lastBlock.header.generationSignature,
+        lastBlock.transactionData ++ txs,
+        blockSigner,
+        lastBlock.header.featureVotes,
+        lastBlock.header.rewardVote,
+        sh,
+        challengedHeader = None,
+        FinalizationVoting.combine(lastBlock.header.finalizationVoting, finalizationVoting)
+      )
+      microblock <- MicroBlock.buildAndSign(
+        lastBlock.header.version,
+        blockSigner,
+        txs,
+        reference = ref.getOrElse(blockchainUpdater.lastBlockId.get),
+        totalResBlockSig = block.signature,
+        block.header.stateHash,
+        finalizationVoting
+      )
     } yield microblock
   }
 
-  def createMicroBlock(stateHash: Option[ByteStr] = None, signer: Option[KeyPair] = None, ref: Option[ByteStr] = None)(
-      txs: Transaction*
-  ): MicroBlock =
-    createMicroBlockE(stateHash, signer, ref)(txs*).explicitGet()
+  def createMicroBlock(
+      stateHash: Option[ByteStr] = None,
+      signer: Option[KeyPair] = None,
+      ref: Option[ByteStr] = None,
+      finalizationVoting: Option[FinalizationVoting] = None
+  )(txs: Transaction*): MicroBlock = createMicroBlockE(stateHash, signer, ref, finalizationVoting)(txs*).explicitGet()
 
   def appendMicroBlock(txs: Transaction*): BlockId = {
     val mb = createMicroBlock()(txs*)
@@ -405,8 +408,9 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
       challengedHeader: Option[ChallengedHeader] = None,
       rewardVote: Long = -1L,
       timestamp: Option[Long] = None,
-      voting: Option[FinalizationVoting] = None
-  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote, timestamp, voting).explicitGet()
+      finalizationVoting: Option[FinalizationVoting] = None
+  ): Block =
+    createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote, timestamp, finalizationVoting).explicitGet()
 
   def createBlockE(
       version: Byte,
@@ -418,7 +422,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
       challengedHeader: Option[ChallengedHeader] = None,
       rewardVote: Long = -1L,
       timestamp: Option[Long] = None,
-      voting: Option[FinalizationVoting] = None
+      finalizationVoting: Option[FinalizationVoting] = None
   ): Either[ValidationError, Block] = {
     val reference = ref.getOrElse(randomSig)
 
@@ -475,7 +479,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
           rewardVote,
           stateHash = None,
           challengedHeader,
-          finalizationVoting = voting
+          finalizationVoting = finalizationVoting
         )
       resultStateHash <- stateHash.map(Right(_)).getOrElse {
         if (blockchain.supportsLightNodeBlockFields(blockchain.height + 1)) {
@@ -518,7 +522,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
           rewardVote,
           resultStateHash,
           challengedHeader,
-          finalizationVoting = voting
+          finalizationVoting = finalizationVoting
         )
     } yield resultBlock
   }

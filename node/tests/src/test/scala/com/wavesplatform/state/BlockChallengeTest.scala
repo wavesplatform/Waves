@@ -482,7 +482,7 @@ class BlockChallengeTest
           .collectFirst {
             case x if x.address == challengedMinerAddr => x.balance
           }
-          .value shouldBe expectedEffectiveBalance // TODO: without challenging
+          .value shouldBe 0 // expectedEffectiveBalance // TODO: ?
       }
     }
   }

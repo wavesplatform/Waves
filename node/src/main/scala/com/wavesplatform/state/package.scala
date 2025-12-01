@@ -41,6 +41,9 @@ package object state {
       def +(that: Int): Height     = h + that
       def -(that: Int): Height     = h - that
 
+      def next: Height = h + 1
+      def prev: Height = h - 1
+
       @targetName("minusHeight")
       def -(that: Height): Int = h - that
 
