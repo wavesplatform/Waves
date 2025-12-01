@@ -1,11 +1,10 @@
 package com.wavesplatform.finalization.conflict
 
-import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
-import com.wavesplatform.crypto.bls.BlsKeyPair
+import com.wavesplatform.block.{Block, FinalizationVoting}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
-import com.wavesplatform.state.{GeneratorIndex, GenesisBlockHeight, Height}
+import com.wavesplatform.state.{GeneratorIndex, Height}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.transaction.TxHelpers
 import org.scalactic.source.Position
@@ -27,11 +26,11 @@ class MultipleConflictEndorserSuite extends BaseFinalizationSpec {
     )
   )
 
-  private val endorsers = Seq(validGenerator, conflictGenerator1, conflictGenerator2)
+  private val generators = Seq(validGenerator, conflictGenerator1, conflictGenerator2)
 
-  "saved conflict endorsers" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(endorsers*)) { d =>
+  "saved conflict endorsers" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
     log.debug(s"Append block 2 with commitments")
-    val txs                   = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+    val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
     val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = validGenerator, strictTime = true)
     d.appender.appendBlock(block2WithCommitments)
 
@@ -41,26 +40,13 @@ class MultipleConflictEndorserSuite extends BaseFinalizationSpec {
 
     log.debug(s"Append microblock with conflict endorsement")
     def appendConflictEndorsements(): Unit = {
-      val otherFinalizedBlockId = TxHelpers.randomBlockId
       val microBlockWithTxn = d.createMicroBlock(
         signer = Some(validGenerator),
         finalizationVoting = Some(
           FinalizationVoting(
             conflict = Vector(
-              BlockEndorsement.signed(
-                BlsKeyPair(conflictGenerator1.privateKey),
-                conflictGenerator1Idx,
-                otherFinalizedBlockId,
-                finalizedHeight = GenesisBlockHeight,
-                endorsedId = block2WithCommitments.id()
-              ),
-              BlockEndorsement.signed(
-                BlsKeyPair(conflictGenerator2.privateKey),
-                conflictGenerator2Idx,
-                otherFinalizedBlockId,
-                finalizedHeight = GenesisBlockHeight,
-                endorsedId = block2WithCommitments.id()
-              )
+              mkConflictEndorsement(conflictGenerator1, conflictGenerator1Idx, block2WithCommitments),
+              mkConflictEndorsement(conflictGenerator2, conflictGenerator2Idx, block2WithCommitments)
             )
           )
         )
@@ -79,7 +65,7 @@ class MultipleConflictEndorserSuite extends BaseFinalizationSpec {
     checkConflictGenerators()
 
     log.debug("Append block 4")
-    val block4Txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(5), x))
+    val block4Txs = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(5), x))
     val block4    = d.createBlock(version = Block.ProtoBlockVersion, txs = block4Txs, generator = validGenerator, strictTime = true)
     d.appender.appendBlock(block4)
     checkConflictGenerators()

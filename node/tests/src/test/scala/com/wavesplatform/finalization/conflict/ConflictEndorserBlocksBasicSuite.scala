@@ -1,14 +1,14 @@
 package com.wavesplatform.finalization.conflict
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
-import com.wavesplatform.crypto.bls.BlsKeyPair
+import com.wavesplatform.account.Address
+import com.wavesplatform.block.{Block, FinalizationVoting}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
 import com.wavesplatform.history.Domain
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BalanceSnapshot, Blockchain, GeneratorIndex, GenesisBlockHeight, Height, Portfolio}
+import com.wavesplatform.state.{BalanceSnapshot, Blockchain, GeneratorIndex, Height, Portfolio}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{FreeSpec, NumericExt}
 import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
@@ -24,7 +24,8 @@ import org.scalatest.Assertion
   * 5. First block at epoch #2 with punishment applied for a conflict endorser, no one committed
   */
 class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
-  private val validGenerator = TxHelpers.signer(0)
+  private val validGenerator     = TxHelpers.signer(0)
+  private val validGeneratorAddr = validGenerator.toAddress
 
   private val conflictGenerator     = TxHelpers.signer(1)
   private val conflictGeneratorAddr = conflictGenerator.toAddress
@@ -37,10 +38,10 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
     )
   )
 
-  private val endorsers              = Seq(validGenerator, conflictGenerator)
+  private val generators             = Seq(validGenerator, conflictGenerator)
   private val conflictGeneratorIndex = GeneratorIndex(1)
 
-  "removed from generator set" in new Scenario[Set[GeneratorIndex]] {
+  "in conflict" in new Scenario[Set[GeneratorIndex]] {
     override def getData = d => d.blockchain.conflictGenerators(d.blockchain.currentGenerationPeriod.value).all
 
     private val removed: IgnorePositionCheck    = _ shouldBe Set(conflictGeneratorIndex)
@@ -87,6 +88,26 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
     override def after3WithNewEpochAndEndorsementsCheck = _ shouldBe (2, after2)
     override def after4EmptyCheck                       = _ shouldBe (2, after2)
     override def after5WithNewEpochAndPunishmentCheck   = _ shouldBe (5, after2 - DepositInWavelets)
+  }.run()
+
+  "current generator balances" in new Scenario[Seq[(Address, Long)]] {
+    override def getData = d => d.blockchain.currentGeneratorBalances()
+
+    val after1 = ENOUGH_AMT
+    val after2 = after1 - TestValues.commitToGenerationFee - DepositInWavelets
+
+    val blockReward = 2.waves
+    val totalTxnFee = 2 * TestValues.commitToGenerationFee
+
+    val balancesAfter2 = Vector(
+      validGeneratorAddr    -> (after2 + blockReward + totalTxnFee * 4 / 10),
+      conflictGeneratorAddr -> after2
+    )
+
+    override def after2WithCommitmentsCheck             = _ shouldBe Nil
+    override def after3WithNewEpochAndEndorsementsCheck = _ shouldBe balancesAfter2
+    override def after4EmptyCheck                       = _ shouldBe balancesAfter2
+    override def after5WithNewEpochAndPunishmentCheck   = _ shouldBe Nil
   }.run()
 
   "generator balance from API" in new Scenario[Long] { // Collected before applying block
@@ -156,13 +177,12 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
       def data(using Position) = getData(d)
 
       log.debug(s"Append block 2 with commitments")
-      val txs                   = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
       val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = validGenerator, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
       after2WithCommitmentsCheck(data)
 
       log.debug(s"Append block 3 with votes")
-      val otherFinalizedBlockId = TxHelpers.randomBlockId
       val block3WithVotes = d.createBlock(
         version = Block.ProtoBlockVersion,
         txs = Nil,
@@ -170,15 +190,7 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
         strictTime = true,
         finalizationVoting = Some(
           FinalizationVoting(
-            conflict = Vector(
-              BlockEndorsement.signed(
-                BlsKeyPair(conflictGenerator.privateKey),
-                GeneratorIndex(1),
-                otherFinalizedBlockId,
-                finalizedHeight = GenesisBlockHeight,
-                endorsedId = block2WithCommitments.id()
-              )
-            )
+            conflict = Vector(mkConflictEndorsement(conflictGenerator, GeneratorIndex(1), block2WithCommitments))
           )
         )
       )

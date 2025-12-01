@@ -1,14 +1,13 @@
 package com.wavesplatform.finalization.conflict
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
-import com.wavesplatform.crypto.bls.BlsKeyPair
+import com.wavesplatform.block.{Block, FinalizationVoting}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
 import com.wavesplatform.history.Domain
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BalanceSnapshot, Blockchain, GeneratorIndex, GenesisBlockHeight, Height, Portfolio}
+import com.wavesplatform.state.{BalanceSnapshot, Blockchain, GeneratorIndex, Height, Portfolio}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
@@ -38,7 +37,7 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
     )
   )
 
-  private val endorsers              = Seq(validGenerator, conflictGenerator)
+  private val generators             = Seq(validGenerator, conflictGenerator)
   private val conflictGeneratorIndex = GeneratorIndex(1)
 
   "finalization happens after microblock" in new Scenario[Height] {
@@ -161,7 +160,7 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
       def data(using Position) = getData(d)
 
       log.debug(s"Append block 2 with commitments")
-      val txs                   = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
       val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = validGenerator, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
       after2WithCommitmentsCheck(data)
@@ -173,20 +172,11 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
       after3KeyBlockWithNewEpochCheck(data)
 
       log.debug(s"Append microblock with conflict endorsement")
-      val otherFinalizedBlockId = TxHelpers.randomBlockId
       val microBlockWithTxn = d.createMicroBlock(
         signer = Some(validGenerator),
         finalizationVoting = Some(
           FinalizationVoting(
-            conflict = Vector(
-              BlockEndorsement.signed(
-                BlsKeyPair(conflictGenerator.privateKey),
-                GeneratorIndex(1),
-                otherFinalizedBlockId,
-                finalizedHeight = GenesisBlockHeight,
-                endorsedId = block2WithCommitments.id()
-              )
-            )
+            conflict = Vector(mkConflictEndorsement(conflictGenerator, GeneratorIndex(1), block2WithCommitments))
           )
         )
       )(TxHelpers.transfer(otherAcc1, otherAcc2.toAddress))

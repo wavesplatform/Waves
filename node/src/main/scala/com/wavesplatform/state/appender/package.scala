@@ -50,27 +50,27 @@ package object appender {
 
       blockHeight   = parentHeight.next
       currentPeriod = blockchain.generationPeriodOf(blockHeight)
+      minerAddress  = newBlock.header.generator.toAddress
 
       committedGenerators = currentPeriod.fold(Nil)(blockchain.committedGenerators)
-      minerAddress        = newBlock.header.generator.toAddress
-      // TODO: allow if all generators have less than required balance
-      // If no one commited, fallback to classic
-      idx = GeneratorIndex.checked(committedGenerators.indexWhere { case (addr, _) => addr == minerAddress })
-      _ <- Either.raiseWhen(committedGenerators.nonEmpty && idx.isEmpty) {
-        s"$minerAddress is not allowed to generate a block, allowed: ${committedGenerators.map { case (addr, _) => addr }.mkString(", ")}. " +
-          s"If it is your node: commit to generation for a next epoch"
-      }
-      _ <- Either.raiseWhen(blockchain.isConflict(blockHeight, minerAddress)) {
-        s"$minerAddress is not allowed to generate a block, because it is conflict"
-      }
-    } yield {
-      val generatorBalances = committedGenerators.map { case (addr, blsPk) =>
+      conflictGenerators  = currentPeriod.fold(ConflictGenerators.empty)(blockchain.conflictGenerators).upTo(blockHeight)
+
+      generatorBalances = committedGenerators.map { case (addr, blsPk) =>
         val balance = GeneratingBalanceProvider.balance(blockchain, addr, Some(parentBlockId))
         (addr, blsPk, balance)
       }
 
-      (parentHeight, generatorBalances)
-    }
+      generatorSet = generatorBalances.view.zipWithIndex.collect {
+        case ((addr, _, balance), idx)
+            if !conflictGenerators.contains(GeneratorIndex(idx)) && blockchain.isEffectiveBalanceValid(parentHeight.toInt, newBlock, balance) =>
+          addr
+      }.toSet
+      // If no one commited, fallback to classic
+      _ <- Either.raiseWhen(generatorSet.nonEmpty && !generatorSet.contains(minerAddress)) {
+        s"$minerAddress is not allowed to generate a block, allowed: ${generatorSet.mkString(", ")}. " +
+          s"If it is your node: commit to generation for a next epoch"
+      }
+    } yield (parentHeight, generatorBalances)
 
     r.leftMap(GenericError(_))
   }
