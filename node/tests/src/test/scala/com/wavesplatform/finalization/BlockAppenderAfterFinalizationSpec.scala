@@ -15,6 +15,7 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{FreeSpec, NumericExt, TestTime}
+import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.wallet.Wallet
@@ -37,6 +38,12 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
   private val defaultSettings = DomainPresets.DeterministicFinality
     .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
+    .configure(
+      _.copy(
+        generationPeriodLength = 2,
+        lightNodeBlockFieldsAbsenceInterval = 0
+      )
+    )
     .copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed)))
 
   private val generator1 = sender
@@ -45,15 +52,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
   "should append a block" - {
     "if no one committed" in {
-      def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-        override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
-      }
-
-      withDomain(
-        defaultSettings,
-        AddrWithBalance.enoughBalances(generator1),
-        wrapBU = wrapBU
-      ) { d =>
+      withDomain(defaultSettings, AddrWithBalance.enoughBalances(generator1)) { d =>
         d.wallet.generateNewAccounts(1)
 
         val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
@@ -63,18 +62,88 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       }
     }
 
-    "if committed" in testWithGenerator { d =>
-      val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
-      d.appender.appendBlock(block)
+    "if committed" in new BaseTest {
+      override def check(d: Domain): Unit = {
+        log.debug(s"Append block 3 of committed generator")
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator1, strictTime = true)
+        d.appender.appendBlock(block)
+      }
+    }.run()
 
-      d.blockchain.isLastBlockId(block.id()) shouldBe true
-    }
+    "if no one eligible committed" - {
+      "all conflict" in new BaseTest {
+        override def check(d: Domain): Unit = {
+          log.debug(s"Append block 3 with votes")
+          val block3WithVotes = d.createBlock(
+            version = Block.ProtoBlockVersion,
+            txs = Nil,
+            generator = committedGenerator1,
+            strictTime = true,
+            finalizationVoting = Some(
+              FinalizationVoting(
+                conflict = Vector(
+                  mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock),
+                  mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock)
+                )
+              )
+            )
+          )
+          d.appender.appendBlock(block3WithVotes)
 
-    "if no one eligible committed" in testWithGenerator { d =>
-      val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
-      d.appender.appendBlock(block)
+          log.debug(s"Append block 4 of not committed generator")
+          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
+          d.appender.appendBlock(block)
+        }
+      }.run()
 
-      d.blockchain.isLastBlockId(block.id()) shouldBe true
+      "all committed are poor" in new BaseTest {
+        override def check(d: Domain): Unit = {
+          log.debug(s"Append block 3 with spending")
+          val block3WithSpending = d.createBlock(
+            version = Block.ProtoBlockVersion,
+            txs = Seq(committedGenerator1, committedGenerator2).map { kp =>
+              TxHelpers.transfer(kp, notCommittedGeneratorAddr, amount = d.balance(kp.toAddress) - TestValues.fee - DepositInWavelets)
+            },
+            generator = committedGenerator1,
+            strictTime = true
+          )
+          d.appender.appendBlock(block3WithSpending)
+
+          log.debug(s"Append block 4 of not committed generator")
+          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
+          d.appender.appendBlock(block)
+        }
+      }.run()
+
+      "poor conflict, rest conflict" in new BaseTest {
+        override def check(d: Domain): Unit = {
+          log.debug(s"Append block 3 with vote and spending")
+          val block3 = d.createBlock(
+            version = Block.ProtoBlockVersion,
+            txs = Seq(
+              TxHelpers.transfer(
+                committedGenerator1,
+                notCommittedGeneratorAddr,
+                amount = d.balance(committedGenerator1Addr) - TestValues.fee - DepositInWavelets
+              )
+            ),
+            generator = committedGenerator1,
+            strictTime = true,
+            finalizationVoting = Some(
+              FinalizationVoting(
+                conflict = Vector(
+                  mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock)
+                )
+              )
+            )
+          )
+          d.appender.appendBlock(block3)
+
+          log.debug(s"Append block 4 of not committed generator")
+          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
+          d.appender.appendBlock(block)
+        }
+      }.run()
     }
   }
 
@@ -362,21 +431,45 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
   }
 
   private def testWithGenerator(f: Domain => Any): Any = {
-    def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-      private val xs = Vector(generator1, generator2, generator3).map { g =>
-        g.toAddress -> BlsKeyPair(g.privateKey).publicKey
+    val generators = Seq(generator1, generator2)
+    withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
+      d.wallet.generateNewAccounts(3)
+
+      val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
+      d.appender.appendBlock(block2WithCommitments)
+      (3 to 5).foreach { _ =>
+        d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
       }
 
-      override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = xs
-    }
-
-    withDomain(
-      defaultSettings,
-      AddrWithBalance.enoughBalances(generator1, generator2, generator3),
-      wrapBU = wrapBU
-    ) { d =>
-      d.wallet.generateNewAccounts(3)
       f(d)
+    }
+  }
+
+  private trait BaseTest {
+    protected val committedGenerator1     = TxHelpers.signer(0)
+    protected val committedGenerator1Addr = committedGenerator1.toAddress
+    protected val committedGenerator1Idx  = GeneratorIndex(0)
+
+    protected val committedGenerator2     = TxHelpers.signer(1)
+    protected val committedGenerator2Addr = committedGenerator2.toAddress
+    protected val committedGenerator2Idx  = GeneratorIndex(1)
+
+    protected val notCommittedGenerator     = TxHelpers.signer(2)
+    protected val notCommittedGeneratorAddr = notCommittedGenerator.toAddress
+
+    protected val committedGenerators = Seq(committedGenerator1, committedGenerator2)
+    protected val allGenerators       = notCommittedGenerator +: committedGenerators
+
+    def check(d: Domain): Unit
+
+    def run(): Unit = withDomain(defaultSettings, AddrWithBalance.enoughBalances(allGenerators*)) { d =>
+      log.debug(s"Append block 2 with commitments")
+      val txs                   = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = notCommittedGenerator, strictTime = true)
+      d.appender.appendBlock(block2WithCommitments)
+
+      check(d)
     }
   }
 

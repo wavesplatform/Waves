@@ -1,13 +1,12 @@
 package com.wavesplatform.finalization.conflict
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
-import com.wavesplatform.crypto.bls.BlsKeyPair
+import com.wavesplatform.block.{Block, FinalizationVoting}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{Blockchain, GeneratorIndex, GenesisBlockHeight, Height, Portfolio}
+import com.wavesplatform.state.{Blockchain, GeneratorIndex, Height, Portfolio}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
@@ -21,8 +20,8 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
   private val conflictGenerator     = TxHelpers.signer(1)
   private val conflictGeneratorAddr = conflictGenerator.toAddress
 
-  private val endorsers     = Seq(validGenerator, conflictGenerator)
-  private val endorserAddrs = endorsers.map(_.toAddress)
+  private val generators     = Seq(validGenerator, conflictGenerator)
+  private val generatorAddrs = generators.map(_.toAddress)
 
   private val baseSettings = DomainPresets.DeterministicFinality.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
   private val defaultSettings = baseSettings.configure(
@@ -34,7 +33,7 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
 
   "punished and committed to next" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(validGenerator, conflictGenerator)) { d =>
     log.debug(s"Append block 2 with commitments")
-    val block2Txs             = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+    val block2Txs             = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
     val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = block2Txs, generator = validGenerator, strictTime = true)
     d.appender.appendBlock(block2WithCommitments)
 
@@ -42,7 +41,6 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
     val balanceAfter2 = balanceAfter1 - TestValues.commitToGenerationFee
 
     log.debug(s"Append block 3 with votes")
-    val otherFinalizedBlockId = TxHelpers.randomBlockId
     val block3WithVotes = d.createBlock(
       version = Block.ProtoBlockVersion,
       txs = Nil,
@@ -50,21 +48,13 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
       strictTime = true,
       finalizationVoting = Some(
         FinalizationVoting(
-          conflict = Vector(
-            BlockEndorsement.signed(
-              BlsKeyPair(conflictGenerator.privateKey),
-              GeneratorIndex(1),
-              otherFinalizedBlockId,
-              finalizedHeight = GenesisBlockHeight,
-              endorsedId = block2WithCommitments.id()
-            )
-          )
+          conflict = Vector(mkConflictEndorsement(conflictGenerator, GeneratorIndex(1), block2WithCommitments))
         )
       )
     )
     d.appender.appendBlock(block3WithVotes)
 
-    val block4Txs             = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(5), x))
+    val block4Txs             = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(5), x))
     val block4WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = block4Txs, generator = validGenerator, strictTime = true)
     d.appender.appendBlock(block4WithCommitments)
 
@@ -76,7 +66,7 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
     val balanceAfter5 = balanceAfter4 - DepositInWavelets
 
     withClue(s"checkCommitted: ") {
-      d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map(_._1) should contain theSameElementsInOrderAs endorserAddrs
+      d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map(_._1) should contain theSameElementsInOrderAs generatorAddrs
     }
 
     d.blockchain.wavesPortfolio(conflictGeneratorAddr) shouldBe Portfolio(balance = balanceAfter5, generationDeposit = DepositInWavelets)

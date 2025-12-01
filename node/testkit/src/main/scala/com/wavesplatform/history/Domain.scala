@@ -399,7 +399,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
   }
 
   def createBlock(
-      version: Byte,
+      version: Byte, // TODO: it's almost always ProtoBlockVersion 
       txs: Seq[Transaction],
       ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
       strictTime: Boolean = false,
