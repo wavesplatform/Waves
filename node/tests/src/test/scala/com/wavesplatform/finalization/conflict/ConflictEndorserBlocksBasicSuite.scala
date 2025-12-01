@@ -1,6 +1,7 @@
 package com.wavesplatform.finalization.conflict
 
 import com.wavesplatform.TestValues
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, FinalizationVoting}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -23,7 +24,8 @@ import org.scalatest.Assertion
   * 5. First block at epoch #2 with punishment applied for a conflict endorser, no one committed
   */
 class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
-  private val validGenerator = TxHelpers.signer(0)
+  private val validGenerator     = TxHelpers.signer(0)
+  private val validGeneratorAddr = validGenerator.toAddress
 
   private val conflictGenerator     = TxHelpers.signer(1)
   private val conflictGeneratorAddr = conflictGenerator.toAddress
@@ -39,7 +41,7 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
   private val generators             = Seq(validGenerator, conflictGenerator)
   private val conflictGeneratorIndex = GeneratorIndex(1)
 
-  "removed from generator set" in new Scenario[Set[GeneratorIndex]] {
+  "in conflict" in new Scenario[Set[GeneratorIndex]] {
     override def getData = d => d.blockchain.conflictGenerators(d.blockchain.currentGenerationPeriod.value).all
 
     private val removed: IgnorePositionCheck    = _ shouldBe Set(conflictGeneratorIndex)
@@ -86,6 +88,26 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
     override def after3WithNewEpochAndEndorsementsCheck = _ shouldBe (2, after2)
     override def after4EmptyCheck                       = _ shouldBe (2, after2)
     override def after5WithNewEpochAndPunishmentCheck   = _ shouldBe (5, after2 - DepositInWavelets)
+  }.run()
+
+  "current generator balances" in new Scenario[Seq[(Address, Long)]] {
+    override def getData = d => d.blockchain.currentGeneratorBalances()
+
+    val after1 = ENOUGH_AMT
+    val after2 = after1 - TestValues.commitToGenerationFee - DepositInWavelets
+
+    val blockReward = 2.waves
+    val totalTxnFee = 2 * TestValues.commitToGenerationFee
+
+    val balancesAfter2 = Vector(
+      validGeneratorAddr    -> (after2 + blockReward + totalTxnFee * 4 / 10),
+      conflictGeneratorAddr -> after2
+    )
+
+    override def after2WithCommitmentsCheck             = _ shouldBe Nil
+    override def after3WithNewEpochAndEndorsementsCheck = _ shouldBe balancesAfter2
+    override def after4EmptyCheck                       = _ shouldBe balancesAfter2
+    override def after5WithNewEpochAndPunishmentCheck   = _ shouldBe Nil
   }.run()
 
   "generator balance from API" in new Scenario[Long] { // Collected before applying block
