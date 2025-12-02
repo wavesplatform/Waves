@@ -807,7 +807,8 @@ class RocksDBWriter(
                 )
               )(_.totalHash)
 
-        val newStateHash = stateHash.createStateHash(prevStateHash)
+        val deterministicFinalityActivated = this.isFeatureActivated(BlockchainFeatures.DeterministicFinality, height)
+        val newStateHash                   = stateHash.createStateHash(prevStateHash, deterministicFinalityActivated)
         rw.put(Keys.stateHash(Height(height)), Some(newStateHash))
       }
     }

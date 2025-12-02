@@ -6,13 +6,12 @@ import com.wavesplatform.account.{Address, PKKeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.RocksDBWriter
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, *}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, SnapshotBlockchain, TxMeta}
+import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, SnapshotBlockchain, TxMeta, StateHash}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -260,12 +259,10 @@ case class DebugApiRoute(
       sh <- db.loadStateHash(Height(height))
       h  <- blockchain.blockHeader(height)
     } yield {
-      val stateHashJson = Json.toJson(sh).as[JsObject]
-      val filteredStateHashJson =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality, height)) stateHashJson
-        else stateHashJson - "nextCommittedGeneratorsHash"
-
-      filteredStateHashJson ++ Json.obj(
+      val deterministicFinalityActivated =
+        blockchain.isFeatureActivated(com.wavesplatform.features.BlockchainFeatures.DeterministicFinality, height)
+      val stateHashJson = StateHash.toJson(sh, deterministicFinalityActivated)
+      stateHashJson ++ Json.obj(
         "snapshotHash" -> db.snapshotStateHash(height),
         "blockId"      -> h.id().toString,
         "baseTarget"   -> h.header.baseTarget,
