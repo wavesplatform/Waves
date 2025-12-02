@@ -105,7 +105,7 @@ class DebugApiRouteStateHashSpec
           "leaseStatusHash"   -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "sponsorshipHash"   -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "aliasHash"         -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          // Note: "nextCommittedGeneratorsHash" is not present
+          // Note: "nextCommittedGeneratorsHash" and "committedGeneratorBalancesHash" fields are not present
           "snapshotHash" -> "2ydpHRFSFwcaQ8s9hPyZwcmJFk4cKDNFcb3DRcvyrXZ9",
           "blockId"      -> beforeFinalityHeader.id().toString,
           "baseTarget"   -> beforeFinalityHeader.header.baseTarget,
@@ -137,22 +137,23 @@ class DebugApiRouteStateHashSpec
 
         val afterFinalityHeader = domain.blockchain.blockHeader(afterFinalityHeight).value
         val expectedResponseAfter = Json.obj(
-          "stateHash"                   -> "db312fac738c0df9903df8e6baa6b3cfee455f2db367ceab6b34f2576c1a3fb2",
-          "wavesBalanceHash"            -> "f9b41de484eb180d9b77d2ff88db971bfba7bf19a99857f26c7f5171a43628f4",
-          "assetBalanceHash"            -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "dataEntryHash"               -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "accountScriptHash"           -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "assetScriptHash"             -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "leaseBalanceHash"            -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "leaseStatusHash"             -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "sponsorshipHash"             -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "aliasHash"                   -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "nextCommittedGeneratorsHash" -> "ea94d09632089883a35a7d51ab712c0fade50a16272d6a89f243e37a4f006c17",
-          "snapshotHash"                -> "FvSRsH9nGSK2eT3dGsN5Cz2xAhK1WZQvnCF2PqHXj2tv",
-          "blockId"                     -> afterFinalityHeader.id().toString,
-          "baseTarget"                  -> afterFinalityHeader.header.baseTarget,
-          "height"                      -> afterFinalityHeight,
-          "version"                     -> Version.VersionString
+          "stateHash"                      -> "30d75a837c49cb3a3f88ffe0e8ded219ab8ab357344634302fe85298d38a9c56",
+          "wavesBalanceHash"               -> "f9b41de484eb180d9b77d2ff88db971bfba7bf19a99857f26c7f5171a43628f4",
+          "assetBalanceHash"               -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "dataEntryHash"                  -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "accountScriptHash"              -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "assetScriptHash"                -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "leaseBalanceHash"               -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "leaseStatusHash"                -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "sponsorshipHash"                -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "aliasHash"                      -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "nextCommittedGeneratorsHash"    -> "ea94d09632089883a35a7d51ab712c0fade50a16272d6a89f243e37a4f006c17",
+          "committedGeneratorBalancesHash" -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "snapshotHash"                   -> "FvSRsH9nGSK2eT3dGsN5Cz2xAhK1WZQvnCF2PqHXj2tv",
+          "blockId"                        -> afterFinalityHeader.id().toString,
+          "baseTarget"                     -> afterFinalityHeader.header.baseTarget,
+          "height"                         -> afterFinalityHeight,
+          "version"                        -> Version.VersionString
         )
 
         Get(routePath(s"/stateHash/last")) ~> route ~> check {

@@ -90,7 +90,7 @@ class DebugApiRouteStateHashGenesisSpec
         val genesisHeight      = 1
         val genesisBlockHeader = domain.blockchain.blockHeader(genesisHeight).value
         val expectedResponse = Json.obj(
-          "stateHash"         -> "e00070ff25686999fdbb42f5357b4c92087646151019c6252250a38fcf0ebf76",
+          "stateHash"         -> "79a65a809de9879bb8010d308333961c34764ff65444ff0028a982ca0cdd6732",
           "wavesBalanceHash"  -> "a3766f502f4bba124d9f6fff49adcac44e309bdbc72c437a0607de9c315bcdfa",
           "assetBalanceHash"  -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "dataEntryHash"     -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
@@ -100,13 +100,14 @@ class DebugApiRouteStateHashGenesisSpec
           "leaseStatusHash"   -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "sponsorshipHash"   -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "aliasHash"         -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          // Note: "nextCommittedGeneratorsHash" is present
-          "nextCommittedGeneratorsHash" -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "snapshotHash"                -> "2ydpHRFSFwcaQ8s9hPyZwcmJFk4cKDNFcb3DRcvyrXZ9",
-          "blockId"                     -> genesisBlockHeader.id().toString,
-          "baseTarget"                  -> genesisBlockHeader.header.baseTarget,
-          "height"                      -> genesisHeight,
-          "version"                     -> Version.VersionString
+          // Note: "nextCommittedGeneratorsHash" and "committedGeneratorBalancesHash" fields are present
+          "nextCommittedGeneratorsHash"    -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "committedGeneratorBalancesHash" -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "snapshotHash"                   -> "2ydpHRFSFwcaQ8s9hPyZwcmJFk4cKDNFcb3DRcvyrXZ9",
+          "blockId"                        -> genesisBlockHeader.id().toString,
+          "baseTarget"                     -> genesisBlockHeader.header.baseTarget,
+          "height"                         -> genesisHeight,
+          "version"                        -> Version.VersionString
         )
 
         Get(routePath(s"/stateHash/$genesisHeight")) ~> route ~> check {

@@ -37,7 +37,8 @@ object StateHashBuilder {
 
 class StateHashBuilder {
   import com.wavesplatform.utils.byteStrOrdering
-  private val maps = Vector.fill(SectionId.maxId)(mutable.TreeMap.empty[ByteStr, Array[Byte]])
+  private val maps                       = Vector.fill(SectionId.maxId)(mutable.TreeMap.empty[ByteStr, Array[Byte]])
+  private val committedGeneratorBalances = mutable.ArrayBuffer.empty[ByteStr]
 
   private def addEntry(section: SectionId.Value, key: Array[Byte]*)(value: Array[Byte]*): Unit = {
     val solidKey   = ByteStr(key.reduce(_ ++ _))
@@ -96,6 +97,10 @@ class StateHashBuilder {
     )
   }
 
+  def addCommittedGeneratorBalances(balances: Seq[Long]): Unit = {
+    committedGeneratorBalances ++= balances.iterator.map(b => ByteStr(Longs.toByteArray(b)))
+  }
+
   def addNextCommittedGenerator(publicKey: PublicKey, blsPublicKey: BlsPublicKey): Unit = {
     addEntry(SectionId.NextCommittedGenerators, publicKey.arr)(
       blsPublicKey.arr
@@ -104,10 +109,16 @@ class StateHashBuilder {
 
   def result(): Result = {
     val digestInstance = StateHashBuilder.newDigestInstance()
-    val sectHashes =
-      for {
-        (section, id) <- this.maps.zipWithIndex if section.nonEmpty
-      } yield SectionId(id) -> StateHashBuilder.createSectionHash(section.flatMap { case (k, v) => Seq(k, ByteStr(v)) }, digestInstance)
+    val sectHashes = {
+      val hashes =
+        for {
+          (section, id) <- this.maps.zipWithIndex if section.nonEmpty
+        } yield SectionId(id) -> StateHashBuilder.createSectionHash(section.flatMap { case (k, v) => Seq(k, ByteStr(v)) }, digestInstance)
+
+      if (committedGeneratorBalances.nonEmpty)
+        hashes :+ (SectionId.CommittedGeneratorBalances -> StateHashBuilder.createSectionHash(committedGeneratorBalances, digestInstance))
+      else hashes
+    }
 
     Result(sectHashes.toMap)
   }

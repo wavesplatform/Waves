@@ -14,7 +14,8 @@ final case class StateHash(totalHash: ByteStr, sectionHashes: Map[SectionId.Valu
 
 object StateHash {
   object SectionId extends Enumeration {
-    val WavesBalance, AssetBalance, DataEntry, AccountScript, AssetScript, LeaseBalance, LeaseStatus, Sponsorship, Alias, NextCommittedGenerators =
+    val WavesBalance, AssetBalance, DataEntry, AccountScript, AssetScript, LeaseBalance, LeaseStatus, Sponsorship, Alias, NextCommittedGenerators,
+        CommittedGeneratorBalances =
       Value
   }
 
@@ -34,7 +35,7 @@ object StateHash {
     )
 
     if (deterministicFinalityActivated)
-      baseSections :+ SectionId.NextCommittedGenerators
+      baseSections :+ SectionId.NextCommittedGenerators :+ SectionId.CommittedGeneratorBalances
     else
       baseSections
   }
