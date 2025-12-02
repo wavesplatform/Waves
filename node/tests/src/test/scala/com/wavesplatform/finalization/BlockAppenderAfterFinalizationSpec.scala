@@ -1,7 +1,7 @@
 package com.wavesplatform.finalization
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.{Block, FinalizationVoting}
+import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
@@ -50,11 +50,9 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
             generator = committedGenerator1,
             strictTime = true,
             finalizationVoting = Some(
-              FinalizationVoting(
-                conflict = Vector(
-                  mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock),
-                  mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock)
-                )
+              mkConflictVoting(
+                mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock),
+                mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock)
               )
             )
           )
@@ -99,13 +97,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
             ),
             generator = committedGenerator1,
             strictTime = true,
-            finalizationVoting = Some(
-              FinalizationVoting(
-                conflict = Vector(
-                  mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock)
-                )
-              )
-            )
+            finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock)))
           )
           d.appender.appendBlock(block3)
 
@@ -124,11 +116,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
           txs = Nil,
           generator = committedGenerator1,
           strictTime = true,
-          finalizationVoting = Some(
-            FinalizationVoting(
-              conflict = Vector(mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock))
-            )
-          )
+          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock)))
         )
         d.appender.appendBlock(block3WithVotes)
 
@@ -164,11 +152,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
           txs = Nil,
           generator = committedGenerator1,
           strictTime = true,
-          finalizationVoting = Some(
-            FinalizationVoting(
-              conflict = Vector(mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock))
-            )
-          )
+          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock)))
         )
         d.appender.appendBlock(block3WithVotes)
 

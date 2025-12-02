@@ -1,7 +1,7 @@
 package com.wavesplatform.finalization.conflict
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.{Block, FinalizationVoting}
+import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
@@ -174,11 +174,7 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
       log.debug(s"Append microblock with conflict endorsement")
       val microBlockWithTxn = d.createMicroBlock(
         signer = Some(validGenerator),
-        finalizationVoting = Some(
-          FinalizationVoting(
-            conflict = Vector(mkConflictEndorsement(conflictGenerator, GeneratorIndex(1), block2WithCommitments))
-          )
-        )
+        finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(conflictGenerator, GeneratorIndex(1), block2WithCommitments)))
       )(TxHelpers.transfer(otherAcc1, otherAcc2.toAddress))
       d.appendMicroBlock(microBlockWithTxn)
       after3MicroBlockWithConflictEndorsementCheck(data)

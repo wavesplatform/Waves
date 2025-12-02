@@ -1,7 +1,7 @@
 package com.wavesplatform.finalization
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.{Block, FinalizationVoting}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -147,8 +147,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
           txs = Nil,
           generator = otherNodeAcc,
           strictTime = true,
-          finalizationVoting =
-            Some(FinalizationVoting(conflict = Vector(mkConflictEndorsement(thisNodeAcc, GeneratorIndex(1), block2WithCommitments))))
+          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(thisNodeAcc, GeneratorIndex(1), block2WithCommitments)))
         )
         d.appender.appendBlock(block3WithVotes)
 
@@ -215,7 +214,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         txs = Nil,
         generator = otherNodeAcc,
         strictTime = true,
-        finalizationVoting = Some(FinalizationVoting(conflict = Vector(mkConflictEndorsement(thisNodeAcc, GeneratorIndex(1), block2WithCommitments))))
+        finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(thisNodeAcc, GeneratorIndex(1), block2WithCommitments)))
       )
       d.appender.appendBlock(block3WithVotes)
 

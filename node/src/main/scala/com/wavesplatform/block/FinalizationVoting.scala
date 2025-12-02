@@ -4,10 +4,10 @@ import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.state.{GeneratorIndex, Height}
 
 case class FinalizationVoting(
-    valid: Seq[GeneratorIndex] = Seq.empty,
-    finalizedHeight: Height = Height(0),
-    aggregatedEndorsement: BlsSignature = BlsSignature.Empty,
-    conflict: IndexedSeq[BlockEndorsement] = IndexedSeq.empty
+    valid: Seq[GeneratorIndex],
+    finalizedHeight: Height,
+    aggregatedEndorsement: BlsSignature,
+    conflict: IndexedSeq[BlockEndorsement]
 ) {
   def withValid(endorser: GeneratorIndex, signature: BlsSignature.NonEmpty): FinalizationVoting = copy(
     valid = valid :+ endorser,

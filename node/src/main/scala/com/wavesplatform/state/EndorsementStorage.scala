@@ -149,7 +149,13 @@ object EndorsementStorage {
     }
 
     private def createVoting(currentFilter: EndorsementFilter, simulationResult: SimulationResult): FinalizationResult = {
-      val votingWithoutValid = FinalizationVoting(finalizedHeight = currentFilter.finalizedHeight, conflict = conflict.values.toIndexedSeq)
+      val votingWithoutValid = FinalizationVoting(
+        valid = Seq.empty,
+        finalizedHeight = currentFilter.finalizedHeight,
+        aggregatedEndorsement = BlsSignature.Empty,
+        conflict = conflict.values.toIndexedSeq
+      )
+
       val voting =
         if (simulationResult.reachedFinalization)
           simulationResult.chosenValid.foldLeft(votingWithoutValid) { case (r, idx) => r.withValid(idx, valid(idx.toInt)) }
@@ -167,7 +173,15 @@ object EndorsementStorage {
   object InMemory {
     private case class FinalizationResult(reachedFinalization: Boolean, voting: FinalizationVoting)
     private object FinalizationResult {
-      val empty = FinalizationResult(false, FinalizationVoting())
+      val empty = FinalizationResult(
+        reachedFinalization = false,
+        FinalizationVoting(
+          valid = Seq.empty,
+          finalizedHeight = GenesisBlockHeight,
+          aggregatedEndorsement = BlsSignature.Empty,
+          conflict = IndexedSeq.empty
+        )
+      )
     }
   }
 }
