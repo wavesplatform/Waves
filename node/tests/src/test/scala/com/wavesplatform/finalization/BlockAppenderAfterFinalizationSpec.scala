@@ -33,7 +33,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     }
 
     "if committed" in new BaseTest {
-      override def check(d: Domain): Unit = {
+      override def continue(d: Domain): Unit = {
         log.debug(s"Append block 3 of committed generator")
         val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator1, strictTime = true)
         d.appender.appendBlock(block)
@@ -42,7 +42,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
     "if no one eligible committed" - {
       "all conflict" in new BaseTest {
-        override def check(d: Domain): Unit = {
+        override def continue(d: Domain): Unit = {
           log.debug(s"Append block 3 with votes")
           val block3WithVotes = d.createBlock(
             version = Block.ProtoBlockVersion,
@@ -67,7 +67,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       }.run()
 
       "all committed are poor" in new BaseTest {
-        override def check(d: Domain): Unit = {
+        override def continue(d: Domain): Unit = {
           log.debug(s"Append block 3 with spending")
           val block3WithSpending = d.createBlock(
             version = Block.ProtoBlockVersion,
@@ -86,7 +86,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       }.run()
 
       "poor conflict, rest conflict" in new BaseTest {
-        override def check(d: Domain): Unit = {
+        override def continue(d: Domain): Unit = {
           log.debug(s"Append block 3 with vote and spending")
           val block3 = d.createBlock(
             version = Block.ProtoBlockVersion,
@@ -115,11 +115,39 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         }
       }.run()
     }
+
+    "on new epoch if was conflict on previous" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        log.debug(s"Append block 3 with votes")
+        val block3WithVotes = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = committedGenerator1,
+          strictTime = true,
+          finalizationVoting = Some(
+            FinalizationVoting(
+              conflict = Vector(mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock))
+            )
+          )
+        )
+        d.appender.appendBlock(block3WithVotes)
+
+        log.debug(s"Append empty blocks")
+        (4 to 5).foreach { _ =>
+          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator2, strictTime = true)
+          d.appender.appendBlock(block)
+        }
+
+        log.debug(s"Append new epoch block")
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator1, strictTime = true)
+        d.appender.appendBlock(block)
+      }
+    }.run()
   }
 
   "should reject a block" - {
     "if not committed" in new BaseTest {
-      override def check(d: Domain): Unit = {
+      override def continue(d: Domain): Unit = {
         log.debug(s"Append block 3 of not committed generator")
         val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
         d.appender.appendBlock(block, requireAppended = false)
@@ -129,7 +157,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     }.run()
 
     "if conflict" in new BaseTest {
-      override def check(d: Domain): Unit = {
+      override def continue(d: Domain): Unit = {
         log.debug(s"Append block 3 with votes")
         val block3WithVotes = d.createBlock(
           version = Block.ProtoBlockVersion,
@@ -168,7 +196,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     protected val committedGenerators = Seq(committedGenerator1, committedGenerator2)
     protected val allGenerators       = notCommittedGenerator +: committedGenerators
 
-    def check(d: Domain): Unit
+    def continue(d: Domain): Unit
 
     def run(): Unit = withDomain(defaultSettings, AddrWithBalance.enoughBalances(allGenerators*)) { d =>
       log.debug(s"Append block 2 with commitments")
@@ -176,7 +204,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = notCommittedGenerator, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
 
-      check(d)
+      continue(d)
     }
   }
 }
