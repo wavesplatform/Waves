@@ -21,11 +21,19 @@ case class GeneratorsApiRoute(settings: RestAPISettings, api: CommonGeneratorsAp
 
           api.generators(Height(height)).map { x =>
             val balance = if (formatNumbersAsStrings) JsString(x.balance.toString) else JsNumber(x.balance)
-            Json.obj(
+
+            val builder = Json.newBuilder
+            builder ++= Seq(
               "address"       -> x.address.toString,
               "balance"       -> balance,
               "transactionId" -> x.commitTxnId.toString
             )
+
+            x.conflictHeight.foreach { h =>
+              builder += "conflictHeight" -> h.toInt
+            }
+
+            builder.result()
           }
         }
       }
