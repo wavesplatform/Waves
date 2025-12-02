@@ -18,8 +18,8 @@ object StateHashBuilder {
   val EmptySectionHash: ByteStr = createSectionHash(Nil)
 
   final case class Result(hashes: Map[SectionId.Value, ByteStr]) {
-    def createStateHash(prevHash: ByteStr): StateHash = {
-      val sortedHashes = SectionId.values.toSeq.map(hashes.getOrElse(_, EmptySectionHash))
+    def createStateHash(prevHash: ByteStr, deterministicFinalityActivated: Boolean): StateHash = {
+      val sortedHashes = StateHash.sections(deterministicFinalityActivated).map(hashes.getOrElse(_, EmptySectionHash))
       val payload      = prevHash +: sortedHashes
       StateHash(createSectionHash(payload), hashes)
     }

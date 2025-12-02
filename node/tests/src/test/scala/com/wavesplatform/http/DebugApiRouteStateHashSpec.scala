@@ -95,7 +95,7 @@ class DebugApiRouteStateHashSpec
         val beforeFinalityHeight = domain.blockchain.height - 1
         val beforeFinalityHeader = domain.blockchain.blockHeader(beforeFinalityHeight).value
         val expectedResponseBefore = Json.obj(
-          "stateHash"         -> "e00070ff25686999fdbb42f5357b4c92087646151019c6252250a38fcf0ebf76",
+          "stateHash"         -> "5b6d80dc02da5d9a76b8f928c0deb18889f25b5515738545532cd164dd70e87c",
           "wavesBalanceHash"  -> "a3766f502f4bba124d9f6fff49adcac44e309bdbc72c437a0607de9c315bcdfa",
           "assetBalanceHash"  -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "dataEntryHash"     -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
@@ -137,7 +137,7 @@ class DebugApiRouteStateHashSpec
 
         val afterFinalityHeader = domain.blockchain.blockHeader(afterFinalityHeight).value
         val expectedResponseAfter = Json.obj(
-          "stateHash"                   -> "c98529a3663278e39645c874e470582f58272f0ee50c33cf6d8b880acf64ca48",
+          "stateHash"                   -> "db312fac738c0df9903df8e6baa6b3cfee455f2db367ceab6b34f2576c1a3fb2",
           "wavesBalanceHash"            -> "f9b41de484eb180d9b77d2ff88db971bfba7bf19a99857f26c7f5171a43628f4",
           "assetBalanceHash"            -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "dataEntryHash"               -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",

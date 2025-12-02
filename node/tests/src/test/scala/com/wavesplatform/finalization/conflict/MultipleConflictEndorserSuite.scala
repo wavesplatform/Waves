@@ -1,6 +1,6 @@
 package com.wavesplatform.finalization.conflict
 
-import com.wavesplatform.block.{Block, FinalizationVoting}
+import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
@@ -43,11 +43,9 @@ class MultipleConflictEndorserSuite extends BaseFinalizationSpec {
       val microBlockWithTxn = d.createMicroBlock(
         signer = Some(validGenerator),
         finalizationVoting = Some(
-          FinalizationVoting(
-            conflict = Vector(
-              mkConflictEndorsement(conflictGenerator1, conflictGenerator1Idx, block2WithCommitments),
-              mkConflictEndorsement(conflictGenerator2, conflictGenerator2Idx, block2WithCommitments)
-            )
+          mkConflictVoting(
+            mkConflictEndorsement(conflictGenerator1, conflictGenerator1Idx, block2WithCommitments),
+            mkConflictEndorsement(conflictGenerator2, conflictGenerator2Idx, block2WithCommitments)
           )
         )
       )(TxHelpers.transfer(conflictGenerator1, conflictGenerator2Addr))

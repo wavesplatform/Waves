@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonGeneratorsApi.GeneratorEntry
 import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database.{AddressId, DBExt, Keys, RDB}
-import com.wavesplatform.state.{Blockchain, Height, NG, TransactionId}
+import com.wavesplatform.state.{Blockchain, GeneratorIndex, Height, NG, TransactionId}
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.mutable
@@ -52,6 +52,7 @@ object CommonGeneratorsApi {
         (addressIds, addresses, blsPks, txnIds, balances)
       }
 
+      val conflict = blockchain.conflictGenerators(period)
       if (
         addressIds.size == addresses.size &&
         addresses.size == balances.size &&
@@ -63,8 +64,9 @@ object CommonGeneratorsApi {
           .lazyZip(balances)
           .lazyZip(blsPks)
           .lazyZip(txIds)
-          .collect { case ((_, Some(address), balance, _), txnId) => // TODO: address=None ?
-            GeneratorEntry(address, balance, txnId)
+          .lazyZip(Iterator.from(0).take(addressIds.size).map(GeneratorIndex(_)).to(Iterable))
+          .collect { case ((_, Some(address), balance, _), txnId, idx) => // TODO: address=None ?
+            GeneratorEntry(address, balance, txnId, conflict.heightOf(idx))
           }
           .toSeq
       else {
@@ -74,5 +76,5 @@ object CommonGeneratorsApi {
     }
   }
 
-  case class GeneratorEntry(address: Address, balance: Long, commitTxnId: TransactionId)
+  case class GeneratorEntry(address: Address, balance: Long, commitTxnId: TransactionId, conflictHeight: Option[Height])
 }

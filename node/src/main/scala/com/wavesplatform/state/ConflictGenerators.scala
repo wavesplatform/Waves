@@ -13,13 +13,12 @@ case class ConflictGenerators private (private val heights: Vector[Height], priv
       s"height $h must increase, last height: ${heights.last}"
     )
     if (idxs.isEmpty) this
-    else appendAllUnsafe(h, idxs)
+    else
+      copy(
+        heights = heights :+ h,
+        generators = generators :+ idxs
+      )
   }
-
-  private def appendAllUnsafe(h: Height, idxs: Seq[GeneratorIndex]): ConflictGenerators = copy(
-    heights = heights :+ h,
-    generators = generators :+ idxs
-  )
 
   def size: Int        = generators.foldLeft(0)(_ + _.size)
   def isEmpty: Boolean = generators.isEmpty

@@ -1,11 +1,9 @@
 package com.wavesplatform.finalization
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2
-import com.wavesplatform.crypto.bls.BlsKeyPair
-import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.mining.{Miner, MinerImpl}
@@ -19,12 +17,11 @@ import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.execution.schedulers.TestScheduler
 import monix.reactive.Observable
-import org.scalatest.EitherValues
 import org.scalatest.time.SpanSugar.convertLongToGrainOfTime
 
 import scala.util.Using
 
-class MinerWithFinalitySuite extends FreeSpec with WithDomain with TestSchedulerOps with EitherValues {
+class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
   private val seed         = ByteStr("finality-test".getBytes())
   private val thisNodeAcc  = Wallet.generateNewAccount(seed.arr, nonce = 0)
   private val otherNodeAcc = TxHelpers.defaultSigner
@@ -103,10 +100,73 @@ class MinerWithFinalitySuite extends FreeSpec with WithDomain with TestScheduler
       "all have no required balance" ignore {}
     }
 
-    "was conflict in previous epoch" ignore {}
+    "was conflict in previous epoch" in Using.Manager { manager =>
+      val minerScheduler    = TestScheduler()
+      val appenderScheduler = TestScheduler()
+
+      val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+      manager.acquire(channels)(using _.close())
+
+      var miner: Miner = Miner.Disabled
+      withDomain(
+        defaultSettings,
+        AddrWithBalance.enoughBalances(otherNodeAcc) ++ Seq(
+          AddrWithBalance(
+            thisNodeAcc.toAddress,
+            MinimalEffectiveBalanceForGenerator2 + TestValues.commitToGenerationFee + CommitToGenerationTransaction.DepositInWavelets
+          )
+        ),
+        miner = x => miner.scheduleMining(x)
+      ) { d =>
+        d.wallet.generateNewAccounts(1).map(_.toAddress)
+
+        val minerImpl = new MinerImpl(
+          channels,
+          d.blockchain,
+          d.settings,
+          d.testTime,
+          d.utxPool,
+          BlockEndorser.Disabled,
+          EndorsementStorage.Disabled,
+          d.wallet,
+          d.posSelector,
+          minerScheduler,
+          appenderScheduler,
+          Observable.empty
+        ) with CatchLogs
+        miner = minerImpl
+
+        log.debug("Append block2 with commitments")
+        val txs                   = Seq(otherNodeAcc, thisNodeAcc).map(x => TxHelpers.commitToGeneration(Height(3), sender = x))
+        val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = otherNodeAcc, strictTime = true)
+        d.appender.appendBlock(block2WithCommitments)
+
+        log.debug("Append block3 with conflict")
+        val block3WithVotes = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = otherNodeAcc,
+          strictTime = true,
+          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(thisNodeAcc, GeneratorIndex(1), block2WithCommitments)))
+        )
+        d.appender.appendBlock(block3WithVotes)
+
+        log.debug("Append empty block")
+        d.appender.appendBlock(d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = otherNodeAcc, strictTime = true))
+        val block5Id = d.blockchain.lastBlockId.value
+
+        log.debug("Trigger thisNode forging")
+        val nextBlockIn = (d.nextBlockTime(thisNodeAcc) - d.testTime.getTimestamp()).millis
+        d.testTime.advance(nextBlockIn)
+        appenderScheduler.tickNext("appender-1")
+        minerScheduler.tickNext("miner-1")
+        appenderScheduler.tickNext("appender-2")
+
+        d.blockchain.lastBlockId.value should not be block5Id
+      }
+    }.get
   }
 
-  // TODO: Move to conflict
   "Mining doesn't work if conflict" in Using.Manager { manager =>
     val minerScheduler    = TestScheduler()
     val appenderScheduler = TestScheduler()
@@ -149,25 +209,12 @@ class MinerWithFinalitySuite extends FreeSpec with WithDomain with TestScheduler
       d.appender.appendBlock(block2WithCommitments)
 
       log.debug("Append block3 with conflict")
-      val otherFinalizedBlockId = TxHelpers.randomBlockId
       val block3WithVotes = d.createBlock(
         version = Block.ProtoBlockVersion,
         txs = Nil,
         generator = otherNodeAcc,
         strictTime = true,
-        finalizationVoting = Some(
-          FinalizationVoting(
-            conflict = Vector(
-              BlockEndorsement.signed(
-                BlsKeyPair(thisNodeAcc.privateKey),
-                GeneratorIndex(1),
-                otherFinalizedBlockId,
-                finalizedHeight = GenesisBlockHeight,
-                endorsedId = block2WithCommitments.id()
-              )
-            )
-          )
-        )
+        finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(thisNodeAcc, GeneratorIndex(1), block2WithCommitments)))
       )
       d.appender.appendBlock(block3WithVotes)
 

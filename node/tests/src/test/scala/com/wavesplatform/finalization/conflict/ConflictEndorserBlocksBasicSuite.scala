@@ -2,7 +2,7 @@ package com.wavesplatform.finalization.conflict
 
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.Address
-import com.wavesplatform.block.{Block, FinalizationVoting}
+import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
@@ -188,11 +188,7 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
         txs = Nil,
         generator = validGenerator,
         strictTime = true,
-        finalizationVoting = Some(
-          FinalizationVoting(
-            conflict = Vector(mkConflictEndorsement(conflictGenerator, GeneratorIndex(1), block2WithCommitments))
-          )
-        )
+        finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(conflictGenerator, GeneratorIndex(1), block2WithCommitments)))
       )
       d.appender.appendBlock(block3WithVotes)
       after3WithNewEpochAndEndorsementsCheck(data)

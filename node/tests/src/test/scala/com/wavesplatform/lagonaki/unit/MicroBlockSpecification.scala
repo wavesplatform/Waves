@@ -10,9 +10,9 @@ import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.protobuf.block.{PBFinalizationVotings, PBMicroBlocks, SignedMicroBlock}
-import com.wavesplatform.protobuf.transaction.{PBTransactions, PBSignedTransaction}
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBUtils
-import com.wavesplatform.state.{GeneratorIndex, Height}
+import com.wavesplatform.state.{GeneratorIndex, GenesisBlockHeight, Height}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -126,13 +126,14 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
     val finalizationVoting = FinalizationVoting(
       valid = Seq(GeneratorIndex(1), GeneratorIndex(2), GeneratorIndex(3)),
+      finalizedHeight = GenesisBlockHeight,
       aggregatedEndorsement = aggregatedSig,
       conflict = IndexedSeq(conflictEndorsement)
     )
 
     val serialized = PBUtils.encodeDeterministic(PBFinalizationVotings.protobuf(finalizationVoting))
     val goFinalizationVotingBase64 =
-      "CgMBAgMaYIMo5F9oE9mJs6Kk/oAmO84HcXie+UmvhLWI0Muqnw3yCi5yekgkQgvH7A/AvPsAIhZneJFnHEX1/KZP9TxYFIxmbX5hcCECeRuKVXscQ1EZLvM+Hr13LHuuL1dly8W+iyLrAQgBEkBpxb4/AhKzhetm0OirYRJGCyY8B3xEfe5k8p5MnRx3OP7JzJFk/gUjXZ4pbUbVtuKfNhmGchlmxT3RNQEZ0YCAGLlgIkDVwvFq3zo0CKVUNrgbDbDy+ROY88ZTY/KfNW7693dcDyhYxOKyXOAEl1eT2pZyBB7k/mAeXwKUnXx7+pUTFOeDKmBGvXB/FKFQiVKk6CpaNmqoerGF2G/U8xmGKYdXA67G3dyA2VqjRKtIJa27xHSsSKFvtch7FrMyokkDABL8a6bH8nYej4RjrxGA5Qd2Gb+PVYZo/Fq/GTZ1PAh6r9EY59M="
+      "CgMBAgMQARpggyjkX2gT2YmzoqT+gCY7zgdxeJ75Sa+EtYjQy6qfDfIKLnJ6SCRCC8fsD8C8+wAiFmd4kWccRfX8pk/1PFgUjGZtfmFwIQJ5G4pVexxDURku8z4evXcse64vV2XLxb6LIusBCAESQGnFvj8CErOF62bQ6KthEkYLJjwHfER97mTynkydHHc4/snMkWT+BSNdniltRtW24p82GYZyGWbFPdE1ARnRgIAYuWAiQNXC8WrfOjQIpVQ2uBsNsPL5E5jzxlNj8p81bvr3d1wPKFjE4rJc4ASXV5PalnIEHuT+YB5fApSdfHv6lRMU54MqYEa9cH8UoVCJUqToKlo2aqh6sYXYb9TzGYYph1cDrsbd3IDZWqNEq0glrbvEdKxIoW+1yHsWszKiSQMAEvxrpsfydh6PhGOvEYDlB3YZv49Vhmj8Wr8ZNnU8CHqv0Rjn0w=="
     Base64.encode(serialized) shouldBe goFinalizationVotingBase64
   }
 
@@ -159,6 +160,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
     val finalizationVoting = FinalizationVoting(
       valid = Seq(GeneratorIndex(1), GeneratorIndex(2), GeneratorIndex(3)),
+      finalizedHeight = GenesisBlockHeight,
       aggregatedEndorsement = aggregatedSig,
       conflict = IndexedSeq(conflictEndorsement)
     )
@@ -183,7 +185,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
     val serializedWithoutSignature = Base64.encode(microBlock.bytesWithoutSignature())
     val goSerializedWithoutSignature =
-      "BWnFvj8CErOF62bQ6KthEkYLJjwHfER97mTynkydHHc4/snMkWT+BSNdniltRtW24p82GYZyGWbFPdE1ARnRgICQgaVdHK4QxQyEYihza6fh1tiQTYDXp9blQTt7S97AiU5A38jSKWoMXr4Q/80NLX0tqB7bHpBBMSzTM5ac6MKPAAAAowAAAAEAAACbClcIVBIg7FlNNgjs8B4KV3mLFwdyeS2xRTKEN3fgrPVEXywc8wQaBBCgjQYgydOsyLgtKAHCBiEKFgoUflp9MfPSElPDgt8e0bJfEbpsP6wSBxCA7oO7rwESQEz8sQx7qThcCFVSdgGm5Dk0VKETkPcJXXJYxnt70rxfsarlD7D4gHB5yTXdDzfndnHAyXH7NwZfzy8YR/CizgbElKnkSNWP6a/gfVPTrZ62oVuqwNg37tT6xi6ELp94YgoDAQIDGmCDKORfaBPZibOipP6AJjvOB3F4nvlJr4S1iNDLqp8N8goucnpIJEILx+wPwLz7ACIWZ3iRZxxF9fymT/U8WBSMZm1+YXAhAnkbilV7HENRGS7zPh69dyx7ri9XZcvFvosi6wEIARJAacW+PwISs4XrZtDoq2ESRgsmPAd8RH3uZPKeTJ0cdzj+ycyRZP4FI12eKW1G1bbinzYZhnIZZsU90TUBGdGAgBi5YCJA1cLxat86NAilVDa4Gw2w8vkTmPPGU2PynzVu+vd3XA8oWMTislzgBJdXk9qWcgQe5P5gHl8ClJ18e/qVExTngypgRr1wfxShUIlSpOgqWjZqqHqxhdhv1PMZhimHVwOuxt3cgNlao0SrSCWtu8R0rEihb7XIexazMqJJAwAS/Gumx/J2Ho+EY68RgOUHdhm/j1WGaPxavxk2dTwIeq/RGOfT"
+      "BWnFvj8CErOF62bQ6KthEkYLJjwHfER97mTynkydHHc4/snMkWT+BSNdniltRtW24p82GYZyGWbFPdE1ARnRgICQgaVdHK4QxQyEYihza6fh1tiQTYDXp9blQTt7S97AiU5A38jSKWoMXr4Q/80NLX0tqB7bHpBBMSzTM5ac6MKPAAAAowAAAAEAAACbClcIVBIg7FlNNgjs8B4KV3mLFwdyeS2xRTKEN3fgrPVEXywc8wQaBBCgjQYgydOsyLgtKAHCBiEKFgoUflp9MfPSElPDgt8e0bJfEbpsP6wSBxCA7oO7rwESQEz8sQx7qThcCFVSdgGm5Dk0VKETkPcJXXJYxnt70rxfsarlD7D4gHB5yTXdDzfndnHAyXH7NwZfzy8YR/CizgbElKnkSNWP6a/gfVPTrZ62oVuqwNg37tT6xi6ELp94YgoDAQIDEAEaYIMo5F9oE9mJs6Kk/oAmO84HcXie+UmvhLWI0Muqnw3yCi5yekgkQgvH7A/AvPsAIhZneJFnHEX1/KZP9TxYFIxmbX5hcCECeRuKVXscQ1EZLvM+Hr13LHuuL1dly8W+iyLrAQgBEkBpxb4/AhKzhetm0OirYRJGCyY8B3xEfe5k8p5MnRx3OP7JzJFk/gUjXZ4pbUbVtuKfNhmGchlmxT3RNQEZ0YCAGLlgIkDVwvFq3zo0CKVUNrgbDbDy+ROY88ZTY/KfNW7693dcDyhYxOKyXOAEl1eT2pZyBB7k/mAeXwKUnXx7+pUTFOeDKmBGvXB/FKFQiVKk6CpaNmqoerGF2G/U8xmGKYdXA67G3dyA2VqjRKtIJa27xHSsSKFvtch7FrMyokkDABL8a6bH8nYej4RjrxGA5Qd2Gb+PVYZo/Fq/GTZ1PAh6r9EY59M="
 
     serializedWithoutSignature shouldBe goSerializedWithoutSignature
   }

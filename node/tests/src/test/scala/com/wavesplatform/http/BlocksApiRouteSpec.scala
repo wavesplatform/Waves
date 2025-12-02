@@ -79,11 +79,13 @@ class BlocksApiRouteSpec
       "VRF"          -> finalizedBlock.id().toString,
       "finalizationVoting" -> Json.obj(
         "endorserIndexes" -> Seq(1, 0),
+        "finalizedHeight" -> 1,
         "aggregatedEndorsementSignature" -> "M4MkhxYz8oNM4n9E9pcmarkUZ3TS1zvYqdRm8X5jh1ZoPqirwXPp5poiC7u34QrWpqrr7zWGTWDETEiNG4srsh2eEJtuJXU5FKvx4h855vKTMiDNqf2V5bL5HpZmypcXdz",
         "conflictEndorsements" -> Seq(
           Json.obj(
             "endorserIndex"    -> 0,
             "finalizedBlockId" -> testBlock2.id(),
+            "finalizedHeight"  -> 1,
             "signature" -> "h7iWQv6yGbjh8ZHTJeEYAiVx75us2zr6gFrXG3AUP28bngSit3ndAecRPEo57pi2egihEz1Xv1RTuURjX8kikP4HTcnoc3w9Veru8PF9AqduiRRkgK3yABf9ae8YxeE4Gy"
           )
         )
@@ -103,6 +105,7 @@ class BlocksApiRouteSpec
           FinalizationVoting(
             valid = GeneratorIndex.unsafeSeq(Seq(1, 0)),
             aggregatedEndorsement = BlsSignature.NonEmpty(Array.fill[Byte](BlsSignature.SizeInBytes)(1)),
+            finalizedHeight = Height(1),
             conflict = Vector(
               BlockEndorsement(
                 endorserIndex = GeneratorIndex(0),

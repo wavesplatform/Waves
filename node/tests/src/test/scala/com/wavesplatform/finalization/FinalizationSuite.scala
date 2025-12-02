@@ -3,7 +3,6 @@ package com.wavesplatform.finalization
 import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
-import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
@@ -15,7 +14,7 @@ import com.wavesplatform.wallet.Wallet
 import org.scalactic.source.Position
 
 // TODO: move to valid
-class FinalizationSuite extends FreeSpec with WithDomain {
+class FinalizationSuite extends BaseFinalizationSpec {
   private val seed          = ByteStr("finality-test".getBytes())
   private val thisNodeAcc   = Wallet.generateNewAccount(seed.arr, nonce = 0)
   private val otherNode1Acc = TxHelpers.signer(0)
@@ -65,6 +64,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           finalizationVoting = Some(
             FinalizationVoting(
               valid = Seq(GeneratorIndex(1)),
+              finalizedHeight = GenesisBlockHeight,
               aggregatedEndorsement = aggSig,
               conflict = Vector.empty
             )
@@ -172,6 +172,7 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           finalizationVoting = Some(
             FinalizationVoting(
               valid = Seq(GeneratorIndex(2)),
+              finalizedHeight = GenesisBlockHeight,
               aggregatedEndorsement = aggSig,
               conflict = Vector.empty
             )
@@ -261,7 +262,8 @@ class FinalizationSuite extends FreeSpec with WithDomain {
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
-      val endorsedBlockId = block3.id()
+      val endorsedBlock   = block3
+      val endorsedBlockId = endorsedBlock.id()
 
       log.debug(s"Append block 4 with conflict vote")
       val aggSig = Seq(otherNode2Acc).foldLeft(BlsSignature.Empty: BlsSignature) { case (r, kp) =>
@@ -273,7 +275,6 @@ class FinalizationSuite extends FreeSpec with WithDomain {
         )
         r.append(sig)
       }
-      val otherFinalizedBlockId = TxHelpers.randomBlockId
       d.appender.appendBlock(
         d.createBlock(
           version = Block.ProtoBlockVersion,
@@ -283,16 +284,9 @@ class FinalizationSuite extends FreeSpec with WithDomain {
           finalizationVoting = Some(
             FinalizationVoting(
               valid = Seq(GeneratorIndex(1)),
+              finalizedHeight = GenesisBlockHeight,
               aggregatedEndorsement = aggSig,
-              conflict = Vector(
-                BlockEndorsement.signed(
-                  BlsKeyPair(otherNode1Acc.privateKey),
-                  GeneratorIndex(0),
-                  otherFinalizedBlockId,
-                  finalizedHeight = GenesisBlockHeight,
-                  endorsedId = endorsedBlockId
-                )
-              )
+              conflict = Vector(mkConflictEndorsement(otherNode1Acc, GeneratorIndex(0), endorsedBlock))
             )
           )
         )
