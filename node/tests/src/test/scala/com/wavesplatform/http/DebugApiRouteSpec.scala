@@ -9,6 +9,7 @@ import com.wavesplatform.api.http.{DebugApiRoute, RouteTimeout}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{V4, V5, V6}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -173,11 +174,12 @@ class DebugApiRouteSpec
           domain.appendBlock()
         }
 
-        val lastButOneHeight        = domain.blockchain.height - 1
-        val lastButOneHeader        = domain.blockchain.blockHeader(lastButOneHeight.toInt).value
-        val lastButOneStateHash     = domain.rocksDBWriter.loadStateHash(Height(lastButOneHeight)).value
-        val lastButOneStateHashJson = Json.toJson(lastButOneStateHash).as[JsObject]
-        def field(name: String)     = (lastButOneStateHashJson \ name).as[String]
+        val lastButOneHeight               = domain.blockchain.height - 1
+        val lastButOneHeader               = domain.blockchain.blockHeader(lastButOneHeight.toInt).value
+        val lastButOneStateHash            = domain.rocksDBWriter.loadStateHash(Height(lastButOneHeight)).value
+        val deterministicFinalityActivated = domain.blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality, lastButOneHeight)
+        val lastButOneStateHashJson        = StateHash.toJson(lastButOneStateHash, deterministicFinalityActivated)
+        def field(name: String)            = (lastButOneStateHashJson \ name).as[String]
 
         val expectedResponse = Json.obj(
           "stateHash"         -> field("stateHash"),

@@ -136,7 +136,7 @@ class StateHashSpec extends FreeSpec {
     }
 
     "total" in {
-      val allHashes = SectionId.values.toSeq.map(id => result.hashes(id))
+      val allHashes = StateHash.sections(true).map(id => result.hashes(id))
       allHashes shouldBe Seq(
         WavesBalance,
         AssetBalance,
@@ -151,8 +151,8 @@ class StateHashSpec extends FreeSpec {
       ).map(sect)
 
       val testPrevHash = sect(SectionId.Alias)
-      result.createStateHash(testPrevHash).totalHash shouldBe hash((testPrevHash.arr +: allHashes.map(_.arr))*)
-      result.copy(hashes = result.hashes - SectionId.WavesBalance).createStateHash(ByteStr.empty).totalHash shouldBe hash(
+      result.createStateHash(testPrevHash, true).totalHash shouldBe hash((testPrevHash.arr +: allHashes.map(_.arr))*)
+      result.copy(hashes = result.hashes - SectionId.WavesBalance).createStateHash(ByteStr.empty, true).totalHash shouldBe hash(
         (StateHashBuilder.EmptySectionHash.arr +: allHashes.tail.map(_.arr))*
       )
     }
