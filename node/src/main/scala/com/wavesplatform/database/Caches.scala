@@ -442,7 +442,6 @@ abstract class Caches extends Blockchain, Storage {
     for ((assetId, sponsorship) <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
     for ((alias, address) <- snapshot.aliases) stateHash.addAlias(address, alias.name)
     snapshot.nextCommittedGenerators.foreach(stateHash.addNextCommittedGenerator)
-    println(s"Caches.append: generatorBalances: ${generatorBalances.mkString("\n", "\n, ", "\n")}") // TODO: remove
     stateHash.addCommittedGeneratorBalances(generatorBalances.map(_._3))
 
     doAppend(
