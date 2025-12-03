@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonGeneratorsApi.GeneratorEntry
 import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database.{AddressId, DBExt, Keys, RDB}
-import com.wavesplatform.state.{Blockchain, GeneratorIndex, Height, NG, TransactionId}
+import com.wavesplatform.state.{Blockchain, ConflictGenerators, GeneratorIndex, Height, NG, TransactionId}
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.mutable
@@ -18,18 +18,19 @@ object CommonGeneratorsApi {
   def apply(rdb: RDB, blockchain: Blockchain & NG): CommonGeneratorsApi = new CommonGeneratorsApi with ScorexLogging {
     private val approxGenerators = blockchain.settings.functionalitySettings.maxEndorsements // Rough buffer size
 
+    /** @note Doesn't work correctly for future heights
+      */
     override def generators(at: Height): Seq[GeneratorEntry] = blockchain.generationPeriodOf(at).fold(Nil) { period =>
-      val (addressIds, addresses, blsPks, txIds, balances) = rdb.db.readOnly { ro =>
-        // TODO: Use Blockchain for this? NG.committed?
-        //  Technically this works, because generators committed on a previous period
-        val generatorsKey       = Keys.committedGenerators(period, at)
-        val generatorsKeyPrefix = generatorsKey.keyBytes.dropRight(Ints.BYTES) // Drop height
+      val (addressIds, addresses, blsPks, txIds, balances, conflict) = rdb.db.readOnly { ro =>
+        // This works even with NG, because generators committed on a previous period
+        val committedKey       = Keys.committedGenerators(period, at)
+        val committedKeyPrefix = committedKey.keyBytes.dropRight(Ints.BYTES) // Drop height
 
         val addressIds = new mutable.ArrayBuffer[AddressId](approxGenerators)
         val blsPks     = new mutable.ArrayBuffer[BlsPublicKey](approxGenerators)
         val txnIds     = new mutable.ArrayBuffer[TransactionId](approxGenerators)
-        ro.iterateOver(generatorsKeyPrefix) { dbEntry =>
-          generatorsKey
+        ro.iterateOver(committedKeyPrefix) { dbEntry =>
+          committedKey
             .parse(dbEntry.getValue)
             .getOrElse(Seq.empty)
             .foreach { (addressId, blsPk) =>
@@ -47,12 +48,31 @@ object CommonGeneratorsApi {
         val addresses = ro.multiGet(addressIds.map(Keys.idToAddress), Address.AddressLength)
         val balances =
           if (at.toInt == blockchain.height) blockchain.currentGeneratorBalances().map { case (_, b) => b }
-          else ro.get(Keys.generatorBalances(at, rdb.apiHandle)).getOrElse(Seq.empty)
+          else ro.get(Keys.generatorBalances(at, rdb.apiHandle)).getOrElse(Seq.empty) // TODO: fill with None if disabled
 
-        (addressIds, addresses, blsPks, txnIds, balances)
+        val conflictKey       = Keys.conflictGenerators(period, at)
+        val conflictKeyPrefix = conflictKey.keyBytes.dropRight(Ints.BYTES) // Drop height
+
+        val conflict =
+          if (at == Height(blockchain.height)) blockchain.conflictGenerators(period)
+          else {
+            var conflict = ConflictGenerators.empty
+            ro.iterateOverWithSeek(conflictKeyPrefix, conflictKeyPrefix) { dbEntry =>
+              val hBytes = dbEntry.getKey.takeRight(Ints.BYTES) // Take height
+              val h      = Height(Ints.fromByteArray(hBytes))
+              if (h > at) false
+              else {
+                val idxs = conflictKey.parse(dbEntry.getValue)
+                conflict = conflict.appendAll(h, idxs*)
+                true
+              }
+            }
+            conflict
+          }
+
+        (addressIds, addresses, blsPks, txnIds, balances, conflict)
       }
 
-      val conflict = blockchain.conflictGenerators(period)
       if (
         addressIds.size == addresses.size &&
         addresses.size == balances.size &&

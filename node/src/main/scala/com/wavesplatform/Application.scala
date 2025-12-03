@@ -435,7 +435,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           extensionContext.accountsApi,
           settings.dbSettings.maxRollbackDepth
         ),
-        GeneratorsApiRoute(settings.restAPISettings, extensionContext.generatorsApi, time, routeTimeout),
+        GeneratorsApiRoute(settings.restAPISettings, blockchainUpdater, extensionContext.generatorsApi, time, routeTimeout),
         DebugApiRoute(
           settings,
           time,
