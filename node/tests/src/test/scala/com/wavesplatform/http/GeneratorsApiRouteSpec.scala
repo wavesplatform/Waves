@@ -14,6 +14,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 import com.wavesplatform.utils.SharedSchedulerMixin
 import com.wavesplatform.wallet.Wallet
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 import play.api.libs.json.*
 
 import scala.concurrent.duration.*
@@ -41,6 +42,7 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
   private val route = seal(
     GeneratorsApiRoute(
       restAPISettings,
+      domain.blockchain,
       api,
       domain.testTime,
       new RouteTimeout(60.seconds)(using sharedScheduler)
@@ -55,12 +57,34 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
 
     domain.appender.appendBlock(block2)
     domain.appendBlock()
+
+    log.debug("Before epoch")
     Get(routePath(s"/at/${domain.blockchain.height}")) ~> route ~> check {
       responseAs[JsValue] shouldBe Json.arr()
     }
 
+    domain.appender.appendBlock(domain.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+
+    log.debug("Before conflict endorsement")
+    val expectedBeforeConflictHeight = Json.arr(
+      Json.obj(
+        "address"       -> generator1.toAddress.toString,
+        "balance"       -> (initBalance - depositAndFee),
+        "transactionId" -> txns.head.id().toString
+      ),
+      Json.obj(
+        "address"       -> generator2.toAddress.toString,
+        "balance"       -> (initBalance - depositAndFee),
+        "transactionId" -> txns.last.id().toString
+      )
+    )
+    Get(routePath(s"/at/${domain.blockchain.height}")) ~> route ~> check {
+      responseAs[JsValue] shouldBe expectedBeforeConflictHeight
+    }
+
+    log.debug("At conflict endorsement")
     val otherFinalizedBlockId = TxHelpers.randomBlockId
-    val block4 = domain.createBlock(
+    val block5 = domain.createBlock(
       Block.PlainBlockVersion,
       txs = Nil,
       strictTime = true,
@@ -82,23 +106,49 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
         )
       )
     )
-    domain.appender.appendBlock(block4)
-    domain.appender.appendBlock(domain.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
-
-    Get(routePath(s"/at/${domain.blockchain.height}")) ~> route ~> check {
-      responseAs[JsValue] shouldBe Json.arr(
-        Json.obj(
-          "address"       -> generator1.toAddress.toString,
-          "balance"       -> (initBalance - depositAndFee),
-          "transactionId" -> txns.head.id().toString
-        ),
-        Json.obj(
-          "address"        -> generator2.toAddress.toString,
-          "balance"        -> (initBalance - depositAndFee),
-          "transactionId"  -> txns.last.id().toString,
-          "conflictHeight" -> 4
-        )
+    domain.appender.appendBlock(block5)
+    val conflictEndorsementHeight = domain.blockchain.height
+    val expectedOnConflictHeight = Json.arr(
+      Json.obj(
+        "address"       -> generator1.toAddress.toString,
+        "balance"       -> (initBalance - depositAndFee),
+        "transactionId" -> txns.head.id().toString
+      ),
+      Json.obj(
+        "address"        -> generator2.toAddress.toString,
+        "balance"        -> (initBalance - depositAndFee),
+        "transactionId"  -> txns.last.id().toString,
+        "conflictHeight" -> conflictEndorsementHeight
       )
+    )
+    Get(routePath(s"/at/${domain.blockchain.height}")) ~> route ~> check {
+      responseAs[JsValue] shouldBe expectedOnConflictHeight
+    }
+
+    log.debug("Request at future height")
+    Get(routePath(s"/at/${domain.blockchain.height + 1}")) ~> route ~> check {
+      status shouldBe StatusCodes.NotFound
+    }
+
+    log.debug("After conflict endorsement")
+    domain.appender.appendBlock(domain.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+    Get(routePath(s"/at/${domain.blockchain.height}")) ~> route ~> check {
+      responseAs[JsValue] shouldBe expectedOnConflictHeight
+    }
+
+    log.debug("After conflict endorsement, request before endorsement height")
+    Get(routePath(s"/at/${conflictEndorsementHeight - 1}")) ~> route ~> check {
+      responseAs[JsValue] shouldBe expectedBeforeConflictHeight
+    }
+
+    log.debug("After conflict endorsement, request at endorsement height")
+    Get(routePath(s"/at/$conflictEndorsementHeight")) ~> route ~> check {
+      responseAs[JsValue] shouldBe expectedOnConflictHeight
+    }
+
+    log.debug("After conflict endorsement, request at future height")
+    Get(routePath(s"/at/${domain.blockchain.height + 1}")) ~> route ~> check {
+      status shouldBe StatusCodes.NotFound
     }
   }
 }
