@@ -126,9 +126,25 @@ class DebugApiRouteStateHashSpec
           Range.inclusive(0, blocksToAdd).foreach(_ => domain.appendBlock())
         }
 
-        val transferTx = TxHelpers.transfer(richAccount, TxHelpers.defaultSigner.toAddress, 1_000.waves)
-        val commitTx   = TxHelpers.commitToGeneration(generationPeriodStart = Height(8), sender = TxHelpers.defaultSigner)
-        domain.appendBlock(transferTx, commitTx)
+        val secondGenerator = TxHelpers.signer(906)
+        val thirdGenerator  = TxHelpers.signer(907)
+
+        val transferTxDefault = TxHelpers.transfer(richAccount, TxHelpers.defaultSigner.toAddress, 1_000.waves)
+        val transferTxSecond  = TxHelpers.transfer(richAccount, secondGenerator.toAddress, 1_001.waves)
+        val transferTxThird   = TxHelpers.transfer(richAccount, thirdGenerator.toAddress, 1_002.waves)
+
+        val commitTxDefault = TxHelpers.commitToGeneration(generationPeriodStart = Height(8), sender = TxHelpers.defaultSigner)
+        val commitTxSecond  = TxHelpers.commitToGeneration(generationPeriodStart = Height(8), sender = secondGenerator)
+        val commitTxThird   = TxHelpers.commitToGeneration(generationPeriodStart = Height(8), sender = thirdGenerator)
+
+        domain.appendBlock(
+          transferTxDefault,
+          transferTxSecond,
+          transferTxThird,
+          commitTxDefault,
+          commitTxSecond,
+          commitTxThird
+        )
         domain.appendBlock()
 
         // Assert after DeterministicFinality feature activation
@@ -137,8 +153,8 @@ class DebugApiRouteStateHashSpec
 
         val afterFinalityHeader = domain.blockchain.blockHeader(afterFinalityHeight).value
         val expectedResponseAfter = Json.obj(
-          "stateHash"                      -> "30d75a837c49cb3a3f88ffe0e8ded219ab8ab357344634302fe85298d38a9c56",
-          "wavesBalanceHash"               -> "f9b41de484eb180d9b77d2ff88db971bfba7bf19a99857f26c7f5171a43628f4",
+          "stateHash"                      -> "3510239200f1052df4ba4d475f730ba7d0994317e86f711ecf856d7d8e768f90",
+          "wavesBalanceHash"               -> "87064c16ed748aee07d591e1abd6d03078ebaafc6ef3cdfe24eaf190f6433326",
           "assetBalanceHash"               -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "dataEntryHash"                  -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "accountScriptHash"              -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
@@ -147,9 +163,9 @@ class DebugApiRouteStateHashSpec
           "leaseStatusHash"                -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "sponsorshipHash"                -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "aliasHash"                      -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "nextCommittedGeneratorsHash"    -> "ea94d09632089883a35a7d51ab712c0fade50a16272d6a89f243e37a4f006c17",
+          "nextCommittedGeneratorsHash"    -> "c67c7a5ceb06065b963b0eab3110c264a0af7aabed859b06f1c1359bc029ee72",
           "committedGeneratorBalancesHash" -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "snapshotHash"                   -> "FvSRsH9nGSK2eT3dGsN5Cz2xAhK1WZQvnCF2PqHXj2tv",
+          "snapshotHash"                   -> "7vb6RK1Yajua8XuLzTYnkLHfRxy7rYa1YJQgGM74PFCM",
           "blockId"                        -> afterFinalityHeader.id().toString,
           "baseTarget"                     -> afterFinalityHeader.header.baseTarget,
           "height"                         -> afterFinalityHeight,
@@ -165,11 +181,36 @@ class DebugApiRouteStateHashSpec
           status shouldBe StatusCodes.OK
           responseAs[JsObject] shouldBe expectedResponseAfter
         }
-      }
 
-      "at nonexistent height" in {
-        Get(routePath(s"/stateHash/${domain.blockchain.height}")) ~> route ~> check {
-          status shouldBe StatusCodes.NotFound
+        // Fast-forward to generation period change
+        domain.appendBlock()
+
+        val heightOnGenerationPeriod = domain.blockchain.height - 1
+        val headerOnGenerationPeriod = domain.blockchain.blockHeader(heightOnGenerationPeriod).value
+
+        val expectedResponseAfter2 = Json.obj(
+          "stateHash"                      -> "99a076718d2f2fa39e12c6635c427bdf3d80baf924cd815f6a9ebcc555338bd2",
+          "wavesBalanceHash"               -> "c4c01e5f091290c8f068e80b24797d2ec763ec46dfb804cc63991788abc94525",
+          "assetBalanceHash"               -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "dataEntryHash"                  -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "accountScriptHash"              -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "assetScriptHash"                -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "leaseBalanceHash"               -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "leaseStatusHash"                -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "sponsorshipHash"                -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "aliasHash"                      -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "nextCommittedGeneratorsHash"    -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+          "committedGeneratorBalancesHash" -> "19ea4a516c66775ea1f648d71f6b8fa227e8b0c1a0c9203f82c33b89c4e759b5",
+          "snapshotHash"                   -> "HYnC3XFMcKWDWHs8conQSUJe49jk6XVWD34MfizzS6Tq",
+          "blockId"                        -> headerOnGenerationPeriod.id().toString,
+          "baseTarget"                     -> headerOnGenerationPeriod.header.baseTarget,
+          "height"                         -> heightOnGenerationPeriod,
+          "version"                        -> Version.VersionString
+        )
+
+        Get(routePath(s"/stateHash/last")) ~> route ~> check {
+          status shouldBe StatusCodes.OK
+          responseAs[JsObject] shouldBe expectedResponseAfter2
         }
       }
     }
