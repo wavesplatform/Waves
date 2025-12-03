@@ -2,10 +2,9 @@ package com.wavesplatform.state
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.common.state.ByteStr
 
 case class AssetDescription(
-    originTransactionId: ByteStr,
+    originTransactionId: TransactionId,
     issuer: PublicKey,
     name: ByteString,
     description: ByteString,

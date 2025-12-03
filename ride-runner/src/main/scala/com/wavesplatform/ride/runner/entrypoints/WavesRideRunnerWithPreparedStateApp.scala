@@ -64,7 +64,7 @@ object WavesRideRunnerWithPreparedStateApp {
           r.updated(x)
         }
         .tapEval { x => Task { if (args.printTotal) args.printMode.printTotal(x, args.colorizer) } }
-        .runSyncUnsafe()(global, CanBlock.permit)
+        .runSyncUnsafe()(using global, CanBlock.permit)
 
       junitReport.writeReport()
       System.exit(stats.appStatus)

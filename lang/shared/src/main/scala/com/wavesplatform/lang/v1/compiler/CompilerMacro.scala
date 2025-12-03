@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.v1.compiler
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 
 object CompilerMacro {
   def unwrapFold(index: Int, limit: Int, list: EXPR, acc: EXPR, func: FunctionHeader): EXPR = {
@@ -11,7 +11,7 @@ object CompilerMacro {
     def call(id: Short, args: List[EXPR])        = FUNCTION_CALL(Native(id), args)
     def callUser(name: String, args: List[EXPR]) = FUNCTION_CALL(User(name), args)
 
-    val funcName = s"$$f${index}_1"
+    val funcName     = s"$$f${index}_1"
     val lastFuncName = s"$$f${index}_2"
 
     def step(last: Boolean) = FUNC(

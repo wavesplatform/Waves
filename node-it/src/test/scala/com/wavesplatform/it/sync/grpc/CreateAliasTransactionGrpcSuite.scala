@@ -3,12 +3,12 @@ package com.wavesplatform.it.sync.grpc
 import scala.util.{Random, Try}
 
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
-import com.wavesplatform.it.api.SyncGrpcApi._
+import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.{aliasTxSupportedVersions, minFee, transferAmount}
 import com.wavesplatform.protobuf.transaction.{PBRecipients, Recipient}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import io.grpc.Status.Code
 import org.scalatest.prop.TableDrivenPropertyChecks
 

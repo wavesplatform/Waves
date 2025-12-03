@@ -2,18 +2,18 @@ package com.wavesplatform.events
 
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.RDB
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.state.{Blockchain, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, Height, StateSnapshot}
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.grpc.netty.NettyServerBuilder
-import io.grpc.protobuf.services.ProtoReflectionService
+import io.grpc.protobuf.services.ProtoReflectionServiceV1
 import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
-import net.ceedubs.ficus.Ficus.*
+import org.rocksdb.RocksDB
+import pureconfig.ConfigSource
 
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
@@ -22,26 +22,24 @@ import scala.concurrent.duration.*
 import scala.util.Try
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
-  private[this] implicit val scheduler: SchedulerService = Schedulers.fixedPool(
-    sys.runtime.availableProcessors(),
+  private val settings = ConfigSource.fromConfig(context.settings.config).at("waves.blockchain-updates").loadOrThrow[BlockchainUpdatesSettings]
+  private implicit val scheduler: SchedulerService = Schedulers.fixedPool(
+    settings.workerThreads,
     "blockchain-updates",
     UncaughtExceptionReporter(err => log.error("Uncaught exception in BlockchainUpdates scheduler", err)),
     ExecutionModel.Default,
-    rejectedExecutionHandler = new akka.dispatch.SaneRejectedExecutionHandler
+    rejectedExecutionHandler = new org.apache.pekko.dispatch.SaneRejectedExecutionHandler
   )
+  private val rdb  = RocksDB.open(context.settings.directory + "/blockchain-updates")
+  private val repo = new Repo(rdb, context.blocksApi)
 
-  private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
-  // todo: no need to open column families here
-  private[this] val rdb  = RDB.open(context.settings.dbSettings.copy(directory = context.settings.directory + "/blockchain-updates"))
-  private[this] val repo = new Repo(rdb.db, context.blocksApi)
-
-  private[this] val grpcServer: Server = NettyServerBuilder
+  private val grpcServer: Server = NettyServerBuilder
     .forAddress(new InetSocketAddress("0.0.0.0", settings.grpcPort))
     .permitKeepAliveTime(settings.minKeepAlive.toNanos, TimeUnit.NANOSECONDS)
     .addStreamTracerFactory((fullMethodName: String, headers: Metadata) =>
       new ServerStreamTracer {
-        private[this] var callInfo = Option.empty[ServerStreamTracer.ServerCallInfo[?, ?]]
-        private[this] def callId   = callInfo.fold("???")(ci => Integer.toHexString(System.identityHashCode(ci)))
+        private var callInfo = Option.empty[ServerStreamTracer.ServerCallInfo[?, ?]]
+        private def callId   = callInfo.fold("???")(ci => Integer.toHexString(System.identityHashCode(ci)))
 
         override def serverCallStarted(callInfo: ServerStreamTracer.ServerCallInfo[?, ?]): Unit = {
           this.callInfo = Some(callInfo)
@@ -53,7 +51,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       }
     )
     .addService(BlockchainUpdatesApiGrpc.bindService(repo, scheduler))
-    .addService(ProtoReflectionService.newInstance())
+    .addService(ProtoReflectionServiceV1.newInstance())
     .build()
 
   override def start(): Unit = {
@@ -67,10 +65,10 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
     if (extensionHeight > nodeHeight) {
       log.info(s"Rolling back from $extensionHeight to node height $nodeHeight")
-      repo.rollbackData(nodeHeight)
+      repo.rollbackData(Height(nodeHeight))
     }
 
-    val lastUpdateId = Try(ByteStr(repo.getBlockUpdate(nodeHeight).getUpdate.id.toByteArray)).toOption
+    val lastUpdateId = Try(ByteStr(repo.getBlockUpdate(Height(nodeHeight)).getUpdate.id.toByteArray)).toOption
     val lastBlockId  = context.blockchain.blockHeader(nodeHeight).map(_.id())
 
     if (lastUpdateId != lastBlockId)
@@ -91,7 +89,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       scheduler.awaitTermination(10 seconds)
       repo.shutdown()
       rdb.close()
-    }(Scheduler.global)
+    }(using Scheduler.global)
 
   override def onProcessBlock(
       block: Block,

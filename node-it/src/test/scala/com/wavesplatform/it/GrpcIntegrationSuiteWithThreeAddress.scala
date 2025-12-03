@@ -2,17 +2,17 @@ package com.wavesplatform.it
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncGrpcApi._
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils.ScorexLogging
-import org.scalatest._
+import org.scalatest.*
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
 trait GrpcIntegrationSuiteWithThreeAddress extends BaseSuite with ScalaFutures with IntegrationPatience with RecoverMethods with ScorexLogging {
-  this: TestSuite with Nodes =>
+  this: TestSuite & Nodes =>
 
   protected lazy val firstAcc: KeyPair  = KeyPair("first_acc".getBytes("UTF-8"))
   protected lazy val secondAcc: KeyPair = KeyPair("second_acc".getBytes("UTF-8"))

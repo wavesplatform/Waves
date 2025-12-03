@@ -6,7 +6,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
-import play.api.libs.functional.syntax._
+import play.api.libs.functional.syntax.*
 import play.api.libs.json.{JsPath, Reads}
 
 object SignedSetAssetScriptRequest {
@@ -18,7 +18,7 @@ object SignedSetAssetScriptRequest {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "proofs").read[Proofs]
-  )(SignedSetAssetScriptRequest.apply _)
+  )(SignedSetAssetScriptRequest.apply)
 }
 
 case class SignedSetAssetScriptRequest(

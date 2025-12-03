@@ -3,7 +3,7 @@ package com.wavesplatform.events
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeRequest}

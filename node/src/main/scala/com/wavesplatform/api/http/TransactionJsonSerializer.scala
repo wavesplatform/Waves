@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.{JsonSerializer, SerializerProvider}
 import com.wavesplatform.account.{Address, AddressOrAlias}
-import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
+import com.wavesplatform.api.common.TransactionMeta
 import com.wavesplatform.api.http.StreamSerializerUtils.*
 import com.wavesplatform.api.http.TransactionJsonSerializer.*
 import com.wavesplatform.api.http.TransactionsApiRoute.{ApplicationStatus, LeaseStatus, TxMetaEnriched}
@@ -12,12 +12,33 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING, CaseObj, EVALUATED, EXPR, FAIL, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{
+  ARR,
+  CONST_BOOLEAN,
+  CONST_BYTESTR,
+  CONST_LONG,
+  CONST_STRING,
+  CaseObj,
+  EVALUATED,
+  EXPR,
+  FAIL,
+  FUNCTION_CALL
+}
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.PBAmounts
-import com.wavesplatform.state.InvokeScriptResult.{AttachedPayment, Burn, Call, ErrorMessage, Invocation, Issue, Lease, LeaseCancel, Reissue, SponsorFee}
-import com.wavesplatform.state.LeaseDetails
-import com.wavesplatform.state.{Blockchain, DataEntry, InvokeScriptResult, TxMeta}
+import com.wavesplatform.state.InvokeScriptResult.{
+  AttachedPayment,
+  Burn,
+  Call,
+  ErrorMessage,
+  Invocation,
+  Issue,
+  Lease,
+  LeaseCancel,
+  Reissue,
+  SponsorFee
+}
+import com.wavesplatform.state.{Height, TransactionId, Blockchain, DataEntry, InvokeScriptResult, LeaseDetails, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -29,10 +50,10 @@ import com.wavesplatform.utils.EthEncoding
 import play.api.libs.json.*
 import play.api.libs.json.JsonConfiguration.Aux
 
-final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
+final case class TransactionJsonSerializer(blockchain: Blockchain) {
 
   val assetSerializer: JsonSerializer[Asset] =
-    (value: Asset, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (value: Asset, gen: JsonGenerator, _) => {
       value match {
         case Waves           => gen.writeNull()
         case IssuedAsset(id) => gen.writeString(id.toString)
@@ -116,21 +137,21 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
   }
 
   val leaseStatusSerializer: JsonSerializer[LeaseStatus] =
-    (status: LeaseStatus, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (status: LeaseStatus, gen: JsonGenerator, _) => {
       if (status == LeaseStatus.active) gen.writeString("active") else gen.writeString("canceled")
     }
 
   def leaseRefSerializer(numbersAsString: Boolean): JsonSerializer[LeaseRef] =
-    (l: LeaseRef, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (l: LeaseRef, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeStringField("id", l.id.toString)
       l.originTransactionId.fold(gen.writeNullField("originTransactionId"))(txId => gen.writeStringField("originTransactionId", txId.toString))
       l.sender.fold(gen.writeNullField("sender"))(sender => gen.writeStringField("sender", sender.toString))
       l.recipient.fold(gen.writeNullField("recipient"))(recipient => gen.writeStringField("recipient", recipient.toString))
       l.amount.fold(gen.writeNullField("amount"))(amount => gen.writeNumberField("amount", amount, numbersAsString))
-      l.height.fold(gen.writeNullField("height"))(height => gen.writeNumberField("height", height, numbersAsString))
+      l.height.fold(gen.writeNullField("height"))(height => gen.writeNumberField("height", height.toInt, numbersAsString))
       gen.writeStringField("status", if (l.status == LeaseStatus.active) "active" else "canceled")
-      l.cancelHeight.fold(gen.writeNullField("cancelHeight"))(ch => gen.writeNumberField("cancelHeight", ch, numbersAsString))
+      l.cancelHeight.fold(gen.writeNullField("cancelHeight"))(ch => gen.writeNumberField("cancelHeight", ch.toInt, numbersAsString))
       l.cancelTransactionId.fold(gen.writeNullField("cancelTransactionId"))(cti => gen.writeStringField("cancelTransactionId", cti.toString))
       gen.writeEndObject()
     }
@@ -171,7 +192,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
     }
 
   def issueSerializer(numbersAsString: Boolean): JsonSerializer[Issue] =
-    (issue: Issue, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (issue: Issue, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeStringField("assetId", issue.id.toString)
       issue.compiledScript.foreach(sc => gen.writeStringField("compiledScript", sc.toString))
@@ -185,7 +206,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
     }
 
   def reissueSerializer(numbersAsString: Boolean): JsonSerializer[Reissue] =
-    (r: Reissue, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (r: Reissue, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeStringField("assetId", r.assetId.toString)
       gen.writeBooleanField("isReissuable", r.isReissuable)
@@ -194,7 +215,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
     }
 
   def burnSerializer(numbersAsString: Boolean): JsonSerializer[Burn] =
-    (b: Burn, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (b: Burn, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeStringField("assetId", b.assetId.toString)
       gen.writeNumberField("quantity", b.quantity, numbersAsString)
@@ -202,7 +223,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
     }
 
   def sponsorFeeSerializer(numbersAsString: Boolean): JsonSerializer[SponsorFee] =
-    (s: SponsorFee, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (s: SponsorFee, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeStringField("assetId", s.assetId.toString)
       s.minSponsoredAssetFee.foreach(fee => gen.writeNumberField("minSponsoredAssetFee", fee, numbersAsString))
@@ -222,13 +243,13 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
       gen.writeStartObject()
       gen.writeStringField("dApp", inv.dApp.toString)
       gen.writeValueField("call")(callSerializer(numbersAsString).serialize(inv.call, _, serializers))
-      gen.writeArrayField("payments", inv.payments)(attachedPaymentSerializer(numbersAsString), serializers)
+      gen.writeArrayField("payment", inv.payments)(attachedPaymentSerializer(numbersAsString), serializers)
       gen.writeValueField("stateChanges")(invokeScriptResultSerializer(numbersAsString).serialize(inv.stateChanges, _, serializers))
       gen.writeEndObject()
     }
 
   val errorMessageSerializer: JsonSerializer[ErrorMessage] =
-    (err: ErrorMessage, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (err: ErrorMessage, gen: JsonGenerator, _) => {
       gen.writeStartObject()
       gen.writeNumberField("code", err.code, false)
       gen.writeStringField("text", err.text)
@@ -251,7 +272,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
       gen.writeEndObject()
     }
 
-  def txMetaJsonSerializer(address: Address, isBlockV5: Int => Boolean, numbersAsString: Boolean): JsonSerializer[TxMetaEnriched] =
+  def txMetaJsonSerializer(address: Address, isBlockV5: Height => Boolean, numbersAsString: Boolean): JsonSerializer[TxMetaEnriched] =
     (txMeta: TxMetaEnriched, gen: JsonGenerator, serializers: SerializerProvider) => {
       txMeta.meta match {
         case TransactionMeta.Invoke(height, tx: InvokeScriptTransaction, status, spentComplexity, invokeScriptResult) =>
@@ -259,7 +280,10 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
           gen.writeNumberField("type", tx.tpe.id, numbersAsString)
           gen.writeStringField("id", tx.id().toString)
           gen.writeNumberField("fee", tx.assetFee._2, numbersAsString)
-          tx.assetFee._1.maybeBase58Repr.foreach(gen.writeStringField("feeAssetId", _))
+          tx.feeAssetId match {
+            case IssuedAsset(id) => gen.writeStringField("feeAssetId", id.toString)
+            case Asset.Waves     => gen.writeNullField("feeAssetId")
+          }
           gen.writeNumberField("timestamp", tx.timestamp, numbersAsString)
           gen.writeNumberField("version", tx.version, numbersAsString)
           if (PBSince.affects(tx)) gen.writeNumberField("chainId", tx.chainId, numbersAsString)
@@ -286,9 +310,10 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
           val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
 
           gen.writeStartObject()
+          gen.writeNumberField("type", tx.tpe.id, numbersAsString)
           gen.writeStringField("id", tx.id().toString)
           gen.writeNumberField("fee", tx.assetFee._2, numbersAsString)
-          tx.assetFee._1.maybeBase58Repr.foreach(gen.writeStringField("feeAssetId", _))
+          gen.writeStringField("feeAssetId", null)
           gen.writeNumberField("timestamp", tx.timestamp, numbersAsString)
           gen.writeNumberField("version", 1, numbersAsString)
           gen.writeNumberField("chainId", tx.chainId, numbersAsString)
@@ -303,6 +328,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
               None
           appStatus.foreach(s => gen.writeStringField("applicationStatus", s))
           gen.writeNumberField("spentComplexity", spentComplexity, numbersAsString)
+          gen.writeObjectFieldStart("payload")
           gen.writeStringField("type", "invocation")
           gen.writeStringField("dApp", Address(EthEncoding.toBytes(tx.underlying.getTo)).toString)
           functionCallEi.fold(gen.writeNullField("call"))(fc =>
@@ -313,7 +339,8 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
             gen.writeValueField("stateChanges")(invokeScriptResultSerializer(numbersAsString).serialize(isr, _, serializers))
           )
           gen.writeEndObject()
-        case meta @ TransactionMeta.Default(height, mtt: MassTransferTransaction, succeeded, spentComplexity) if mtt.sender.toAddress != address =>
+          gen.writeEndObject()
+        case meta @ TransactionMeta.Default(_, mtt: MassTransferTransaction, _, _) if mtt.sender.toAddress != address =>
           /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer transaction
             * only.
             */
@@ -438,16 +465,16 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
   def metaJson(m: TxMeta): JsObject =
     TransactionJsonSerializer.applicationStatus(isBlockV5(m.height), m.status) ++ Json.obj("spentComplexity" -> m.spentComplexity)
 
-  private[this] def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
+  private def isBlockV5(height: Height): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height.toInt)
 
   // Extended lease format. Overrides default
-  private[this] def leaseIdToLeaseRef(
+  private def leaseIdToLeaseRef(
       leaseId: ByteStr,
       recipientParamOpt: Option[AddressOrAlias] = None,
       amountOpt: Option[Long] = None
   ): LeaseRef = {
     val detailsOpt           = blockchain.leaseDetails(leaseId)
-    val txMetaOpt            = detailsOpt.flatMap(d => blockchain.transactionMeta(d.sourceId))
+    val txMetaOpt            = detailsOpt.flatMap(d => blockchain.transactionMeta(d.sourceId.byteStr))
     val recipientOpt         = recipientParamOpt.orElse(detailsOpt.map(_.recipientAddress))
     val resolvedRecipientOpt = recipientOpt.flatMap(r => blockchain.resolveAlias(r).toOption)
 
@@ -507,19 +534,19 @@ object TransactionJsonSerializer {
       case TxMeta.Status.Elided    => ApplicationStatus.Elided
     }
 
-  def height(height: Int): JsObject =
-    Json.obj("height" -> height)
+  def height(height: Height): JsObject =
+    Json.obj("height" -> height.toInt)
 
   final case class LeaseRef(
       id: ByteStr,
-      originTransactionId: Option[ByteStr],
+      originTransactionId: Option[TransactionId],
       sender: Option[Address],
       recipient: Option[Address],
       amount: Option[Long],
-      height: Option[Int],
+      height: Option[Height],
       status: LeaseStatus,
-      cancelHeight: Option[Int],
-      cancelTransactionId: Option[ByteStr]
+      cancelHeight: Option[Height],
+      cancelTransactionId: Option[TransactionId]
   )
 
   object LeaseRef {

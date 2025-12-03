@@ -1,0 +1,73 @@
+package com.wavesplatform.state
+
+import com.wavesplatform.account.Address
+import com.wavesplatform.crypto.bls.BlsPublicKey
+import com.wavesplatform.transaction.BlockchainUpdater
+
+class ForwardingBlockchainUpdaterImpl(delegate: CompleteBlockchainUpdater) extends Blockchain with BlockchainUpdater with NG {
+  export delegate.{
+    settings,
+    height,
+    finalizedHeight,
+    finalizedHeightAt,
+    score,
+    blockHeader,
+    hitSource,
+    carryFee,
+    heightOf,
+    approvedFeatures,
+    activatedFeatures,
+    featureVotes,
+    blockReward,
+    blockRewardVotes,
+    wavesAmount,
+    transferById,
+    transactionInfo,
+    transactionInfos,
+    transactionMeta,
+    transactionSnapshot,
+    containsTransaction,
+    assetDescription,
+    resolveAlias,
+    leaseDetails,
+    filledVolumeAndFee,
+    balanceAtHeight,
+    balanceSnapshots,
+    accountScript,
+    hasAccountScript,
+    assetScript,
+    accountData,
+    hasData,
+    leaseBalance,
+    leaseBalances,
+    balance,
+    balances,
+    wavesBalances,
+    effectiveBalanceBanHeights,
+    resolveERC20Address,
+    lastStateHash,
+    processBlock,
+    processMicroBlock,
+    computeNextReward,
+    removeAfter,
+    lastBlockInfo,
+    isLastBlockId,
+    referencedBlockchain,
+    shutdown,
+    microBlock,
+    bestLastBlockInfo,
+    microblockIds,
+    liquidBlock,
+    liquidBlockSnapshot,
+    microBlockSnapshot,
+    liquidTransactions,
+    liquidBlockMeta,
+    bestLiquidSnapshot,
+    bestLiquidSnapshotAndFees,
+    snapshotBlockchain,
+    currentGeneratorBalances,
+    conflictGenerators
+  }
+
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = delegate.committedGenerators(at)
+}

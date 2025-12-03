@@ -13,6 +13,7 @@ import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import org.influxdb.dto.Point
+import pureconfig.*
 
 object Metrics extends ScorexLogging {
   case class InfluxDbSettings(
@@ -32,15 +33,15 @@ object Metrics extends ScorexLogging {
       collectResponsivenessMetrics: Boolean,
       createResponsivenessCsv: Boolean,
       responsivenessMetricsRetentionPolicy: String
-  )
+  ) derives ConfigReader
 
-  private[this] implicit val scheduler: SchedulerService = Schedulers.singleThread("metrics")
+  private implicit val scheduler: SchedulerService = Schedulers.singleThread("metrics")
 
-  private[this] var settings: Settings   = _
-  private[this] var time: Time           = _
-  private[this] var db: Option[InfluxDB] = None
+  private var settings: Settings   = compiletime.uninitialized
+  private var time: Time           = compiletime.uninitialized
+  private var db: Option[InfluxDB] = None
 
-  private[this] def currentTimestamp: Long =
+  private def currentTimestamp: Long =
     if (time == null) System.currentTimeMillis()
     else time.getTimestamp()
 
@@ -57,8 +58,8 @@ object Metrics extends ScorexLogging {
         try {
           db.write(
             b
-            // Should be a tag, but tags are the strings now
-            // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
+              // Should be a tag, but tags are the strings now
+              // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
               .addField("node", settings.nodeId)
               .tag("node", settings.nodeId.toString)
               .time(ts, TimeUnit.MILLISECONDS)
@@ -78,7 +79,7 @@ object Metrics extends ScorexLogging {
     settings = config
     time = thatTime
     if (settings.enable) {
-      import config.{influxDb => dbSettings}
+      import config.{influxDb as dbSettings}
 
       log.info(s"Precise metrics are enabled and will be sent to ${dbSettings.uri}/${dbSettings.db}")
       try {

@@ -2,14 +2,13 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidDecimals, InvalidName, NonPositiveAmount}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.IssueTransactionInfo
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.TxVersion
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.{JsNull, JsString, JsValue, Json}
 
@@ -82,7 +81,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         "version"         -> version,
         "timestamp"       -> System.currentTimeMillis(),
         "proofs"          -> Json.arr(),
-        "script"          -> scriptOpt.fold[JsValue](JsNull)(JsString)
+        "script"          -> scriptOpt.fold[JsValue](JsNull)(JsString.apply)
       )
     )
 
@@ -108,7 +107,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       ("base64:AA==", "Illegal length of script: 1"),
       ("base64:AAQB", "Invalid content type of script: 4"),
       ("base64:AAEF", "Invalid checksum"),
-      ("base64:CQEF", "Invalid version of script: 9")
+      ("base64:CgEF", "Invalid version of script: 10")
     )
 
   forAll(invalidScript) { (script: String, error: String) =>
@@ -117,7 +116,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         val json = {
           val tx = IssueTransaction
             .selfSigned(
-              TxVersion.V1,
+              v,
               firstKeyPair,
               "1234",
               "",

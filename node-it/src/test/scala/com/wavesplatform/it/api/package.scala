@@ -1,31 +1,29 @@
 package com.wavesplatform.it
 
-import java.nio.charset.StandardCharsets
-
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.state._
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.{Paged, ScorexLogging}
 import org.asynchttpclient.Response
-import play.api.libs.functional.syntax._
+import play.api.libs.functional.syntax.*
 import play.api.libs.json.Json.parse
-import play.api.libs.json.{JsError, JsString, JsSuccess, Reads, _}
+import play.api.libs.json.*
 
+import java.nio.charset.StandardCharsets
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 package object api {
   implicit class ResponseFutureExt(f: Future[Response]) extends ScorexLogging {
-    import cats.instances.either._
-    import cats.instances.list._
-    import cats.syntax.alternative._
-    import cats.syntax.either._
+    import cats.instances.either.*
+    import cats.instances.list.*
+    import cats.syntax.alternative.*
+    import cats.syntax.either.*
     def as[A: Reads](implicit ec: ExecutionContext): Future[A] =
       f.map { r =>
         val json = r.getResponseBody(StandardCharsets.UTF_8)
         Try(parse(json).as[A]).fold(err => throw new RuntimeException(s"Json parse failed: $json", err), identity)
-      }(ec)
+      }(using ec)
 
     def as[A: Reads](numberAsString: Boolean = false)(implicit ec: ExecutionContext): Future[A] = {
       def convert(jsv: JsValue): Either[RuntimeException, JsValue] = {
@@ -78,15 +76,14 @@ package object api {
         }
       }
       f.map { r =>
-          val value  = parse(r.getResponseBody(StandardCharsets.UTF_8))
-          val result = if (numberAsString) convert(value) else value.asRight
-          result.left.foreach(err => log.error(s"Error converting ${Json.prettyPrint(value)}", err))
-          result
-        }
-        .flatMap {
-          case Right(value) => Future(value.as[A])
-          case Left(err)    => Future.failed(err)
-        }
+        val value  = parse(r.getResponseBody(StandardCharsets.UTF_8))
+        val result = if (numberAsString) convert(value) else value.asRight
+        result.left.foreach(err => log.error(s"Error converting ${Json.prettyPrint(value)}", err))
+        result
+      }.flatMap {
+        case Right(value) => Future(value.as[A])
+        case Left(err)    => Future.failed(err)
+      }
     }
   }
 
@@ -100,9 +97,8 @@ package object api {
 
   implicit val dstMapReads: Reads[Map[com.wavesplatform.account.Address, Long]] = Reads { json =>
     json.validate[Map[String, Long]].map { dst =>
-      dst.map {
-        case (addrStr, balance) =>
-          com.wavesplatform.account.Address.fromString(addrStr).explicitGet() -> balance
+      dst.map { case (addrStr, balance) =>
+        com.wavesplatform.account.Address.fromString(addrStr).explicitGet() -> balance
       }
     }
   }
@@ -113,20 +109,10 @@ package object api {
     }
   }
 
-  implicit val distributionReads: Reads[AssetDistribution] = Reads { json =>
-    json
-      .validate[Map[com.wavesplatform.account.Address, Long]]
-      .map(dst => AssetDistribution(dst))
-  }
-
   implicit def pagedReads[C: Reads, R: Reads]: Reads[Paged[C, R]] =
     (
       (JsPath \ "hasNext").read[Boolean] and
         (JsPath \ "lastItem").readNullable[C] and
         (JsPath \ "items").read[R]
-    )(Paged.apply[C, R] _)
-
-  implicit val distributionPageReads: Reads[AssetDistributionPage] = Reads { json =>
-    json.validate[Paged[com.wavesplatform.account.Address, AssetDistribution]].map(pg => AssetDistributionPage(pg))
-  }
+    )(Paged.apply[C, R])
 }

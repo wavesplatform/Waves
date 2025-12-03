@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.wallet.Wallet

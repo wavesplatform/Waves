@@ -2,14 +2,14 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{Proofs, TxPositiveAmount}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -50,7 +50,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       """.stripMargin
 
       val (contractBalance, contractEffBalance) = sender.accountBalances(contract.toAddress.toString)
-      val script                                = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+      val script                                = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
       val setScriptId                           = sender.setScript(contract, Some(script), setScriptFee, version = v).id
 
       nodes.waitForHeightAriseAndTxPresent(setScriptId)

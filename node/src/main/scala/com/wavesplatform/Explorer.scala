@@ -1,24 +1,24 @@
 package com.wavesplatform
 
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
-import com.google.common.primitives.Longs
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.api.common.{AddressPortfolio, CommonAccountsApi}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.database.*
 import com.wavesplatform.database.protobuf.StaticAssetInfo
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
-import com.wavesplatform.state.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, Height, Portfolio, StateSnapshot, TransactionId}
+import com.wavesplatform.state.{Blockchain, Height, Portfolio, SnapshotBlockchain, StateSnapshot, TransactionId, StateHash}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.{ExecutionModel, Scheduler}
-import org.rocksdb.RocksDB
-import play.api.libs.json.Json
+import org.rocksdb.{ReadOptions, RocksDB}
 
 import java.io.File
 import java.nio.ByteBuffer
@@ -29,7 +29,7 @@ import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.jdk.CollectionConverters.*
-import scala.util.Using
+import scala.util.{Try, Using}
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
@@ -39,7 +39,8 @@ object Explorer extends ScorexLogging {
     Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
-      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, StateSnapshot.empty, _ => true).flatten.to(VectorMap))
+      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, StateSnapshot.empty, _ => true).flatten.to(VectorMap)),
+      blockchain.generationDeposit(address)
     )
 
   def main(argsRaw: Array[String]): Unit = {
@@ -69,16 +70,16 @@ object Explorer extends ScorexLogging {
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
     val rdb    = RDB.open(settings.dbSettings)
-    val reader = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
+    val reader = RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
     try {
-      def loadBalanceHistory(curBalanceKey: Key[CurrentBalance], balanceNodeKey: Height => Key[BalanceNode]): Seq[(Int, Long)] = rdb.db.readOnly {
+      def loadBalanceHistory(curBalanceKey: Key[CurrentBalance], balanceNodeKey: Height => Key[BalanceNode]): Seq[(Height, Long)] = rdb.db.readOnly {
         db =>
           @tailrec
-          def getPrevBalances(height: Height, acc: Seq[(Int, Long)]): Seq[(Int, Long)] = {
-            if (height > 0) {
+          def getPrevBalances(height: Height, acc: Seq[(Height, Long)]): Seq[(Height, Long)] = {
+            if (height > Height(0)) {
               val balance = rdb.db.get(balanceNodeKey(height))
               getPrevBalances(balance.prevHeight, (height, balance.balance) +: acc)
             } else acc
@@ -94,19 +95,27 @@ object Explorer extends ScorexLogging {
 
       flag match {
         case "WB" =>
-          val balances = mutable.Map[BigInt, Long]()
-          rdb.db.iterateOver(KeyTags.WavesBalance) { e =>
-            val addressId = BigInt(e.getKey.drop(6))
-            val balance   = Longs.fromByteArray(e.getValue)
-            balances += (addressId -> balance)
+          var accountsBaseTotalBalance = 0L
+          var wavesBalanceRecords      = 0
+          rdb.db.iterateOver(KeyTag.WavesBalance) { e =>
+            val addressId = AddressId(Longs.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+            val key       = Keys.wavesBalance(addressId)
+            accountsBaseTotalBalance += key.parse(e.getValue).balance
+            wavesBalanceRecords += 1
           }
 
           var actualTotalReward = 0L
-          rdb.db.iterateOver(KeyTags.BlockReward) { e =>
-            actualTotalReward += Longs.fromByteArray(e.getValue)
+          var blocksRecords     = 0
+          rdb.db.iterateOver(KeyTag.BlockInfoAtHeight) { e =>
+            val height = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+            val key    = Keys.blockMetaAt(height)
+            actualTotalReward += key.parse(e.getValue).fold(0L)(_.reward)
+            blocksRecords += 1
           }
 
-          val actualTotalBalance   = balances.values.sum + reader.carryFee(None)
+          log.info(s"Found $wavesBalanceRecords waves balance records and $blocksRecords block records")
+
+          val actualTotalBalance   = accountsBaseTotalBalance + reader.carryFee(None)
           val expectedTotalBalance = Constants.UnitsInWave * Constants.TotalWaves + actualTotalReward
           val byKeyTotalBalance    = reader.wavesAmount(blockchainHeight)
 
@@ -120,7 +129,7 @@ object Explorer extends ScorexLogging {
 
         case "DA" =>
           val addressIds = mutable.Seq[(BigInt, Address)]()
-          rdb.db.iterateOver(KeyTags.AddressId) { e =>
+          rdb.db.iterateOver(KeyTag.AddressId) { e =>
             val address   = Address.fromBytes(e.getKey.drop(2))
             val addressId = BigInt(e.getValue)
             addressIds :+ (addressId -> address)
@@ -146,10 +155,10 @@ object Explorer extends ScorexLogging {
           } else log.error("No block ID was provided")
 
         case "O" =>
-          def loadVfHistory(orderId: ByteStr): Seq[(Int, Long, Long)] = {
+          def loadVfHistory(orderId: ByteStr): Seq[(Height, Long, Long)] = {
             @tailrec
-            def getPrevVfs(height: Height, acc: Seq[(Int, Long, Long)]): Seq[(Int, Long, Long)] = {
-              if (height > 0) {
+            def getPrevVfs(height: Height, acc: Seq[(Height, Long, Long)]): Seq[(Height, Long, Long)] = {
+              if (height > Height(0)) {
                 val vf = rdb.db.get(Keys.filledVolumeAndFeeAt(orderId, height))
                 getPrevVfs(vf.prevHeight, (height, vf.volume, vf.fee) +: acc)
               } else acc
@@ -192,7 +201,7 @@ object Explorer extends ScorexLogging {
         case "AD" =>
           val result = new util.HashMap[Address, java.lang.Integer]()
 
-          rdb.db.iterateOver(KeyTags.IdToAddress) { e =>
+          rdb.db.iterateOver(KeyTag.IdToAddress) { e =>
             result.compute(
               Address.fromBytes(e.getValue).explicitGet(),
               (_, prev) =>
@@ -223,7 +232,9 @@ object Explorer extends ScorexLogging {
 
           val result = new util.HashMap[Short, Stats]
           Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txSnapshotHandle.handle, rdb.txMetaHandle.handle).foreach { cf =>
-            Using(rdb.db.newIterator(cf)) { iterator =>
+            Using.Manager { use =>
+              val ro       = use(new ReadOptions().setTotalOrderSeek(true).setVerifyChecksums(false))
+              val iterator = use(rdb.db.newIterator(cf, ro))
               iterator.seekToFirst()
 
               while (iterator.isValid) {
@@ -245,7 +256,9 @@ object Explorer extends ScorexLogging {
 
           log.info("key-space,entry-count,total-key-size,total-value-size")
           for ((prefix, stats) <- result.asScala) {
-            log.info(s"${KeyTags(prefix)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
+            log.info(
+              s"${Try(KeyTag.fromOrdinal(prefix)).getOrElse(prefix.toString)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}"
+            )
           }
 
         case "TXBH" =>
@@ -266,7 +279,7 @@ object Explorer extends ScorexLogging {
         case "OC" =>
           log.info("Counting orders")
           var counter = 0L
-          rdb.db.iterateOver(KeyTags.FilledVolumeAndFeeHistory) { _ =>
+          rdb.db.iterateOver(KeyTag.FilledVolumeAndFeeHistory) { _ =>
             counter += 1
           }
           log.info(s"Found $counter orders")
@@ -276,7 +289,7 @@ object Explorer extends ScorexLogging {
           val addressCount = rdb.db.get(Keys.lastAddressId).get.toInt
           log.info(s"Processing $addressCount addresses")
           val txCounts = new Array[Int](addressCount + 1)
-          rdb.db.iterateOver(KeyTags.AddressTransactionHeightTypeAndNums) { e =>
+          rdb.db.iterateOver(KeyTag.AddressTransactionHeightTypeAndNums) { e =>
             txCounts(Longs.fromByteArray(e.getKey.slice(2, 10)).toInt) += readTransactionHNSeqAndType(e.getValue)._2.size
           }
           log.info("Sorting result")
@@ -284,11 +297,11 @@ object Explorer extends ScorexLogging {
             log.info(s"${rdb.db.get(Keys.idToAddress(AddressId(id.toLong)))}: $count")
           }
         case "ES" =>
-          rdb.db.iterateOver(KeyTags.AddressScript) { e =>
+          rdb.db.iterateOver(KeyTag.AddressScript) { e =>
             val asi = readAccountScriptInfo(e.getValue)
             val estimationResult = asi.script match {
               case ContractScript.ContractScriptImpl(stdLibVersion, expr) =>
-                SetScriptTransactionDiff.estimate(reader, stdLibVersion, expr, checkOverflow = true)
+                SetScriptTransactionDiff.estimate(reader, stdLibVersion, expr)
               case script: ExprScript =>
                 DiffsCommon.countVerifierComplexity(Some(script), reader, isAsset = false)
               case _ => ???
@@ -305,7 +318,7 @@ object Explorer extends ScorexLogging {
           val PrefixLength = argument(1, "prefix").toInt
           var prevAssetId  = Array.emptyByteArray
           var assetCounter = 0
-          rdb.db.iterateOver(KeyTags.AssetStaticInfo) { e =>
+          rdb.db.iterateOver(KeyTag.AssetStaticInfo) { e =>
             assetCounter += 1
             val thisAssetId = StaticAssetInfo.parseFrom(e.getValue).id.toByteArray
             if (prevAssetId.nonEmpty) {
@@ -326,7 +339,7 @@ object Explorer extends ScorexLogging {
             CommonAccountsApi(() => SnapshotBlockchain(reader, StateSnapshot.empty), rdb, reader)
               .dataStream(Address.fromString("3PC9BfRwJWWiw9AREE2B3eWzCks3CYtg4yo").explicitGet(), None)
               .countL
-              .runToFuture(s)
+              .runToFuture(using s)
           }
 
           import scala.concurrent.ExecutionContext.Implicits.global
@@ -341,7 +354,7 @@ object Explorer extends ScorexLogging {
         case "DDD" =>
           log.info(s"Collecting addresses")
           var count = 0L
-          rdb.db.iterateOver(KeyTags.AddressId) { _ =>
+          rdb.db.iterateOver(KeyTag.AddressId) { _ =>
             count += 1
           }
           log.info(s"Found $count addresses")
@@ -349,25 +362,28 @@ object Explorer extends ScorexLogging {
           val bf = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 200_000_000L)
           log.info("Counting transactions")
           var count = 0L
-          rdb.db.iterateOver(KeyTags.TransactionMetaById, Some(rdb.txMetaHandle.handle)) { e =>
+          rdb.db.iterateOver(KeyTag.TransactionMetaById, Some(rdb.txMetaHandle.handle)) { e =>
             bf.put(e.getKey.drop(2))
             count += 1
           }
           log.info(s"Found $count transactions")
         case "SH" =>
-          val targetHeight = argument(1, "height").toInt
+          val targetHeight = Height(argument(1, "height").toInt)
           log.info(s"Loading state hash at $targetHeight")
+          val deterministicFinalityActivated = reader.isFeatureActivated(BlockchainFeatures.DeterministicFinality, targetHeight.toInt)
           rdb.db.get(Keys.stateHash(targetHeight)).foreach { sh =>
-            println(Json.toJson(sh).toString())
+            println(StateHash.toJson(sh, deterministicFinalityActivated).toString())
           }
         case "CTI" =>
           log.info("Counting transaction IDs")
           var counter = 0
-          Using(rdb.db.newIterator(rdb.txMetaHandle.handle)) { iter =>
+          Using.Manager { use =>
+            val ro   = use(new ReadOptions().setTotalOrderSeek(true).setVerifyChecksums(false))
+            val iter = use(rdb.db.newIterator(rdb.txMetaHandle.handle, ro))
             iter.seekToFirst()
-//            iter.seek(KeyTags.TransactionMetaById.prefixBytes)
-            log.info(iter.key().mkString(","))
-            while (iter.isValid && iter.key().startsWith(KeyTags.TransactionMetaById.prefixBytes)) {
+            // iter.seek(KeyTags.TransactionMetaById.prefixBytes) // Doesn't work, because of CappedPrefixExtractor(10)
+
+            while (iter.isValid && iter.key().startsWith(KeyTag.TransactionMetaById.prefixBytes)) {
               counter += 1
               iter.next()
             }
@@ -379,7 +395,96 @@ object Explorer extends ScorexLogging {
           log.info(s"Load meta for $id")
           val meta = rdb.db.get(Keys.transactionMetaById(TransactionId(ByteStr.decodeBase58(id).get), rdb.txMetaHandle))
           log.info(s"Meta: $meta")
+        case "DH" =>
+          val address         = Address.fromString(argument(1, "address")).explicitGet()
+          val key             = argument(2, "key")
+          val requestedHeight = Height(argument(3, "height").toInt)
+          log.info(s"Loading address ID for $address")
+          val addressId = rdb.db.get(Keys.addressId(address)).get
+          log.info(s"Collecting data history for key $key on $address ($addressId)")
+          val currentEntry = rdb.db.get(Keys.data(addressId, key))
+          log.info(s"Current entry: $currentEntry")
+          val problematicEntry = rdb.db.get(Keys.dataAt(addressId, key)(requestedHeight))
+          log.info(s"Entry at $requestedHeight: $problematicEntry")
+        case "DHC" =>
+          log.info("Looking for data entry history corruptions")
+          var thisAddressId = 0L
+          var prevHeight    = Height(0)
+          var key           = ""
+          var addressCount  = 0
+          rdb.db.iterateOver(KeyTag.DataHistory.prefixBytes, None) { e =>
+            val addressIdFromKey = Longs.fromByteArray(e.getKey.slice(2, 10))
+            val heightFromKey    = Height(Ints.fromByteArray(e.getKey.takeRight(4)))
+            val keyFromKey       = new String(e.getKey.drop(10).dropRight(4), "utf-8")
+            if (addressIdFromKey != thisAddressId) {
+              thisAddressId = addressIdFromKey
+              key = keyFromKey
+              addressCount += 1
+            } else if (key != keyFromKey) {
+              key = keyFromKey
+            } else {
+              val node = readDataNode(key)(e.getValue)
+              if (node.prevHeight != prevHeight) {
+                val address = rdb.db.get(Keys.idToAddress(AddressId(thisAddressId)))
+                log.warn(s"$address/$key@$heightFromKey: node.prevHeight=${node.prevHeight}, actual=$prevHeight")
+
+              }
+            }
+            prevHeight = heightFromKey
+          }
+          log.info(s"Checked $addressCount addresses")
+        case "ABHC" =>
+          log.info("Looking for asset balance history corruptions")
+          var thisAddressId = 0L
+          var prevHeight    = Height(0)
+          var key           = IssuedAsset(ByteStr(new Array[Byte](32)))
+          var addressCount  = 0
+          rdb.db.iterateOver(KeyTag.AssetBalanceHistory.prefixBytes, None) { e =>
+            val addressIdFromKey = Longs.fromByteArray(e.getKey.slice(34, 42))
+            val heightFromKey    = Height(Ints.fromByteArray(e.getKey.takeRight(4)))
+            val keyFromKey       = IssuedAsset(ByteStr(e.getKey.slice(2, 34)))
+            if (keyFromKey != key) {
+              thisAddressId = addressIdFromKey
+              key = keyFromKey
+              addressCount += 1
+            } else if (thisAddressId != addressIdFromKey) {
+              thisAddressId = addressIdFromKey
+            } else {
+              val node = readBalanceNode(e.getValue)
+              if (node.prevHeight != prevHeight) {
+                val address = rdb.db.get(Keys.idToAddress(AddressId(thisAddressId)))
+                log.warn(s"$key/$address@$heightFromKey: node.prevHeight=${node.prevHeight}, actual=$prevHeight")
+
+              }
+            }
+            prevHeight = heightFromKey
+          }
+          log.info(s"Checked $addressCount assets")
+        case "BHC" =>
+          log.info("Looking for balance history corruptions")
+          var thisAddressId = 0L
+          var prevHeight    = Height(0)
+          var addressCount  = 0
+          rdb.db.iterateOver(KeyTag.WavesBalanceHistory.prefixBytes, None) { e =>
+            val addressIdFromKey = Longs.fromByteArray(e.getKey.slice(2, 10))
+            val heightFromKey    = Height(Ints.fromByteArray(e.getKey.takeRight(4)))
+            if (addressIdFromKey != thisAddressId) {
+              thisAddressId = addressIdFromKey
+              addressCount += 1
+            } else {
+              val node = readBalanceNode(e.getValue)
+              if (node.prevHeight != prevHeight) {
+                val address = rdb.db.get(Keys.idToAddress(AddressId(thisAddressId)))
+                log.warn(s"$address@$heightFromKey: node.prevHeight=${node.prevHeight}, actual=$prevHeight")
+              }
+            }
+            prevHeight = heightFromKey
+          }
+          log.info(s"Checked $addressCount addresses")
       }
-    } finally rdb.close()
+    } finally {
+      reader.close()
+      rdb.close()
+    }
   }
 }

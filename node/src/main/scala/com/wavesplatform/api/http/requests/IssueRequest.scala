@@ -22,7 +22,7 @@ case class IssueRequest(
     timestamp: Option[Long],
     signature: Option[ByteStr],
     proofs: Option[Proofs]
-) extends TxBroadcastRequest {
+) extends TxBroadcastRequest[IssueTransaction] {
   def toTxFrom(sender: PublicKey): Either[ValidationError, IssueTransaction] = {
     val actualVersion = version.getOrElse(TxVersion.V3)
 

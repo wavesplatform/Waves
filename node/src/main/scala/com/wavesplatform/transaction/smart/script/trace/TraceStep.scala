@@ -91,7 +91,7 @@ case class InvokeScriptTrace(
       "id"          -> dAppAddressOrAlias.toString,
       "function"    -> functionCall.function.funcName,
       "args"        -> functionCall.args.map(_.toString),
-      "invocations" -> invocations.map(_.maybeLoggedJson(logged)(invokeResultWrites))
+      "invocations" -> invocations.map(_.maybeLoggedJson(logged)(using invokeResultWrites))
     ) ++ (resultE match {
       case Right(value) => TraceStep.maybeErrorJson(None) ++ Json.obj("result" -> TraceStep.scriptResultJson(invokeId, value))
       case Left(e)      => TraceStep.maybeErrorJson(Some(e))
@@ -112,13 +112,14 @@ object TraceStep {
   private def errorJson(e: ValidationError): JsObject = e match {
     case see: ScriptExecutionError          => Json.obj(logJson(see.log), "error" -> see.message)
     case tne: TransactionNotAllowedByScript => Json.obj(logJson(tne.log), "error" -> JsNull)
-    case fte: FailedTransactionError        => Json.obj(logJson(fte.log), "error" -> fte.error.map(JsString))
+    case fte: FailedTransactionError        => Json.obj(logJson(fte.log), "error" -> fte.error.map(JsString.apply))
     case a                                  => Json.obj("error" -> a.toString)
   }
 
   def logJson(l: Log[Id]): (String, JsValueWrapper) =
     "vars" -> l.collect {
-      case (k, Right(v)) if !LogKeys.TraceExcluded.exists(k.contains)   => Json.obj("name" -> k) ++ ScriptValuesJson.serializeValue(v, intAsString = false)
+      case (k, Right(v)) if !LogKeys.TraceExcluded.exists(k.contains) =>
+        Json.obj("name" -> k) ++ ScriptValuesJson.serializeValue(v, intAsString = false)
       case (k, Left(CommonError(_, Some(fte: FailedTransactionError)))) => Json.obj("name" -> k, "error" -> fte.error)
       case (k, Left(err))                                               => Json.obj("name" -> k, "error" -> err.message)
     }

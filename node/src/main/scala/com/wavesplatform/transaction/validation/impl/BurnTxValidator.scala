@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.validation.impl
 
-import cats.syntax.validated._
+import cats.syntax.validated.*
 import com.wavesplatform.transaction.assets.BurnTransaction
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedV}
 

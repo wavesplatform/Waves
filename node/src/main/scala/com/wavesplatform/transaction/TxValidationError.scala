@@ -7,31 +7,30 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits.FailFreeInvokeComplexity
 import com.wavesplatform.lang.v1.evaluator.Log
-import com.wavesplatform.state.InvokeScriptResult
-import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
+import com.wavesplatform.state.{InvokeScriptResult, Height}
 import com.wavesplatform.transaction.assets.exchange.Order
 
 object TxValidationError {
   type Validation[T] = Either[ValidationError, T]
 
-  case class InvalidAddress(reason: String)                  extends ValidationError
-  case class NegativeAmount(amount: Long, of: String)        extends ValidationError
-  case class NonPositiveAmount(amount: Long, of: String)     extends ValidationError
-  case class InvalidDecimals(decimals: Byte)                 extends ValidationError
-  case class NegativeMinFee(minFee: Long, of: String)        extends ValidationError
-  case object InsufficientFee                                extends ValidationError
-  case object TooBigArray                                    extends ValidationError
-  case class TooBigInBytes(err: String)                      extends ValidationError
-  case object InvalidName                                    extends ValidationError
-  case object InvalidAssetId                                 extends ValidationError
-  case object OverflowError                                  extends ValidationError
-  case object ToSelf                                         extends ValidationError
-  case object MissingSenderPrivateKey                        extends ValidationError
-  case object UnsupportedTransactionType                     extends ValidationError
-  case object InvalidRequestSignature                        extends ValidationError
-  case class BlockFromFuture(blockTs: Long, localTs: Long)   extends ValidationError
-  case class AlreadyInTheState(txId: ByteStr, txHeight: Int) extends ValidationError
-  case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
+  case class InvalidAddress(reason: String)                     extends ValidationError
+  case class NegativeAmount(amount: Long, of: String)           extends ValidationError
+  case class NonPositiveAmount(amount: Long, of: String)        extends ValidationError
+  case class InvalidDecimals(decimals: Byte)                    extends ValidationError
+  case class NegativeMinFee(minFee: Long, of: String)           extends ValidationError
+  case object InsufficientFee                                   extends ValidationError
+  case object TooBigArray                                       extends ValidationError
+  case class TooBigInBytes(err: String)                         extends ValidationError
+  case object InvalidName                                       extends ValidationError
+  case object InvalidAssetId                                    extends ValidationError
+  case object OverflowError                                     extends ValidationError
+  case object ToSelf                                            extends ValidationError
+  case object MissingSenderPrivateKey                           extends ValidationError
+  case object UnsupportedTransactionType                        extends ValidationError
+  case object InvalidRequestSignature                           extends ValidationError
+  case class BlockFromFuture(blockTs: Long, localTs: Long)      extends ValidationError
+  case class AlreadyInTheState(txId: ByteStr, txHeight: Height) extends ValidationError
+  case class AccountBalanceError(errs: Map[Address, String])    extends ValidationError
   case class AliasDoesNotExist(a: Alias)                     extends ValidationError { override def toString: String = s"Alias '$a' does not exist." }
   case class AliasIsDisabled(a: Alias)                       extends ValidationError
   case class OrderValidationError(order: Order, err: String) extends ValidationError
@@ -49,7 +48,7 @@ object TxValidationError {
     override def toString: String = s"InvalidSignature(${entity.toString + " reason: " + details})"
   }
 
-  case class InvalidStateHash(blockStateHash: Option[ByteStr]) extends ValidationError
+  case class InvalidStateHash(blockStateHash: Option[ByteStr], computedStateHash: Option[ByteStr]) extends ValidationError
 
   sealed trait WithLog extends Product with Serializable {
     def log: Log[Id]
@@ -58,7 +57,7 @@ object TxValidationError {
 
   /** Errors which can produce failed transaction */
   case class FailedTransactionError(
-      cause: Cause,
+      cause: FailedTransactionError.Cause,
       spentComplexity: Long,
       log: Log[Id],
       error: Option[String],

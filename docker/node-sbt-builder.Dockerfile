@@ -14,4 +14,4 @@ VOLUME /src
 
 RUN git clone --depth 1 -b v$WAVES_VERSION https://github.com/wavesplatform/Waves.git /src && \
   cd /src && \
-  sbt --batch --mem 2048 ";node/compile;grpc-server/compile"
+  sbt --batch ";node/compile;grpc-server/compile"

@@ -2,20 +2,21 @@ package com.wavesplatform.it.repl
 
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.transactions.{FailedTransactionSuiteLike, OverflowBlock}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.test._
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 
 class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[String] with OverflowBlock {
@@ -25,7 +26,7 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
   override def nodeConfigs: Seq[Config] =
     com.wavesplatform.it.NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures(BlockchainFeatures.BlockV5.id.toInt -> 0))
+      .overrideBase(_.preactivatedFeatures(BlockchainFeatures.BlockV5.id.toInt -> Height(0)))
       .withDefault(1)
       .buildNonConflicting()
 
@@ -41,25 +42,25 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
     val failDApp = ScriptCompiler
       .compile(
         s"""
-               |{-# STDLIB_VERSION 4 #-}
-               |{-# CONTENT_TYPE DAPP #-}
-               |{-# SCRIPT_TYPE ACCOUNT #-}
-               |
-               |@Callable(i)
-               |func default() = {
-               |  let action = valueOrElse(getString(this, "crash"), "no")
-               |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
-               |
-               |  if (action == "yes")
-               |  then {
-               |    if (check)
-               |    then throw("Crashed by dApp")
-               |    else throw("Crashed by dApp")
-               |  }
-               |  else []
-               |}
-               |
-               |""".stripMargin,
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func default() = {
+           |  let action = valueOrElse(getString(this, "crash"), "no")
+           |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+           |
+           |  if (action == "yes")
+           |  then {
+           |    if (check)
+           |    then throw("Crashed by dApp")
+           |    else throw("Crashed by dApp")
+           |  }
+           |  else []
+           |}
+           |
+           |""".stripMargin,
         ScriptEstimatorV3.latest
       )
       .explicitGet()
@@ -70,12 +71,12 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
     val assetScript = ScriptCompiler
       .compile(
         """
-               |{-# STDLIB_VERSION 2 #-}
-               |{-# CONTENT_TYPE EXPRESSION #-}
-               |{-# SCRIPT_TYPE ASSET #-}
-               |
-               | false
-               |""".stripMargin,
+          |{-# STDLIB_VERSION 2 #-}
+          |{-# CONTENT_TYPE EXPRESSION #-}
+          |{-# SCRIPT_TYPE ASSET #-}
+          |
+          | false
+          |""".stripMargin,
         ScriptEstimatorV3.latest
       )
       .explicitGet()
@@ -101,7 +102,7 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
 
     miner.putData(
       issuer,
-      List[DataEntry[_]](
+      List[DataEntry[?]](
         IntegerDataEntry("int", 100500L),
         StringDataEntry("str", "text"),
         BinaryDataEntry("bin", ByteStr(Base58.decode("r1Mw3j9J"))),

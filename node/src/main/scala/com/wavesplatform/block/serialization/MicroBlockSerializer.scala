@@ -5,6 +5,8 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.{DigestLength, SignatureLength}
+import com.wavesplatform.protobuf.block.PBFinalizationVotings
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
 
 import scala.util.Try
@@ -12,6 +14,10 @@ import scala.util.Try
 object MicroBlockSerializer {
   def toBytes(microBlock: MicroBlock): Array[Byte] = {
     val transactionDataBytes = writeTransactionData(microBlock.version, microBlock.transactionData)
+    val finalizationVotingBytes = microBlock.finalizationVoting
+      .map(voting => PBUtils.encodeDeterministic(PBFinalizationVotings.protobuf(voting)))
+      .getOrElse(Array.emptyByteArray)
+
     Bytes.concat(
       Array(microBlock.version),
       microBlock.reference.arr,
@@ -20,10 +26,12 @@ object MicroBlockSerializer {
       transactionDataBytes,
       microBlock.sender.arr,
       microBlock.signature.arr,
-      microBlock.stateHash.map(_.arr).getOrElse(Array.emptyByteArray)
+      microBlock.stateHash.map(_.arr).getOrElse(Array.emptyByteArray),
+      finalizationVotingBytes
     )
   }
 
+  // Legacy
   def parseBytes(bytes: Array[Byte]): Try[MicroBlock] =
     Try {
       val buf = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
@@ -38,7 +46,8 @@ object MicroBlockSerializer {
       val generator       = buf.getPublicKey
       val signature       = ByteStr(buf.getByteArray(SignatureLength))
       val stateHash       = buf.getByteArrayOpt(DigestLength).map(ByteStr(_))
+      // We don't use this parsing since protobuf, no new bytes parsing is needed
 
-      MicroBlock(version, generator, transactionData, reference, totalResBlockSig, signature, stateHash)
+      MicroBlock(version, generator, transactionData, reference, totalResBlockSig, signature, stateHash, finalizationVoting = None)
     }
 }

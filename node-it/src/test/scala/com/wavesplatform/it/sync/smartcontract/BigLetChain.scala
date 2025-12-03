@@ -1,11 +1,11 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction

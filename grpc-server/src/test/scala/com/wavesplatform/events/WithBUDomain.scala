@@ -9,15 +9,18 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdate
 import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, WavesSettings}
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.utils.Schedulers
+import monix.execution.ExecutionModel.SynchronousExecution
 import monix.execution.Scheduler
-import monix.execution.Scheduler.Implicits.global
 import org.rocksdb.RocksDB
 import monix.reactive.subjects.PublishToOneSubject
 import org.scalatest.Suite
 import org.scalatest.concurrent.ScalaFutures.convertScalaFuture
 
-trait WithBUDomain extends WithDomain { _: Suite =>
+trait WithBUDomain extends WithDomain { suite: Suite =>
+  private given scheduler: Scheduler = Schedulers.singleThread("bu-domain", executionModel = SynchronousExecution)
   def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: RocksDB => RocksDB = identity): Unit = {
     withDomain(settings) { d =>
       tempDb { rdb =>
@@ -39,7 +42,7 @@ trait WithBUDomain extends WithDomain { _: Suite =>
               subject: PublishToOneSubject[BlockchainUpdated],
               maxQueueSize: Int
           ): Handler =
-            new Handler(id, maybeLiquidState, subject, maxQueueSize)(Scheduler(MoreExecutors.newDirectExecutorService())) {
+            new Handler(id, maybeLiquidState, subject, maxQueueSize)(using Scheduler(MoreExecutors.newDirectExecutorService())) {
               setSendUpdate(() => super.sendUpdate())
               override def sendUpdate(): Unit = ()
             }
@@ -74,7 +77,7 @@ trait WithBUDomain extends WithDomain { _: Suite =>
     withDomainAndRepo(settings) { (d, repo) =>
       d.appendBlock(balances.map(awb => TxHelpers.genesis(awb.address, awb.balance))*)
       generateBlocks(d)
-      val getBlockUpdate = repo.getBlockUpdate(height)
+      val getBlockUpdate = repo.getBlockUpdate(Height(height))
       f(getBlockUpdate)
     }
   }

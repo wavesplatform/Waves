@@ -1,12 +1,10 @@
 package com.wavesplatform.network
 
-import java.net.{InetAddress, InetSocketAddress}
-import java.util
-import scala.util.Try
 import com.google.common.primitives.{Bytes, Ints}
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.block.serialization.{BlockHeaderSerializer, MicroBlockSerializer}
 import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.*
@@ -14,10 +12,18 @@ import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.mining.MiningConstraints
 import com.wavesplatform.network.message.*
 import com.wavesplatform.network.message.Message.*
-import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, PBMicroBlocks, SignedMicroBlock}
+import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, PBMicroBlocks, SignedMicroBlock, EndorseBlock as PBEndorseBlock}
 import com.wavesplatform.protobuf.snapshot.{BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.transaction.{DataTransaction, EthereumTransaction, Transaction, TransactionParsers}
+import io.netty.channel.ChannelHandler.Sharable
+
+import java.net.{InetAddress, InetSocketAddress}
+import java.util
+import scala.reflect.ClassTag
+import scala.util.Try
+
+// For protobuf see https://protobuf.dev/programming-guides/encoding/#varints
 
 object GetPeersSpec extends MessageSpec[GetPeers.type] {
   override val messageCode: Message.MessageCode = 1: Byte
@@ -33,7 +39,7 @@ object GetPeersSpec extends MessageSpec[GetPeers.type] {
   override def serializeData(data: GetPeers.type): Array[Byte] = Array()
 }
 
-object PeersSpec extends MessageSpec[KnownPeers] {
+abstract class InetSocketAddressSeqSpec[A <: AnyRef: ClassTag] extends MessageSpec[A] {
   private val AddressLength = 4
   private val PortLength    = 4
   private val DataLength    = 4
@@ -42,34 +48,44 @@ object PeersSpec extends MessageSpec[KnownPeers] {
 
   override val maxLength: Int = DataLength + 1000 * (AddressLength + PortLength)
 
-  override def deserializeData(bytes: Array[Byte]): Try[KnownPeers] = Try {
+  protected def unwrap(v: A): Seq[InetSocketAddress]
+  protected def wrap(addresses: Seq[InetSocketAddress]): A
+
+  override def deserializeData(bytes: Array[Byte]): Try[A] = Try {
     val lengthBytes = util.Arrays.copyOfRange(bytes, 0, DataLength)
     val length      = Ints.fromByteArray(lengthBytes)
 
-    assert(bytes.length == DataLength + (length * (AddressLength + PortLength)), "Data does not match length")
+    val expectedMessageLength = DataLength + (length * (AddressLength + PortLength))
+    assert(
+      bytes.length == expectedMessageLength,
+      s"Invalid KnownPeers message length ${bytes.length}, expecting $expectedMessageLength for $length peers"
+    )
 
-    KnownPeers((0 until length).map { i =>
+    (0 until length).map { i =>
       val position     = lengthBytes.length + (i * (AddressLength + PortLength))
       val addressBytes = util.Arrays.copyOfRange(bytes, position, position + AddressLength)
       val address      = InetAddress.getByAddress(addressBytes)
       val portBytes    = util.Arrays.copyOfRange(bytes, position + AddressLength, position + AddressLength + PortLength)
       new InetSocketAddress(address, Ints.fromByteArray(portBytes))
-    })
-  }
+    }
+  }.map(wrap)
 
-  override def serializeData(peers: KnownPeers): Array[Byte] = {
-    val length      = peers.peers.size
-    val lengthBytes = Ints.toByteArray(length)
-
-    val xs = for {
-      inetAddress <- peers.peers
+  def serializeData(value: A): Array[Byte] = {
+    val peersWithResolvedAddresses = for {
+      inetAddress <- unwrap(value)
       address     <- Option(inetAddress.getAddress)
     } yield (address.getAddress, inetAddress.getPort)
 
-    xs.foldLeft(lengthBytes) { case (bs, (peerAddress, peerPort)) =>
+    peersWithResolvedAddresses.foldLeft(Ints.toByteArray(peersWithResolvedAddresses.size)) { case (bs, (peerAddress, peerPort)) =>
       Bytes.concat(bs, peerAddress, Ints.toByteArray(peerPort))
     }
   }
+}
+
+object PeersSpec extends InetSocketAddressSeqSpec[KnownPeers] {
+  override protected def unwrap(v: KnownPeers): Seq[InetSocketAddress] = v.peers
+
+  override protected def wrap(addresses: Seq[InetSocketAddress]): KnownPeers = KnownPeers(addresses)
 }
 
 trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
@@ -347,6 +363,17 @@ object MicroBlockSnapshotResponseSpec extends MessageSpec[MicroBlockSnapshotResp
   override val maxLength: Int = NetworkServer.MaxFrameLength
 }
 
+object EndorseBlockSpec extends MessageSpec[EndorseBlock] {
+  override val messageCode: MessageCode = 38: Byte
+
+  override def deserializeData(bytes: Array[Byte]): Try[EndorseBlock] =
+    Try(EndorseBlock.fromProtobuf(PBEndorseBlock.parseFrom(bytes)))
+
+  override def serializeData(data: EndorseBlock): Array[Byte] = data.toProtobuf.toByteArray
+
+  override val maxLength: Int = 238 // 4 + 32*2 (or 64*2 for old blocks) + 4 + 96 + 4 tags + 2 varint max overhead
+}
+
 // Virtual, only for logs
 object HandshakeSpec {
   val messageCode: MessageCode = 101: Byte
@@ -355,7 +382,7 @@ object HandshakeSpec {
 object BasicMessagesRepo {
   type Spec = MessageSpec[? <: AnyRef]
 
-  val specs: Seq[Spec] = Seq(
+  private val specs: Seq[Spec] = Seq(
     GetPeersSpec,
     PeersSpec,
     GetSignaturesSpec,
@@ -375,9 +402,37 @@ object BasicMessagesRepo {
     GetSnapsnotSpec,
     MicroSnapshotRequestSpec,
     BlockSnapshotResponseSpec,
-    MicroBlockSnapshotResponseSpec
+    MicroBlockSnapshotResponseSpec,
+    EndorseBlockSpec
   )
 
   val specsByCodes: Map[Byte, Spec]       = specs.map(s => s.messageCode -> s).toMap
   val specsByClasses: Map[Class[?], Spec] = specs.map(s => s.contentClass -> s).toMap
+
+  @Sharable
+  class MessageLogger(settings: TrafficLogger.Settings) extends TrafficLogger(settings) {
+    @transient
+    override protected lazy val logger: Logger = Logger("com.wavesplatform.network.TrafficLogger")
+
+    protected def codeOf(msg: AnyRef): Option[Byte] = {
+      val aux: PartialFunction[AnyRef, Byte] = {
+        case x: RawBytes                          => x.code
+        case _: Transaction                       => TransactionSpec.messageCode
+        case _: BigInt | _: LocalScoreChanged     => ScoreSpec.messageCode
+        case _: Block | _: BlockForged            => BlockSpec.messageCode
+        case x: com.wavesplatform.network.Message => specsByClasses(x.getClass).messageCode
+        case _: Handshake                         => HandshakeSpec.messageCode
+      }
+
+      aux.lift(msg)
+    }
+
+    protected def stringify(msg: Any): String = msg match {
+      case tx: Transaction => s"Transaction(${tx.id()})"
+      case b: Block =>
+        s"${b.id()}, header: ${BlockHeaderSerializer.toJson(b.header, b.bytes().length, b.transactionData.length, b.signature).toString}"
+      case RawBytes(code, data) => s"RawBytes(${specsByCodes(code).messageName}, ${data.length} bytes)"
+      case other                => other.toString
+    }
+  }
 }

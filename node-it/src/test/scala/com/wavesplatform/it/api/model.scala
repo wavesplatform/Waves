@@ -2,7 +2,8 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.DataEntry
+import com.wavesplatform.it.api.FinalizationVoting.ConflictEndorsement
+import com.wavesplatform.state.{DataEntry, Height}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status as GrpcStatus}
@@ -25,6 +26,12 @@ object Status {
 case class Peer(address: String, declaredAddress: String, peerName: String)
 object Peer {
   implicit val peerFormat: Format[Peer] = Json.format
+}
+
+case class KnownPeer(address: String, lastSeen: Long)
+
+object KnownPeer {
+  implicit val peerFormat: Format[KnownPeer] = Json.format
 }
 
 case class Address(address: String)
@@ -128,7 +135,7 @@ class Transaction(
     val buyMatcherFee: Option[Long],
     val sellOrderMatcherFee: Option[Long],
     val buyOrderMatcherFee: Option[Long],
-    val data: Option[Seq[DataEntry[_]]],
+    val data: Option[Seq[DataEntry[?]]],
     val minSponsoredAssetFee: Option[Long],
     val transfers: Option[Seq[Transfer]],
     val totalAmount: Option[Long],
@@ -137,9 +144,12 @@ class Transaction(
     val proofs: Option[Seq[String]],
     val applicationStatus: Option[String],
     val feeAssetId: Option[String],
-    val expression: Option[String]
+    val expression: Option[String],
+    val commitmentSignature: Option[String],
+    val generationPeriodStart: Option[Int],
+    val endorserPublicKey: Option[String]
 ) {
-  import Transaction._
+  import Transaction.*
   override def toString: String = Json.toJson(this).toString
   override def equals(x: Any): Boolean = {
     x match {
@@ -167,7 +177,7 @@ object Transaction {
       buyMatcherFee: Option[Long],
       sellOrderMatcherFee: Option[Long],
       buyOrderMatcherFee: Option[Long],
-      data: Option[Seq[DataEntry[_]]],
+      data: Option[Seq[DataEntry[?]]],
       minSponsoredAssetFee: Option[Long],
       transfers: Option[Seq[Transfer]],
       totalAmount: Option[Long],
@@ -176,7 +186,10 @@ object Transaction {
       proofs: Option[Seq[String]],
       applicationStatus: Option[String],
       feeAssetId: Option[String],
-      expression: Option[String]
+      expression: Option[String],
+      commitmentSignature: Option[String],
+      generationPeriodStart: Option[Int],
+      endorserPublicKey: Option[String]
   ): Transaction = new Transaction(
     _type,
     id,
@@ -203,7 +216,10 @@ object Transaction {
     proofs,
     applicationStatus,
     feeAssetId,
-    expression
+    expression,
+    commitmentSignature,
+    generationPeriodStart,
+    endorserPublicKey
   )
 
   implicit val transactionFormat: Format[Transaction] = Format(
@@ -220,24 +236,27 @@ object Transaction {
         amount      <- (jsv \ "amount").validateOpt[Long]
         description <- (jsv \ "description").validateOpt[String]
         attachment <- version match {
-          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(_) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _                                    => JsSuccess(None)
         }
-        price                <- (jsv \ "price").validateOpt[Long]
-        sellMatcherFee       <- (jsv \ "sellMatcherFee").validateOpt[Long]
-        buyMatcherFee        <- (jsv \ "buyMatcherFee").validateOpt[Long]
-        sellOrderMatcherFee  <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
-        buyOrderMatcherFee   <- (jsv \ "order1" \ "matcherFee").validateOpt[Long]
-        data                 <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
-        minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
-        transfers            <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
-        totalAmount          <- (jsv \ "totalAmount").validateOpt[Long]
-        senderPublicKey      <- (jsv \ "senderPublicKey").validateOpt[String]
-        recipient            <- (jsv \ "recipient").validateOpt[String]
-        proofs               <- (jsv \ "proofs").validateOpt[Seq[String]]
-        applicationStatus    <- (jsv \ "applicationStatus").validateOpt[String]
-        feeAssetId           <- (jsv \ "feeAssetId").validateOpt[String]
-        expression           <- (jsv \ "expression").validateOpt[String]
+        price                 <- (jsv \ "price").validateOpt[Long]
+        sellMatcherFee        <- (jsv \ "sellMatcherFee").validateOpt[Long]
+        buyMatcherFee         <- (jsv \ "buyMatcherFee").validateOpt[Long]
+        sellOrderMatcherFee   <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
+        buyOrderMatcherFee    <- (jsv \ "order1" \ "matcherFee").validateOpt[Long]
+        data                  <- (jsv \ "data").validateOpt[Seq[DataEntry[?]]]
+        minSponsoredAssetFee  <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+        transfers             <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
+        totalAmount           <- (jsv \ "totalAmount").validateOpt[Long]
+        senderPublicKey       <- (jsv \ "senderPublicKey").validateOpt[String]
+        recipient             <- (jsv \ "recipient").validateOpt[String]
+        proofs                <- (jsv \ "proofs").validateOpt[Seq[String]]
+        applicationStatus     <- (jsv \ "applicationStatus").validateOpt[String]
+        feeAssetId            <- (jsv \ "feeAssetId").validateOpt[String]
+        expression            <- (jsv \ "expression").validateOpt[String]
+        commitmentSignature   <- (jsv \ "commitmentSignature").validateOpt[String]
+        generationPeriodStart <- (jsv \ "generationPeriodStart").validateOpt[Int]
+        endorserPublicKey     <- (jsv \ "endorserPublicKey").validateOpt[String]
       } yield new Transaction(
         _type,
         id,
@@ -264,34 +283,40 @@ object Transaction {
         proofs,
         applicationStatus,
         feeAssetId,
-        expression
+        expression,
+        commitmentSignature,
+        generationPeriodStart,
+        endorserPublicKey
       )
     ),
     Writes { t =>
       Json.obj(
-        "type"                 -> t._type,
-        "id"                   -> t.id,
-        "chainId"              -> t.chainId,
-        "fee"                  -> t.fee,
-        "timestamp"            -> t.timestamp,
-        "sender"               -> t.sender,
-        "version"              -> t.version,
-        "name"                 -> t.name,
-        "amount"               -> t.amount,
-        "description"          -> t.description,
-        "attachment"           -> t.attachment,
-        "price"                -> t.price,
-        "sellMatcherFee"       -> t.sellMatcherFee,
-        "buyMatcherFee"        -> t.buyMatcherFee,
-        "sellOrderFee"         -> t.sellOrderMatcherFee,
-        "buyOrderFee"          -> t.buyOrderMatcherFee,
-        "data"                 -> t.data,
-        "minSponsoredAssetFee" -> t.minSponsoredAssetFee,
-        "transfers"            -> t.transfers,
-        "totalAmount"          -> t.totalAmount,
-        "senderPublicKey"      -> t.senderPublicKey,
-        "recipient"            -> t.recipient,
-        "proofs"               -> t.proofs
+        "type"                  -> t._type,
+        "id"                    -> t.id,
+        "chainId"               -> t.chainId,
+        "fee"                   -> t.fee,
+        "timestamp"             -> t.timestamp,
+        "sender"                -> t.sender,
+        "version"               -> t.version,
+        "name"                  -> t.name,
+        "amount"                -> t.amount,
+        "description"           -> t.description,
+        "attachment"            -> t.attachment,
+        "price"                 -> t.price,
+        "sellMatcherFee"        -> t.sellMatcherFee,
+        "buyMatcherFee"         -> t.buyMatcherFee,
+        "sellOrderFee"          -> t.sellOrderMatcherFee,
+        "buyOrderFee"           -> t.buyOrderMatcherFee,
+        "data"                  -> t.data,
+        "minSponsoredAssetFee"  -> t.minSponsoredAssetFee,
+        "transfers"             -> t.transfers,
+        "totalAmount"           -> t.totalAmount,
+        "commitmentSignature"   -> t.commitmentSignature,
+        "generationPeriodStart" -> t.generationPeriodStart,
+        "endorserPublicKey"     -> t.endorserPublicKey,
+        "senderPublicKey"       -> t.senderPublicKey,
+        "recipient"             -> t.recipient,
+        "proofs"                -> t.proofs
       )
     }
   )
@@ -329,7 +354,7 @@ case class TransactionInfo(
     recipient: Option[String],
     script: Option[String],
     version: Option[Byte],
-    data: Option[Seq[DataEntry[_]]],
+    data: Option[Seq[DataEntry[?]]],
     transfers: Option[Seq[Transfer]],
     totalAmount: Option[Long],
     expression: Option[String],
@@ -359,7 +384,7 @@ object TransactionInfo {
         buyMatcherFee        <- (jsv \ "buyMatcherFee").validateOpt[Long]
         sellOrderMatcherFee  <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
         buyOrderMatcherFee   <- (jsv \ "order1" \ "matcherFee").validateOpt[Long]
-        data                 <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
+        data                 <- (jsv \ "data").validateOpt[Seq[DataEntry[?]]]
         transfers            <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
         totalAmount          <- (jsv \ "totalAmount").validateOpt[Long]
         expression           <- (jsv \ "expression").validateOpt[String]
@@ -555,7 +580,7 @@ object TransferTransactionInfo {
       for {
         _type     <- (jsv \ "type").validate[Int]
         id        <- (jsv \ "id").validate[String]
-        chainId   <- (jsv \ "chainId").validateOpt[Byte]
+        _         <- (jsv \ "chainId").validateOpt[Byte]
         fee       <- (jsv \ "fee").validate[Long]
         timestamp <- (jsv \ "timestamp").validate[Long]
         sender    <- (jsv \ "sender").validateOpt[String]
@@ -565,7 +590,7 @@ object TransferTransactionInfo {
         version   <- (jsv \ "version").validateOpt[Byte]
         chainId   <- (jsv \ "chainId").validateOpt[Byte]
         attachment <- version match {
-          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(_) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _                                    => JsSuccess(None)
         }
         proofs <- (jsv \ "proofs").validateOpt[Seq[String]]
@@ -618,7 +643,7 @@ object MassTransferTransactionInfo {
         version   <- (jsv \ "version").validateOpt[Byte]
         chainId   <- (jsv \ "chainId").validateOpt[Byte]
         attachment <- version match {
-          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(_) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _                                    => JsSuccess(None)
         }
         transfers   <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
@@ -806,7 +831,6 @@ case class Block(
     version: Option[Byte] = None
 )
 object Block {
-  import PublicKey.*
 
   implicit val blockFormat: Format[Block] = Format(
     Reads(jsv =>
@@ -863,7 +887,7 @@ object Block {
 case class BlockHeader(
     id: String,
     signature: String,
-    height: Int,
+    height: Height,
     timestamp: Long,
     generator: String,
     transactionCount: Int,
@@ -877,6 +901,7 @@ case class BlockHeader(
     totalFee: Long,
     vrf: Option[String],
     challengedHeader: Option[ChallengedBlockHeader],
+    finalizationVoting: Option[FinalizationVoting],
     version: Option[Byte] = None
 )
 object BlockHeader {
@@ -900,10 +925,11 @@ object BlockHeader {
         transactionsRoot    <- (jsv \ "transactionsRoot").validateOpt[String]
         vrf                 <- (jsv \ "VRF").validateOpt[String]
         challengedHeader    <- (jsv \ "challengedHeader").validateOpt[ChallengedBlockHeader]
+        finalizationVoting  <- (jsv \ "finalizationVoting").validateOpt[FinalizationVoting]
       } yield BlockHeader(
         id,
         signature,
-        height,
+        Height(height),
         timestamp,
         generator,
         transactionCount,
@@ -917,6 +943,7 @@ object BlockHeader {
         totalFee,
         vrf,
         challengedHeader,
+        finalizationVoting,
         version
       )
     ),
@@ -936,9 +963,30 @@ object ChallengedBlockHeader {
   implicit val challengedBlockHeaderFormat: Format[ChallengedBlockHeader] = Json.format
 }
 
+case class FinalizationVoting(
+    aggregatedEndorsementSignature: String,
+    endorserIndexes: Seq[Int] = Seq.empty,
+    conflictEndorsements: Seq[ConflictEndorsement] = Seq.empty
+)
+object FinalizationVoting {
+  given OFormat[FinalizationVoting] = Json.format
+
+  case class ConflictEndorsement(endorserIndex: Int, finalizedBlockId: String, signature: String)
+  object ConflictEndorsement {
+    given OFormat[ConflictEndorsement] = Json.format
+  }
+}
+
 case class GenerationSignatureResponse(generationSignature: String)
 object GenerationSignatureResponse {
   implicit val generationSignatureResponseFormat: Format[GenerationSignatureResponse] = Json.format
+}
+
+object GeneratorsResponse {
+  case class Entry(address: String, balance: Long, transactionId: String)
+  object Entry {
+    given OFormat[Entry] = Json.format
+  }
 }
 
 case class MatcherMessage(id: String)

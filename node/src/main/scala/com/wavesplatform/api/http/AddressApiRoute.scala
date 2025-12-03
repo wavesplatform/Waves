@@ -1,10 +1,5 @@
 package com.wavesplatform.api.http
 
-import akka.NotUsed
-import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
-import akka.http.scaladsl.model.HttpMethods
-import akka.http.scaladsl.server.{Directive0, Route}
-import akka.stream.scaladsl.Source
 import cats.instances.option.*
 import cats.syntax.traverse.*
 import com.wavesplatform.account.Address
@@ -12,6 +7,7 @@ import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.FunctionSignatures
@@ -21,12 +17,17 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{Blockchain, DataEntry}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import org.apache.pekko.http.scaladsl.model.HttpMethods
+import org.apache.pekko.http.scaladsl.server.{Directive0, Route}
+import org.apache.pekko.stream.scaladsl.Source
 import play.api.libs.json.*
 
 import scala.util.Try
@@ -52,7 +53,7 @@ case class AddressApiRoute(
   override lazy val route: Route =
     pathPrefix("addresses") {
       balanceDetails ~ validate ~ seed ~ balance ~ balances ~ balancesPost ~ balanceWithConfirmations ~ deleteAddress ~
-        seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ scriptInfo ~ scriptMeta
+        seq ~ publicKey ~ blsKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create
 
   def scriptInfo: Route = (path("scriptInfo" / AddrSegment) & get) { address =>
@@ -174,7 +175,7 @@ case class AddressApiRoute(
   def getData: Route =
     pathPrefix("data" / AddrSegment) { address =>
       implicit val jsonStreamingSupport: ToResponseMarshaller[Source[DataEntry[?], NotUsed]] =
-        jacksonStreamMarshaller()(DataEntry.dataEntrySerializer)
+        jacksonStreamMarshaller()(using DataEntry.dataEntrySerializer)
 
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))
@@ -256,7 +257,7 @@ case class AddressApiRoute(
     Balance(acc.toString, confirmations, commonAccountsApi.effectiveBalance(acc, confirmations))
   }
 
-  private[this] def validateBalanceDepth(height: Int): Directive0 = {
+  private def validateBalanceDepth(height: Int): Directive0 = {
     if (height < blockchain.height - maxBalanceDepth)
       complete(CustomValidationError(s"Unable to get balance past height ${blockchain.height - maxBalanceDepth}"))
     else
@@ -291,6 +292,14 @@ case class AddressApiRoute(
   def publicKey: Route = (path("publicKey" / PublicKeySegment) & get) { publicKey =>
     complete(Json.obj("address" -> Address.fromPublicKey(publicKey).toString))
   }
+
+  def blsKey: Route = (path("bls" / AddrSegment) & get) { address =>
+    complete {
+      wallet.privateKeyAccount(address).map { kp =>
+        Json.obj("blsPublicKey" -> BlsKeyPair(kp.privateKey).publicKey.base58)
+      }
+    }
+  }
 }
 
 object AddressApiRoute {
@@ -304,7 +313,7 @@ object AddressApiRoute {
         (JsPath \ "publickey")
           .read[String]
           .orElse((JsPath \ "publicKey").read[String])
-        and (JsPath \ "signature").read[String])(Signed.apply _),
+        and (JsPath \ "signature").read[String])(Signed.apply),
       Json.writes[Signed]
     )
   }

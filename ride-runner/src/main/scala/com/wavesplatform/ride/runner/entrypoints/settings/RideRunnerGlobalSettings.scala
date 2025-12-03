@@ -7,8 +7,8 @@ import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache
 import com.wavesplatform.ride.runner.entrypoints.{Heights, WavesRideRunnerCompareService}
 import com.wavesplatform.ride.runner.requests.DefaultRequestService
 import com.wavesplatform.settings.*
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import com.wavesplatform.settings.BlockchainSettings.given
+import pureconfig.*
 
 import scala.concurrent.duration.DurationInt
 
@@ -18,7 +18,7 @@ case class RideRunnerGlobalSettings(
     restApi: RestAPISettings,
     rideRunner: RideRunnerCommonSettings,
     rideCompareService: WavesRideRunnerCompareService.Settings
-) {
+) derives ConfigReader {
   // Consider the service as unhealthy if it don't update events in more than this duration.
   // Should be more than publicApi.noDataTimeout, because it could be fixed after a restart of the blockchain updates stream.
   val unhealthyIdleTimeoutMs: Long = (publicApi.noDataTimeout + 30.seconds).toMillis
@@ -50,5 +50,5 @@ case class RideRunnerGlobalSettings(
 }
 
 object RideRunnerGlobalSettings {
-  def fromRootConfig(config: Config): RideRunnerGlobalSettings = config.getConfig("waves").as[RideRunnerGlobalSettings]
+  def fromRootConfig(config: Config): RideRunnerGlobalSettings = ConfigSource.fromConfig(config).at("waves").loadOrThrow[RideRunnerGlobalSettings]
 }

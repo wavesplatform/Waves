@@ -12,7 +12,7 @@ import scala.util.Try
 
 object ExchangeTxSerializer {
   def toJson(tx: ExchangeTransaction): JsObject = {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++ Json.obj(
       "order1"         -> order1.json(),
       "order2"         -> order2.json(),
@@ -24,7 +24,7 @@ object ExchangeTxSerializer {
   }
 
   def bodyBytes(tx: ExchangeTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
 
     version match {
       case TxVersion.V1 =>

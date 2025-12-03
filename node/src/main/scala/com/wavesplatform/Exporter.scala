@@ -1,16 +1,14 @@
 package com.wavesplatform
 
 import com.google.common.collect.AbstractIterator
-
-import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.database.protobuf.BlockMeta
-import com.wavesplatform.database.{KeyTags, RDB, createBlock, readBlockMeta, readTransaction}
+import com.wavesplatform.database.{KeyTag, RDB, createBlock, readBlockMeta, readTransaction}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.metrics.Metrics
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Transaction
@@ -19,6 +17,8 @@ import kamon.Kamon
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB}
 import scopt.OParser
 
+import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
+import scala.annotation.tailrec
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -39,22 +39,23 @@ object Exporter extends ScorexLogging {
   // noinspection ScalaStyle
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
-      case ExporterOptions(configFile, blocksOutputFileNamePrefix, snapshotsOutputFileNamePrefix, exportSnapshots, exportHeight, format) =>
+      case ExporterOptions(configFile, blocksOutputFileNamePrefix, snapshotsOutputFileNamePrefix, exportHeight, format) =>
         val settings = Application.loadApplicationConfig(configFile)
 
         Using.resources(
           new NTP(settings.ntpServer),
           RDB.open(settings.dbSettings)
         ) { (time, rdb) =>
-          val (blockchain, _)  = StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.noop)
-          val blockchainHeight = blockchain.height
-          val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
+          val (blockchain, rdbWriter) = StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.noop)
+          val blockchainHeight        = blockchain.height
+          val height                  = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
           log.info(s"Blockchain height is $blockchainHeight exporting to $height")
           val blocksOutputFilename = s"$blocksOutputFileNamePrefix-$height"
           log.info(s"Blocks output file: $blocksOutputFilename")
 
+          val exportSnapshots = snapshotsOutputFileNamePrefix.isDefined
           val snapshotsOutputFilename = if (exportSnapshots) {
-            val filename = s"$snapshotsOutputFileNamePrefix-$height"
+            val filename = s"${snapshotsOutputFileNamePrefix.get}-$height"
             log.info(s"Snapshots output file: $filename")
             Some(filename)
           } else None
@@ -66,15 +67,21 @@ object Exporter extends ScorexLogging {
 
           Using.resources(
             createOutputFile(blocksOutputFilename),
-            snapshotsOutputFilename.map(createOutputFile)
-          ) { case (blocksOutput, snapshotsOutput) =>
+            snapshotsOutputFilename.map(createOutputFile),
+            rdbWriter
+          ) { case (blocksOutput, snapshotsOutput, _) =>
             Using.resources(createBufferedOutputStream(blocksOutput, 10), snapshotsOutput.map(createBufferedOutputStream(_, 100))) {
               case (blocksStream, snapshotsStream) =>
                 var exportedBlocksBytes    = 0L
                 var exportedSnapshotsBytes = 0L
                 val start                  = System.currentTimeMillis()
 
-                new BlockSnapshotIterator(rdb, height, settings.enableLightMode).asScala.foreach { case (h, block, txSnapshots) =>
+                new BlockSnapshotIterator(rdb, height, exportSnapshots).asScala.foreach { case (h, block, txSnapshots) =>
+                  val txCount = block.transactionData.length
+                  if (exportSnapshots && txCount != txSnapshots.length)
+                    throw new RuntimeException(
+                      s"${txSnapshots.length} snapshot(s) don't match $txCount transaction(s) on height $h, data is corrupted"
+                    )
                   exportedBlocksBytes += IO.exportBlock(blocksStream, Some(block), format == Formats.Binary)
                   snapshotsStream.foreach { output =>
                     exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
@@ -100,7 +107,8 @@ object Exporter extends ScorexLogging {
     }
   }
 
-  private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, isLightMode: Boolean) extends AbstractIterator[(Int, Block, Seq[Array[Byte]])] {
+  private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, exportSnapshots: Boolean)
+      extends AbstractIterator[(Int, Block, Seq[Array[Byte]])] {
     var nextTxEntry: Option[(Int, Transaction)]       = None
     var nextSnapshotEntry: Option[(Int, Array[Byte])] = None
 
@@ -108,12 +116,12 @@ object Exporter extends ScorexLogging {
       new DataIterator[BlockMeta](
         rdb.db,
         rdb.db.getDefaultColumnFamily,
-        KeyTags.BlockInfoAtHeight.prefixBytes,
+        KeyTag.BlockInfoAtHeight.prefixBytes,
         _.takeRight(Ints.BYTES),
         _ => readBlockMeta
       )
     val txIterator: DataIterator[Transaction] = {
-      val prefixBytes = KeyTags.NthTransactionInfoAtHeight.prefixBytes
+      val prefixBytes = KeyTag.NthTransactionInfoAtHeight.prefixBytes
       new DataIterator(
         rdb.db,
         rdb.txHandle.handle,
@@ -123,7 +131,7 @@ object Exporter extends ScorexLogging {
       )
     }
     val snapshotIterator: DataIterator[Array[Byte]] = {
-      val prefixBytes = KeyTags.NthTransactionStateSnapshotAtHeight.prefixBytes
+      val prefixBytes = KeyTag.NthTransactionStateSnapshotAtHeight.prefixBytes
       new DataIterator(
         rdb.db,
         rdb.txSnapshotHandle.handle,
@@ -133,7 +141,8 @@ object Exporter extends ScorexLogging {
       )
     }
 
-    def loadTxData[A](acc: Seq[A], height: Int, iterator: DataIterator[A], updateNextEntryF: (Int, A) => Unit): Seq[A] = {
+    @tailrec
+    private def loadTxData[A](acc: Seq[A], height: Int, iterator: DataIterator[A], updateNextEntryF: (Int, A) => Unit): Seq[A] = {
       if (iterator.hasNext) {
         val (h, txData) = iterator.next()
         if (h == height) {
@@ -145,7 +154,8 @@ object Exporter extends ScorexLogging {
       } else acc.reverse
     }
 
-    override def computeNext(): (Int, Block, Seq[Array[Byte]]) = {
+    @tailrec
+    override final def computeNext(): (Int, Block, Seq[Array[Byte]]) = {
       if (blockMetaIterator.hasNext) {
         val (h, meta) = blockMetaIterator.next()
         if (h <= targetHeight) {
@@ -156,7 +166,7 @@ object Exporter extends ScorexLogging {
             case Some(_) => Seq.empty
             case _       => loadTxData[Transaction](Seq.empty, h, txIterator, (h, tx) => nextTxEntry = Some(h -> tx))
           }
-          val snapshots = if (isLightMode) {
+          val snapshots = if (exportSnapshots) {
             nextSnapshotEntry match {
               case Some((snapshotHeight, txSnapshot)) if snapshotHeight == h =>
                 nextSnapshotEntry = None
@@ -166,8 +176,10 @@ object Exporter extends ScorexLogging {
             }
           } else Seq.empty
           createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, txs).toOption
-            .map(block => (h, block, snapshots))
-            .getOrElse(computeNext())
+            .map(block => (h, block, snapshots)) match {
+            case Some(r) => r
+            case None    => computeNext()
+          }
         } else {
           closeResources()
           endOfData()
@@ -198,7 +210,8 @@ object Exporter extends ScorexLogging {
 
     dbIterator.seek(prefixBytes)
 
-    override def computeNext(): (Int, A) = {
+    @tailrec
+    override final def computeNext(): (Int, A) = {
       if (dbIterator.isValid && dbIterator.key().startsWith(prefixBytes)) {
         val h = Ints.fromByteArray(heightFromKeyF(dbIterator.key()))
         if (h > 1) {
@@ -264,16 +277,15 @@ object Exporter extends ScorexLogging {
     }
   }
 
-  private[this] final case class ExporterOptions(
+  private final case class ExporterOptions(
       configFileName: Option[File] = None,
       blocksOutputFileNamePrefix: String = "blockchain",
-      snapshotsFileNamePrefix: String = "snapshots",
-      exportSnapshots: Boolean = false,
+      snapshotsFileNamePrefix: Option[String] = None,
       exportHeight: Option[Int] = None,
       format: String = Formats.Binary
   )
 
-  private[this] lazy val commandParser = {
+  private lazy val commandParser = {
     import scopt.OParser
 
     val builder = OParser.builder[ExporterOptions]
@@ -290,10 +302,7 @@ object Exporter extends ScorexLogging {
         .action((p, c) => c.copy(blocksOutputFileNamePrefix = p)),
       opt[String]('s', "snapshot-output-prefix")
         .text("Snapshots output file name prefix")
-        .action((p, c) => c.copy(snapshotsFileNamePrefix = p)),
-      opt[Unit]('l', "export-snapshots")
-        .text("Export snapshots for light node")
-        .action((_, c) => c.copy(exportSnapshots = true)),
+        .action((p, c) => c.copy(snapshotsFileNamePrefix = Some(p))),
       opt[Int]('h', "height")
         .text("Export to height")
         .action((h, c) => c.copy(exportHeight = Some(h)))

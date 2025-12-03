@@ -5,10 +5,10 @@ import com.wavesplatform.block.Block.protoHeaderHash
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
+import com.wavesplatform.protobuf.toByteStr
 
 case class BlockMeta(
     header: BlockHeader,

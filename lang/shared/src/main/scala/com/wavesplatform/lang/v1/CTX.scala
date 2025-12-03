@@ -17,11 +17,11 @@ import scala.scalajs.js.annotation.*
 
 @JSExportTopLevel("CTX")
 case class CTX[C[_[_]]](
-  @(JSExport @field) types: Seq[FINAL],
-  @(JSExport @field) vars: Map[String, (FINAL, ContextfulVal[C])],
-  @(JSExport @field) functions: Array[BaseFunction[C]]
+    @(JSExport @field) types: Seq[FINAL],
+    @(JSExport @field) vars: Map[String, (FINAL, ContextfulVal[C])],
+    @(JSExport @field) functions: Array[BaseFunction[C]]
 ) {
-  lazy val typeDefs = types.view.map(t => t.name -> t).toMap
+  lazy val typeDefs    = types.view.map(t => t.name -> t).toMap
   lazy val functionMap = functions.view.map(f => f.header -> f).toMap
 
   def evaluationContext[F[_]: Monad](env: C[F]): EvaluationContext[C, F] = {
@@ -60,17 +60,19 @@ case class CTX[C[_[_]]](
     .toSet
 
   lazy val decompilerContext: DecompilerContext = DecompilerContext(
-    opCodes = compilerContext.functionDefs
-      .view.mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name))
+    opCodes = compilerContext.functionDefs.view
+      .mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name))
       .toList
       .flatMap { case (name, codes) => codes.map((_, name)) }
       .toMap,
-    binaryOps = compilerContext.functionDefs
-      .view.filterKeys(opsNames(_))
+    binaryOps = compilerContext.functionDefs.view
+      .filterKeys(opsNames(_))
       .mapValues(
-        _.fSigList.map(_.header)
+        _.fSigList
+          .map(_.header)
           .filter(_.isInstanceOf[Native])
-          .map(_.asInstanceOf[Native].name))
+          .map(_.asInstanceOf[Native].name)
+      )
       .toList
       .flatMap { case (name, codes) => codes.map((_, name)) }
       .toMap,

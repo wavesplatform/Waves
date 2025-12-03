@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.evaluator
 
 import cats.syntax.either.*
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
@@ -20,7 +20,7 @@ import scala.util.Random
 
 class EvaluatorV2Test extends PropSpec with Inside {
   private val version     = V4
-  private val ctx         = lazyContexts((DirectiveSet(version, Account, DApp).explicitGet(), true, true))()
+  private val ctx         = lazyContexts((DirectiveSet(version, Account, DApp).explicitGet(), true, true, true))()
   private val environment = Common.emptyBlockchainEnvironment()
 
   private def evalEither(expr: EXPR, limit: Int, newMode: Boolean): Either[String, (EXPR, Int)] =

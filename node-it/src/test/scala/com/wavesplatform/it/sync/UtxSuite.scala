@@ -4,7 +4,7 @@ import scala.util.{Random, Try}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.{BaseFunSuite, Node}
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{AsyncHttpApi, TransactionInfo}
@@ -16,13 +16,13 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class UtxSuite extends BaseFunSuite {
-  private var whitelistedAccount: KeyPair     = _
-  private var whitelistedDAppAccount: KeyPair = _
+  private var whitelistedAccount: KeyPair     = scala.compiletime.uninitialized
+  private var whitelistedDAppAccount: KeyPair = scala.compiletime.uninitialized
 
   private val ENOUGH_FEE = 5000000
   private val AMOUNT     = ENOUGH_FEE * 10
 
-  test("Invalid transaction should be removed from from utx") {
+  test("Invalid transaction should be removed from utx") {
     val account = UtxSuite.createAccount
 
     val transferToAccount = TransferTransaction
@@ -174,8 +174,8 @@ class UtxSuite extends BaseFunSuite {
   }
 
   override protected def nodeConfigs: Seq[Config] = {
-    import UtxSuite._
-    import com.wavesplatform.it.NodeConfigs._
+    import UtxSuite.*
+    import com.wavesplatform.it.NodeConfigs.*
 
     whitelistedAccount = createAccount
     whitelistedDAppAccount = createAccount

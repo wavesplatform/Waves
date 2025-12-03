@@ -29,8 +29,8 @@ object Global extends BaseGlobal {
     if (input.length > limit) Left(s"base58Decode input exceeds $limit")
     else Base58.tryDecodeWithLimit(input, limit).toEither.left.map(_ => "can't parse Base58 string")
 
-  def base64Encode(input: Array[Byte]): Either[String, String] =
-    Either.cond(input.length <= MaxBase64Bytes, Base64.encode(input), s"base64Encode input exceeds $MaxBase64Bytes")
+  def base64Encode(input: Array[Byte], limit: Int): Either[String, String] =
+    Either.cond(input.length <= limit, Base64.encode(input), s"base64Encode input exceeds $limit")
 
   def base64Decode(input: String, limit: Int): Either[String, Array[Byte]] =
     for {
@@ -38,13 +38,13 @@ object Global extends BaseGlobal {
       result <- Base64.tryDecode(input).toEither.left.map(_ => "can't parse Base64 string")
     } yield result
 
-  private val base16Encoder: BaseEncoding = BaseEncoding.base16().lowerCase()
+  private val base16Codec: BaseEncoding = BaseEncoding.base16().lowerCase().ignoreCase()
 
   override def base16EncodeImpl(input: Array[Byte]): Either[String, String] =
-    tryEither(base16Encoder.encode(input))
+    tryEither(base16Codec.encode(input))
 
   override def base16DecodeImpl(input: String): Either[String, Array[Byte]] =
-    tryEither(base16Encoder.decode(input.toLowerCase))
+    tryEither(base16Codec.decode(input))
 
   private def tryEither[A](f: => A): Either[String, A] =
     Try(f).toEither
@@ -171,7 +171,7 @@ object Global extends BaseGlobal {
   override def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     Bn256Groth16.verify(verifyingKey, proof, inputs)
 
-  override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] = {
+  override def ecrecover(messageHash: Array[Byte], signature: Array[Byte], handleLeadingZerosInPublicKey: Boolean): Array[Byte] = {
     // https://github.com/web3j/web3j/blob/master/crypto/src/test/java/org/web3j/crypto/ECRecoverTest.java#L43
     val signatureData = {
       val vTemp = signature(64)
@@ -181,6 +181,10 @@ object Global extends BaseGlobal {
       new SignatureData(v, r, s)
     }
     val pk = Sign.signedMessageHashToKey(messageHash, signatureData)
-    base16Encoder.decode(pk.toString(16))
+    if (handleLeadingZerosInPublicKey) {
+      org.web3j.utils.Numeric.toBytesPadded(pk, 64)
+    } else {
+      base16Codec.decode(pk.toString(16))
+    }
   }
 }

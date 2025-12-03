@@ -1,7 +1,5 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.server.Route
 import cats.instances.either.*
 import cats.instances.list.*
 import cats.syntax.alternative.*
@@ -17,13 +15,15 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.reactive.Observable
+import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
+import org.apache.pekko.http.scaladsl.server.Route
 import play.api.libs.json.*
 
 case class TransactionsApiRoute(
@@ -41,12 +41,12 @@ case class TransactionsApiRoute(
     with AuthRoute {
   import TransactionsApiRoute.*
 
-  private[this] val serializer                     = TransactionJsonSerializer(blockchain, commonApi)
-  private[this] implicit val transactionMetaWrites: OWrites[TransactionMeta] = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
+  private val serializer                                               = TransactionJsonSerializer(blockchain)
+  private implicit val transactionMetaWrites: OWrites[TransactionMeta] = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
 
   override lazy val route: Route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressWithLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
+      unconfirmed ~ addressWithLimit ~ info ~ snapshot ~ status ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
     }
 
   def addressWithLimit: Route = {
@@ -60,11 +60,15 @@ case class TransactionsApiRoute(
 
       routeTimeout.executeFromObservable {
         transactionsByAddress(address, limit, after) // Double list - [ [tx1, tx2, ...] ]
-      }(jacksonStreamMarshaller("[[", ",", "]]")(improvedSerializer.txMetaJsonSerializer(address, h => blockV5Activation.exists(v5h => v5h <= h), _)))
+      }(using
+        jacksonStreamMarshaller("[[", ",", "]]")(using
+          improvedSerializer.txMetaJsonSerializer(address, h => blockV5Activation.exists(v5h => v5h <= h), _)
+        )
+      )
     }
   }
 
-  private[this] def readTransactionMeta(id: String): Either[ApiError, TransactionMeta] =
+  private def readTransactionMeta(id: String): Either[ApiError, TransactionMeta] =
     for {
       id   <- ByteStr.decodeBase58(id).toEither.leftMap(err => CustomValidationError(err.toString))
       meta <- commonApi.transactionById(id).toRight(ApiError.TransactionDoesNotExist)
@@ -83,14 +87,33 @@ case class TransactionsApiRoute(
     }
   }
 
-  private[this] def loadTransactionStatus(id: ByteStr): JsObject = {
+  def snapshot: Route = pathPrefix("snapshot") {
+    def readSnapshot(id: ByteStr) =
+      blockchain
+        .transactionSnapshot(id)
+        .toRight(TransactionDoesNotExist)
+        .map { case (snapshot, txStatus) => StateSnapshotJson.fromSnapshot(snapshot, txStatus) }
+    val single = (get & path(TransactionId))(id => complete(readSnapshot(id)))
+    val multiple = (pathEndOrSingleSlash & anyParam("id", limit = settings.transactionSnapshotsLimit))(rawIds =>
+      complete(
+        for {
+          _    <- Either.cond(rawIds.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
+          ids  <- rawIds.toSeq.traverse(ByteStr.decodeBase58(_).toEither.leftMap(err => CustomValidationError(err.toString)))
+          meta <- ids.traverse(readSnapshot)
+        } yield meta
+      )
+    )
+    single ~ multiple
+  }
+
+  private def loadTransactionStatus(id: ByteStr): JsObject = {
     import Status.*
     val statusJson = blockchain.transactionInfo(id) match {
       case Some((tm, _)) =>
         Json.obj(
           "status"        -> Confirmed,
-          "height"        -> JsNumber(tm.height),
-          "confirmations" -> (blockchain.height - tm.height).max(0)
+          "height"        -> tm.height.toInt,
+          "confirmations" -> (blockchain.height - tm.height.toInt).max(0)
         ) ++ serializer.metaJson(tm)
       case None =>
         commonApi.unconfirmedTransactionById(id) match {
@@ -164,12 +187,12 @@ case class TransactionsApiRoute(
 
   def sign: Route = (pathPrefix("sign") & withAuth) {
     pathEndOrSingleSlash(jsonPost[JsObject] { jsv =>
-      TransactionFactory.parseRequestAndSign(wallet, (jsv \ "sender").as[String], time, jsv)
+      mkTxFactory.parseRequestAndSign((jsv \ "sender").as[String], jsv)
     }) ~ signWithSigner
   }
 
   def signWithSigner: Route = path(AddrSegment) { address =>
-    jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.toString, time, _))
+    jsonPost[JsObject](mkTxFactory.parseRequestAndSign(address.toString, _))
   }
 
   def signedBroadcast: Route = path("broadcast") {
@@ -227,6 +250,8 @@ case class TransactionsApiRoute(
       .take(limitParam)
       .mapEval(txMetaEnriched(address, _))
   }
+
+  private def mkTxFactory = TransactionFactory(wallet, time, blockchain.currentGenerationPeriod)
 }
 
 object TransactionsApiRoute {
@@ -238,6 +263,11 @@ object TransactionsApiRoute {
     val canceled = Value(0)
 
     def apply(bool: Boolean): LeaseStatus = if (bool) active else canceled
+  }
+
+  implicit val leaseStatusWrites: Writes[LeaseStatus] = Writes {
+    case LeaseStatus.active   => JsString("active")
+    case LeaseStatus.canceled => JsString("canceled")
   }
 
   object Status {

@@ -17,7 +17,6 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
-import shapeless.Coproduct
 
 import scala.annotation.tailrec
 import scala.util.{Left, Right, Try}
@@ -38,7 +37,7 @@ object Common {
 
   val multiplierFunction: NativeFunction[NoContext] =
     NativeFunction("MULTIPLY", 1L, 10005.toShort, LONG, ("x1", LONG), ("x2", LONG)) {
-      case CONST_LONG(x1: Long) :: CONST_LONG(x2: Long) :: Nil => Try(x1 * x2).map(CONST_LONG).toEither.left.map(_.toString)
+      case CONST_LONG(x1: Long) :: CONST_LONG(x2: Long) :: Nil => Try(x1 * x2).map(CONST_LONG.apply).toEither.left.map(_.toString)
       case _                                                   => ??? // suppress pattern match warning
     }
 
@@ -89,7 +88,7 @@ object Common {
       def resolveAlias(name: String): Either[String, Recipient.Address]                   = ???
       def accountBalanceOf(a: Recipient, b: Option[Array[Byte]]): Either[String, Long]    = ???
       def accountWavesBalanceOf(a: Recipient): Either[String, Environment.BalanceDetails] = ???
-      def tthis: Environment.Tthis                                                        = Coproduct(Address(ByteStr.empty))
+      def tthis: Environment.Tthis                                                        = Address(ByteStr.empty)
       def multiPaymentAllowed: Boolean                                                    = true
       def txId: ByteStr                                                                   = ???
       def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]               = ???

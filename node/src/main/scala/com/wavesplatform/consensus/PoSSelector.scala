@@ -62,7 +62,12 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
       gs <-
         if (vrfActivated(parentHeight + 1)) {
           crypto
-            .verifyVRF(header.generationSignature, parentHitSource.arr, header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, parentHeight))
+            .verifyVRF(
+              header.generationSignature,
+              parentHitSource.arr,
+              header.generator,
+              blockchain.isFeatureActivated(BlockchainFeatures.RideV6, parentHeight)
+            )
             .map(_.arr)
         } else {
           generationSignature(parentHitSource, header.generator).asRight[ValidationError]
@@ -79,12 +84,13 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
   def validateGenerationSignature(block: Block): Either[ValidationError, ByteStr] = {
     val blockGenSig = block.header.generationSignature
 
+    // TODO: we already check this
     blockchain.heightOf(block.header.reference).toRight(GenericError(s"Block reference ${block.header.reference} doesn't exist")).flatMap { height =>
       if (vrfActivated(height + 1)) {
         getHitSource(height)
           .flatMap(hs =>
-        crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height))
-      )
+            crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height))
+          )
       } else {
         blockchain
           .blockHeader(height)
@@ -118,7 +124,7 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
     )
   }
 
-  private[this] def calculateBaseTarget(height: Int, timestamp: Long, parent: BlockHeader, grandParent: Option[BlockHeader]): Long = {
+  private def calculateBaseTarget(height: Int, timestamp: Long, parent: BlockHeader, grandParent: Option[BlockHeader]): Long = {
     posCalculator(height).calculateBaseTarget(
       blockchainSettings.genesisSettings.averageBlockDelay.toSeconds,
       height,

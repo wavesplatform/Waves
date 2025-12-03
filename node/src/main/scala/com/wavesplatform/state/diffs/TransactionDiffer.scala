@@ -11,7 +11,7 @@ import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
-import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
+import com.wavesplatform.metrics.TxProcessingStats.measureForType
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
@@ -164,7 +164,7 @@ object TransactionDiffer {
         }
       } yield ()
 
-  private[this] def verifierDiff(blockchain: Blockchain, tx: Transaction, enableExecutionLog: Boolean): TracedResult[ValidationError, StateSnapshot] =
+  private def verifierDiff(blockchain: Blockchain, tx: Transaction, enableExecutionLog: Boolean): TracedResult[ValidationError, StateSnapshot] =
     Verifier(blockchain, enableExecutionLog = enableExecutionLog)(tx)
       .map(complexity => StateSnapshot(scriptsComplexity = complexity))
 
@@ -225,8 +225,9 @@ object TransactionDiffer {
           case sstx: SetScriptTransaction        => SetScriptTransactionDiff(blockchain)(sstx).traced
           case sstx: SetAssetScriptTransaction   => AssetTransactionsDiffs.setAssetScript(blockchain)(sstx).traced
           case stx: SponsorFeeTransaction        => AssetTransactionsDiffs.sponsor(blockchain)(stx).traced
-          case et: EthereumTransaction           => EthereumTransactionDiff(blockchain, currentBlockTs, limitedExecution, enableExecutionLog)(et)
-          case _                                 => UnsupportedTransactionType.asLeft.traced
+          case cgtx: CommitToGenerationTransaction => CommitToGenerationTransactionDiff(blockchain)(cgtx).traced
+          case et: EthereumTransaction             => EthereumTransactionDiff(blockchain, currentBlockTs, limitedExecution, enableExecutionLog)(et)
+          case _                                   => UnsupportedTransactionType.asLeft.traced
         }
       }
       .map(txSnapshot => initSnapshot |+| txSnapshot.withTransaction(NewTransactionInfo.create(tx, Status.Succeeded, txSnapshot, blockchain)))
@@ -336,7 +337,7 @@ object TransactionDiffer {
         case _ => None
       }
 
-    private[this] def scriptResult(cf: FailedTransactionError): Option[InvokeScriptResult] =
+    private def scriptResult(cf: FailedTransactionError): Option[InvokeScriptResult] =
       Some(InvokeScriptResult(error = Some(ErrorMessage(cf.code, cf.message)), invokes = cf.invocations))
   }
 

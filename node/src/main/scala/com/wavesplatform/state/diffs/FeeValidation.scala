@@ -25,29 +25,30 @@ object FeeValidation {
   val BlockV5Multiplier = 0.001
 
   val FeeConstants: Map[TransactionType.TransactionType, Long] = Map(
-    TransactionType.Genesis          -> 0,
-    TransactionType.Payment          -> 1,
-    TransactionType.Issue            -> 1000,
-    TransactionType.Reissue          -> 1000,
-    TransactionType.Burn             -> 1,
-    TransactionType.Transfer         -> 1,
-    TransactionType.MassTransfer     -> 1,
-    TransactionType.Lease            -> 1,
-    TransactionType.LeaseCancel      -> 1,
-    TransactionType.Exchange         -> 3,
-    TransactionType.CreateAlias      -> 1,
-    TransactionType.Data             -> 1,
-    TransactionType.SetScript        -> 10,
-    TransactionType.SponsorFee       -> 1000,
-    TransactionType.SetAssetScript   -> (1000 - 4),
-    TransactionType.InvokeScript     -> 5,
-    TransactionType.UpdateAssetInfo  -> 1,
-    TransactionType.Ethereum         -> 1,
-    TransactionType.InvokeExpression -> 10
+    TransactionType.Genesis            -> 0,
+    TransactionType.Payment            -> 1,
+    TransactionType.Issue              -> 1000,
+    TransactionType.Reissue            -> 1000,
+    TransactionType.Burn               -> 1,
+    TransactionType.Transfer           -> 1,
+    TransactionType.MassTransfer       -> 1,
+    TransactionType.Lease              -> 1,
+    TransactionType.LeaseCancel        -> 1,
+    TransactionType.Exchange           -> 3,
+    TransactionType.CreateAlias        -> 1,
+    TransactionType.Data               -> 1,
+    TransactionType.SetScript          -> 10,
+    TransactionType.SponsorFee         -> 1000,
+    TransactionType.SetAssetScript     -> (1000 - 4),
+    TransactionType.InvokeScript       -> 5,
+    TransactionType.UpdateAssetInfo    -> 1,
+    TransactionType.Ethereum           -> 1,
+    TransactionType.InvokeExpression   -> 10,
+    TransactionType.CommitToGeneration -> 100 // TODO: decide
   )
 
   def apply(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {
-    if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
+    if (Height(blockchain.height) >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
         feeDetails <- getMinFee(blockchain, tx)
         _ <- Either.cond(
@@ -99,16 +100,18 @@ object FeeValidation {
             (baseFee * multiplier).toLong
           case et: EthereumTransaction =>
             et.payload match {
-              case _: EthereumTransaction.Transfer   => 1
-              case _: EthereumTransaction.Invocation => 5
+              case _: EthereumTransaction.Transfer   => 1L
+              case _: EthereumTransaction.Invocation => 5L
             }
 
           case ss: SetScriptTransaction if blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
-            ss.script.fold(1) { script =>
-              val scriptSize = script.bytes().size
-              val kbs        = scriptSize / 1024
-              if (scriptSize > 0 && scriptSize % 1024 == 0) kbs else kbs + 1
-            }
+            ss.script
+              .fold(1) { script =>
+                val scriptSize = script.bytes().size
+                val kbs        = scriptSize / 1024
+                if (scriptSize > 0 && scriptSize % 1024 == 0) kbs else kbs + 1
+              }
+              .toLong
 
           case _ => baseFee
         }
@@ -117,7 +120,7 @@ object FeeValidation {
   }
 
   private def feeAfterSponsorship(txAsset: Asset, blockchain: Blockchain, tx: Transaction): Either[ValidationError, FeeInfo] = {
-    if (blockchain.height < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
+    if (Height(blockchain.height) < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       // This could be true for private blockchains
       feeInUnits(blockchain, tx).map(x => FeeInfo(None, Chain.empty, x * FeeUnit))
     } else {
@@ -179,9 +182,9 @@ object FeeValidation {
 
   private def feeAfterSmartAccounts(blockchain: Blockchain, tx: Transaction)(inputFee: FeeInfo): FeeInfo = {
     val smartAccountScriptsCount: Int = tx match {
-      case _: EthereumTransaction          => 0
-      case tx: Transaction with Authorized => if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
-      case _                               => 0
+      case _: EthereumTransaction         => 0
+      case tx: (Transaction & Authorized) => if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
+      case _                              => 0
     }
 
     val extraFee = smartAccountScriptsCount * ScriptExtraFee

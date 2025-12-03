@@ -2,13 +2,14 @@ package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.smartcontract.exchangeTx
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -55,7 +56,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val matcher = acc2
 
       val ts                  = ntpTime.correctedTime()
-      val expirationTimestamp = ts + Order.MaxLiveTime
+      val expirationTimestamp = ts + Order.MaxLiveTime / 2
 
       val buyPrice   = 2 * Order.PriceConstant
       val sellPrice  = 2 * Order.PriceConstant
@@ -197,7 +198,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
       val matcher                  = thirdKeyPair
       val ts                       = ntpTime.correctedTime()
-      val expirationTimestamp      = ts + Order.MaxLiveTime
+      val expirationTimestamp      = ts + Order.MaxLiveTime / 2
       var assetBalanceBefore: Long = 0L
 
       if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
@@ -283,7 +284,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     val matcher             = thirdKeyPair
     val ts                  = ntpTime.correctedTime()
-    val expirationTimestamp = ts + Order.MaxLiveTime
+    val expirationTimestamp = ts + Order.MaxLiveTime / 2
     val amount              = 1
     val nftWavesPrice       = 1000 * math.pow(10, 8).toLong
     val nftForAssetPrice    = 1 * math.pow(10, 8).toLong
@@ -418,7 +419,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id.toInt, 0)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id.toInt, Height(0))))
       .withDefault(1)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()

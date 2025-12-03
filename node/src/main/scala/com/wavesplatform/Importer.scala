@@ -1,16 +1,15 @@
 package com.wavesplatform
 
-import akka.actor.ActorSystem
 import cats.implicits.catsSyntaxOption
 import cats.syntax.apply.*
 import com.google.common.io.ByteStreams
-import com.google.common.primitives.Ints
+import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.Exporter.Formats
-import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
+import com.wavesplatform.api.common.*
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{DBExt, KeyTags, RDB}
+import com.wavesplatform.database.{DBExt, KeyTag, RDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
@@ -24,7 +23,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.ParSignatureChecker.sigverify
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, ParSignatureChecker}
+import com.wavesplatform.state.{BlockEndorser, Blockchain, BlockchainUpdaterImpl, Height, ParSignatureChecker}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -38,7 +37,7 @@ import monix.reactive.Observable
 import scopt.OParser
 
 import java.io.*
-import java.net.{MalformedURLException, URL}
+import java.net.{MalformedURLException, URI}
 import java.time
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -53,7 +52,7 @@ object Importer extends ScorexLogging {
   final case class ImportOptions(
       configFile: Option[File] = None,
       blockchainFile: String = "blockchain",
-      snapshotsFile: String = "snapshots",
+      snapshotsFile: Option[String] = None,
       importHeight: Int = Int.MaxValue,
       format: String = Formats.Binary,
       verify: Boolean = true,
@@ -79,7 +78,7 @@ object Importer extends ScorexLogging {
           .action((f, c) => c.copy(blockchainFile = f)),
         opt[String]('s', "snapshots-file")
           .text("Snapshots data file name")
-          .action((f, c) => c.copy(snapshotsFile = f)),
+          .action((f, c) => c.copy(snapshotsFile = Some(f))),
         opt[Int]('h', "height")
           .text("Import to height")
           .action((h, c) => c.copy(importHeight = h))
@@ -114,7 +113,7 @@ object Importer extends ScorexLogging {
 
   def loadSettings(file: Option[File]): WavesSettings = Application.loadApplicationConfig(file)
 
-  private[this] var triggers = Seq.empty[BlockchainUpdateTriggers]
+  private var triggers = Seq.empty[BlockchainUpdateTriggers]
 
   def initExtensions(
       wavesSettings: WavesSettings,
@@ -122,8 +121,7 @@ object Importer extends ScorexLogging {
       appenderScheduler: Scheduler,
       extensionTime: Time,
       utxPool: UtxPool,
-      rdb: RDB,
-      extensionActorSystem: ActorSystem
+      rdb: RDB
   ): Seq[Extension] =
     if (wavesSettings.extensions.isEmpty) Seq.empty
     else {
@@ -139,7 +137,6 @@ object Importer extends ScorexLogging {
 
           override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
             TracedResult.wrapE(Left(GenericError("Not implemented during import")))
-          override def actorSystem: ActorSystem        = extensionActorSystem
           override def utxEvents: Observable[UtxEvent] = Observable.empty
           override def transactionsApi: CommonTransactionsApi =
             CommonTransactionsApi(
@@ -153,6 +150,7 @@ object Importer extends ScorexLogging {
             )
           override def blocksApi: CommonBlocksApi =
             CommonBlocksApi(
+              settings.synchronizationSettings.maxRollback,
               blockchainUpdater,
               Application.loadBlockMetaAt(rdb.db, blockchainUpdater),
               Application.loadBlockInfoAt(rdb, blockchainUpdater)
@@ -161,6 +159,8 @@ object Importer extends ScorexLogging {
             CommonAccountsApi(() => blockchainUpdater.snapshotBlockchain, rdb, blockchainUpdater)
           override def assetsApi: CommonAssetsApi =
             CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.orEmpty, rdb.db, blockchainUpdater)
+          override def generatorsApi: CommonGeneratorsApi =
+            CommonGeneratorsApi(rdb, blockchainUpdater)
         }
       }
 
@@ -217,6 +217,8 @@ object Importer extends ScorexLogging {
     val maxSize = importOptions.maxQueueSize
     val queue   = new mutable.Queue[(VanillaBlock, Option[BlockSnapshotResponse])](maxSize)
 
+    val CurrentTS = System.currentTimeMillis()
+
     @tailrec
     def readBlocks(queue: mutable.Queue[(VanillaBlock, Option[BlockSnapshotResponse])], remainCount: Int, maxCount: Int): Unit = {
       if (remainCount == 0) ()
@@ -247,11 +249,12 @@ object Importer extends ScorexLogging {
             if (blocksToSkip > 0) {
               blocksToSkip -= 1
             } else {
-              val blockV5               = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height + (maxCount - remainCount) + 1)
               val rideV6                = blockchain.isFeatureActivated(BlockchainFeatures.RideV6, blockchain.height + (maxCount - remainCount) + 1)
               lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
-
-              val block = (if (!blockV5) Block.parseBytes(blockBytes) else parsedProtoBlock).orElse(parsedProtoBlock).get
+              val block = (if (1 < blockBytes.head && blockBytes.head < 5 && Longs.fromByteArray(blockBytes.slice(1, 9)) < CurrentTS)
+                             Block.parseBytes(blockBytes).orElse(parsedProtoBlock)
+                           else
+                             parsedProtoBlock).get
               val blockSnapshot = snapshotsBytes.map { bytes =>
                 BlockSnapshotResponse(
                   block.id(),
@@ -300,7 +303,7 @@ object Importer extends ScorexLogging {
         lock.synchronized {
           val (block, snapshot) = queue.dequeue()
           if (blockchain.lastBlockId.contains(block.header.reference)) {
-            Await.result(appendBlock(block, snapshot).runAsyncLogErr(appender), Duration.Inf) match {
+            Await.result(appendBlock(block, snapshot).runAsyncLogErr(using appender), Duration.Inf) match {
               case Left(ve) =>
                 log.error(s"Error appending block: $ve")
                 queue.clear()
@@ -308,7 +311,7 @@ object Importer extends ScorexLogging {
               case _ =>
                 counter = counter + 1
             }
-          } else {
+          } else if (!quit) {
             log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
           }
         }
@@ -328,7 +331,7 @@ object Importer extends ScorexLogging {
         case _ =>
           System.setProperty("http.agent", s"waves-node/${Version.VersionString}")
           try {
-            val url        = new URL(file)
+            val url        = URI.create(file).toURL
             val connection = url.openConnection()
             if (offset > 0) connection.setRequestProperty("Range", s"bytes=$offset-")
             connection.connect()
@@ -345,23 +348,22 @@ object Importer extends ScorexLogging {
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
 
-    val actorSystem = ActorSystem("wavesplatform-import")
-    val rdb         = RDB.open(settings.dbSettings)
-    val (blockchainUpdater, _) =
+    val rdb = RDB.open(settings.dbSettings)
+    val (blockchainUpdater, rdbWriter) =
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]] =
-      BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify, txSignParCheck = false)
+      BlockAppender(blockchainUpdater, time, utxPool, pos, BlockEndorser.Disabled, scheduler, importOptions.verify, txSignParCheck = false)
 
-    val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb, actorSystem)
+    val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
-    val (blocksFileOffset, snapshotsFileOffset) =
+    val blocksFileOffset =
       importOptions.format match {
         case Formats.Binary =>
           var blocksOffset = 0L
-          rdb.db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
+          rdb.db.iterateOver(KeyTag.BlockInfoAtHeight) { e =>
             e.getKey match {
               case Array(_, _, 0, 0, 0, 1) => // Skip genesis
               case _ =>
@@ -369,26 +371,26 @@ object Importer extends ScorexLogging {
                 blocksOffset += meta.size + 4
             }
           }
-
-          var totalSize = 0L
-          rdb.db.iterateOver(KeyTags.NthTransactionStateSnapshotAtHeight) { e =>
-            totalSize += (e.getValue.length + 4)
-          }
-
-          val snapshotsOffset = totalSize
-
-          blocksOffset -> snapshotsOffset
-        case _ => 0L -> 0L
+          blocksOffset
+        case _ =>
+          0
       }
     val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)
     val snapshotsInputStream =
-      if (settings.enableLightMode)
-        Some(new BufferedInputStream(initFileStream(importOptions.snapshotsFile, snapshotsFileOffset), 20 * 1024 * 1024))
-      else None
+      importOptions.snapshotsFile
+        .map { file =>
+          val inputStream = new BufferedInputStream(initFileStream(file, 0), 20 * 1024 * 1024)
+          val sizeBytes   = new Array[Byte](Ints.BYTES)
+          (2 to blockchainUpdater.height).foreach { _ =>
+            ByteStreams.read(inputStream, sizeBytes, 0, 4)
+            val snapshotsSize = Ints.fromByteArray(sizeBytes)
+            ByteStreams.skipFully(inputStream, snapshotsSize)
+          }
+          inputStream
+        }
 
     sys.addShutdownHook {
       quit = true
-      Await.result(actorSystem.terminate(), 10.second)
       lock.synchronized {
         if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG) && blockchainUpdater.liquidBlockMeta.nonEmpty) {
           // Force store liquid block in rocksdb
@@ -401,16 +403,17 @@ object Importer extends ScorexLogging {
               lastHeader.baseTarget,
               lastHeader.generationSignature,
               lastHeader.generator,
-              Nil,
-              0,
-              ByteStr.empty,
-              None,
-              None
+              featureVotes = Nil,
+              rewardVote = 0,
+              transactionsRoot = ByteStr.empty,
+              stateHash = None,
+              challengedHeader = None,
+              finalizationVoting = None
             ),
             ByteStr.empty,
             Nil
           )
-          blockchainUpdater.processBlock(pseudoBlock, ByteStr.empty, None, verify = false)
+          blockchainUpdater.processBlock(pseudoBlock, hitSource = ByteStr.empty, snapshot = None, generatorBalances = Seq.empty, verify = false)
         }
 
         // Terminate appender
@@ -422,6 +425,7 @@ object Importer extends ScorexLogging {
 
         utxPool.close()
         blockchainUpdater.shutdown()
+        rdbWriter.close()
         rdb.close()
       }
       blocksInputStream.close()

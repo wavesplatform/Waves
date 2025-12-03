@@ -3,7 +3,7 @@ package com.wavesplatform
 import com.google.common.primitives.Shorts
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.Asset.IssuedAsset

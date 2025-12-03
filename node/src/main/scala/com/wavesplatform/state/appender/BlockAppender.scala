@@ -8,9 +8,9 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.network.*
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
+import com.wavesplatform.state.{BlockEndorser, Blockchain}
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature, InvalidStateHash}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -23,6 +23,7 @@ import monix.eval.Task
 import monix.execution.Scheduler
 
 import java.time.Instant
+import scala.util.chaining.*
 
 object BlockAppender extends ScorexLogging {
   def apply(
@@ -30,19 +31,23 @@ object BlockAppender extends ScorexLogging {
       time: Time,
       utxStorage: UtxPool,
       pos: PoSSelector,
+      blockEndorser: BlockEndorser,
       scheduler: Scheduler,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
   )(newBlock: Block, snapshot: Option[BlockSnapshotResponse]): Task[Either[ValidationError, BlockApplyResult]] =
     Task {
       if (
-        blockchainUpdater
-          .isLastBlockId(newBlock.header.reference) || blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
+        blockchainUpdater.isLastBlockId(newBlock.header.reference) ||
+        blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
       ) {
         if (newBlock.header.challengedHeader.isDefined) {
           appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
         } else {
-          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
+          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot).tap {
+            case Right(_: Applied) => blockEndorser.vote()
+            case _                 =>
+          }
         }
       } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(Ignored)
@@ -58,6 +63,7 @@ object BlockAppender extends ScorexLogging {
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
       blockChallenger: Option[BlockChallenger],
+      blockEndorser: BlockEndorser,
       scheduler: Scheduler
   )(ch: Channel, newBlock: Block, snapshot: Option[BlockSnapshotResponse]): Task[Unit] = {
     import metrics.*
@@ -70,7 +76,7 @@ object BlockAppender extends ScorexLogging {
       (for {
         _ <- EitherT(Task(Either.cond(newBlock.signatureValid(), (), GenericError("Invalid block signature"))))
         _ = span.markNtp("block.signatures-validated")
-        validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock, snapshot))
+        validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, blockEndorser, scheduler)(newBlock, snapshot))
       } yield validApplication).value
 
     val handle = append.flatMap {
@@ -117,7 +123,7 @@ object BlockAppender extends ScorexLogging {
   }
 
   // noinspection TypeAnnotation,ScalaStyle
-  private[this] object metrics {
+  private object metrics {
     def createApplySpan(block: Block) = {
       Kamon
         .spanBuilder("block-appender")
@@ -133,7 +139,7 @@ object BlockAppender extends ScorexLogging {
       def finishNtp()(implicit time: Time): Unit =
         span.finish(ntpTime)
 
-      private[this] def ntpTime(implicit time: Time) =
+      private def ntpTime(implicit time: Time) =
         Instant.ofEpochMilli(time.correctedTime())
     }
   }

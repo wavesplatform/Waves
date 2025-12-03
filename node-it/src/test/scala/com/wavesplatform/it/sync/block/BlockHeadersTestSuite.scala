@@ -2,15 +2,16 @@ package com.wavesplatform.it.sync.block
 
 import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api._
+import com.wavesplatform.it.api.*
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
+import com.wavesplatform.state.Height
 import org.scalactic.source.Position
-import org.scalatest._
+import org.scalatest.*
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class BlockHeadersTestSuite
     extends funsuite.AnyFunSuite
@@ -19,7 +20,7 @@ class BlockHeadersTestSuite
     with NodesFromDocker
     with matchers.should.Matchers {
 
-  private val activationHeight   = 4
+  private val activationHeight   = Height(4)
   private val minerDesiredReward = 750000000
   private val minIncrement       = 50000000
   private val initialReward      = 600000000
@@ -31,20 +32,20 @@ class BlockHeadersTestSuite
       .overrideBase(
         _.raw(
           s"""waves {
-           |  blockchain.custom.functionality {
-           |    pre-activated-features = {
-           |      ${BlockchainFeatures.BlockReward.id} = $activationHeight
-           |    }
-           |  }
-           |  blockchain.custom.rewards {
-           |    term = $rewardTerm
-           |    initial = $initialReward
-           |    min-increment = $minIncrement
-           |    voting-interval = $votingInterval
-           |  }
-           |  rewards.desired = $minerDesiredReward
-           |  miner.quorum = 1
-           |}""".stripMargin
+             |  blockchain.custom.functionality {
+             |    pre-activated-features = {
+             |      ${BlockchainFeatures.BlockReward.id} = $activationHeight
+             |    }
+             |  }
+             |  blockchain.custom.rewards {
+             |    term = $rewardTerm
+             |    initial = $initialReward
+             |    min-increment = $minIncrement
+             |    voting-interval = $votingInterval
+             |  }
+             |  rewards.desired = $minerDesiredReward
+             |  miner.quorum = 1
+             |}""".stripMargin
         )
       )
       .withDefault(1)
@@ -68,14 +69,14 @@ class BlockHeadersTestSuite
     val baseHeight = nodes.map(_.height).max
     Await.result(processRequests(generateTransfersToRandomAddresses(10, nodeAddresses)), 2.minutes)
     nodes.waitForHeight(baseHeight + 4)
-    notMiner.blockHeadersAt(activationHeight).reward shouldBe Some(initialReward)
-    notMiner.blockHeadersAt(activationHeight + 1).desiredReward shouldBe Some(minerDesiredReward)
-    val block        = notMiner.blockAt(baseHeight + 1)
-    val blocksHeader = notMiner.blockHeadersAt(baseHeight + 1)
+    notMiner.blockHeaderAt(activationHeight).reward shouldBe Some(initialReward)
+    notMiner.blockHeaderAt(activationHeight + 1).desiredReward shouldBe Some(minerDesiredReward)
+    val block       = notMiner.blockAt(baseHeight + 1)
+    val blockHeader = notMiner.blockHeaderAt(baseHeight + 1)
 
-    assertBlockInfo(block, blocksHeader)
+    assertBlockInfo(block, blockHeader)
     nodes.waitForHeight(activationHeight + rewardTerm)
-    notMiner.blockHeadersAt(activationHeight + rewardTerm).reward shouldBe Some(initialReward + minIncrement)
+    notMiner.blockHeaderAt(activationHeight + rewardTerm).reward shouldBe Some(initialReward + minIncrement)
   }
 
   test("lastBlock content should be equal to lastBlockHeader, except transactions info") {
@@ -94,14 +95,13 @@ class BlockHeadersTestSuite
     val blocks       = nodes.head.blockSeq(baseHeight + 1, baseHeight + 3)
     val blockHeaders = nodes.head.blockHeadersSeq(baseHeight + 1, baseHeight + 3)
 
-    blocks.zip(blockHeaders).foreach {
-      case (block, header) =>
-        header.generator shouldBe block.generator
-        header.timestamp shouldBe block.timestamp
-        header.signature shouldBe block.signature
-        header.desiredReward shouldBe block.desiredReward
-        header.reward shouldBe block.reward
-        header.transactionCount shouldBe block.transactions.size
+    blocks.zip(blockHeaders).foreach { case (block, header) =>
+      header.generator shouldBe block.generator
+      header.timestamp shouldBe block.timestamp
+      header.signature shouldBe block.signature
+      header.desiredReward shouldBe block.desiredReward
+      header.reward shouldBe block.reward
+      header.transactionCount shouldBe block.transactions.size
     }
   }
 
@@ -109,8 +109,8 @@ class BlockHeadersTestSuite
     val miner  = nodes.head
     val height = miner.height
 
-    val minerBlocks    = miner.blockSeqByAddress(miner.address, 1, height)
-    val nonMinerBlocks = notMiner.blockSeqByAddress(notMiner.address, 1, height)
+    val minerBlocks    = miner.blockSeqByAddress(miner.address, Height(1), height)
+    val nonMinerBlocks = notMiner.blockSeqByAddress(notMiner.address, Height(1), height)
 
     minerBlocks.size shouldEqual (height - 1)
     nonMinerBlocks shouldBe empty

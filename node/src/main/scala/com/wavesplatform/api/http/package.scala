@@ -1,9 +1,10 @@
 package com.wavesplatform.api
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.*
-import akka.http.scaladsl.server.Directives.*
+import org.apache.pekko
+import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.server.*
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import cats.syntax.either.*
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, PublicKey}
@@ -60,7 +61,7 @@ package object http {
   ): ToResponseMarshallable = {
     val typeId = (jsv \ "type").as[Byte]
 
-    (jsv \ "version").validateOpt[Byte](versionReads) match {
+    (jsv \ "version").validateOpt[Byte](using versionReads) match {
       case JsError(errors) => WrongJson(None, errors)
       case JsSuccess(value, _) =>
         val version = value.getOrElse(1: Byte)
@@ -124,8 +125,8 @@ package object http {
     }
   }
 
-  val TransactionId: PathMatcher1[ByteStr] = idOrHash(InvalidTransactionId)
-  val BlockId: PathMatcher1[ByteStr]       = idOrHash(InvalidBlockId)
+  val TransactionId: PathMatcher1[ByteStr] = idOrHash(InvalidTransactionId.apply)
+  val BlockId: PathMatcher1[ByteStr]       = idOrHash(InvalidBlockId.apply)
 
   val AssetId: PathMatcher1[IssuedAsset] = base58Segment(Some(crypto.DigestLength), _ => InvalidAssetId).map(IssuedAsset(_))
 
@@ -162,7 +163,7 @@ package object http {
   def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
 
   private lazy val logger: Logger =
-    Logger(LoggerFactory.getLogger(getClass.getName))
+    Logger(LoggerFactory.getLogger(this.getClass.getName))
 
   val uncaughtExceptionHandler: ExceptionHandler = ExceptionHandler {
     case ApiException(error)   => complete(error)
@@ -170,25 +171,25 @@ package object http {
     case NonFatal(e)           => logger.error("Uncaught error", e); complete(ApiError.Unknown)
   }
 
-  /** Handles all [[scala.util.control.NonFatal non-fatal]] exceptions and tries to handle fatal errors.
+  /** Handles all [[scala.util.control.NonFatal]] exceptions and tries to handle fatal errors.
     *
     * This directive can't handle __fatal__ errors from:
     *
     *   - Monix [[monix.eval.Task tasks]] with async boundaries:
-    * {{{
+    *     {{{
     *       get(complete(Task(throw new StackOverflowError()).executeAsync.runToFuture))
     *       get(complete(Task.evalAsync(throw new StackOverflowError()).runToFuture))
     *       get(complete(Task.deferFuture(Future(throw new StackOverflowError())).runToFuture))
-    * }}}
+    *     }}}
     *   - Async futures (i.e. which are not available at the time of handling):
-    * {{{
+    *     {{{
     *       get(complete(Future(throw new StackOverflowException())))
-    * }}}
+    *     }}}
     */
   def handleAllExceptions: Directive0 =
     Directive { inner => ctx =>
       val handleExceptions = uncaughtExceptionHandler.andThen(_(ctx))
-      try inner(())(ctx).recoverWith(handleExceptions)(ctx.executionContext)
+      try inner(())(ctx).recoverWith(handleExceptions)(using ctx.executionContext)
       catch {
         case thr: Throwable => uncaughtExceptionHandler.andThen(_(ctx)).applyOrElse[Throwable, Future[RouteResult]](thr, throw _)
       }

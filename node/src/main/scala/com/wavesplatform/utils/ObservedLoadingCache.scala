@@ -18,7 +18,7 @@ class ObservedLoadingCache[K, V](override val delegate: LoadingCache[K, V], chan
     changed.onNext(key)
   }
 
-  override def putAll(m: java.util.Map[_ <: K, _ <: V]): Unit = {
+  override def putAll(m: java.util.Map[? <: K, ? <: V]): Unit = {
     super.putAll(m)
     m.keySet().forEach(k => changed.onNext(k))
   }
@@ -28,7 +28,7 @@ class ObservedLoadingCache[K, V](override val delegate: LoadingCache[K, V], chan
     onNext(key)
   }
 
-  override def invalidateAll(keys: java.lang.Iterable[_]): Unit = {
+  override def invalidateAll(keys: java.lang.Iterable[?]): Unit = {
     super.invalidateAll(keys)
     keys.forEach(onNext)
   }

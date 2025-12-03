@@ -1,13 +1,12 @@
 package com.wavesplatform.network
 
-import java.util
-
 import com.wavesplatform.crypto
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.MessageToMessageCodec
 
+import java.util
 import scala.util.{Failure, Success}
 
 @Sharable
@@ -32,6 +31,7 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
       case m: MicroSnapshotRequest       => RawBytes.from(MicroSnapshotRequestSpec, m)
       case s: BlockSnapshotResponse      => RawBytes.from(BlockSnapshotResponseSpec, s)
       case s: MicroBlockSnapshotResponse => RawBytes.from(MicroBlockSnapshotResponseSpec, s)
+      case e: EndorseBlock               => RawBytes.from(EndorseBlockSpec, e)
 
       // Version switch
       case gs: GetSignatures if isNewMsgsSupported(ctx) =>
@@ -67,7 +67,7 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
     peerDatabase.blacklistAndClose(ctx.channel(), s"Invalid message. ${e.getMessage}")
   }
 
-  private[this] def isNewMsgsSupported(ctx: ChannelHandlerContext): Boolean = {
+  private def isNewMsgsSupported(ctx: ChannelHandlerContext): Boolean = {
     val (v1, v2, _) = ctx.channel().attr(HandshakeHandler.NodeVersionAttributeKey).get()
     v1 > 1 || (v1 == 1 && v2 >= 2) // >= 1.2.0
   }

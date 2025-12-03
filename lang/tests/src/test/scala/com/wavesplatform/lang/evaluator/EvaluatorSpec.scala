@@ -2,7 +2,7 @@ package com.wavesplatform.lang.evaluator
 
 import cats.Id
 import cats.implicits.*
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.utils.lazyContexts
@@ -17,7 +17,7 @@ import com.wavesplatform.test.PropSpec
 import org.scalatest.Inside
 import org.scalatest.exceptions.TestFailedException
 
-abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
+trait EvaluatorSpecBase extends ScriptGen, Inside {
   val lastVersion: StdLibVersion = DirectiveDictionary[StdLibVersion].all.last
 
   def eval(
@@ -73,7 +73,7 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
   }
 
   private def evalExpr(expr: EXPR, version: StdLibVersion, useNewPowPrecision: Boolean): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
-    val ctx     = lazyContexts((DirectiveSet(version, Account, Expression).explicitGet(), useNewPowPrecision, true)).value()
+    val ctx     = lazyContexts((DirectiveSet(version, Account, Expression).explicitGet(), useNewPowPrecision, true, true)).value()
     val evalCtx = ctx.evaluationContext(Common.emptyBlockchainEnvironment())
     EvaluatorV2.applyCompleted(
       evalCtx,
@@ -88,7 +88,9 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
   }
 
   private def compile(code: String, version: StdLibVersion): Either[String, EXPR] = {
-    val ctx = lazyContexts((DirectiveSet(version, Account, Expression).explicitGet(), true, true)).value()
+    val ctx = lazyContexts((DirectiveSet(version, Account, Expression).explicitGet(), true, true, true)).value()
     ExpressionCompiler.compile(code, NoLibraries, ctx.compilerContext, version, allowIllFormedStrings = true).map(_._1)
   }
 }
+
+abstract class EvaluatorSpec extends PropSpec, EvaluatorSpecBase

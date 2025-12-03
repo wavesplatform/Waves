@@ -1,13 +1,11 @@
 package com.wavesplatform.ride.runner.db
 
-import com.google.common.primitives.Ints
-import com.wavesplatform.database.rocksdb.Key
+import com.wavesplatform.database.Key
 import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.caches.disk.KvHistoryPair
 import com.wavesplatform.ride.runner.db.Heights.{splitHeightsAt, splitHeightsAtRollback}
 import com.wavesplatform.state.Height
 import org.rocksdb.ColumnFamilyHandle
-import shapeless.=:!=
 
 import scala.annotation.unused
 import scala.collection.mutable
@@ -70,7 +68,7 @@ trait ReadWrite extends ReadOnly {
     val affectedEntryKeys = mutable.Set.empty[K]
     val entriesKey        = historyKey.kvPairAtHeight
 
-    iterateOverPrefix(entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight), entriesKey.columnFamilyHandle) { e =>
+    iterateOverPrefix(entriesKey.prefixBytes ++ fromHeight.toByteArray, entriesKey.columnFamilyHandle) { e =>
       val rawKey        = e.getKey
       val keyWithHeight = entriesKey.parseKey(rawKey)
       val (_, key)      = keyWithHeight

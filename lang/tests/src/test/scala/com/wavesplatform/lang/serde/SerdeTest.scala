@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.serde
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -117,7 +117,7 @@ class SerdeTest extends FreeSpec {
     val byteArr   = Array[Byte](1, 113, -1, 63, 0, -1, 127, 0, -1, 39, -1, 87, -41, 50, -111, -38, 12, 1, 0, -19, 101, -128, -1, 54)
     val (r, time) = measureTime(ser.deserialize(byteArr).map(_._1))
 
-    r shouldBe an[Either[_, _]]
+    r shouldBe an[Either[?, ?]]
     time should be <= 1000L
   }
 
@@ -125,7 +125,7 @@ class SerdeTest extends FreeSpec {
     forAll(Gen.containerOf[Array, Byte](Arbitrary.arbByte.arbitrary)) { byteArr =>
       val (r, time) = measureTime(ser.deserialize(byteArr).map(_._1))
 
-      r shouldBe an[Either[_, _]]
+      r shouldBe an[Either[?, ?]]
       time should be <= 1000L
     }
   }

@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.directives
 
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.directives.DirectiveKey._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.directives.DirectiveKey.*
 
 case class Directive(key: DirectiveKey, value: DirectiveValue)
 
@@ -17,11 +17,14 @@ object Directive {
       })
       .asInstanceOf[key.Value]
 
-  def extractDirectives(directives: Iterable[Directive], defaultStdLib: => STDLIB_VERSION.Value = StdLibVersion.VersionDic.default): Either[String, DirectiveSet] =
+  def extractDirectives(
+      directives: Iterable[Directive],
+      defaultStdLib: => STDLIB_VERSION.Value = StdLibVersion.VersionDic.default
+  ): Either[String, DirectiveSet] =
     DirectiveSet(
       directives.find(_.key == STDLIB_VERSION).fold(defaultStdLib)(_.value.asInstanceOf[STDLIB_VERSION.Value]),
-      extractValue(directives, SCRIPT_TYPE)(None),
-      extractValue(directives, CONTENT_TYPE)(None),
-      extractValue(directives, IMPORT)(None)
+      extractValue(directives, SCRIPT_TYPE)(using None),
+      extractValue(directives, CONTENT_TYPE)(using None),
+      extractValue(directives, IMPORT)(using None)
     )
 }

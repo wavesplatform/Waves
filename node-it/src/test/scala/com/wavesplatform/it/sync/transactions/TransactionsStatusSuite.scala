@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.api.http.ApiError.InvalidIds
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{TransactionInfo, TransactionStatus}
@@ -40,7 +40,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
     notMiner.utxSize shouldBe 5
 
-    val checkData = CheckData(notMiner.height, confirmedTxsInfo, unconfirmedTxs.map(_.id().toString), notFoundTxs.map(_.id().toString))
+    val checkData = CheckData(notMiner.height.toInt, confirmedTxsInfo, unconfirmedTxs.map(_.id().toString), notFoundTxs.map(_.id().toString))
 
     val postJsonResult = notMiner.transactionStatus(txIds)
     val postFormResult =

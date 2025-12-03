@@ -3,16 +3,17 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.{BaseFreeSpec, WaitForHeight2}
-import com.wavesplatform.test._
+import com.wavesplatform.state.Height
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class NodeRestartTestSuite extends BaseFreeSpec with WaitForHeight2 {
-  import NodeRestartTestSuite._
+  import NodeRestartTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -20,7 +21,7 @@ class NodeRestartTestSuite extends BaseFreeSpec with WaitForHeight2 {
   private def nodeB = nodes(1)
 
   "node should grow up to 5 blocks together and sync" in {
-    nodes.waitForSameBlockHeadersAt(height = 5)
+    nodes.waitForSameBlockHeadersAt(Height(5))
   }
 
   "create many addresses and check them after node restart" in {
@@ -58,7 +59,7 @@ class NodeRestartTestSuite extends BaseFreeSpec with WaitForHeight2 {
     docker.restartContainer(dockerNodes().head)
     docker.restartContainer(dockerNodes()(1))
 
-    nodes.waitForHeight(txHeight + 2)
+    nodes.waitForHeight(Height(txHeight + 2))
 
     assertBadRequestAndMessage(
       nodeB.signedBroadcast(txJson, waitForTx = true),
@@ -69,7 +70,7 @@ class NodeRestartTestSuite extends BaseFreeSpec with WaitForHeight2 {
 }
 
 object NodeRestartTestSuite {
-  import com.wavesplatform.it.NodeConfigs._
+  import com.wavesplatform.it.NodeConfigs.*
   private val FirstNode = ConfigFactory.parseString(s"""
                                                          |waves {
                                                          |  synchronization.synchronization-timeout = 10s

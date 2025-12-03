@@ -1,9 +1,12 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import cats.implicits.*
+import cats.syntax.either.*
+import cats.syntax.semigroup.*
+import cats.syntax.traverse.*
 import cats.{Id, Monad}
 import com.wavesplatform.common.merkle.Merkle.createRoot
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
@@ -14,14 +17,13 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
-import com.wavesplatform.lang.{CommonError, ExecutionError, ThrownError}
 
 import scala.collection.mutable
 import scala.util.Try
 
 object CryptoContext {
 
-  val rsaTypeNames = List("NoAlg", "Md5", "Sha1", "Sha224", "Sha256", "Sha384", "Sha512", "Sha3224", "Sha3256", "Sha3384", "Sha3512")
+  val rsaTypeNames: Seq[String] = List("NoAlg", "Md5", "Sha1", "Sha224", "Sha256", "Sha384", "Sha512", "Sha3224", "Sha3256", "Sha3384", "Sha3512")
 
   private def rsaHashAlgs(v: StdLibVersion) = {
     rsaTypeNames.map(CASETYPEREF(_, List.empty, v > V3))
@@ -42,17 +44,17 @@ object CryptoContext {
   private def digestAlgValue(tpe: CASETYPEREF): ContextfulVal[NoContext] =
     ContextfulVal.pure(CaseObj(tpe, Map.empty))
 
-  def build(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] =
+  def build(global: BaseGlobal, version: StdLibVersion, fixEcrecover: Boolean): CTX[NoContext] =
     ctxCache.getOrElse(
-      (global, version),
+      (global, version, fixEcrecover),
       ctxCache.synchronized {
-        ctxCache.getOrElseUpdate((global, version), buildNew(global, version))
+        ctxCache.getOrElseUpdate((global, version, fixEcrecover), buildNew(global, version, fixEcrecover))
       }
     )
 
-  private val ctxCache = mutable.AnyRefMap.empty[(BaseGlobal, StdLibVersion), CTX[NoContext]]
+  private val ctxCache = mutable.HashMap.empty[(BaseGlobal, StdLibVersion, Boolean), CTX[NoContext]]
 
-  private def buildNew(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] = {
+  private def buildNew(global: BaseGlobal, version: StdLibVersion, fixEcrecover: Boolean): CTX[NoContext] = {
     def functionFamily(
         startId: Short,
         nameByLimit: Int => String,
@@ -257,7 +259,7 @@ object CryptoContext {
         ("sig", BYTESTR),
         ("pub", BYTESTR)
       ) {
-        case (digestAlg: CaseObj) :: CONST_BYTESTR(msg) :: CONST_BYTESTR(sig) :: CONST_BYTESTR(pub) :: Nil if version < V4 && msg.size > lim =>
+        case (_: CaseObj) :: CONST_BYTESTR(msg) :: CONST_BYTESTR(_) :: CONST_BYTESTR(_) :: Nil if version < V4 && msg.size > lim =>
           Left(s"Invalid message size = ${msg.size} bytes, must be not greater than ${lim / 1024} KB")
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg) :: CONST_BYTESTR(sig) :: CONST_BYTESTR(pub) :: Nil =>
           rsaVerify(digestAlg, msg, sig, pub)
@@ -296,7 +298,7 @@ object CryptoContext {
     def toBase58StringF: BaseFunction[NoContext] =
       NativeFunction(
         "toBase58String",
-        Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 3L),
+        Map(V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 3L),
         TOBASE58,
         STRING,
         ("bytes", BYTESTR)
@@ -309,7 +311,7 @@ object CryptoContext {
     def fromBase58StringF: BaseFunction[NoContext] =
       NativeFunction(
         "fromBase58String",
-        Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 1L),
+        Map(V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 1L),
         FROMBASE58,
         BYTESTR,
         ("str", STRING)
@@ -319,31 +321,51 @@ object CryptoContext {
         case xs => notImplemented[Id, EVALUATED]("fromBase58String(str: String)", xs)
       }
 
-    def toBase64StringF: BaseFunction[NoContext] =
-      NativeFunction(
-        "toBase64String",
-        Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 35L),
-        TOBASE64,
-        STRING,
-        ("bytes", BYTESTR)
-      ) {
+    def toBase64StringF(
+        name: String,
+        complexities: Map[StdLibVersion, Long],
+        id: Short,
+        limit: Int = global.MaxBase64Bytes
+    ): BaseFunction[NoContext] =
+      NativeFunction(name, complexities, id, STRING, ("bytes", BYTESTR)) {
         case CONST_BYTESTR(bytes) :: Nil =>
-          global.base64Encode(bytes.arr).leftMap(CommonError(_)).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+          global.base64Encode(bytes.arr, limit).leftMap(CommonError(_)).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
         case xs => notImplemented[Id, EVALUATED]("toBase64String(bytes: ByteVector)", xs)
       }
 
-    def fromBase64StringF: BaseFunction[NoContext] =
+    val toBase64String    = toBase64StringF("toBase64String", Map(V1 -> 10L, V4 -> 35L, V9 -> 3L), TOBASE64)
+    val toBase64String_1C = toBase64StringF("toBase64String_1C", Map(V9 -> 1L), TOBASE64_1C, 1024)
+
+    def fromBase64StringF(
+        name: String,
+        complexities: Map[StdLibVersion, Long],
+        functionId: Short,
+        inputSizeLimit: Int = global.MaxBase64String,
+        resultSizeLimit: Option[Int] = None
+    ): BaseFunction[NoContext] =
       NativeFunction(
-        "fromBase64String",
-        Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 40L),
-        FROMBASE64,
+        name,
+        complexities,
+        functionId,
         BYTESTR,
         ("str", STRING)
       ) {
         case CONST_STRING(str: String) :: Nil =>
-          global.base64Decode(str, global.MaxBase64String).leftMap(CommonError(_)).flatMap(x => CONST_BYTESTR(ByteStr(x)))
-        case xs => notImplemented[Id, EVALUATED]("fromBase64String(str: String)", xs)
+          for {
+            bs <- global.base64Decode(str, inputSizeLimit).leftMap(CommonError(_))
+            _ <- resultSizeLimit
+              .toLeft(())
+              .leftFlatMap { limit =>
+                Either.raiseWhen(bs.length > limit)(s"byte vector length ${bs.length} exceeds limit $limit")
+              }
+              .leftMap(CommonError(_))
+            cbs <- CONST_BYTESTR(ByteStr(bs))
+          } yield cbs
+        case xs => notImplemented[Id, EVALUATED](s"$name(str: String)", xs)
       }
+
+    val fromBase64String    = fromBase64StringF("fromBase64String", Map(V1 -> 10L, V4 -> 40L, V9 -> 12L), FROMBASE64)
+    val fromBase64String_1C = fromBase64StringF("fromBase64String_1C", Map(V9 -> 1L), FROMBASE64_1C, global.MaxBase64String_1C, Some(1024))
 
     val checkMerkleProofF: BaseFunction[NoContext] =
       NativeFunction(
@@ -363,7 +385,7 @@ object CryptoContext {
     val createMerkleRootF: BaseFunction[NoContext] =
       NativeFunction(
         "createMerkleRoot",
-        30,
+        Map(V4 -> 30L, V9 -> 3L),
         CREATE_MERKLE_ROOT,
         BYTESTR,
         ("merkleProof", LIST(BYTESTR)),
@@ -373,8 +395,7 @@ object CryptoContext {
         case xs @ ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
           val sizeCheckedProofs = proof.collect { case bs @ CONST_BYTESTR(v) if v.size == 32 => bs }
           if (value.size == 32 && proof.length <= 16 && sizeCheckedProofs.size == proof.size) {
-            Try(createRoot(value.arr, Math.toIntExact(index), sizeCheckedProofs.reverse.map(_.bs.arr)))
-              .toEither
+            Try(createRoot(value.arr, Math.toIntExact(index), sizeCheckedProofs.reverse.map(_.bs.arr))).toEither
               .leftMap(e => ThrownError(if (e.getMessage != null) e.getMessage else "error"))
               .flatMap(r => CONST_BYTESTR(ByteStr(r)))
           } else {
@@ -383,16 +404,25 @@ object CryptoContext {
         case xs => notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector, index: Int)", xs)
       }
 
-    def toBase16StringF(checkLength: Boolean): BaseFunction[NoContext] = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
-      case CONST_BYTESTR(bytes) :: Nil => global.base16Encode(bytes.arr, checkLength).leftMap(CommonError(_)).flatMap(CONST_STRING(_))
-      case xs                          => notImplemented[Id, EVALUATED]("toBase16String(bytes: ByteVector)", xs)
-    }
+    def toBase16StringF(name: String, complexities: Map[StdLibVersion, Long], id: Short, limit: Option[Int]): BaseFunction[NoContext] =
+      NativeFunction(name, complexities, id, STRING, ("bytes", BYTESTR)) {
+        case CONST_BYTESTR(bytes) :: Nil => global.base16Encode(bytes.arr, limit).leftMap(CommonError(_)).flatMap(CONST_STRING(_))
+        case xs                          => notImplemented[Id, EVALUATED]("toBase16String(bytes: ByteVector)", xs)
+      }
 
-    def fromBase16StringF(checkLength: Boolean): BaseFunction[NoContext] =
-      NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, ("str", STRING)) {
-        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, checkLength).leftMap(CommonError(_)).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+    def toBase16String(checkLength: Boolean) =
+      toBase16StringF("toBase16String", Map(V3 -> 10L, V9 -> 4L), TOBASE16, if (checkLength) Some(global.MaxBase16Bytes) else None)
+    val toBase16String_1C = toBase16StringF("toBase16String_1C", Map(V9 -> 1L), TOBASE16_1C, Some(1024))
+
+    def fromBase16StringF(name: String, complexities: Map[StdLibVersion, Long], id: Short, limit: Option[Int]): BaseFunction[NoContext] =
+      NativeFunction(name, complexities, id, BYTESTR, ("str", STRING)) {
+        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, limit).leftMap(CommonError(_)).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id, EVALUATED]("fromBase16String(str: String)", xs)
       }
+
+    def fromBase16String(checkLength: Boolean) =
+      fromBase16StringF("fromBase16String", Map(V3 -> 10L, V9 -> 4L), FROMBASE16, if (checkLength) Some(global.MaxBase16String) else None)
+    val fromBase16String_1C = fromBase16StringF("fromBase16String_1C", Map(V9 -> 1L), FROMBASE16_1C, Some(global.MaxBase16String_1C))
 
     val bls12Groth16VerifyL: Array[BaseFunction[NoContext]] =
       functionFamily(
@@ -510,7 +540,7 @@ object CryptoContext {
           else if (signature.size != 65)
             Left(s"Invalid signature size ${signature.size} bytes, must be equal to 65 bytes")
           else
-            CONST_BYTESTR(ByteStr(global.ecrecover(messageHash.arr, signature.arr)))
+            CONST_BYTESTR(ByteStr(global.ecrecover(messageHash.arr, signature.arr, fixEcrecover)))
         case xs => notImplemented[Id, EVALUATED]("ecrecover(messageHash:ByteVector, signature:ByteVector)", xs)
 
       }
@@ -523,8 +553,8 @@ object CryptoContext {
         sigVerifyF(version),
         toBase58StringF,
         fromBase58StringF,
-        toBase64StringF,
-        fromBase64StringF
+        toBase64String,
+        fromBase64String
       )
 
     val rsaVarNames = List("NOALG", "MD5", "SHA1", "SHA224", "SHA256", "SHA384", "SHA512", "SHA3224", "SHA3256", "SHA3384", "SHA3512")
@@ -546,8 +576,8 @@ object CryptoContext {
       Array(
         rsaVerifyF,
         checkMerkleProofF,
-        toBase16StringF(checkLength = false),
-        fromBase16StringF(checkLength = false)
+        toBase16String(checkLength = false),
+        fromBase16String(checkLength = false)
       )
 
     def fromV4Functions(version: StdLibVersion) =
@@ -557,26 +587,36 @@ object CryptoContext {
         createMerkleRootF,
         ecrecover, // new in V4
         rsaVerifyF,
-        toBase16StringF(checkLength = true),
-        fromBase16StringF(checkLength = true) // from V3
+        toBase16String(checkLength = true),
+        fromBase16String(checkLength = true) // from V3
       ) ++ sigVerifyL ++ rsaVerifyL(version) ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL ++ bn256Groth16VerifyL
+
+    val fromV9Functions = fromV4Functions(V9) ++ Array(
+      fromBase64String_1C,
+      fromBase16String_1C,
+      toBase64String_1C,
+      toBase16String_1C
+    )
 
     val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
     val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)
     val fromV4Ctx = fromV1Ctx |+| CTX[NoContext](v4Types, v4Vars, fromV4Functions(V4))
     val fromV6Ctx = fromV1Ctx |+| CTX[NoContext](v6Types, v4Vars, fromV4Functions(V6))
 
+    val fromV9Ctx = fromV1Ctx |+| CTX[NoContext](v6Types, v4Vars, fromV9Functions)
+
     version match {
-      case V1 | V2 => fromV1Ctx
-      case V3      => fromV3Ctx
-      case V4 | V5 => fromV4Ctx
-      case _       => fromV6Ctx
+      case V1 | V2      => fromV1Ctx
+      case V3           => fromV3Ctx
+      case V4 | V5      => fromV4Ctx
+      case V6 | V7 | V8 => fromV6Ctx
+      case V9           => fromV9Ctx
     }
   }
 
-  def evalContext[F[_]: Monad](global: BaseGlobal, version: StdLibVersion): EvaluationContext[NoContext, F] =
-    build(global, version).evaluationContext[F]
+  def evalContext[F[_]: Monad](global: BaseGlobal, version: StdLibVersion, fixEcrecover: Boolean): EvaluationContext[NoContext, F] =
+    build(global, version, fixEcrecover).evaluationContext[F]
 
-  def compilerContext(global: BaseGlobal, version: StdLibVersion): CompilerContext =
-    build(global, version).compilerContext
+  def compilerContext(global: BaseGlobal, version: StdLibVersion, fixEcrecover: Boolean): CompilerContext =
+    build(global, version, fixEcrecover).compilerContext
 }

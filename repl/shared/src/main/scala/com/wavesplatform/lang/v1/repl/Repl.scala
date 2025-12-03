@@ -76,7 +76,10 @@ case class Repl(
           .fold(
             e => throw new RuntimeException(e),
             { case (r, ctx @ (compilerCtx, evaluationCtx)) =>
-              val mappedCtx = evaluationCtx.mapK(λ[FunctionK[Id, Future]](Future.successful(_))) |+| initialCtx.evaluationContext(environment)
+              val idToFuture = new FunctionK[Id, Future] {
+                def apply[A](a: A): Future[A] = Future.successful(a)
+              }
+              val mappedCtx = evaluationCtx.mapK(idToFuture) |+| initialCtx.evaluationContext(environment)
               currentState.set(state((compilerCtx, mappedCtx), view))
               (Right(r), ctx)
             }

@@ -1,6 +1,6 @@
 package com.wavesplatform.state.appender
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
@@ -97,7 +97,9 @@ object ExtensionAppender extends ScorexLogging {
                   forkApplicationResultEi match {
                     case Left(e) =>
                       blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
-                      droppedBlocks.foreach { case (b, gp, sn) => blockchainUpdater.processBlock(b, gp, sn).explicitGet() }
+                      droppedBlocks.foreach { x =>
+                        blockchainUpdater.processBlock(x.block, x.hitSource, x.snapshot, x.generatorBalances).explicitGet()
+                      }
                       Left(e)
 
                     case Right(_) =>

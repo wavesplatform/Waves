@@ -6,7 +6,8 @@ import com.google.common.primitives.Ints
 import com.wavesplatform.common.merkle.*
 import com.wavesplatform.common.merkle.Merkle.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
@@ -107,7 +108,7 @@ class MerkleTest extends PropSpec {
 
   private def eval(code: String, version: StdLibVersion = V3): Either[String, EVALUATED] = {
     val untyped = Parser.parseExpr(code).get.value
-    val ctx     = lazyContexts((DirectiveSet(version, Account, Expression).explicitGet(), true, true))()
+    val ctx     = lazyContexts((DirectiveSet(version, Account, Expression).explicitGet(), true, true, true))()
     val evalCtx = ctx.evaluationContext[Id](Common.emptyBlockchainEnvironment())
     val typed   = ExpressionCompiler(ctx.compilerContext, V3, untyped)
     typed.flatMap(v => EvaluatorV2.applyCompleted(evalCtx, v._1, LogExtraInfo(), version, true, true, false, true)._3.leftMap(_.toString))

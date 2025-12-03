@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.api.GrpcChannelSettings
 import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache
 import com.wavesplatform.ride.runner.db.RideRocksDb
+import pureconfig.ConfigReader
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -23,7 +24,7 @@ case class RideRunnerCommonSettings(
     grpcApiChannel: GrpcChannelSettings,
     blockchainUpdatesApiChannel: GrpcChannelSettings,
     delayBeforeForceRestartBlockchainUpdates: FiniteDuration
-) {
+) derives ConfigReader {
   val availableProcessors          = Runtime.getRuntime.availableProcessors()
   val exactRideSchedulerThreads    = rideSchedulerThreads.getOrElse(availableProcessors * 2).min(4)
   val grpcConnectorExecutorThreads = grpcApiMaxConcurrentRequests.fold(availableProcessors * 2)(_ + 1) // +1 for Blockchain Updates

@@ -33,7 +33,7 @@ object StdBase58 extends BaseXXEncDec {
     }
 
     while (out < output.length && output(out) == Alphabet(0)) out += 1
-    for (i <- 0 until zeroCount) {
+    for (_ <- 0 until zeroCount) {
       out -= 1
       output(out) = Alphabet(0)
     }

@@ -1,12 +1,13 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
-import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncGrpcApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import io.grpc.Status.Code
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -138,7 +139,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       ("base64:AA==", "Illegal length of script: 1"),
       ("base64:AAQB", "Invalid content type of script: 4"),
       ("base64:AAEF", "Invalid checksum"),
-      ("base64:CQEF", "Invalid version of script: 9")
+      ("base64:CgEF", "Invalid version of script: 10")
     )
 
   forAll(invalidScript) { (script: String, error: String) =>

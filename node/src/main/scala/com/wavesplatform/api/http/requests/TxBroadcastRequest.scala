@@ -5,13 +5,13 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
-trait TxBroadcastRequest {
+trait TxBroadcastRequest[A <: Transaction] {
   def sender: Option[String]
   def senderPublicKey: Option[String]
 
-  def toTxFrom(sender: PublicKey): Either[ValidationError, Transaction]
+  def toTxFrom(sender: PublicKey): Either[ValidationError, A]
 
-  def toTx: Either[ValidationError, Transaction] =
+  def toTx: Either[ValidationError, A] =
     for {
       sender <- senderPublicKey match {
         case Some(key) => PublicKey.fromBase58String(key)

@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.server.*
+import org.apache.pekko.http.scaladsl.server.*
 import cats.data.{Validated, ValidatedNel}
 import cats.instances.vector.*
 import cats.syntax.traverse.*

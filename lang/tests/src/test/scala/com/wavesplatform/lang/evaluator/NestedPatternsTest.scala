@@ -136,8 +136,8 @@ class NestedPatternsTest extends EvaluatorSpec {
          |   case _                  => false
          | }
        """.stripMargin
-    eval(script1)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(true))
-    eval(script1)(V8) should produce("Only constant value could be matched with object field in 63-66")
+    eval(script1)(using V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(true))
+    eval(script1)(using V8) should produce("Only constant value could be matched with object field in 63-66")
 
     val script2 =
       s"""
@@ -147,8 +147,8 @@ class NestedPatternsTest extends EvaluatorSpec {
          |   case _                  => false
          | }
        """.stripMargin
-    eval(script2)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(true))
-    eval(script2)(V8) should produce("Only constant value could be matched with object field in 79-82")
+    eval(script2)(using V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(true))
+    eval(script2)(using V8) should produce("Only constant value could be matched with object field in 79-82")
 
     val script3 =
       s"""
@@ -158,8 +158,8 @@ class NestedPatternsTest extends EvaluatorSpec {
          |   case _                    => false
          | }
        """.stripMargin
-    eval(script3)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
-    eval(script3)(V8) should produce("Only constant value could be matched with object field in 80-83")
+    eval(script3)(using V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
+    eval(script3)(using V8) should produce("Only constant value could be matched with object field in 80-83")
 
     val script4 =
       s"""
@@ -168,8 +168,8 @@ class NestedPatternsTest extends EvaluatorSpec {
          |   case _                      => false
          | }
        """.stripMargin
-    eval(script4)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
-    eval(script4)(V8) should produce("Only constant value could be matched with object field in 64-69")
+    eval(script4)(using V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
+    eval(script4)(using V8) should produce("Only constant value could be matched with object field in 64-69")
 
     val script5 =
       s"""
@@ -178,7 +178,7 @@ class NestedPatternsTest extends EvaluatorSpec {
          |   case _                                        => false
          | }
        """.stripMargin
-    eval(script5)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
-    eval(script5)(V8) should produce("Only constant value could be matched with object field in 64-87")
+    eval(script5)(using V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
+    eval(script5)(using V8) should produce("Only constant value could be matched with object field in 64-87")
   }
 }

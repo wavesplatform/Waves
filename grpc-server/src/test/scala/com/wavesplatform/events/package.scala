@@ -8,12 +8,14 @@ import org.scalactic.source.Position
 import org.scalatest.OptionValues.*
 import org.scalatest.matchers.should.Matchers
 
+import scala.annotation.unused
+
 package object events {
   implicit class BlockchainUpdatedExt(val se: PBBlockchainUpdated) extends Matchers {
-    def append(implicit pos: Position): Append =
+    def append(implicit @unused pos: Position): Append =
       se.update match {
-        case Update.Append(a) => a
-        case other            => fail(s"${other.getClass.getSimpleName} is not an Append")
+        case Update.Append(append) => append
+        case other                 => fail(s"${other.getClass.getSimpleName} is not an Append")
       }
   }
 

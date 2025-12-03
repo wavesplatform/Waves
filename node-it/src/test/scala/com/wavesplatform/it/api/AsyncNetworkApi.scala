@@ -18,7 +18,7 @@ object AsyncNetworkApi {
         s"it-client-to-${node.name}",
         nonce
       )
-      sender.connect(node.networkAddress).flatMap { ch =>
+      sender.connect(node.networkAddressAccessibleFromHost).flatMap { ch =>
         if (ch.isActive) sender.send(ch, messages*).map(_ => sender.close()) else {
           sender.close()
           Future.failed(new Exception("Channel is inactive"))

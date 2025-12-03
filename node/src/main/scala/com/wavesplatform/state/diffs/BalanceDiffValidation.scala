@@ -1,9 +1,11 @@
 package com.wavesplatform.state.diffs
 
+import cats.syntax.either.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.{Blockchain, LeaseBalance, StateSnapshot}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 
 import scala.util.{Left, Right}
@@ -18,31 +20,36 @@ object BalanceDiffValidation {
     def checkWaves(
         acc: Address,
         newWaves: Long,
-        newLease: LeaseBalance
+        newLease: LeaseBalance,
+        additionalDeposit: Long
     ): Either[(Address, String), Unit] = {
-      val oldWaves     = b.balance(acc)
-      val oldLease     = b.leaseBalance(acc)
-      val wavesDiff    = newWaves - oldWaves
+      val oldWaves            = b.balance(acc)
+      val oldDeposit          = b.generationDeposit(acc)
+      val oldWavesWithDeposit = oldWaves - oldDeposit
+      val oldLease            = b.leaseBalance(acc)
+
+      val newDeposit          = oldDeposit + additionalDeposit
+      val newWavesWithDeposit = newWaves - newDeposit
+
+      val wavesDiff    = newWavesWithDeposit - oldWavesWithDeposit
       val leaseOutDiff = newLease.out - oldLease.out
 
-      if (wavesDiff < 0) {
-        if (newWaves < 0) {
-          Left(acc -> s"negative waves balance: $acc, old: $oldWaves, new: $newWaves")
-        } else if (newWaves < newLease.out && b.height > b.settings.functionalitySettings.allowLeasedBalanceTransferUntilHeight) {
-          val errorMessage =
-            if (newWaves + newLease.in - newLease.out < 0)
-              s"negative effective balance: $acc, old: ${(oldWaves, oldLease)}, new: ${(newWaves, newLease)}"
-            else if (leaseOutDiff == 0)
-              s"$acc trying to spend leased money"
-            else
-              s"leased being more than own: $acc, old: ${(oldWaves, oldLease)}, new: ${(newWaves, newLease)}"
-          Left(acc -> errorMessage)
-        } else {
-          Right(())
-        }
-      } else {
-        Right(())
-      }
+      val errorMessage =
+        if (wavesDiff >= 0) Either.unit
+        else if (newWavesWithDeposit < 0) {
+          if (newDeposit > oldDeposit)
+            s"$acc not enough funds for deposit, old: ${(oldWaves, oldLease, oldDeposit)}, new: ${(newWaves, newLease, newDeposit)}".asLeft
+          else if (oldDeposit > 0)
+            s"$acc trying to spend a deposit, old: ${(oldWaves, oldLease, oldDeposit)}, new: ${(newWaves, newLease, newDeposit)}".asLeft
+          else s"negative waves balance: $acc, old: $oldWaves, new: $newWaves".asLeft
+        } else if (newWavesWithDeposit < newLease.out && b.height > b.settings.functionalitySettings.allowLeasedBalanceTransferUntilHeight) {
+          if (newWavesWithDeposit + newLease.in - newLease.out < 0)
+            s"negative effective balance: $acc, old: ${(oldWaves, oldLease, oldDeposit)}, new: ${(newWaves, newLease, newDeposit)}".asLeft
+          else if (leaseOutDiff == 0) s"$acc trying to spend leased money".asLeft
+          else s"leased being more than own: $acc, old: ${(oldWaves, oldLease, oldDeposit)}, new: ${(newWaves, newLease, newDeposit)}".asLeft
+        } else Either.unit
+
+      errorMessage.leftMap(acc -> _)
     }
 
     val wavesCheck =
@@ -50,7 +57,9 @@ object BalanceDiffValidation {
         .flatMap {
           case ((address, Waves), balance) =>
             val currentLeaseBalance = snapshot.leaseBalances.getOrElse(address, b.leaseBalance(address))
-            checkWaves(address, balance, currentLeaseBalance).fold(error => List(error), _ => Nil)
+            val depositedOnNext = DepositInWavelets *
+              snapshot.nextCommittedGenerators.find { case (pk, _) => pk.toAddress == address }.size
+            checkWaves(address, balance, currentLeaseBalance, depositedOnNext).fold(error => List(error), _ => Nil)
           case _ =>
             Nil
         }

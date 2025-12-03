@@ -12,7 +12,7 @@ import com.wavesplatform.lang.contract.DApp.*
 import com.wavesplatform.lang.contract.meta.{MetaMapper, V1 as MetaV1, V2 as MetaV2}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, UnionNotAllowedForCallableArgs, WrongArgumentType}
-import com.wavesplatform.lang.v1.compiler.CompilerContext.{VariableInfo, vars}
+import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.ContractCompiler.*
 import com.wavesplatform.lang.v1.compiler.ScriptResultSource.FreeCall
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
@@ -87,7 +87,7 @@ class ContractCompiler(version: StdLibVersion) extends ExpressionCompiler(versio
         .getOrElse(List.empty)
       unionInCallableErrs <- checkCallableUnions(af, annotationsWithErr._1.toList.flatten)
       compiledBody <- local {
-        modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings)).flatMap(_ =>
+        modify[Id, CompilerContext, CompilationError](ctx => ctx.copy(varDefs = ctx.varDefs ++ annotationBindings)).flatMap(_ =>
           compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1), allowIllFormedStrings)
         )
       }
@@ -232,7 +232,7 @@ class ContractCompiler(version: StdLibVersion) extends ExpressionCompiler(versio
     } yield result
   }
 
-  private def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {
+  private def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = (part: @unchecked) match {
     case x: PART.VALID[T]         => x.pure[CompileM]
     case PART.INVALID(p, message) => raiseError(Generic(p.start, p.end, message))
   }
@@ -332,7 +332,7 @@ class ContractCompiler(version: StdLibVersion) extends ExpressionCompiler(versio
 
   private def checkCallableUnions(
       func: Expressions.ANNOTATEDFUNC,
-      annotations: List[Annotation],
+      annotations: List[Annotation]
   ): CompileM[Seq[UnionNotAllowedForCallableArgs]] = {
     @tailrec
     def containsUnion(tpe: Type): Boolean =
@@ -408,7 +408,7 @@ object ContractCompiler {
       removeUnusedCode: Boolean = false,
       allowIllFormedStrings: Boolean = false
   ): Either[String, DApp] = {
-    val parser = new Parser(version)(offset)
+    val parser = new Parser(version)(using offset)
     parser.parseContract(input) match {
       case fastparse.Parsed.Success(xs, _) =>
         apply(ctx, xs, version, source, needCompaction, removeUnusedCode, allowIllFormedStrings) match {
@@ -429,7 +429,7 @@ object ContractCompiler {
       removeUnusedCode: Boolean = false,
       saveExprContext: Boolean = true
   ): Either[(String, Int, Int), (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] =
-    new Parser(version)(offset)
+    new Parser(version)(using offset)
       .parseDAPPWithErrorRecovery(input)
       .flatMap { case (parseResult, removedCharPosOpt) =>
         new ContractCompiler(version)
@@ -462,7 +462,7 @@ object ContractCompiler {
       ctx: CompilerContext,
       version: StdLibVersion
   ): Either[String, EXPR] = {
-    val parser = new Parser(version)(offset)
+    val parser = new Parser(version)(using offset)
     parser.parseExpr(input) match {
       case fastparse.Parsed.Success(expr, _) =>
         val p          = AnyPos

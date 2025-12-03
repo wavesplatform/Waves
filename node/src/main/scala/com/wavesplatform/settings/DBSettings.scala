@@ -1,5 +1,7 @@
 package com.wavesplatform.settings
-import scala.concurrent.duration.FiniteDuration
+
+import pureconfig.*
+import pureconfig.generic.semiauto.deriveReader
 
 case class DBSettings(
     directory: String,
@@ -9,7 +11,14 @@ case class DBSettings(
     storeStateHashes: Boolean,
     maxCacheSize: Int,
     maxRollbackDepth: Int,
-    rememberBlocks: FiniteDuration,
-    useBloomFilter: Boolean,
+    cleanupInterval: Option[Int] = None,
+    txBloomFilterSize: Int,
     rocksdb: RocksDBSettings
 )
+
+object DBSettings {
+  // This given is required for default args to work.
+  // Details: https://github.com/pureconfig/pureconfig/issues/1673
+  // Note: the proposed approach with `extension` doesn't work.
+  given ConfigReader[DBSettings] = deriveReader
+}

@@ -1,39 +1,32 @@
 package com.wavesplatform.network
 
 import com.google.common.cache.CacheBuilder
-
-import java.util
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.crypto
+import com.wavesplatform.network.BasicMessagesRepo.Spec
+import com.wavesplatform.network.LegacyFrameCodec.{Magic, MessageRawData}
 import com.wavesplatform.network.message.Message.*
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled.*
 import io.netty.channel.ChannelHandlerContext
-import io.netty.handler.codec.{ByteToMessageCodec, DecoderException}
+import io.netty.handler.codec.ByteToMessageCodec
 
+import java.util
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
-class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: FiniteDuration) extends ByteToMessageCodec[Any] with ScorexLogging {
+abstract class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessageCodec[Any] with ScorexLogging {
 
-  import BasicMessagesRepo.specsByCodes
-  import LegacyFrameCodec.*
-
-  private val receivedTxsCache = CacheBuilder
-    .newBuilder()
-    .expireAfterWrite(receivedTxsCacheTimeout.length, receivedTxsCacheTimeout.unit)
-    .build[String, Object]()
-
-  override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = cause match {
-    case e: DecoderException => peerDatabase.blacklistAndClose(ctx.channel(), s"Corrupted message frame: $e")
-    case _                   => super.exceptionCaught(ctx, cause)
-  }
+  protected def filterBySpecOrChecksum(spec: BasicMessagesRepo.Spec, checkSum: Array[Byte]): Boolean = true
+  protected def specsByCodes: Map[Byte, BasicMessagesRepo.Spec]
+  protected def messageToRawData(msg: Any): MessageRawData
+  protected def rawDataToMessage(rawData: MessageRawData): AnyRef
 
   override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit =
-    try {
+    if (!ctx.isRemoved && ctx.channel().isActive) try {
       require(in.readInt() == Magic, "invalid magic number")
 
       val code = in.readByte()
@@ -53,30 +46,18 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fini
         require(declaredChecksum.equals(actualChecksum), "invalid checksum")
         actualChecksum.release()
 
-        spec != TransactionSpec || {
-          val actualChecksumStr = Base64.encode(rawChecksum)
-          if (receivedTxsCache.getIfPresent(actualChecksumStr) == null) {
-            receivedTxsCache.put(actualChecksumStr, LegacyFrameCodec.dummy)
-            true
-          } else false
-        }
+        filterBySpecOrChecksum(spec, rawChecksum)
       }
 
-      if (pushToPipeline) out.add(RawBytes(code, dataBytes))
+      if (pushToPipeline) out.add(rawDataToMessage(MessageRawData(code, dataBytes)))
     } catch {
       case NonFatal(e) =>
         log.warn(s"${id(ctx)} Malformed network message", e)
         peerDatabase.blacklistAndClose(ctx.channel(), s"Malformed network message: $e")
-        in.resetReaderIndex() // Cancels subsequent read tries, see Netty decode() documentation
     }
 
   override def encode(ctx: ChannelHandlerContext, msg1: Any, out: ByteBuf): Unit = {
-    val msg = (msg1: @unchecked) match {
-      case rb: RawBytes           => rb
-      case tx: Transaction        => RawBytes.fromTransaction(tx)
-      case block: Block           => RawBytes.fromBlock(block)
-      case mb: MicroBlockResponse => RawBytes.fromMicroBlock(mb)
-    }
+    val msg = messageToRawData(msg1)
 
     out.writeInt(Magic)
     out.writeByte(msg.code)
@@ -91,6 +72,43 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fini
 }
 
 object LegacyFrameCodec {
-  val Magic         = 0x12345678
+  val Magic = 0x12345678
+  case class MessageRawData(code: Byte, data: Array[Byte])
+}
+
+class LegacyFrameCodecL1(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: FiniteDuration) extends LegacyFrameCodec(peerDatabase) {
+
+  private val receivedTxsCache = CacheBuilder
+    .newBuilder()
+    .expireAfterWrite(receivedTxsCacheTimeout.length, receivedTxsCacheTimeout.unit)
+    .build[String, Object]()
+
+  protected def specsByCodes: Map[MessageCode, Spec] = BasicMessagesRepo.specsByCodes
+
+  protected override def filterBySpecOrChecksum(spec: BasicMessagesRepo.Spec, checkSum: Array[Byte]): Boolean = {
+    spec != TransactionSpec || {
+      val actualChecksumStr = Base64.encode(checkSum)
+      if (receivedTxsCache.getIfPresent(actualChecksumStr) == null) {
+        receivedTxsCache.put(actualChecksumStr, LegacyFrameCodecL1.dummy)
+        true
+      } else false
+    }
+  }
+
+  protected def messageToRawData(msg: Any): MessageRawData = {
+    val rawBytes = (msg: @unchecked) match {
+      case rb: RawBytes           => rb
+      case tx: Transaction        => RawBytes.fromTransaction(tx)
+      case block: Block           => RawBytes.fromBlock(block)
+      case mb: MicroBlockResponse => RawBytes.fromMicroBlock(mb)
+    }
+    MessageRawData(rawBytes.code, rawBytes.data)
+  }
+
+  protected def rawDataToMessage(rawData: MessageRawData): AnyRef =
+    RawBytes(rawData.code, rawData.data)
+}
+
+object LegacyFrameCodecL1 {
   private val dummy = new Object()
 }

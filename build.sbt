@@ -11,9 +11,18 @@ Global / onChangedBuildSource := ReloadOnSourceChanges
 enablePlugins(GitVersioning)
 
 git.uncommittedSignifier       := Some("DIRTY")
-git.useGitDescribe             := true
 ThisBuild / git.useGitDescribe := true
-ThisBuild / PB.protocVersion   := "3.25.1" // https://protobuf.dev/support/version-support/#java
+ThisBuild / PB.protocVersion   := Dependencies.gProtoVersion
+
+ThisBuild / dependencyOverrides ++= Dependencies.overrides.value
+
+ThisBuild / pomIncludeRepository := { _ => false }
+ThisBuild / publishMavenStyle    := true
+ThisBuild / publishTo := {
+  val centralSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
+  if (isSnapshot.value) Some("central-snapshots" at centralSnapshots)
+  else localStaging.value
+}
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -36,29 +45,37 @@ lazy val lang =
     )
 
 lazy val `lang-jvm` = lang.jvm
+  .enablePlugins(PublishedModule)
   .settings(
-    name                                  := "RIDE Compiler",
-    normalizedName                        := "lang",
-    description                           := "The RIDE smart contract language compiler",
-    libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided
+    name           := "RIDE Compiler",
+    normalizedName := "lang",
+    description    := "The RIDE smart contract language compiler",
+    libraryDependencies ++= Seq(
+      "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
+      Dependencies.gProto,
+      Dependencies.gProto % "protobuf"
+    )
   )
 
 lazy val `lang-js` = lang.js
   .enablePlugins(VersionObject)
+  .settings(
+    libraryDependencies ++= Dependencies.scalapbRuntimeJS.value
+  )
 
 lazy val `lang-testkit` = project
-  .dependsOn(`lang-jvm`)
   .in(file("lang/testkit"))
+  .dependsOn(`lang-jvm`)
+  .enablePlugins(PublishedModule)
   .settings(
     libraryDependencies ++=
-      Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps ++ Dependencies.logDeps ++ Seq(
-        "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
-      )
+      Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps ++ Dependencies.logDeps :+
+        Dependencies.scalaLogging
   )
 
 lazy val `lang-tests` = project
   .in(file("lang/tests"))
-  .dependsOn(`lang-testkit` % "test;test->test")
+  .dependsOn(`lang-testkit`)
 
 lazy val `lang-tests-js` = project
   .in(file("lang/tests-js"))
@@ -69,46 +86,64 @@ lazy val `lang-tests-js` = project
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
 
-lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test")
+lazy val node = project.dependsOn(`lang-jvm`)
 
-lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
-lazy val `ride-runner`    = project.dependsOn(node % "compile;test->test", `grpc-server`)
-lazy val `node-it`        = project.dependsOn(node % "compile;test->test", `lang-testkit`, `repl-jvm`, `grpc-server`)
-lazy val `node-generator` = project.dependsOn(node % "compile->test")
-lazy val benchmark        = project.dependsOn(node % "compile;test->test")
+lazy val `node-testkit` = project
+  .in(file("node/testkit"))
+  .dependsOn(`node`, `lang-testkit`)
+  .enablePlugins(PublishedModule)
+  .settings(libraryDependencies ++= Dependencies.nodeTests)
+
+lazy val `node-tests` = project
+  .in(file("node/tests"))
+  .dependsOn(`node-testkit`)
+  .settings(libraryDependencies ++= Dependencies.logDeps)
+
+lazy val `grpc-server` =
+  project.dependsOn(node % "compile;runtime->provided", `node-testkit`)
+
+lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-testkit`)
+lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `node-testkit`)
+
+lazy val `node-generator` = project.dependsOn(node, `node-testkit`)
+
+lazy val benchmark = project.dependsOn(node, `node-testkit`)
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .crossType(CrossType.Full)
   .settings(
-    libraryDependencies ++=
-      Dependencies.protobuf.value ++
-        Dependencies.langCompilerPlugins.value ++
-        Dependencies.circe.value ++
-        Seq(
-          "org.scala-js" %%% "scala-js-macrotask-executor" % "1.0.0"
-        ),
+    libraryDependencies ++= Dependencies.circe.value ++ Seq(
+      Dependencies.protoSchemasLib % "protobuf"
+    ),
     inConfig(Compile)(
       Seq(
         PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
         PB.protoSources += PB.externalIncludePath.value,
         PB.generate / includeFilter := { (f: File) =>
           (** / "waves" / "*.proto").matches(f.toPath)
-        }
+        },
+        PB.deleteTargetDirectory := false
       )
     )
   )
 
 lazy val `repl-jvm` = repl.jvm
-  .dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test")
+  .dependsOn(`lang-jvm`, `lang-testkit`)
   .settings(
-    libraryDependencies ++= Dependencies.circe.value ++ Seq(
+    libraryDependencies ++= Seq(
       "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
       Dependencies.sttp3
     )
   )
 
-lazy val `repl-js` = repl.js.dependsOn(`lang-js`)
+lazy val `repl-js` = repl.js
+  .dependsOn(`lang-js`)
+  .settings(
+    libraryDependencies ++= Dependencies.scalapbRuntimeJS.value ++ Seq(
+      "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
+    )
+  )
 
 lazy val `curve25519-test` = project.dependsOn(node)
 
@@ -123,34 +158,37 @@ lazy val `waves-node` = (project in file("."))
     `repl-jvm`,
     node,
     `node-it`,
+    `node-testkit`,
+    `node-tests`,
     `node-generator`,
+    `grpc-server`,
     benchmark,
-    `repl-js`,
-    `repl-jvm`,
     `ride-runner`
   )
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "2.13.12",
+    scalaVersion         := "3.7.4",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses             := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     publish / skip       := true,
     scalacOptions ++= Seq(
-      "-Xsource:3",
       "-feature",
       "-deprecation",
       "-unchecked",
       "-language:higherKinds",
       "-language:implicitConversions",
       "-language:postfixOps",
-      "-Ywarn-unused:-implicits",
-      "-Xlint",
-      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
-      "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
-      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
+      "-Xmax-inlines",
+      "50", // Required for FunctionalitySettings compilation
+      "-Wunused:all",
+      "-Wconf:cat=deprecation&origin=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&origin=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
+      "-Wconf:cat=deprecation&origin=com.wavesplatform.state.InvokeScriptResult.*:s",
+      "-Wconf:cat=deprecation&origin=com\\.wavesplatform\\.(lang\\..*|JsApiUtils)&origin=com\\.wavesplatform\\.lang\\.v1\\.compiler\\.Terms\\.LET_BLOCK:s",
+      "-Wconf:src=src_managed/.*:s"
     ),
     crossPaths        := false,
     cancelable        := true,
@@ -167,8 +205,7 @@ inScope(Global)(
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network         := Network.default(),
     instrumentation := false,
-    resolvers ++= Resolver.sonatypeOssRepos("releases") ++ Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
-    Compile / doc / sources                := Seq.empty,
+    resolvers ++= Resolver.sonatypeCentralSnapshots +: Seq(Resolver.mavenLocal),
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
     excludeLintKeys ++= Set(
@@ -198,6 +235,10 @@ buildTarballsForDocker := {
     (`grpc-server` / Universal / packageZipTarball).value,
     baseDirectory.value / "docker" / "target" / "waves-grpc-server.tgz"
   )
+}
+
+lazy val buildRIDERunnerForDocker = taskKey[Unit]("Package RIDE Runner tarball and copy it to docker/target")
+buildRIDERunnerForDocker := {
   IO.copyFile(
     (`ride-runner` / Universal / packageZipTarball).value,
     (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
@@ -207,19 +248,22 @@ buildTarballsForDocker := {
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := Def
   .sequential(
-    `waves-node` / clean,
+    clean,
     Def.task {
       (`lang-tests` / Test / test).value
       (`repl-jvm` / Test / test).value
-      (`lang-js` / Compile / fastOptJS).value
+      (`lang-js` / Compile / fullOptJS).value
       (`lang-tests-js` / Test / test).value
       (`grpc-server` / Test / test).value
-      (node / Test / test).value
-      (`repl-js` / Compile / fastOptJS).value
+      (`node-tests` / Test / test).value
+      (`repl-js` / Compile / fullOptJS).value
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
       (`node-generator` / Compile / compile).value
-      (`ride-runner` / Test / compile).value
+      (`ride-runner` / Test / test).value
+      (node / assembly).value
+      buildTarballsForDocker.value
+      (`lang-jvm` / assembly).value
     }
   )
   .value
@@ -240,14 +284,20 @@ completeQaseRun := Def.task {
   (`lang-testkit` / Test / runMain).toTask(" com.wavesplatform.report.QaseRunCompleter").value
 }.value
 
-lazy val buildDebPackages = taskKey[Unit]("Build debian packages")
+lazy val buildDebPackages = taskKey[Unit]("Build DEB packages")
 buildDebPackages := {
   (`grpc-server` / Debian / packageBin).value
   (node / Debian / packageBin).value
-  (`ride-runner` / Debian / packageBin).value
 }
 
-def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser) { (state, args) =>
+lazy val buildPlatformIndependentArtifacts = taskKey[Unit]("Build fat JARs for node and ride-runner and TGZ for grpc-server")
+buildPlatformIndependentArtifacts := {
+  (node / assembly).value
+  (`ride-runner` / assembly).value
+  (`grpc-server` / Universal / packageZipTarball).value
+}
+
+lazy val buildReleaseArtifacts: Command = Command("buildReleaseArtifacts")(_ => Network.networkParser) { (state, args) =>
   args.toSet[Network].foreach { n =>
     val newState = Project
       .extract(state)
@@ -258,9 +308,41 @@ def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser
     Project.extract(newState).runTask(buildDebPackages, newState)
   }
 
-  Project.extract(state).runTask(packageAll, state)
+  Project.extract(state).runTask(buildPlatformIndependentArtifacts, state)
 
   state
 }
 
-commands ++= Seq(checkPR, buildPackages)
+/** Command: generateGenesis <path-to-config>
+  * Runs: node / runMain com.wavesplatform.GenesisBlockGenerator <path>
+  * Path is always resolved relative to build root, output without "[info]".
+  */
+def generateGenesisCommand: Command =
+  Command.single("generateGenesis") { (state, rawPath) =>
+    val ex = Project.extract(state)
+
+    val rootBase = ex.get(LocalRootProject / baseDirectory)
+    val absFile = {
+      val f = file(rawPath)
+      if (f.isAbsolute) f else rootBase / rawPath
+    }
+
+    val stateWithSettings = ex.appendWithoutSession(
+      Seq(
+        ThisBuild / useSuperShell             := false,
+        node / Compile / run / outputStrategy := Some(StdoutOutput),
+        node / Compile / run / logLevel       := Level.Error
+      ),
+      state
+    )
+
+    val input = s" com.wavesplatform.GenesisBlockGenerator ${absFile.getAbsolutePath}"
+
+    Project
+      .extract(stateWithSettings)
+      .runInputTask(node / Compile / runMain, input, stateWithSettings)
+
+    state
+  }
+
+commands ++= Seq(checkPR, buildReleaseArtifacts, generateGenesisCommand)

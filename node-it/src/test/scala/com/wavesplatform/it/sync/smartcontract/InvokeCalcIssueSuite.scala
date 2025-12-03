@@ -1,27 +1,27 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.util.*
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.BinaryDataEntry
+import com.wavesplatform.state.{BinaryDataEntry, Height}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest._
+import org.scalatest.*
 
 class InvokeCalcIssueSuite extends BaseTransactionSuite with CancelAfterFailure with OptionValues {
-  import InvokeCalcIssueSuite._
+  import InvokeCalcIssueSuite.*
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, 0), (BlockchainFeatures.BlockV5.id, 0)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, Height(0)), (BlockchainFeatures.BlockV5.id, Height(0))))
       .buildNonConflicting()
 
   private def smartAcc  = firstKeyPair

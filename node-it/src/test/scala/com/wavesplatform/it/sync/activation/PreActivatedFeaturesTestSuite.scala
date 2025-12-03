@@ -2,8 +2,9 @@ package com.wavesplatform.it.sync.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, Docker}
+import com.wavesplatform.state.Height
 
 class PreActivatedFeaturesTestSuite extends BaseFreeSpec with ActivationStatusRequest {
   override protected def nodeConfigs: Seq[Config] = PreActivatedFeaturesTestSuite.Configs
@@ -14,7 +15,7 @@ class PreActivatedFeaturesTestSuite extends BaseFreeSpec with ActivationStatusRe
   }
 
   "before activation check" in {
-    nodes.waitForHeight(PreActivatedFeaturesTestSuite.votingInterval / 2)
+    nodes.waitForHeight(Height(PreActivatedFeaturesTestSuite.votingInterval / 2))
 
     val mainNodeStatus = nodes.head.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
     mainNodeStatus.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
@@ -27,7 +28,7 @@ class PreActivatedFeaturesTestSuite extends BaseFreeSpec with ActivationStatusRe
     }
   }
   "on activation height check" in {
-    nodes.waitForHeight(PreActivatedFeaturesTestSuite.votingInterval + 3)
+    nodes.waitForHeight(Height(PreActivatedFeaturesTestSuite.votingInterval + 3))
 
     val mainNodeStatus = nodes.head.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
     mainNodeStatus.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
@@ -47,7 +48,7 @@ class PreActivatedFeaturesTestSuite extends BaseFreeSpec with ActivationStatusRe
     }
   }
   "after activation height check" in {
-    nodes.waitForHeight(PreActivatedFeaturesTestSuite.votingInterval * 2 + 4)
+    nodes.waitForHeight(Height(PreActivatedFeaturesTestSuite.votingInterval * 2 + 4))
 
     val mainNodeStatus = nodes.head.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
     mainNodeStatus.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
@@ -62,7 +63,7 @@ class PreActivatedFeaturesTestSuite extends BaseFreeSpec with ActivationStatusRe
 }
 
 object PreActivatedFeaturesTestSuite {
-  import com.wavesplatform.it.NodeConfigs._
+  import com.wavesplatform.it.NodeConfigs.*
   val votingInterval             = 10
   val featureNum: Short          = BlockchainFeatures.SmallerMinimalGeneratingBalance.id
   val featureDescr               = BlockchainFeatures.SmallerMinimalGeneratingBalance.description

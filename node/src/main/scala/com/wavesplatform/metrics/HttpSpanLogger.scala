@@ -1,7 +1,7 @@
 package com.wavesplatform.metrics
 
 import java.time.{Duration, Instant, LocalDateTime, ZoneId}
-import akka.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import kamon.instrumentation.tag.TagKeys
@@ -57,11 +57,11 @@ class HttpSpanLogger extends CombinedReporter with LazyLogging {
         Json
           .obj(
             "@timestamp"                    -> LocalDateTime.ofInstant(snapshot.from, ZoneId.systemDefault()),
-            "executor_queue_duration_max"   -> dist.max.toDouble / 10e6,
-            "executor_queue_duration_min"   -> dist.min.toDouble / 10e6,
-            "executor_queue_duration_sum"   -> dist.sum.toDouble / 10e6,
+            "executor_queue_duration_max"   -> dist.max,
+            "executor_queue_duration_min"   -> dist.min,
+            "executor_queue_duration_sum"   -> dist.sum,
             "executor_queue_duration_count" -> dist.count,
-            "executor_queue_duration_avg"   -> dist.sum.toDouble / dist.count / 10e6
+            "executor_queue_duration_avg"   -> dist.sum.toDouble / dist.count
           )
           .toString
       )
@@ -81,11 +81,11 @@ object HttpSpanLogger {
 
   val TimeInQueueMetricKey = "executor.time-in-queue"
 
-  case class Mark(key: String, duration: Double)
+  case class Mark(key: String, durationMillis: Long)
 
-  def millisBetween(from: Instant, to: Instant): Double = Duration.between(from, to).toNanos * 1e-6
+  def millisBetween(from: Instant, to: Instant): Long = Duration.between(from, to).toMillis
   implicit class FinishedSpanExt(val span: Span.Finished) extends AnyVal {
-    def isAkkaHttpServer: Boolean = span.metricTags.get(Lookups.option("component")).contains("akka.http.server")
+    def isAkkaHttpServer: Boolean = span.metricTags.get(Lookups.option("component")).contains("pekko.http.server")
     def method: String            = span.metricTags.get(Lookups.plain(TagKeys.HttpMethod))
     def statusCode: Int           = span.metricTags.get(Lookups.plainLong(TagKeys.HttpStatusCode)).toInt
     def operation: String         = span.metricTags.get(Lookups.plain("operation"))

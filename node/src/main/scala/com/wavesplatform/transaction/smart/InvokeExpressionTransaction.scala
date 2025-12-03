@@ -35,7 +35,6 @@ case class InvokeExpressionTransaction(
   override def root: InvokeExpressionTransaction              = this
   override val funcCall: Terms.FUNCTION_CALL                  = InvokeTransaction.DefaultCall
   override def payments: Seq[InvokeScriptTransaction.Payment] = Nil
-  override val checkedAssets: Seq[Asset.IssuedAsset]          = Nil
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBTransactionSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(PBTransactionSerializer.bytes(this))

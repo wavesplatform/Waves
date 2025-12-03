@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.http
 
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.server.Route
 import com.wavesplatform.api.http.*
 
 case class ServiceApiRoute(getServiceStatus: () => HttpServiceStatus) extends ApiRoute {

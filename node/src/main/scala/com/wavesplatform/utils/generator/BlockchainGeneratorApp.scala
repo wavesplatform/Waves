@@ -1,11 +1,7 @@
 package com.wavesplatform.utils.generator
 
-import java.io.{File, FileOutputStream, PrintWriter}
-import java.util.concurrent.TimeUnit
-
 import cats.implicits.*
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
-import com.wavesplatform.{GenesisBlockGenerator, Version}
 import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
@@ -13,23 +9,34 @@ import com.wavesplatform.database.RDB
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.mining.{ForgeAttemptResult, Miner, MinerImpl}
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.{BlockEndorser, EndorsementStorage}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{GenesisBlockGenerator, Version}
 import io.netty.channel.group.DefaultChannelGroup
 import monix.reactive.subjects.ConcurrentSubject
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import play.api.libs.json.Json
+import pureconfig.ConfigSource
 import scopt.OParser
 
+import java.io.{File, FileOutputStream, PrintWriter}
+import java.util.concurrent.TimeUnit
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.*
 import scala.language.reflectiveCalls
+
+class FakeTime(val startTime: Long) extends Time {
+  @volatile
+  var time: Long = startTime
+
+  override def correctedTime(): Long = time
+  override def getTimestamp(): Long  = time
+}
 
 object BlockchainGeneratorApp extends ScorexLogging {
   final case class BlockchainGeneratorAppSettings(
@@ -96,7 +103,11 @@ object BlockchainGeneratorApp extends ScorexLogging {
 
     val config      = readConfFile(options.genesisConfigFile)
     val genSettings = GenesisBlockGenerator.parseSettings(config)
-    val genesis     = ConfigFactory.parseString(GenesisBlockGenerator.createConfig(genSettings)).as[GenesisSettings]("genesis")
+    val genesis =
+      ConfigSource
+        .fromConfig(ConfigFactory.parseString(GenesisBlockGenerator.createConfig(genSettings)))
+        .at("genesis")
+        .loadOrThrow[GenesisSettings]
 
     log.info(s"Initial base target is ${genesis.initialBaseTarget}")
 
@@ -106,23 +117,16 @@ object BlockchainGeneratorApp extends ScorexLogging {
       settings.copy(blockchainSettings = blockchainSettings, minerSettings = settings.minerSettings.copy(quorum = 0))
     }
 
-    val fakeTime = new Time {
-      val startTime: Long = genSettings.timestamp.getOrElse(System.currentTimeMillis())
-
-      @volatile
-      var time: Long = startTime
-
-      override def correctedTime(): Long = time
-      override def getTimestamp(): Long  = time
-    }
+    val fakeTime = new FakeTime(genSettings.timestamp.getOrElse(System.currentTimeMillis()))
 
     val blockchain = {
       val rdb = RDB.open(wavesSettings.dbSettings)
-      val (blockchainUpdater, rocksdb) =
+      val (blockchainUpdater, rdbWriter) =
         StorageFactory(wavesSettings, rdb, fakeTime, BlockchainUpdateTriggers.noop)
       com.wavesplatform.checkGenesis(wavesSettings, blockchainUpdater, Miner.Disabled)
       sys.addShutdownHook(synchronized {
         blockchainUpdater.shutdown()
+        rdbWriter.close()
         rdb.close()
       })
       blockchainUpdater
@@ -135,7 +139,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
     }
 
     val wallet: Wallet = new Wallet {
-      private[this] val map                                            = miners.map(kp => kp.toAddress -> kp).toMap
+      private val map                                                  = miners.map(kp => kp.toAddress -> kp).toMap
       override def seed: Array[Byte]                                   = Array.emptyByteArray
       override def nonce: Int                                          = miners.length
       override def privateKeyAccounts: Seq[SeedKeyPair]                = miners
@@ -149,24 +153,26 @@ object BlockchainGeneratorApp extends ScorexLogging {
 
     val utx = new UtxPoolImpl(fakeTime, blockchain, wavesSettings.utxSettings, wavesSettings.maxTxErrorLogSize, wavesSettings.minerSettings.enable)
     val posSelector = PoSSelector(blockchain, None)
-    val utxEvents   = ConcurrentSubject.publish[UtxEvent](scheduler)
+    val utxEvents   = ConcurrentSubject.publish[UtxEvent](using scheduler)
     val miner = new MinerImpl(
       new DefaultChannelGroup("", null),
       blockchain,
       wavesSettings,
       fakeTime,
       utx,
+      BlockEndorser.Disabled,
+      EndorsementStorage.Disabled,
       wallet,
       posSelector,
       scheduler,
       scheduler,
       utxEvents.collect { case _: UtxEvent.TxAdded => () }
     )
-    val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, scheduler, verify = false)(_, None)
+    val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, BlockEndorser.Disabled, scheduler, verify = false)(_, None)
 
     object Output {
-      private[this] var first = true
-      private[this] val output = options.outputFile.map { f =>
+      private var first = true
+      private val output = options.outputFile.map { f =>
         log.info(s"Blocks json will be written to $f")
         val fs = new FileOutputStream(f)
         new PrintWriter(fs)
@@ -243,7 +249,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       fakeTime.time = nextTime
 
       miner.forgeBlock(bestMiner) match {
-        case Right((block, _)) =>
+        case ForgeAttemptResult.Success(block, _) =>
           blockAppender(block).runSyncUnsafe() match {
             case Right(_) =>
               blocks += block
@@ -255,7 +261,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
               sys.exit(1)
           }
 
-        case Left(err) =>
+        case err =>
           log.error(s"Error generating block: $err")
           sys.exit(1)
       }

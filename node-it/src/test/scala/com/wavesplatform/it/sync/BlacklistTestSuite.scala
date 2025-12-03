@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
+import com.wavesplatform.state.Height
 
 import scala.concurrent.duration.*
 

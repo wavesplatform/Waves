@@ -1,25 +1,25 @@
 package com.wavesplatform.state
 
-import java.nio.charset.StandardCharsets
-
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.StateHashBuilder.Result
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import org.bouncycastle.crypto.digests.Blake2bDigest
 
+import java.nio.charset.StandardCharsets
 import scala.collection.mutable
 
 object StateHashBuilder {
   val EmptySectionHash: ByteStr = createSectionHash(Nil)
 
   final case class Result(hashes: Map[SectionId.Value, ByteStr]) {
-    def createStateHash(prevHash: ByteStr): StateHash = {
-      val sortedHashes = SectionId.values.toSeq.map(hashes.getOrElse(_, EmptySectionHash))
+    def createStateHash(prevHash: ByteStr, deterministicFinalityActivated: Boolean): StateHash = {
+      val sortedHashes = StateHash.sections(deterministicFinalityActivated).map(hashes.getOrElse(_, EmptySectionHash))
       val payload      = prevHash +: sortedHashes
       StateHash(createSectionHash(payload), hashes)
     }
@@ -37,9 +37,9 @@ object StateHashBuilder {
 
 class StateHashBuilder {
   import com.wavesplatform.utils.byteStrOrdering
-  private[this] val maps = Vector.fill(SectionId.maxId)(mutable.TreeMap.empty[ByteStr, Array[Byte]])
+  private val maps = Vector.fill(SectionId.maxId)(mutable.TreeMap.empty[ByteStr, Array[Byte]])
 
-  private[this] def addEntry(section: SectionId.Value, key: Array[Byte]*)(value: Array[Byte]*): Unit = {
+  private def addEntry(section: SectionId.Value, key: Array[Byte]*)(value: Array[Byte]*): Unit = {
     val solidKey   = ByteStr(key.reduce(_ ++ _))
     val solidValue = value.foldLeft(Array.emptyByteArray)(_ ++ _)
     maps(section.id)(solidKey) = solidValue
@@ -55,7 +55,7 @@ class StateHashBuilder {
     )
   }
 
-  def addDataEntry(address: Address, dataEntry: DataEntry[_]): Unit = {
+  def addDataEntry(address: Address, dataEntry: DataEntry[?]): Unit = {
     addEntry(SectionId.DataEntry, address.bytes, dataEntry.key.getBytes(StandardCharsets.UTF_8))(
       dataEntry.valueBytes
     )
@@ -93,6 +93,12 @@ class StateHashBuilder {
   def addSponsorship(asset: IssuedAsset, minSponsoredFee: Long): Unit = {
     addEntry(SectionId.Sponsorship, asset.id.arr)(
       Longs.toByteArray(minSponsoredFee)
+    )
+  }
+
+  def addNextCommittedGenerator(publicKey: PublicKey, blsPublicKey: BlsPublicKey): Unit = {
+    addEntry(SectionId.NextCommittedGenerators, publicKey.arr)(
+      blsPublicKey.arr
     )
   }
 

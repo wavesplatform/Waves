@@ -13,7 +13,6 @@ import vt.assets.exchange.OrderAuthentication
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.{TxExchangeAmount, TxMatcherFee, TxOrderPrice}
-import com.wavesplatform.transaction as vt
 
 object PBOrders {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions.*

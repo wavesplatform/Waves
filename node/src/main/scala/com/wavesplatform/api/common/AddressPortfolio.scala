@@ -6,7 +6,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.NFTIterator.BatchSize
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.database.{AddressId, CurrentBalance, DBResource, Key, KeyTags, Keys, readCurrentBalance}
+import com.wavesplatform.database.{AddressId, CurrentBalance, DBResource, Key, KeyTag, Keys, readCurrentBalance}
 import com.wavesplatform.state.{AssetDescription, StateSnapshot}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -20,7 +20,7 @@ import scala.jdk.CollectionConverters.*
 class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resource: DBResource)
     extends AbstractIterator[Seq[(IssuedAsset, Long)]]
     with ScorexLogging {
-  private val prefixBytes: Array[Byte] = KeyTags.NftPossession.prefixBytes ++ addressId.toByteArray
+  private val prefixBytes: Array[Byte] = KeyTag.NftPossession.prefixBytes ++ addressId.toByteArray
 
   resource.withSafePrefixIterator { dbIterator =>
     dbIterator.seek(prefixBytes)
@@ -64,7 +64,7 @@ object NFTIterator {
 }
 
 class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends AbstractIterator[Seq[(IssuedAsset, Long)]] {
-  private val prefixBytes: Array[Byte] = KeyTags.AssetBalance.prefixBytes ++ addressId.toByteArray
+  private val prefixBytes: Array[Byte] = KeyTag.AssetBalance.prefixBytes ++ addressId.toByteArray
 
   resource.withSafePrefixIterator(_.seek(prefixBytes))(())
 
@@ -80,7 +80,7 @@ class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends A
 }
 
 class WavesBalanceIterator(addressId: AddressId, resource: DBResource) extends AbstractIterator[(Int, Long)] {
-  private val prefixBytes: Array[Byte] = KeyTags.WavesBalanceHistory.prefixBytes ++ addressId.toByteArray
+  private val prefixBytes: Array[Byte] = KeyTag.WavesBalanceHistory.prefixBytes ++ addressId.toByteArray
   private val lastHeight: Int          = resource.get(Keys.wavesBalance(addressId)).height.toInt
 
   resource.withSafePrefixIterator(_.seekForPrev(prefixBytes ++ Ints.toByteArray(lastHeight)))(())

@@ -1,31 +1,65 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.api.http.DebugMessage
-import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.utils.ScorexLogging
-import org.scalatest.{Args, Status, Suite, SuiteMixin}
+import com.wavesplatform.it.ReportingTestName.CaptureCancel
+import com.wavesplatform.it.api.AsyncHttpApi.*
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import org.scalatest.events.*
+import org.scalatest.*
+import org.slf4j.LoggerFactory
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 
 trait ReportingTestName extends SuiteMixin with ScorexLogging {
-  th: Suite with Nodes =>
+  th: Suite & Nodes =>
+  override protected lazy val log = LoggerFacade(LoggerFactory.getLogger("Test"))
 
   abstract override protected def runTest(testName: String, args: Args): Status = {
-    print(s"Test '$testName' started")
-    val r = super.runTest(testName, args)
-    print(s"Test '$testName' ${if (r.succeeds()) "SUCCEEDED" else "FAILED"}")
+    printTestWorkflow(s"Test '$testName' started")
+    val reporter = new CaptureCancel(testName, args.reporter)
+    val r        = super.runTest(testName, args.copy(reporter = reporter))
+    printTestWorkflow(s"Test '$testName' ${reporter.status.toString.toUpperCase}")
     r
   }
 
-  private def print(text: String): Unit = {
-    import scala.concurrent.ExecutionContext.Implicits.global
+  def step(text: String): Unit = {
     val formatted = s"---------- $text ----------"
     log.debug(formatted)
+    printDebugMessage(formatted)
+  }
+
+  private def printTestWorkflow(text: String): Unit = {
+    val formatted = s"========== $text =========="
+    log.debug(formatted)
+    printDebugMessage(formatted)
+  }
+
+  private def printDebugMessage(text: String): Unit = {
+    import scala.concurrent.ExecutionContext.Implicits.global
     try {
-      Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(formatted))), 10.seconds)
+      Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(text))), 10.seconds)
     } catch {
       case _: Throwable => ()
+    }
+  }
+}
+
+object ReportingTestName {
+  enum Status {
+    case Unknown, Succeeded, Failed, Ignored, Canceled
+  }
+  class CaptureCancel(testName: String, inner: Reporter) extends Reporter {
+    @volatile var status: Status = Status.Unknown
+    override def apply(event: Event): Unit = {
+      event match {
+        case TestSucceeded(testName = `testName`) => status = Status.Succeeded
+        case TestFailed(testName = `testName`)    => status = Status.Failed
+        case TestIgnored(testName = `testName`)   => status = Status.Ignored
+        case TestCanceled(testName = `testName`)  => status = Status.Canceled
+        case _                                    =>
+      }
+      inner.apply(event)
     }
   }
 }

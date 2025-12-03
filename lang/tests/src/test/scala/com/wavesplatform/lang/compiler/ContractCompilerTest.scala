@@ -4,7 +4,7 @@ import cats.kernel.Monoid
 import cats.syntax.semigroup.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.*
@@ -32,7 +32,7 @@ class ContractCompilerTest extends PropSpec {
       .combineAll(
         Seq(
           PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, version).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, version, fixEcrecover = true).withEnvironment[Environment],
           WavesContext.build(
             Global,
             DirectiveSet(version, Account, DAppType).explicitGet(),
@@ -364,19 +364,7 @@ class ContractCompilerTest extends PropSpec {
   }
 
   property("hodlContract") {
-    val ctx = Monoid
-      .combineAll(
-        Seq(
-          PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
-          WavesContext.build(
-            Global,
-            DirectiveSet(V3, Account, DAppType).explicitGet(),
-            fixBigScriptField = true
-          )
-        )
-      )
-      .compilerContext
+    val ctx = dAppV3Ctx
     val expr = {
       val script =
         """
@@ -492,19 +480,7 @@ class ContractCompilerTest extends PropSpec {
   }
 
   property("assetBalanceV3 allow issued assets and waves") {
-    val ctx = Monoid
-      .combineAll(
-        Seq(
-          PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
-          WavesContext.build(
-            Global,
-            DirectiveSet(V3, Account, DAppType).explicitGet(),
-            fixBigScriptField = true
-          )
-        )
-      )
-      .compilerContext
+    val ctx = dAppV3Ctx
     val expr = {
       val script =
         """
@@ -821,19 +797,7 @@ class ContractCompilerTest extends PropSpec {
   }
 
   property("Asset has no name") {
-    val ctx = Monoid
-      .combineAll(
-        Seq(
-          PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
-          WavesContext.build(
-            Global,
-            DirectiveSet(V3, Account, DAppType).explicitGet(),
-            fixBigScriptField = true
-          )
-        )
-      )
-      .compilerContext
+    val ctx = dAppV3Ctx
     val expr = {
       val script =
         """

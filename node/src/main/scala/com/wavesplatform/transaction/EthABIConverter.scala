@@ -38,11 +38,11 @@ final case class EthABIConverter(script: Script) {
         data: String,
         blockchain: Blockchain
     ): Either[ValidationError, (List[EVALUATED], Seq[InvokeScriptTransaction.Payment])] = {
-      val arr   = FastHex.decode(data)
-      val func  = new Function(ethSignature)
-      val tuple = func.decodeCall(arr)
+      val arr          = FastHex.decode(data)
+      val func         = new Function(ethSignature)
+      val tuple: Tuple = func.decodeCall(arr)
 
-      tuple.asScala.toList
+      (tuple: java.lang.Iterable[AnyRef]).asScala.toList
         .zip(args.map(_.rideType) :+ EthABIConverter.PaymentListType)
         .traverse { case (ethArg, rideT) => EthABIConverter.toRideValue(ethArg, rideT) }
         .flatMap(checkLen(func, tuple, arr.length, blockchain).as(_))
@@ -93,7 +93,7 @@ final case class EthABIConverter(script: Script) {
     }
   }
 
-  private[this] lazy val funcsWithTypes =
+  private lazy val funcsWithTypes =
     Global
       .dAppFuncTypes(script)
       .map { signatures =>
@@ -103,7 +103,7 @@ final case class EthABIConverter(script: Script) {
         signatures.copy(argsWithFuncName = filtered)
       }
 
-  private[this] def functionsWithArgs: Seq[(String, List[(String, Types.FINAL)])] = {
+  private def functionsWithArgs: Seq[(String, List[(String, Types.FINAL)])] = {
     funcsWithTypes match {
       case Right(signatures) => signatures.argsWithFuncName.toSeq
       case Left(_)           => Nil

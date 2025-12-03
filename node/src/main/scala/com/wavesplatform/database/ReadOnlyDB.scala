@@ -5,7 +5,6 @@ import com.wavesplatform.metrics.RocksDBStats
 import com.wavesplatform.metrics.RocksDBStats.DbHistogramExt
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, RocksIterator}
 
-import scala.annotation.tailrec
 import scala.util.Using
 
 class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
@@ -15,16 +14,16 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
     key.parse(bytes)
   }
 
-  def multiGetOpt[V](keys: IndexedSeq[Key[Option[V]]], valBufferSize: Int): Seq[Option[V]] =
+  def multiGetOpt[V](keys: collection.IndexedSeq[Key[Option[V]]], valBufferSize: Int): Seq[Option[V]] =
     db.multiGetOpt(readOptions, keys, valBufferSize)
 
-  def multiGet[V](keys: IndexedSeq[Key[V]], valBufferSize: Int): Seq[Option[V]] =
+  def multiGet[V](keys: collection.IndexedSeq[Key[V]], valBufferSize: Int): Seq[Option[V]] =
     db.multiGet(readOptions, keys, valBufferSize)
 
-  def multiGetOpt[V](keys: IndexedSeq[Key[Option[V]]], valBufSizes: IndexedSeq[Int]): Seq[Option[V]] =
+  def multiGetOpt[V](keys: collection.IndexedSeq[Key[Option[V]]], valBufSizes: collection.IndexedSeq[Int]): Seq[Option[V]] =
     db.multiGetOpt(readOptions, keys, valBufSizes)
 
-  def multiGetInts(keys: IndexedSeq[Key[Int]]): Seq[Option[Int]] =
+  def multiGetInts(keys: collection.IndexedSeq[Key[Int]]): Seq[Option[Int]] =
     db.multiGetInts(readOptions, keys)
 
   def has[V](key: Key[V]): Boolean = {
@@ -35,24 +34,15 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
 
   def newIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(true))
 
-  def iterateOverPrefix(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOverPrefix(tag.prefixBytes)(f)
-
-  def iterateOverPrefix(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
-    @tailrec
-    def loop(iter: RocksIterator): Unit = {
-      val key = iter.key()
-      if (iter.isValid) {
-        f(Maps.immutableEntry(key, iter.value()))
-        iter.next()
-        loop(iter)
-      } else ()
+  def iterateOverWithSeek(prefix: Array[Byte], seek: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Boolean): Unit =
+    Using.resource(db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(true))) { iter =>
+      iter.seek(seek)
+      var continue = true
+      while (iter.isValid && iter.key().startsWith(prefix) && continue) {
+        continue = f(Maps.immutableEntry(iter.key(), iter.value()))
+        if (continue) iter.next()
+      }
     }
-
-    Using.resource(db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))) { iter =>
-      iter.seek(prefix)
-      loop(iter)
-    }
-  }
 
   def iterateOver(prefix: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Unit): Unit =
     Using.resource(db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(true))) { iter =>
@@ -63,6 +53,10 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
       }
     }
 
+  /** Tries to find the exact key if prefix.length < 10.
+    * @see
+    *   RDB.newColumnFamilyOptions
+    */
   def prefixExists(prefix: Array[Byte]): Boolean = Using.resource(db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))) {
     iter =>
       iter.seek(prefix)

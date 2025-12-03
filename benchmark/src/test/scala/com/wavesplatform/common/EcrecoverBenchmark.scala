@@ -6,7 +6,7 @@ import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.EcrecoverBenchmark.{EcrecoverSt1, EcrecoverSt2}
 import com.wavesplatform.crypto.Keccak256
 import com.wavesplatform.lang.Global
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -19,11 +19,11 @@ class EcrecoverBenchmark {
 
   @Benchmark
   def ecrover1(st: EcrecoverSt1, bh: Blackhole): Unit =
-    bh.consume(Global.ecrecover(st.messageHash, st.signature))
+    bh.consume(Global.ecrecover(st.messageHash, st.signature, true))
 
   @Benchmark
   def ecrover2(st: EcrecoverSt2, bh: Blackhole): Unit =
-    bh.consume(Global.ecrecover(st.messageHash, st.signature))
+    bh.consume(Global.ecrecover(st.messageHash, st.signature, true))
 }
 
 object EcrecoverBenchmark {

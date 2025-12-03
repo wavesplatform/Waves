@@ -1,20 +1,20 @@
 package com.wavesplatform
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair, SeedKeyPair}
+import com.wavesplatform.account.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
 import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator}
 import com.wavesplatform.crypto.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
+import com.wavesplatform.settings.*
 import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import com.wavesplatform.utils.*
 import com.wavesplatform.wallet.Wallet
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import pureconfig.*
+import pureconfig.generic.semiauto.deriveReader
 
 import java.io.{File, FileNotFoundException}
 import java.nio.file.Files
@@ -28,7 +28,14 @@ object GenesisBlockGenerator {
   private type SeedText = String
   private type Share    = Long
 
-  case class DistributionItem(seedText: String, nonce: Int, amount: Share, miner: Boolean = true)
+  case class DistributionItem(seedText: String, amount: Share, nonce: Int = 0, miner: Boolean = true)
+
+  object DistributionItem {
+    // This given is required for default args to work.
+    // Details: https://github.com/pureconfig/pureconfig/issues/1673
+    // Note: the proposed approach with `extension` doesn't work.
+    given ConfigReader[DistributionItem] = deriveReader
+  }
 
   case class Settings(
       networkType: String,
@@ -39,14 +46,17 @@ object GenesisBlockGenerator {
       preActivatedFeatures: Option[List[Int]],
       minBlockTime: Option[FiniteDuration],
       delayDelta: Option[Int]
-  ) {
+  ) derives ConfigReader {
 
     val initialBalance: Share = distributions.map(_.amount).sum
 
     val chainId: Byte = networkType.head.toByte
 
     private val features: Map[Short, Int] =
-      preActivatedFeatures.getOrElse(List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt)).map(f => f.toShort -> 0).toMap
+      preActivatedFeatures
+        .getOrElse(List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt))
+        .map(f => f.toShort -> 0)
+        .toMap
 
     val functionalitySettings: FunctionalitySettings = FunctionalitySettings(
       Int.MaxValue,
@@ -64,8 +74,8 @@ object GenesisBlockGenerator {
       seedText: SeedText,
       seed: ByteStr,
       accountSeed: ByteStr,
-      accountPrivateKey: ByteStr,
-      accountPublicKey: ByteStr,
+      accountPrivateKey: PrivateKey,
+      accountPublicKey: PublicKey,
       accountAddress: Address,
       account: SeedKeyPair,
       miner: Boolean
@@ -96,14 +106,13 @@ object GenesisBlockGenerator {
       .headOption
       .map(new File(_).getAbsoluteFile.ensuring(f => !f.isDirectory && f.getParentFile.isDirectory || f.getParentFile.mkdirs()))
 
-    val settings = parseSettings(ConfigFactory.parseFile(inputConfFile))
+    val settings = parseSettings(ConfigFactory.parseFile(inputConfFile).resolve())
     val confBody = createConfig(settings)
     outputConfFile.foreach(ocf => Files.write(ocf.toPath, confBody.utf8Bytes))
   }
 
   def parseSettings(config: Config): Settings = {
-    import net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-    config.as[Settings]("genesis-generator")
+    ConfigSource.fromConfig(config).at("genesis-generator").loadOrThrow[Settings]
   }
 
   def createConfig(settings: Settings): String = {
@@ -180,7 +189,8 @@ object GenesisBlockGenerator {
           featureVotes = Seq.empty,
           rewardVote = -1L,
           stateHash = None,
-          challengedHeader = None
+          challengedHeader = None,
+          finalizationVoting = None
         )
         .explicitGet()
 
@@ -261,8 +271,8 @@ object GenesisBlockGenerator {
             minerShares,
             { case (miner, balance) =>
               val (hit, newHitSource) = getHitWithSource(miner.account, currentHitSource)
-              val delay               = posCalculator.calculateDelay(hit, baseTargets.head, balance)
-              (delay, newHitSource)
+              val delay1              = posCalculator.calculateDelay(hit, baseTargets.head, balance)
+              (delay1, newHitSource)
             },
             _._1
           )

@@ -1,26 +1,27 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError._
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.{Assertion, CancelAfterFailure}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure {
-  import RideV4ActivationSuite._
+  import RideV4ActivationSuite.*
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
@@ -33,7 +34,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   private def callerAcc  = secondKeyPair
   private def smartAccV3 = thirdKeyPair
 
-  private var asset: Asset = _
+  private var asset: Asset = scala.compiletime.uninitialized
 
   private val dAppV4 =
     """{-# STDLIB_VERSION 4 #-}
@@ -153,11 +154,11 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       error.statusCode shouldBe 400
       error.message shouldBe
         "State check failed. Reason: " +
-          "Attempt to transfer unavailable funds: " +
-          "Transaction application leads to negative asset " +
-          s"'$asset' balance to " +
-          "(at least) temporary negative state, " +
-          s"current balance is 0, spends equals -$amount, result is -$amount"
+        "Attempt to transfer unavailable funds: " +
+        "Transaction application leads to negative asset " +
+        s"'$asset' balance to " +
+        "(at least) temporary negative state, " +
+        s"current balance is 0, spends equals -$amount, result is -$amount"
     }
   }
 
@@ -259,13 +260,13 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       error.message should include("Non-matching types: expected: List[T], actual: AttachedPayment|Unit")
     }
     assertApiError(sender.scriptCompile(asAssetV3(s"""match tx {
-           |  case is: InvokeScriptTransaction => is.payments[0].amount > 0
-           |  case _ => true }""".stripMargin))) { error =>
+                                                     |  case is: InvokeScriptTransaction => is.payments[0].amount > 0
+                                                     |  case _ => true }""".stripMargin))) { error =>
       error.message should include("Undefined field `payments` of variable of type `InvokeScriptTransaction`")
     }
     assertApiError(sender.scriptCompile(asAssetV3(s"""match tx {
-           |  case is: InvokeScriptTransaction => is.payment[0].amount > 0
-           |  case _ => true }""".stripMargin))) { error =>
+                                                     |  case is: InvokeScriptTransaction => is.payment[0].amount > 0
+                                                     |  case _ => true }""".stripMargin))) { error =>
       error.message should include("Non-matching types: expected: List[T], actual: AttachedPayment|Unit")
     }
 
@@ -298,8 +299,8 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     }
 
     assertApiError(sender.scriptCompile(asDappV3(s"""WriteSet([])}
-           |@Callable(inv)
-           |func withArg(a: List[Int]) = { WriteSet([ DataEntry("a", a[0]) ])""".stripMargin))) { error =>
+                                                    |@Callable(inv)
+                                                    |func withArg(a: List[Int]) = { WriteSet([ DataEntry("a", a[0]) ])""".stripMargin))) { error =>
       error.message should include("Unexpected callable func arg type: List[Int] ")
     }
   }
@@ -328,10 +329,10 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       error.message should include("Undefined field `payment` of variable of type `Invocation`")
     }
     assertApiError(sender.scriptCompile(asAssetV4(s"""match tx {
-           |  case is: InvokeScriptTransaction =>
-           |    let x = is.payment.extract().amount
-           |    true
-           |  case _ => true }""".stripMargin))) { error =>
+                                                     |  case is: InvokeScriptTransaction =>
+                                                     |    let x = is.payment.extract().amount
+                                                     |    true
+                                                     |  case _ => true }""".stripMargin))) { error =>
       error.message should include("Undefined field `payment` of variable of type `InvokeScriptTransaction`")
     }
   }
@@ -384,7 +385,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
 
 object RideV4ActivationSuite {
   private val estimator = ScriptEstimatorV2
-  val activationHeight  = 9
+  val activationHeight  = Height(9)
 
   def asAssetV3(body: String): String = {
     s"""{-# STDLIB_VERSION 3 #-}

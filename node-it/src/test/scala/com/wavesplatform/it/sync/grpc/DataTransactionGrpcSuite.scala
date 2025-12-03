@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.{dataTxSupportedVersions, minFee}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
@@ -113,7 +113,7 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     for (v <- dataTxSupportedVersions) {
       val firstBalance    = sender.wavesBalance(firstAddress).available
       val firstEffBalance = sender.wavesBalance(firstAddress).effective
-      assertGrpcError(sender.putData(firstAcc, data, minFee - 1), "Fee .* does not exceed minimal value", Code.INVALID_ARGUMENT)
+      assertGrpcError(sender.putData(firstAcc, data, minFee - 1, v), "Fee .* does not exceed minimal value", Code.INVALID_ARGUMENT)
       sender.waitForHeight(sender.height + 1)
       sender.wavesBalance(firstAddress).available shouldBe firstBalance
       sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance

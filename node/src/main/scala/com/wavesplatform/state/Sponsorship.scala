@@ -5,12 +5,15 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
+import play.api.libs.json.{JsNumber, Writes}
 
 sealed abstract class Sponsorship
 case class SponsorshipValue(minFee: Long) extends Sponsorship
 case object SponsorshipNoInfo             extends Sponsorship
 
 object Sponsorship {
+  implicit val writesValue: Writes[SponsorshipValue] = Writes[SponsorshipValue](v => JsNumber(v.minFee))
+
   implicit val sponsorshipMonoid: Monoid[Sponsorship] = new Monoid[Sponsorship] {
     override def empty: Sponsorship = SponsorshipNoInfo
 
@@ -29,11 +32,11 @@ object Sponsorship {
       amountInWaves
   }
 
-  def sponsoredFeesSwitchHeight(blockchain: Blockchain): Int =
+  def sponsoredFeesSwitchHeight(blockchain: Blockchain): Height =
     blockchain
-      .featureActivationHeight(BlockchainFeatures.FeeSponsorship.id)
-      .map(h => h + blockchain.settings.functionalitySettings.activationWindowSize(h))
-      .getOrElse(Int.MaxValue)
+      .featureActivationHeight(BlockchainFeatures.FeeSponsorship)
+      .map(h => h + blockchain.settings.functionalitySettings.activationWindowSize(h.toInt))
+      .getOrElse(Height(Int.MaxValue))
 
   def toWaves(assetFee: Long, sponsorship: Long): Long =
     if (sponsorship == 0) Long.MaxValue

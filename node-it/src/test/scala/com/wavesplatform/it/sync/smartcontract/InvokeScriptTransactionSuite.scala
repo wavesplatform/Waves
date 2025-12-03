@@ -3,36 +3,36 @@ package com.wavesplatform.it.sync.smartcontract
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state._
-import com.wavesplatform.test._
+import com.wavesplatform.state.*
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  val activationHeight = 8
+  val activationHeight = Height(8)
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(NodeConfigs.Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
       .overrideBase(
         _.preactivatedFeatures(
-          (BlockchainFeatures.Ride4DApps.id, 0),
+          (BlockchainFeatures.Ride4DApps.id, Height(0)),
           (BlockchainFeatures.BlockV5.id, activationHeight)
         )
       )

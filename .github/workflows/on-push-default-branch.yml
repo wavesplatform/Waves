@@ -1,0 +1,43 @@
+name: Publish snapshot JARs and dependency graph
+
+on:
+  push:
+    branches:
+      - 'version-1.*.*'
+
+jobs:
+  update-graph:
+    name: Update Dependency Graph
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'sbt'
+      - uses: sbt/setup-sbt@v1
+      - uses: scalacenter/sbt-dependency-submission@v3
+        with:
+          configs-ignore: test compile-internal provided
+  publish-snapshot:
+    name: Publish Snapshots to Sonatype
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'sbt'
+          gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
+          gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
+      - uses: sbt/setup-sbt@v1
+      - name: Publish snapshots
+        env:
+          SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
+        run: |
+          version=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-SNAPSHOT
+          sbt -Dproject.version=$version --batch publish

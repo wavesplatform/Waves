@@ -2,7 +2,7 @@ package com.wavesplatform.it.asset
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{issueFee, minFee, smartMinFee}
 import com.wavesplatform.lang.directives.values.{V4, V5, V6}

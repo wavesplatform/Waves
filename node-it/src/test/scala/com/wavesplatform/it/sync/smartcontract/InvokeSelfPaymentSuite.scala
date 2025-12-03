@@ -2,9 +2,9 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
@@ -20,7 +20,7 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
   private def dAppV4 = secondKeyPair
   private def dAppV3 = thirdKeyPair
 
-  private var asset1: IssuedAsset = _
+  private var asset1: IssuedAsset = scala.compiletime.uninitialized
   private def asset1Id            = asset1.id.toString
 
   private lazy val dAppV3Address: String = dAppV3.toAddress.toString

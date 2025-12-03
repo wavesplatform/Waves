@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import com.google.common.base.Charsets.UTF_8
 import com.google.common.collect.{Interners, Maps}
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
@@ -10,8 +9,9 @@ import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.*
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database.protobuf as pb
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.protobuf.TransactionData.Transaction as TD
@@ -19,7 +19,7 @@ import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
+import com.wavesplatform.protobuf.{PBSnapshots, toPublicKey, toByteStr, toByteString}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -29,15 +29,14 @@ import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.*
 import sun.nio.ch.Util
-import supertagged.TaggedType
 
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 import java.util.Map as JMap
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{View, mutable}
 import scala.jdk.CollectionConverters.*
-import scala.util.Using
 
 //noinspection UnstableApiUsage
 package object database {
@@ -62,7 +61,7 @@ package object database {
   }
 
   def writeIntSeq(values: Seq[Int]): Array[Byte] = {
-    values.foldLeft(ByteBuffer.allocate(4 * values.length))(_ putInt _).array()
+    values.foldLeft(ByteBuffer.allocate(4 * values.length))(_ `putInt` _).array()
   }
 
   def readIntSeq(data: Array[Byte]): Seq[Int] = Option(data).fold(Seq.empty[Int]) { d =>
@@ -98,7 +97,7 @@ package object database {
 
     while (i < data.length) {
       val len = ((data(i) << 8) | (data(i + 1) & 0xff)).toShort // Optimization
-      s += new String(data, i + 2, len, UTF_8)
+      s += new String(data, i + 2, len, StandardCharsets.UTF_8)
       i += (2 + len)
     }
     s.result()
@@ -118,7 +117,7 @@ package object database {
   else LeaseBalanceNode.Empty
 
   def writeLeaseBalanceNode(leaseBalanceNode: LeaseBalanceNode): Array[Byte] =
-    Longs.toByteArray(leaseBalanceNode.in) ++ Longs.toByteArray(leaseBalanceNode.out) ++ Ints.toByteArray(leaseBalanceNode.prevHeight)
+    Longs.toByteArray(leaseBalanceNode.in) ++ Longs.toByteArray(leaseBalanceNode.out) ++ leaseBalanceNode.prevHeight.toByteArray
 
   def readLeaseBalance(data: Array[Byte]): CurrentLeaseBalance = if (data != null && data.length == 24)
     CurrentLeaseBalance(
@@ -130,7 +129,7 @@ package object database {
   else CurrentLeaseBalance.Unavailable
 
   def writeLeaseBalance(lb: CurrentLeaseBalance): Array[Byte] =
-    Longs.toByteArray(lb.in) ++ Longs.toByteArray(lb.out) ++ Ints.toByteArray(lb.height) ++ Ints.toByteArray(lb.prevHeight)
+    Longs.toByteArray(lb.in) ++ Longs.toByteArray(lb.out) ++ lb.height.toByteArray ++ lb.prevHeight.toByteArray
 
   def writeLeaseDetails(ld: LeaseDetails): Array[Byte] =
     pb.LeaseDetails(
@@ -138,13 +137,13 @@ package object database {
       Some(PBRecipients.create(ld.recipientAddress)),
       ld.amount.value,
       ByteString.copyFrom(ld.sourceId.arr),
-      ld.height,
+      ld.height.toInt,
       ld.status match {
         case LeaseDetails.Status.Active => pb.LeaseDetails.CancelReason.Empty
         case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
           pb.LeaseDetails.CancelReason
-            .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
-        case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height))
+            .Cancelled(pb.LeaseDetails.Cancelled(height.toInt, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
+        case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height.toInt))
       }
     ).toByteArray
 
@@ -155,13 +154,13 @@ package object database {
         d.senderPublicKey.toPublicKey,
         PBRecipients.toAddress(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
         TxPositiveAmount.unsafeFrom(d.amount),
-        d.sourceId.toByteStr,
-        d.height
+        TransactionId(d.sourceId.toByteStr),
+        Height(d.height)
       ),
       d.cancelReason match {
-        case pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
+        case pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(Height(height))
         case pb.LeaseDetails.CancelReason.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
-          LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
+          LeaseDetails.Status.Cancelled(Height(height), Some(transactionId).collect { case id if !id.isEmpty => TransactionId(id.toByteStr) })
         case pb.LeaseDetails.CancelReason.Empty => LeaseDetails.Status.Active
       }
     )
@@ -172,7 +171,7 @@ package object database {
   else VolumeAndFeeNode.Empty
 
   def writeVolumeAndFeeNode(volumeAndFeeNode: VolumeAndFeeNode): Array[Byte] =
-    Longs.toByteArray(volumeAndFeeNode.volume) ++ Longs.toByteArray(volumeAndFeeNode.fee) ++ Ints.toByteArray(volumeAndFeeNode.prevHeight)
+    Longs.toByteArray(volumeAndFeeNode.volume) ++ Longs.toByteArray(volumeAndFeeNode.fee) ++ volumeAndFeeNode.prevHeight.toByteArray
 
   def readVolumeAndFee(data: Array[Byte]): CurrentVolumeAndFee = if (data != null && data.length == 24)
     CurrentVolumeAndFee(
@@ -184,22 +183,22 @@ package object database {
   else CurrentVolumeAndFee.Unavailable
 
   def writeVolumeAndFee(vf: CurrentVolumeAndFee): Array[Byte] =
-    Longs.toByteArray(vf.volume) ++ Longs.toByteArray(vf.fee) ++ Ints.toByteArray(vf.height) ++ Ints.toByteArray(vf.prevHeight)
+    Longs.toByteArray(vf.volume) ++ Longs.toByteArray(vf.fee) ++ vf.height.toByteArray ++ vf.prevHeight.toByteArray
 
-  def readFeatureMap(data: Array[Byte]): Map[Short, Int] = Option(data).fold(Map.empty[Short, Int]) { _ =>
+  def readFeatureMap(data: Array[Byte]): Map[Short, Height] = Option(data).fold(Map.empty) { _ =>
     val b        = ByteBuffer.wrap(data)
-    val features = Map.newBuilder[Short, Int]
+    val features = Map.newBuilder[Short, Height]
     while (b.hasRemaining) {
-      features += b.getShort -> b.getInt
+      features += b.getShort -> Height(b.getInt)
     }
 
     features.result()
   }
 
-  def writeFeatureMap(features: Map[Short, Int]): Array[Byte] = {
+  def writeFeatureMap(features: Map[Short, Height]): Array[Byte] = {
     val b = ByteBuffer.allocate(features.size * 6)
     for ((featureId, height) <- features)
-      b.putShort(featureId).putInt(height)
+      b.putShort(featureId).putInt(height.toInt)
 
     b.array()
   }
@@ -231,7 +230,7 @@ package object database {
     pb.AssetDetails(
       info.name,
       info.description,
-      info.lastUpdatedAt,
+      info.lastUpdatedAt.toInt,
       volumeInfo.isReissuable,
       ByteString.copyFrom(volumeInfo.volume.toByteArray)
     ).toByteArray
@@ -264,11 +263,11 @@ package object database {
     val outputLength = 4 + 4 + numSeqLength * (1 + 2 + 4)
     val ndo          = newDataOutput(outputLength)
 
-    ndo.writeInt(height)
+    ndo.writeInt(height.toInt)
     ndo.writeInt(numSeqLength)
     numSeq.foreach { case (tp, num, size) =>
       ndo.writeByte(tp)
-      ndo.writeShort(num)
+      ndo.writeShort(num.toShort)
       ndo.writeInt(size)
     }
 
@@ -309,13 +308,15 @@ package object database {
   }
 
   private def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[?] =
-    if (bs == null || bs.length == 0) EmptyDataEntry(key) else  pb.DataEntry.parseFrom(bs).value match {
-      case Value.Empty              => EmptyDataEntry(key)
-      case Value.IntValue(value)    => IntegerDataEntry(key, value)
-      case Value.BoolValue(value)   => BooleanDataEntry(key, value)
-      case Value.BinaryValue(value) => BinaryDataEntry(key, value.toByteStr)
-      case Value.StringValue(value) => StringDataEntry(key, value)
-    }
+    if (bs == null || bs.length == 0) EmptyDataEntry(key)
+    else
+      pb.DataEntry.parseFrom(bs).value match {
+        case Value.Empty              => EmptyDataEntry(key)
+        case Value.IntValue(value)    => IntegerDataEntry(key, value)
+        case Value.BoolValue(value)   => BooleanDataEntry(key, value)
+        case Value.BinaryValue(value) => BinaryDataEntry(key, value.toByteStr)
+        case Value.StringValue(value) => StringDataEntry(key, value)
+      }
 
   private def writeDataEntry(e: DataEntry[?]): Array[Byte] =
     pb.DataEntry(e match {
@@ -335,28 +336,70 @@ package object database {
     )
 
   def writeCurrentData(cdn: CurrentData): Array[Byte] =
-    Ints.toByteArray(cdn.height) ++ Ints.toByteArray(cdn.prevHeight) ++ writeDataEntry(cdn.entry)
+    cdn.height.toByteArray ++ cdn.prevHeight.toByteArray ++ writeDataEntry(cdn.entry)
 
   def readDataNode(key: String)(bs: Array[Byte]): DataNode = if (bs == null) DataNode.empty(key)
   else
     DataNode(readDataEntry(key)(bs.drop(4)), Height(Ints.fromByteArray(bs.take(4))))
 
   def writeDataNode(dn: DataNode): Array[Byte] =
-    Ints.toByteArray(dn.prevHeight) ++ writeDataEntry(dn.entry)
+    dn.prevHeight.toByteArray ++ writeDataEntry(dn.entry)
 
   def readCurrentBalance(bs: Array[Byte]): CurrentBalance = if (bs != null && bs.length == 16)
     CurrentBalance(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.slice(8, 12))), Height(Ints.fromByteArray(bs.takeRight(4))))
   else CurrentBalance.Unavailable
 
   def writeCurrentBalance(balance: CurrentBalance): Array[Byte] =
-    Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.height) ++ Ints.toByteArray(balance.prevHeight)
+    Longs.toByteArray(balance.balance) ++ balance.height.toByteArray ++ balance.prevHeight.toByteArray
 
-  def readBalanceNode(bs: Array[Byte]): BalanceNode = if (bs != null && bs.length == 12)
+  def readBalanceNode(bs: Array[Byte]): BalanceNode = if (bs != null && bs.length == BalanceNode.SizeInBytes)
     BalanceNode(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.takeRight(4))))
   else BalanceNode.Empty
 
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
-    Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
+    Longs.toByteArray(balance.balance) ++ balance.prevHeight.toByteArray
+
+  def readGeneratorBalances(data: Array[Byte]): Seq[Long] =
+    data
+      .grouped(Longs.BYTES) // One entry (balance) size
+      .map(Longs.fromByteArray)
+      .toSeq
+
+  def writeGeneratorBalances(data: Seq[Long]): Array[Byte] = data.view.flatMap(Longs.toByteArray).toArray
+
+  def readCommittedGenerators(data: Array[Byte]): Seq[(AddressId, BlsPublicKey)] = {
+    val addressSize = Longs.BYTES
+    data
+      .grouped(addressSize + BlsPublicKey.SizeInBytes)
+      .map { data =>
+        val (addressIdBytes, blsPublicKeyBytes) = data.splitAt(addressSize)
+        (
+          Longs.fromByteArray(addressIdBytes),
+          BlsPublicKey(blsPublicKeyBytes)
+        )
+      }
+      .toSeq
+  }
+
+  def writeCommittedGenerators(data: Seq[(AddressId, BlsPublicKey)]): Array[Byte] =
+    data.view.flatMap { (addressId, blsPublicKey) => Longs.toByteArray(addressId) ++ blsPublicKey.arr }.toArray
+
+  def readConflictGenerators(data: Array[Byte]): Seq[GeneratorIndex] = data
+    .grouped(Ints.BYTES)
+    .map { bytes => GeneratorIndex(Ints.fromByteArray(bytes)) }
+    .toSeq
+
+  def writeConflictGenerators(data: Seq[GeneratorIndex]): Array[Byte] = data.view.flatMap(i => Ints.toByteArray(i.toInt)).toArray
+
+  def readCommitmentTransactions(data: Array[Byte]): Seq[TransactionId] = {
+    val transactionSize = DigestLength
+    data
+      .grouped(transactionSize)
+      .map { bytes => TransactionId(ByteStr(bytes)) }
+      .toSeq
+  }
+
+  def writeCommitmentTransactions(data: Seq[TransactionId]): Array[Byte] = data.view.flatMap(_.arr).toArray
 
   def getKeyBuffersFromKeys(keys: collection.IndexedSeq[Key[?]]): collection.IndexedSeq[ByteBuffer] =
     keys.map { k =>
@@ -390,39 +433,55 @@ package object database {
 
   implicit class DBExt(val db: RocksDB) extends AnyVal {
 
-    def readOnly[A](f: ReadOnlyDB => A): A = {
-      Using.resource(db.getSnapshot) { s =>
-        Using.resource(new ReadOptions().setSnapshot(s).setVerifyChecksums(false)) { ro =>
-          f(new ReadOnlyDB(db, ro))
-        }
-      }(db.releaseSnapshot(_))
-    }
+    def readOnly[A](f: ReadOnlyDB => A): A = withReadOptions { ro => f(new ReadOnlyDB(db, ro)) }
 
     /** @note
       *   Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
       */
-    def readWrite[A](f: RW => A): A = {
-      val snapshot     = db.getSnapshot
-      val readOptions  = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
-      val batch        = new WriteBatch()
-      val rw           = new RW(db, readOptions, batch)
-      val writeOptions = new WriteOptions()
+    def readWrite[A](f: RW => A): A = withOptions { (ro, wo) => readWriteWithOptions(ro, wo)(f) }
+
+    def readWriteWithOptions[A](readOptions: ReadOptions, writeOptions: WriteOptions)(f: RW => A): A = {
+      val batch = new WriteBatch()
+      val rw    = new RW(db, readOptions, batch)
       try {
         val r = f(rw)
         db.write(writeOptions, batch)
         r
-      } finally {
-        readOptions.close()
-        writeOptions.close()
-        batch.close()
+      } finally batch.close()
+    }
+
+    def withOptions[A](f: (ReadOptions, WriteOptions) => A): A =
+      withReadOptions { ro =>
+        withWriteOptions { wo =>
+          f(ro, wo)
+        }
+      }
+
+    def withWriteOptions[A](f: WriteOptions => A): A = {
+      val wo = new WriteOptions()
+      try f(wo)
+      finally wo.close()
+    }
+
+    def withReadOptions[A](f: ReadOptions => A): A = {
+      val snapshot = db.getSnapshot
+      // checksum may be verification is **very** expensive, so it's explicitly disabled
+      val ro = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
+      try f(ro)
+      finally {
+        ro.close()
         db.releaseSnapshot(snapshot)
       }
     }
 
-    def multiGetOpt[A](readOptions: ReadOptions, keys: IndexedSeq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
+    def multiGetOpt[A](readOptions: ReadOptions, keys: collection.IndexedSeq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGetOpt[A](readOptions: ReadOptions, keys: IndexedSeq[Key[Option[A]]], valBufSizes: IndexedSeq[Int]): Seq[Option[A]] =
+    def multiGetOpt[A](
+        readOptions: ReadOptions,
+        keys: collection.IndexedSeq[Key[Option[A]]],
+        valBufSizes: collection.IndexedSeq[Int]
+    ): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(valBufSizes))
 
     def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSizes: ArrayBuffer[Int]): View[A] =
@@ -431,7 +490,7 @@ package object database {
     def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSize: Int): View[A] =
       multiGet(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGet[A](readOptions: ReadOptions, keys: IndexedSeq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
+    def multiGet[A](readOptions: ReadOptions, keys: collection.IndexedSeq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
       val keyBufs = getKeyBuffersFromKeys(keys)
       val valBufs = getValueBuffers(keys.size, valBufSize)
 
@@ -452,7 +511,7 @@ package object database {
       result
     }
 
-    def multiGetInts(readOptions: ReadOptions, keys: IndexedSeq[Key[Int]]): Seq[Option[Int]] = {
+    def multiGetInts(readOptions: ReadOptions, keys: collection.IndexedSeq[Key[Int]]): Seq[Option[Int]] = {
       val keyBytes = keys.map(_.keyBytes)
       val keyBufs  = getKeyBuffers(keyBytes)
       val valBufs  = getValueBuffers(keyBytes.size, 4)
@@ -500,7 +559,7 @@ package object database {
       key.parse(db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), readOptions, key.keyBytes))
     def has(key: Key[?]): Boolean = db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes) != null
 
-    def iterateOver(tag: KeyTags.KeyTag, cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Unit): Unit =
+    def iterateOver(tag: KeyTag, cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Unit): Unit =
       iterateOver(tag.prefixBytes, cfh)(f)
 
     def iterateOver(prefix: Array[Byte], cfh: Option[ColumnFamilyHandle])(f: DBEntry => Unit): Unit = {
@@ -513,17 +572,29 @@ package object database {
         } else ()
       }
 
-      val iterator = db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), new ReadOptions().setTotalOrderSeek(true))
-      try {
-        iterator.seek(prefix)
-        loop(iterator)
-      } finally iterator.close()
+      withReadOptions { ro =>
+        val iterator = db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), ro.setTotalOrderSeek(true))
+        try {
+          iterator.seek(prefix)
+          loop(iterator)
+        } finally iterator.close()
+      }
     }
 
-    def resourceObservable: Observable[DBResource] = Observable.resource(Task(DBResource(db)))(r => Task(r.close()))
+    def resourceObservable: Observable[DBResource] =
+      Observable.resource(Task(new DBResource(db, None)))(r => Task(r.close()))
+
+    def resourceObservable(iteratorCfHandle: ColumnFamilyHandle): Observable[DBResource] =
+      Observable.resource(Task(new DBResource(db, Some(iteratorCfHandle))))(r => Task(r.close()))
 
     def withResource[A](f: DBResource => A): A = {
-      val resource = DBResource(db)
+      val resource = new DBResource(db)
+      try f(resource)
+      finally resource.close()
+    }
+
+    def withResource[A](iteratorCfHandle: ColumnFamilyHandle)(f: DBResource => A): A = {
+      val resource = new DBResource(db, Some(iteratorCfHandle))
       try f(resource)
       finally resource.close()
     }
@@ -626,16 +697,16 @@ package object database {
   def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {
     val (m, tx) = v
     val ptx = tx match {
-      case lps: PBSince with Versioned if PBSince.affects(lps) => TD.WavesTransaction(PBTransactions.protobuf(tx))
-      case et: EthereumTransaction                             => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
-      case _                                                   => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case lps: (PBSince & Versioned) if PBSince.affects(lps) => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case et: EthereumTransaction                            => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+      case _                                                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
     }
     pb.TransactionData(ptx, m.status.protobuf, m.spentComplexity).toByteArray
   }
 
   def loadTransactions(height: Height, rdb: RDB): Seq[(TxMeta, Transaction)] = {
     val transactions = Seq.newBuilder[(TxMeta, Transaction)]
-    rdb.db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txHandle.handle)) { e =>
+    rdb.db.iterateOver(KeyTag.NthTransactionInfoAtHeight.prefixBytes ++ height.toByteArray, Some(rdb.txHandle.handle)) { e =>
       transactions += readTransaction(height)(e.getValue)
     }
     transactions.result()
@@ -643,7 +714,7 @@ package object database {
 
   def loadTxStateSnapshots(height: Height, rdb: RDB): Seq[TransactionStateSnapshot] = {
     val txSnapshots = Seq.newBuilder[TransactionStateSnapshot]
-    rdb.db.iterateOver(KeyTags.NthTransactionStateSnapshotAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txSnapshotHandle.handle)) { e =>
+    rdb.db.iterateOver(KeyTag.NthTransactionStateSnapshotAtHeight.prefixBytes ++ height.toByteArray, Some(rdb.txSnapshotHandle.handle)) { e =>
       txSnapshots += TransactionStateSnapshot.parseFrom(e.getValue)
     }
     txSnapshots.result()
@@ -658,7 +729,7 @@ package object database {
       block <- createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, loadTransactions(height, rdb).map(_._2)).toOption
     } yield block
 
-  def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
+  def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Height]], valueKey: Height => Key[A]): Option[A] =
     for {
       h <- resource.get(historyKey).headOption
     } yield resource.get(valueKey(h))
@@ -670,7 +741,7 @@ package object database {
       sponsorship = fromHistory(resource, Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
       script      = fromHistory(resource, Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
     } yield AssetDescription(
-      pbStaticInfo.sourceId.toByteStr,
+      TransactionId(pbStaticInfo.sourceId.toByteStr),
       PublicKey(pbStaticInfo.issuerPublicKey.toByteStr),
       info.name,
       info.description,
@@ -685,7 +756,7 @@ package object database {
       Height(pbStaticInfo.height)
     )
 
-  def loadActiveLeases(rdb: RDB, fromHeight: Int, toHeight: Int): Map[ByteStr, LeaseDetails] = rdb.db.withResource { r =>
+  def loadActiveLeases(rdb: RDB, fromHeight: Height, toHeight: Height): Map[ByteStr, LeaseDetails] = rdb.db.withResource { r =>
     (for {
       id         <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
       newDetails <- loadLease(r, id)
@@ -696,17 +767,17 @@ package object database {
   def loadLease(resource: DBResource, id: ByteStr): Option[LeaseDetails] =
     fromHistory(resource, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id)).flatten
 
-  def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
+  def loadLeaseIds(resource: DBResource, fromHeight: Height, toHeight: Height, includeCancelled: Boolean): Set[ByteStr] = {
     val leaseIds = mutable.Set.empty[ByteStr]
     val iterator = resource.fullIterator
 
     @inline
     def keyInRange(): Boolean = {
       val actualKey = iterator.key()
-      actualKey.startsWith(KeyTags.LeaseDetails.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
+      actualKey.startsWith(KeyTag.LeaseDetails.prefixBytes) && Height(Ints.fromByteArray(actualKey.slice(2, 6))) <= toHeight
     }
 
-    iterator.seek(KeyTags.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
+    iterator.seek(KeyTag.LeaseDetails.prefixBytes ++ fromHeight.toByteArray)
     while (iterator.isValid && keyInRange()) {
       val leaseId = ByteStr(iterator.key().drop(6))
       if (includeCancelled || readLeaseDetails(iterator.value()).isActive)
@@ -720,14 +791,17 @@ package object database {
     leaseIds.toSet
   }
 
-  object AddressId extends TaggedType[Long] {
-    def fromByteArray(bs: Array[Byte]): Type = AddressId(Longs.fromByteArray(bs))
-  }
+  opaque type AddressId = Long
 
-  type AddressId = AddressId.Type
+  object AddressId {
+    def apply(l: Long): AddressId                 = l
+    def raw(x: AddressId): Long                   = x
+    def fromByteArray(bs: Array[Byte]): AddressId = Longs.fromByteArray(bs)
 
-  implicit final class Ops(private val value: AddressId) extends AnyVal {
-    def toByteArray: Array[Byte] = Longs.toByteArray(AddressId.raw(value))
+    extension (x: AddressId) {
+      def toByteArray: Array[Byte] = Longs.toByteArray(x)
+      def toLong: Long             = x
+    }
   }
 
   implicit class LongExt(val l: Long) extends AnyVal {

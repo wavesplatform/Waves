@@ -1,7 +1,7 @@
 package com.wavesplatform.common.state
 
 import com.wavesplatform.common.utils.{Base58, Base64}
-import org.scalatest._
+import org.scalatest.*
 
 class ByteStrTest extends wordspec.AnyWordSpec with matchers.should.Matchers {
 

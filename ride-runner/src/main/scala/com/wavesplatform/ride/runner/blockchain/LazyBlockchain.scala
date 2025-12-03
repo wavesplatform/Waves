@@ -7,13 +7,14 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.{toPublicKey, toAddress}
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
@@ -25,7 +26,7 @@ import com.wavesplatform.ride.runner.estimate
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, DataEntry, Height, LeaseBalance, TransactionId, TxMeta}
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -88,10 +89,11 @@ class LazyBlockchain[TagT] private (
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] = blockHeaderWithVrf(Height(height)).map(_.vrf)
 
-
   override def carryFee(refId: Option[BlockId]): Long = ???
 
   override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, transaction.Transaction)]] = ???
+
+  override def transactionSnapshot(id: ByteStr): Option[(StateSnapshot, TxMeta.Status)] = ???
 
   override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = ???
 
@@ -111,7 +113,11 @@ class LazyBlockchain[TagT] private (
   }
 
   // Ride: wavesBalance, height, lastBlock
-  override def height: Int = heightUntagged
+  override def height: Int = heightUntagged.toInt
+
+  override def finalizedHeight: Option[Height] = None // TODO:
+
+  override def finalizedHeightAt(at: Height): Option[Height] = None // TODO:
 
   // Ride: environment initialization
   override def activatedFeatures: ActivatedFeatures = currentActivatedFeatures.get()
@@ -190,12 +196,18 @@ class LazyBlockchain[TagT] private (
     // NOTE: This code leads to a wrong generating balance, but we see no use-cases for now
     val lb           = leaseBalance(address)
     val wavesBalance = balance(address, Asset.Waves)
-    List(BalanceSnapshot(height, wavesBalance, lb.in, lb.out))
+    List(BalanceSnapshot(Height(height), wavesBalance, lb.in, lb.out, 0))
   }
 
   // Ride: transactionHeightById
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
     getTransactionHeight(TransactionId(id)).map(TxMeta(_, TxMeta.Status.Succeeded, 0)) // Other information not used
+
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
+
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = ConflictGenerators.empty
+
+  override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 
   private def getTransactionHeight(id: TransactionId): Option[Height] = db.directReadWrite { implicit ctx =>
     memCache.getOrLoad(MemCacheKey.Transaction(id)) { key =>
@@ -279,19 +291,19 @@ class LazyBlockchain[TagT] private (
       affected
     }
 
-  private def updateCacheIfExists[CacheKeyT <: MemCacheKey](key: CacheKeyT)(v: RemoteData[CacheKeyT#ValueT]): AffectedTags[TagT] = {
+  private def updateCacheIfExists[V, K <: MemCacheKey[V]](key: K)(v: RemoteData[V]): AffectedTags[TagT] = {
     getAffectedTags(key).tap { tags =>
       if (tags.isEmpty) memCache.updateIfExists(key, v) // Not yet removed from memCache, but already removed from tags
       else memCache.set(key, v)
     }
   }
 
-  private def removeCache[CacheKeyT <: MemCacheKey](key: CacheKeyT): AffectedTags[TagT] = {
+  private def removeCache[K <: MemCacheKey[?]](key: K): AffectedTags[TagT] = {
     memCache.remove(key)
     getAffectedTags(key)
   }
 
-  private def getAffectedTags(key: MemCacheKey): AffectedTags[TagT] = allTags.get(key).getOrElse(AffectedTags.empty)
+  private def getAffectedTags(key: MemCacheKey[?]): AffectedTags[TagT] = allTags.get(key).getOrElse(AffectedTags.empty)
 
   private def append(atHeight: Height, evt: BlockchainUpdated.Append)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val (initialAffectedTags, txs, timer) = evt.body match {
@@ -381,7 +393,7 @@ class LazyBlockchain[TagT] private (
 
   private def rollback(toHeight: Height, rollback: BlockchainUpdated.Rollback)(implicit ctx: ReadWrite): AffectedTags[TagT] =
     RideRunnerStats.rollbackProcessingTime.measure {
-      removeAllFromCtx(Height(toHeight + 1))
+      removeAllFromCtx(toHeight + 1)
 
       val stateUpdate = rollback.getRollbackStateUpdate
       getAffectedTags(MemCacheKey.Height) ++

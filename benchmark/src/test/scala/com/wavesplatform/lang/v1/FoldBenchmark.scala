@@ -8,7 +8,7 @@ import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import org.openjdk.jmh.annotations.{State, _}
+import org.openjdk.jmh.annotations.{State, *}
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -46,7 +46,7 @@ class FoldBenchmark {
 @State(Scope.Benchmark)
 class FoldSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts((ds, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts((ds, true, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val function = "func f(acc: Boolean, elem: ByteVector) = acc && sigVerify(elem, base58'', base58'')"
 

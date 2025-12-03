@@ -5,10 +5,10 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state.{Portfolio, StateSnapshot}
+import com.wavesplatform.state.{GenesisBlockHeight, Height, Portfolio, StateSnapshot}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
@@ -22,7 +22,7 @@ object RollbackBenchmark extends ScorexLogging {
     val settings      = Application.loadApplicationConfig(Some(new File(args(0))))
     val rdb           = RDB.open(settings.dbSettings)
     val time          = new NTP(settings.ntpServer)
-    val rocksDBWriter = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
+    val rocksDBWriter = RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val issuer = KeyPair(new Array[Byte](32))
 
@@ -57,14 +57,15 @@ object RollbackBenchmark extends ScorexLogging {
         1.toByte,
         time.getTimestamp(),
         Block.GenesisReference,
-        1000,
+        baseTarget = 1000,
         Block.GenesisGenerationSignature,
         GenesisTransaction.create(issuer.publicKey.toAddress, 100000e8.toLong, time.getTimestamp()).explicitGet() +: assets,
         issuer,
-        Seq.empty,
-        -1,
-        None,
-        None
+        featureVotes = Seq.empty,
+        rewardVote = -1,
+        stateHash = None,
+        challengedHeader = None,
+        finalizationVoting = None
       )
       .explicitGet()
 
@@ -76,12 +77,14 @@ object RollbackBenchmark extends ScorexLogging {
     log.info("Appending genesis block")
     rocksDBWriter.append(
       StateSnapshot.build(rocksDBWriter, portfolios.toMap).explicitGet(),
-      0,
-      0,
-      None,
+      carryFee = 0,
+      totalFee = 0,
+      reward = None,
       genesisBlock.header.generationSignature,
-      ByteStr.empty,
-      genesisBlock
+      computedBlockStateHash = ByteStr.empty,
+      genesisBlock,
+      newFinalizedHeight = GenesisBlockHeight,
+      generatorBalances = Seq.empty
     )
 
     val nextBlock =
@@ -92,25 +95,37 @@ object RollbackBenchmark extends ScorexLogging {
           genesisBlock.id(),
           1000,
           Block.GenesisGenerationSignature,
-          Seq.empty,
+          txs = Seq.empty,
           issuer,
-          Seq.empty,
-          -1,
-          None,
-          None
+          featureVotes = Seq.empty,
+          rewardVote = -1,
+          stateHash = None,
+          challengedHeader = None,
+          finalizationVoting = None
         )
         .explicitGet()
     val portfolios2  = addresses.map(_ -> Portfolio(1, assets = VectorMap(IssuedAsset(assets.head.id()) -> 1L)))
     val nextSnapshot = StateSnapshot.build(rocksDBWriter, portfolios2.toMap).explicitGet()
 
     log.info("Appending next block")
-    rocksDBWriter.append(nextSnapshot, 0, 0, None, ByteStr.empty, ByteStr.empty, nextBlock)
+    rocksDBWriter.append(
+      nextSnapshot,
+      carryFee = 0,
+      totalFee = 0,
+      reward = None,
+      hitSource = ByteStr.empty,
+      computedBlockStateHash = ByteStr.empty,
+      nextBlock,
+      newFinalizedHeight = GenesisBlockHeight,
+      generatorBalances = Seq.empty
+    )
 
     log.info("Rolling back")
     val start = System.nanoTime()
-    rocksDBWriter.rollbackTo(1)
+    rocksDBWriter.rollbackTo(Height(1))
     val end = System.nanoTime()
     log.info(f"Rollback took ${(end - start) * 1e-6}%.3f ms")
+    rocksDBWriter.close()
     rdb.close()
   }
 }

@@ -2,13 +2,15 @@ package com.wavesplatform.network
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockEndorsement, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.network.message.MessageSpec
-import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
+import com.wavesplatform.protobuf.block.EndorseBlock as PBEndorseBlock
 import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
+import com.wavesplatform.state.{GeneratorIndex, Height}
 import com.wavesplatform.transaction.{Signed, Transaction}
+import com.wavesplatform.protobuf.{toByteString, toByteStr}
 import monix.eval.Coeval
 
 import java.net.InetSocketAddress
@@ -111,4 +113,29 @@ case class MicroBlockSnapshotResponse(totalBlockId: BlockId, snapshots: Seq[Tran
 object MicroBlockSnapshotResponse {
   def fromProtobuf(snapshot: PBMicroBlockSnapshot): MicroBlockSnapshotResponse =
     MicroBlockSnapshotResponse(snapshot.totalBlockId.toByteStr, snapshot.snapshots)
+}
+
+case class EndorseBlock(endorserIndex: Int, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, signature: ByteStr) extends Message {
+  def toProtobuf: PBEndorseBlock = PBEndorseBlock(
+    endorserIndex,
+    finalizedId.toByteString,
+    finalizedHeight.toInt,
+    endorsedId.toByteString,
+    signature.toByteString
+  )
+
+  override def toString: String = s"EndorseBlock(i=$endorserIndex, f=$finalizedId, fh=$finalizedHeight, e=$endorsedId, s=$signature)"
+}
+
+object EndorseBlock {
+  def fromProtobuf(x: PBEndorseBlock): EndorseBlock = EndorseBlock(
+    x.endorserIndex,
+    x.finalizedBlockId.toByteStr,
+    Height(x.finalizedBlockHeight),
+    x.endorsedBlockId.toByteStr,
+    x.signature.toByteStr
+  )
+
+  def from(x: BlockEndorsement): EndorseBlock =
+    EndorseBlock(x.endorserIndex.toInt, x.finalizedId, x.finalizedHeight, x.endorsedId, x.signature.byteStr)
 }

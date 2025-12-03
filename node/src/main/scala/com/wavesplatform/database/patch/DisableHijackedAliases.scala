@@ -1,14 +1,15 @@
 package com.wavesplatform.database.patch
 
 import com.wavesplatform.account.{AddressScheme, Alias}
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database.{Keys, RW}
 import com.wavesplatform.state.patch.PatchDataLoader
+import com.wavesplatform.state.Height
 
 case object DisableHijackedAliases extends PatchDataLoader {
-  val height: Int = AddressScheme.current.chainId.toChar match {
-    case 'W' => 1060000
-    case _   => 0
+  val height: Height = AddressScheme.current.chainId.toChar match {
+    case 'W' => Height(1060000)
+    case _   => Height(0)
   }
 
   def apply(rw: RW): Set[Alias] = {

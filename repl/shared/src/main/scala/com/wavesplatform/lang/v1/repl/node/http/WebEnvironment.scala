@@ -3,7 +3,8 @@ package com.wavesplatform.lang.v1.repl.node.http
 import cats.implicits.*
 import cats.{Functor, Id}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
@@ -18,7 +19,6 @@ import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAsse
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import io.circe.{Decoder, HCursor}
 import monix.eval.Coeval
-import shapeless.Coproduct
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -30,7 +30,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
   import mappings.*
 
   override implicit def chainId: Byte   = settings.chainId
-  override def tthis: Environment.Tthis = Coproduct[Environment.Tthis](Address(ByteStr.decodeBase58(settings.address).get))
+  override def tthis: Environment.Tthis = Address(ByteStr.decodeBase58(settings.address).get)
 
   override def height: Future[Long] =
     getEntity[Id, HeightResponse, Long]("/blocks/height")
@@ -96,7 +96,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
     } yield AddressResponse(address)
 
   override def resolveAlias(name: String): Future[Either[String, Address]] =
-    getEntity[Either[String, *], AddressResponse, Address](s"/alias/by-alias/$name")
+    getEntity[[X] =>> Either[String, X], AddressResponse, Address](s"/alias/by-alias/$name")
 
   implicit val balanceResponseDecoder: Decoder[BalanceResponse] = (c: HCursor) =>
     for {
@@ -109,7 +109,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
   ): Future[Either[String, Long]] =
     for {
       address <- extractAddress(recipient)
-      entity <- getEntity[Either[String, *], BalanceResponse, Long](assetId match {
+      entity <- getEntity[[X] =>> Either[String, X], BalanceResponse, Long](assetId match {
         case Some(assetId) => s"/assets/balance/$address/${Base58.encode(assetId)}"
         case None          => s"/address/balance/$address"
       })
@@ -120,7 +120,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
   ): Future[Either[String, Environment.BalanceDetails]] =
     for {
       address <- extractAddress(recipient)
-      entity  <- client.get[Either[String, *], Environment.BalanceDetails](s"/addresses/balance/details/$address")
+      entity  <- client.get[[X] =>> Either[String, X], Environment.BalanceDetails](s"/addresses/balance/details/$address")
     } yield entity
 
   private def extractAddress(addressOrAlias: Recipient): Future[String] =
@@ -142,7 +142,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
 
   override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]] = ???
 
-  private def getEntity[F[_]: Functor: ResponseWrapper, A: Decoder, B](url: String)(implicit ev: A => B): Future[F[B]] =
+  private def getEntity[F[_]: {Functor, ResponseWrapper}, A: Decoder, B](url: String)(implicit ev: A => B): Future[F[B]] =
     client.get[F, A](url).map(_.map(ev))
 
   override def accountScript(addressOrAlias: Recipient): Future[Option[Script]] = ???

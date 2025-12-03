@@ -17,7 +17,7 @@ case class LeaseRequest(
     timestamp: Option[Long],
     signature: Option[ByteStr],
     proofs: Option[Proofs]
-) extends TxBroadcastRequest {
+) extends TxBroadcastRequest[LeaseTransaction] {
   def toTxFrom(sender: PublicKey): Either[ValidationError, LeaseTransaction] =
     for {
       validRecipient <- AddressOrAlias.fromString(recipient)

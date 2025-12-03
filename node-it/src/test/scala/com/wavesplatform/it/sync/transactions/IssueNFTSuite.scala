@@ -2,10 +2,11 @@ package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.{Node, NodeConfigs}
-import com.wavesplatform.test._
+import com.wavesplatform.state.Height
+import com.wavesplatform.test.*
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
@@ -47,7 +48,7 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
     val assetName        = "NFTAsset"
     val assetDescription = "my asset description"
 
-    nodes.waitForHeight(10)
+    nodes.waitForHeight(Height(10))
 
     val nftIssueTxId = secondNode
       .issue(

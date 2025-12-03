@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import com.google.common.base.Charsets
 import com.google.common.primitives.UnsignedBytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
@@ -8,6 +7,7 @@ import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import play.api.libs.json.*
 
+import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
 import scala.annotation.tailrec
 
@@ -80,7 +80,7 @@ package object utils {
   }
 
   implicit class StringBytes(val s: String) extends AnyVal {
-    def utf8Bytes: Array[Byte]   = s.getBytes(Charsets.UTF_8)
+    def utf8Bytes: Array[Byte]   = s.getBytes(StandardCharsets.UTF_8)
     def toByteString: ByteString = ByteString.copyFromUtf8(s)
   }
 
@@ -98,5 +98,5 @@ package object utils {
       case FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
     }
 
-    implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => UnsignedBytes.lexicographicalComparator().compare(x.arr, y.arr)
+  implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => UnsignedBytes.lexicographicalComparator().compare(x.arr, y.arr)
 }

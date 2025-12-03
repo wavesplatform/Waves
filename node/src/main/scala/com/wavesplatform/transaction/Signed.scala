@@ -15,13 +15,12 @@ trait Signed extends Authorized {
   val signaturesValid: Coeval[Either[InvalidSignature, this.type]] = Coeval.evalOnce {
     (this +: signedDescendants())
       .to(LazyList)
-      .map(
-        entity =>
-          if (entity.signatureValid()) {
-            Right(entity)
-          } else {
-            Left(InvalidSignature(entity, None))
-          }
+      .map(entity =>
+        if (entity.signatureValid()) {
+          Right(entity)
+        } else {
+          Left(InvalidSignature(entity, None))
+        }
       )
       .sequence
       .left

@@ -1,13 +1,13 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.state._
-import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.state.*
+import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.{DataTransaction, TxVersion}
 import org.scalatest.CancelAfterFailure
 
@@ -17,8 +17,8 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
   private def acc2 = thirdKeyPair
 
   var exchAsset: String    = ""
-  var dtx: DataTransaction = _
-  var pair: AssetPair      = _
+  var dtx: DataTransaction = scala.compiletime.uninitialized
+  var pair: AssetPair      = scala.compiletime.uninitialized
 
   val sc1: Option[String] = Some(s"true")
   val sc2: Option[String] = Some(s"""

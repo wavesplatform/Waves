@@ -1,12 +1,12 @@
 package com.wavesplatform.transaction.assets
 
-import cats.syntax.traverse._
+import cats.syntax.traverse.*
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.NegativeMinFee
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.serialization.impl.SponsorFeeTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator

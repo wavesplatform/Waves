@@ -1,10 +1,10 @@
 package com.wavesplatform.api.http.assets
 
-import akka.NotUsed
-import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
-import akka.http.scaladsl.model.headers.Accept
-import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.Source
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import org.apache.pekko.http.scaladsl.model.headers.Accept
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.stream.scaladsl.Source
 import cats.data.Validated
 import cats.instances.either.*
 import cats.instances.list.*
@@ -18,14 +18,9 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.StreamSerializerUtils.*
-import com.wavesplatform.api.http.assets.AssetsApiRoute.{
-  AssetDetails,
-  AssetInfo,
-  DistributionParams,
-  assetDetailsSerializer,
-  assetDistributionSerializer
-}
+import com.wavesplatform.api.http.assets.AssetsApiRoute.*
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.{TransactionId, Height}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, TxMeta}
@@ -38,6 +33,7 @@ import com.wavesplatform.transaction.{EthereumTransaction, TxTimestamp, TxVersio
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.concurrent.DefaultThreadFactory
+import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import play.api.libs.json.*
@@ -60,7 +56,7 @@ case class AssetsApiRoute(
 ) extends ApiRoute
     with AuthRoute {
 
-  private[this] val distributionTaskScheduler = Scheduler(
+  private val distributionTaskScheduler = Scheduler(
     new ThreadPoolExecutor(
       1,
       1,
@@ -71,7 +67,7 @@ case class AssetsApiRoute(
     )
   )
 
-  private val assetDistRouteTimeout = new RouteTimeout(serverRequestTimeout)(distributionTaskScheduler)
+  private val assetDistRouteTimeout = new RouteTimeout(serverRequestTimeout)(using distributionTaskScheduler)
 
   override lazy val route: Route =
     pathPrefix("assets") {
@@ -93,11 +89,10 @@ case class AssetsApiRoute(
         }
       } ~ pathPrefix("details") {
         (anyParam("id", limit = settings.assetDetailsLimit) & parameter("full".as[Boolean] ? false)) { (ids, full) =>
-          val result = Either
-            .cond(ids.nonEmpty, (), AssetIdNotSpecified)
-            .map(_ => multipleDetails(ids.toList, full))
-
-          complete(result)
+          if (ids.isEmpty) complete(AssetIdNotSpecified)
+          else {
+            routeTimeout.executeToFuture(Task(multipleDetails(ids.toList, full)))
+          }
         } ~ (get & path(AssetId) & parameter("full".as[Boolean] ? false)) { (assetId, full) =>
           singleDetails(assetId, full)
         }
@@ -158,7 +153,7 @@ case class AssetsApiRoute(
     */
   def balances(address: Address, assets: Option[Seq[IssuedAsset]] = None): Route = {
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[AssetInfo, NotUsed]] =
-      jacksonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")(AssetsApiRoute.assetInfoSerializer)
+      jacksonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")(using AssetsApiRoute.assetInfoSerializer)
 
     routeTimeout.executeFromObservable(
       (assets match {
@@ -181,7 +176,7 @@ case class AssetsApiRoute(
           .take(limit)
           .toListL
           .map(f)
-          .runAsyncLogErr(distributionTaskScheduler)
+          .runAsyncLogErr(using distributionTaskScheduler)
       } catch {
         case _: RejectedExecutionException =>
           val errMsg = CustomValidationError("Asset distribution currently unavailable, try again later")
@@ -191,7 +186,7 @@ case class AssetsApiRoute(
 
   def balanceDistribution(assetId: IssuedAsset): Route = {
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[(Address, Long), NotUsed]] =
-      jacksonStreamMarshaller(prefix = "{", suffix = "}")(assetDistributionSerializer)
+      jacksonStreamMarshaller(prefix = "{", suffix = "}")(using assetDistributionSerializer)
 
     assetDistRouteTimeout.executeFromObservable(
       commonAssetsApi
@@ -230,7 +225,7 @@ case class AssetsApiRoute(
     if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation)
     else {
       import cats.syntax.either.*
-      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[AssetDetails, NotUsed]] = jacksonStreamMarshaller()(assetDetailsSerializer)
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[AssetDetails, NotUsed]] = jacksonStreamMarshaller()(using assetDetailsSerializer)
 
       val compBlockchain = compositeBlockchain()
       routeTimeout.executeStreamed {
@@ -331,7 +326,7 @@ object AssetsApiRoute {
       }
     }
 
-    getTimestamps(assets.map { case (_, description) => description.originTransactionId }).map { infos =>
+    getTimestamps(assets.map { case (_, description) => description.originTransactionId.byteStr }).map { infos =>
       assets.zip(infos).map { case ((id, description), timestamp) =>
         AssetDetails(
           assetId = id.id.toString,
@@ -365,10 +360,10 @@ object AssetsApiRoute {
 
   def jsonDetails(blockchain: Blockchain)(id: IssuedAsset, description: AssetDescription, full: Boolean): Either[String, JsObject] = {
     // (timestamp, height)
-    def additionalInfo(id: ByteStr): Either[String, Long] =
+    def additionalInfo(id: TransactionId): Either[String, Long] =
       for {
         (_, tx) <- blockchain
-          .transactionInfo(id)
+          .transactionInfo(id.byteStr)
           .filter { case (tm, _) => tm.status == TxMeta.Status.Succeeded }
           .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
         timestamp <- (tx match {
@@ -388,7 +383,7 @@ object AssetsApiRoute {
     } yield JsObject(
       Seq(
         "assetId"         -> JsString(id.id.toString),
-        "issueHeight"     -> JsNumber(description.issueHeight),
+        "issueHeight"     -> JsNumber(description.issueHeight.toInt),
         "issueTimestamp"  -> JsNumber(timestamp),
         "issuer"          -> JsString(description.issuer.toAddress.toString),
         "issuerPublicKey" -> JsString(description.issuer.toString),
@@ -422,7 +417,7 @@ object AssetsApiRoute {
 
   case class AssetDetails(
       assetId: String,
-      issueHeight: Int,
+      issueHeight: Height,
       issueTimestamp: Long,
       issuer: String,
       issuerPublicKey: String,
@@ -467,7 +462,7 @@ object AssetsApiRoute {
     (details: AssetDetails, gen: JsonGenerator, serializers: SerializerProvider) => {
       gen.writeStartObject()
       gen.writeStringField("assetId", details.assetId)
-      gen.writeNumberField("issueHeight", details.issueHeight, numbersAsString)
+      gen.writeNumberField("issueHeight", details.issueHeight.toInt, numbersAsString)
       gen.writeNumberField("issueTimestamp", details.issueTimestamp, numbersAsString)
       gen.writeStringField("issuer", details.issuer)
       gen.writeStringField("issuerPublicKey", details.issuerPublicKey)

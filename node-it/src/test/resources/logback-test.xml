@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
+    <shutdownHook/>
+
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>${logback.file.level:-TRACE}</level>
@@ -7,7 +9,7 @@
         <file>${waves.it.logging.dir:-target/logs}/test.log</file>
         <append>false</append>
         <encoder>
-            <pattern>%date{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{26} - %msg%n</pattern>
+            <pattern>%date{HH:mm:ss.SSS} %-5level [%.25thread] %logger{26} - %msg%n</pattern>
         </encoder>
     </appender>
 

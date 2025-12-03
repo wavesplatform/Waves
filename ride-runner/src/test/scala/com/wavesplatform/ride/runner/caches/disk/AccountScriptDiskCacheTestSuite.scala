@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.caches.disk
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.database.AddressId
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.runner.caches.WeighedAccountScriptInfo

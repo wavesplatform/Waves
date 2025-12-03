@@ -2,7 +2,7 @@ package com.wavesplatform.events
 
 import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.fixtures.PrepareInvokeTestData.*

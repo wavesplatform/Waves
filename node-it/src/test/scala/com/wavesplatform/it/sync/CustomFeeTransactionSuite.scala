@@ -2,19 +2,19 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.test._
-import com.wavesplatform.state.Sponsorship
+import com.wavesplatform.state.{Height, Sponsorship}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import org.scalatest.CancelAfterFailure
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  import CustomFeeTransactionSuite._
+  import CustomFeeTransactionSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -52,7 +52,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     notMiner.assertAssetBalance(minerAddress, issuedAssetId, transferFee)
 
     // after `feature-check-blocks-period` asset fees should be sponsored
-    nodes.waitForSameBlockHeadersAt(featureCheckBlocksPeriod)
+    nodes.waitForSameBlockHeadersAt(Height(featureCheckBlocksPeriod))
     val sponsoredId = notMiner.transfer(senderKeyPair, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(sponsoredId)
 

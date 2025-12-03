@@ -1,0 +1,194 @@
+package com.wavesplatform.finalization
+
+import com.wavesplatform.TestValues
+import com.wavesplatform.block.Block
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain
+import com.wavesplatform.state.*
+import com.wavesplatform.test.DomainPresets.WavesSettingsOps
+import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
+import com.wavesplatform.transaction.TxHelpers
+
+class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
+  private val defaultSettings = DomainPresets.DeterministicFinality
+    .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
+    .configure(
+      _.copy(
+        generationPeriodLength = 2,
+        lightNodeBlockFieldsAbsenceInterval = 0
+      )
+    )
+
+  "should append a block" - {
+    "if no one committed" in {
+      val generator = TxHelpers.signer(0)
+      withDomain(defaultSettings, AddrWithBalance.enoughBalances(generator)) { d =>
+        d.wallet.generateNewAccounts(1)
+
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator, strictTime = true)
+        d.appender.appendBlock(block)
+      }
+    }
+
+    "if committed" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        log.debug(s"Append block 3 of committed generator")
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator1, strictTime = true)
+        d.appender.appendBlock(block)
+      }
+    }.run()
+
+    "if no one eligible committed" - {
+      "all conflict" in new BaseTest {
+        override def continue(d: Domain): Unit = {
+          log.debug(s"Append block 3 with votes")
+          val block3WithVotes = d.createBlock(
+            version = Block.ProtoBlockVersion,
+            txs = Nil,
+            generator = committedGenerator1,
+            strictTime = true,
+            finalizationVoting = Some(
+              mkConflictVoting(
+                mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock),
+                mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock)
+              )
+            )
+          )
+          d.appender.appendBlock(block3WithVotes)
+
+          log.debug(s"Append block 4 of not committed generator")
+          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
+          d.appender.appendBlock(block)
+        }
+      }.run()
+
+      "all committed are poor" in new BaseTest {
+        override def continue(d: Domain): Unit = {
+          log.debug(s"Append block 3 with spending")
+          val block3WithSpending = d.createBlock(
+            version = Block.ProtoBlockVersion,
+            txs = Seq(committedGenerator1, committedGenerator2).map { kp =>
+              TxHelpers.transfer(kp, notCommittedGeneratorAddr, amount = d.balance(kp.toAddress) - TestValues.fee - DepositInWavelets)
+            },
+            generator = committedGenerator1,
+            strictTime = true
+          )
+          d.appender.appendBlock(block3WithSpending)
+
+          log.debug(s"Append block 4 of not committed generator")
+          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
+          d.appender.appendBlock(block)
+        }
+      }.run()
+
+      "poor conflict, rest conflict" in new BaseTest {
+        override def continue(d: Domain): Unit = {
+          log.debug(s"Append block 3 with vote and spending")
+          val block3 = d.createBlock(
+            version = Block.ProtoBlockVersion,
+            txs = Seq(
+              TxHelpers.transfer(
+                committedGenerator1,
+                notCommittedGeneratorAddr,
+                amount = d.balance(committedGenerator1Addr) - TestValues.fee - DepositInWavelets
+              )
+            ),
+            generator = committedGenerator1,
+            strictTime = true,
+            finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock)))
+          )
+          d.appender.appendBlock(block3)
+
+          log.debug(s"Append block 4 of not committed generator")
+          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
+          d.appender.appendBlock(block)
+        }
+      }.run()
+    }
+
+    "on new epoch if was conflict on previous" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        log.debug(s"Append block 3 with votes")
+        val block3WithVotes = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = committedGenerator1,
+          strictTime = true,
+          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock)))
+        )
+        d.appender.appendBlock(block3WithVotes)
+
+        log.debug(s"Append empty blocks")
+        (4 to 5).foreach { _ =>
+          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator2, strictTime = true)
+          d.appender.appendBlock(block)
+        }
+
+        log.debug(s"Append new epoch block")
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator1, strictTime = true)
+        d.appender.appendBlock(block)
+      }
+    }.run()
+  }
+
+  "should reject a block" - {
+    "if not committed" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        log.debug(s"Append block 3 of not committed generator")
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
+        d.appender.appendBlock(block, requireAppended = false)
+
+        d.blockchain.isLastBlockId(block.id()) shouldBe false
+      }
+    }.run()
+
+    "if conflict" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        log.debug(s"Append block 3 with votes")
+        val block3WithVotes = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = committedGenerator1,
+          strictTime = true,
+          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock)))
+        )
+        d.appender.appendBlock(block3WithVotes)
+
+        log.debug(s"Append block 4")
+        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator1, strictTime = true)
+        d.appender.appendBlock(block, requireAppended = false)
+
+        d.blockchain.isLastBlockId(block.id()) shouldBe false
+      }
+    }.run()
+  }
+
+  private trait BaseTest {
+    protected val committedGenerator1     = TxHelpers.signer(0)
+    protected val committedGenerator1Addr = committedGenerator1.toAddress
+    protected val committedGenerator1Idx  = GeneratorIndex(0)
+
+    protected val committedGenerator2     = TxHelpers.signer(1)
+    protected val committedGenerator2Addr = committedGenerator2.toAddress
+    protected val committedGenerator2Idx  = GeneratorIndex(1)
+
+    protected val notCommittedGenerator     = TxHelpers.signer(2)
+    protected val notCommittedGeneratorAddr = notCommittedGenerator.toAddress
+
+    protected val committedGenerators = Seq(committedGenerator1, committedGenerator2)
+    protected val allGenerators       = notCommittedGenerator +: committedGenerators
+
+    def continue(d: Domain): Unit
+
+    def run(): Unit = withDomain(defaultSettings, AddrWithBalance.enoughBalances(allGenerators*)) { d =>
+      log.debug(s"Append block 2 with commitments")
+      val txs                   = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = notCommittedGenerator, strictTime = true)
+      d.appender.appendBlock(block2WithCommitments)
+
+      continue(d)
+    }
+  }
+}

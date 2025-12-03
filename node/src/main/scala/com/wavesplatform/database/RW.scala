@@ -2,6 +2,7 @@ package com.wavesplatform.database
 
 import com.wavesplatform.metrics.RocksDBStats
 import com.wavesplatform.metrics.RocksDBStats.DbHistogramExt
+import com.wavesplatform.state.Height
 import org.rocksdb.{ReadOptions, RocksDB, WriteBatch}
 
 class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB(db, readOptions) {
@@ -21,7 +22,14 @@ class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadO
   def delete[V](key: Key[V]): Unit =
     batch.delete(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes)
 
-  def filterHistory(key: Key[Seq[Int]], heightToRemove: Int): Unit = {
+  def deleteRange[V](fromInclusive: Key[V], toExclusive: Key[V]): Unit = deleteRange(fromInclusive.keyBytes, toExclusive.keyBytes)
+
+  // Deletes in range [from, to)
+  // Keep in mind, that bytes in Java are signed.
+  // So fromInclusive=[0, ...] removes all keys, but [Byte.MinValue, ...] can skip some keys.
+  def deleteRange(fromInclusive: Array[Byte], toExclusive: Array[Byte]): Unit = batch.deleteRange(fromInclusive, toExclusive)
+
+  def filterHistory(key: Key[Seq[Height]], heightToRemove: Height): Unit = {
     val newValue = get(key).filterNot(_ == heightToRemove)
     if (newValue.nonEmpty) put(key, newValue)
     else delete(key)

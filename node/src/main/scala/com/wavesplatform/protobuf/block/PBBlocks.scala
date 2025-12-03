@@ -1,16 +1,16 @@
 package com.wavesplatform.protobuf.block
 
-import scala.util.Try
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.{BlockHeader, ChallengedHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.protobuf.ByteStrExt
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.protobuf.{toPublicKey, toByteStr, toByteString}
 import com.wavesplatform.protobuf.block.Block.Header as PBHeader
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
+
+import scala.util.Try
 
 object PBBlocks {
   def vanilla(header: PBBlock.Header): BlockHeader =
@@ -36,7 +36,8 @@ object PBBlocks {
           Option.unless(ch.stateHash.isEmpty)(ch.stateHash.toByteStr),
           ch.headerSignature.toByteStr
         )
-      }
+      },
+      header.finalizationVoting.map(PBFinalizationVotings.vanilla(_).get)
     )
 
   def vanilla(block: PBBlock, unsafe: Boolean = false): Try[VanillaBlock] = Try {
@@ -67,7 +68,8 @@ object PBBlocks {
         ch.stateHash.getOrElse(ByteStr.empty).toByteString,
         ch.headerSignature.toByteString
       )
-    }
+    },
+    header.finalizationVoting.map(PBFinalizationVotings.protobuf)
   )
 
   def protobuf(block: VanillaBlock): PBBlock = {

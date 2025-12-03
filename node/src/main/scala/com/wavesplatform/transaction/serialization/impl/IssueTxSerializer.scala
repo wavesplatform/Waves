@@ -26,7 +26,7 @@ object IssueTxSerializer {
   }
 
   def bodyBytes(tx: IssueTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
     lazy val baseBytes = Bytes.concat(
       sender.arr,
       Deser.serializeArrayWithLength(name.toByteArray),

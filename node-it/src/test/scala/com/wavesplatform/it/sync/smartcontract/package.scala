@@ -5,7 +5,7 @@ import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 
 package object smartcontract {
   val invokeScrTxSupportedVersions: List[Byte] = List(1, 2)
@@ -150,7 +150,7 @@ package object smartcontract {
     val seller              = accounts.tail.head // second one
     val matcher             = accounts.last
     val ts                  = time.correctedTime()
-    val expirationTimestamp = ts + Order.MaxLiveTime
+    val expirationTimestamp = ts + Order.MaxLiveTime / 2
     val buyPrice            = 1 * Order.PriceConstant
     val sellPrice           = (0.50 * Order.PriceConstant).toLong
     val buyAmount           = 2

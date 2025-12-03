@@ -4,7 +4,8 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{TransactionStatus as PBTransactionStatus, *}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
 import com.wavesplatform.it.sync.*
@@ -59,10 +60,10 @@ object SyncGrpcApi extends Assertions {
     import com.wavesplatform.account.Address as Addr
     import com.wavesplatform.it.api.AsyncGrpcApi.NodeAsyncGrpcApi as async
 
-    private[this] lazy val accounts     = AccountsApiGrpc.blockingStub(n.grpcChannel)
-    private[this] lazy val assets       = AssetsApiGrpc.blockingStub(n.grpcChannel)
-    private[this] lazy val transactions = TransactionsApiGrpc.blockingStub(n.grpcChannel)
-    private[this] lazy val blocks       = BlocksApiGrpc.blockingStub(n.grpcChannel)
+    private lazy val accounts     = AccountsApiGrpc.blockingStub(n.grpcChannel)
+    private lazy val assets       = AssetsApiGrpc.blockingStub(n.grpcChannel)
+    private lazy val transactions = TransactionsApiGrpc.blockingStub(n.grpcChannel)
+    private lazy val blocks       = BlocksApiGrpc.blockingStub(n.grpcChannel)
 
     def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
       try Await.result(awaitable, atMost)

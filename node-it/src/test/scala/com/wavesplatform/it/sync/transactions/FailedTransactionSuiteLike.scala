@@ -8,11 +8,12 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, TransactionStatus as PBTransactionStatus}
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.{Node, NodeConfigs}
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -20,7 +21,7 @@ import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsObject
 
-trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
+trait FailedTransactionSuiteLike[T] extends ScorexLogging { matchers: Matchers =>
   protected def waitForHeightArise(): Unit
   protected def sender: Node
 
@@ -63,7 +64,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
 
       all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
 
-      val failedIdsByHeight = failed.groupBy(_.height.get).view.mapValues(_.map(_.id))
+      val failedIdsByHeight = failed.groupBy(_.height.get).map { case (h, txs) => Height(h) -> txs.map(_.id)}
 
       failedIdsByHeight.foreach { case (h, ids) =>
         sender.blockAt(h).transactions.map(_.id) should contain allElementsOf ids
@@ -73,7 +74,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
 
         val liquidBlock         = sender.lastBlock()
         val maxHeightWithFailed = failedIdsByHeight.keys.max
-        if (liquidBlock.height == maxHeightWithFailed) {
+        if (Height(liquidBlock.height) == maxHeightWithFailed) {
           liquidBlock.transactions.map(_.id) should contain allElementsOf failedIdsByHeight(maxHeightWithFailed)
         }
       }
@@ -255,7 +256,8 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                 .map(_._1)
             }
           ),
-          fee = fee
+          fee = fee,
+          waitForTx = waitForTx
         )
     }
   }
@@ -288,7 +290,7 @@ object FailedTransactionSuiteLike {
       100,
       100,
       timestamp,
-      timestamp + Order.MaxLiveTime,
+      timestamp + Order.MaxLiveTime / 2,
       buyMatcherFee,
       Asset.fromString(Some(buyMatcherFeeAsset))
     ).explicitGet()
@@ -300,7 +302,7 @@ object FailedTransactionSuiteLike {
       100,
       100,
       timestamp,
-      timestamp + Order.MaxLiveTime,
+      timestamp + Order.MaxLiveTime / 2,
       sellMatcherFee,
       Asset.fromString(Some(sellMatcherFeeAsset))
     ).explicitGet()

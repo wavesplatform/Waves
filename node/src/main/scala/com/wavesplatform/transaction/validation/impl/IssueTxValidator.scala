@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.TxVersion
 object IssueTxValidator extends TxValidator[IssueTransaction] {
   override def validate(tx: IssueTransaction): ValidatedV[IssueTransaction] = {
 
-    import tx._
+    import tx.*
     V.seq(tx)(
       V.assetName(tx.name),
       V.assetDescription(tx.description),

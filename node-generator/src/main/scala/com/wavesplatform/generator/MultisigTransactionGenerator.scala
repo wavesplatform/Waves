@@ -3,7 +3,7 @@ package com.wavesplatform.generator
 import cats.Show
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.generator.utils.Implicits.DoubleExt
@@ -13,6 +13,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Proofs, Transaction, TxPositiveAmount}
+import pureconfig.ConfigReader
 
 import scala.util.Random
 
@@ -67,7 +68,7 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
 }
 
 object MultisigTransactionGenerator {
-  final case class Settings(transactions: Int, firstRun: Boolean)
+  final case class Settings(transactions: Int, firstRun: Boolean) derives ConfigReader
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>

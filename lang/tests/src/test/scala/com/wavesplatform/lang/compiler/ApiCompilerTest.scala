@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.compiler
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.API
 import com.wavesplatform.lang.CompileAndParseResult.{Contract, Expression}
 import com.wavesplatform.lang.CompileResult.DApp

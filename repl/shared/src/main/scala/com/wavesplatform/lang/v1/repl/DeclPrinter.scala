@@ -34,8 +34,9 @@ object DeclPrinter {
   private def typeStrRec(t: FINAL): String =
     t.name + (
       if (t.fields.isEmpty) ""
-      else t.fields
-        .map { case (name, fieldType) => s"$name: ${typeStrRec(fieldType)}" }
-        .mkString(" { ", ", ", " }")
+      else
+        t.fields
+          .map { case (name, fieldType) => s"$name: ${typeStrRec(fieldType)}" }
+          .mkString(" { ", ", ", " }")
     )
 }

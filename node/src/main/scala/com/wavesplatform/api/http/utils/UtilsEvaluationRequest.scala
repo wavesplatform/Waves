@@ -96,7 +96,7 @@ case class UtilsInvocationRequest(
       payments <- AttachedPaymentExtractor
         .extractPayments(payment, V6, blockchainAllowsMultiPayment = true, smart.DApp)
         .leftMap(GenericError(_))
-    } yield Invocation(functionCall, senderAddress, senderPK, senderAddress, senderPK, payments, id, fee, feeAssetId)
+    } yield Invocation(functionCall, senderAddress, senderPK.byteStr, senderAddress, senderPK.byteStr, payments, id, fee, feeAssetId)
 
   private def decodeBase58(base58: String): Either[ValidationError, ByteStr] =
     ByteStr.decodeBase58(base58).toEither.leftMap(e => GenericError(String.valueOf(e.getMessage)))

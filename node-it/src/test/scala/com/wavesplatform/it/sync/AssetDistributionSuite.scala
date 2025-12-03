@@ -4,7 +4,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.state.AssetDistributionPage
+import com.wavesplatform.state.{AssetDistributionPage, Height}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import org.scalatest.CancelAfterFailure
 
@@ -49,7 +49,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val issuerAssetDis = assetDis.view.filterKeys(_ == issuer.toAddress).values
 
-    assetDis should be equals node.assetDistribution(issueTx)
+    assetDis should be `equals` node.assetDistribution(issueTx)
 
     issuerAssetDis.size shouldBe 1
     issuerAssetDis.head shouldBe (issueAmount - addresses.length * transferAmount)
@@ -142,7 +142,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
     list should have size 2001
   }
 
-  def distributionPages(asset: String, height: Int, limit: Int): List[AssetDistributionPage] = {
+  def distributionPages(asset: String, height: Height, limit: Int): List[AssetDistributionPage] = {
     def _load(acc: List[AssetDistributionPage], maybeAfter: Option[String]): List[AssetDistributionPage] = {
       val page = node.assetDistributionAtHeight(asset, height, limit, maybeAfter)
       if (page.hasNext) _load(page :: acc, page.lastItem.map(_.toString))

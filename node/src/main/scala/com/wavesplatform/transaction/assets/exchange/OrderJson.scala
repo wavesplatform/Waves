@@ -135,8 +135,8 @@ object OrderJson {
   val assetReads: Reads[Asset] = Asset.assetReads(true)
 
   implicit val assetPairReads: Reads[AssetPair] = {
-    val r = (JsPath \ "amountAsset").readWithDefault[Asset](Waves)(assetReads) and
-      (JsPath \ "priceAsset").readWithDefault[Asset](Waves)(assetReads)
+    val r = (JsPath \ "amountAsset").readWithDefault[Asset](Waves)(using assetReads) and
+      (JsPath \ "priceAsset").readWithDefault[Asset](Waves)(using assetReads)
     r(AssetPair(_, _))
   }
 
@@ -151,8 +151,8 @@ object OrderJson {
     }
 
   private val orderV1V2Reads: Reads[Order] = {
-    val r = (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
-      (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
+    val r = (JsPath \ "senderPublicKey").read[PublicKey](using accountPublicKeyReads) and
+      (JsPath \ "matcherPublicKey").read[PublicKey](using accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
       (JsPath \ "orderType").read[OrderType] and
       (JsPath \ "amount").read[Long].map(TxExchangeAmount.from).flatMapResult {
@@ -172,12 +172,12 @@ object OrderJson {
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
       (JsPath \ "version").readNullable[Byte]
-    r(readOrderV1V2 _)
+    r(readOrderV1V2)
   }
 
   private val orderV3V4Reads: Reads[Order] = {
-    val r = (JsPath \ "senderPublicKey").readNullable[PublicKey](accountPublicKeyReads) and
-      (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
+    val r = (JsPath \ "senderPublicKey").readNullable[PublicKey](using accountPublicKeyReads) and
+      (JsPath \ "matcherPublicKey").read[PublicKey](using accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
       (JsPath \ "orderType").read[OrderType] and
       (JsPath \ "amount").read[Long].map(TxExchangeAmount.from).flatMapResult {
@@ -204,7 +204,7 @@ object OrderJson {
       (JsPath \ "priceMode")
         .readWithDefault[OrderPriceMode](OrderPriceMode.Default) and
       (JsPath \ "attachment").readNullable[ByteStr]
-    r(readOrderV3V4 _)
+    r(readOrderV3V4)
   }
 
   implicit val orderReads: Reads[Order] = {

@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import play.api.libs.json.{Json, OFormat, Reads}
 
 package object patch {

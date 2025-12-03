@@ -8,11 +8,11 @@ import com.wavesplatform.lang.v1.ContractLimits.*
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
-import com.wavesplatform.lang.{CommonError, ExecutionError}
+import com.wavesplatform.lang.*
 import monix.eval.Coeval
 
 import java.nio.charset.StandardCharsets
-import scala.annotation.{nowarn, tailrec}
+import scala.annotation.tailrec
 import scala.util.hashing.MurmurHash3
 
 object Terms {
@@ -165,7 +165,7 @@ object Terms {
     var body: EXPR
   }
 
-  @Deprecated
+  @deprecated("use BLOCK instead", "1.0")
   case class LET_BLOCK(let: LET, var body: EXPR) extends EXPR with BLOCK_DEF {
     def toStr: Coeval[String] =
       for {
@@ -221,7 +221,7 @@ object Terms {
   case class FUNCTION_CALL(function: FunctionHeader, var args: List[EXPR]) extends EXPR {
     def toStr: Coeval[String] =
       for {
-        e <- args.map(_.toStr).sequence
+        e <- args.map(_.toStr).sequence[Coeval, String]
       } yield "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
 
     override def deepCopy: Eval[EXPR] =
@@ -346,7 +346,6 @@ object Terms {
   lazy val TRUE: CONST_BOOLEAN  = CONST_BOOLEAN(true)
   lazy val FALSE: CONST_BOOLEAN = CONST_BOOLEAN(false)
 
-  @nowarn // do not warn about private constructor
   case class CaseObj private (caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
     // must be with fixArrIndentation = false, because of makeString behavior before RideV6 (NODE-2370)
     override def toString: String = TermPrinter().string(this)
@@ -408,8 +407,9 @@ object Terms {
       }
 
     def apply(xs: IndexedSeq[EVALUATED], limited: Boolean): Either[ExecutionError, ARR] = {
-      val weight = EMPTYARR_WEIGHT + ELEM_WEIGHT * xs.size + xs.map(_.weight).sum
-      ARR(xs, weight, limited)
+      var measuredWeight = EMPTYARR_WEIGHT + ELEM_WEIGHT * xs.size
+      xs.foreach { ev => measuredWeight += ev.weight }
+      ARR(xs, measuredWeight, limited)
     }
   }
 

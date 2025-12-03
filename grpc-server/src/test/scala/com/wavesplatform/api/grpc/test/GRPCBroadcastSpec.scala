@@ -1,97 +1,117 @@
 package com.wavesplatform.api.grpc.test
 
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration.*
-import com.wavesplatform.account.Address
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.test.{FlatSpec, TestTime}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.BlockchainStubHelpers
-import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.grpc.TransactionsApiGrpcImpl
-import com.wavesplatform.block.Block
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, EthTxGenerator, Transaction, TxHelpers, TxVersion}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.utils.{DiffMatchers, EthHelpers}
-import io.grpc.StatusException
+import com.wavesplatform.test.{FlatSpec, NumericExt}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.exchange.*
+import com.wavesplatform.transaction.utils.EthConverters.*
+import com.wavesplatform.transaction.{EthTxGenerator, TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
+import com.wavesplatform.utils.Schedulers
+import monix.execution.ExecutionModel.SynchronousExecution
 import monix.execution.Scheduler
-import monix.reactive.Observable
-import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.ParallelTestExecution
+import org.web3j.crypto.Bip32ECKeyPair
 
-class GRPCBroadcastSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory with BlockchainStubHelpers with EthHelpers with DiffMatchers {
-  // Fake NTP time
-  val FakeTime: TestTime = TestTime(100)
+import scala.concurrent.Await
+import scala.concurrent.duration.*
+import scala.util.Try
+
+class GRPCBroadcastSpec extends FlatSpec with WithDomain with ParallelTestExecution with GrpcApiHelpers {
+  import GRPCBroadcastSpec.{ethBuyOrderSigned, ethSellOrderSigned}
+
+  private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
 
   "GRPC broadcast" should "accept Exchange with ETH orders" in {
-    import com.wavesplatform.transaction.assets.exchange.EthOrderSpec.{ethBuyOrder, ethSellOrder}
+    val assetIssuer      = TxHelpers.defaultSigner
+    val buyerEthAccount  = TxHelpers.signer(1).toEthKeyPair
+    val sellerEthAccount = TxHelpers.signer(2).toEthKeyPair
 
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.creditBalance(ethBuyOrder.senderAddress, *)
-      sh.creditBalance(ethSellOrder.senderAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(
-          Map(
-            TxHelpers.defaultAddress   -> Long.MaxValue / 3,
-            ethBuyOrder.senderAddress  -> Long.MaxValue / 3,
-            ethSellOrder.senderAddress -> Long.MaxValue / 3
-          )
-        )
-      sh.issueAsset(ByteStr(EthStubBytes32))
+    val balances = Seq(
+      AddrWithBalance(buyerEthAccount.toWavesAddress, 1000.waves),
+      AddrWithBalance(sellerEthAccount.toWavesAddress, 1000.waves),
+      AddrWithBalance(TxHelpers.matcher.toAddress, 1000.waves)
+    )
+
+    withDomain(DomainPresets.RideV6, balances) { d =>
+      val grpcApi = getGrpcApi(d)
+
+      // Issue an asset
+      val issueTx   = TxHelpers.issue(assetIssuer, Long.MaxValue)
+      val testAsset = issueTx.asset
+      d.appendBlock(issueTx)
+
+      // Transfer asset to seller
+      d.appendBlock(TxHelpers.transfer(assetIssuer, sellerEthAccount.toWavesAddress, 1000L, testAsset))
+
+      val ethBuyOrder  = ethBuyOrderSigned(testAsset, buyerEthAccount, TxHelpers.timestamp)
+      val ethSellOrder = ethSellOrderSigned(testAsset, sellerEthAccount, TxHelpers.timestamp)
+
+      val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, TxHelpers.matcher, price = 100, version = TxVersion.V3)
+      Await.result(grpcApi.broadcast(PBTransactions.protobuf(transaction)), 10.seconds)
     }
-
-    val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    FakeTime.setTime(transaction.timestamp)
-    blockchain.assertBroadcast(transaction)
   }
 
   it should "reject eth transactions" in {
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.creditBalance(TxHelpers.defaultEthAddress, Waves)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls)
-    }
+    withDomain(DomainPresets.RideV6) { d =>
+      val grpcApi = getGrpcApi(d)
 
-    val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 10, Waves)
-    FakeTime.setTime(transaction.timestamp)
-    intercept[Exception](blockchain.assertBroadcast(transaction)).toString should include("ETH transactions should not be broadcasted over gRPC")
+      val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 10, Waves)
+
+      Try(Await.result(grpcApi.broadcast(PBTransactions.protobuf(transaction)), 10.seconds)).toEither should matchPattern {
+        case Left(err) if err.toString.contains("ETH transactions should not be broadcasted over gRPC") =>
+      }
+    }
   }
 
-  // noinspection NotImplementedCode
-  implicit class BlockchainBroadcastExt(blockchain: Blockchain) {
-    def grpcTxApi: TransactionsApiGrpcImpl =
-      new TransactionsApiGrpcImpl(
-        blockchain,
-        new CommonTransactionsApi {
-          def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = ???
-          def transactionById(txId: ByteStr): Option[TransactionMeta]                          = ???
-          def unconfirmedTransactions: Seq[Transaction]                                        = ???
-          def unconfirmedTransactionById(txId: ByteStr): Option[Transaction]                   = ???
-          def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)]      = ???
-          def transactionsByAddress(
-              subject: Address,
-              sender: Option[Address],
-              transactionTypes: Set[TransactionType],
-              fromId: Option[ByteStr]
-          ): Observable[TransactionMeta] = ???
-          def transactionProofs(transactionIds: List[ByteStr]): List[Block.TransactionProof] = ???
-          def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = {
-            val differ = blockchain.stub.transactionDiffer(FakeTime)
-            Future.successful(differ(tx).map(_ => true))
-          }
-        }
-      )(Scheduler.global)
+  private def getGrpcApi(d: Domain) =
+    new TransactionsApiGrpcImpl(d.blockchain, d.transactionsApi)
+}
 
-    @throws[StatusException]("on failed broadcast")
-    def assertBroadcast(tx: Transaction): Unit = {
-      Await.result(grpcTxApi.broadcast(PBTransactions.protobuf(tx)), 10.seconds)
-    }
+object GRPCBroadcastSpec {
+  private val emptySignature = OrderAuthentication.Eip712Signature(ByteStr(new Array[Byte](64)))
+
+  def ethBuyOrderSigned(testAsset: IssuedAsset, buyerEthAccount: Bip32ECKeyPair, timestamp: Long): Order = {
+    val ethBuyOrderTemplate: Order = Order(
+      Order.V4,
+      emptySignature,
+      TxHelpers.matcher.publicKey,
+      AssetPair(testAsset, Waves),
+      OrderType.BUY,
+      TxExchangeAmount.unsafeFrom(1),
+      TxOrderPrice.unsafeFrom(100L),
+      timestamp,
+      timestamp + 10000,
+      TxMatcherFee.unsafeFrom(100000),
+      Waves
+    )
+
+    ethBuyOrderTemplate.copy(
+      orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(EthOrders.signOrder(ethBuyOrderTemplate, buyerEthAccount)))
+    )
+  }
+
+  def ethSellOrderSigned(testAsset: IssuedAsset, sellerEthAccount: Bip32ECKeyPair, timestamp: Long): Order = {
+    val ethSellOrderTemplate: Order = Order(
+      Order.V4,
+      emptySignature,
+      TxHelpers.matcher.publicKey,
+      AssetPair(testAsset, Waves),
+      OrderType.SELL,
+      TxExchangeAmount.unsafeFrom(1),
+      TxOrderPrice.unsafeFrom(100L),
+      timestamp,
+      timestamp + 10000,
+      TxMatcherFee.unsafeFrom(100000),
+      Waves
+    )
+
+    ethSellOrderTemplate.copy(
+      orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(EthOrders.signOrder(ethSellOrderTemplate, sellerEthAccount)))
+    )
   }
 }

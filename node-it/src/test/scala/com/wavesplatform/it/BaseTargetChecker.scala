@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import com.typesafe.config.ConfigFactory.{defaultApplication, defaultReference}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.RDB
 import com.wavesplatform.events.BlockchainUpdateTriggers
@@ -12,7 +12,7 @@ import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.utils.NTP
-import net.ceedubs.ficus.Ficus.*
+import pureconfig.ConfigSource
 
 object BaseTargetChecker {
   def main(args: Array[String]): Unit = {
@@ -23,11 +23,11 @@ object BaseTargetChecker {
       .withFallback(defaultReference())
       .resolve()
 
-    val settings               = WavesSettings.fromRootConfig(sharedConfig)
-    val db                     = RDB.open(settings.dbSettings.copy(directory = "/tmp/tmp-db"))
-    val ntpTime                = new NTP("ntp.pool.org")
-    val (blockchainUpdater, _) = StorageFactory(settings, db, ntpTime, BlockchainUpdateTriggers.noop)
-    val poSSelector            = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
+    val settings                       = WavesSettings.fromRootConfig(sharedConfig)
+    val db                             = RDB.open(settings.dbSettings.copy(directory = "/tmp/tmp-db"))
+    val ntpTime                        = new NTP("ntp.pool.org")
+    val (blockchainUpdater, rdbWriter) = StorageFactory(settings, db, ntpTime, BlockchainUpdateTriggers.noop)
+    val poSSelector                    = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
     try {
       val genesisBlock =
@@ -38,10 +38,10 @@ object BaseTargetChecker {
             blockchainUpdater.isFeatureActivated(BlockchainFeatures.LightNode)
           )
           .explicitGet()
-      blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature, None)
+      blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature, snapshot = None, generatorBalances = Seq.empty)
 
       NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
-        case cfg if cfg.as[Boolean]("waves.miner.enable") =>
+        case cfg if ConfigSource.fromConfig(cfg).at("waves.miner.enable").loadOrThrow[Boolean] =>
           val account = KeyPair.fromSeed(cfg.getString("account-seed")).explicitGet()
           val address = account.toAddress
           val balance = blockchainUpdater.balance(address, Waves)
@@ -51,6 +51,10 @@ object BaseTargetChecker {
 
           f"$address: ${timeDelay * 1e-3}%10.3f s"
       }
-    } finally ntpTime.close()
+    } finally {
+      ntpTime.close()
+      rdbWriter.close()
+      db.close()
+    }
   }
 }

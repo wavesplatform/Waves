@@ -33,7 +33,7 @@ object SetScriptTransactionDiff {
       }
 
       callableComplexities <- tx.script match {
-        case Some(ContractScriptImpl(version, dApp)) => estimate(blockchain, version, dApp, checkOverflow = blockchain.checkEstimatorSumOverflow)
+        case Some(ContractScriptImpl(version, dApp)) => estimate(blockchain, version, dApp)
         case _                                       => Right(Map[Int, Map[String, Long]]())
       }
       verifierWithComplexity <- DiffsCommon.countVerifierComplexity(tx.script, blockchain, isAsset = false)
@@ -60,8 +60,7 @@ object SetScriptTransactionDiff {
   def estimate(
       blockchain: Blockchain,
       version: StdLibVersion,
-      dApp: DApp,
-      checkOverflow: Boolean
+      dApp: DApp
   ): Either[GenericError, Map[Int, Map[String, Long]]] = {
     val callables = dApp.copy(verifierFuncOpt = None)
     val actualComplexities =

@@ -12,7 +12,10 @@ import com.wavesplatform.transaction.{EthereumTransaction, Transaction, Transact
 
 package object serialization {
   private[block] def writeTransactionData(version: Byte, txs: Seq[Transaction]): Array[Byte] = {
-    val txsBytes     = txs.map(tx => if (version == ProtoBlockVersion) PBUtils.encodeDeterministic(PBTransactions.protobuf(tx)) else tx.bytes().ensuring(!tx.isInstanceOf[EthereumTransaction]))
+    val txsBytes = txs.map(tx =>
+      if (version == ProtoBlockVersion) PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
+      else tx.bytes().ensuring(!tx.isInstanceOf[EthereumTransaction])
+    )
     val txsBytesSize = txsBytes.map(_.length + Ints.BYTES).sum
     val txsBuf       = ByteBuffer.allocate(txsBytesSize)
     txsBytes.foreach(tx => txsBuf.putInt(tx.length).put(tx))

@@ -3,12 +3,14 @@
 .ensime
 .ensime_cache/
 .bsp
+.bloop
+.metals
+metals.sbt
 
 # scala build folders and files
 target
 *.tgz
 *.jar
-!third-party/yourkit/yjp-controller-api-redist.jar
 
 # vim
 *.*~
@@ -39,4 +41,5 @@ package
 !ride-runner/src/package
 native
 
-!lang/jvm/lib/*.jar
+lang/js/dist
+repl/js/dist

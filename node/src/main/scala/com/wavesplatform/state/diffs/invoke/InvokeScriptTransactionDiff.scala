@@ -6,7 +6,7 @@ import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{LightNode, RideV6}
 import com.wavesplatform.features.EstimatorProvider.*
@@ -27,25 +27,22 @@ import com.wavesplatform.lang.v1.evaluator.*
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{Recipient as RideRecipient, *}
 import com.wavesplatform.metrics.TxProcessingStats as Stats
-import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
+import com.wavesplatform.metrics.TxProcessingStats.measureForType
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
-import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.TransactionBase
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.InvokeTransaction.DefaultCall
-import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
-import shapeless.Coproduct
 
 object InvokeScriptTransactionDiff {
 
-  private[this] def allIssues(r: InvokeScriptResult): Seq[Issue] = {
+  private def allIssues(r: InvokeScriptResult): Seq[Issue] = {
     r.issues ++ r.invokes.flatMap(s => allIssues(s.stateChanges))
   }
 
@@ -221,8 +218,8 @@ object InvokeScriptTransactionDiff {
           _ <- TracedResult(checkCall(funcCall, blockchain).leftMap(GenericError(_)))
           (directives, tthis, input) <- TracedResult(for {
             directives <- DirectiveSet(version, Account, DAppType)
-            tthis = Coproduct[Environment.Tthis](RideRecipient.Address(ByteStr(dAppAddress.bytes)))
-            input <- buildThisValue(Coproduct[TxOrd](tx: TransactionBase), blockchain, directives, tthis)
+            tthis = RideRecipient.Address(ByteStr(dAppAddress.bytes))
+            input <- buildThisValue(tx: TransactionBase, blockchain, directives, tthis)
           } yield (directives, tthis, input)).leftMap(GenericError(_))
 
           paymentsPart <- TracedResult(
@@ -262,9 +259,9 @@ object InvokeScriptTransactionDiff {
           invocation = ContractEvaluator.Invocation(
             funcCall,
             invoker,
-            tx.sender,
+            tx.sender.byteStr,
             invoker,
-            tx.sender,
+            tx.sender.byteStr,
             payments,
             tx.id(),
             tx.fee,

@@ -25,13 +25,10 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction.assets.exchange.{EthOrders, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
-import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
-import shapeless.Coproduct
-
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
@@ -39,7 +36,7 @@ object Verifier extends ScorexLogging {
 
   private val stats = TxProcessingStats
 
-  import stats.TxTimerExt
+  import com.wavesplatform.metrics.TxProcessingStats.measureForType
 
   type ValidationResult[T] = Either[ValidationError, T]
 
@@ -62,7 +59,7 @@ object Verifier extends ScorexLogging {
             if (limitedExecution) ContractLimits.FailFreeInvokeComplexity else Int.MaxValue,
             enableExecutionLog
           )
-        case (tx: SigProofsSwitch, Some(_)) if tx.usesLegacySignature =>
+        case (sps: SigProofsSwitch, Some(_)) if sps.usesLegacySignature =>
           Left(GenericError("Can't process transaction with signature from scripted account"))
         case (_: PaymentTransaction, Some(_)) =>
           Left(GenericError("Can't process transaction with signature from scripted account"))
@@ -183,12 +180,10 @@ object Verifier extends ScorexLogging {
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
     val resultE = Try {
-      val containerAddress = assetIdOpt.fold(Coproduct[Environment.Tthis](Recipient.Address(ByteStr(senderAddress.bytes))))(v =>
-        Coproduct[Environment.Tthis](Environment.AssetId(v.arr))
-      )
+      val containerAddress = assetIdOpt.fold(Recipient.Address(ByteStr(senderAddress.bytes)))(v => Environment.AssetId(v.arr))
       val (log, evaluatedComplexity, result) =
         ScriptRunner(
-          Coproduct[TxOrd](transaction),
+          transaction,
           blockchain,
           script,
           isAsset,
@@ -235,11 +230,11 @@ object Verifier extends ScorexLogging {
   ): ValidationResult[Int] =
     Try(
       ScriptRunner(
-        Coproduct[ScriptRunner.TxOrd](order),
+        order,
         blockchain,
         script.script,
         isAssetScript = false,
-        Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.sender.toAddress.bytes))),
+        Recipient.Address(ByteStr(order.sender.toAddress.bytes)),
         enableExecutionLog,
         complexityLimit
       )
@@ -352,10 +347,8 @@ object Verifier extends ScorexLogging {
       .foldLeft(builder) {
         case (sb, (k, Right(v))) =>
           sb.append(s"\nEvaluated `$k` to ")
-          v match {
-            case obj: EVALUATED => TermPrinter().print(str => sb.append(str), obj); sb
-            case a              => sb.append(a.toString)
-          }
+          TermPrinter().print(str => sb.append(str), v)
+          sb
         case (sb, (k, Left(err))) => sb.append(s"\nFailed to evaluate `$k`: $err")
       }
       .toString

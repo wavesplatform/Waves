@@ -5,12 +5,15 @@ import com.wavesplatform.events.api.grpc.protobuf.{SubscribeEvent, SubscribeRequ
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.serde.BlockchainUpdatedVanilla
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.utils.Schedulers
 import io.grpc.stub.{CallStreamObserver, StreamObserver}
 import monix.eval.Task
-import monix.execution.Scheduler.Implicits.global
+import monix.execution.ExecutionModel.SynchronousExecution
+import monix.execution.Scheduler
 
+import scala.annotation.unused
 import scala.concurrent.duration.*
 
 trait FakeObserver[T] extends StreamObserver[T] {
@@ -20,10 +23,11 @@ trait FakeObserver[T] extends StreamObserver[T] {
 }
 
 object FakeObserver {
+  private given scheduler: Scheduler = Schedulers.singleThread("fake-observer", executionModel = SynchronousExecution)
   def apply[T]: FakeObserver[T] = new CallStreamObserver[T] with FakeObserver[T] {
-    @volatile var values    = Seq.empty[T]
-    @volatile var error     = Option.empty[Throwable]
-    @volatile var completed = false
+    @volatile @unused var values    = Seq.empty[T]
+    @volatile @unused var error     = Option.empty[Throwable]
+    @volatile @unused var completed = false
 
     override def isReady: Boolean                                  = true
     override def setOnReadyHandler(onReadyHandler: Runnable): Unit = ()

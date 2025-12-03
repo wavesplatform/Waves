@@ -7,7 +7,7 @@ import com.wavesplatform.account
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.{FairPoSCalculator, PoSCalculator}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.LightNode
@@ -37,12 +37,11 @@ import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, DiffToLogConverter, TransactionBase, TransactionType}
 import monix.eval.Coeval
-import shapeless.*
 
 import scala.util.Try
 
 object WavesEnvironment {
-  type In = TransactionBase :+: Order :+: PseudoTx :+: CNil
+  type In = TransactionBase | Order | PseudoTx
 
   def apply(
       nByte: Byte,
@@ -168,7 +167,7 @@ class WavesEnvironment(
       isBanned  = currentBlockchain().hasBannedEffectiveBalance(address)
       effectiveBalance <- portfolio.effectiveBalance(isBanned)
     } yield Environment.BalanceDetails(
-      portfolio.balance - portfolio.lease.out,
+      portfolio.balance - portfolio.lease.out - portfolio.generationDeposit,
       portfolio.balance,
       if (blockchain.isFeatureActivated(LightNode))
         currentBlockchain().generatingBalance(address)
@@ -180,7 +179,7 @@ class WavesEnvironment(
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     // There are no new transactions in currentBlockchain
-    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.status == TxMeta.Status.Succeeded => tm.height.toLong }
+    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.status == TxMeta.Status.Succeeded => tm.height.toInt }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
@@ -193,7 +192,7 @@ class WavesEnvironment(
         quantity = assetDesc.totalVolume.toLong,
         decimals = assetDesc.decimals,
         issuer = Address(ByteStr(assetDesc.issuer.toAddress.bytes)),
-        issuerPk = assetDesc.issuer,
+        issuerPk = assetDesc.issuer.byteStr,
         reissuable = assetDesc.reissuable,
         scripted = assetDesc.script.nonEmpty,
         minSponsoredFee = Some(assetDesc.sponsorship).filter(_ != 0)
@@ -220,7 +219,7 @@ class WavesEnvironment(
       baseTarget = blockH.baseTarget,
       generationSignature = blockH.generationSignature,
       generator = ByteStr(blockH.generator.toAddress.bytes),
-      generatorPublicKey = blockH.generator,
+      generatorPublicKey = blockH.generator.byteStr,
       if (blockchainForRuntime.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
       if (blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution))
         getRewards(blockH.generator, bHeight)
@@ -308,7 +307,7 @@ object DAppEnvironment {
   final case class InvocationTreeTracker(root: DAppInvocation) {
     private var result: Either[ValidationError, ScriptResult] = Left(GenericError("No result"))
     private var log: Log[Id]                                  = Nil
-    private[this] var invocations                             = Vector.empty[InvocationTreeTracker]
+    private var invocations                                   = Vector.empty[InvocationTreeTracker]
 
     def record(invocation: DAppInvocation): InvocationTreeTracker = {
       val tracker = InvocationTreeTracker(invocation)
@@ -354,7 +353,7 @@ object DAppEnvironment {
       }
     }
 
-    private[this] def errorMessage(ve: ValidationError): InvokeScriptResult.ErrorMessage = {
+    private def errorMessage(ve: ValidationError): InvokeScriptResult.ErrorMessage = {
       val fte = FailedTransactionError.asFailedScriptError(ve)
       InvokeScriptResult.ErrorMessage(fte.code, fte.message)
     }
@@ -419,7 +418,7 @@ class DAppEnvironment(
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id(), blockchain)
     with DAppEnvironmentInterface {
 
-  private[this] var mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
+  private var mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
 
   override def currentBlockchain(): SnapshotBlockchain = this.mutableBlockchain
 

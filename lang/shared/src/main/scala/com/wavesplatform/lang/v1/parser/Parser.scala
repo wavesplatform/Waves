@@ -20,7 +20,7 @@ import fastparse.*
 import fastparse.MultiLineWhitespace.*
 import fastparse.Parsed.Failure
 
-import scala.annotation.tailrec
+import scala.annotation.{tailrec, unused}
 
 class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
 
@@ -48,8 +48,9 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
   def unusedText[A: P] = comment ~ directive ~ comment
 
   def escapedUnicodeSymbolP[A: P]: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
+  def escapedUnicodeOrEndOfString[A: P]: P[Any] = escapedUnicodeSymbolP[A] | notEndOfString
   def stringP[A: P]: P[EXPR] =
-    P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~~ Index)
+    P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeOrEndOfString).!.repX ~~ "\"" ~~ Index)
       .map { case (start, xs, end) =>
         var errors         = Vector.empty[String]
         val consumedString = new StringBuilder
@@ -135,7 +136,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
 
   def anyVarName(check: Boolean = false)(implicit c: fastparse.P[Any]): P[PART[String]] = {
     def nameP(implicit c: fastparse.P[Any]): P[Unit] = declNameP(check)
-    genericVarName(nameP(_))
+    genericVarName(nameP(using _))
   }
 
   def invalid[A: P]: P[INVALID] = {
@@ -167,8 +168,8 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
           .getOrElse(INVALID(Pos(ifTruePos, ifTruePos), s"expected a $branch branch"))
       }
 
-    def thenPart[AA: P] = optionalPart("then", "true")
-    def elsePart[AA: P] = optionalPart("else", "false")
+    def thenPart = optionalPart("then", "true")
+    def elsePart = optionalPart("else", "false")
 
     P(Index ~~ "if" ~~ &(border) ~/ Index ~ baseExpr.? ~ thenPart ~ elsePart ~~ Index)
       .map { case (start, condPos, condRaw, ifTrue, ifFalse, end) =>
@@ -245,7 +246,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
         ContractLimits.MaxTupleSize
       )
       ~ comment ~/ ")")
-      .map(Tuple)
+      .map(Tuple.apply)
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
     def funcName       = anyVarName(check = true)
@@ -255,9 +256,9 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
     def funcBody       = singleBaseExpr
     def correctFunc    = Index ~~ funcKWAndName ~ comment ~/ args(min = 0) ~ ("=" ~ funcBody | "=" ~/ Fail.opaque("function body")) ~~ Index
     def noKeyword = {
-      def noArgs      = "(" ~ comment ~ ")" ~ comment
-      def validName   = NoCut(funcName).filter(_.isInstanceOf[VALID[?]])
-      def argsOrEqual = (NoCut(args(min = 1)) ~ "=".?) | (noArgs ~ "=" ~~ !"=")
+      def noArgs              = "(" ~ comment ~ ")" ~ comment
+      def validName           = NoCut(funcName).filter(_.isInstanceOf[VALID[?]])
+      def argsOrEqual: P[Any] = (NoCut(args(min = 1)) ~ "=".?) | (noArgs ~ "=" ~~ !"=")
       (validName ~ comment ~ argsOrEqual ~/ funcBody.? ~~ Fail)
         .asInstanceOf[P[Nothing]]
         .opaque(""""func" keyword""")
@@ -321,11 +322,11 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
         case TypedVar(_, t)    => checkForGenericAndGetLastPos(t)
         case ConstsPat(_, pos) => Right(Some(pos))
         case TuplePat(ps, pos) =>
-          ps.toList traverse checkPattern map { _ =>
+          ps.toList `traverse` checkPattern map { _ =>
             Some(pos)
           }
         case ObjPat(ps, _, pos) =>
-          ps.values.toList traverse checkPattern map { _ =>
+          ps.values.toList `traverse` checkPattern map { _ =>
             Some(pos)
           }
       }
@@ -371,7 +372,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
 
   def accessOrName(implicit c: fastparse.P[Any]): P[PART[String]] = {
     def nameP(implicit c: fastparse.P[Any]) = (char | "_") ~~ ("_".? ~~ (digit | char)).repX()
-    genericVarName(nameP(_))
+    genericVarName(nameP(using _))
   }
 
   def genericMethodName(implicit c: fastparse.P[Any]): P[PART[String]] =
@@ -381,13 +382,13 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
     }
 
   def accessP[A: P]: P[(Int, Accessor, Int)] = P(
-    (("" ~ comment ~ Index ~ "." ~/ comment ~ getterOrOOPCall) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
+    (("" ~ comment ~ Index ~ "." ~/ comment ~ getterOrOOPCall) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex.apply) ~ "]" ~~ Index)
   )
 
   def getterOrOOPCall[A: P]: P[Accessor] =
     (genericMethodName ~~/ ("[" ~ unionTypeP ~/ "]")).map { case (name, tpe) =>
       GenericMethod(name, tpe)
-    } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs.opaque("""")"""") ~ comment ~/ ")").?).map {
+    } | (accessOrName.map(Getter.apply) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs.opaque("""")"""") ~ comment ~/ ")").?).map {
       case (g @ Getter(name), args) =>
         args.fold(g: Accessor)(Method(name, _))
     }
@@ -411,7 +412,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
         val innerStart = start + 8
         val innerEnd   = end - 1
         val decoded = base match {
-          case "16" => Global.base16Decode(xs, checkLength = false)
+          case "16" => Global.base16Decode(xs, None)
           case "58" => Global.base58Decode(xs)
           case "64" => Global.base64Decode(xs)
         }
@@ -452,7 +453,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
   private def singleLet(pos: Pos, names: Seq[(Int, PART[String])], value: EXPR) =
     names.map { case (_, name) => LET(pos, name, value) }
 
-  private def desugaredMultipleLets[A: P](pos: Pos, names: Seq[(Int, PART[String])], value: EXPR) = {
+  private def desugaredMultipleLets(pos: Pos, names: Seq[(Int, PART[String])], value: EXPR) = {
     val exprRefName = "$t0" + s"${pos.start}${pos.end}"
     val exprRef     = LET(pos, VALID(pos, exprRefName), value)
     val tupleValues =
@@ -502,19 +503,19 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
       }
   }
 
-  def baseAtom[A: P](epn: fastparse.P[Any] => P[EXPR]) = {
-    def ep[AA: P](implicit c: fastparse.P[Any]) = epn(c)
+  def baseAtom[A: P](epn: fastparse.P[Any] => P[EXPR]): P[EXPR] = {
+    def ep[AA](implicit c: fastparse.P[Any], @unused u: P[AA]) = epn(c)
     comment ~ P(foldMacroP | ifP | matchP | ep | maybeAccessP) ~ comment
   }
 
-  def baseExpr[A: P] = P(strictLetBlockP | binaryOp(baseAtom(block(None)(_))(_), opsByPriority))
+  def baseExpr[A: P] = P(strictLetBlockP | binaryOp(baseAtom(block(None)(using _))(using _), opsByPriority))
 
   def singleBaseAtom[A: P] =
     comment ~
       P(foldMacroP | ifP | matchP | maybeAccessP) ~
       comment
 
-  def singleBaseExpr[A: P] = P(binaryOp(singleBaseAtom(_), opsByPriority))
+  def singleBaseExpr[A: P] = P(binaryOp(singleBaseAtom(using _), opsByPriority))
 
   def declaration[A: P] = P(variableDefP("let") | funcP.map(Seq(_)))
 
@@ -529,17 +530,17 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
   ): P[EXPR] = {
     def atom(implicit c: fastparse.P[Any]) = atomA(c)
     rest match {
-      case Nil => unaryOp(atom(_), unaryOps)
+      case Nil => unaryOp(atom(using _), unaryOps)
       case Left(kinds) :: restOps =>
-        def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(_), restOps)
+        def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(using _), restOps)
         val kindc = kinds
-          .map(o => { implicit c: fastparse.P[Any] =>
+          .map(o => { implicit (c: fastparse.P[Any]) =>
             o.parser
           })
           .reduce((plc, prc) => {
             def pl(implicit c: fastparse.P[Any]) = plc(c)
             def pr(implicit c: fastparse.P[Any]) = prc(c);
-            { implicit c: fastparse.P[Any] =>
+            { implicit (c: fastparse.P[Any]) =>
               P(pl | pr)
             }
           })
@@ -552,15 +553,15 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
           }
         }
       case Right(kinds) :: restOps =>
-        def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(_), restOps)
+        def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(using _), restOps)
         val kindc = kinds
-          .map(o => { implicit c: fastparse.P[Any] =>
+          .map(o => { implicit (c: fastparse.P[Any]) =>
             o.parser
           })
           .reduce((plc, prc) => {
             def pl(implicit c: fastparse.P[Any]) = plc(c)
             def pr(implicit c: fastparse.P[Any]) = prc(c);
-            { implicit c: fastparse.P[Any] =>
+            { implicit (c: fastparse.P[Any]) =>
               P(pl | pr)
             }
           })
@@ -578,7 +579,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
   def unaryOp(atom: fastparse.P[Any] => P[EXPR], ops: List[UnaryOperation])(implicit c: fastparse.P[Any]): P[EXPR] =
     ops.foldRight(atom) { case (op, accc) =>
       def acc(implicit c: fastparse.P[Any]) = accc(c);
-      { implicit c: fastparse.P[Any] =>
+      { implicit (c: fastparse.P[Any]) =>
         (Index ~~ op.parser.map(_ => ()) ~ P(unaryOp(atom, ops)) ~~ Index).map { case (start, expr, end) =>
           op.expr(start, end, expr)
         } | acc
@@ -587,14 +588,14 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
 
   def parseExpr(str: String): Parsed[EXPR] = {
     def expr[A: P] = P(Start ~ unusedText ~ (baseExpr | invalid | ("" ~/ Fail).opaque("result expression")) ~ End)
-    parse(str, expr(_), verboseFailures = true)
+    parse(str, expr(using _), verboseFailures = true)
   }
 
   def parseReplExpr(str: String): Parsed[EXPR] = {
     def unit[A: P]     = Pass(REF(AnyPos, VALID(AnyPos, GlobalValNames.Unit)))
-    def replAtom[A: P] = baseAtom(block(Some(unit))(_))
-    def replExpr[A: P] = binaryOp(baseAtom(replAtom(_))(_), opsByPriority)
-    parse(str, replExpr(_), verboseFailures = true)
+    def replAtom[A: P] = baseAtom(block(Some(unit))(using _))
+    def replExpr[A: P] = binaryOp(baseAtom(replAtom(using _))(using _), opsByPriority)
+    parse(str, replExpr(using _), verboseFailures = true)
   }
 
   def parseContract(str: String): Parsed[DAPP] = {
@@ -604,10 +605,10 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
           (DAPP(Pos(0, end), ds.flatten.toList, fs.toList), t)
         }
 
-    parse(str, contract(_), verboseFailures = true) match {
+    parse(str, contract(using _), verboseFailures = true) match {
       case Parsed.Success((_, t), _) if t.nonEmpty =>
         def contract[A: P] = P(Start ~ unusedText ~ declaration.rep ~ comment ~ annotatedFunc.rep ~ !declaration.rep(1) ~ End ~~ Index)
-        parse(str, contract(_)) match {
+        parse(str, contract(using _)) match {
           case Parsed.Failure(_, o, e) =>
             Parsed.Failure(s"Local functions should be defined before @Callable one: ${str.substring(o)}", o, e)
           case _ => throw new Exception("Parser error")
@@ -669,8 +670,6 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
               .map { case (parsed, errorIndexes) => (parsed, baseErrorIndexes ++ errorIndexes) }
           else
             Right((defaultResult, baseErrorIndexes))
-        case _ =>
-          Left(("Unknown parsing error.", 0, 0))
       }
 
   @tailrec
@@ -721,7 +720,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
 }
 
 object Parser {
-  private def parser(version: StdLibVersion)                                                                  = new Parser(version)(NoLibraries)
+  private def parser(version: StdLibVersion)                                                                  = new Parser(version)(using NoLibraries)
   def parseExpr(str: String, version: StdLibVersion = StdLibVersion.VersionDic.all.last): Parsed[EXPR]        = parser(version).parseExpr(str)
   def parseReplExpr(str: String, version: StdLibVersion = StdLibVersion.VersionDic.all.last): Parsed[EXPR]    = parser(version).parseReplExpr(str)
   def parseContract(str: String, version: StdLibVersion = StdLibVersion.VersionDic.all.last): Parsed[DAPP]    = parser(version).parseContract(str)

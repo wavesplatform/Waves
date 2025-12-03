@@ -36,10 +36,7 @@ trait Script {
 }
 
 object Script {
-
   case class ComplexityInfo(verifierComplexity: Long, callableComplexities: Map[String, Long], maxComplexity: Long)
-
-  val checksumLength = 4
 
   def fromBase64String(str: String): Either[ScriptParseError, Script] =
     for {
@@ -57,7 +54,7 @@ object Script {
     val ctx = getDecompilerContext(s.stdLibVersion, cType)
     val (scriptText, directives) = (s: @unchecked) match {
       case e: ExprScript                   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression))
-      case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx, s.stdLibVersion), List(s.stdLibVersion, Account, DAppType))
+      case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx), List(s.stdLibVersion, Account, DAppType))
     }
     val directivesText = directives
       .map(_.unparsed)
@@ -93,9 +90,7 @@ object Script {
           )
           complexityInfo = verifierFuncOpt.fold(
             ComplexityInfo(0L, callableComplexities, maxComplexity)
-          )(
-            v => ComplexityInfo(callableComplexities(v.u.name), callableComplexities - v.u.name, maxComplexity)
-          )
+          )(v => ComplexityInfo(callableComplexities(v.u.name), callableComplexities - v.u.name, maxComplexity))
         } yield complexityInfo
     }
 

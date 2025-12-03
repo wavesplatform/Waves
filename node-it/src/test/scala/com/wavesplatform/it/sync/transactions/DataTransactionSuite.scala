@@ -5,12 +5,14 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation, WrongJson}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{TransactionInfo, UnexpectedStatusCodeException}
 import com.wavesplatform.it.sync.{calcDataFee, minFee, *}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
@@ -28,7 +30,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       .overrideBase(_.quorum(0))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation = 1"))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period = 1"))
-      .overrideBase(_.preactivatedFeatures(15 -> 0))
+      .overrideBase(_.preactivatedFeatures(15 -> Height(0)))
       .withDefault(1)
       .withSpecial(1, _.nonMiner)
       .buildNonConflicting()
@@ -74,7 +76,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   }
 
   test("put and remove keys") {
-    def dataEntries(i: Int): List[DataEntry[_]] =
+    def dataEntries(i: Int): List[DataEntry[?]] =
       List(
         BooleanDataEntry(s"bool-key-$i", i % 2 == 0),
         IntegerDataEntry(s"int-key-$i", i),
@@ -82,7 +84,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
         StringDataEntry(s"string-key-$i", s"$i-value")
       )
 
-    def updateDataEntry(de: DataEntry[_]): DataEntry[_] = de match {
+    def updateDataEntry(de: DataEntry[?]): DataEntry[?] = de match {
       case BooleanDataEntry(k, v) => BooleanDataEntry(k, !v)
       case IntegerDataEntry(k, v) => IntegerDataEntry(k, v + 100)
       case BinaryDataEntry(k, v)  => BinaryDataEntry(k, ByteStr(v.arr :+ v.arr.length.toByte))
@@ -382,7 +384,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     }
   }
 
-  private def postDataTxJson(source: KeyPair, data: Seq[DataEntry[_]], fee: Long, version: Byte) =
+  private def postDataTxJson(source: KeyPair, data: Seq[DataEntry[?]], fee: Long, version: Byte) =
     sender.signedBroadcast(
       Json.obj(
         "type"            -> DataTransaction.typeId,
@@ -471,10 +473,10 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   }
 
   def data(
-      entries: List[DataEntry[_]],
+      entries: List[DataEntry[?]],
       fee: Long = 100000,
       timestamp: Long = System.currentTimeMillis,
       version: TxVersion
   ): DataTransaction =
-    DataTransaction.selfSigned(1.toByte, sender.keyPair, entries, fee, timestamp).explicitGet()
+    DataTransaction.selfSigned(version, sender.keyPair, entries, fee, timestamp).explicitGet()
 }

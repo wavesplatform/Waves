@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import play.api.libs.json._
+import play.api.libs.json.*
 
 sealed trait OrderPriceMode {
   private[OrderPriceMode] val jsonName: String = {
@@ -14,7 +14,7 @@ object OrderPriceMode {
   case object AssetDecimals extends OrderPriceMode
   case object FixedDecimals extends OrderPriceMode
 
-  private[this] val byJsonName = Seq(Default, AssetDecimals, FixedDecimals).map(v => v.jsonName -> v).toMap
+  private val byJsonName = Seq(Default, AssetDecimals, FixedDecimals).map(v => v.jsonName -> v).toMap
 
   implicit val jsonFormat: Format[OrderPriceMode] = Format(
     Reads {

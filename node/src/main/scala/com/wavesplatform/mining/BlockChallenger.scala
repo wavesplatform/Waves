@@ -16,8 +16,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.MaxTimeDrift
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, Height, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -53,7 +52,7 @@ class BlockChallengerImpl(
 
   private val processingTxs: ConcurrentHashMap[ByteStr, Transaction] = new ConcurrentHashMap()
 
-  def challengeBlock(block: Block, ch: Channel): Task[Unit] = {
+  override def challengeBlock(block: Block, ch: Channel): Task[Unit] = {
     log.debug(s"Challenging block $block")
 
     withProcessingTxs(block.transactionData) {
@@ -81,7 +80,7 @@ class BlockChallengerImpl(
     }
   }
 
-  def challengeMicroblock(md: MicroblockData, ch: Channel): Task[Unit] = {
+  override def challengeMicroblock(md: MicroblockData, ch: Channel): Task[Unit] = {
     val idStr = md.invOpt.map(_.totalBlockId.toString).getOrElse(s"(sig=${md.microBlock.totalResBlockSig})")
     log.debug(s"Challenging microblock $idStr")
 
@@ -120,15 +119,18 @@ class BlockChallengerImpl(
     )
   }
 
-  def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] =
+  override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] =
     accounts.minByOption(_._2).toRight(GenericError("No suitable account in wallet"))
 
-  def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] =
+  override def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] =
     wallet.privateKeyAccounts
       .map { pk =>
         pk -> blockchainUpdater.generatingBalance(pk.toAddress)
       }
-      .filter { case (_, balance) => blockchainUpdater.isMiningAllowed(blockchainUpdater.height, balance) }
+      .filter { case (pk, balance) =>
+        blockchainUpdater.isCommitted(Height(blockchainUpdater.height), pk.toAddress) // Only a committed generator can challenge on current height
+        && blockchainUpdater.isMiningAllowed(blockchainUpdater.height, balance)
+      }
       .traverse { case (acc, initGenBalance) =>
         pos
           .getValidBlockDelay(
@@ -140,9 +142,9 @@ class BlockChallengerImpl(
           .map((acc, _))
       }
 
-  def getProcessingTx(id: ByteStr): Option[Transaction] = Option(processingTxs.get(id))
+  override def getProcessingTx(id: ByteStr): Option[Transaction] = Option(processingTxs.get(id))
 
-  def allProcessingTxs: Seq[Transaction] = processingTxs.values.asScala.toSeq
+  override def allProcessingTxs: Seq[Transaction] = processingTxs.values.asScala.toSeq
 
   private def withProcessingTxs[A](txs: Seq[Transaction])(body: Task[A]): Task[A] =
     Task(processingTxs.putAll(txs.map(tx => tx.id() -> tx).toMap.asJava))
@@ -190,8 +192,9 @@ class BlockChallengerImpl(
         acc,
         blockFeatures(blockchainUpdater, settings),
         blockRewardVote(settings),
-        None,
-        None
+        stateHash = None,
+        challengedHeader = None,
+        finalizationVoting = None
       )
       hitSource <- pos.validateGenerationSignature(blockWithoutChallengeAndStateHash)
       blockchainWithNewBlock = SnapshotBlockchain(
@@ -241,7 +244,8 @@ class BlockChallengerImpl(
                 challengedSignature
               )
             )
-          else None
+          else None,
+          finalizationVoting = None
         )
     } yield {
       log.debug(s"Forged challenging block $challengingBlock")

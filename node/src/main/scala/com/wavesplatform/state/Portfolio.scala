@@ -8,10 +8,15 @@ import com.wavesplatform.transaction.Asset.*
 
 import scala.collection.immutable.VectorMap
 
-case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empty, assets: VectorMap[IssuedAsset, Long] = VectorMap.empty) {
+case class Portfolio(
+    balance: Long = 0L,
+    lease: LeaseBalance = LeaseBalance.empty,
+    assets: VectorMap[IssuedAsset, Long] = VectorMap.empty,
+    generationDeposit: Long = 0L
+) {
   import Portfolio.*
-  private lazy val effectiveBalance: Either[String, Long] = safeSum(balance, lease.in, "Effective balance").map(_ - lease.out)
-  lazy val spendableBalance: Long                         = balance - lease.out
+  private lazy val effectiveBalance: Either[String, Long] = safeSum(balance, lease.in, "Effective balance").map(_ - lease.out - generationDeposit)
+  lazy val spendableBalance: Long                         = balance - lease.out - generationDeposit
 
   lazy val isEmpty: Boolean = this == Portfolio.empty
 
@@ -23,13 +28,14 @@ case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empt
 
   def combine(that: Portfolio): Either[String, Portfolio] =
     for {
-      balance  <- safeSum(this.balance, that.balance, "Waves balance")
-      assets   <- combineAssets(this.assets, that.assets)
-      leaseIn  <- safeSum(this.lease.in, that.lease.in, "Lease in")
-      leaseOut <- safeSum(this.lease.out, that.lease.out, "Lease out")
-    } yield Portfolio(balance, LeaseBalance(leaseIn, leaseOut), assets)
+      balance           <- safeSum(this.balance, that.balance, "Waves balance")
+      assets            <- combineAssets(this.assets, that.assets)
+      leaseIn           <- safeSum(this.lease.in, that.lease.in, "Lease in")
+      leaseOut          <- safeSum(this.lease.out, that.lease.out, "Lease out")
+      generationDeposit <- safeSum(this.generationDeposit, that.generationDeposit, "Generation deposit")
+    } yield Portfolio(balance, LeaseBalance(leaseIn, leaseOut), assets, generationDeposit)
 
-  override def toString: String = s"PF($balance,${assets.mkString("[", ",", "]")})"
+  override def toString: String = s"PF($balance,${assets.mkString("[", ",", "]")}${if (generationDeposit > 0) s",g=$generationDeposit" else ""})"
 }
 
 object Portfolio {
@@ -80,12 +86,15 @@ object Portfolio {
         in = 0,
         out = Math.max(self.lease.out, 0)
       ),
-      assets = self.assets.filter { case (_, v) => v < 0 }
+      assets = self.assets.filter { case (_, v) => v < 0 },
+      generationDeposit = Math.max(self.generationDeposit, 0)
     )
 
+    // Used in fee calculations
     def multiply(f: Fraction): Portfolio =
       Portfolio(f(self.balance), LeaseBalance.empty, self.assets.view.mapValues(f.apply).to(VectorMap))
 
+    // Used in fee calculations
     def minus(other: Portfolio): Portfolio =
       Portfolio(self.balance - other.balance, LeaseBalance.empty, unsafeCombineAssets(self.assets, other.assets.view.mapValues(-_).to(VectorMap)))
 

@@ -39,15 +39,15 @@ object AddressLeaseInfo {
 
   private def leasesFromDb(rdb: RDB, subject: Address): Observable[LeaseInfo] =
     for {
-      dbResource <- rdb.db.resourceObservable
+      dbResource <- rdb.db.resourceObservable(rdb.apiHandle.handle)
       (leaseId, details) <- dbResource
         .get(Keys.addressId(subject))
-        .map(fromLeaseDbIterator(dbResource, _))
+        .map(fromLeaseDbIterator(dbResource, rdb.apiHandle, _))
         .getOrElse(Observable.empty)
     } yield LeaseInfo.fromLeaseDetails(leaseId, details)
 
-  private def fromLeaseDbIterator(dbResource: DBResource, addressId: AddressId): Observable[(ByteStr, LeaseDetails)] =
+  private def fromLeaseDbIterator(dbResource: DBResource, apiHandle: RDB.ApiHandle, addressId: AddressId): Observable[(ByteStr, LeaseDetails)] =
     Observable
-      .fromIterator(Task(new LeaseByAddressIterator(dbResource, addressId).asScala))
+      .fromIterator(Task(new LeaseByAddressIterator(dbResource, apiHandle, addressId).asScala))
       .concatMapIterable(identity)
 }

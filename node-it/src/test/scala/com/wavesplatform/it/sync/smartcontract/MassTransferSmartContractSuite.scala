@@ -1,20 +1,21 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import org.scalatest.CancelAfterFailure
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 /*
 Scenario:
@@ -59,7 +60,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
        |""".stripMargin
 
     // set script
-    val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     notMiner.setScript(notMiner.keyPair, Some(script), setScriptFee, waitForTx = true).id
 
     notMiner.addressScriptInfo(notMiner.address).scriptText.isEmpty shouldBe false

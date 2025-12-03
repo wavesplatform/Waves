@@ -35,10 +35,12 @@ import scala.util.Random
 trait BaseGlobal {
   val MaxBase16Bytes: Int               = 8 * 1024
   val MaxBase16String: Int              = 32 * 1024
+  val MaxBase16String_1C: Int           = 2048
   val MaxBase58Bytes                    = 64
   val MaxBase58String                   = 100
   val MaxBase64Bytes: Int               = 32 * 1024
   val MaxBase64String: Int              = 44 * 1024
+  val MaxBase64String_1C: Int           = 1375
   val MaxLiteralLength: Int             = 12 * 1024
   val MaxAddressLength                  = 36
   val MaxByteStrSizeForVerifyFuncs: Int = 32 * 1024
@@ -48,20 +50,18 @@ trait BaseGlobal {
   def base58Encode(input: Array[Byte]): Either[String, String]
   def base58Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
 
-  def base64Encode(input: Array[Byte]): Either[String, String]
+  def base64Encode(input: Array[Byte], limit: Int = MaxBase64Bytes): Either[String, String]
   def base64Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
 
-  def base16Encode(input: Array[Byte], checkLength: Boolean): Either[String, String] =
-    if (checkLength && input.length > MaxBase16Bytes)
-      Left(s"Base16 encode input length=${input.length} should not exceed $MaxBase16Bytes")
-    else
-      base16EncodeImpl(input)
+  def base16Encode(input: Array[Byte], limit: Option[Int] = Some(MaxBase16Bytes)): Either[String, String] = limit match {
+    case Some(lim) if input.length > lim => Left(s"Base16 encode input length=${input.length} should not exceed $lim")
+    case _                               => base16EncodeImpl(input)
+  }
 
-  def base16Decode(input: String, checkLength: Boolean): Either[String, Array[Byte]] =
-    if (checkLength && input.length > MaxBase16String)
-      Left(s"Base16 decode input length=${input.length} should not exceed $MaxBase16String")
-    else
-      base16DecodeImpl(input)
+  def base16Decode(input: String, limit: Option[Int] = Some(MaxBase16String)): Either[String, Array[Byte]] = limit match {
+    case Some(lim) if input.length > lim => Left(s"Base16 decode input length=${input.length} should not exceed $lim")
+    case _                               => base16DecodeImpl(input)
+  }
 
   protected def base16EncodeImpl(input: Array[Byte]): Either[String, String]
 
@@ -269,7 +269,7 @@ trait BaseGlobal {
     }
 
   def dAppFuncTypes(dApp: DApp): Either[ScriptParseError, FunctionSignatures] =
-    MetaMapper.dicFromProto(dApp).bimap(ScriptParseError, combineMetaWithDApp(_, dApp))
+    MetaMapper.dicFromProto(dApp).bimap(ScriptParseError.apply, combineMetaWithDApp(_, dApp))
 
   private def combineMetaWithDApp(meta: ParsedMeta, dApp: DApp): FunctionSignatures = {
     val argTypesWithFuncName =
@@ -332,8 +332,6 @@ trait BaseGlobal {
                } else {
                  division
                }) * sign)
-      case _ =>
-        Left(s"unsupported rounding $rounding")
     }
   }
 
@@ -341,18 +339,18 @@ trait BaseGlobal {
 
   def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
 
-  def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
+  def ecrecover(messageHash: Array[Byte], signature: Array[Byte], handleLeadingZerosInPublicKey: Boolean): Array[Byte]
 
   def median[@specialized T](seq: Array[T])(implicit num: Integral[T]): T = {
     import num.*
     @tailrec
     def findKMedianInPlace(arr: ArrayView[T], k: Int)(implicit choosePivot: ArrayView[T] => T): T = {
       val a      = choosePivot(arr)
-      val (s, b) = arr partitionInPlace (a > _)
+      val (s, b) = arr `partitionInPlace` (a > _)
       if (s.size == k) a
       // The following test is used to avoid infinite repetition
       else if (s.isEmpty) {
-        val (s, b) = arr partitionInPlace (a == _)
+        val (s, b) = arr `partitionInPlace` (a == _)
         if (s.size > k) a
         else findKMedianInPlace(b, k - s.size)
       } else if (s.size < k) findKMedianInPlace(b, k - s.size)
@@ -363,10 +361,10 @@ trait BaseGlobal {
       (arr: ArrayView[T]) => arr(Random.nextInt(arr.size))
 
     if (seq.length % 2 == 1)
-      findKMedianInPlace(ArrayView[T](seq), (seq.size - 1) / 2)(pivot)
+      findKMedianInPlace(ArrayView[T](seq), (seq.size - 1) / 2)(using pivot)
     else {
-      val r1 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2 - 1)(pivot)
-      val r2 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2)(pivot)
+      val r1 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2 - 1)(using pivot)
+      val r2 = findKMedianInPlace(ArrayView[T](seq), seq.size / 2)(using pivot)
       // save Math.floorDiv(r1 + r2, 2) semantic and avoid overflow
       if (num.sign(r1) == num.sign(r2)) {
         if (r1 < r2) {

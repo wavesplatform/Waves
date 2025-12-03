@@ -31,7 +31,7 @@ package object grpc {
   }
 
   protected lazy val logger: Logger =
-    Logger(LoggerFactory.getLogger(getClass.getName))
+    Logger(LoggerFactory.getLogger(this.getClass.getName))
 
   implicit class StreamObserverMonixOps[T](val streamObserver: StreamObserver[T]) extends AnyVal {
     def id: String =
@@ -68,12 +68,12 @@ package object grpc {
   }
 
   implicit class FutureExt[T](val f: Future[T]) extends AnyVal {
-    def wrapErrors(implicit ec: ExecutionContext): Future[T] = f.recoverWith {
-      case err => Future.failed(GRPCErrors.toStatusException(err))
+    def wrapErrors(implicit ec: ExecutionContext): Future[T] = f.recoverWith { case err =>
+      Future.failed(GRPCErrors.toStatusException(err))
     }
   }
 
-  private[this] def wrapObservable[A](source: Observable[A], dest: StreamObserver[A])(implicit s: Scheduler): Unit = dest match {
+  private def wrapObservable[A](source: Observable[A], dest: StreamObserver[A])(implicit s: Scheduler): Unit = dest match {
     case cso: ServerCallStreamObserver[A] @unchecked =>
       val nextItem = AtomicAny(Option.empty[(Promise[Ack], A)])
 
@@ -102,7 +102,8 @@ package object grpc {
               p.future
             } else Future.failed(new IllegalStateException(s"An element ${nextItem()} is pending"))
           },
-        err => cso.onError(err), { () =>
+        err => cso.onError(err),
+        { () =>
           logger.debug("Source observer completed")
           cso.onCompleted()
         }

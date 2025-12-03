@@ -4,15 +4,16 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.google.common.primitives.Ints
 import com.typesafe.config.Config
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.api.http.requests.TransferRequest
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.TransferSending.Req
-import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.Suite
 import play.api.libs.json.Json.toJson
@@ -26,7 +27,7 @@ object TransferSending {
 }
 
 trait TransferSending extends ScorexLogging {
-  this: Suite with Nodes =>
+  this: Suite & Nodes =>
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -140,7 +141,7 @@ trait TransferSending extends ScorexLogging {
   }
 
   protected def createSignedTransferRequest(tx: TransferTransaction): TransferRequest = {
-    import tx._
+    import tx.*
     TransferRequest(
       Some(2.toByte),
       None,

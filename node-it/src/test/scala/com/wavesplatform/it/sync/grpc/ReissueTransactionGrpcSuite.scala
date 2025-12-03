@@ -1,11 +1,11 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
-import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncGrpcApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import io.grpc.Status.Code
 
 class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime {

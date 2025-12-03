@@ -7,7 +7,7 @@ import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.EvaluatorFixProvider.*
 import com.wavesplatform.lang.contract.DApp
@@ -20,7 +20,6 @@ import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCo
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, Log, ScriptResult}
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
-import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.serialization.ScriptValuesJson
@@ -37,7 +36,6 @@ import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.*
-import shapeless.*
 
 object UtilsEvaluator {
   object ConflictingRequestStructure        extends ValidationError
@@ -118,7 +116,7 @@ object UtilsEvaluator {
           Coeval.raiseError(new IllegalStateException("No input entity available")),
           Coeval.evalOnce(blockchain.height),
           blockchain,
-          Coproduct[Tthis](Recipient.Address(ByteStr(dAppAddress.bytes))),
+          Recipient.Address(ByteStr(dAppAddress.bytes)),
           ds,
           script.stdLibVersion,
           invoke,
@@ -142,8 +140,15 @@ object UtilsEvaluator {
           wrapDAppEnv = wrapDAppEnv
         )
       environment = wrapDAppEnv(underlyingEnvironment)
-      ctx         = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true)
-      dApp        = ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp])
+      ctx = BlockchainContext.build(
+        ds,
+        environment,
+        fixUnicodeFunctions = true,
+        useNewPowPrecision = true,
+        fixBigScriptField = true,
+        fixEcrecover = true
+      )
+      dApp = ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp])
       expr <- dAppToExpr(dApp)
       limitedResult <- EvaluatorV2
         .applyLimitedCoeval(

@@ -2,8 +2,8 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{minFee, setScriptFee, smartFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -32,7 +32,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
         |}
       """.stripMargin
 
-    val compiled = ScriptCompiler(scriptSrc, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+    val compiled = ScriptCompiler.compile(scriptSrc, ScriptEstimatorV2).explicitGet()._1
 
     val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(1.toByte, thirdKeyPair, Some(compiled), setScriptFee, ts).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)

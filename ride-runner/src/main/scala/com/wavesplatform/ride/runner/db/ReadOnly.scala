@@ -1,12 +1,11 @@
 package com.wavesplatform.ride.runner.db
 
 import com.wavesplatform.database.DBEntry
-import com.wavesplatform.database.rocksdb.Key
+import com.wavesplatform.database.Key
 import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.caches.disk.{KvHistoryPair, KvPair}
 import com.wavesplatform.state.Height
 import org.rocksdb.ColumnFamilyHandle
-import shapeless.=:!=
 
 import scala.annotation.unused
 
@@ -41,7 +40,9 @@ trait ReadOnly {
   def iterateOverPrefix[KeyT, ValueT](
       kvPair: KvPair[KeyT, ValueT],
       seekKey: KeyT
-  )(f: DbPair[KeyT, ValueT] => Unit): Unit = iterateOverPrefixContinue(kvPair, seekKey) { p => f(p); true }
+  )(f: DbPair[KeyT, ValueT] => Unit): Unit = iterateOverPrefixContinue(kvPair, seekKey) { p =>
+    f(p); true
+  }
 
   def iterateOverPrefix[ValueT](seekKey: Key[ValueT])(f: DBEntry => Unit): Unit =
     iterateOverPrefixContinue(seekKey.keyBytes, seekKey.columnFamilyHandle) { p =>

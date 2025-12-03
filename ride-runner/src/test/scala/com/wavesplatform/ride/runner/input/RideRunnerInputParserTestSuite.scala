@@ -1,24 +1,25 @@
 package com.wavesplatform.ride.runner.input
 
 import cats.syntax.option.*
-import com.softwaremill.diffx.generic.auto.*
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher.*
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.ride.runner.input.PureconfigImplicits.*
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser.*
 import com.wavesplatform.ride.{DiffXInstances, ScriptUtil}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxNonNegativeAmount
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
-import net.ceedubs.ficus.Ficus.toFicusConfig
-import net.ceedubs.ficus.readers.ValueReader
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.*
+import pureconfig.*
 
 import java.nio.charset.StandardCharsets
+import scala.reflect.ClassTag
 import scala.util.{Success, Try}
 
 class RideRunnerInputParserTestSuite extends BaseTestSuite with TableDrivenPropertyChecks with HasTestAccounts with DiffXInstances {
@@ -145,12 +146,12 @@ let x = getIntegerValue(alice, "x")
 
       "Integer" in {
         List(
-          Byte.MinValue,
-          Byte.MaxValue,
-          Short.MinValue,
-          Short.MaxValue,
-          Int.MinValue,
-          Int.MaxValue,
+          Byte.MinValue.toLong,
+          Byte.MaxValue.toLong,
+          Short.MinValue.toLong,
+          Short.MaxValue.toLong,
+          Int.MinValue.toLong,
+          Int.MaxValue.toLong,
           Long.MinValue,
           Long.MaxValue
         ).foreach { x => parse("integer", x.toString) shouldBe IntegerRideRunnerDataEntry(x) }
@@ -268,9 +269,9 @@ let x = getIntegerValue(alice, "x")
               regularBalance = TxNonNegativeAmount.unsafeFrom(500001).some
             ),
             aliceAddr -> RideRunnerAccount(
-              assetBalances = Map(btc -> TxNonNegativeAmount(1)),
+              assetBalances = Map(btc -> TxNonNegativeAmount.unsafeFrom(1)),
               regularBalance = TxNonNegativeAmount.unsafeFrom(500100).some,
-              leasing = RideRunnerLeaseBalance(in = TxNonNegativeAmount(10), out = TxNonNegativeAmount(100)).some,
+              leasing = RideRunnerLeaseBalance(in = TxNonNegativeAmount.unsafeFrom(10), out = TxNonNegativeAmount.unsafeFrom(100)).some,
               generatingBalance = TxNonNegativeAmount.unsafeFrom(100_000_000_000L).some,
               data = Map(
                 "a" -> IntegerRideRunnerDataEntry(11),
@@ -372,6 +373,8 @@ func bar () = {
     }
   }
 
-  private def parseQuotedStringAs[T: ValueReader](s: String): T = ConfigFactory.parseString(s"""x = \"\"\"$s\"\"\"""").as[T]("x")
-  private def parseAs[T: ValueReader](rawContent: String): T    = ConfigFactory.parseString(s"""x = $rawContent""").as[T]("x")
+  private def parseQuotedStringAs[T: {ConfigReader, ClassTag}](s: String): T =
+    ConfigSource.fromConfig(ConfigFactory.parseString(s"""x = \"\"\"$s\"\"\"""")).at("x").loadOrThrow[T]
+  private def parseAs[T: {ConfigReader, ClassTag}](rawContent: String): T =
+    ConfigSource.fromConfig(ConfigFactory.parseString(s"""x = $rawContent""")).at("x").loadOrThrow[T]
 }

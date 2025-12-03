@@ -6,12 +6,12 @@ import com.wavesplatform.api.grpc.BlockRangeRequest
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.it.api.SyncGrpcApi._
+import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.{GrpcIntegrationSuiteWithThreeAddress, NodeConfigs}
-import org.scalatest._
+import org.scalatest.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class BlockV5GrpcSuite extends freespec.AnyFreeSpec with ActivationStatusRequest with OptionValues with GrpcIntegrationSuiteWithThreeAddress {
 

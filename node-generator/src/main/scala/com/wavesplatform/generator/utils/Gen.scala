@@ -1,21 +1,22 @@
 package com.wavesplatform.generator.utils
 
-import java.util.concurrent.ThreadLocalRandom
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.Curve25519.KeyLength
 import com.wavesplatform.generator.utils.Implicits.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Transaction, TxNonNegativeAmount}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.{Transaction, TxNonNegativeAmount}
 import com.wavesplatform.utils.LoggerFacade
 import org.slf4j.LoggerFactory
+
+import java.util.concurrent.ThreadLocalRandom
 
 object Gen {
   private def random = ThreadLocalRandom.current
@@ -25,8 +26,8 @@ object Gen {
   def script(complexity: Boolean = true, estimator: ScriptEstimator): Script = {
     val s = if (complexity) s"""
                                |${(for (b <- 1 to 10) yield {
-      s"let a$b = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58'' && sigVerify(base58'333', base58'123', base58'567')"
-    }).mkString("\n")}
+                                s"let a$b = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58'' && sigVerify(base58'333', base58'123', base58'567')"
+                              }).mkString("\n")}
                                |
                                |${(for (b <- 1 to 10) yield { s"a$b" }).mkString("&&")} || true
        """.stripMargin
@@ -35,7 +36,7 @@ object Gen {
          |${recString(10)} || true
       """.stripMargin
 
-    val script = ScriptCompiler(s, isAssetScript = false, estimator).explicitGet()
+    val script = ScriptCompiler.compile(s, estimator).explicitGet()
 
     script._1
   }
@@ -47,13 +48,15 @@ object Gen {
 
   def oracleScript(oracle: KeyPair, data: Set[DataEntry[?]], estimator: ScriptEstimator): Script = {
     val conditions =
-      data.map {
-        case IntegerDataEntry(key, value) => s"""(extract(getInteger(oracle, "$key")) == $value)"""
-        case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
-        case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
-        case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
-        case EmptyDataEntry(_)            => ???
-      }.reduce[String] { case (l, r) => s"$l && $r " }
+      data
+        .map {
+          case IntegerDataEntry(key, value) => s"""(extract(getInteger(oracle, "$key")) == $value)"""
+          case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
+          case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
+          case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
+          case EmptyDataEntry(_)            => ???
+        }
+        .reduce[String] { case (l, r) => s"$l && $r " }
 
     val src =
       s"""
@@ -65,7 +68,7 @@ object Gen {
          |}
        """.stripMargin
 
-    val script = ScriptCompiler(src, isAssetScript = false, estimator).explicitGet()
+    val script = ScriptCompiler.compile(src, estimator).explicitGet()
 
     script._1
   }
@@ -101,7 +104,8 @@ object Gen {
          |$finalStatement
       """.stripMargin
 
-    val (script, _) = ScriptCompiler(src, isAssetScript = false, estimator)
+    val (script, _) = ScriptCompiler
+      .compile(src, estimator)
       .explicitGet()
 
     script

@@ -4,7 +4,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.settings.FeaturesSettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import monix.execution.Scheduler
 
 import scala.concurrent.Future
@@ -20,7 +20,7 @@ class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSe
       functionalitySettings.activationWindowSize(request.height),
       functionalitySettings.blocksForFeatureActivation(request.height),
       functionalitySettings.activationWindow(request.height).last,
-      (blockchain.featureVotes(request.height).keySet ++
+      (blockchain.featureVotes(Height(request.height)).keySet ++
         blockchain.approvedFeatures.keySet ++
         BlockchainFeatures.implemented).toSeq.sorted.map(id => {
         val status = blockchain.featureStatus(id, request.height) match {
@@ -38,8 +38,8 @@ class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSe
             case (_, true)  => FeatureActivationStatus.NodeFeatureStatus.VOTED
             case _          => FeatureActivationStatus.NodeFeatureStatus.IMPLEMENTED
           },
-          blockchain.featureActivationHeight(id).getOrElse(0),
-          if (status.isUndefined) blockchain.featureVotes(request.height).getOrElse(id, 0) else 0
+          blockchain.featureActivationHeight(id).getOrElse(Height(0)).toInt,
+          if (status.isUndefined) blockchain.featureVotes(Height(request.height)).getOrElse(id, 0) else 0
         )
       })
     )

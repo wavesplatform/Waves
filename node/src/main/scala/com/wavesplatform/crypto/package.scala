@@ -53,7 +53,7 @@ package object crypto {
   // see
   // https://github.com/jedisct1/libsodium/blob/ab4ab23d5744a8e060864a7cec1a7f9b059f9ddd/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c#L17
   // https://boringssl.googlesource.com/boringssl/+/master/third_party/wycheproof_testvectors/x25519_test.json
-  private[this] val BlacklistedKeys: Array[Array[Byte]] = Array(
+  private val BlacklistedKeys: Array[Array[Byte]] = Array(
     // 0 (order 4)
     Array(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00),

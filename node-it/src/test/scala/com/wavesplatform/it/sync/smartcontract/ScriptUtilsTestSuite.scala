@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import org.scalatest.CancelAfterFailure
 

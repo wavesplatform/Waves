@@ -1,13 +1,14 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.account.{KeyPair, SeedKeyPair}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.*
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -37,7 +38,7 @@ trait IntegrationSuiteWithThreeAddresses extends BaseSuite with ScalaFutures wit
       val accounts = Seq(firstKeyPair, secondKeyPair, thirdKeyPair)
 
       withClue("waitForTxsToReachAllNodes") {
-        nodes.waitForHeight(makeTransfers(accounts).map(ts => nodes.waitForTransaction(ts).height).max + 1)
+        nodes.waitForHeight(Height(makeTransfers(accounts).map(ts => nodes.waitForTransaction(ts).height).max + 1))
       }
     }
 
@@ -49,7 +50,7 @@ trait IntegrationSuiteWithThreeAddresses extends BaseSuite with ScalaFutures wit
   def setContract(contractText: Option[String], acc: KeyPair): String = {
     val script = contractText.map { x =>
       val scriptText = x.stripMargin
-      ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+      ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
     }
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(1.toByte, acc, script, 0.014.waves, System.currentTimeMillis())

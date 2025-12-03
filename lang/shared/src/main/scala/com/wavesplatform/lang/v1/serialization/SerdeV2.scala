@@ -6,7 +6,7 @@ import cats.syntax.apply.*
 import cats.syntax.traverse.*
 import com.google.protobuf.{CodedInputStream, CodedOutputStream}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.serialization.Serde.*
@@ -69,7 +69,7 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
       case E_LONG   => Coeval.now(CONST_LONG(in.readInt64()))
       case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(in.readByteArray())).explicitGet())
       case E_STRING => Coeval.now(CONST_STRING(in.readString()).explicitGet())
-      case E_IF     => (desAuxR(in, allowObjects, acc), desAuxR(in, allowObjects, acc), desAuxR(in, allowObjects, acc)).mapN(IF)
+      case E_IF     => (desAuxR(in, allowObjects, acc), desAuxR(in, allowObjects, acc), desAuxR(in, allowObjects, acc)).mapN(IF.apply)
       case E_BLOCK =>
         for {
           name     <- Coeval.now(in.readString())
@@ -92,13 +92,12 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
       case E_FUNCALL =>
         Coeval
           .now((in.getFunctionHeader, in.readRawByte()))
-          .flatMap {
-            case (header, argc) =>
-              (1 to argc)
-                .map(_ => desAuxR(in, allowObjects, acc))
-                .toList
-                .sequence
-                .map(FUNCTION_CALL(header, _))
+          .flatMap { case (header, argc) =>
+            (1 to argc)
+              .map(_ => desAuxR(in, allowObjects, acc))
+              .toList
+              .sequence[Coeval, EXPR]
+              .map(FUNCTION_CALL(header, _))
           }
       case E_ARR =>
         Coeval
@@ -116,7 +115,7 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
             .to(LazyList)
             .traverse { _ =>
               for {
-                fieldName <- Coeval.now(in.readString())
+                fieldName  <- Coeval.now(in.readString())
                 fieldValue <- evaluatedOnly(desAuxR(in, allowObjects, acc))
               } yield (fieldName, fieldValue)
             }
@@ -129,10 +128,11 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
     val res = Try(desAux(in, allowObjects).value()).toEither.left
       .map(_.getMessage)
     (if (all)
-      res.flatMap { r =>
-        if (!in.isAtEnd) Left(s"${in.getBytesUntilLimit} bytes left")
-        else Right(r)
-      } else res)
+       res.flatMap { r =>
+         if (!in.isAtEnd) Left(s"${in.getBytesUntilLimit} bytes left")
+         else Right(r)
+       }
+     else res)
       .map((_, in.getBytesUntilLimit))
   }
 
@@ -142,7 +142,7 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
   def deserializeFunctionCall(in: CodedInputStream): Either[Throwable, FUNCTION_CALL] =
     Try(desAux(in).value()).toEither.flatMap {
       case fc: FUNCTION_CALL => Right(fc)
-      case other => Left(new RuntimeException(s"Not a function call: $other"))
+      case other             => Left(new RuntimeException(s"Not a function call: $other"))
     }
 
   def deserializeFunctionCall(array: Array[Byte]): Either[Throwable, FUNCTION_CALL] =
@@ -217,12 +217,11 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
           out.writeStringNoTag(caseType.name)
           out.writeRawByte(fields.size.toByte)
         }
-        fields.foldLeft(dataInfo) {
-          case (acc, (fieldName, fieldValue)) =>
-            for {
-              _ <- Coeval.now(out.writeStringNoTag(fieldName))
-              r <- serAux(out, acc, fieldValue, allowObjects)
-            } yield r
+        fields.foldLeft(dataInfo) { case (acc, (fieldName, fieldValue)) =>
+          for {
+            _ <- Coeval.now(out.writeStringNoTag(fieldName))
+            r <- serAux(out, acc, fieldValue, allowObjects)
+          } yield r
         }
 
       case x =>
@@ -232,7 +231,7 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
 
   def serialize(expr: EXPR, allowObjects: Boolean = false): Array[Byte] = {
     val internalOut = new ByteArrayOutputStream()
-    val out = CodedOutputStream.newInstance(internalOut)
+    val out         = CodedOutputStream.newInstance(internalOut)
     serAux(out, acc = Coeval.now(()), expr, allowObjects).value()
     out.flush()
     internalOut.toByteArray

@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync.transactions
 
-import cats.syntax.option._
+import cats.syntax.option.*
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.BurnTransactionInfo
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{issueAmount, issueFee, _}
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.{issueAmount, issueFee, *}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion

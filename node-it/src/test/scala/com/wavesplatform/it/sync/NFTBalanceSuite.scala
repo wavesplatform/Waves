@@ -3,10 +3,11 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.*
-import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.api.*
+import com.wavesplatform.it.api.AsyncHttpApi.*
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
@@ -42,7 +43,7 @@ class NFTBalanceSuite extends BaseFreeSpec {
 
     val fundAndIssue =
       for {
-        _      <- traverse(nodes)(_.waitForHeight(2))
+        _      <- traverse(nodes)(_.waitForHeight(Height(2)))
         fundTx <- node.transfer(node.keyPair, issuer.toAddress.toString, 1000.waves, 0.001.waves)
         _      <- node.waitForTransaction(fundTx.id)
         _ <- Future.sequence((simple ++ nft) map { tx =>
@@ -127,7 +128,7 @@ class NFTBalanceSuite extends BaseFreeSpec {
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
         .recoverWith { case ex: Throwable =>
           Future.successful {
-            assert(ex.getMessage contains "Too big sequence requested")
+            assert(ex.getMessage `contains` "Too big sequence requested")
           }
         }
 
@@ -139,7 +140,7 @@ class NFTBalanceSuite extends BaseFreeSpec {
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
         .recoverWith { case ex: Throwable =>
           Future.successful {
-            assert(ex.getMessage contains "Invalid asset id")
+            assert(ex.getMessage `contains` "Invalid asset id")
           }
         }
 
@@ -241,7 +242,7 @@ object NFTBalanceSuite {
       .get(s"/assets/balance/$address")
       .as[JsObject]
       .map { json =>
-        (json \ "balances").as[List[String]](Reads.list(Reads { details =>
+        (json \ "balances").as[List[String]](using Reads.list(using Reads { details =>
           (details \ "issueTransaction" \ "assetId").validate[String]
         }))
       }

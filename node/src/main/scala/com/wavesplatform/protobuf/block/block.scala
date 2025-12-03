@@ -21,4 +21,13 @@ package object block {
 
   type VanillaMicroBlock = com.wavesplatform.block.MicroBlock
   val VanillaMicroBlock = com.wavesplatform.block.MicroBlock
+
+  type PBEndorseBlock = com.wavesplatform.protobuf.block.EndorseBlock
+  val PBEndorseBlock = com.wavesplatform.protobuf.block.EndorseBlock
+
+  type VanillaFinalizationVoting = com.wavesplatform.block.FinalizationVoting
+  val VanillaFinalizationVoting = com.wavesplatform.block.FinalizationVoting
+
+  type PBFinalizationVoting = com.wavesplatform.protobuf.block.FinalizationVoting
+  val PBFinalizationVoting = com.wavesplatform.protobuf.block.FinalizationVoting
 }

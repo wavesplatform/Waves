@@ -12,7 +12,7 @@ import scala.util.Try
 
 object LeaseTxSerializer {
   def toJson(tx: LeaseTransaction): JsObject = {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++ Json.obj(
       "amount"    -> amount.value,
       "recipient" -> recipient.toString
@@ -20,7 +20,7 @@ object LeaseTxSerializer {
   }
 
   def bodyBytes(tx: LeaseTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
     val baseBytes =
       Bytes.concat(sender.arr, recipient.bytes, Longs.toByteArray(amount.value), Longs.toByteArray(fee.value), Longs.toByteArray(timestamp))
 

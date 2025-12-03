@@ -5,8 +5,8 @@ import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuite
 import io.grpc.{CallOptions, ManagedChannelBuilder}
-import io.grpc.reflection.v1alpha.ServerReflectionGrpc.getServerReflectionInfoMethod
-import io.grpc.reflection.v1alpha.ServerReflectionRequest
+import io.grpc.reflection.v1.ServerReflectionGrpc.getServerReflectionInfoMethod
+import io.grpc.reflection.v1.ServerReflectionRequest
 import io.grpc.stub.ClientCalls
 
 import scala.util.Try

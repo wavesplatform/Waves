@@ -81,11 +81,7 @@ object RxScoreObserver extends ScorexLogging {
       remoteScores
         .observeOn(scheduler)
         .groupBy(_._1)
-        .map(
-          _.distinctUntilChanged
-            .debounce(remoteScoreDebounce)
-        )
-        .merge
+        .mergeMap(_.distinctUntilChanged.debounce(remoteScoreDebounce))
         .collect {
           case (ch, score) if ch.isOpen =>
             scores.put(ch, score)
@@ -94,7 +90,8 @@ object RxScoreObserver extends ScorexLogging {
         }
 
     def cc: Observable[Option[Channel]] =
-      Observable(channelClosed, channelTimeout).merge
+      Observable(channelClosed, channelTimeout)
+        .mergeMap(identity)
         .observeOn(scheduler)
         .map { ch =>
           scores.invalidate(ch)
@@ -105,7 +102,8 @@ object RxScoreObserver extends ScorexLogging {
           Option(ch)
         }
 
-    val observable = Observable(ls, rs, cc).merge
+    val observable = Observable(ls, rs, cc)
+      .mergeMap(identity)
       .map { maybeClosedChannel =>
         val sw: SyncWith = calcSyncWith(currentBestChannel.filterNot(maybeClosedChannel.contains), localScore, scores.asMap().asScala)
         currentBestChannel = sw.map(_.channel)
@@ -113,7 +111,7 @@ object RxScoreObserver extends ScorexLogging {
       }
       .logErr
       .distinctUntilChanged
-      .share(scheduler)
+      .share(using scheduler)
 
     (observable, statsReporter)
   }

@@ -5,7 +5,7 @@ import cats.kernel.Monoid
 import cats.syntax.either.*
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.Keccak256
 import com.wavesplatform.lang.Common.*
 import com.wavesplatform.lang.Testing.*
@@ -39,9 +39,10 @@ class IntegrationTest extends PropSpec with Inside {
       pointInstance: Option[CaseObj] = None,
       pointType: FINAL = AorBorC,
       ctxt: CTX[NoContext] = CTX.empty,
-      version: StdLibVersion = V3
+      version: StdLibVersion = V3,
+      fixEcrecover: Boolean = false
   ): Either[String, T] =
-    genericEval[NoContext, T](code, pointInstance, pointType, ctxt, version, Contextful.empty[Id])
+    genericEval[NoContext, T](code, pointInstance, pointType, ctxt, version, Contextful.empty[Id], fixEcrecover)
 
   private def genericEval[C[_[_]], T <: EVALUATED](
       code: String,
@@ -49,7 +50,8 @@ class IntegrationTest extends PropSpec with Inside {
       pointType: FINAL = AorBorC,
       ctxt: CTX[C],
       version: StdLibVersion,
-      env: C[Id]
+      env: C[Id],
+      fixEcrecover: Boolean = false
   ): Either[String, T] = {
     val f: BaseFunction[C] =
       NativeFunction(
@@ -82,7 +84,7 @@ class IntegrationTest extends PropSpec with Inside {
       Monoid.combineAll(
         Seq(
           PureContext.build(version, useNewPowPrecision = true).withEnvironment[C],
-          CryptoContext.build(Global, version).withEnvironment[C],
+          CryptoContext.build(Global, version, fixEcrecover).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
           ctxt
@@ -243,10 +245,10 @@ class IntegrationTest extends PropSpec with Inside {
     val longMin = Long.MinValue
     eval(s"$longMax + 1 - 1") shouldBe Left("long overflow")
     eval(s"$longMin - 1 + 1") shouldBe Left("long overflow")
-    eval(s"$longMax - 1 + 1") shouldBe evaluated(longMax)
-    eval(s"$longMin + 1 - 1") shouldBe evaluated(longMin)
-    eval(s"$longMax / $longMin + 1") shouldBe evaluated(0)
-    eval(s"($longMax / 2) * 2") shouldBe evaluated(longMax - 1)
+    eval[EVALUATED](s"$longMax - 1 + 1") shouldBe evaluated(longMax)
+    eval[EVALUATED](s"$longMin + 1 - 1") shouldBe evaluated(longMin)
+    eval[EVALUATED](s"$longMax / $longMin + 1") shouldBe evaluated(0)
+    eval[EVALUATED](s"($longMax / 2) * 2") shouldBe evaluated(longMax - 1)
     eval[EVALUATED]("fraction(9223372036854775807, 3, 0)") shouldBe Left(
       s"Fraction: division by zero"
     )
@@ -260,7 +262,7 @@ class IntegrationTest extends PropSpec with Inside {
       s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1"
     )
     eval[EVALUATED](s"2 + 2 * 2") shouldBe evaluated(6)
-    eval("2 * 3 == 2 + 4") shouldBe evaluated(true)
+    eval[EVALUATED]("2 * 3 == 2 + 4") shouldBe evaluated(true)
   }
 
   property("equals works on primitive types") {
@@ -1419,10 +1421,10 @@ class IntegrationTest extends PropSpec with Inside {
     val base16String8Kb              = "fedcba9876543210" * 1024
     def script(base16String: String) = s"toBase16String(base16'$base16String')"
 
-    eval(script(base16String8Kb), version = V3) shouldBe CONST_STRING(base16String8Kb)
-    eval(script(base16String8Kb), version = V4) shouldBe CONST_STRING(base16String8Kb)
+    eval[EVALUATED](script(base16String8Kb), version = V3) shouldBe CONST_STRING(base16String8Kb)
+    eval[EVALUATED](script(base16String8Kb), version = V4) shouldBe CONST_STRING(base16String8Kb)
 
-    eval(script(base16String8Kb + "aa"), version = V3) shouldBe CONST_STRING(base16String8Kb + "aa")
+    eval[EVALUATED](script(base16String8Kb + "aa"), version = V3) shouldBe CONST_STRING(base16String8Kb + "aa")
     eval(script(base16String8Kb + "aa"), version = V4) shouldBe Left("Base16 encode input length=8193 should not exceed 8192")
   }
 
@@ -1432,7 +1434,7 @@ class IntegrationTest extends PropSpec with Inside {
     val value  = "fedcba9876543210FEDCBA9876543210"
     val script = s"""fromBase16String("$value")"""
 
-    eval(script) shouldBe CONST_BYTESTR(bytes(value.toUpperCase))
+    eval[EVALUATED](script) shouldBe CONST_BYTESTR(bytes(value.toUpperCase))
   }
 
   property("string limit") {
@@ -1441,8 +1443,8 @@ class IntegrationTest extends PropSpec with Inside {
     val constructingTooBigString      = s""" "$almostMaxString" + "aa" """
     val constructingMaxStringAndBytes = s""" ("$almostMaxString" + "a").toBytes() """
 
-    eval(constructingMaxStringAndBytes, version = V3) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
-    eval(constructingMaxStringAndBytes, version = V4) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
+    eval[EVALUATED](constructingMaxStringAndBytes, version = V3) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
+    eval[EVALUATED](constructingMaxStringAndBytes, version = V4) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
 
     eval(constructingTooBigString, version = V3) should produce("String size = 32768 exceeds 32767 bytes")
     eval(constructingTooBigString, version = V4) should produce("String size = 32768 exceeds 32767 bytes")
@@ -1459,12 +1461,12 @@ class IntegrationTest extends PropSpec with Inside {
        """.stripMargin
     val constructingTooBigBytes = constructingMaxBytes + "+ base58'a'"
 
-    inside(eval[EVALUATED](constructingMaxBytes, version = V3)) { case Right(CONST_BYTESTR(bytes)) =>
-      bytes.size shouldBe Terms.DataEntryValueMax
+    inside(eval[EVALUATED](constructingMaxBytes, version = V3)) { case Right(CONST_BYTESTR(bs)) =>
+      bs.size shouldBe Terms.DataEntryValueMax
     }
 
-    inside(eval[EVALUATED](constructingMaxBytes, version = V4)) { case Right(CONST_BYTESTR(bytes)) =>
-      bytes.size shouldBe Terms.DataEntryValueMax
+    inside(eval[EVALUATED](constructingMaxBytes, version = V4)) { case Right(CONST_BYTESTR(bs)) =>
+      bs.size shouldBe Terms.DataEntryValueMax
     }
 
     eval(constructingTooBigBytes, version = V3) should produce("ByteVector size = 32768 bytes exceeds 32767")
@@ -1604,6 +1606,23 @@ class IntegrationTest extends PropSpec with Inside {
 
     eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'${"a" * 130}')", version = V4) should
       produce("Header byte out of range: 197")
+  }
+
+  property("ecrecover fails for short public keys before fix") {
+    eval[CONST_BYTESTR](
+      "ecrecover(base16'da74793f1299abeb213430596f281261355e29af0fdf5d359fe23cd9aca824c8'," +
+        "base16'a57deea68952929239bd764d1f6966ea982af65fa6305f3bb71819a0376bd0ff42887b4496780434bd954af05f2b24ab54f10d63ba11e3ce0a2c73c6e25a77cd1c')",
+      version = V4
+    ) should produce("Invalid input length 127")
+  }
+
+  property("ecrecover succeeds for short public keys after fix") {
+    eval[CONST_BYTESTR](
+      "ecrecover(base16'da74793f1299abeb213430596f281261355e29af0fdf5d359fe23cd9aca824c8'," +
+        "base16'a57deea68952929239bd764d1f6966ea982af65fa6305f3bb71819a0376bd0ff42887b4496780434bd954af05f2b24ab54f10d63ba11e3ce0a2c73c6e25a77cd1c')",
+      version = V4,
+      fixEcrecover = true
+    ).shouldBe(Right(CONST_BYTESTR(ByteStr.decodeBase58("Fco3a9D9kvzVR5gbnTciJX46f3jLLDEqSmGcah7dNB6Py3NPqcv1iiNgCnAwvnaf4RJyD1mJjLtrgihwyCEV2AJ").get).explicitGet()))
   }
 
   property("n-size generic tuple") {

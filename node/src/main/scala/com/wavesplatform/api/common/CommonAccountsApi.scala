@@ -1,21 +1,20 @@
 package com.wavesplatform.api.common
 
-import com.google.common.base.Charsets
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.api.common.lease.AddressLeaseInfo
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{DBExt, DBResource, KeyTags, Keys, RDB}
+import com.wavesplatform.database.{AddressId, DBExt, DBResource, KeyTag, Keys, RDB}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.RocksIterator
 
+import java.nio.charset.StandardCharsets
 import java.util.regex.Pattern
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
@@ -58,7 +57,7 @@ object CommonAccountsApi {
   ): CommonAccountsApi = new CommonAccountsApi {
 
     override def balance(address: Address, confirmations: Int = 0): Long =
-      blockchain.balance(address, blockchain.height, confirmations)
+      blockchain.regularBalance(address, blockchain.height, confirmations)
 
     override def effectiveBalance(address: Address, confirmations: Int = 0): Long = {
       blockchain.effectiveBalance(address, confirmations)
@@ -73,7 +72,7 @@ object CommonAccountsApi {
           BalanceDetails(
             portfolio.balance,
             blockchain.generatingBalance(address),
-            portfolio.balance - portfolio.lease.out,
+            portfolio.balance - portfolio.generationDeposit - portfolio.lease.out,
             effectiveBalance,
             portfolio.lease.in,
             portfolio.lease.out
@@ -95,7 +94,7 @@ object CommonAccountsApi {
     }
 
     override def nftList(address: Address, after: Option[IssuedAsset]): Observable[Seq[(IssuedAsset, AssetDescription)]] = {
-      rdb.db.resourceObservable.flatMap { resource =>
+      rdb.db.resourceObservable(rdb.apiHandle.handle).flatMap { resource =>
         Observable
           .fromIterator(Task(nftIterator(resource, address, compositeBlockchain().snapshot, after, blockchain.assetDescription)))
       }
@@ -113,11 +112,13 @@ object CommonAccountsApi {
         .fold(Array.empty[DataEntry[?]])(_.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 
       rdb.db.resourceObservable.flatMap { dbResource =>
-        Observable
-          .fromIterator(
-            Task(new AddressDataIterator(dbResource, address, entriesFromDiff, pattern).asScala)
-          )
-          .filterNot(_.isEmpty)
+        dbResource.get(Keys.addressId(address)).fold(Observable.fromIterable(entriesFromDiff)) { addressId =>
+          Observable
+            .fromIterator(
+              Task(new AddressDataIterator(dbResource, addressId, entriesFromDiff, pattern).asScala)
+            )
+            .filterNot(_.isEmpty)
+        }
       }
     }
 
@@ -132,20 +133,20 @@ object CommonAccountsApi {
 
   private class AddressDataIterator(
       db: DBResource,
-      address: Address,
+      addressId: AddressId,
       entriesFromDiff: Array[DataEntry[?]],
       pattern: Option[Pattern]
   ) extends AbstractIterator[DataEntry[?]] {
-    private val prefix: Array[Byte] = KeyTags.Data.prefixBytes ++ PBRecipients.publicKeyHash(address)
+    private val prefix: Array[Byte] = KeyTag.Data.prefixBytes ++ addressId.toByteArray
 
     private val length: Int = entriesFromDiff.length
 
-    db.withSafePrefixIterator(_.seek(prefix))()
+    db.withSafePrefixIterator(_.seek(prefix))(())
 
     private var nextIndex                         = 0
     private var nextDbEntry: Option[DataEntry[?]] = None
 
-    private def matches(key: String): Boolean = pattern.forall(_.matcher(key).matches())
+    private def matches(dataKey: String): Boolean = pattern.forall(_.matcher(dataKey).matches())
 
     @tailrec
     private def doComputeNext(iter: RocksIterator): DataEntry[?] =
@@ -177,10 +178,10 @@ object CommonAccountsApi {
               endOfData()
             }
           } else {
-            val key = new String(iter.key().drop(2 + Address.HashLength), Charsets.UTF_8)
-            if (matches(key)) {
+            val dataKey = new String(iter.key().drop(prefix.length), StandardCharsets.UTF_8)
+            if (matches(dataKey)) {
               nextDbEntry = Option(iter.value()).map { arr =>
-                Keys.data(address, key).parse(arr).entry
+                Keys.data(addressId, dataKey).parse(arr).entry
               }
             }
             iter.next()

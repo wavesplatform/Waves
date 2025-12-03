@@ -1,20 +1,28 @@
 package com.wavesplatform.protobuf.block
 
-import scala.util.Try
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.network.MicroBlockResponse
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.PBTransactions
 
-object PBMicroBlocks {
+import scala.util.{Failure, Success, Try}
 
+object PBMicroBlocks {
   def vanilla(signedMicro: PBSignedMicroBlock, unsafe: Boolean = false): Try[MicroBlockResponse] = Try {
     require(signedMicro.microBlock.isDefined, "microblock is missing")
     val microBlock   = signedMicro.getMicroBlock
     val transactions = microBlock.transactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
+
+    val finalizationVoting = microBlock.finalizationVoting.map { x =>
+      PBFinalizationVotings.vanilla(x) match {
+        case Failure(e) => throw new RuntimeException(s"Can't decode $x as a vanilla finalization voting: ${e.getMessage}", e)
+        case Success(x) => x
+      }
+    }
+
     MicroBlockResponse(
       VanillaMicroBlock(
         microBlock.version.toByte,
@@ -23,7 +31,8 @@ object PBMicroBlocks {
         microBlock.reference.toByteStr,
         microBlock.updatedBlockSignature.toByteStr,
         signedMicro.signature.toByteStr,
-        Option.unless(microBlock.stateHash.isEmpty)(microBlock.stateHash.toByteStr)
+        Option.unless(microBlock.stateHash.isEmpty)(microBlock.stateHash.toByteStr),
+        finalizationVoting
       ),
       signedMicro.totalBlockId.toByteStr
     )
@@ -38,7 +47,8 @@ object PBMicroBlocks {
           updatedBlockSignature = microBlock.totalResBlockSig.toByteString,
           senderPublicKey = microBlock.sender.toByteString,
           transactions = microBlock.transactionData.map(PBTransactions.protobuf),
-          stateHash = microBlock.stateHash.getOrElse(ByteStr.empty).toByteString
+          stateHash = microBlock.stateHash.getOrElse(ByteStr.empty).toByteString,
+          finalizationVoting = microBlock.finalizationVoting.map(PBFinalizationVotings.protobuf)
         )
       ),
       signature = microBlock.signature.toByteString,

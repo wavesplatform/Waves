@@ -1,3 +1,5 @@
 package com.wavesplatform.settings
 
-case class RewardsVotingSettings(desired: Option[Long])
+import pureconfig.*
+
+case class RewardsVotingSettings(desired: Option[Long]) derives ConfigReader

@@ -5,6 +5,7 @@ import cats.implicits.{catsSyntaxEitherId, catsSyntaxSemigroup, toBifunctorOps, 
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -23,7 +24,7 @@ case class StateSnapshot(
     assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
     sponsorships: Map[IssuedAsset, SponsorshipValue] = Map(),
     newLeases: Map[ByteStr, LeaseStaticInfo] = Map(),
-    cancelledLeases: Map[ByteStr, LeaseDetails.Status.Inactive] = Map.empty,
+    cancelledLeases: Map[ByteStr, LeaseDetails.Status & LeaseDetails.Status.Inactive] = Map.empty,
     aliases: Map[Alias, Address] = Map(),
     orderFills: Map[ByteStr, VolumeAndFee] = Map(),
     accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
@@ -31,7 +32,8 @@ case class StateSnapshot(
     scriptResults: Map[ByteStr, InvokeScriptResult] = Map(),
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
     scriptsComplexity: Long = 0,
-    erc20Addresses: Map[ERC20Address, IssuedAsset] = Map()
+    erc20Addresses: Map[ERC20Address, IssuedAsset] = Map(),
+    nextCommittedGenerators: Seq[(PublicKey, BlsPublicKey)] = Seq.empty
 ) {
 
   // ignores lease balances from portfolios
@@ -78,14 +80,15 @@ object StateSnapshot {
       assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
       sponsorships: Map[IssuedAsset, Sponsorship] = Map(),
       newLeases: Map[ByteStr, LeaseStaticInfo] = Map(),
-      cancelledLeases: Map[ByteStr, LeaseDetails.Status.Inactive] = Map.empty,
+      cancelledLeases: Map[ByteStr, LeaseDetails.Status & LeaseDetails.Status.Inactive] = Map.empty,
       aliases: Map[Alias, Address] = Map(),
       accountData: Map[Address, Map[String, DataEntry[?]]] = Map(),
       accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map(),
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
       scriptsComplexity: Long = 0,
-      transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap()
+      transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap(),
+      nextCommittedGenerators: Seq[(PublicKey, BlsPublicKey)] = Seq.empty
   ): Either[ValidationError, StateSnapshot] = {
     val r =
       for {
@@ -110,14 +113,15 @@ object StateSnapshot {
         scriptResults,
         ethereumTransactionMeta,
         scriptsComplexity,
-        issuedAssets.view.map { case (id, _) => ERC20Address(id) -> id }.toMap
+        issuedAssets.view.map { case (id, _) => ERC20Address(id) -> id }.toMap,
+        nextCommittedGenerators
       )
     r.leftMap(GenericError(_))
   }
 
   // ignores lease balances from portfolios
   private def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, VectorMap[(Address, Asset), Long]] =
-    flatTraverse(portfolios) { case (address, Portfolio(wavesAmount, _, assets)) =>
+    flatTraverse(portfolios) { case (address, Portfolio(wavesAmount, _, assets, _)) =>
       val assetBalancesE = flatTraverse(assets) {
         case (_, 0) =>
           Right(VectorMap[(Address, Asset), Long]())
@@ -145,14 +149,14 @@ object StateSnapshot {
   def ofLeaseBalances(balances: Map[Address, LeaseBalance], blockchain: Blockchain): Either[String, StateSnapshot] =
     balances.toSeq
       .traverse { case (address, leaseBalance) =>
-        leaseBalance.combineF[Either[String, *]](blockchain.leaseBalance(address)).map(address -> _)
+        leaseBalance.combineF[[X] =>> Either[String, X]](blockchain.leaseBalance(address)).map(address -> _)
       }
       .map(newBalances => StateSnapshot(leaseBalances = newBalances.toMap))
 
   private def leaseBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, Map[Address, LeaseBalance]] =
     portfolios.toSeq
       .flatTraverse {
-        case (address, Portfolio(_, lease, _)) if lease.out != 0 || lease.in != 0 =>
+        case (address, Portfolio(_, lease, _, _)) if lease.out != 0 || lease.in != 0 =>
           val bLease = blockchain.leaseBalance(address)
           for {
             newIn  <- safeSum(bLease.in, lease.in, s"$address -> Lease")
@@ -228,7 +232,8 @@ object StateSnapshot {
         s1.scriptResults |+| s2.scriptResults,
         s1.ethereumTransactionMeta ++ s2.ethereumTransactionMeta,
         s1.scriptsComplexity + s2.scriptsComplexity,
-        s1.erc20Addresses ++ s2.erc20Addresses
+        s1.erc20Addresses ++ s2.erc20Addresses,
+        s1.nextCommittedGenerators ++ s2.nextCommittedGenerators
       )
 
     private def combineDataEntries(

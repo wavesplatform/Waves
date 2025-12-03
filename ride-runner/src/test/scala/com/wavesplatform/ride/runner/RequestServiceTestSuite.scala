@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner
 
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import cats.syntax.option.*
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.BaseTestSuite
@@ -154,7 +154,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
     }
   }
 
-  private case class TestDependencies(
+  case class TestDependencies(
       requestServiceSettings: DefaultRequestService.Settings,
       requests: RequestService,
       processor: Processor,
@@ -178,13 +178,13 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
     }
 
     def trackAndRun(request: RideScriptRunRequest): RideScriptRunResult = {
-      val task = requests.trackAndRun(request).runToFuture(scheduler)
+      val task = requests.trackAndRun(request).runToFuture(using scheduler)
       scheduler.tick()
       Await.result(task, 5.seconds)
     }
 
     def trackAndRunLastResult(request: RideScriptRunRequest): JsValue = {
-      val task = requests.trackAndRun(request).runToFuture(scheduler)
+      val task = requests.trackAndRun(request).runToFuture(using scheduler)
       scheduler.tick()
       Json.parse(Await.result(task, 5.seconds).lastResult)
     }
@@ -202,7 +202,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       val blockchainApi = new TestBlockchainApi() {
         override def getCurrentBlockchainHeight(): Height = Height(2)
         override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] =
-          toVanilla(BlockWithHeight(mkPbBlock(height).some, height))
+          toVanilla(BlockWithHeight(mkPbBlock(height).some, height.toInt))
         override def getActivatedFeatures(height: Height): Map[Short, Height] =
           blockchainSettings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_)).toMap
         override def getAccountScript(address: Address): Option[(PublicKey, Script)] = accountScripts.get(address)
@@ -228,7 +228,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
         )
       }
 
-      val requestsService = use(new DefaultRequestService(requestServiceSettings, blockchain, allTags, use(new TestJobScheduler()), testScheduler))
+      val requestsService = use(new DefaultRequestService(requestServiceSettings, blockchain, allTags, use(new TestJobScheduler[RideScriptRunRequest]()), testScheduler))
       val processor       = new BlockchainProcessor(blockchain, requestsService)
       val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
 

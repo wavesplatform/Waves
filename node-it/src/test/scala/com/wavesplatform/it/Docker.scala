@@ -10,25 +10,24 @@ import com.typesafe.config.ConfigFactory.*
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.util.GlobalTimer.instance as timer
 import com.wavesplatform.settings.*
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl.*
+import pureconfig.ConfigSource
 
 import java.io.{FileOutputStream, IOException}
-import java.net.{InetAddress, InetSocketAddress, URL}
+import java.net.{InetAddress, InetSocketAddress, URI, URL}
 import java.nio.file.{Files, Path, Paths}
-import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.time.{LocalDateTime, Duration as JDuration}
 import java.util.Collections.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
@@ -58,9 +57,9 @@ class Docker(
       .setMaxConnections(18)
       .setMaxConnectionsPerHost(3)
       .setMaxRequestRetry(1)
-      .setReadTimeout(10000)
+      .setReadTimeout(JDuration.ofSeconds(10))
       .setKeepAlive(false)
-      .setRequestTimeout(10000)
+      .setRequestTimeout(JDuration.ofSeconds(10))
   )
 
   private val client = DefaultDockerClient.fromEnv().build()
@@ -305,7 +304,8 @@ class Docker(
 
   private def getNodeInfo(containerId: String, settings: WavesSettings): NodeInfo = {
     val restApiPort = settings.restAPISettings.port
-    val networkPort = settings.networkSettings.bindAddress.getPort
+    // assume test nodes always have an open port
+    val networkPort = settings.networkSettings.derivedBindAddress.get.getPort
 
     val containerInfo  = inspectContainer(containerId)
     val wavesIpAddress = containerInfo.networkSettings().networks().get(wavesNetwork.name()).ipAddress()
@@ -349,6 +349,7 @@ class Docker(
     client.startContainer(id)
     nodes.asScala.find(_.containerId == id).foreach { node =>
       node.nodeInfo = getNodeInfo(node.containerId, node.settings)
+      Await.result(node.waitForStartup(), 3.minutes)
     }
   }
 
@@ -579,14 +580,19 @@ object Docker {
                                             |}""".stripMargin)
 
     val genesisConfig = timestampOverrides.withFallback(configTemplate)
-    val gs            = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
-    val features = featuresConfig
+    val gs            = ConfigSource.fromConfig(genesisConfig).at("waves.blockchain.custom.genesis").loadOrThrow[GenesisSettings]
+    val featuresConfigAdjusted = featuresConfig
       .map(_.withFallback(configTemplate))
       .getOrElse(configTemplate)
       .resolve()
-      .getAs[Map[Short, Int]]("waves.blockchain.custom.functionality.pre-activated-features")
-    val isRideV6Activated          = features.exists(_.get(BlockchainFeatures.RideV6.id).contains(0))
-    val isTxStateSnapshotActivated = features.exists(_.get(BlockchainFeatures.LightNode.id).contains(0))
+    val features =
+      ConfigSource
+        .fromConfig(featuresConfigAdjusted)
+        .at("waves.blockchain.custom.functionality.pre-activated-features")
+        .loadOrThrow[Map[Short, Int]]
+
+    val isRideV6Activated          = features.get(BlockchainFeatures.RideV6.id).contains(0)
+    val isTxStateSnapshotActivated = features.get(BlockchainFeatures.LightNode.id).contains(0)
 
     val genesisSignature = Block.genesis(gs, isRideV6Activated, isTxStateSnapshotActivated).explicitGet().id()
 
@@ -594,7 +600,8 @@ object Docker {
   }
 
   AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
+    override val chainId: Byte =
+      ConfigSource.fromConfig(configTemplate).at("waves.blockchain.custom.address-scheme-character").loadOrThrow[String].charAt(0).toByte
   }
 
   def apply(owner: Class[?]): Docker = new Docker(tag = owner.getSimpleName)
@@ -614,7 +621,7 @@ object Docker {
       .mkString(" ")
 
   case class NodeInfo(restApiPort: Int, networkPort: Int, wavesIpAddress: String, ports: JMap[String, JList[PortBinding]]) {
-    val nodeApiEndpoint: URL                       = new URL(s"http://localhost:${externalPort(restApiPort)}")
+    val nodeApiEndpoint: URL                       = URI.create(s"http://localhost:${externalPort(restApiPort)}").toURL
     val hostNetworkAddress: InetSocketAddress      = new InetSocketAddress("localhost", externalPort(networkPort))
     val containerNetworkAddress: InetSocketAddress = new InetSocketAddress(wavesIpAddress, networkPort)
 
@@ -631,8 +638,10 @@ object Docker {
     override def networkAddress: InetSocketAddress = nodeInfo.containerNetworkAddress
 
     def getConfig: Config = config
+
+    override def networkAddressAccessibleFromHost: InetSocketAddress = nodeInfo.hostNetworkAddress
   }
 
-  private[this] val debuggerPort      = new AtomicInteger(11000)
+  private val debuggerPort            = new AtomicInteger(11000)
   private def freeDebuggerPort(): Int = debuggerPort.getAndIncrement()
 }

@@ -1,15 +1,15 @@
 package com.wavesplatform.lang
 
-import com.google.common.base.Charsets
 import com.google.common.io
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 
 import java.io.File
+import java.nio.charset.StandardCharsets
 
-object FileCompiler extends App {
+object FileCompiler {
   private val estimator = ScriptEstimatorV3.latest
 
-  args
+  def main(args: Array[String]): Unit = args
     .foreach { path =>
       val scriptFile = new File(path).getAbsoluteFile
       require(scriptFile.isFile, s"$path is not a file")
@@ -19,12 +19,12 @@ object FileCompiler extends App {
           pathname.isFile && pathname.getAbsoluteFile != scriptFile
         })
         .map { f =>
-          f.getName -> io.Files.asCharSource(f, Charsets.UTF_8).read()
+          f.getName -> io.Files.asCharSource(f, StandardCharsets.UTF_8).read()
         }
         .toMap
 
       API
-        .compile(io.Files.asCharSource(scriptFile, Charsets.UTF_8).read(), estimator, libraries = imports)
+        .compile(io.Files.asCharSource(scriptFile, StandardCharsets.UTF_8).read(), estimator, libraries = imports)
         .fold(
           error => throw new RuntimeException(s"$error while compiling $path"),
           _ => println(s"successfully compiled $path")

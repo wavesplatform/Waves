@@ -3,7 +3,7 @@ package com.wavesplatform.events.protobuf
 import cats.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.events.StateUpdate.AssetInfo
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append, Rollback, Update}

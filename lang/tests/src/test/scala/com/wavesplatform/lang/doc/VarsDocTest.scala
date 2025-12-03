@@ -2,7 +2,7 @@ package com.wavesplatform.lang.doc
 
 import cats.syntax.semigroup.*
 import com.wavesplatform.DocSource
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
@@ -15,7 +15,7 @@ import com.wavesplatform.test.*
 class VarsDocTest extends PropSpec {
   def buildFullContext(ds: DirectiveSet): CTX[Environment] = {
     val wavesCtx  = WavesContext.build(Global, ds, fixBigScriptField = true)
-    val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
+    val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion, fixEcrecover = true).withEnvironment[Environment]
     val pureCtx   = PureContext.build(ds.stdLibVersion, useNewPowPrecision = true).withEnvironment[Environment]
     pureCtx |+| cryptoCtx |+| wavesCtx
   }

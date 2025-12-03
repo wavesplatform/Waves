@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import com.typesafe.config.Config
-import net.ceedubs.ficus.Ficus._
+import pureconfig.*
 
 case class Settings(
     networkConfigFile: String,
@@ -11,11 +11,10 @@ case class Settings(
     accountsFile: String,
     assetsFile: String,
     dataFile: String
-)
+) derives ConfigReader
 
 object Settings {
   def fromConfig(config: Config): Settings = {
-    import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-    config.as[Settings]("waves.benchmark.state")
+    ConfigSource.fromConfig(config).at("waves.benchmark.state").loadOrThrow[Settings]
   }
 }

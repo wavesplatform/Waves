@@ -1,30 +1,30 @@
 package com.wavesplatform.utils
 
-import java.security.{KeyPair, KeyPairGenerator, SecureRandom, Signature}
-
 import cats.Id
-import cats.implicits._
+import cats.implicits.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.BaseFunction
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV1}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest._
+import org.scalatest.*
 
+import java.security.{KeyPair, KeyPairGenerator, SecureRandom, Signature}
 import scala.util.Random
 
 class RSATest extends PropSpec with BeforeAndAfterAll {
@@ -86,7 +86,6 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
     case SHA3512 => "SHA3512"
   }
 
-
   def scriptSrc(alg: DigestAlgorithm, msg: Array[Byte], sig: Array[Byte], pub: Array[Byte]): String = {
     s"""
        |let msg = base64'${Base64.encode(msg)}'
@@ -138,7 +137,10 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
 
         val signature = privateSignature.sign
 
-        eval(scriptSrc(alg, message, signature, xpub.getEncoded), PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3)) shouldBe Right(CONST_BOOLEAN(true))
+        eval(
+          scriptSrc(alg, message, signature, xpub.getEncoded),
+          PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3, true)
+        ) shouldBe Right(CONST_BOOLEAN(true))
       }
     }
   }
@@ -157,14 +159,17 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
 
         val signature = privateSignature.sign
 
-        eval(scriptSrc(alg, message, signature, xpub.getEncoded), PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4)) should produce(s"Can't find a function '${algToType(alg)}'()")
+        eval(
+          scriptSrc(alg, message, signature, xpub.getEncoded),
+          PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4, true)
+        ) should produce(s"Can't find a function '${algToType(alg)}'()")
       }
     }
   }
 
   property("rsaVerify_*Kb work with max size") {
-    for(lim <- Seq(16, 32, 64, 128)) {
-      forAll(keyPairGenerator, sizedMessageGenerator(lim*1024)) { (keyPair, message) =>
+    for (lim <- Seq(16, 32, 64, 128)) {
+      forAll(keyPairGenerator, sizedMessageGenerator(lim * 1024)) { (keyPair, message) =>
         val xpub = keyPair.getPublic
         val xprv = keyPair.getPrivate
 
@@ -178,9 +183,13 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
           val signature = privateSignature.sign
 
           val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-             ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
-           )
-          val ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+            ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet())))
+          )
+          val ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4, true) |+| CTX[NoContext](
+            Seq(),
+            vars,
+            Array.empty[BaseFunction[NoContext]]
+          )
 
           eval(limScriptSrc(lim, alg, signature, xpub.getEncoded), ctx) shouldBe Right(CONST_BOOLEAN(true))
         }
@@ -189,8 +198,8 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
   }
 
   property("rsaVerify_*Kb fail with max+1 size") {
-    for(lim <- Seq(16, 32, 64, 128)) {
-      forAll(keyPairGenerator, sizedMessageGenerator(lim*1024 + 1)) { (keyPair, message) =>
+    for (lim <- Seq(16, 32, 64, 128)) {
+      forAll(keyPairGenerator, sizedMessageGenerator(lim * 1024 + 1)) { (keyPair, message) =>
         val xpub = keyPair.getPublic
         val xprv = keyPair.getPrivate
 
@@ -204,11 +213,17 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
           val signature = privateSignature.sign
 
           val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-             ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
-           )
-          val ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+            ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet())))
+          )
+          val ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4, true) |+| CTX[NoContext](
+            Seq(),
+            vars,
+            Array.empty[BaseFunction[NoContext]]
+          )
 
-          eval(limScriptSrc(lim, alg, signature, xpub.getEncoded), ctx) shouldBe Left(s"Invalid message size = ${lim * 1024 + 1} bytes, must be not greater than ${lim} KB")
+          eval(limScriptSrc(lim, alg, signature, xpub.getEncoded), ctx) shouldBe Left(
+            s"Invalid message size = ${lim * 1024 + 1} bytes, must be not greater than ${lim} KB"
+          )
         }
       }
     }
@@ -229,9 +244,13 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
         val signature = privateSignature.sign
 
         val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
-         )
-        val ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+          ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet())))
+        )
+        val ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4, true) |+| CTX[NoContext](
+          Seq(),
+          vars,
+          Array.empty[BaseFunction[NoContext]]
+        )
 
         eval(maxScriptSrcV4(alg, signature, xpub.getEncoded), ctx) shouldBe Right(CONST_BOOLEAN(true))
       }
@@ -239,7 +258,7 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
   }
 
   property("rsaVerify works with max size V3") {
-    forAll(keyPairGenerator, sizedMessageGenerator(32*1024)) { (keyPair, message) =>
+    forAll(keyPairGenerator, sizedMessageGenerator(32 * 1024)) { (keyPair, message) =>
       val xpub = keyPair.getPublic
       val xprv = keyPair.getPrivate
 
@@ -253,9 +272,13 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
         val signature = privateSignature.sign
 
         val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
-         )
-        val ctx: CTX[NoContext] = PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+          ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet())))
+        )
+        val ctx: CTX[NoContext] = PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3, true) |+| CTX[NoContext](
+          Seq(),
+          vars,
+          Array.empty[BaseFunction[NoContext]]
+        )
 
         eval(maxScriptSrc(alg, signature, xpub.getEncoded), ctx) shouldBe Right(CONST_BOOLEAN(true))
       }
@@ -263,7 +286,7 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
   }
 
   property("rsaVerify fails with max+1 size V3") {
-    forAll(keyPairGenerator, sizedMessageGenerator(32*1024 + 1)) { (keyPair, message) =>
+    forAll(keyPairGenerator, sizedMessageGenerator(32 * 1024 + 1)) { (keyPair, message) =>
       val xpub = keyPair.getPublic
       val xprv = keyPair.getPrivate
 
@@ -277,15 +300,67 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
         val signature = privateSignature.sign
 
         val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
-         )
-        val ctx: CTX[NoContext] = PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+          ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet())))
+        )
+        val ctx: CTX[NoContext] = PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3, true) |+| CTX[NoContext](
+          Seq(),
+          vars,
+          Array.empty[BaseFunction[NoContext]]
+        )
 
-        eval(maxScriptSrc(alg, signature, xpub.getEncoded), ctx) shouldBe Left(s"Invalid message size = ${32 * 1024 + 1} bytes, must be not greater than 32 KB")
+        eval(maxScriptSrc(alg, signature, xpub.getEncoded), ctx) shouldBe Left(
+          s"Invalid message size = ${32 * 1024 + 1} bytes, must be not greater than 32 KB"
+        )
       }
     }
   }
 
+  property("test from ride-js") {
+    val message = "hello world".getBytes()
+    val signature = Base64.decode("Gnco0w3Kd19R6GiWU+ANsJoleurQ8sYQZWUfY+pst9u9m22FHmqnUgo7A22yyQHLBdeLAyPCqbMvFFMKlebnAiZWjbQsOClo8Ddv4avVJJdetSzjJO0QpoG/34/N+1Zmm0TKxDZG8+++hwR1JGsIRI5msT5/ZxW01Dzqaz+ErfNOt6NMAU37bCgdZoF6QxXg2SCLCfOwK31jMcFdBpMOFiKZDogBYl5GX2y2uf1jzUHSwzTr3GZAtMNMXDjZNOQOZ6SRo0SKuZ5nBS9jndAXliT0AMtg838YjCh8I+yNCT+4vnPMPMnot3ikMFORcKdHBhOpApV6K2FqydA7/NItQA==")
+    val pub = Base64.decode("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsoF++eHcQwJ6gtPcxHEMAmVTVmpyRrUrxsCQV3oeNu+EiMC45WTDHs5iTEaVgneDOhJ71CmgzJ1HvxRjSmuRtP29M/9HDQOtZjLDKGY+UvroJxjXQcJ/z/PDgTZv1pV6eX754vb+h1z600Vy8MNCoY1P2D36i9v4oN5vnVnHhdrT7h6zU7IyW4UW9arRBZe3K0JXzTLOx+nSxnoFuOb6e5Ruv7sRMZPIirLHM6hUx3eOJP3AWo/B6vRvqMNqXqpSiqDQazJqp8PVljOHsQUpHpx52+/+lzRGREERNirQF7Q+C8gUnFo9B2mRg02j0g8o2TFDBVn+HLQ0NFPQlrc2gQIDAQAB")
+    eval(
+      scriptSrc(SHA3256, message, signature, pub),
+      PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3, true)
+    ) shouldBe Right(CONST_BOOLEAN(true))
+  }
+  
+  ignore("test all hashes") {
+    val message = "hello world".getBytes()
+    val keyPair = keyPairGenerator.sample.get
+    val xpub = keyPair.getPublic
+    val xprv = keyPair.getPrivate
+    println(s"PUB=${Base64.encode(xpub.getEncoded)}")
+    println(s"MSG=${Base64.encode(message)}")
+    algs.foreach { alg =>
+      val prefix = RSA.digestAlgorithmPrefix(alg)
+
+      val privateSignature = Signature.getInstance(s"${prefix}withRSA", provider)
+      privateSignature.initSign(xprv)
+      privateSignature.update(message)
+
+      val signature = privateSignature.sign
+      println(s"$alg=${Base64.encode(signature)}")
+    }
+  }
+
+  property("sign from scala") {
+    val message = "hello world".getBytes()
+    val kp = keyPairGenerator.sample.get
+
+    val prefix = RSA.digestAlgorithmPrefix(SHA3256)
+
+    val privateSignature = Signature.getInstance(s"${prefix}withRSA", provider)
+    privateSignature.initSign(kp.getPrivate)
+    privateSignature.update(message)
+
+    val signature = privateSignature.sign
+
+    eval(
+      scriptSrc(SHA3256, message, signature, kp.getPublic.getEncoded),
+      PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3, true)
+    ) shouldBe Right(CONST_BOOLEAN(true))
+  }
 
   property("false on incorrect signature") {
     forAll(keyPairGenerator, messageGenerator) { (keyPair, message) =>
@@ -295,21 +370,22 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
       Random.nextBytes(signature)
 
       algs foreach { alg =>
-        eval(scriptSrc(alg, message, signature, xpub.getEncoded), PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3)) shouldBe Right(CONST_BOOLEAN(false))
+        eval(
+          scriptSrc(alg, message, signature, xpub.getEncoded),
+          PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3, true)
+        ) shouldBe Right(CONST_BOOLEAN(false))
       }
     }
   }
 
   property("can't compile instantiating from const") {
-    forAll(keyPairGenerator, messageGenerator) { (keyPair, message) =>
-      def wrongScriptSrc(algConst: String): String = {
-        s"rsaVerify($algConst(), base64'', base64'', base64'')".stripMargin
-      }
+    def wrongScriptSrc(algConst: String): String = {
+      s"rsaVerify($algConst(), base64'', base64'', base64'')".stripMargin
+    }
 
-      algs foreach { alg =>
-        val const = algToType(alg).toUpperCase
-        eval(wrongScriptSrc(const)) should produce(s"Can't find a function '$const'() or it is @Callable")
-      }
+    algs foreach { alg =>
+      val const = algToType(alg).toUpperCase
+      eval(wrongScriptSrc(const)) should produce(s"Can't find a function '$const'() or it is @Callable")
     }
   }
 
@@ -325,7 +401,7 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
         privateSignature.update(message)
 
         val signature = privateSignature.sign
-        val ctx = PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3)
+        val ctx       = PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3, true)
 
         val invalidKey = Array[Byte](1, 2, 3)
         eval(scriptSrc(alg, message, signature, invalidKey), ctx) should produce(s"Invalid key base58'${ByteStr(invalidKey)}'")
@@ -335,9 +411,12 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
 
   private val evaluator = new EvaluatorV1[Id, NoContext]()
 
-  private def eval[T <: EVALUATED](code: String, ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4)): Either[String, T] = {
-    val untyped  = Parser.parseExpr(code).get.value
-    val typed    = ExpressionCompiler(ctx.compilerContext, V4, untyped)
+  private def eval[T <: EVALUATED](
+      code: String,
+      ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4, true)
+  ): Either[String, T] = {
+    val untyped = Parser.parseExpr(code).get.value
+    val typed   = ExpressionCompiler(ctx.compilerContext, V4, untyped)
     typed.flatMap(v => evaluator[T](ctx.evaluationContext, v._1).leftMap(_.message))
   }
 

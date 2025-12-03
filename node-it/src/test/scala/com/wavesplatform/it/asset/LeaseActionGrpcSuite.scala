@@ -4,12 +4,12 @@ import com.google.protobuf.ByteString
 import com.typesafe.config.Config
 import com.wavesplatform.api.grpc.LeaseResponse
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncGrpcApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuite
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.Lease
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.protobuf.transaction.Recipient
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
@@ -25,7 +26,7 @@ class LeaseActionGrpcSuite extends GrpcBaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(Default, 2, Seq.empty)
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, 1)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, Height(1))))
       .buildNonConflicting()
 
   private def compile(script: String): Script =

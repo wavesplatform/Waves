@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
 
 object Testing {

@@ -4,7 +4,7 @@ import com.wavesplatform.it.{Docker, DockerBased, Node, Nodes}
 import monix.eval.Coeval
 import org.scalatest.Suite
 
-trait NodesFromDocker extends Nodes with DockerBased { _: Suite =>
+trait NodesFromDocker extends Nodes with DockerBased { suite: Suite =>
   protected val dockerNodes: Coeval[Seq[Docker.DockerNode]] = dockerSingleton
     .map(_.startNodes(nodeConfigs))
     .memoize

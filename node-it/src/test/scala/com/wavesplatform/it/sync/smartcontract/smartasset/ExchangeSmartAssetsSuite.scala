@@ -2,17 +2,17 @@ package com.wavesplatform.it.sync.smartcontract.smartasset
 
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
-import com.wavesplatform.it.sync.smartcontract.{cryptoContextScript, pureContextScript, wavesContextScript, _}
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
+import com.wavesplatform.it.sync.smartcontract.{cryptoContextScript, pureContextScript, wavesContextScript, *}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.DataTransaction
-import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
@@ -23,7 +23,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
   private def acc1 = secondKeyPair
   private def acc2 = thirdKeyPair
 
-  private var dtx: DataTransaction = _
+  private var dtx: DataTransaction = scala.compiletime.uninitialized
 
   private val sc1 = Some("true")
 
@@ -43,13 +43,12 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     combination of smart accounts and smart assets
      */
     val s = Some(
-      ScriptCompiler(
-        s"""
+      ScriptCompiler.compile(
+        s"""{-# SCRIPT_TYPE ASSET #-}
            |match tx {
            |case _: SetAssetScriptTransaction => true
            |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc2.publicKey}')
            |case _ => false}""".stripMargin,
-        isAssetScript = true,
         estimator
       ).explicitGet()._1.bytes().base64
     )
@@ -74,13 +73,12 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     }
 
     val sUpdated = Some(
-      ScriptCompiler(
-        s"""
+      ScriptCompiler.compile(
+        s"""{-# SCRIPT_TYPE ASSET #-}
            |match tx {
            |case _: SetAssetScriptTransaction => true
            |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc1.publicKey}')
            |case _ => false}""".stripMargin,
-        isAssetScript = true,
         estimator
       ).explicitGet()._1.bytes().base64
     )
@@ -108,15 +106,14 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     sender.transfer(firstKeyPair, secondAddress, 1000, minFee + smartFee, Some(assetA), waitForTx = true)
 
     val script = Some(
-      ScriptCompiler(
-        s"""
+      ScriptCompiler.compile(
+        s"""{-# SCRIPT_TYPE ASSET #-}
                                         |let assetA = base58'$assetA'
                                         |let assetB = base58'$assetB'
                                         |match tx {
                                         |case _: SetAssetScriptTransaction => true
                                         |case e: ExchangeTransaction => (e.sellOrder.assetPair.priceAsset == assetA || e.sellOrder.assetPair.amountAsset == assetA) && (e.sellOrder.assetPair.priceAsset == assetB || e.sellOrder.assetPair.amountAsset == assetB)
                                         |case _ => false}""".stripMargin,
-        isAssetScript = true,
         estimator
       ).explicitGet()._1.bytes().base64
     )
@@ -164,9 +161,9 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("use all functions from RIDE for asset script") {
-    val script1 = Some(ScriptCompiler(cryptoContextScript(false), isAssetScript = true, estimator).explicitGet()._1.bytes().base64)
-    val script2 = Some(ScriptCompiler(pureContextScript(dtx, false), isAssetScript = true, estimator).explicitGet()._1.bytes().base64)
-    val script3 = Some(ScriptCompiler(wavesContextScript(dtx, false), isAssetScript = true, estimator).explicitGet()._1.bytes().base64)
+    val script1 = Some(ScriptCompiler.compile("{-# SCRIPT_TYPE ASSET #-}" + cryptoContextScript(false), estimator).explicitGet()._1.bytes().base64)
+    val script2 = Some(ScriptCompiler.compile("{-# SCRIPT_TYPE ASSET #-}" + pureContextScript(dtx, false), estimator).explicitGet()._1.bytes().base64)
+    val script3 = Some(ScriptCompiler.compile("{-# SCRIPT_TYPE ASSET #-}" + wavesContextScript(dtx, false), estimator).explicitGet()._1.bytes().base64)
 
     List(script1, script2, script3)
       .map { i =>

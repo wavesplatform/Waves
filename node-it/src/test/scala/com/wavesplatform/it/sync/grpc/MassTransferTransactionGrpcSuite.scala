@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.protobuf.transaction.MassTransferTransactionData.Transfer
@@ -30,7 +30,7 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       sender.waitForTransaction(assetId)
 
       val massTransferTransactionFee = calcMassTransferFee(transfers.size)
-      sender.broadcastMassTransfer(firstAcc, Some(assetId), transfers, attachment, massTransferTransactionFee, waitForTx = true)
+      sender.broadcastMassTransfer(firstAcc, Some(assetId), transfers, attachment, massTransferTransactionFee, waitForTx = true, version = v)
 
       val firstBalanceAfter  = sender.wavesBalance(firstAddress)
       val secondBalanceAfter = sender.wavesBalance(secondAddress)

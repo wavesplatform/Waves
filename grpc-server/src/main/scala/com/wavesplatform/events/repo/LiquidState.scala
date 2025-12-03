@@ -1,6 +1,6 @@
 package com.wavesplatform.events.repo
 
-import cats.syntax.monoid._
+import cats.syntax.monoid.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.{BlockAppended, BlockchainUpdated, MicroBlockAppended}
 

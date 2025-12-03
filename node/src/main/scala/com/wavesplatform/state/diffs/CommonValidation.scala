@@ -116,8 +116,8 @@ object CommonValidation {
     } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = tx match {
-    case _: PaymentTransaction                                                          => Right(tx)
-    case _: CreateAliasTransaction if blockchain.height < DisableHijackedAliases.height => Right(tx)
+    case _: PaymentTransaction                                                                  => Right(tx)
+    case _: CreateAliasTransaction if Height(blockchain.height) < DisableHijackedAliases.height => Right(tx)
     case _ =>
       val id = tx.id()
       Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionMeta(id).get.height))
@@ -145,10 +145,10 @@ object CommonValidation {
         RideVersionProvider.actualVersionByFeature.map { case (feature, version) => (version, activationBarrier(feature)) }.toMap
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
-        case V1 | V2 | V3 if sc.containsArray => barrierByVersion(V4)
-        case V1 | V2 if sc.containsBlockV2()  => barrierByVersion(V3)
-        case V1 | V2                          => Right(tx)
-        case v                                => barrierByVersion(v)
+        case V1 | V2 | V3 if sc.containsArray       => barrierByVersion(V4)
+        case V1 | V2 if sc.containsBlockV2()        => barrierByVersion(V3)
+        case V1 | V2                                => Right(tx)
+        case v @ (V3 | V4 | V5 | V6 | V7 | V8 | V9) => barrierByVersion(v)
       }
 
       def oldScriptVersionDeactivation(sc: Script): Either[ActivationError, Unit] = sc.stdLibVersion match {
@@ -184,7 +184,7 @@ object CommonValidation {
       case v: Versioned if !versionIsCorrect(v) && blockchain.isFeatureActivated(LightNode) =>
         Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
-      case p: PBSince with Versioned if PBSince.affects(p) =>
+      case p: (PBSince & Versioned) if PBSince.affects(p) =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
       case v: Versioned if !versionIsCorrect(v) =>
@@ -244,6 +244,8 @@ object CommonValidation {
       case iet: InvokeExpressionTransaction =>
         if (iet.version == 1) activationBarrier(BlockchainFeatures.ContinuationTransaction)
         else Left(TxValidationError.ActivationError(s"Transaction version ${iet.version} has not been activated yet"))
+
+      case _: CommitToGenerationTransaction => activationBarrier(BlockchainFeatures.DeterministicFinality)
 
       case _: EthereumTransaction => activationBarrier(BlockchainFeatures.RideV6)
 

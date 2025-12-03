@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.contract.serialization
 
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.option._
-import cats.syntax.traverse._
+import cats.instances.list.*
+import cats.syntax.either.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC}
-import com.wavesplatform.lang.utils.Serialize._
+import com.wavesplatform.lang.utils.Serialize.*
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.dapp.DAppMeta
@@ -117,7 +117,7 @@ object ContractSerDeV1 extends ContractSerDe {
     val len = bb.getInt
     if (len <= (bb.limit() - bb.position()) && len >= 0) {
       (1 to len).toList
-        .traverse[Either[String, *], A](_ => df(bb))
+        .traverse(_ => df(bb))
     } else {
       Left(s"At position ${bb.position()} array of arguments too big.")
     }

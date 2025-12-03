@@ -1,0 +1,40 @@
+name: Prepare release draft
+run-name: Prepare release draft for ${{ inputs.version }} from ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      networks:
+        description: 'Networks'
+        required: true
+        default: 'mainnet testnet stagenet'
+      version:
+        description: 'Version'
+        required: true
+
+jobs:
+  prepare-release-draft:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'sbt'
+      - uses: sbt/setup-sbt@v1
+      - run: ./.github/workflows/prepare-release-draft.sh
+        id: prepare-release-draft
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_NETWORKS: ${{ inputs.networks }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPO: ${{ github.repository }}
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.prepare-release-draft.outputs.subject-path }}

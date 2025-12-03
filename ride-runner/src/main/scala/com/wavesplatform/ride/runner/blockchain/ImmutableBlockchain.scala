@@ -6,7 +6,8 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -16,13 +17,11 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.ride.runner.*
 import com.wavesplatform.ride.runner.input.RideRunnerBlockchainState
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, DataEntry, Height, LeaseBalance, TxMeta}
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxPositiveAmount}
-
-import scala.util.chaining.scalaUtilChainingOps
 
 class ImmutableBlockchain(override val settings: BlockchainSettings, input: RideRunnerBlockchainState) extends SupportedBlockchain { blockchain =>
   private val chainId: Byte = settings.addressSchemeCharacter.toByte
@@ -68,16 +67,17 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
       SignedBlockHeader(
         header = BlockHeader(
           version = 5,
-          timestamp = blockInfo.timestamp,
+          blockInfo.timestamp,
           reference = ByteStr(Array.emptyByteArray),
-          baseTarget = blockInfo.baseTarget,
-          generationSignature = blockInfo.generationSignature,
-          generator = blockInfo.generatorPublicKey,
+          blockInfo.baseTarget,
+          blockInfo.generationSignature,
+          blockInfo.generatorPublicKey,
           featureVotes = Nil,
           rewardVote = -1,
           transactionsRoot = ByteStr(Array.emptyByteArray),
-          None,
-          None
+          stateHash = None,
+          challengedHeader = None,
+          finalizationVoting = None
         ),
         signature = ByteStr(Array.emptyByteArray)
       )
@@ -86,12 +86,7 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   // Ride: blockInfoByHeight, lastBlock
   override def blockHeader(height: Int): Option[SignedBlockHeader] =
-    // Dirty, but we have a clear error instead of "None.get"
-    blockHeaders
-      .get(height)
-      .tap { r =>
-        if (r.isEmpty) throw new RuntimeException(s"blockHeader($height): can't find a block header, please specify or check your script")
-      }
+    blockHeaders.get(height)
 
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] = input.blocks.get(height).flatMap(_.VRF)
@@ -102,15 +97,20 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = input.height
 
-  override val activatedFeatures: ActivatedFeatures = settings.functionalitySettings.preActivatedFeatures ++ input.features.map(id => id -> height)
+  override def finalizedHeight: Option[Height] = ???
+
+  override def finalizedHeightAt(at: Height): Option[Height] = ???
+
+  override val activatedFeatures: ActivatedFeatures =
+    (settings.functionalitySettings.preActivatedFeatures ++ input.features.map(id => id -> height)).map((k, v) => k -> Height(v))
 
   private val assets = mkCache[IssuedAsset, Option[AssetDescription]] { assetId =>
     input.assets.get(assetId).map { info =>
       AssetDescription(
-        originTransactionId = assetId.id,
+        originTransactionId = TransactionId(assetId.id),
         issuer = info.issuerPublicKey,
-        name = UnsafeByteOperations.unsafeWrap(info.name),
-        description = UnsafeByteOperations.unsafeWrap(info.description),
+        name = UnsafeByteOperations.unsafeWrap(info.name.arr),
+        description = UnsafeByteOperations.unsafeWrap(info.description.arr),
         decimals = info.decimals,
         reissuable = info.reissuable,
         totalVolume = info.quantity,
@@ -159,14 +159,14 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
       .flatMap { addressState => addressState.generatingBalance.map(_.value).orElse(addressState.balance(Waves)) }
       .getOrElse(0L)
 
-    Seq(BalanceSnapshot(height, generatingBalance, 0, 0))
+    Seq(BalanceSnapshot(Height(height), generatingBalance, 0, 0, 0))
   }
 
   // Ride: wavesBalance (specifies to=None)
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
     // "to" always None
-    balanceSnapshotsCache.get(address).filter(_.height >= from)
+    balanceSnapshotsCache.get(address).filter(_.height >= Height(from))
 
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] =
     if (height < this.height) None
@@ -188,13 +188,21 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]] = ???
 
+  override def transactionSnapshot(id: ByteStr): Option[(StateSnapshot, TxMeta.Status)] = ???
+
   override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = ???
 
   override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = ???
 
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = ???
 
-  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = ???
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = Seq.empty
+
+  override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
+
+  override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = ConflictGenerators.empty
+
+  override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
 
   override def lastStateHash(refId: Option[BlockId]): BlockId = ???
 
@@ -210,12 +218,12 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
         amount = TxPositiveAmount.from(inputTx.amount).explicitGet(),
         feeAssetId = inputTx.feeAssetId,
         fee = TxPositiveAmount.from(inputTx.fee).explicitGet(),
-        attachment = ByteStr(inputTx.attachment),
+        attachment = ByteStr(inputTx.attachment.arr),
         timestamp = inputTx.timestamp,
-        proofs = Proofs(inputTx.proofs.map(ByteStr(_))),
+        proofs = Proofs(inputTx.proofs.map(p => ByteStr(p.arr))),
         chainId = chainId
       )
-      (meta.height, tx)
+      (meta.height.toInt, tx)
     }
 
   private def mkCache[K, V](f: K => V): LoadingCache[K, V] = Caffeine

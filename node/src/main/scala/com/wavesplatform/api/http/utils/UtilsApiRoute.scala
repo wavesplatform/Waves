@@ -1,13 +1,13 @@
 package com.wavesplatform.api.http.utils
 
-import akka.http.scaladsl.model.headers.Accept
-import akka.http.scaladsl.server.{PathMatcher1, Route}
+import org.apache.pekko.http.scaladsl.model.headers.Accept
+import org.apache.pekko.http.scaladsl.server.{PathMatcher1, Route}
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
@@ -248,7 +248,7 @@ case class UtilsApiRoute(
       complete(apiResult ++ request ++ Json.obj("address" -> address.toString))
     }
 
-  private[this] val ScriptedAddress: PathMatcher1[Address] = AddrSegment.map {
+  private val ScriptedAddress: PathMatcher1[Address] = AddrSegment.map {
     case address: Address if blockchain.hasAccountScript(address) => address
     case other                                                    => throw ApiException(CustomValidationError(s"Address $other is not dApp"))
   }

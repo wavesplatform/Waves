@@ -12,19 +12,21 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{DataEntry, Recipient}
-import com.wavesplatform.state.{BlockRewardCalculator, EmptyDataEntry, IntegerDataEntry}
+import com.wavesplatform.state.{Height, BlockRewardCalculator, EmptyDataEntry, IntegerDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utils.DiffMatchers
-import monix.execution.Scheduler.Implicits.global
+import com.wavesplatform.utils.{DiffMatchers, Schedulers}
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 import com.wavesplatform.test.DomainPresets.*
+import monix.execution.ExecutionModel.SynchronousExecution
+import monix.execution.Scheduler
 
 import scala.concurrent.Await
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatchers with WithDomain with GrpcApiHelpers {
+  private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
 
   val sender: KeyPair         = TxHelpers.signer(1)
   val recipient: KeyPair      = TxHelpers.signer(2)
@@ -246,7 +248,7 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
   private def getLastBlockMinerReward(d: Domain): Long =
     BlockRewardCalculator
       .getBlockRewardShares(
-        d.blockchain.height,
+        Height(d.blockchain.height),
         d.blockchain.settings.rewardsSettings.initial,
         d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
         d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,

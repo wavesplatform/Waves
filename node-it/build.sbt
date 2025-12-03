@@ -11,5 +11,8 @@ inTask(docker)(
   )
 )
 
-val packageAll = taskKey[Unit]("build all packages")
-docker := docker.dependsOn(LocalProject("waves-node") / packageAll).value
+val buildTarballsForDocker = taskKey[Unit]("build all packages")
+
+// To solve "Error response from daemon: No such image: " see:
+// https://github.com/marcus-drake/sbt-docker/issues/133#issuecomment-2718354260
+docker := docker.dependsOn(LocalProject("waves-node") / buildTarballsForDocker).value

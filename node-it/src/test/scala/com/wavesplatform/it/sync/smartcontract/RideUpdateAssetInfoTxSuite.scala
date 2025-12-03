@@ -3,14 +3,15 @@ package com.wavesplatform.it.sync.smartcontract
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.ScriptCompilerError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
@@ -27,8 +28,8 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
   private def dApp     = firstKeyPair
   private def smartAcc = secondKeyPair
 
-  private var asset1: IssuedAsset = _
-  private var asset2: IssuedAsset = _
+  private var asset1: IssuedAsset = scala.compiletime.uninitialized
+  private var asset2: IssuedAsset = scala.compiletime.uninitialized
 
   private val name: String        = "MyAsset"
   private val description: String = "Some description"
@@ -124,7 +125,7 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
   }
 
   test("can check UpdateAssetInfo tx from contracts") {
-    val asset2Height = sender.transactionInfo[TransactionInfo](asset2.id.toString).height
+    val asset2Height = Height(sender.transactionInfo[TransactionInfo](asset2.id.toString).height)
     nodes.waitForHeight(asset2Height + 2)
 
     sender.updateAssetInfo(dApp, asset1.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)

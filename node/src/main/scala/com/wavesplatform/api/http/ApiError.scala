@@ -1,10 +1,11 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Transaction, *}
@@ -18,7 +19,7 @@ object ApiErrorResponse {
 
 trait ApiError {
   val id: Int
-  val message: String
+  def message: String
   val code: StatusCode
 
   lazy val json: JsObject = Json.obj("error" -> id, "message" -> message)
@@ -26,8 +27,8 @@ trait ApiError {
 
 //noinspection TypeAnnotation
 object ApiError {
-  implicit def fromValidationError(e: ValidationError): ApiError = {
-    e match {
+  implicit def fromValidationError(ve: ValidationError): ApiError = {
+    ve match {
       case TxValidationError.InvalidAddress(_)               => InvalidAddress
       case TxValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
       case TxValidationError.NonPositiveAmount(x, of)        => NonPositiveAmount(s"$x of $of")
@@ -52,8 +53,8 @@ object ApiError {
       case TxValidationError.WrongChain(ex, pr)              => InvalidChainId(ex, pr)
       case err: TxValidationError.TooManyProofs              => InvalidProofs(err.toString())
       case err: TxValidationError.ToBigProof                 => InvalidProofs(err.toString())
-      case TransactionValidationError(error, tx) =>
-        error match {
+      case TransactionValidationError(cause, tx) =>
+        cause match {
           case e: TxValidationError.TransactionNotAllowedByScript =>
             if (e.isAssetScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)
@@ -315,10 +316,11 @@ object ApiError {
   }
 
   case class AssetsDoesNotExist(ids: Seq[IssuedAsset]) extends ApiError {
-    val id: Int                      = 314
-    val message: String              = s"Asset does not exist. ${ids.map(_.id.toString).mkString(", ")}"
-    val code: StatusCode             = StatusCodes.BadRequest
-    override lazy val json: JsObject = Json.obj("error" -> id, "message" -> message, "ids" -> ids)
+    val id: Int                                   = 314
+    val message: String                           = s"Asset does not exist. ${ids.map(_.id.toString).mkString(", ")}"
+    val code: StatusCode                          = StatusCodes.BadRequest
+    implicit val assetWrites: Writes[IssuedAsset] = Asset.assetWrites
+    override lazy val json: JsObject              = Json.obj("error" -> id, "message" -> message, "ids" -> ids)
   }
 
   final case class NegativeAmount(msg: String) extends ApiError {
@@ -367,7 +369,7 @@ object ApiError {
     val Id = 117
   }
 
-  case class AlreadyInState(transactionId: ByteStr, height: Int) extends ApiError {
+  case class AlreadyInState(transactionId: ByteStr, height: Height) extends ApiError {
     override val id: Int          = 400
     override val code: StatusCode = StatusCodes.BadRequest
     override val message: String  = s"Transaction $transactionId is already in the state on a height of $height"

@@ -16,7 +16,7 @@ class BlockDiskCacheTestSuite extends DiskTestSuite {
     "setLastHeight" in test { cache => implicit ctx =>
       cache.getLastHeight shouldBe empty
       cache.setLastHeight(Height(2))
-      cache.getLastHeight.value shouldBe 2
+      cache.getLastHeight.value shouldBe Height(2)
     }
 
     "set" - {
@@ -90,7 +90,7 @@ class BlockDiskCacheTestSuite extends DiskTestSuite {
 
   private def defaultHeader(ts: Long) = SignedBlockHeaderWithVrf(
     SignedBlockHeader(
-      BlockHeader(0, ts, ByteStr.empty, 0, ByteStr.empty, EmptyPublicKey, Vector.empty, 0, ByteStr.empty, None, None),
+      BlockHeader(0, ts, ByteStr.empty, 0, ByteStr.empty, EmptyPublicKey, Vector.empty, 0, ByteStr.empty, None, None, None),
       ByteStr.empty
     ),
     vrf = ByteStr.empty,

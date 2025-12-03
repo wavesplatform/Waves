@@ -1,17 +1,17 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
-import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncGrpcApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import io.grpc.Status.Code
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime {
 
-  var issuedAssetId: String = _
+  var issuedAssetId: String = scala.compiletime.uninitialized
   override def beforeAll(): Unit = {
     super.beforeAll()
 

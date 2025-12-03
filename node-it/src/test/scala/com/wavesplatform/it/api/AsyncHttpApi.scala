@@ -1,18 +1,15 @@
 package com.wavesplatform.it.api
 
-import java.io.IOException
-import java.net.{InetSocketAddress, URLEncoder}
-import java.util.concurrent.TimeoutException
-import java.util.{NoSuchElementException, UUID}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.DebugMessage.*
-import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
+import com.wavesplatform.api.http.RewardApiRoute.{RewardStatus, RewardVotes}
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.{ConnectReq, DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.features.api.ActivationStatus
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.features.api.{ActivationStatus, activationStatusFormat}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.util.*
@@ -23,7 +20,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.state.DataEntry.Format
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Height, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.{Order, ExchangeTransaction as ExchangeTx}
@@ -36,6 +33,8 @@ import com.wavesplatform.transaction.{
   CreateAliasTransaction,
   DataTransaction,
   Proofs,
+  TransactionSignOps,
+  TransactionValidationOps,
   TxDecimals,
   TxExchangeAmount,
   TxExchangePrice,
@@ -43,6 +42,7 @@ import com.wavesplatform.transaction.{
   TxPositiveAmount,
   TxVersion
 }
+import monix.execution.atomic.AtomicInt
 import org.asynchttpclient.*
 import org.asynchttpclient.Dsl.{delete as _delete, get as _get, post as _post, put as _put}
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
@@ -51,15 +51,25 @@ import org.scalatest.{Assertions, matchers}
 import play.api.libs.json.*
 import play.api.libs.json.Json.{stringify, toJson}
 
+import java.io.IOException
+import java.net.{InetSocketAddress, URLEncoder}
+import java.time.Duration as JDuration
+import java.util.NoSuchElementException
+import java.util.concurrent.TimeoutException
 import scala.collection.immutable.VectorMap
-import scala.compat.java8.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration.*
+import scala.jdk.FutureConverters.*
 import scala.util.{Failure, Success}
 
 object AsyncHttpApi extends Assertions {
+
+  given Reads[RewardVotes]  = Json.reads
+  given Reads[RewardStatus] = Json.reads
+
+  private val counter = AtomicInt(1)
 
   // noinspection ScalaStyle
   implicit class NodeAsyncHttpApi(val n: Node) extends Assertions with matchers.should.Matchers {
@@ -173,6 +183,10 @@ object AsyncHttpApi extends Assertions {
       Json.parse(r.getResponseBody).as[Seq[BlacklistedPeer]]
     }
 
+    def allPeers: Future[Seq[KnownPeer]] = get("/peers/all").map { r =>
+      (Json.parse(r.getResponseBody) \ "peers").as[Seq[KnownPeer]]
+    }
+
     def connect(address: InetSocketAddress): Future[Unit] =
       postJson("/peers/connect", ConnectReq(address.getHostName, address.getPort)).map(_ => ())
 
@@ -181,15 +195,15 @@ object AsyncHttpApi extends Assertions {
 
       def request =
         _get(s"${n.nodeApiEndpoint}/blocks/height?${System.currentTimeMillis()}")
-          .setReadTimeout(timeout)
-          .setRequestTimeout(timeout)
+          .setReadTimeout(JDuration.ofMillis(timeout))
+          .setRequestTimeout(JDuration.ofMillis(timeout))
           .build()
 
       def send(): Future[Option[Response]] =
         n.client
           .executeRequest(request)
           .toCompletableFuture
-          .toScala
+          .asScala
           .map(Option(_))
           .recoverWith { case _: IOException | _: TimeoutException =>
             Future(None)
@@ -208,9 +222,13 @@ object AsyncHttpApi extends Assertions {
     def waitForBlackList(blackListSize: Int): Future[Seq[BlacklistedPeer]] =
       waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers > $blackListSize")(_.blacklistedPeers, _.lengthCompare(blackListSize) > 0, 500.millis)
 
-    def height: Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
+    def height: Future[Height] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Height])
 
-    def blockAt(height: Int, amountsAsStrings: Boolean = false): Future[Block] =
+    def finalizedHeight: Future[Height] = get("/blocks/height/finalized").as[JsValue].map(v => (v \ "height").as[Height])
+
+    def finalizedHeightAt(at: Height): Future[Height] = get(s"/blocks/finalized/at/$at").as[JsValue].map(v => (v \ "height").as[Height])
+
+    def blockAt(height: Height, amountsAsStrings: Boolean = false): Future[Block] =
       get(s"/blocks/at/$height", amountsAsStrings).as[Block](amountsAsStrings)
 
     def blockById(id: String, amountsAsStrings: Boolean = false): Future[Block] = get(s"/blocks/$id", amountsAsStrings).as[Block](amountsAsStrings)
@@ -227,15 +245,15 @@ object AsyncHttpApi extends Assertions {
 
     def lastBlock(amountsAsStrings: Boolean = false): Future[Block] = get("/blocks/last", amountsAsStrings).as[Block](amountsAsStrings)
 
-    def blockSeq(from: Int, to: Int, amountsAsStrings: Boolean = false): Future[Seq[Block]] =
+    def blockSeq(from: Height, to: Height, amountsAsStrings: Boolean = false): Future[Seq[Block]] =
       get(s"/blocks/seq/$from/$to", amountsAsStrings)
         .as[Seq[Block]](amountsAsStrings)
 
-    def blockSeqByAddress(address: String, from: Int, to: Int, amountsAsStrings: Boolean = false): Future[Seq[Block]] =
+    def blockSeqByAddress(address: String, from: Height, to: Height, amountsAsStrings: Boolean = false): Future[Seq[Block]] =
       get(s"/blocks/address/$address/$from/$to", amountsAsStrings)
         .as[Seq[Block]](amountsAsStrings)
 
-    def blockHeadersAt(height: Int, amountsAsStrings: Boolean = false): Future[BlockHeader] =
+    def blockHeaderAt(height: Height, amountsAsStrings: Boolean = false): Future[BlockHeader] =
       get(s"/blocks/headers/at/$height", amountsAsStrings)
         .as[BlockHeader](amountsAsStrings)
 
@@ -243,19 +261,26 @@ object AsyncHttpApi extends Assertions {
       get(s"/blocks/headers/$id", amountsAsStrings)
         .as[BlockHeader](amountsAsStrings)
 
-    def blockHeadersSeq(from: Int, to: Int, amountsAsStrings: Boolean = false): Future[Seq[BlockHeader]] =
+    def blockHeadersSeq(from: Height, to: Height, amountsAsStrings: Boolean = false): Future[Seq[BlockHeader]] =
       get(s"/blocks/headers/seq/$from/$to", amountsAsStrings)
         .as[Seq[BlockHeader]](amountsAsStrings)
 
+    def generators(atHeight: Height, amountsAsStrings: Boolean = false): Future[Seq[GeneratorsResponse.Entry]] =
+      get(s"/generators/at/$atHeight", amountsAsStrings).as(amountsAsStrings)
+
     def lastBlockHeader(amountsAsStrings: Boolean = false): Future[BlockHeader] =
       get("/blocks/headers/last", amountsAsStrings)
+        .as[BlockHeader](amountsAsStrings)
+
+    def finalizedBlockHeader(amountsAsStrings: Boolean = false): Future[BlockHeader] =
+      get("/blocks/headers/finalized", amountsAsStrings)
         .as[BlockHeader](amountsAsStrings)
 
     def status: Future[Status] = get("/node/status").as[Status]
 
     def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]
 
-    def rewardStatus(height: Option[Int] = None, amountsAsString: Boolean = false): Future[RewardStatus] = {
+    def rewardStatus(height: Option[Height] = None, amountsAsString: Boolean = false): Future[RewardStatus] = {
       val maybeHeight = height.fold("")(a => s"/$a")
       get(s"/blockchain/rewards$maybeHeight", amountsAsString).as[RewardStatus](amountsAsString)
     }
@@ -265,7 +290,7 @@ object AsyncHttpApi extends Assertions {
       get(s"/addresses/balance/$address$maybeConfirmations", amountsAsStrings).as[Balance](amountsAsStrings)
     }
 
-    def balances(height: Option[Int], addresses: Seq[String], asset: Option[String]): Future[Seq[Balance]] = {
+    def balances(height: Option[Height], addresses: Seq[String], asset: Option[String]): Future[Seq[Balance]] = {
       for {
         json <- postJson(
           "/addresses/balance",
@@ -307,7 +332,8 @@ object AsyncHttpApi extends Assertions {
       100.millis
     )
 
-    def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 2.seconds)
+    def waitForHeight(expectedHeight: Height): Future[Height] =
+      waitFor[Height](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 2.seconds)
 
     def rawTransactionInfo(txId: String): Future[JsValue] = get(s"/transactions/info/$txId").map(r => Json.parse(r.getResponseBody))
 
@@ -327,7 +353,7 @@ object AsyncHttpApi extends Assertions {
 
     def assetDistributionAtHeight(
         asset: String,
-        height: Int,
+        height: Height,
         limit: Int,
         maybeAfter: Option[String] = None,
         amountsAsStrings: Boolean = false
@@ -691,7 +717,7 @@ object AsyncHttpApi extends Assertions {
       )
 
     def removeData(sender: KeyPair, data: Seq[String], fee: Long, version: Byte = 2): Future[Transaction] =
-      broadcastData(sender, data.map[DataEntry[?]](EmptyDataEntry), fee, version)
+      broadcastData(sender, data.map[DataEntry[?]](EmptyDataEntry.apply), fee, version)
 
     def getData(address: String, amountsAsStrings: Boolean = false): Future[List[DataEntry[?]]] =
       get(s"/addresses/data/$address", amountsAsStrings).as[List[DataEntry[?]]](amountsAsStrings)
@@ -714,6 +740,9 @@ object AsyncHttpApi extends Assertions {
 
     def getMerkleProofPost(ids: String*): Future[Seq[MerkleProofResponse]] =
       postJson(s"/transactions/merkleProof", Json.obj("ids" -> ids)).as[Seq[MerkleProofResponse]]
+
+    def sign(json: JsValue): Future[Transaction] =
+      postJson(s"/transactions/sign", json).as[Transaction]
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 
@@ -797,8 +826,8 @@ object AsyncHttpApi extends Assertions {
     def addressByAlias(targetAlias: String): Future[Address] =
       get(s"/alias/by-alias/$targetAlias").as[Address]
 
-    def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
-      postJson("/debug/rollback", RollbackParams(to, returnToUTX)).map(_ => ())
+    def rollback(to: Height, returnToUTX: Boolean = true): Future[Unit] =
+      postJson("/debug/rollback", RollbackParams(to.toInt, returnToUTX)).map(_ => ())
 
     def ensureTxDoesntExist(txId: String): Future[Unit] =
       utx()
@@ -836,22 +865,22 @@ object AsyncHttpApi extends Assertions {
         actualBlock  <- findBlockHeaders(_.height > currentBlock.height, currentBlock.height)
       } yield actualBlock
 
-    def waitForHeightArise: Future[Int] =
+    def waitForHeightArise: Future[Height] =
       for {
         height    <- height
         newHeight <- waitForHeight(height + 1)
       } yield newHeight
 
-    def findBlock(cond: Block => Boolean, from: Int = 1, to: Int = Int.MaxValue): Future[Block] = {
-      def load(_from: Int, _to: Int): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
+    def findBlock(cond: Block => Boolean, from: Height = Height(1), to: Height = Height(Int.MaxValue)): Future[Block] = {
+      def load(_from: Height, _to: Height): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
         blocks
           .find(cond)
           .fold[Future[Block]] {
             val maybeLastBlock = blocks.lastOption
-            if (maybeLastBlock.exists(_.height >= to)) {
+            if (maybeLastBlock.exists(_.height >= to.toInt)) {
               Future.failed(new NoSuchElementException)
             } else {
-              val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 19).min(to))
+              val newFrom = maybeLastBlock.fold(_from)(b => Height(b.height + 19).min(to))
               val newTo   = newFrom + 19
               n.log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 19}]")
               timer.schedule(load(newFrom, newTo), n.settings.blockchainSettings.genesisSettings.averageBlockDelay)
@@ -862,8 +891,8 @@ object AsyncHttpApi extends Assertions {
       load(from, (from + 19).min(to))
     }
 
-    def findBlockHeaders(cond: BlockHeader => Boolean, from: Int = 1, to: Int = Int.MaxValue): Future[BlockHeader] = {
-      def load(_from: Int, _to: Int): Future[BlockHeader] = blockHeadersSeq(_from, _to).flatMap { blocks =>
+    def findBlockHeaders(cond: BlockHeader => Boolean, from: Height = Height(1), to: Height = Height(Int.MaxValue)): Future[BlockHeader] = {
+      def load(_from: Height, _to: Height): Future[BlockHeader] = blockHeadersSeq(_from, _to).flatMap { blocks =>
         blocks
           .find(cond)
           .fold[Future[BlockHeader]] {
@@ -887,28 +916,31 @@ object AsyncHttpApi extends Assertions {
 
     def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = OK_200, waitForStatus: Boolean = false): Future[Response] = {
       def executeRequest: Future[Response] = {
-        val id = UUID.randomUUID()
-        n.log.trace(s"[$id] Executing request '$r'")
-        if (r.getStringData != null) n.log.debug(s"[$id] Request's body '${r.getStringData}'")
+        val log = !(r.getMethod == "POST" && r.getUri.getPath == "/debug/print")
+        val id  = counter.getAndIncrement()
+        if (log) {
+          val s = new StringBuilder(s"[$id] Executing: ${r.getMethod} ${r.getUri}")
+          if (r.getHeaders != null && !r.getHeaders.isEmpty) s.append(s", ${r.getHeaders}")
+          if (r.getStringData != null) s.append(s", body:\n${r.getStringData}")
+          n.log.debug(s.toString())
+        }
         n.client
           .executeRequest(
             r,
             new AsyncCompletionHandler[Response] {
               override def onCompleted(response: Response): Response = {
                 if (response.getStatusCode == statusCode) {
-                  n.log.debug(s"[$id] Request: ${r.getMethod} ${r.getUrl}\nResponse: ${response.getResponseBody}")
+                  if (log) n.log.debug(s"[$id] Result: ${response.getResponseBody}")
                   response
                 } else {
-                  n.log.debug(
-                    s"[$id] Request: ${r.getMethod} ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}"
-                  )
+                  if (log) n.log.debug(s"[$id] Result: Unexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
                   throw UnexpectedStatusCodeException(r.getMethod, r.getUrl, response.getStatusCode, response.getResponseBody)
                 }
               }
             }
           )
           .toCompletableFuture
-          .toScala
+          .asScala
           .recoverWith {
             case e: UnexpectedStatusCodeException if e.statusCode == 503 || waitForStatus =>
               n.log.debug(s"[$id] Failed to execute request '$r' with error: ${e.getMessage}")
@@ -922,7 +954,7 @@ object AsyncHttpApi extends Assertions {
       executeRequest
     }
 
-    def debugStateAt(height: Long): Future[Map[String, Long]] = getWithApiKey(s"/debug/stateWaves/$height").as[Map[String, Long]]
+    def debugStateAt(height: Height): Future[Map[String, Long]] = getWithApiKey(s"/debug/stateWaves/$height").as[Map[String, Long]]
 
     def debugBalanceHistory(address: String, amountsAsStrings: Boolean = false): Future[Seq[BalanceHistory]] = {
       get(s"/debug/balances/history/$address", withApiKey = true, amountsAsStrings = amountsAsStrings)
@@ -944,10 +976,10 @@ object AsyncHttpApi extends Assertions {
 
     def accountBalance(acc: String): Future[Long] = n.balance(acc).map(_.balance)
 
-    def balanceAtHeight(address: String, height: Int): Future[Long] =
+    def balanceAtHeight(address: String, height: Height): Future[Long] =
       accountsBalances(Some(height), Seq(address), None).map(_.collectFirst { case (`address`, balance) => balance }.getOrElse(0L))
 
-    def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String]): Future[Seq[(String, Long)]] =
+    def accountsBalances(height: Option[Height], accounts: Seq[String], asset: Option[String]): Future[Seq[(String, Long)]] =
       n.balances(height, accounts, asset).map(_.map(b => (b.address, b.balance)))
 
     def accountBalances(acc: String): Future[(Long, Long)] =
@@ -992,34 +1024,34 @@ object AsyncHttpApi extends Assertions {
   }
 
   implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends matchers.should.Matchers {
-    def height: Future[Seq[Int]] = traverse(nodes)(_.height)
+    def height: Future[Seq[Height]] = traverse(nodes)(_.height)
 
-    def waitForHeightAriseAndTxPresent(transactionId: String)(implicit p: Position): Future[Unit] =
+    def waitForHeightAriseAndTxPresent(transactionId: String): Future[Unit] =
       for {
         allHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
-        _          <- traverse(nodes)(_.waitForHeight(allHeights.max + 1))
+        _          <- traverse(nodes)(_.waitForHeight(Height(allHeights.max + 1)))
         _ <- waitFor("nodes sync")(1 second)(
           _.waitForTransaction(transactionId).map(_.height),
           (finalHeights: Iterable[Int]) => finalHeights.forall(_ == finalHeights.head)
         )
       } yield ()
 
-    def waitForTransaction(transactionId: String)(implicit p: Position): Future[TransactionInfo] =
+    def waitForTransaction(transactionId: String): Future[TransactionInfo] =
       traverse(nodes)(_.waitForTransaction(transactionId)).map(_.head)
 
-    def waitForHeightArise(): Future[Int] =
+    def waitForHeightArise(): Future[Height] =
       for {
         height <- height.map(_.max)
         _      <- traverse(nodes)(_.waitForHeight(height + 1))
       } yield height + 1
 
-    def waitForSameBlockHeadersAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
+    def waitForSameBlockHeadersAt(height: Height, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
 
-      def waitHeight = waitFor[Int](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
+      def waitHeight = waitFor[Height](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
 
       def waitSameBlockHeaders =
         waitFor[BlockHeader](s"same blocks at height = $height")(retryInterval)(
-          _.blockHeadersAt(height),
+          _.blockHeaderAt(height),
           { blocks =>
             val id = blocks.map(_.id)
             id.forall(_ == id.head)

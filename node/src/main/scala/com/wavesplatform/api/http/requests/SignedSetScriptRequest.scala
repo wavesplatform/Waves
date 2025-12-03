@@ -5,8 +5,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import play.api.libs.functional.syntax._
-import play.api.libs.json._
+import play.api.libs.functional.syntax.*
+import play.api.libs.json.*
 
 object SignedSetScriptRequest {
   implicit val signedSetScriptRequestReads: Reads[SignedSetScriptRequest] = (
@@ -16,7 +16,7 @@ object SignedSetScriptRequest {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "proofs").read[Proofs]
-  )(SignedSetScriptRequest.apply _)
+  )(SignedSetScriptRequest.apply)
 
   implicit val signedSetScriptRequestWrites: OWrites[SignedSetScriptRequest] =
     Json.writes[SignedSetScriptRequest].transform((request: JsObject) => request + ("version" -> JsNumber(1)))

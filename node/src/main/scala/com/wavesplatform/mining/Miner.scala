@@ -26,8 +26,8 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
-import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 
 import java.time.LocalTime
@@ -56,36 +56,38 @@ class MinerImpl(
     settings: WavesSettings,
     timeService: Time,
     utx: UtxPool,
+    blockEndorser: BlockEndorser,
+    endorsementStorage: EndorsementStorage,
     wallet: Wallet,
     pos: PoSSelector,
-    val minerScheduler: SchedulerService,
-    val appenderScheduler: SchedulerService,
+    val minerScheduler: Scheduler,
+    val appenderScheduler: Scheduler,
     transactionAdded: Observable[Unit],
     maxTimeDrift: Long = appender.MaxTimeDrift
 ) extends Miner
     with MinerDebugInfo
     with ScorexLogging {
 
-  private[this] val minerSettings              = settings.minerSettings
-  private[this] val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
-  private[this] val blockchainSettings         = settings.blockchainSettings
+  private val minerSettings              = settings.minerSettings
+  private val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
+  private val blockchainSettings         = settings.blockchainSettings
 
-  private[this] val scheduledAttempts = SerialCancelable()
-  private[this] val microBlockAttempt = SerialCancelable()
+  private val scheduledAttempts = SerialCancelable()
+  private val microBlockAttempt = SerialCancelable()
 
   @volatile
-  private[this] var debugStateRef: MinerDebugInfo.State = MinerDebugInfo.Disabled
+  private var debugStateRef: MinerDebugInfo.State = MinerDebugInfo.Disabled
 
-  private[this] val microBlockMiner: MicroBlockMiner = MicroBlockMiner(
+  private val microBlockMiner: MicroBlockMiner = MicroBlockMiner(
     debugStateRef = _,
     allChannels,
     blockchainUpdater,
     utx,
+    endorsementStorage,
     settings.minerSettings,
     minerScheduler,
     appenderScheduler,
-    transactionAdded,
-    utx.getPriorityPool.map(p => p.nextMicroBlockSize(_)).getOrElse(identity)
+    transactionAdded
   )
 
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =
@@ -101,12 +103,10 @@ class MinerImpl(
         wallet.privateKeyAccounts
       }
 
-      val hasAllowedForMiningScriptsAccounts =
-        accounts.filter(kp => hasAllowedForMiningScript(kp.toAddress, tempBlockchain.getOrElse(blockchainUpdater)))
-      scheduledAttempts := CompositeCancelable.fromSet(hasAllowedForMiningScriptsAccounts.map { account =>
+      scheduledAttempts := CompositeCancelable.fromSet(accounts.map { account =>
         generateBlockTask(account, tempBlockchain)
-          .onErrorHandle(err => log.warn(s"Error mining Block", err))
-          .runAsyncLogErr(appenderScheduler)
+          .onErrorHandle(err => log.warn(s"Error mining Block by ${account.toAddress}", err))
+          .runAsyncLogErr(using appenderScheduler)
       }.toSet)
       microBlockAttempt := SerialCancelable()
 
@@ -127,7 +127,7 @@ class MinerImpl(
         )
       )
 
-  private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
+  private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG).exists(Height(blockchainUpdater.height) > _ + 1)
 
   private def consensusData(height: Int, account: KeyPair, lastBlock: BlockHeader, blockTime: Long): Either[String, NxtLikeConsensusBlockData] =
     pos
@@ -167,53 +167,72 @@ class MinerImpl(
     }
   }
 
-  def forgeBlock(account: KeyPair): Either[String, (Block, MiningConstraint)] = {
+  def forgeBlock(account: KeyPair, referenceOpt: Option[ByteStr] = None): ForgeAttemptResult = {
     // should take last block right at the time of mining since microblocks might have been added
     val height          = blockchainUpdater.height
     val version         = blockchainUpdater.nextBlockVersion
     val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
-    val reference       = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get.blockId
+    val lastBlockInfo   = blockchainUpdater.bestLastBlockInfo(timeService.monotonicMillis() - minMicroBlockDurationMills)
+    val reference       = referenceOpt.getOrElse(lastBlockInfo.get.blockId)
+    val address         = account.toAddress
 
-    metrics.blockBuildTimeStats.measureSuccessful(for {
-      _ <- checkQuorumAvailable()
-      balance = blockchainUpdater.generatingBalance(account.toAddress, Some(reference))
-      validBlockDelay <- pos
-        .getValidBlockDelay(height, account, lastBlockHeader.baseTarget, balance)
-        .leftMap(_.toString)
-      currentTime = timeService.correctedTime()
-      blockTime = math.max(
-        lastBlockHeader.timestamp + validBlockDelay,
-        currentTime - 1.minute.toMillis
-      )
-      _ <- Either.cond(
-        blockTime <= currentTime + maxTimeDrift,
-        log.debug(
-          s"Forging with ${account.toAddress}, balance $balance, prev block $reference at $height with target ${lastBlockHeader.baseTarget}"
-        ),
-        s"Block time $blockTime is from the future: current time is $currentTime, MaxTimeDrift = $maxTimeDrift"
-      )
-      consensusData <- consensusData(height, account, lastBlockHeader, blockTime)
-      prevStateHash =
-        if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.LightNode, blockchainUpdater.height + 1))
-          Some(blockchainUpdater.lastStateHash(Some(reference)))
-        else None
-      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(account.toAddress, reference, prevStateHash)
-      block <- Block
-        .buildAndSign(
-          version,
-          blockTime,
-          reference,
-          consensusData.baseTarget,
-          consensusData.generationSignature,
-          unconfirmed,
-          account,
-          blockFeatures(version),
-          blockRewardVote(version),
-          if (blockchainUpdater.supportsLightNodeBlockFields(height + 1)) stateHash else None,
-          None
+    metrics.blockBuildTimeStats.measureSuccessful {
+      val stopReasons = for {
+        _ <- isAllowedForMining(address, blockchainUpdater)
+        _ <- Either.raiseUnless(blockchainUpdater.isCommitted(Height(height + 1), address)) {
+          s"$address is not committed on ${height + 1}. Try to commit to generation on next period"
+        }
+        _ <- Either.raiseWhen(blockchainUpdater.isConflict(Height(height + 1), address)) {
+          s"$address is conflict on ${height + 1}. Try to commit to generation on next period"
+        }
+      } yield ()
+
+      lazy val retryReasons = for {
+        _ <- checkQuorumAvailable()
+        balance = blockchainUpdater.generatingBalance(address, Some(reference))
+        validBlockDelay <- pos
+          .getValidBlockDelay(height, account, lastBlockHeader.baseTarget, balance)
+          .leftMap(_.toString)
+        currentTime = timeService.correctedTime()
+        blockTime = math.max(
+          lastBlockHeader.timestamp + validBlockDelay,
+          currentTime - 1.minute.toMillis
         )
-        .leftMap(_.err)
-    } yield (block, totalConstraint))
+        _ <- Either.cond(
+          blockTime <= currentTime + maxTimeDrift,
+          log.debug(s"Forging with $address, balance $balance, prev block $reference at $height with target ${lastBlockHeader.baseTarget}"),
+          s"Block time $blockTime is from the future: current time is $currentTime, MaxTimeDrift = $maxTimeDrift"
+        )
+        consensusData <- consensusData(height, account, lastBlockHeader, blockTime)
+        prevStateHash =
+          if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.LightNode, blockchainUpdater.height + 1))
+            Some(blockchainUpdater.lastStateHash(Some(reference)))
+          else None
+        (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(address, reference, prevStateHash)
+        block <- Block
+          .buildAndSign(
+            version,
+            blockTime,
+            reference,
+            consensusData.baseTarget,
+            consensusData.generationSignature,
+            unconfirmed,
+            account,
+            blockFeatures(version),
+            blockRewardVote(version),
+            if (blockchainUpdater.supportsLightNodeBlockFields(height + 1)) stateHash else None,
+            challengedHeader = None,
+            finalizationVoting = None // Haven't voted in a key block
+          )
+          .leftMap(_.err)
+      } yield ForgeAttemptResult.Success(block, totalConstraint)
+
+      stopReasons
+        .leftMap(ForgeAttemptResult.PermanentFailure.apply)
+        .flatMap { _ =>
+          retryReasons.leftMap(ForgeAttemptResult.TemporaryFailure.apply)
+        }
+    }.merge
   }
 
   private def checkQuorumAvailable(): Either[String, Int] =
@@ -243,12 +262,10 @@ class MinerImpl(
       for {
         delay <- blockDelayE.leftMap(_.toString)
         expectedTS = delay + block.header.timestamp
-        result <- Either.cond(
-          0 < expectedTS && expectedTS < Long.MaxValue,
-          expectedTS,
+        _ <- Either.raiseUnless(0 < expectedTS && expectedTS < Long.MaxValue) {
           s"Invalid next block generation time: $expectedTS"
-        )
-      } yield result
+        }
+      } yield expectedTS
     } else Left(s"Balance $balance of ${account.toAddress} is lower than required for generation")
   }
 
@@ -261,7 +278,6 @@ class MinerImpl(
       ts <- nextBlockGenerationTime(blockchain, height, lastBlock, account)
       calculatedOffset = ts - timeService.correctedTime()
       offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
-
     } yield offset
   }
 
@@ -289,8 +305,8 @@ class MinerImpl(
           case None => Task.unit
         }
 
-        def appendTask(block: Block, totalConstraint: MiningConstraint) =
-          BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block, None).flatMap {
+        def appendTask(block: Block, totalConstraint: MiningConstraint) = // TODO: accept blockAppender instead all these dependencies?
+          BlockAppender(blockchainUpdater, timeService, utx, pos, blockEndorser, appenderScheduler)(block, None).flatMap {
             case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
               generateBlockTask(account, None)
 
@@ -314,16 +330,20 @@ class MinerImpl(
           elapsed <- waitBlockAppendedTask.timed.map(_._1)
           newOffset = (offset - elapsed).max(Duration.Zero)
 
-          _      <- Task(microBlockAttempt := SerialCancelable()).delayExecution(newOffset)
+          _      <- Task.sleep(newOffset)
           result <- Task(forgeBlock(account)).executeOn(minerScheduler)
 
           _ <- result match {
-            case Right((block, totalConstraint)) =>
-              appendTask(block, totalConstraint)
+            case ForgeAttemptResult.Success(block, restConstraint) =>
+              appendTask(block, restConstraint)
 
-            case Left(err) =>
+            case ForgeAttemptResult.TemporaryFailure(err) =>
               log.debug(s"No block generated because $err, retrying")
               generateBlockTask(account, None)
+
+            case ForgeAttemptResult.PermanentFailure(err) =>
+              log.debug(s"No block generated because $err, stopping")
+              Task.unit
           }
         } yield ()
 
@@ -334,7 +354,7 @@ class MinerImpl(
     }
   }
 
-  private[this] def startMicroBlockMining(
+  private def startMicroBlockMining(
       account: KeyPair,
       lastBlock: Block,
       restTotalConstraint: MiningConstraint
@@ -342,12 +362,12 @@ class MinerImpl(
     Miner.microMiningStarted.increment()
     microBlockAttempt := microBlockMiner
       .generateMicroBlockSequence(account, lastBlock, restTotalConstraint, 0)
-      .runAsyncLogErr(minerScheduler)
+      .runAsyncLogErr(using minerScheduler)
     log.trace(s"MicroBlock mining scheduled for acc=${account.toAddress}")
   }
 
   // noinspection TypeAnnotation,ScalaStyle
-  private[this] object metrics {
+  private object metrics {
     val blockBuildTimeStats = Kamon.timer("miner.pack-and-forge-block-time").withoutTags()
   }
 }

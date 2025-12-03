@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
-import akka.http.scaladsl.server.{Directive1, Route}
+import org.apache.pekko.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import org.apache.pekko.http.scaladsl.server.{Directive1, Route}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.transaction.Transaction
@@ -10,7 +10,7 @@ import play.api.libs.json.*
 
 import scala.concurrent.Future
 
-trait BroadcastRoute { _: ApiRoute =>
+trait BroadcastRoute { apiRoute: ApiRoute =>
   def transactionPublisher: TransactionPublisher
 
   private def broadcastTransaction(tx: Transaction, includeTrace: Boolean): Future[ToResponseMarshallable] = {

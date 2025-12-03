@@ -1,16 +1,16 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.{BaseFreeSpec, WaitForHeight2}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class UTXAllowance extends BaseFreeSpec with WaitForHeight2 {
-  import UTXAllowance._
+  import UTXAllowance.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -25,7 +25,7 @@ class UTXAllowance extends BaseFreeSpec with WaitForHeight2 {
       i.transfer(i.keyPair, acc.toAddress.toString, 10.waves, 0.005.waves, None, waitForTx = true)
 
       val scriptText = s"""true""".stripMargin
-      val script     = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+      val script     = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
       i.setScript(acc, Some(script), setScriptFee, waitForTx = true)
 
       acc
@@ -63,7 +63,7 @@ class UTXAllowance extends BaseFreeSpec with WaitForHeight2 {
 }
 
 object UTXAllowance {
-  import com.wavesplatform.it.NodeConfigs._
+  import com.wavesplatform.it.NodeConfigs.*
   private val FirstNode = ConfigFactory.parseString(s"""
                                                          |waves {
                                                          |  utx.allow-transactions-from-smart-accounts = false

@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.compiler
 
 import cats.implicits.toBifunctorOps
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
 import com.wavesplatform.lang.utils

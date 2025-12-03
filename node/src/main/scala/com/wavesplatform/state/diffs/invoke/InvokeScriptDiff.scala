@@ -28,23 +28,21 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.BalanceDiffValidation
 import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
-import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.script.ScriptRunner
-import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import com.wavesplatform.transaction.{TransactionType, TxValidationError}
 import monix.eval.Coeval
-import shapeless.Coproduct
 
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
-  import stats.TxTimerExt
+
+  import com.wavesplatform.metrics.TxProcessingStats.measureForType
 
   def apply(
       blockchain: Blockchain,
@@ -122,7 +120,7 @@ object InvokeScriptDiff {
                   tx.txId,
                   tx.timestamp,
                   RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
-                  tx.sender,
+                  tx.sender.byteStr,
                   RideRecipient.Address(ByteStr(tx.dApp.bytes)),
                   None,
                   Some(tx.funcCall.function.funcName),
@@ -133,7 +131,7 @@ object InvokeScriptDiff {
                 ScriptTransfer(
                   Some(assetId),
                   RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
-                  tx.sender,
+                  tx.sender.byteStr,
                   RideRecipient.Address(ByteStr(tx.dApp.bytes)),
                   amount,
                   tx.timestamp,
@@ -141,11 +139,11 @@ object InvokeScriptDiff {
                 )
               }
               val (log, evaluatedComplexity, result) = ScriptRunner(
-                Coproduct[TxOrd](pseudoTx: PseudoTx),
+                pseudoTx: PseudoTx,
                 blockchain,
                 script.script,
                 isAssetScript = true,
-                scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)),
+                scriptContainerAddress = Environment.AssetId(assetId.arr),
                 enableExecutionLog = enableExecutionLog,
                 nextRemainingComplexity
               )
@@ -168,8 +166,8 @@ object InvokeScriptDiff {
           complexityAfterPayments <- CoevalR(Coeval.now(complexityAfterPaymentsTraced))
           paymentsComplexity = checkedPayments.map(_._1.complexity).sum.toInt
 
-          tthis = Coproduct[Environment.Tthis](RideRecipient.Address(ByteStr(dAppAddress.bytes)))
-          input <- traced(buildThisValue(Coproduct[TxOrd](tx.root), blockchain, directives, tthis).leftMap(GenericError(_)))
+          tthis = RideRecipient.Address(ByteStr(dAppAddress.bytes))
+          input <- traced(buildThisValue(tx.root, blockchain, directives, tthis).leftMap(GenericError(_)))
 
           result <- for {
             paymentsPart <- traced(InvokeDiffsCommon.paymentsPart(blockchain, tx, tx.dApp, Map()))
@@ -194,29 +192,38 @@ object InvokeScriptDiff {
                 )
                 val (paymentsPartInsideDApp, paymentsPartToResolve) =
                   if (version < V5) (StateSnapshot.empty, paymentsPart) else (paymentsPart, StateSnapshot.empty)
-                val environment = wrapDAppEnv(new DAppEnvironment(
-                  AddressScheme.current.chainId,
-                  Coeval.evalOnce(input),
-                  Coeval(height),
-                  blockchain,
-                  tthis,
-                  directives,
-                  rootVersion,
-                  tx.root,
-                  tx.dApp,
-                  pk,
-                  calledAddresses,
-                  limitedExecution,
-                  enableExecutionLog,
-                  totalComplexityLimit,
-                  remainingCalls - 1,
-                  remainingActions,
-                  remainingPayments - tx.payments.size,
-                  paymentsPartInsideDApp,
-                  invocationRoot,
-                  wrapDAppEnv
-                ))
+                val environment = wrapDAppEnv(
+                  new DAppEnvironment(
+                    AddressScheme.current.chainId,
+                    Coeval.evalOnce(input),
+                    Coeval(height),
+                    blockchain,
+                    tthis,
+                    directives,
+                    rootVersion,
+                    tx.root,
+                    tx.dApp,
+                    pk,
+                    calledAddresses,
+                    limitedExecution,
+                    enableExecutionLog,
+                    totalComplexityLimit,
+                    remainingCalls - 1,
+                    remainingActions,
+                    remainingPayments - tx.payments.size,
+                    paymentsPartInsideDApp,
+                    invocationRoot,
+                    wrapDAppEnv
+                  )
+                )
                 for {
+                  _ <-
+                    if (
+                      blockchain.height >= blockchain.settings.functionalitySettings.paymentsCheckHeight && blockchain
+                        .isFeatureActivated(BlockchainFeatures.LightNode)
+                    )
+                      validateIntermediateBalances(blockchain, paymentsPartInsideDApp, 0, Nil)
+                    else traced(Right(()))
                   evaluated <- CoevalR(
                     evaluateV2(
                       version,

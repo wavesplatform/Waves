@@ -1,7 +1,8 @@
 package com.wavesplatform.ride.runner.entrypoints
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import com.typesafe.config.Config
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.ride.runner.blockchain.LazyBlockchain
@@ -9,6 +10,7 @@ import com.wavesplatform.ride.runner.caches.CacheKeyTags
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache
 import com.wavesplatform.ride.runner.db.RideRocksDb
+import com.wavesplatform.ride.runner.entrypoints.settings.RideRunnerGlobalSettings
 import com.wavesplatform.ride.runner.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RideScriptRunRequest, SynchronizedJobScheduler}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
@@ -30,7 +32,8 @@ import scala.concurrent.duration.{Duration, DurationInt}
 
 object WavesRideRunnerWithBlockchainService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val (globalConfig, settings) = AppInitializer.init(externalConfig = args.headOption.map(new File(_).getAbsoluteFile))
+    val (globalConfig: Config, settings: RideRunnerGlobalSettings) =
+      AppInitializer.init(externalConfig = args.headOption.map(new File(_).getAbsoluteFile))
 
     log.info("Starting...")
     // It has to be before other code: https://github.com/kamon-io/Kamon/issues/601#issuecomment-748995094
@@ -131,7 +134,7 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
       settings.requestsService,
       sharedBlockchain,
       allTags,
-      new SynchronizedJobScheduler()(rideScheduler),
+      new SynchronizedJobScheduler()(using rideScheduler),
       rideScheduler
     )
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { requestService.close() }
@@ -152,7 +155,7 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
         Task {
           lastServiceStatus = ServiceStatus(
             maxObservedHeight = state.processedHeight,
-            lastProcessedHeight = math.max(lastServiceStatus.lastProcessedHeight, state.processedHeight),
+            lastProcessedHeight = state.processedHeight.max(lastServiceStatus.lastProcessedHeight),
             lastProcessedTimeMs = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS),
             healthy = state match {
               case _: BlockchainState.Working => true
@@ -168,13 +171,13 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
         }
       }
       .lastL
-      .runToFuture(blockchainEventsStreamScheduler)
+      .runToFuture(using blockchainEventsStreamScheduler)
 
-    blockchainUpdatesStream.start(Height(heights.lastKnownHardened + 1))
+    blockchainUpdatesStream.start(heights.lastKnownHardened + 1)
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
-      EvaluateApiRoute(requestService.trackAndRun(_).runToFuture(rideScheduler)),
+      EvaluateApiRoute(requestService.trackAndRun(_).runToFuture(using rideScheduler)),
       ServiceApiRoute(
         { () =>
           val nowMs      = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
@@ -211,8 +214,8 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
       healthy: Boolean = false,
       nowTimeMs: Long = 0,
       lastProcessedTimeMs: Long = 0,
-      lastProcessedHeight: Int = 0,
+      lastProcessedHeight: Height = Height(0),
       idleTimeMs: Long = 0,
-      maxObservedHeight: Int = 0
+      maxObservedHeight: Height = Height(0)
   )
 }

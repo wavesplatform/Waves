@@ -5,7 +5,7 @@ import monix.eval.Coeval
 import org.scalatest.{Args, BeforeAndAfterAll, Status, Suite}
 
 trait DockerBased extends BeforeAndAfterAll {
-  this: Suite with Nodes =>
+  this: Suite & Nodes =>
 
   protected val dockerSingleton: Coeval[Docker] = Coeval.evalOnce(createDocker)
   final def docker: Docker                      = dockerSingleton()
@@ -16,7 +16,7 @@ trait DockerBased extends BeforeAndAfterAll {
         docker.printThreadDump(node)
     }
     val r = super.runTest(testName, args)
-    if (!r.succeeds()) printThreadDump()
+    if (!r.succeeds() && Option(System.getenv("DISABLE_THREAD_DUMPS")).isEmpty) printThreadDump()
     r
   }
 

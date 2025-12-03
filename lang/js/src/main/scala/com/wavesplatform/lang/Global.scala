@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import java.math.{BigInteger, BigDecimal as BD}
 import scala.collection.mutable
 import scala.scalajs.js.JSConverters.*
-import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
+import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array, TA2AB}
 import scala.util.Try
 
 object Global extends BaseGlobal {
@@ -20,7 +20,8 @@ object Global extends BaseGlobal {
       x <- Try(Base58.decode(input)).toEither.leftMap(_.getMessage)
     } yield x
 
-  override def base64Encode(input: Array[Byte]): Either[String, String] = Right(Base64.encode(input))
+  override def base64Encode(input: Array[Byte], limit: Int): Either[String, String] =
+    Either.cond(input.length <= limit, Base64.encode(input), s"base64Encode input exceeds $limit")
   override def base64Decode(input: String, limit: Int): Either[String, Array[Byte]] =
     for {
       _ <- Either.cond(input.length <= limit, {}, s"Input is too long (${input.length}), limit is $limit")
@@ -31,9 +32,8 @@ object Global extends BaseGlobal {
   override def base16EncodeImpl(input: Array[Byte]): Either[String, String] = {
     val output = new StringBuilder(input.length * 2)
     for (b <- input) {
-      b.toHexString
-      output.append(hex((b >> 4) & 0xf))
-      output.append(hex(b & 0xf))
+      output.append(hex((b.toInt >> 4) & 0xf))
+      output.append(hex(b.toInt & 0xf))
     }
     Right(output.result())
   }
@@ -140,6 +140,6 @@ object Global extends BaseGlobal {
   override def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     ???
 
-  override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] =
+  override def ecrecover(messageHash: Array[Byte], signature: Array[Byte], handleLeadingZerosInPublicKey: Boolean): Array[Byte] =
     ???
 }

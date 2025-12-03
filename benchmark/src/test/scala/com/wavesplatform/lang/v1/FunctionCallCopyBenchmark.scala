@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.FunctionCallCopyBenchmark.FuncCallSt
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import org.openjdk.jmh.annotations.*

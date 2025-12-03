@@ -1,12 +1,12 @@
 package com.wavesplatform.api.grpc
 
 import com.wavesplatform.api.http.ApiError
-import com.wavesplatform.api.http.ApiError._
+import com.wavesplatform.api.http.ApiError.*
 import io.grpc.Metadata.AsciiMarshaller
 import io.grpc.{Metadata, Status, StatusException}
 
 object GRPCErrors {
-  private[this] val IntMarshaller: AsciiMarshaller[Int] = new AsciiMarshaller[Int] {
+  private val IntMarshaller: AsciiMarshaller[Int] = new AsciiMarshaller[Int] {
     override def toAsciiString(value: Int): String         = value.toString
     override def parseAsciiString(serialized: String): Int = serialized.toInt
   }

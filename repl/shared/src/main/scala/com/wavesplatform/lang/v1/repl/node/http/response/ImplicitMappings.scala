@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.repl.node.http.response
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.repl.node.http.response.model._
+import com.wavesplatform.lang.v1.repl.node.http.response.model.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo, Tx}
 
@@ -9,11 +9,12 @@ case class ImplicitMappings(chainId: Byte) {
   private val chainDependentMapper = new ChainDependentMapper(chainId)
 
   implicit val heightO: HeightResponse => Option[Long] =
-    (r: HeightResponse) => if(r.succeed) {
-      Some(r.height)
-    } else {
-      None
-    }
+    (r: HeightResponse) =>
+      if (r.succeed) {
+        Some(r.height)
+      } else {
+        None
+      }
 
   implicit val heightM: HeightResponse => Long =
     _.height

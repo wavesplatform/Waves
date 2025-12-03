@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.v1.compiler.Types.*
+import com.wavesplatform.lang.v1.traits.domain.AttachedPayments.*
 
 object Types {
 

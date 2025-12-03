@@ -1,7 +1,7 @@
 package com.wavesplatform.protobuf.transaction
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.protobuf._
+import com.wavesplatform.protobuf.*
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 

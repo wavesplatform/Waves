@@ -1,5 +1,7 @@
 package com.wavesplatform.settings
 
+import pureconfig.*
+
 case class UtxSettings(
     maxSize: Int,
     maxBytesSize: Long,
@@ -11,4 +13,4 @@ case class UtxSettings(
     allowSkipChecks: Boolean,
     forceValidateInCleanup: Boolean,
     alwaysUnlimitedExecution: Boolean
-)
+) derives ConfigReader

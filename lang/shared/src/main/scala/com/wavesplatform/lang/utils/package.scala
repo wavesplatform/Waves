@@ -1,10 +1,9 @@
 package com.wavesplatform.lang
 
-import cats.{Id, Monoid}
-import cats.syntax.traverse.*
 import cats.implicits.catsSyntaxSemigroup
+import cats.{Id, Monoid}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.Script
@@ -12,16 +11,15 @@ import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
-import com.wavesplatform.lang.v1.evaluator.{FunctionIds, Log}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.{FunctionIds, Log}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
 import monix.eval.Coeval
-import shapeless.Coproduct
 
 import scala.collection.mutable
 
@@ -47,13 +45,13 @@ package object utils {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-    override def tthis: Environment.Tthis                                              = Coproduct(Recipient.Address(ByteStr.empty))
-    override def multiPaymentAllowed: Boolean                                          = true
-    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]     = ???
-    override def addressFromString(address: String): Either[String, Recipient.Address] = ???
-    override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]     = ???
-    override def accountScript(addressOrAlias: Recipient): Option[Script]              = ???
-    override def calculateDelay(gt: ByteStr, b: Long): Long                            = ???
+    override def tthis: Environment.Tthis                                                                        = Recipient.Address(ByteStr.empty)
+    override def multiPaymentAllowed: Boolean                                                                    = true
+    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
+    override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+    override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]                               = ???
+    override def accountScript(addressOrAlias: Recipient): Option[Script]                                        = ???
+    override def calculateDelay(gt: ByteStr, b: Long): Long                                                      = ???
     override def callScript(
         dApp: Address,
         func: String,
@@ -64,21 +62,22 @@ package object utils {
     ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
   }
 
-  val lazyContexts: Map[(DirectiveSet, Boolean, Boolean), Coeval[CTX[Environment]]] =
+  val lazyContexts: Map[(DirectiveSet, Boolean, Boolean, Boolean), Coeval[CTX[Environment]]] =
     (for {
       version     <- DirectiveDictionary[StdLibVersion].all
       scriptType  <- DirectiveDictionary[ScriptType].all
       contentType <- DirectiveDictionary[ContentType].all if contentType != DApp || (contentType == DApp && version >= V3 && scriptType == Account)
       useNewPowPrecision <- Seq(false, true)
       fixBigScriptField  <- Seq(false, true)
+      fixEcRecover       <- Seq(false, true)
     } yield {
       val ds = DirectiveSet(version, scriptType, contentType).explicitGet()
       val ctx = Coeval.evalOnce(
         PureContext.build(version, useNewPowPrecision).withEnvironment[Environment] |+|
-          CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+          CryptoContext.build(Global, version, fixEcRecover).withEnvironment[Environment] |+|
           WavesContext.build(Global, ds, fixBigScriptField)
       )
-      (ds, useNewPowPrecision, fixBigScriptField) -> ctx
+      (ds, useNewPowPrecision, fixBigScriptField, fixEcRecover) -> ctx
     }).toMap
 
   private val lazyFunctionCosts: Map[DirectiveSet, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
@@ -104,12 +103,7 @@ package object utils {
         (ds._1.stdLibVersion, ds._1.contentType)
       }
       .view
-      .mapValues(
-        _.toList
-          .map(_._2)
-          .sequence
-          .map(Monoid.combineAll[CTX[Environment]])()
-      )
+      .mapValues(x => Monoid.combineAll(x.values.map(_.value())))
       .toMap
 
   private val combinedFunctionCosts: Map[(StdLibVersion, ContentType), Map[FunctionHeader, Coeval[Long]]] =
@@ -119,10 +113,7 @@ package object utils {
       }
       .view
       .mapValues(
-        _.toList
-          .map(_._2)
-          .sequence
-          .map(_.foldLeft(Map.empty[FunctionHeader, Coeval[Long]])(_ ++ _))()
+        _.values.map(_.value()).foldLeft(Map.empty[FunctionHeader, Coeval[Long]])(_ ++ _)
       )
       .toMap
 
@@ -165,7 +156,7 @@ package object utils {
       ScriptType.isAssetScript(isTokenContext),
       if (isContract) DApp else Expression
     )
-    lazyContexts((ds.explicitGet(), true, true)).value()
+    lazyContexts((ds.explicitGet(), true, true, true)).value()
   }
 
   def compilerContext(version: StdLibVersion, cType: ContentType, isAssetScript: Boolean): CompilerContext = {
@@ -174,7 +165,7 @@ package object utils {
   }
 
   def compilerContext(ds: DirectiveSet): CompilerContext =
-    lazyContexts((ds.copy(imports = Imports()), true, true))().compilerContext
+    lazyContexts((ds.copy(imports = Imports()), true, true, true))().compilerContext
 
   def getDecompilerContext(v: StdLibVersion, cType: ContentType): DecompilerContext =
     combinedContext((v, cType)).decompilerContext

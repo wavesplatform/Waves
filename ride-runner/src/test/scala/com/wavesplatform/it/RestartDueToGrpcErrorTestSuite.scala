@@ -76,7 +76,7 @@ class RestartDueToGrpcErrorTestSuite extends BaseTestSuite with TableDrivenPrope
           )
         }
         .lastL
-        .runToFuture(testScheduler)
+        .runToFuture(using testScheduler)
 
       stream.start(Height(3))
 

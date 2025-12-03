@@ -6,7 +6,8 @@ import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{TransactionStatus as PBTransactionStatus, *}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.invokeExpressionFee
@@ -24,8 +25,10 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.utils.Schedulers
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
+import monix.execution.ExecutionModel.SynchronousExecution
 import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
 import play.api.libs.json.Json
@@ -37,12 +40,13 @@ object AsyncGrpcApi {
   implicit class NodeAsyncGrpcApi(val n: Node) {
 
     import com.wavesplatform.protobuf.transaction.{Transaction as PBTransaction, *}
-    import monix.execution.Scheduler.Implicits.global
 
-    private[this] lazy val assets       = AssetsApiGrpc.stub(n.grpcChannel)
-    private[this] lazy val accounts     = AccountsApiGrpc.stub(n.grpcChannel)
-    private[this] lazy val blocks       = BlocksApiGrpc.stub(n.grpcChannel)
-    private[this] lazy val transactions = TransactionsApiGrpc.stub(n.grpcChannel)
+    private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
+    
+    private lazy val assets       = AssetsApiGrpc.stub(n.grpcChannel)
+    private lazy val accounts     = AccountsApiGrpc.stub(n.grpcChannel)
+    private lazy val blocks       = BlocksApiGrpc.stub(n.grpcChannel)
+    private lazy val transactions = TransactionsApiGrpc.stub(n.grpcChannel)
 
     val chainId: Byte = AddressScheme.current.chainId
 

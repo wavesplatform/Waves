@@ -7,7 +7,7 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.*
@@ -23,9 +23,8 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, Contextful
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
-import com.wavesplatform.lang.{CoevalF, CommonError, ExecutionError, FailOrRejectError, ThrownError}
+import com.wavesplatform.lang.{CoevalF, CommonError, ExecutionError, FailOrRejectError, ThrownError, toError}
 import monix.eval.Coeval
-import shapeless.Coproduct.unsafeGet
 
 object Functions {
   private def getDataFromStateF(name: String, internalName: Short, dataType: DataType, selfCall: Boolean): BaseFunction[Environment] = {
@@ -61,7 +60,7 @@ object Functions {
 
       new ContextfulNativeFunction.Simple[Environment](name, resultType, args) {
         override def evaluate[F[_]: Monad](env: Environment[F], args: List[EVALUATED]): F[Either[ExecutionError, EVALUATED]] = {
-          (unsafeGet(env.tthis), args) match {
+          (env.tthis, args) match {
             case (address: Recipient.Address, CONST_STRING(key) :: Nil) if selfCall =>
               getData(env, Bindings.senderObject(address), key)
             case (_, (addressOrAlias: CaseObj) :: CONST_STRING(key) :: Nil) =>
@@ -146,7 +145,7 @@ object Functions {
   private def getDataByIndexF(name: String, dataType: DataType, version: StdLibVersion): BaseFunction[Environment] =
     UserFunction(
       name,
-      Map[StdLibVersion, Long](V1 -> 30L, V2 -> 30L, V3 -> 30L, V4 -> 4L),
+      Map[StdLibVersion, Long](V1 -> 30L, V2 -> 30L, V3 -> 30L, V4 -> 4L, V9 -> 2L),
       UNION(dataType.innerType, UNIT),
       ("@data", LIST(commonDataEntryType(version))),
       ("@index", LONG)
@@ -440,13 +439,13 @@ object Functions {
               caseObjToRecipient(c)
                 .fold(
                   _.asLeft[EVALUATED].pure[F],
-                  r => env.accountBalanceOf(r, None).map(_.map(CONST_LONG).leftMap(CommonError(_)))
+                  r => env.accountBalanceOf(r, None).map(_.map(CONST_LONG.apply).leftMap(CommonError(_)))
                 )
             case (c: CaseObj) :: CONST_BYTESTR(assetId: ByteStr) :: Nil =>
               caseObjToRecipient(c)
                 .fold(
                   _.asLeft[EVALUATED].pure[F],
-                  r => env.accountBalanceOf(r, Some(assetId.arr)).map(_.map(CONST_LONG).leftMap(CommonError(_)))
+                  r => env.accountBalanceOf(r, Some(assetId.arr)).map(_.map(CONST_LONG.apply).leftMap(CommonError(_)))
                 )
             case xs =>
               notImplemented[F, EVALUATED](s"assetBalance(a: Address|Alias, u: ByteVector|Unit)", xs)
@@ -470,7 +469,7 @@ object Functions {
               caseObjToRecipient(c)
                 .fold(
                   _.asLeft[EVALUATED].pure[F],
-                  r => env.accountBalanceOf(r, Some(assetId.arr)).map(_.map(CONST_LONG).leftMap(CommonError(_)))
+                  r => env.accountBalanceOf(r, Some(assetId.arr)).map(_.map(CONST_LONG.apply).leftMap(CommonError(_)))
                 )
             case xs =>
               notImplemented[F, EVALUATED](s"assetBalance(a: Address|Alias, u: ByteVector)", xs)
@@ -614,7 +613,7 @@ object Functions {
             env: Environment[F],
             args: List[EVALUATED],
             availableComplexity: Int
-        )(implicit monad: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, (EVALUATED, Log[F])], Int)]] = {
+        )(implicit monad: Monad[CoevalF[F]]): Coeval[F[(Either[ExecutionError, (EVALUATED, Log[F])], Int)]] = {
           def thrown[R](message: String): F[Either[ExecutionError, R]] =
             (ThrownError(message): ExecutionError).asLeft[R].pure[F]
 
@@ -628,7 +627,7 @@ object Functions {
                   }
                 case (dApp: CaseObj) :: _ if dApp.caseType == aliasType =>
                   dApp.fields.get("alias") match {
-                    case Some(CONST_STRING(a)) => env.resolveAlias(a).map(_.bimap(ThrownError, _.bytes))
+                    case Some(CONST_STRING(a)) => env.resolveAlias(a).map(_.bimap(ThrownError.apply, _.bytes))
                     case arg                   => thrown(s"Unexpected alias arg $arg")
                   }
                 case arg :: _ =>
@@ -705,7 +704,7 @@ object Functions {
     UserFunction(
       f.name ++ ExtractedFuncPostfix,
       ExtractedFuncPrefix ++ f.header.toString,
-      f.costByLibVersionMap,
+      f.costByLibVersionMap.toMap,
       f.signature.result.asInstanceOf[UNION].typeList.find(_ != UNIT).get,
       args*
     ) {

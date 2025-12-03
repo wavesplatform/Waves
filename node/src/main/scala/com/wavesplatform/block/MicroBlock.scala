@@ -17,20 +17,22 @@ case class MicroBlock(
     sender: PublicKey,
     transactionData: Seq[Transaction],
     reference: BlockId,
-    totalResBlockSig: BlockId,
+    totalResBlockSig: ByteStr,
     signature: ByteStr,
-    stateHash: Option[ByteStr]
+    stateHash: Option[ByteStr],
+    finalizationVoting: Option[FinalizationVoting]
 ) extends Signed {
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(MicroBlockSerializer.toBytes(this))
 
-  private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(copy(signature = ByteStr.empty).bytes())
+  val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(copy(signature = ByteStr.empty).bytes())
 
   override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature, bytesWithoutSignature(), sender))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
-  override def toString: String = s"MicroBlock(... -> ${reference.trim}, txs=${transactionData.size}"
+  override def toString: String = s"MicroBlock(... -> ${reference.trim}, txs=${transactionData.size})"
 
-  def stringRepr(totalBlockId: ByteStr): String = s"MicroBlock(${totalBlockId.trim} -> ${reference.trim}, txs=${transactionData.size})"
+  def stringRepr(totalBlockId: ByteStr): String =
+    s"MicroBlock(${totalBlockId.trim} -> ${reference.trim}, txs=${transactionData.size})"
 }
 
 object MicroBlock {
@@ -40,11 +42,13 @@ object MicroBlock {
       transactionData: Seq[Transaction],
       reference: BlockId,
       totalResBlockSig: BlockId,
-      stateHash: Option[ByteStr]
+      stateHash: Option[ByteStr],
+      finalizationVoting: Option[FinalizationVoting]
   ): Either[ValidationError, MicroBlock] =
-    MicroBlock(version, generator.publicKey, transactionData, reference, totalResBlockSig, ByteStr.empty, stateHash).validate
+    MicroBlock(version, generator.publicKey, transactionData, reference, totalResBlockSig, ByteStr.empty, stateHash, finalizationVoting).validate
       .map(_.sign(generator.privateKey))
 
+  // Legacy
   def parseBytes(bytes: Array[Byte]): Try[MicroBlock] =
     MicroBlockSerializer
       .parseBytes(bytes)

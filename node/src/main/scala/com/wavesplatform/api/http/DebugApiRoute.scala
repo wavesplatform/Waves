@@ -1,31 +1,31 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.headers.Accept
-import akka.http.scaladsl.server.Route
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.account.{Address, PKKeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.RocksDBWriter
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, *}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash, TxMeta}
+import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, SnapshotBlockchain, TxMeta, StateHash}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{ScorexLogging, Time, byteStrFormat}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.headers.Accept
+import org.apache.pekko.http.scaladsl.server.Route
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
@@ -54,9 +54,7 @@ case class DebugApiRoute(
     mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
     scoreReporter: Coeval[RxScoreObserver.Stats],
     configRoot: ConfigObject,
-    loadBalanceHistory: Address => Seq[(Int, Long)],
-    loadStateHash: Int => Option[StateHash],
-    priorityPoolBlockchain: () => Option[Blockchain],
+    db: RocksDBWriter,
     routeTimeout: RouteTimeout,
     heavyRequestScheduler: Scheduler
 ) extends ApiRoute
@@ -71,7 +69,7 @@ case class DebugApiRoute(
 
   override val settings: RestAPISettings = ws.restAPISettings
 
-  private[this] val serializer = TransactionJsonSerializer(blockchain, transactionsApi)
+  private val serializer = TransactionJsonSerializer(blockchain)
 
   override lazy val route: Route = pathPrefix("debug") {
     balanceHistory ~ stateHash ~ validate ~ withAuth {
@@ -86,7 +84,7 @@ case class DebugApiRoute(
     })
 
   def balanceHistory: Route = (path("balances" / "history" / AddrSegment) & get) { address =>
-    complete(Json.toJson(loadBalanceHistory(address).map { case (h, b) =>
+    complete(Json.toJson(db.loadBalanceHistory(address).map { case (h, b) =>
       Json.obj("height" -> h, "balance" -> b)
     }))
   }
@@ -198,14 +196,13 @@ case class DebugApiRoute(
 
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
-      val resBlockchain = priorityPoolBlockchain().getOrElse(blockchain)
-      val startTime     = System.nanoTime()
+      val startTime = System.nanoTime()
 
       val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
 
       val tracedSnapshot = for {
         tx   <- TracedResult(parsedTransaction)
-        diff <- TransactionDiffer.forceValidate(resBlockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(resBlockchain, tx)
+        diff <- TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(blockchain, tx)
       } yield (tx, diff)
 
       val error = tracedSnapshot.resultE match {
@@ -219,7 +216,7 @@ case class DebugApiRoute(
         .fold(
           _ => this.serializer,
           { case (_, snapshot) =>
-            val snapshotBlockchain = SnapshotBlockchain(resBlockchain, snapshot)
+            val snapshotBlockchain = SnapshotBlockchain(blockchain, snapshot)
             this.serializer.copy(blockchain = snapshotBlockchain)
           }
         )
@@ -231,8 +228,8 @@ case class DebugApiRoute(
             val meta = tx match {
               case ist: InvokeScriptTransaction =>
                 val result = diff.scriptResults.get(ist.id())
-                TransactionMeta.Invoke(Height(resBlockchain.height), ist, TxMeta.Status.Succeeded, diff.scriptsComplexity, result)
-              case tx => TransactionMeta.Default(Height(resBlockchain.height), tx, TxMeta.Status.Succeeded, diff.scriptsComplexity)
+                TransactionMeta.Invoke(Height(blockchain.height), ist, TxMeta.Status.Succeeded, diff.scriptsComplexity, result)
+              case tx => TransactionMeta.Default(Height(blockchain.height), tx, TxMeta.Status.Succeeded, diff.scriptsComplexity)
             }
             serializer.transactionWithMetaJson(meta)
           }
@@ -242,10 +239,10 @@ case class DebugApiRoute(
         "valid"          -> error.isEmpty,
         "validationTime" -> (System.nanoTime() - startTime).nanos.toMillis,
         "trace" -> tracedSnapshot.trace.map {
-          case ist: InvokeScriptTrace => ist.maybeLoggedJson(logged = true)(serializer.invokeScriptResultWrites)
+          case ist: InvokeScriptTrace => ist.maybeLoggedJson(logged = true)(using serializer.invokeScriptResultWrites)
           case trace                  => trace.loggedJson
         },
-        "height" -> resBlockchain.height
+        "height" -> blockchain.height
       )
 
       error.fold(response ++ extendedJson)(err =>
@@ -259,14 +256,20 @@ case class DebugApiRoute(
 
   private def stateHashAt(height: Int): Route = {
     val result = for {
-      sh <- loadStateHash(height)
+      sh <- db.loadStateHash(Height(height))
       h  <- blockchain.blockHeader(height)
-    } yield Json.toJson(sh).as[JsObject] ++ Json.obj(
-      "blockId"    -> h.id().toString,
-      "baseTarget" -> h.header.baseTarget,
-      "height"     -> height,
-      "version"    -> Version.VersionString
-    )
+    } yield {
+      val deterministicFinalityActivated =
+        blockchain.isFeatureActivated(com.wavesplatform.features.BlockchainFeatures.DeterministicFinality, height)
+      val stateHashJson = StateHash.toJson(sh, deterministicFinalityActivated)
+      stateHashJson ++ Json.obj(
+        "snapshotHash" -> db.snapshotStateHash(height),
+        "blockId"      -> h.id().toString,
+        "baseTarget"   -> h.header.baseTarget,
+        "height"       -> height,
+        "version"      -> Version.VersionString
+      )
+    }
 
     result match {
       case Some(value) => complete(value)
@@ -323,13 +326,17 @@ object DebugApiRoute {
     })
   }
 
-  implicit val portfolioJsonWrites: Writes[Portfolio] = Writes { pf =>
-    JsObject(
-      Map(
-        "balance" -> JsNumber(pf.balance),
-        "lease"   -> Json.toJson(pf.lease),
-        "assets"  -> Json.toJson(pf.assets)
+  implicit val portfolioJsonWrites: Writes[Portfolio] = {
+    implicit val assetWrites: Writes[IssuedAsset] = Asset.assetWrites
+    Writes { pf =>
+      JsObject(
+        Map(
+          "balance"           -> JsNumber(pf.balance),
+          "lease"             -> Json.toJson(pf.lease),
+          "assets"            -> Json.toJson(pf.assets),
+          "generationDeposit" -> JsNumber(pf.generationDeposit)
+        )
       )
-    )
+    }
   }
 }

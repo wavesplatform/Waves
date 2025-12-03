@@ -118,7 +118,7 @@ object WavesContext {
         getStringByIndexF(version),
         if (version >= V4) addressFromStringV4 else addressFromStringF(version),
         if (version >= V6) addressFromPublicKeyNative else addressFromPublicKeyF(version)
-      ) ++ (if (version >= V5) Array(accountScriptHashF(global)) else Array())
+      ) ++ (if (version >= V5) Array(accountScriptHashF(global)) else Array.empty[BaseFunction[Environment]])
 
     val versionSpecificFuncs =
       version match {

@@ -1,37 +1,39 @@
 package com.wavesplatform.it.api
 
-import java.net.InetSocketAddress
-import akka.http.scaladsl.model.StatusCodes.BadRequest
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
-import com.wavesplatform.api.http.requests.IssueRequest
+import com.wavesplatform.api.http.requests.{CommitToGenerationRequest, IssueRequest}
 import com.wavesplatform.api.http.{ApiError, DebugMessage}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, GenerationPeriod, Height}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TxExchangeAmount, TxExchangePrice, TxVersion}
+import com.wavesplatform.transaction.{Asset, TransactionType, TxExchangeAmount, TxExchangePrice, TxVersion}
 import io.grpc.Status.Code
+import org.apache.pekko.http.scaladsl.model.StatusCodes.BadRequest
+import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, matchers}
 import play.api.libs.json.*
 import play.api.libs.json.Json.parse
 
+import java.net.InetSocketAddress
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Awaitable, Future}
 import scala.util.*
+import scala.util.chaining.*
 import scala.util.control.NonFatal
 
 object SyncHttpApi extends Assertions with matchers.should.Matchers {
@@ -180,7 +182,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def activationStatus: ActivationStatus =
       sync(async(n).activationStatus)
 
-    def rewardStatus(height: Option[Int] = None, amountsAsStrings: Boolean = false): RewardStatus =
+    def rewardStatus(height: Option[Height] = None, amountsAsStrings: Boolean = false): RewardStatus =
       sync(async(n).rewardStatus(height, amountsAsStrings))
 
     def seed(address: String): String =
@@ -192,7 +194,9 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def lastBlockHeader(amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).lastBlockHeader(amountsAsStrings))
 
-    def blockHeadersAt(height: Int, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeadersAt(height, amountsAsStrings))
+    def finalizedBlockHeader(amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).finalizedBlockHeader(amountsAsStrings))
+
+    def blockHeaderAt(height: Height, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeaderAt(height, amountsAsStrings))
 
     def blockHeaderForId(id: String, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeaderForId(id, amountsAsStrings))
 
@@ -214,10 +218,10 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def accountBalances(acc: String): (Long, Long) =
       sync(async(n).accountBalances(acc))
 
-    def balanceAtHeight(address: String, height: Int): Long =
+    def balanceAtHeight(address: String, height: Height): Long =
       sync(async(n).balanceAtHeight(address, height))
 
-    def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String] = None): Seq[(String, Long)] =
+    def accountsBalances(height: Option[Height], accounts: Seq[String], asset: Option[String] = None): Seq[(String, Long)] =
       sync(async(n).accountsBalances(height, accounts, asset))
 
     def balance(address: String, confirmations: Option[Int] = None, amountsAsStrings: Boolean = false): Balance =
@@ -254,7 +258,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def assetDistributionAtHeight(
         asset: String,
-        height: Int,
+        height: Height,
         limit: Int,
         maybeAfter: Option[String] = None,
         amountsAsStrings: Boolean = false
@@ -544,6 +548,13 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def getMerkleProofPost(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProofPost(ids*))
 
+    def sign(req: CommitToGenerationRequest): Transaction =
+      sign(Json.obj("type" -> TransactionType.CommitToGeneration.id) ++ Json.toJsObject(req)).tap { r =>
+        require(r._type == TransactionType.CommitToGeneration.id)
+      }
+
+    def sign(json: JsValue): Transaction = sync(async(n).sign(json))
+
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
 
@@ -596,8 +607,17 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def waitForTransaction(txId: String, timeout: FiniteDuration = 2.minutes): TransactionInfo =
       sync(async(n).waitForTransaction(txId), timeout)
 
-    def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
+    def waitForHeight(expectedHeight: Height, requestAwaitTime: FiniteDuration = RequestAwaitTime): Height =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
+
+    def currentGenerationPeriod: Option[GenerationPeriod] = for {
+      activationStatus <- sync(async(n).activationStatus).features.find(_.id == BlockchainFeatures.DeterministicFinality.id)
+      activation       <- activationStatus.activationHeight
+      r                <- GenerationPeriod.from(sync(async(n).height), activation, n.settings)
+    } yield r
+
+    def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Height =
+      waitForHeight(p.start, requestAwaitTime)
 
     def blacklist(address: InetSocketAddress): Unit =
       sync(async(n).blacklist(address))
@@ -610,26 +630,33 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def transactionSerializer(body: JsObject): TransactionSerialize = sync(async(n).transactionSerializer(body))
 
-    def debugStateAt(height: Long): Map[String, Long] = sync(async(n).debugStateAt(height))
+    def debugStateAt(height: Height): Map[String, Long] = sync(async(n).debugStateAt(height))
 
     def debugBalanceHistory(address: String, amountsAsStrings: Boolean = false): Seq[BalanceHistory] =
       sync(async(n).debugBalanceHistory(address, amountsAsStrings))
 
-    def height: Int =
-      sync(async(n).height)
+    def height: Height = sync(async(n).height)
 
-    def blockAt(height: Int, amountsAsStrings: Boolean = false): Block = sync(async(n).blockAt(height, amountsAsStrings))
+    def finalizedHeight: Height = sync(async(n).finalizedHeight)
 
-    def blockSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[Block] =
+    def finalizedHeightAt(at: Height): Height = sync(async(n).finalizedHeightAt(at))
+
+    def blockAt(height: Height, amountsAsStrings: Boolean = false): Block = sync(async(n).blockAt(height, amountsAsStrings))
+
+    def blockSeq(fromHeight: Height, toHeight: Height, amountsAsStrings: Boolean = false): Seq[Block] =
       sync(async(n).blockSeq(fromHeight, toHeight, amountsAsStrings))
 
-    def blockSeqByAddress(address: String, from: Int, to: Int, amountsAsStrings: Boolean = false): Seq[Block] =
+    def blockSeqByAddress(address: String, from: Height, to: Height, amountsAsStrings: Boolean = false): Seq[Block] =
       sync(async(n).blockSeqByAddress(address, from, to, amountsAsStrings))
 
-    def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
+    def blockHeadersSeq(fromHeight: Height, toHeight: Height, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
       sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
 
-    def rollback(to: Int, returnToUTX: Boolean = true): Unit =
+    def generators(atHeight: Height, amountsAsStrings: Boolean = false): Seq[GeneratorsResponse.Entry] = sync(
+      async(n).generators(atHeight, amountsAsStrings)
+    )
+
+    def rollback(to: Height, returnToUTX: Boolean = true): Unit =
       sync(async(n).rollback(to, returnToUTX))
 
     def findTransactionInfo(txId: String): Option[TransactionInfo] = sync(async(n).findTransactionInfo(txId))
@@ -641,6 +668,9 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def blacklistedPeers: Seq[BlacklistedPeer] =
       sync(async(n).blacklistedPeers)
+
+    def allPeers: Seq[KnownPeer] =
+      sync(async(n).allPeers)
 
     def waitFor[A](desc: String)(f: Node => A, cond: A => Boolean, retryInterval: FiniteDuration): A =
       sync(async(n).waitFor[A](desc)(x => Future.successful(f(x.n)), cond, retryInterval), 5.minutes)
@@ -753,24 +783,24 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
 
-    private[this] def withTxIdMessage[T](transactionId: String)(f: => T): T =
+    private def withTxIdMessage[T](transactionId: String)(f: => T): T =
       try f
       catch { case NonFatal(cause) => throw new RuntimeException(s"Error awaiting transaction: $transactionId", cause) }
 
-    def height(implicit pos: Position): Seq[Int] =
+    def height: Seq[Height] =
       sync(async(nodes).height, TxInBlockchainAwaitTime)
 
-    def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
+    def waitForHeightAriseAndTxPresent(transactionId: String): Unit =
       withTxIdMessage(transactionId)(sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime))
 
-    def waitForTransaction(transactionId: String)(implicit pos: Position): TransactionInfo =
+    def waitForTransaction(transactionId: String): TransactionInfo =
       withTxIdMessage(transactionId)(sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime))
 
-    def waitForHeightArise(): Int =
+    def waitForHeightArise(): Height =
       sync(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)
 
     def waitForSameBlockHeadersAt(
-        height: Int,
+        height: Height,
         retryInterval: FiniteDuration = 5.seconds,
         conditionAwaitTime: FiniteDuration = ConditionAwaitTime
     ): Boolean =
@@ -778,14 +808,14 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def waitFor[A](desc: String, retryInterval: FiniteDuration = 1.second)(request: Node => A)(cond: Iterable[A] => Boolean): Boolean =
       sync(
-        async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
+        async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(using scala.concurrent.ExecutionContext.Implicits.global), cond),
         ConditionAwaitTime
       )
 
     def waitForEmptyUtx(): Unit =
       waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
 
-    def rollbackWithoutBlacklisting(height: Int, returnToUTX: Boolean = true): Unit = {
+    def rollbackWithoutBlacklisting(height: Height, returnToUTX: Boolean = true): Unit = {
       sync(
         Future.traverse(nodes) { node =>
           com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollback(height, returnToUTX)
@@ -794,7 +824,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       )
     }
 
-    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+    def rollback(height: Height, returnToUTX: Boolean = true): Unit = {
       val combinations = nodes.combinations(2).toSeq
       combinations.foreach { ns =>
         ns.head.blacklist(ns(1).networkAddress)
@@ -809,7 +839,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       }
     }
 
-    def waitForHeight(height: Int): Unit = {
+    def waitForHeight(height: Height): Unit = {
       sync(
         Future.traverse(nodes) { node =>
           com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).waitForHeight(height)

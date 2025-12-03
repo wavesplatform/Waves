@@ -1,14 +1,12 @@
 package com.wavesplatform.state
 
-import java.io.File
-import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
-
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.*
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.database
 import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
@@ -17,7 +15,10 @@ import com.wavesplatform.transaction.Transaction
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
+import java.io.File
+import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import scala.io.Codec
+import scala.util.Using
 
 /** Tests over real database. How to test:
   *   1. Download a database 2. Import it:
@@ -51,22 +52,22 @@ object RocksDBWriterBenchmark {
 
   @State(Scope.Benchmark)
   class TransactionByIdSt extends BaseSt {
-    val allTxs: Vector[ByteStr] = load("transactionById", benchSettings.restTxsFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
+    val allTxs: Vector[ByteStr] = load(benchSettings.restTxsFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
   }
 
   @State(Scope.Benchmark)
   class TransactionByAddressSt extends BaseSt {
-    val txsAddresses: Vector[Address] = load("transactionByAddress", ???)(x => Address.fromString(x).explicitGet())
+    val txsAddresses: Vector[Address] = load(???)(x => Address.fromString(x).explicitGet())
   }
 
   @State(Scope.Benchmark)
   class BlocksByIdSt extends BaseSt {
-    val allBlocks: Vector[ByteStr] = load("blocksById", benchSettings.blocksFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
+    val allBlocks: Vector[ByteStr] = load(benchSettings.blocksFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
   }
 
   @State(Scope.Benchmark)
   class BlocksByHeightSt extends BaseSt {
-    val allBlocks: Vector[Int] = load("blocksByHeight", benchSettings.blocksFile)(_.toInt)
+    val allBlocks: Vector[Int] = load(benchSettings.blocksFile)(_.toInt)
   }
 
   @State(Scope.Benchmark)
@@ -87,30 +88,27 @@ object RocksDBWriterBenchmark {
       RDB.open(wavesSettings.dbSettings)
     }
 
-    val db = new RocksDBWriter(rawDB, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
+    val db = RocksDBWriter(rawDB, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
 
-    def loadBlockInfoAt(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
+    def loadBlockInfoAt(height: Height): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       loadBlockMetaAt(height).map { meta =>
-        meta -> database.loadTransactions(Height(height), rawDB)
+        meta -> database.loadTransactions(height, rawDB)
       }
 
-    def loadBlockMetaAt(height: Int): Option[BlockMeta] = rawDB.db.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb)
+    def loadBlockMetaAt(height: Height): Option[BlockMeta] = rawDB.db.get(Keys.blockMetaAt(height)).flatMap(BlockMeta.fromPb)
 
-    val cba = CommonBlocksApi(db, loadBlockMetaAt, loadBlockInfoAt)
+    val cba = CommonBlocksApi(wavesSettings.synchronizationSettings.maxRollback, db, loadBlockMetaAt, loadBlockInfoAt)
 
     def blockById(id: ByteStr): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = cba.block(id)
 
     @TearDown
     def close(): Unit = {
+      db.close()
       rawDB.close()
     }
 
-    protected def load[T](label: String, absolutePath: String)(f: String => T): Vector[T] = {
-      scala.io.Source
-        .fromFile(absolutePath)(Codec.UTF8)
-        .getLines()
-        .map(f)
-        .toVector
+    protected def load[T](absolutePath: String)(f: String => T): Vector[T] = {
+      Using.resource(scala.io.Source.fromFile(absolutePath)(using Codec.UTF8))(_.getLines().map(f).toVector)
     }
   }
 

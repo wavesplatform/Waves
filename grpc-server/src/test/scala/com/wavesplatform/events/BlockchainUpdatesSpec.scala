@@ -6,7 +6,7 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.InterferableDB
 import com.wavesplatform.events.FakeObserver.*
@@ -27,10 +27,10 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{DataEntry, InvokeScriptResult}
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation, Payment}
+import com.wavesplatform.protobuf.transaction.{DataEntry, InvokeScriptResult}
 import com.wavesplatform.settings.{Constants, WavesSettings}
-import com.wavesplatform.state.{AssetDescription, BlockRewardCalculator, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
+import com.wavesplatform.state.{AssetDescription, BlockRewardCalculator, EmptyDataEntry, Height, LeaseBalance, StringDataEntry, TransactionId}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
@@ -41,9 +41,10 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, GenesisTransaction, PaymentTransaction, TxHelpers}
-import com.wavesplatform.utils.byteStrOrdering
+import com.wavesplatform.utils.{Schedulers, byteStrOrdering}
 import io.grpc.StatusException
-import monix.execution.Scheduler.Implicits.global
+import monix.execution.ExecutionModel.SynchronousExecution
+import monix.execution.Scheduler
 import org.scalactic.source.Position
 import org.scalatest.Assertion
 import org.scalatest.concurrent.ScalaFutures
@@ -54,6 +55,8 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures {
+  private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
+  
   val currentSettings: WavesSettings = RideV5
 
   val transfer: TransferTransaction       = TxHelpers.transfer()
@@ -81,19 +84,19 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
   val description: AssetDescription =
     AssetDescription(
-      issue.assetId,
+      TransactionId(issue.assetId),
       issue.sender,
       issue.name,
       issue.description,
       issue.decimals.value,
       issue.reissuable,
       issue.quantity.value + reissue.quantity.value,
-      Height @@ 2,
+      Height(2),
       None,
       0L,
       nft = false,
       sequenceInBlock = 1,
-      issueHeight = Height @@ 2
+      issueHeight = Height(2)
     )
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(10 seconds, 500 millis)
@@ -314,11 +317,11 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         withDomainAndRepo(settings) { case (d, repo) =>
           d.appendBlock()
           d.blockchain.wavesAmount(1) shouldBe totalWaves + reward
-          repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
+          repo.getBlockUpdate(Height(1)).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
 
           d.appendBlock()
           d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
-          repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+          repo.getBlockUpdate(Height(2)).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
         }
       }
 
@@ -333,19 +336,19 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         withDomainAndRepo(settings) { case (d, repo) =>
           d.appendBlock()
           d.blockchain.wavesAmount(1) shouldBe totalWaves
-          repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves
+          repo.getBlockUpdate(Height(1)).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves
 
           d.appendBlock()
           d.blockchain.wavesAmount(2) shouldBe totalWaves
-          repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves
+          repo.getBlockUpdate(Height(2)).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves
 
           d.appendBlock()
           d.blockchain.wavesAmount(3) shouldBe totalWaves + reward
-          repo.getBlockUpdate(3).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
+          repo.getBlockUpdate(Height(3)).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
 
           d.appendBlock()
           d.blockchain.wavesAmount(4) shouldBe totalWaves + reward * 2
-          repo.getBlockUpdate(4).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+          repo.getBlockUpdate(Height(4)).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
         }
       }
 
@@ -359,17 +362,17 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
           d.appendMicroBlock(TxHelpers.transfer(TxHelpers.defaultSigner))
           d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
-          repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+          repo.getBlockUpdate(Height(2)).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
 
           // micro rollback
           d.appendKeyBlock(ref = Some(block.id()))
           d.blockchain.wavesAmount(3) shouldBe totalWaves + reward * 3
-          repo.getBlockUpdate(3).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 3
+          repo.getBlockUpdate(Height(3)).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 3
 
           // block rollback
           d.rollbackTo(2)
           d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
-          repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+          repo.getBlockUpdate(Height(2)).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
         }
       }
     }
@@ -391,13 +394,13 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
     "should include script updates" in withDomainAndRepo(RideV6) { case (d, repo) =>
       d.appendBlock(setScript1)
-      repo.getBlockUpdate(1).getUpdate.vanillaAppend.transactionStateUpdates.flatMap(_.scripts) shouldBe
+      repo.getBlockUpdate(Height(1)).getUpdate.vanillaAppend.transactionStateUpdates.flatMap(_.scripts) shouldBe
         setScript1.script.map(_.bytes()).toSeq.map { script =>
           ScriptUpdate(ByteStr(TxHelpers.defaultAddress.bytes), None, Some(script))
         }
 
       d.appendBlock(setScript2)
-      repo.getBlockUpdate(2).getUpdate.vanillaAppend.transactionStateUpdates.flatMap(_.scripts) shouldBe
+      repo.getBlockUpdate(Height(2)).getUpdate.vanillaAppend.transactionStateUpdates.flatMap(_.scripts) shouldBe
         (for {
           scriptBefore <- setScript1.script.map(_.bytes())
           scriptAfter  <- setScript2.script.map(_.bytes())
@@ -416,7 +419,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         .map(_.update.append.map(_.getBlock.vrf.toByteStr).filterNot(_.isEmpty))
 
       val expectedResult = d.blocksApi
-        .blocksRange(1, blocksCount)
+        .blocksRange(Height(1), Height(blocksCount))
         .toListL
         .runSyncUnsafe()
         .map(_._1.vrf)
@@ -484,19 +487,19 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
     "should return issued assets" in {
       val issue = TxHelpers.issue()
       val description = AssetDescription(
-        issue.assetId,
+        TransactionId(issue.assetId),
         issue.sender,
         issue.name,
         issue.description,
         issue.decimals.value,
         issue.reissuable,
         issue.quantity.value,
-        Height @@ 2,
+        Height(2),
         None,
         0L,
         nft = false,
         1,
-        Height @@ 1
+        Height(1)
       )
 
       withGenerateSubscription(settings = currentSettings) { d =>
@@ -726,7 +729,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val leaseId = d.blockchain.binaryData(issuerAddress, "leaseId").get
 
       def check()(implicit pos: Position): Unit = {
-        val genesisUpdate = repo.getBlockUpdate(1).getUpdate.vanillaAppend
+        val genesisUpdate = repo.getBlockUpdate(Height(1)).getUpdate.vanillaAppend
         genesisUpdate.referencedAssets.head.id shouldEqual assetId
         val leaseUpdate = genesisUpdate.transactionStateUpdates(3).leases.head
         leaseUpdate.originTransactionId shouldEqual invoke.id()
@@ -846,7 +849,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         val daoAddress        = d.settings.blockchainSettings.functionalitySettings.daoAddressParsed.toOption.flatten
         val xtnBuybackAddress = d.settings.blockchainSettings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
         val blockRewards = BlockRewardCalculator.getBlockRewardShares(
-          2,
+          Height(2),
           d.settings.blockchainSettings.rewardsSettings.initial,
           daoAddress,
           xtnBuybackAddress,
@@ -1091,6 +1094,33 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
             RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward5)
           ).sortBy(_.address.toByteStr)
         )
+      }
+    }
+
+    "should return correct updated_waves_amount when reward boost is active" in {
+      val settings = ConsensusImprovements
+        .setFeaturesHeight(
+          BlockchainFeatures.BlockReward -> 0,
+          BlockchainFeatures.BlockRewardDistribution -> 0,
+          BlockchainFeatures.BoostBlockReward        -> 5
+        )
+        .configure(fs =>
+          fs.copy(blockRewardBoostPeriod = 10)
+        )
+
+      withDomainAndRepo(settings) { case (d, repo) =>
+        d.appendBlock()
+        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+
+        (1 to 15).foreach(_ => d.appendBlock())
+
+
+        subscription
+          .fetchAllEvents(d.blockchain)
+        .map(_.getUpdate.getAppend.getBlock.updatedWavesAmount) shouldBe
+          (2 to 16).scanLeft(100_000_000.waves) { (total, height) => total + 6.waves * d.blockchain.blockRewardBoost(Height(height)) }
+
+
       }
     }
   }

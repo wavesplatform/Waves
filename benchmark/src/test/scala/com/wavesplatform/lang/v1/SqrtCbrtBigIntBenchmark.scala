@@ -7,7 +7,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import org.openjdk.jmh.annotations.{State, _}
+import org.openjdk.jmh.annotations.{State, *}
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -33,7 +33,7 @@ class SqrtCbrtBigIntBenchmark {
 @State(Scope.Benchmark)
 class SqrtBigIntSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts((ds, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts((ds, true, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val max = PureContext.BigIntMax
   val min = PureContext.BigIntMin

@@ -1,0 +1,61 @@
+# NPM registry supports only one source workflow per package: https://docs.npmjs.com/trusted-publishers#for-github-actions
+name: Publish packages to NPMJS
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version
+        required: true
+      tag:
+        description: Package tag
+        required: true
+        default: snapshot
+
+concurrency:
+  group: "npm-packages"
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: NPMJS
+      url: ${{ steps.publish.outputs.url }}
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: proudust/gh-describe@70f72d4f6304ea053cf5a3d71c36211d5acc0c73
+        id: ghd
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'sbt'
+      - uses: sbt/setup-sbt@v1
+      - run: sbt -Dproject.version=${{ steps.ghd.outputs.describe }} --batch ';lang-tests/test;lang-tests-js/test;repl/test;langJS/fullOptJS;replJS/fullOptJS'
+      - uses: actions/setup-node@v4
+        with:
+          registry-url: 'https://registry.npmjs.org'
+          node-version: '>=24.7.0' # Trusted publishing requires npm CLI version 11.5.1 or later.
+      - if: github.event_name == 'workflow_dispatch'
+        run:
+          echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
+          echo "TAG=${{ inputs.tag }}" >> $GITHUB_ENV
+      - if: github.event_name == 'release'
+        run: |
+          echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_ENV
+          echo "TAG=latest" >> $GITHUB_ENV
+      - id: publish
+        run: |
+          cd lang/js
+          npm version $VERSION --no-git-tag-version
+          npm publish --provenance --access public --tag $TAG
+          cd ../../repl/js
+          npm version $VERSION --no-git-tag-version
+          npm publish --provenance --access public --tag $TAG
+          echo "url=https://www.npmjs.com/package/@waves/ride-lang/v/$VERSION" >> "$GITHUB_OUTPUT"

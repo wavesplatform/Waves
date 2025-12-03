@@ -1,3 +1,9 @@
 package com.wavesplatform.settings
 
-final case class GRPCSettings(host: String, port: Int)
+import pureconfig.*
+
+final case class GRPCSettings(
+    host: String,
+    port: Int,
+    workerThreads: Int
+) derives ConfigReader

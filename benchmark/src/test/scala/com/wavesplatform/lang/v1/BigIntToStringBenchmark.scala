@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BIGINT, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.BIGINT_TO_STRING
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import org.openjdk.jmh.annotations.{State, _}
+import org.openjdk.jmh.annotations.{State, *}
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -27,7 +27,7 @@ class BigIntToStringBenchmark {
 @State(Scope.Benchmark)
 class BigIntToStringSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts((ds, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts((ds, true, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val expr = FUNCTION_CALL(
     Native(BIGINT_TO_STRING),

@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.AddressBenchmark.{CachedAddress, PublicKeySt, UncachedAddress}
 import com.wavesplatform.crypto.Curve25519
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 import scala.util.Random

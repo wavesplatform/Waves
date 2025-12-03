@@ -6,8 +6,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.BurnTransaction
-import play.api.libs.functional.syntax._
-import play.api.libs.json._
+import play.api.libs.functional.syntax.*
+import play.api.libs.json.*
 
 case class BurnRequest(
     version: Option[Byte],
@@ -19,7 +19,7 @@ case class BurnRequest(
     timestamp: Option[Long],
     signature: Option[ByteStr],
     proofs: Option[Proofs]
-) extends TxBroadcastRequest {
+) extends TxBroadcastRequest[BurnTransaction] {
   def toTxFrom(sender: PublicKey): Either[ValidationError, BurnTransaction] =
     for {
       validProofs <- toProofs(signature, proofs)
@@ -46,7 +46,7 @@ object BurnRequest {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").readNullable[Long] and
       (JsPath \ "signature").readNullable[ByteStr] and
-      (JsPath \ "proofs").readNullable[Proofs])(BurnRequest.apply _),
+      (JsPath \ "proofs").readNullable[Proofs])(BurnRequest.apply),
     Json.writes[BurnRequest]
   )
 }

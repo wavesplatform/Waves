@@ -1,0 +1,165 @@
+{
+  funcs : [
+    {
+      name: "+"
+      params: [ "Int", "Int" ]
+      doc: "Sum integers."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: "-"
+      params: [ "Int", "Int" ]
+      doc: "Subtract integers."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: "*"
+      params: [ "Int", "Int" ]
+      doc: "Multiply integers."
+      paramsDoc: [ "Multiplier", "Multiplier" ]
+      complexity: 1
+    }
+    {
+      name: "/"
+      params: [ "Int", "Int" ]
+      doc: "Divide integers."
+      paramsDoc: [ "Divisible", "Divisor" ]
+      complexity: 1
+    }
+    {
+      name: "%"
+      params: [ "Int", "Int" ]
+      doc: "Calculate modulo."
+      paramsDoc: [ "Divisible", "Divisor" ]
+      complexity: 1
+    }
+    {
+      name: "+"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Sum big integers."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: "-"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Subtract big integers."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: "*"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Multiply big integers."
+      paramsDoc: [ "Multiplier", "Multiplier" ]
+      complexity: 1
+    }
+    {
+      name: "/"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Divide big integers."
+      paramsDoc: [ "Divisible", "Divisor" ]
+      complexity: 1
+    }
+    {
+      name: "%"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Calculate big modulo."
+      paramsDoc: [ "Divisible", "Divisor" ]
+      complexity: 1
+    }
+    {
+      name: "+"
+      params: [ "String", "String" ]
+      doc: "Concat limited strings."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: "+"
+      params: [ "ByteVector", "ByteVector" ]
+      doc: "Concat limited byte vectors."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 2
+    }
+    {
+      name: "=="
+      params: [ "T", "T" ]
+      doc: "Check equality."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: "!="
+      params: [ "T", "T" ]
+      doc: "Check inequality."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: ">="
+      params: [ "Int", "Int" ]
+      doc: "Check if integer greater or equal comparison."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: ">"
+      params: [ "Int", "Int" ]
+      doc: "Check if integer greater comparison."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: ">="
+      params: [ "BigInt", "BigInt" ]
+      doc: "Check if integer greater or equal comparison."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: ">"
+      params: [ "BigInt", "BigInt" ]
+      doc: "Check if integer greater comparison."
+      paramsDoc: [ "First value", "Second value" ]
+      complexity: 1
+    }
+    {
+      name: "-"
+      params: [ "Int" ]
+      doc: "Change integer sign."
+      paramsDoc: [ "Value" ]
+      complexity: 1
+    }
+    {
+      name: "-"
+      params: [ "BigInt" ]
+      doc: "Change integer sign."
+      paramsDoc: [ "Value" ]
+      complexity: 1
+    }
+    {
+      name: "!"
+      params: [ "Boolean" ]
+      doc: "Unary negation."
+      paramsDoc: [ "Value" ]
+      complexity: 1
+    }
+    {
+      name: "++"
+      params: [ "List[A]", "List[B]" ]
+      doc: "List Concatenation."
+      paramsDoc: [ "First list", "Second list" ]
+      complexity: 4
+    }
+    {
+      name: ":+"
+      params: [ "List[A]", "B" ]
+      doc: "Adding the element to the end of the list."
+      paramsDoc: [ "The list", "The element" ]
+      complexity: 1
+    }
+  ]
+}

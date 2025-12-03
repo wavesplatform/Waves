@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.estimator
 
 import cats.kernel.Monoid
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.functionCosts
@@ -40,7 +40,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
       .combineAll(
         Seq(
           PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, version).withEnvironment[Environment],
+          CryptoContext.build(Global, version, fixEcrecover = true).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet(), fixBigScriptField = true),
           CTX[NoContext](
             Seq(transactionType),
@@ -72,7 +72,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
   }
 
   protected def estimate(script: String): Either[String, Long] = {
-    val expr = compile(script)(V6)
+    val expr = compile(script)(using V6)
     val results = estimators.map(_(lets, functionCosts(V6), expr))
     if (results.distinct.length == 1)
       results.head

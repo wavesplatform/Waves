@@ -17,7 +17,7 @@ import monix.execution.Scheduler
 import org.asynchttpclient.AsyncHttpClient
 import play.api.libs.json.Json
 
-import scala.compat.java8.FutureConverters
+import scala.jdk.javaapi.FutureConverters
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -35,9 +35,9 @@ class Worker(
     extends ScorexLogging {
 
   def run(): Future[Unit] =
-    task.runAsyncLogErr(Scheduler(ec))
+    task.runAsyncLogErr(using Scheduler(ec))
 
-  private[this] val task =
+  private val task =
     for {
       state <- Ref.of[Task, State](EmptyState(settings.warmUp))
       initState <- settings.initialWarmUp match {
@@ -52,29 +52,29 @@ class Worker(
       _       <- closeChannel(channel)
     } yield ()
 
-  private[this] val nodeUTXTransactionsToSendCount: Task[Int] = Task.defer {
+  private val nodeUTXTransactionsToSendCount: Task[Int] = Task.defer {
     import org.asynchttpclient.Dsl.*
     val request = get(s"$nodeRestAddress/transactions/unconfirmed/size").build()
     Task
-      .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
+      .fromFuture(FutureConverters.asScala(httpClient.executeRequest(request).toCompletableFuture))
       .map(r => math.max(settings.utxLimit - (Json.parse(r.getResponseBody) \ "size").as[Int], 0))
   }
 
-  private[this] val balanceOfRichAccount: Task[Map[String, Long]] =
+  private val balanceOfRichAccount: Task[Map[String, Long]] =
     Task
       .defer {
         import org.asynchttpclient.Dsl.*
         val results = richAccountAddresses.map { address =>
           val request = get(s"$nodeRestAddress/addresses/balance/$address").build()
           Task
-            .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
+            .fromFuture(FutureConverters.asScala(httpClient.executeRequest(request).toCompletableFuture))
             .map(r => address -> (Json.parse(r.getResponseBody) \ "balance").as[Long])
         }
         Task.parSequence(results).map(_.toMap)
       }
       .onErrorFallbackTo(Task.now(Map()))
 
-  private[this] val retrieveBalances: Task[Unit] =
+  private val retrieveBalances: Task[Unit] =
     if (!canContinue())
       Task.unit
     else
@@ -83,7 +83,7 @@ class Worker(
         _        <- if (balances.nonEmpty) logInfo(s"Balances: ${balances.mkString("(", ", ", ")")}") else Task.unit
       } yield ()
 
-  private[this] def writeInitial(channel: Channel, state: Ref[Task, State], txs: Seq[Transaction] = initial): Task[Channel] =
+  private def writeInitial(channel: Channel, state: Ref[Task, State], txs: Seq[Transaction] = initial): Task[Channel] =
     if (!canContinue())
       Task.now(channel)
     else
@@ -91,12 +91,13 @@ class Worker(
         validChannel <- validateChannel(channel)
         _            <- logInfo(s"Sending initial transactions to $validChannel")
         cntToSend    <- calcAndSaveCntToSend(state)
-        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend) *))
-        r <- if (cntToSend >= txs.size) sleepOrWaitEmptyUtx(settings.tailInitialDelay) *> writeTailInitial(validChannel, state)
-        else sleep(settings.delay) *> Task.defer(writeInitial(channel, state, txs.drop(cntToSend)))
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend)*))
+        r <-
+          if (cntToSend >= txs.size) sleepOrWaitEmptyUtx(settings.tailInitialDelay) *> writeTailInitial(validChannel, state)
+          else sleep(settings.delay) *> Task.defer(writeInitial(channel, state, txs.drop(cntToSend)))
       } yield r
 
-  private[this] def sleepOrWaitEmptyUtx(strategy: Either[FiniteDuration, FiniteDuration]): Task[Unit] =
+  private def sleepOrWaitEmptyUtx(strategy: Either[FiniteDuration, FiniteDuration]): Task[Unit] =
     strategy match {
       case Left(duration) => sleep(duration)
       case Right(duration) =>
@@ -106,7 +107,7 @@ class Worker(
         } yield ()
     }
 
-  private[this] def writeTailInitial(channel: Channel, state: Ref[Task, State], txs: Seq[Transaction] = tailInitial): Task[Channel] =
+  private def writeTailInitial(channel: Channel, state: Ref[Task, State], txs: Seq[Transaction] = tailInitial): Task[Channel] =
     if (!canContinue())
       Task.now(channel)
     else
@@ -114,12 +115,13 @@ class Worker(
         validChannel <- validateChannel(channel)
         _            <- logInfo(s"Sending tail initial transactions to $validChannel")
         cntToSend    <- calcAndSaveCntToSend(state)
-        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend) *))
-        r <- if (cntToSend >= txs.size) sleepOrWaitEmptyUtx(settings.initialDelay) *> Task.now(validChannel)
-        else sleep(settings.delay) *> Task.defer(writeTailInitial(validChannel, state, txs.drop(cntToSend)))
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend)*))
+        r <-
+          if (cntToSend >= txs.size) sleepOrWaitEmptyUtx(settings.initialDelay) *> Task.now(validChannel)
+          else sleep(settings.delay) *> Task.defer(writeTailInitial(validChannel, state, txs.drop(cntToSend)))
       } yield r
 
-  private[this] def pullAndWrite(channel: Channel, state: Ref[Task, State], cnt: Int = 0): Task[Channel] =
+  private def pullAndWrite(channel: Channel, state: Ref[Task, State], cnt: Int = 0): Task[Channel] =
     if (!canContinue())
       Task.now(channel)
     else
@@ -130,12 +132,12 @@ class Worker(
         _            <- logInfo(s"Sending $cntToSend transactions to $validChannel")
         txs          <- Task(transactionSource.take(cntToSend).to(LazyList))
         _            <- txs.headOption.fold(Task.unit)(tx => logInfo(s"Head transaction id: ${tx.id()}"))
-        _            <- Task.deferFuture(networkSender.send(validChannel, txs *))
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs*))
         _            <- sleep(settings.delay)
         r            <- Task.defer(pullAndWrite(validChannel, state, (cnt + 1) % 10))
       } yield r
 
-  private[this] def calcAndSaveCntToSend(stateRef: Ref[Task, State]): Task[Int] =
+  private def calcAndSaveCntToSend(stateRef: Ref[Task, State]): Task[Int] =
     for {
       utxCnt <- nodeUTXTransactionsToSendCount
       state  <- stateRef.get
@@ -144,7 +146,7 @@ class Worker(
       _ <- stateRef.set(nextState)
     } yield nextState.cnt
 
-  private[this] def withReconnect[A](baseTask: Task[A]): Task[A] =
+  private def withReconnect[A](baseTask: Task[A]): Task[A] =
     baseTask.onErrorHandleWith {
       case error if settings.autoReconnect && canContinue() =>
         logError(s"[$node] An error during sending transactions, reconnect", error) *>
@@ -155,15 +157,19 @@ class Worker(
           Task.raiseError(error)
     }
 
-  private[this] def getChannel: Task[Channel]                        = Task.deferFuture(networkSender.connect(node))
-  private[this] def closeChannel(channel: Channel): Task[Unit]       = Task(channel.close())
-  private[this] def validateChannel(channel: Channel): Task[Channel] = if (channel.isOpen) Task.now(channel) else getChannel
+  private def getChannel: Task[Channel] = Task.deferFuture(networkSender.connect(node))
 
-  private[this] def logError(msg: => String, err: Throwable): Task[Unit] = Task(log.error(msg, err))
-  private[this] def logInfo(msg: => String): Task[Unit]                  = Task(log.info(msg))
-  private[this] def logTrace(msg: => String): Task[Unit]                 = Task(log.trace(msg))
+  private def closeChannel(channel: Channel): Task[Unit] = Task(channel.close())
 
-  private[this] def sleep(delay: FiniteDuration): Task[Unit] = logInfo(s"Sleeping for $delay") *> Task.sleep(delay)
+  private def validateChannel(channel: Channel): Task[Channel] = if (channel.isOpen) Task.now(channel) else getChannel
+
+  private def logError(msg: => String, err: Throwable): Task[Unit] = Task(log.error(msg, err))
+
+  private def logInfo(msg: => String): Task[Unit] = Task(log.info(msg))
+
+  private def logTrace(msg: => String): Task[Unit] = Task(log.trace(msg))
+
+  private def sleep(delay: FiniteDuration): Task[Unit] = logInfo(s"Sleeping for $delay") *> Task.sleep(delay)
 }
 
 object Worker {
@@ -202,8 +208,7 @@ object Worker {
               case _ =>
                 val mayBeNextCnt = math.min(cnt + warmUp.step, warmUp.end)
                 val nextCnt      = math.min(mayBeNextCnt, utxToSendCnt)
-                val nextRaised   = nextCnt == warmUp.end && warmUp.once
-                WorkState(nextCnt, nextRaised, endAfter, warmUp)
+                WorkState(nextCnt, false, endAfter, warmUp)
             }
           }
       }

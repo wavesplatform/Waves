@@ -11,12 +11,12 @@ import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.mining.{ForgeAttemptResult, Miner, MinerImpl}
 import com.wavesplatform.network.BlockSnapshotResponse
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{BalanceSnapshot, BlockchainUpdaterImpl}
+import com.wavesplatform.state.{BalanceSnapshot, BlockEndorser, BlockchainUpdaterImpl, EndorsementStorage}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{Schedulers, Time}
 import com.wavesplatform.utx.UtxPoolImpl
@@ -25,9 +25,8 @@ import io.netty.channel.group.DefaultChannelGroup
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.ConcurrentSubject
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import org.apache.commons.io.FileUtils
+import pureconfig.ConfigSource
 
 import java.io.{File, FileNotFoundException}
 import scala.concurrent.duration.*
@@ -56,7 +55,11 @@ object MinerChallengeSimulator {
 
     val config      = readConfFile(genesisConfFile)
     val genSettings = GenesisBlockGenerator.parseSettings(config)
-    val genesis     = ConfigFactory.parseString(GenesisBlockGenerator.createConfig(genSettings)).as[GenesisSettings]("genesis")
+    val genesis =
+      ConfigSource
+        .fromConfig(ConfigFactory.parseString(GenesisBlockGenerator.createConfig(genSettings)))
+        .at("genesis")
+        .loadOrThrow[GenesisSettings]
 
     val blockchainSettings = BlockchainSettings(
       genSettings.chainId.toChar,
@@ -79,7 +82,7 @@ object MinerChallengeSimulator {
     val challengingMiner = miners(challengingMinerIdx)
 
     val wallet: Wallet = new Wallet {
-      private[this] val map                                            = miners.map(kp => kp.toAddress -> kp).toMap
+      private val map                                                  = miners.map(kp => kp.toAddress -> kp).toMap
       override def seed: Array[Byte]                                   = Array.emptyByteArray
       override def nonce: Int                                          = miners.length
       override def privateKeyAccounts: Seq[SeedKeyPair]                = miners
@@ -122,7 +125,7 @@ object MinerChallengeSimulator {
       rdb: RDB,
       miner: MinerImpl,
       blockAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]],
-      fakeTime: Time & Object { var time: Long },
+      fakeTime: FakeTime,
       isChallenging: Boolean
   ) {
     def forgeAndAppendBlock(miners: List[SeedKeyPair], challengingMiner: SeedKeyPair, maliciousMiner: SeedKeyPair): Option[BigInt] = {
@@ -137,7 +140,7 @@ object MinerChallengeSimulator {
       fakeTime.time = nextTime
 
       miner.forgeBlock(bestMiner) match {
-        case Right((block, _)) =>
+        case ForgeAttemptResult.Success(block, _) =>
           blockAppender(block, None).runSyncUnsafe() match {
             case Right(BlockApplyResult.Applied(_, score)) => Some(score)
             case other =>
@@ -146,7 +149,7 @@ object MinerChallengeSimulator {
               Some(0)
           }
 
-        case Left(err) =>
+        case err =>
           println(s"Error generating block: $err")
           quit = true
           Some(0)
@@ -186,8 +189,13 @@ object MinerChallengeSimulator {
       val dbSettings         = wavesSettings.dbSettings.copy(directory = correctBlockchainDbDir)
       val fixedWavesSettings = wavesSettings.copy(dbSettings = dbSettings)
       val rdb                = RDB.open(dbSettings)
-      val rocksDBWriter      = new RocksDBWriter(rdb, fixedWavesSettings.blockchainSettings, fixedWavesSettings.dbSettings, false)
-      val fakeTime           = createFakeTime(rocksDBWriter.lastBlockTimestamp.get)
+      val rocksDBWriter = RocksDBWriter(
+        rdb,
+        fixedWavesSettings.blockchainSettings,
+        fixedWavesSettings.dbSettings,
+        isLightMode = false
+      )
+      val fakeTime = createFakeTime(rocksDBWriter.lastBlockTimestamp.get)
       val blockchainUpdater = new BlockchainUpdaterImpl(
         rocksDBWriter,
         fixedWavesSettings,
@@ -236,32 +244,28 @@ object MinerChallengeSimulator {
     ) = {
       val utx = new UtxPoolImpl(fakeTime, blockchain, wavesSettings.utxSettings, wavesSettings.maxTxErrorLogSize, wavesSettings.minerSettings.enable)
       val posSelector = PoSSelector(blockchain, None)
-      val utxEvents   = ConcurrentSubject.publish[UtxEvent](scheduler)
+      val utxEvents   = ConcurrentSubject.publish[UtxEvent](using scheduler)
       val miner = new MinerImpl(
         new DefaultChannelGroup("", null),
         blockchain,
         wavesSettings,
         fakeTime,
         utx,
+        BlockEndorser.Disabled,
+        EndorsementStorage.Disabled,
         wallet,
         posSelector,
         scheduler,
         scheduler,
         utxEvents.collect { case _: UtxEvent.TxAdded => () }
       )
-      val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, scheduler, verify = false) _
+      val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, BlockEndorser.Disabled, scheduler, verify = false)
 
       miner -> blockAppender
     }
 
     private def createFakeTime(startTime: Long) =
-      new Time {
-        @volatile
-        var time: Long = startTime
-
-        override def correctedTime(): Long = time
-        override def getTimestamp(): Long  = time
-      }
+      new FakeTime(startTime)
   }
 
   private def readConfFile(f: File) = ConfigFactory.parseFile(f, ConfigParseOptions.defaults().setAllowMissing(false))

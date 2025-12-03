@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit
 import cats.Id
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.smart.VerifierLoggerBenchmark.BigLog
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)

@@ -1,15 +1,16 @@
 package com.wavesplatform.api.http
 
-import java.io.IOException
-import akka.http.scaladsl.model.MediaTypes.`application/json`
-import akka.http.scaladsl.model.{MediaRange, MediaType}
 import com.fasterxml.jackson.core.io.SegmentedStringWriter
-import com.fasterxml.jackson.core.util.BufferRecyclers
+import com.fasterxml.jackson.core.util.JsonRecyclerPools
 import com.fasterxml.jackson.core.{JsonGenerator, JsonProcessingException}
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.databind.{JsonMappingException, JsonSerializer, ObjectMapper, SerializerProvider}
 import com.wavesplatform.api.http.CustomJson.fieldNamesToTranslate
+import org.apache.pekko.http.scaladsl.model.MediaTypes.`application/json`
+import org.apache.pekko.http.scaladsl.model.{MediaRange, MediaType}
 import play.api.libs.json.*
+
+import java.io.IOException
 
 object NumberAsStringSerializer extends JsonSerializer[JsValue] {
   override def serialize(value: JsValue, json: JsonGenerator, provider: SerializerProvider): Unit =
@@ -18,9 +19,9 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
   private def serializeWithNumberAsStrings(value: JsValue, json: JsonGenerator, provider: SerializerProvider, insideStringifiedField: Boolean): Unit =
     value match {
       case JsNumber(v) if insideStringifiedField => json.writeString(v.bigDecimal.toPlainString)
-      case JsNumber(v) => json.writeNumber(v.bigDecimal)
-      case JsString(v) => json.writeString(v)
-      case v: JsBoolean => json.writeBoolean(v.value)
+      case JsNumber(v)                           => json.writeNumber(v.bigDecimal)
+      case JsString(v)                           => json.writeString(v)
+      case v: JsBoolean                          => json.writeBoolean(v.value)
 
       case JsArray(elements) =>
         json.writeStartArray()
@@ -89,7 +90,8 @@ object CustomJson {
     .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, true)
 
   def writeValueAsString(value: JsValue): String = {
-    val sw = new SegmentedStringWriter(BufferRecyclers.getBufferRecycler)
+    val br = JsonRecyclerPools.defaultPool().acquireAndLinkPooled()
+    val sw = new SegmentedStringWriter(br)
     try mapper.writeValue(sw, value)
     catch {
       case e: JsonProcessingException =>
@@ -97,7 +99,7 @@ object CustomJson {
       case e: IOException =>
         // shouldn't really happen, but is declared as possibility so:
         throw JsonMappingException.fromUnexpectedIOE(e)
-    }
+    } finally JsonRecyclerPools.defaultPool().releasePooled(br)
     sw.getAndClear
   }
 }

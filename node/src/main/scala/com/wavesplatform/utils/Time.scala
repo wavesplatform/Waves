@@ -12,36 +12,37 @@ import scala.concurrent.duration.DurationInt
 trait Time {
   def correctedTime(): Long
   def getTimestamp(): Long
+  def monotonicMillis(): Long = System.nanoTime() / 1_000_000
 }
 
 class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable {
-  private[this] val ExpirationTimeout = 60.seconds
-  private[this] val RetryDelay        = 10.seconds
-  private[this] val ResponseTimeout   = 10.seconds
+  private val ExpirationTimeout = 60.seconds
+  private val RetryDelay        = 10.seconds
+  private val ResponseTimeout   = 10.seconds
 
-  private[this] implicit val scheduler: SchedulerService =
+  private implicit val scheduler: SchedulerService =
     Schedulers.singleThread(name = "time-impl", reporter = log.error("Error in NTP", _), ExecutionModel.AlwaysAsyncExecution)
 
-  private[this] val client = new NTPUDPClient()
+  private val client = new NTPUDPClient()
   client.setDefaultTimeout(Duration.ofMillis(ResponseTimeout.toMillis))
 
-  @volatile private[this] var ntpTimestamp = System.currentTimeMillis()
-  @volatile private[this] var nanoTime     = System.nanoTime()
+  @volatile private var ntpTimestamp = System.currentTimeMillis()
+  @volatile private var nanoTime     = System.nanoTime()
 
   def correctedTime(): Long = {
     val timestamp = ntpTimestamp
-    val offset    = (System.nanoTime() - nanoTime) / 1000000
+    val offset    = (System.nanoTime() - nanoTime) / 1_000_000
     timestamp + offset
   }
 
-  @volatile private[this] var txTime: Long = 0
+  @volatile private var txTime: Long = 0
 
   def getTimestamp(): Long = {
     txTime = Math.max(correctedTime(), txTime + 1)
     txTime
   }
 
-  private[this] val updateTask: Task[Unit] = {
+  private val updateTask: Task[Unit] = {
     def newOffsetTask: Task[Option[(InetAddress, Long, Long)]] = Task {
       try {
         client.open()
@@ -50,7 +51,7 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
         val message         = info.getMessage
         val ntpTime         = message.getTransmitTimeStamp.getTime
         val serverSpentTime = message.getTransmitTimeStamp.getTime - message.getReceiveTimeStamp.getTime
-        val roundripTime    = (System.nanoTime() - beforeRequest) / 1000000 - serverSpentTime
+        val roundripTime    = (System.nanoTime() - beforeRequest) / 1_000_000 - serverSpentTime
         val corrected       = ntpTime + roundripTime / 2
         Some((info.getAddress, corrected, System.nanoTime()))
       } catch {
@@ -75,7 +76,7 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
     }
   }
 
-  private[this] val taskHandle = updateTask.runAsyncLogErr
+  private val taskHandle = updateTask.runAsyncLogErr
 
   override def close(): Unit = {
     log.trace("Shutting down Time")

@@ -3,7 +3,8 @@ package com.wavesplatform.protobuf
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.NewAsset
@@ -33,9 +34,13 @@ object PBSnapshots {
       cancelledLeases = snapshot.cancelledLeases.view.map { case (id, _) =>
         S.CancelledLease(id.toByteString)
       }.toSeq,
-      assetStatics.map { case (id, (st, idx)) =>
-        (idx, NewAsset(id.id.toByteString, st.issuer.toByteString, st.decimals, st.nft))
-      }.toSeq.sortBy(_._1).map(_._2),
+      assetStatics
+        .map { case (id, (st, idx)) =>
+          (idx, NewAsset(id.id.toByteString, st.issuer.toByteString, st.decimals, st.nft))
+        }
+        .toSeq
+        .sortBy(_._1)
+        .map(_._2),
       assetVolumes.map { case (asset, info) =>
         S.AssetVolume(asset.id.toByteString, info.isReissuable, ByteString.copyFrom(info.volume.toByteArray))
       }.toSeq,
@@ -66,11 +71,14 @@ object PBSnapshots {
       sponsorships.collect { case (asset, SponsorshipValue(minFee)) =>
         S.Sponsorship(asset.id.toByteString, minFee)
       }.toSeq,
-      txStatus.protobuf
+      txStatus.protobuf,
+      nextCommittedGenerators.map { case (pk, blsPk) =>
+        S.GenerationCommitment(pk.toByteString, blsPk.byteStr.toByteString)
+      }.headOption
     )
   }
 
-  def fromProtobuf(pbSnapshot: TransactionStateSnapshot, txId: ByteStr, height: Int): (StateSnapshot, TxMeta.Status) = {
+  def fromProtobuf(pbSnapshot: TransactionStateSnapshot, txId: ByteStr, height: Height): (StateSnapshot, TxMeta.Status) = {
     val balances: VectorMap[(Address, Asset), Long] =
       VectorMap() ++ pbSnapshot.balances.map(b => (b.address.toAddress(), b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
 
@@ -86,13 +94,16 @@ object PBSnapshots {
 
     val assetStatics: Map[IssuedAsset, (AssetStaticInfo, Int)] =
       pbSnapshot.assetStatics.zipWithIndex.map { case (info, idx) =>
-        info.assetId.toIssuedAssetId -> (AssetStaticInfo(
-          info.assetId.toByteStr,
-          TransactionId(txId),
-          PublicKey(info.issuerPublicKey.toByteStr),
-          info.decimals,
-          info.nft
-        ), idx + 1)
+        info.assetId.toIssuedAssetId -> (
+          AssetStaticInfo(
+            info.assetId.toByteStr,
+            TransactionId(txId),
+            PublicKey(info.issuerPublicKey.toByteStr),
+            info.decimals,
+            info.nft
+          ),
+          idx + 1
+        )
       }.toMap
 
     val assetVolumes: Map[IssuedAsset, AssetVolumeInfo] =
@@ -102,7 +113,7 @@ object PBSnapshots {
 
     val assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] =
       pbSnapshot.assetNamesAndDescriptions
-        .map(i => i.assetId.toIssuedAssetId -> AssetInfo(i.name, i.description, Height @@ height))
+        .map(i => i.assetId.toIssuedAssetId -> AssetInfo(i.name, i.description, height))
         .toMap
 
     val sponsorships: Map[IssuedAsset, SponsorshipValue] =
@@ -112,11 +123,17 @@ object PBSnapshots {
 
     val newLeases = pbSnapshot.newLeases.map { l =>
       l.leaseId.toByteStr ->
-        LeaseStaticInfo(l.senderPublicKey.toPublicKey, l.recipientAddress.toAddress(), TxPositiveAmount.unsafeFrom(l.amount), txId, height)
+        LeaseStaticInfo(
+          l.senderPublicKey.toPublicKey,
+          l.recipientAddress.toAddress(),
+          TxPositiveAmount.unsafeFrom(l.amount),
+          TransactionId(txId),
+          height
+        )
     }.toMap
 
     val cancelledLeases = pbSnapshot.cancelledLeases.map { cl =>
-      cl.leaseId.toByteStr -> LeaseDetails.Status.Cancelled(height, Some(txId))
+      cl.leaseId.toByteStr -> LeaseDetails.Status.Cancelled(height, Some(TransactionId(txId)))
     }.toMap
 
     val aliases: Map[Alias, Address] =
@@ -155,6 +172,10 @@ object PBSnapshots {
         data.address.toAddress() -> entries
       }.toMap
 
+    val nextCommittedGenerators = pbSnapshot.generationCommitment.map { x =>
+      x.senderPublicKey.toPublicKey -> BlsPublicKey(x.endorserPublicKey.toByteArray)
+    }.toSeq
+
     (
       StateSnapshot(
         VectorMap(),
@@ -170,7 +191,8 @@ object PBSnapshots {
         aliases,
         orderFills,
         accountScripts,
-        accountData
+        accountData,
+        nextCommittedGenerators = nextCommittedGenerators
       ),
       TxMeta.Status.fromProtobuf(pbSnapshot.transactionStatus)
     )

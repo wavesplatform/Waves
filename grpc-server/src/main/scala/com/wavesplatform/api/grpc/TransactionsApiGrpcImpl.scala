@@ -1,6 +1,5 @@
 package com.wavesplatform.api.grpc
 
-import scala.concurrent.Future
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.grpc.TransactionsApiGrpcImpl.applicationStatusFromTxStatus
@@ -8,12 +7,14 @@ import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
 import com.wavesplatform.state.{Blockchain, TxMeta, InvokeScriptResult as VISR}
-import com.wavesplatform.transaction.{Authorized, EthereumTransaction}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import io.grpc.{Status, StatusRuntimeException}
+import com.wavesplatform.transaction.{Authorized, EthereumTransaction}
 import io.grpc.stub.StreamObserver
+import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
 import monix.reactive.Observable
+
+import scala.concurrent.Future
 
 class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransactionsApi)(implicit sc: Scheduler)
     extends TransactionsApiGrpc.TransactionsApi {
@@ -51,7 +52,10 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 
         // By ids
         case None =>
-          Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById))
+          for {
+            id <- Observable.fromIterable(transactionIds)
+            tx <- Observable.fromIterable(commonApi.transactionById(id))
+          } yield tx
       }
 
       val transactionIdSet = transactionIds.toSet
@@ -62,6 +66,20 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
               TransactionsApiGrpcImpl.toTransactionResponse(m)
           }
       )
+    }
+
+  override def getTransactionSnapshots(
+      request: TransactionSnapshotsRequest,
+      responseObserver: StreamObserver[TransactionSnapshotResponse]
+  ): Unit =
+    responseObserver.interceptErrors {
+      val snapshots =
+        for {
+          id                 <- Observable.fromIterable(request.transactionIds)
+          (snapshot, status) <- Observable.fromIterable(blockchain.transactionSnapshot(id.toByteStr))
+          pbSnapshot = PBSnapshots.toProtobuf(snapshot, status)
+        } yield TransactionSnapshotResponse(id, Some(pbSnapshot))
+      responseObserver.completeWith(snapshots)
     }
 
   override def getUnconfirmed(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =
@@ -104,7 +122,7 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
             commonApi.transactionById(txId.toByteStr).map { m =>
               val status = applicationStatusFromTxStatus(m.status)
 
-              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height, status)
+              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height.toInt, status)
             }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
@@ -135,7 +153,7 @@ private object TransactionsApiGrpcImpl {
       case _                                     => None
     }
 
-    TransactionResponse(transactionId, meta.height, Some(meta.transaction.toPB), status, invokeScriptResult)
+    TransactionResponse(transactionId, meta.height.toInt, Some(meta.transaction.toPB), status, invokeScriptResult)
   }
 
   def applicationStatusFromTxStatus(status: TxMeta.Status): ApplicationStatus.Recognized =

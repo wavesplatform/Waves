@@ -42,7 +42,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       override def getCurrentBlockchainHeight(): Height = Height(1)
 
       override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] =
-        toVanilla(BlockWithHeight(mkPbBlock(height).some, height))
+        toVanilla(BlockWithHeight(mkPbBlock(height).some, height.toInt))
 
       override def getBlockHeaderRange(fromHeight: Height, toHeight: Height): List[SignedBlockHeaderWithVrf] = ???
 
@@ -89,7 +89,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     )
 
     val requestService = use(
-      new DefaultRequestService(requestServiceSettings, blockchain, allTags, use(new TestJobScheduler()), testScheduler) {
+      new DefaultRequestService(requestServiceSettings, blockchain, allTags, use(new TestJobScheduler[RideScriptRunRequest]()), testScheduler) {
         override def start(): Unit = {
           super.start()
           testScheduler.tick()
@@ -148,7 +148,8 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 
     val after = getScriptResult
     withClue(s"result.value._2.value at ${Json.prettyPrint(after)}") {
-      (after \ "result" \ "value" \ "_2" \ "value").as[BigInt] shouldBe xPlusHeight
+      if ((after \ "error").isDefined) fail(s"Expected success, got: $after")
+      else (after \ "result" \ "value" \ "_2" \ "value").as[BigInt] shouldBe xPlusHeight
     }
   }.get
 

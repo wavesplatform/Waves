@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
 import cats.syntax.semigroup.*
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -21,7 +21,7 @@ import scala.collection.mutable
 class TestCompiler(version: StdLibVersion) {
   private lazy val baseCompilerContext =
     PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
-      CryptoContext.build(Global, version).withEnvironment[Environment]
+      CryptoContext.build(Global, version, fixEcrecover = true).withEnvironment[Environment]
 
   private lazy val compilerContext =
     (baseCompilerContext |+|
@@ -95,7 +95,8 @@ class TestCompiler(version: StdLibVersion) {
 }
 
 object TestCompiler {
-  private val compilerByVersion = mutable.HashMap.empty[StdLibVersion, TestCompiler]
+  private val compilerByVersion         = mutable.HashMap.empty[StdLibVersion, TestCompiler]
+  lazy val DefaultVersion: TestCompiler = TestCompiler(StdLibVersion.VersionDic.default)
   def apply(version: StdLibVersion): TestCompiler =
     compilerByVersion.getOrElse(
       version,

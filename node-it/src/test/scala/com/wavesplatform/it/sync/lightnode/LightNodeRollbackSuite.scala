@@ -5,12 +5,13 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFunSuite, NodeConfigs, TransferSending}
+import com.wavesplatform.state.Height
 
 class LightNodeRollbackSuite extends BaseFunSuite with TransferSending {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((14, 1000000)))
+      .overrideBase(_.preactivatedFeatures((14, Height(1000000))))
       .withDefault(1)
       .withSpecial(1, _.lightNode)
       .buildNonConflicting()
@@ -35,7 +36,7 @@ class LightNodeRollbackSuite extends BaseFunSuite with TransferSending {
 
     lightNode.rollback(startHeight)
     allTxIds.foreach(lightNode.waitForTransaction(_))
-    val maxHeight = sender.transactionStatus(allTxIds).flatMap(_.height).max
+    val maxHeight = Height(sender.transactionStatus(allTxIds).flatMap(_.height).max)
     sender.waitForHeight(maxHeight + 2) // so that NG fees won't affect miner's balances
 
     val stateAfterSecondTry = nodes.head.debugStateAt(maxHeight + 1)

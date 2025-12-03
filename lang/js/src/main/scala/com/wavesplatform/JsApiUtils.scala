@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, LIST, NOTHING, TYPE, UNION}
@@ -8,6 +7,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext}
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.{PART, Type}
 
+import scala.annotation.nowarn
 import scala.scalajs.js
 import scala.scalajs.js.Any
 import scala.scalajs.js.Dynamic.literal as jObj
@@ -236,7 +236,6 @@ object JsApiUtils {
           "argList"  -> args.toJSArray.map(arg => serFuncArg(arg._1, arg._2)),
           "expr"     -> serExpr(expr)
         )
-      case t => jObj("[not_supported]stringRepr" -> t.toString)
     }
   }
 
@@ -244,6 +243,7 @@ object JsApiUtils {
     jObj("posStart" -> err.start, "posEnd" -> err.end, "msg" -> err.message)
   }
 
+  @nowarn("cat=deprecation")
   def toJs(ast: EXPR): js.Object = {
     def r(expr: EXPR): js.Object = {
       expr match {
@@ -281,7 +281,7 @@ object JsApiUtils {
     r(ast)
   }
 
-  def toJs(c: DApp): js.Object = {
+  def toJs(): js.Object = {
     toJs(TRUE) // later
   }
 

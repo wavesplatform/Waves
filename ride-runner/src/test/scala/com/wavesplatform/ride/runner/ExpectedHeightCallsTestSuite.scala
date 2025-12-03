@@ -15,7 +15,7 @@ import play.api.libs.json.Json
 import java.util.concurrent.atomic.AtomicInteger
 
 class ExpectedHeightCallsTestSuite extends BaseTestSuite with HasTestAccounts {
-  private val DefaultHeight = Height @@ 3565654
+  private val DefaultHeight = Height(3565654)
 
   "Blockchain.height is used in script" - {
     "never" - {
@@ -117,18 +117,18 @@ class ExpectedHeightCallsTestSuite extends BaseTestSuite with HasTestAccounts {
     address = scriptedAccAddr,
     request = Json.obj(),
     state = RideRunnerBlockchainState(
-      height = DefaultHeight,
+      height = DefaultHeight.toInt,
       accounts = Map(
         aliceAddr -> RideRunnerAccount(
-          regularBalance = Some(TxNonNegativeAmount(10_000_000))
+          regularBalance = Some(TxNonNegativeAmount.unsafeFrom(10_000_000))
         ),
         bobAddr -> RideRunnerAccount(
           data = Some(Map.empty),
-          regularBalance = Some(TxNonNegativeAmount(10_300_000))
+          regularBalance = Some(TxNonNegativeAmount.unsafeFrom(10_300_000))
         )
       ),
       blocks = Map(
-        DefaultHeight -> RideRunnerBlock(
+        DefaultHeight.toInt -> RideRunnerBlock(
           timestamp = 1663299568885L,
           VRF = Some(ByteStr.decodeBase58("GHC3DQuW9ncm5sNy5u3TVEF4CXu1fsLVHVHYxJzuZr7b").get)
         )

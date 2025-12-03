@@ -1,14 +1,15 @@
 package com.wavesplatform
 
 import cats.Id
-import cats.implicits.*
-import cats.kernel.Monoid
+import cats.syntax.either.*
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.utils.Paged
+import com.wavesplatform.crypto.bls.BlsPublicKey
+import com.wavesplatform.transaction.BlockchainUpdater
 import play.api.libs.json.*
-import supertagged.TaggedType
 
+import scala.annotation.targetName
 import scala.reflect.ClassTag
 import scala.util.Try
 
@@ -16,8 +17,8 @@ package object state {
   def safeSum(x: Long, y: Long, source: String): Either[String, Long] =
     Try(Math.addExact(x, y)).toEither.leftMap(_ => s"$source sum overflow")
 
-  implicit val safeSummarizer: Summarizer[Either[String, *]] = safeSum(_, _, _)
-  implicit val unsafeSummarizer: Summarizer[Id]              = (x, y, _) => x + y
+  implicit val safeSummarizer: Summarizer[[X] =>> Either[String, X]] = safeSum(_, _, _)
+  implicit val unsafeSummarizer: Summarizer[Id]                      = (x, y, _) => x + y
 
   implicit class Cast[A](a: A) {
     def cast[B: ClassTag]: Option[B] = {
@@ -28,44 +29,72 @@ package object state {
     }
   }
 
-  object AssetDistribution extends TaggedType[Map[Address, Long]]
-  type AssetDistribution = AssetDistribution.Type
+  object Height {
+    def apply(h: Int): Height                                      = h
+    def seq(ints: Int*): Seq[Height]                               = ints
+    def tuple(i1: Int, i2: Int, i3: Int): (Height, Height, Height) = (i1, i2, i3)
+    def ints(heights: Seq[Height]): Seq[Int]                       = heights
 
-  implicit val dstMonoid: Monoid[AssetDistribution] = new Monoid[AssetDistribution] {
-    override def empty: AssetDistribution = AssetDistribution(Map.empty[Address, Long])
+    extension (h: Height) {
+      def toInt: Int               = h
+      def toByteArray: Array[Byte] = Ints.toByteArray(h)
+      def +(that: Int): Height     = h + that
+      def -(that: Int): Height     = h - that
 
-    override def combine(x: AssetDistribution, y: AssetDistribution): AssetDistribution = {
-      AssetDistribution(x ++ y)
+      def next: Height = h + 1
+      def prev: Height = h - 1
+
+      @targetName("minusHeight")
+      def -(that: Height): Int = h - that
+
+      infix def to(end: Height): Range.Inclusive = Range.inclusive(h, end)
+
+      def max(that: Height): Height = math.max(h, that)
+      def min(that: Height): Height = math.min(h, that)
+    }
+
+    given Ordering[Height]                    = Ordering[Int]
+    given Conversion[Height, Ordered[Height]] = scala.math.Ordered.orderingToOrdered(_)
+
+    given Writes[Height] = Writes.IntWrites
+    given Reads[Height]  = Reads.IntReads
+  }
+  opaque type Height = Int
+
+  object TxNum {
+    def apply(s: Short): TxNum = s
+
+    extension (n: TxNum) {
+      def toShort: Short  = n
+      def unary_- : TxNum = (-n).toShort
+    }
+
+    given Ordering[TxNum] = Ordering[Short]
+
+    given Conversion[TxNum, Ordered[TxNum]] = scala.math.Ordered.orderingToOrdered(_)
+  }
+
+  type GeneratorBalances = Seq[(Address, BlsPublicKey, Long)]
+
+  val GenesisBlockHeight = Height(1)
+
+  opaque type TxNum = Short
+
+  object TransactionId {
+    def apply(bs: ByteStr): TransactionId = bs
+
+    implicit val format: Format[TransactionId] = Format[TransactionId](
+      com.wavesplatform.utils.byteStrFormat.map(this(_)),
+      Writes(com.wavesplatform.utils.byteStrFormat.writes)
+    )
+
+    extension (txId: TransactionId) {
+      def arr: Array[Byte] = txId.arr
+      def byteStr: ByteStr = txId
     }
   }
 
-  implicit val dstWrites: Writes[AssetDistribution] = Writes { dst =>
-    Json
-      .toJson(dst.map {
-        case (addr, balance) => addr.toString -> balance
-      })
-  }
+  type CompleteBlockchainUpdater = Blockchain & BlockchainUpdater & NG
 
-  object AssetDistributionPage extends TaggedType[Paged[Address, AssetDistribution]]
-  type AssetDistributionPage = AssetDistributionPage.Type
-
-  implicit val dstPageWrites: Writes[AssetDistributionPage] = Writes { page =>
-    Json.obj(
-      "hasNext"  -> JsBoolean(page.hasNext),
-      "lastItem" -> Json.toJson(page.lastItem.map(_.toString)),
-      "items"    -> Json.toJson(page.items)
-    )
-  }
-
-  object Height extends TaggedType[Int]
-  type Height = Height.Type
-
-  object TxNum extends TaggedType[Short]
-  type TxNum = TxNum.Type
-
-  object AssetNum extends TaggedType[Int]
-  type AssetNum = AssetNum.Type
-
-  object TransactionId extends TaggedType[ByteStr]
-  type TransactionId = TransactionId.Type
+  opaque type TransactionId = ByteStr
 }

@@ -2,7 +2,7 @@ package com.wavesplatform.it.asset
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.api.{IssueInfoResponse, SponsorFeeResponse, StateChangesDetails}
 import com.wavesplatform.it.sync.*
@@ -22,7 +22,7 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
   private val minSponsoredAssetFee          = 100
   private var sponsoredAssetId: String      = ""
   private var globalDAppAddress: ByteString = ""
-  private var dApp: KeyPair                 = _
+  private var dApp: KeyPair                 = scala.compiletime.uninitialized
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()

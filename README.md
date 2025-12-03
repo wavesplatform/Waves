@@ -13,9 +13,6 @@
 
   <br/>
 
-  <a href="https://twitter.com/wavesprotocol" target="_blank">
-    <img alt="Twitter: Waves Tech" src="https://badgen.net/twitter/follow/wavesprotocol?icon=twitter&label=follow%20on%20Twitter" />
-  </a>
   <a href="https://medium.com/wavesprotocol" target="_blank">
     <img alt="Medium: Waves Tech" src="https://badgen.net/runkit/msmolyakov/get-medium-followers?icon=medium&cache=86400" />
   </a>
@@ -27,7 +24,7 @@
   </a>
 </p>
 
-> Waves is an open source [blockchain protocol](https://waves.tech/waves-protocol). <br/> 
+> Waves is an open source [blockchain protocol](https://waves.tech). <br/> 
 You can use it to build your own decentralized applications. Waves provides full blockchain ecosystem including smart contracts language called RIDE.
 
 
@@ -196,7 +193,7 @@ Keep up with the latest news and articles, and find out all about events happeni
 ## ⛓ Links
 
 - [Documentation](https://docs.waves.tech/)
-- Blockchain clients for Mainnet: [Waves Exchange](https://waves.exchange/), [Waves FX](https://github.com/wavesfx), [SIGN app](https://www.sign-web.app/)
+- Blockchain clients for Mainnet: [Waves Exchange](https://waves.exchange/)
 - Blockchain clients for Testnet: [Waves Exchange](https://testnet.waves.exchange/)
 - Blockchain Explorer: [Mainnet](https://wavesexplorer.com/), [Testnet](https://testnet.wavesexplorer.com/), [Stagenet](https://stagenet.wavesexplorer.com/) 
 - [Ride Online IDE](https://waves-ide.com/)
@@ -207,7 +204,7 @@ The code in this project is licensed under [MIT license](./LICENSE)
 
 ## 👏 Acknowledgements
 
-[<img src="https://camo.githubusercontent.com/97fa03cac759a772255b93c64ab1c9f76a103681/68747470733a2f2f7777772e796f75726b69742e636f6d2f696d616765732f796b6c6f676f2e706e67">](https://www.yourkit.com/)
+[<img src="https://www.yourkit.com/images/yklogo.png">](https://www.yourkit.com)
 
 We use YourKit full-featured Java Profiler to make Waves node faster. YourKit, LLC is the creator of innovative and intelligent tools for profiling Java and .NET applications.
 

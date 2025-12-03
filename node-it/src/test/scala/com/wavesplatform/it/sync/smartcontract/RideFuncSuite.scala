@@ -2,13 +2,13 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -42,7 +42,7 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |}
       """.stripMargin
 
-    val compiled = ScriptCompiler(scriptSrc, isAssetScript = false, estimator).explicitGet()._1
+    val compiled = ScriptCompiler.compile(scriptSrc, estimator).explicitGet()._1
 
     val tx =
       sender.signedBroadcast(
@@ -94,7 +94,7 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |}
       """.stripMargin
 
-    val updated = ScriptCompiler(udpatedScript, isAssetScript = false, estimator).explicitGet()._1
+    val updated = ScriptCompiler.compile(udpatedScript, estimator).explicitGet()._1
 
     val updTx =
       sender.signedBroadcast(

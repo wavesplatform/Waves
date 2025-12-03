@@ -1,12 +1,12 @@
 package com.wavesplatform.transaction.utils
 
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{Asset, Proofs, TxTimestamp}
+import com.wavesplatform.transaction.{Asset, Proofs, TxTimestamp, TransactionSignOps}
 
 object Signed {
   def invokeScript(

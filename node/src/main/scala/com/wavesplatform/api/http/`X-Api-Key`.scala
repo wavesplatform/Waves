@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.model.headers.*
+import org.apache.pekko.http.scaladsl.model.headers.*
 
 import scala.util.Try
 

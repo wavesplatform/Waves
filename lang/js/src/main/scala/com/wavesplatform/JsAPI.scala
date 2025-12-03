@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import JsApiUtils.*
-import com.wavesplatform.DocSource
 import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.*
@@ -17,14 +16,14 @@ import scala.scalajs.js.{Any, Dictionary}
 object JsAPI {
 
   @JSExportTopLevel("getTypes")
-  def getTypes(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
+  def getTypes(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object & js.Dynamic] =
     API
       .allTypes(ver, isTokenContext, isContract)
       .map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v)))
       .toJSArray
 
   @JSExportTopLevel("getVarsDoc")
-  def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
+  def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object & js.Dynamic] =
     API
       .allVars(ver, isTokenContext, isContract)
       .map { case (name, ft) =>
@@ -37,7 +36,7 @@ object JsAPI {
       .toJSArray
 
   @JSExportTopLevel("getFunctionsDoc")
-  def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
+  def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object & js.Dynamic] =
     API
       .allFunctions(ver, isTokenContext, isContract)
       .map { case (name, args, signature) =>
@@ -154,7 +153,7 @@ object JsAPI {
                   error => Seq("error" -> error),
                   _ => Seq()
                 )
-            js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
+            js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt*)
           case CompileResult.Library(_, bytes, complexity, expr) =>
             js.Dynamic.literal(
               "result"     -> Global.toBuffer(bytes),
@@ -172,7 +171,7 @@ object JsAPI {
 
             val resultFields: Seq[(String, Any)] = Seq(
               "result"               -> Global.toBuffer(di.bytes),
-              "ast"                  -> toJs(di.dApp),
+              "ast"                  -> toJs(),
               "meta"                 -> mappedMeta,
               "complexity"           -> di.maxComplexity._2.toDouble,
               "verifierComplexity"   -> di.verifierComplexity.toDouble,

@@ -33,7 +33,7 @@ object RideTestSuite {
 
     // Folding test suites
     testSuites.keys.toVector
-      .sortBy(_.getNameCount)(Ordering.ordered[Int].reverse) // Deepest in the front
+      .sortBy(_.getNameCount)(using Ordering.ordered[Int].reverse) // Deepest in the front
       .foreach { testSuitePath =>
         if (testSuitePath != rootPath) {
           val testSuite       = testSuites(testSuitePath)

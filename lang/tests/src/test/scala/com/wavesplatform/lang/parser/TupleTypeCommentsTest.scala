@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.parser
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.lang.v1.compiler.{Decompiler, TestCompiler}
@@ -42,6 +42,6 @@ class TupleTypeCommentsTest extends PropSpec {
         """.stripMargin
       )
       .explicitGet()
-    Decompiler(expr, getDecompilerContext(V6, DApp), V6).trim shouldBe "func f (a) = nil"
+    Decompiler(expr, getDecompilerContext(V6, DApp)).trim shouldBe "func f (a) = nil"
   }
 }

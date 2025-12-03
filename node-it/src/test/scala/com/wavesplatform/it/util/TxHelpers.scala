@@ -5,6 +5,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{MassTransferTransactionData, PBTransaction}

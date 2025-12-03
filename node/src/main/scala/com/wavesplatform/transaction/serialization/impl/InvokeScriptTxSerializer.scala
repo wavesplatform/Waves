@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.serialization.SerdeV1

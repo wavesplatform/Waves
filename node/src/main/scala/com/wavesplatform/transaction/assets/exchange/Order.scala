@@ -7,7 +7,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets.exchange.Order.Version
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import monix.eval.Coeval
@@ -26,7 +25,7 @@ object OrderAuthentication {
 /** Order to matcher service for asset exchange
   */
 case class Order(
-    version: Version,
+    version: Order.Version,
     orderAuthentication: OrderAuthentication,
     matcherPublicKey: PublicKey,
     assetPair: AssetPair,
@@ -121,10 +120,10 @@ object Order {
 
   implicit lazy val jsonFormat: Format[Order] = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
 
-  val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
-  val PriceConstant     = 100000000L
-  val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
-  val MaxAttachmentSize = 1024
+  val MaxLiveTime: Long   = 30L * 24L * 60L * 60L * 1000L
+  final val PriceConstant = 100000000L
+  final val MaxAmount     = 100 * PriceConstant * PriceConstant
+  val MaxAttachmentSize   = 1024
 
   val V1: Version = 1.toByte
   val V2: Version = 2.toByte

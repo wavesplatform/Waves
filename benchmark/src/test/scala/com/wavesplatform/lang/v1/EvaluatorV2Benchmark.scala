@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.values.{V1, V3}
-import com.wavesplatform.lang.v1.EvaluatorV2Benchmark.*
+
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, IF, TRUE}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
@@ -15,7 +15,7 @@ import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
 import scala.annotation.tailrec
 
-object EvaluatorV2Benchmark {
+object EV2Benchmark {
   val pureContext     = PureContext.build(V1, useNewPowPrecision = true).withEnvironment[Environment]
   val pureEvalContext = pureContext.evaluationContext(Common.emptyBlockchainEnvironment())
   val evaluatorV2     = new EvaluatorV2(DisabledLogEvaluationContext(pureEvalContext), V1, Int.MaxValue, true, false, true, true, true)
@@ -28,6 +28,7 @@ object EvaluatorV2Benchmark {
 @Warmup(iterations = 10, time = 1)
 @Measurement(iterations = 10, time = 1)
 class EvaluatorV2Benchmark {
+  import com.wavesplatform.lang.v1.EV2Benchmark.*
   @Benchmark
   def funcs(st: Funcs, bh: Blackhole): Unit = bh.consume(eval(pureEvalContext, st.expr, V1))
 

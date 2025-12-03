@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.server.{Directive1, ExceptionHandler, Route}
+import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
+import org.apache.pekko.http.scaladsl.server.{Directive1, ExceptionHandler, Route}
 import com.google.common.util.concurrent.{ExecutionError, UncheckedExecutionException}
 import com.wavesplatform.utils.Schedulers.ExecutorExt
 import monix.execution.Scheduler
