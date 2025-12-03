@@ -81,10 +81,16 @@ object FinalizationState extends ScorexLogging {
         }
     }
 
-    val logPrefix = ""
-    val r         = FinalizationVoting.isFinalized(endorsedBalance, totalBalance)
+    for {
+      c <- voting.conflict
+      idx = c.endorserIndex.toInt
+      if 0 <= idx && idx < generatorBalances.size
+      (addr, _, balance) = generatorBalances(idx)
+    } log.debug(s"New conflict endorser $addr with index $idx and balance $balance")
+
+    val r = FinalizationVoting.isFinalized(endorsedBalance, totalBalance)
     log.debug(
-      s"$logPrefix ${if (r) "" else "not "}reached, endorsed=$endorsedBalance, total=$totalBalance, " +
+      s"${if (r) "Reached" else "Not reached"}, endorsed=$endorsedBalance, total=$totalBalance, " +
         s"miner=$minerIdx" +
         (if (voting.valid.isEmpty) "" else s", valid=[${voting.valid.view.mkString(", ")}]") +
         (if (allConflictIndexes.isEmpty) "" else s", conflict=[${allConflictIndexes.mkString(", ")}]")
