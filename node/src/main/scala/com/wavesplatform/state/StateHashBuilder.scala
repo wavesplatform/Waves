@@ -40,7 +40,7 @@ class StateHashBuilder {
   private val maps = Vector.fill(SectionId.maxId)(mutable.TreeMap.empty[ByteStr, Array[Byte]])
 
   private def addEntry(section: SectionId.Value, key: Array[Byte]*)(value: Array[Byte]*): Unit = {
-    val solidKey   = ByteStr(if (key.isEmpty) Array.emptyByteArray else key.reduce(_ ++ _))
+    val solidKey   = ByteStr(key.foldLeft(Array.emptyByteArray)(_ ++ _))
     val solidValue = value.foldLeft(Array.emptyByteArray)(_ ++ _)
     maps(section.id)(solidKey) = solidValue
   }
