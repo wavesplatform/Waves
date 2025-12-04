@@ -163,7 +163,7 @@ class DebugApiRouteStateHashSpec
           "aliasHash"                      -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "nextCommittedGeneratorsHash"    -> "c67c7a5ceb06065b963b0eab3110c264a0af7aabed859b06f1c1359bc029ee72", // Note: non-empty
           "committedGeneratorBalancesHash" -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "snapshotHash"                   -> "qNA5Run1vgLpz4SLQUpaye3GzecmfYKiW13H6ibkgvN",
+          "snapshotHash"                   -> "9rPYMJ4CbLXFwiba7pKvYVhoZDXY38FcXniZrJ1v7pfJ",
           "blockId"                        -> afterGeneratingBalanceUpdateHeader.id().toString,
           "baseTarget"                     -> afterGeneratingBalanceUpdateHeader.header.baseTarget,
           "height"                         -> afterGeneratingBalanceUpdateHeight,
@@ -200,7 +200,7 @@ class DebugApiRouteStateHashSpec
           "aliasHash"                      -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "nextCommittedGeneratorsHash"    -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "committedGeneratorBalancesHash" -> "ea4322a8f09a9d010956932ebde7b98a703f5679b85df9c29a44d0de254f705e", // Note: non-empty
-          "snapshotHash"                   -> "FqG5qTYuVgLCdDGoKZV263RJM1zjgE2VwywzhG4mpmvd",
+          "snapshotHash"                   -> "E2Hr4vjbPDWizxEibcRN52k21Es9mos9nrnN3jwwr93N",
           "blockId"                        -> headerOnGenerationPeriod.id().toString,
           "baseTarget"                     -> headerOnGenerationPeriod.header.baseTarget,
           "height"                         -> heightOnGenerationPeriod,

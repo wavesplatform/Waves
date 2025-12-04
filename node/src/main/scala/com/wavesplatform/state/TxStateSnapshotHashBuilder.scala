@@ -97,6 +97,10 @@ object TxStateSnapshotHashBuilder {
         Ints.toByteArray(assetInfo.lastUpdatedAt.toInt)
     }
 
+    snapshot.nextCommittedGenerators.foreach { case (publicKey, blsPublicKey) =>
+      changedKeys += publicKey.arr ++ blsPublicKey.arr
+    }
+
     txStatusOpt.foreach(txInfo =>
       txInfo.status match {
         case Status.Failed    => changedKeys += txInfo.id.arr ++ Array(1: Byte)
