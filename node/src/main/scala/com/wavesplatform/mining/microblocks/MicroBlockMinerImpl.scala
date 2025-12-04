@@ -15,7 +15,7 @@ import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.appender.MicroblockAppender
 import com.wavesplatform.state.{Blockchain, EndorsementStorage}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
+import com.wavesplatform.transaction.{BlockchainUpdater, Transaction, TransactionType}
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.utx.UtxPool.PackStrategy
@@ -120,10 +120,15 @@ class MicroBlockMinerImpl(
             accumulatedBlock,
             unconfirmed,
             stateHash.map { sh =>
-              if (unconfirmed.exists(_.isInstanceOf[TransferTransaction])) {
+              val containsTransferTransaction = unconfirmed.exists(_.tpe == TransactionType.Transfer)
+              log.info(s"Packed transaction types: ${unconfirmed.map(_.tpe.id).mkString("[",",","]")}, contains type 4 = $containsTransferTransaction")
+              if (containsTransferTransaction) {
                 log.info("Filling state hash with zero bytes")
                 ByteStr(new Array[Byte](32))
-              } else sh
+              } else {
+                log.info("No transfer transactions were packed")
+                sh
+              }
             }
           )
             .leftWiden[Throwable]
