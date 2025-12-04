@@ -120,9 +120,10 @@ class MicroBlockMinerImpl(
             accumulatedBlock,
             unconfirmed,
             stateHash.map { sh =>
-              if (unconfirmed.exists(_.isInstanceOf[TransferTransaction]))
-                ByteStr.fill(32)(1)
-              else sh
+              if (unconfirmed.exists(_.isInstanceOf[TransferTransaction])) {
+                log.info("Filling state hash with zero bytes")
+                ByteStr(new Array[Byte](32))
+              } else sh
             }
           )
             .leftWiden[Throwable]
