@@ -35,6 +35,7 @@ class DebugApiRouteStateHashSpec
   private lazy val deterministicFinalityActivationHeight = 5
 
   override def settings: WavesSettings = DomainPresets.TransactionStateSnapshot
+    .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
     .copy(
       dbSettings = DomainPresets.TransactionStateSnapshot.dbSettings.copy(storeStateHashes = true),
       restAPISettings = restAPISettings
@@ -44,9 +45,14 @@ class DebugApiRouteStateHashSpec
 
   private val configObject: ConfigObject = settings.config.root()
 
-  private val richAccount = TxHelpers.signer(905)
+  private val secondGenerator = TxHelpers.signer(906)
+  private val thirdGenerator  = TxHelpers.signer(907)
 
-  override def genesisBalances: Seq[AddrWithBalance] = Seq(AddrWithBalance(richAccount.toAddress, 50_000.waves))
+  override def genesisBalances: Seq[AddrWithBalance] = Seq(
+    AddrWithBalance(TxHelpers.defaultSigner.toAddress, 10_000.waves),
+    AddrWithBalance(secondGenerator.toAddress, 11_000.waves),
+    AddrWithBalance(thirdGenerator.toAddress, 12_000.waves)
+  )
 
   val miner: Miner & MinerDebugInfo = new Miner with MinerDebugInfo {
     override def scheduleMining(blockchain: Option[Blockchain]): Unit = ()
@@ -95,8 +101,8 @@ class DebugApiRouteStateHashSpec
         val beforeFinalityHeight = domain.blockchain.height - 1
         val beforeFinalityHeader = domain.blockchain.blockHeader(beforeFinalityHeight).value
         val expectedResponseBefore = Json.obj(
-          "stateHash"         -> "5b6d80dc02da5d9a76b8f928c0deb18889f25b5515738545532cd164dd70e87c",
-          "wavesBalanceHash"  -> "a3766f502f4bba124d9f6fff49adcac44e309bdbc72c437a0607de9c315bcdfa",
+          "stateHash"         -> "9a4cde77f9ae2207e23e94457dceb4fa8826a0c8a56466c1e28d83d35e087588",
+          "wavesBalanceHash"  -> "6bb9f756054493145441eb34bb09d0c26ae78ab09e25c9061b11dbac756b9b65",
           "assetBalanceHash"  -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "dataEntryHash"     -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "accountScriptHash" -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
@@ -106,7 +112,7 @@ class DebugApiRouteStateHashSpec
           "sponsorshipHash"   -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "aliasHash"         -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           // Note: "nextCommittedGeneratorsHash" and "committedGeneratorBalancesHash" fields are not present
-          "snapshotHash" -> "2ydpHRFSFwcaQ8s9hPyZwcmJFk4cKDNFcb3DRcvyrXZ9",
+          "snapshotHash" -> "GfGLptLRk1pw9fcYL3qyCzN7XWsnqftkGmX4zsWnHvoD",
           "blockId"      -> beforeFinalityHeader.id().toString,
           "baseTarget"   -> beforeFinalityHeader.header.baseTarget,
           "height"       -> beforeFinalityHeight,
@@ -135,22 +141,9 @@ class DebugApiRouteStateHashSpec
         val afterFinalityHeight = domain.blockchain.height - 1
         domain.blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality, afterFinalityHeight) shouldBe true
 
-        val secondGenerator = TxHelpers.signer(906)
-        val thirdGenerator  = TxHelpers.signer(907)
-
-        val transferTxDefault = TxHelpers.transfer(richAccount, TxHelpers.defaultSigner.toAddress, 1_000.waves)
-        val transferTxSecond  = TxHelpers.transfer(richAccount, secondGenerator.toAddress, 1_001.waves)
-        val transferTxThird   = TxHelpers.transfer(richAccount, thirdGenerator.toAddress, 1_002.waves)
-
-        domain.appendBlock(transferTxDefault, transferTxSecond, transferTxThird)
-
-        // Fast-forward 1000 blocks
-        Range.inclusive(1, 1000).foreach(_ => domain.appendBlock())
-
-        val commitTxDefault = TxHelpers.commitToGeneration(generationPeriodStart = Height(1010), sender = TxHelpers.defaultSigner)
-        val commitTxSecond  = TxHelpers.commitToGeneration(generationPeriodStart = Height(1010), sender = secondGenerator)
-        val commitTxThird   = TxHelpers.commitToGeneration(generationPeriodStart = Height(1010), sender = thirdGenerator)
-
+        val commitTxDefault = TxHelpers.commitToGeneration(generationPeriodStart = Height(8), sender = TxHelpers.defaultSigner)
+        val commitTxSecond  = TxHelpers.commitToGeneration(generationPeriodStart = Height(8), sender = secondGenerator)
+        val commitTxThird   = TxHelpers.commitToGeneration(generationPeriodStart = Height(8), sender = thirdGenerator)
         domain.appendBlock(commitTxDefault, commitTxSecond, commitTxThird)
         domain.appendBlock()
 
@@ -158,8 +151,8 @@ class DebugApiRouteStateHashSpec
         val afterGeneratingBalanceUpdateHeight = domain.blockchain.height - 1
         val afterGeneratingBalanceUpdateHeader = domain.blockchain.blockHeader(afterGeneratingBalanceUpdateHeight).value
         val expectedResponseAfter = Json.obj(
-          "stateHash"                      -> "8009c4658ab4df48890a53f309b9fb38ef34e8e6a1524feda363fc607effd735",
-          "wavesBalanceHash"               -> "f162260737b87d88e6ff1b5d02dc3e4383e913bd8da8800344a87b7f1420322d",
+          "stateHash"                      -> "7613e6344b8a594e34eb21025e1216b9899c434dc4cbe322c0d8467520da12ae",
+          "wavesBalanceHash"               -> "b00aadcea779b68ff76fe9cfac28f48786a299a856cd9fa42fc82bcab5149400",
           "assetBalanceHash"               -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "dataEntryHash"                  -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "accountScriptHash"              -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
@@ -170,7 +163,7 @@ class DebugApiRouteStateHashSpec
           "aliasHash"                      -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "nextCommittedGeneratorsHash"    -> "c67c7a5ceb06065b963b0eab3110c264a0af7aabed859b06f1c1359bc029ee72", // Note: non-empty
           "committedGeneratorBalancesHash" -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "snapshotHash"                   -> "97pxuitSr2ftkBJhwq8hM7gQfJ9rmzpT3S37fnybVVrf",
+          "snapshotHash"                   -> "qNA5Run1vgLpz4SLQUpaye3GzecmfYKiW13H6ibkgvN",
           "blockId"                        -> afterGeneratingBalanceUpdateHeader.id().toString,
           "baseTarget"                     -> afterGeneratingBalanceUpdateHeader.header.baseTarget,
           "height"                         -> afterGeneratingBalanceUpdateHeight,
@@ -182,12 +175,12 @@ class DebugApiRouteStateHashSpec
           responseAs[JsObject] shouldBe expectedResponseAfter
         }
 
-        // Fast-forward to generation period change
         // Note: the generating balances are used on this height (parent block for heightOnGenerationPeriod)
-        domain.blockchain.generatingBalance(TxHelpers.defaultSigner.toAddress) shouldBe 101803000000L
-        domain.blockchain.generatingBalance(secondGenerator.toAddress) shouldBe 90090000000L
-        domain.blockchain.generatingBalance(thirdGenerator.toAddress) shouldBe 90190000000L
+        domain.blockchain.generatingBalance(TxHelpers.defaultSigner.toAddress) shouldBe 991202000000L
+        domain.blockchain.generatingBalance(secondGenerator.toAddress) shouldBe 1089990000000L
+        domain.blockchain.generatingBalance(thirdGenerator.toAddress) shouldBe 1189990000000L
 
+        // Fast-forward to generation period change
         domain.appendBlock() // heightOnGenerationPeriod
         domain.appendBlock() // add 1 more block for API requests
 
@@ -195,8 +188,8 @@ class DebugApiRouteStateHashSpec
         val heightOnGenerationPeriod = domain.blockchain.height - 1
         val headerOnGenerationPeriod = domain.blockchain.blockHeader(heightOnGenerationPeriod).value
         val expectedResponseAfter2 = Json.obj(
-          "stateHash"                      -> "a6848babda5748f824c57e5b62aebdad720232583dad4473f02f3f14442a69f9",
-          "wavesBalanceHash"               -> "aa737ab08c1d4d8f8aec34e5d3a7f948266da01f6c0d60f349554350374688ab",
+          "stateHash"                      -> "f2203fea46be2d4ea7bc736c60dafce832bfb8444175c36f73a0d4e52a5a15da",
+          "wavesBalanceHash"               -> "0bd486480e3b07b95227f0c5e6d132aff5c98491d2f60b97c4cc43a8e7aa375b",
           "assetBalanceHash"               -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "dataEntryHash"                  -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "accountScriptHash"              -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
@@ -206,8 +199,8 @@ class DebugApiRouteStateHashSpec
           "sponsorshipHash"                -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "aliasHash"                      -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
           "nextCommittedGeneratorsHash"    -> "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
-          "committedGeneratorBalancesHash" -> "cfeada0229fc3e4c4bc45d852231f189a7b44a9da08ab08f001a7c59b39c52f4", // Note: non-empty
-          "snapshotHash"                   -> "23VWD7k7LLLorKRG7245ni4G8LQwpc82StwqPFsz7yW5",
+          "committedGeneratorBalancesHash" -> "ea4322a8f09a9d010956932ebde7b98a703f5679b85df9c29a44d0de254f705e", // Note: non-empty
+          "snapshotHash"                   -> "FqG5qTYuVgLCdDGoKZV263RJM1zjgE2VwywzhG4mpmvd",
           "blockId"                        -> headerOnGenerationPeriod.id().toString,
           "baseTarget"                     -> headerOnGenerationPeriod.header.baseTarget,
           "height"                         -> heightOnGenerationPeriod,
