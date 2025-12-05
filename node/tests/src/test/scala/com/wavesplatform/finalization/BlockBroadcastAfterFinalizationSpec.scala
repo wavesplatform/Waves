@@ -26,7 +26,7 @@ import monix.execution.schedulers.SchedulerService
 import scala.jdk.CollectionConverters.*
 
 // TODO: remove bu
-class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec, WithManager {
+class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
   private val appenderScheduler: SchedulerService = Schedulers.singleThread("appender")
   private val testTime: TestTime                  = TestTime()
 

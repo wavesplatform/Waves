@@ -5,16 +5,15 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, FinalizationVoting}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.finalization.WithManager
 import com.wavesplatform.network.EndorseBlock
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test.{FreeSpec, WithResourceManager}
 import com.wavesplatform.transaction.TxHelpers
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import org.scalactic.source.Position
 
-class BlockEndorserSpec extends FreeSpec, WithDomain, WithManager {
+class BlockEndorserSpec extends FreeSpec, WithDomain, WithResourceManager {
   private val defaultSettings = DomainPresets.DeterministicFinality
     .copy(synchronizationSettings = DomainPresets.DeterministicFinality.synchronizationSettings.copy(maxRollback = 2))
     .configure(
