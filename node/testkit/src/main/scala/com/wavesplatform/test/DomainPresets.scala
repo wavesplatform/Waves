@@ -53,6 +53,7 @@ object DomainPresets {
       .noFeatures()
       .blockchainSettings
       .functionalitySettings
+      .copy(lightNodeBlockFieldsAbsenceInterval = 0)
 
     domainSettingsWithFS(defaultFS.copy(preActivatedFeatures = fs.map { case (f, h) =>
       f.id -> h
