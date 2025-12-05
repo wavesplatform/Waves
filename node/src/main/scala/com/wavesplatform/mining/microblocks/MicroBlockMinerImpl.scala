@@ -14,7 +14,6 @@ import com.wavesplatform.network.{MicroBlockInv, *}
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.appender.MicroblockAppender
 import com.wavesplatform.state.{Blockchain, EndorsementStorage}
-import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction, TransactionType}
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
