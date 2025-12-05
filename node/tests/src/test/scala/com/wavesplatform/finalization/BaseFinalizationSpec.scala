@@ -9,7 +9,7 @@ import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 import org.scalatest.EitherValues
 
-trait BaseFinalizationSpec extends FreeSpec, WithDomain, EitherValues {
+trait BaseFinalizationSpec extends FreeSpec, WithDomain, WithManager, EitherValues {
   protected def mkConflictGenerators(h: Int, idxs: Int*): ConflictGenerators =
     ConflictGenerators.empty.appendAll(Height(h), GeneratorIndex.seq(idxs)*)
 

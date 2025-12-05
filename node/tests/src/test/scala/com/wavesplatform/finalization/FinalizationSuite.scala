@@ -216,6 +216,8 @@ class FinalizationSuite extends BaseFinalizationSpec {
       d.checkFinalizedHeight()
     }
 
+    "same finalized height if mines a generator not from generator set" ignore {} // TODO: implement
+
     "increased if surpass maxRollback blocks even no votes" in withDomain(
       defaultSettings.copy(synchronizationSettings = defaultSettings.synchronizationSettings.copy(maxRollback = 2)),
       AddrWithBalance.enoughBalances(otherNode1Acc, thisNodeAcc)
