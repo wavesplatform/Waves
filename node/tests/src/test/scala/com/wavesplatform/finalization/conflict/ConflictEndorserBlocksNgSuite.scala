@@ -20,8 +20,8 @@ import org.scalatest.Assertion
   * 2. With commitments from two generators
   * 3. First block at epoch #1
   *   1. Microblock with one valid endorsement
-  * 4. Empty block
-  * 5. First block at epoch #2 with punishment applied for a conflict endorser, no one committed
+  * 4. Empty block with punishment applied for a conflict endorser
+  * 5. First block at epoch #2, no one committed
   */
 class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
   private val validGenerator = TxHelpers.signer(0)
@@ -46,8 +46,8 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
     override def after2WithCommitmentsCheck                   = _ shouldBe Height(1)
     override def after3KeyBlockWithNewEpochCheck              = _ shouldBe Height(1)
     override def after3MicroBlockWithConflictEndorsementCheck = _ shouldBe Height(2)
-    override def after4EmptyCheck                             = _ shouldBe Height(2)
-    override def after5WithNewEpochAndPunishmentCheck         = _ shouldBe Height(2)
+    override def after4WithPunishmentCheck                    = _ shouldBe Height(2)
+    override def after5WithNewEpochCheck                      = _ shouldBe Height(2)
   }.run()
 
   "removed from generator set" in new Scenario[Set[GeneratorIndex]] {
@@ -59,8 +59,8 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
     override def after2WithCommitmentsCheck                   = notRemoved
     override def after3KeyBlockWithNewEpochCheck              = notRemoved
     override def after3MicroBlockWithConflictEndorsementCheck = removed
-    override def after4EmptyCheck                             = removed
-    override def after5WithNewEpochAndPunishmentCheck         = notRemoved
+    override def after4WithPunishmentCheck                    = removed
+    override def after5WithNewEpochCheck                      = notRemoved
   }.run()
 
   "waves amount" in new Scenario[Long] {
@@ -71,8 +71,8 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
     override def after2WithCommitmentsCheck                   = _ shouldBe base(2)
     override def after3KeyBlockWithNewEpochCheck              = _ shouldBe base(3)
     override def after3MicroBlockWithConflictEndorsementCheck = _ shouldBe base(3)
-    override def after4EmptyCheck                             = _ shouldBe base(4)
-    override def after5WithNewEpochAndPunishmentCheck         = _ shouldBe (base(5) - DepositInWavelets)
+    override def after4WithPunishmentCheck                    = _ shouldBe (base(4) - DepositInWavelets)
+    override def after5WithNewEpochCheck                      = _ shouldBe (base(5) - DepositInWavelets)
   }.run()
 
   "waves portfolio" in new Scenario[Portfolio] {
@@ -85,8 +85,8 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
     override def after2WithCommitmentsCheck                   = _ shouldBe portfolioAfter2
     override def after3KeyBlockWithNewEpochCheck              = _ shouldBe portfolioAfter2
     override def after3MicroBlockWithConflictEndorsementCheck = _ shouldBe portfolioAfter2
-    override def after4EmptyCheck                             = _ shouldBe portfolioAfter2
-    override def after5WithNewEpochAndPunishmentCheck         = _ shouldBe Portfolio(balance = after2 - DepositInWavelets)
+    override def after4WithPunishmentCheck                    = _ shouldBe Portfolio(balance = after2 - DepositInWavelets)
+    override def after5WithNewEpochCheck                      = _ shouldBe Portfolio(balance = after2 - DepositInWavelets)
   }.run()
 
   "balance at height" in new Scenario[(Int, Long)] {
@@ -99,8 +99,8 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
     override def after2WithCommitmentsCheck                   = _ shouldBe balanceAfter2
     override def after3KeyBlockWithNewEpochCheck              = _ shouldBe balanceAfter2
     override def after3MicroBlockWithConflictEndorsementCheck = _ shouldBe balanceAfter2
-    override def after4EmptyCheck                             = _ shouldBe balanceAfter2
-    override def after5WithNewEpochAndPunishmentCheck         = _ shouldBe (5, after2 - DepositInWavelets)
+    override def after4WithPunishmentCheck                    = _ shouldBe (4, after2 - DepositInWavelets)
+    override def after5WithNewEpochCheck                      = _ shouldBe (4, after2 - DepositInWavelets)
   }.run()
 
   "generating balance" in new Scenario[Long] { // Collected after applying block
@@ -112,8 +112,8 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
     override def after2WithCommitmentsCheck                   = _ shouldBe after2
     override def after3KeyBlockWithNewEpochCheck              = _ shouldBe after2
     override def after3MicroBlockWithConflictEndorsementCheck = _ shouldBe after2
-    override def after4EmptyCheck                             = _ shouldBe after2
-    override def after5WithNewEpochAndPunishmentCheck         = _ shouldBe after2 // Punished for deposit, but deposit gone, so no difference
+    override def after4WithPunishmentCheck                    = _ shouldBe after2
+    override def after5WithNewEpochCheck                      = _ shouldBe after2 // Punished for deposit, but deposit gone, so no difference
   }.run()
 
   "balance snapshots" in new Scenario[Seq[BalanceSnapshot]] {
@@ -121,19 +121,32 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
 
     val after1 = ENOUGH_AMT
     val after2 = after1 - TestValues.commitToGenerationFee
-    val after5 = after2 - DepositInWavelets
+    val after4 = after2 - DepositInWavelets
 
-    override def after2WithCommitmentsCheck                   = _ => succeed
-    override def after3KeyBlockWithNewEpochCheck              = _ => succeed
-    override def after3MicroBlockWithConflictEndorsementCheck = _ => succeed
-    override def after4EmptyCheck                             = _ => succeed
-    override def after5WithNewEpochAndPunishmentCheck =
-      _ should contain theSameElementsInOrderAs Seq(
-        bs(height = 5, regularBalance = after5), // Punishment
-        // height = 4 // Nothing happened
-        // height = 3 // Sent conflict endorsement
-        bs(height = 2, regularBalance = after2, deposits = 1) // Sent CommitToGeneration
-      )
+    override def after2WithCommitmentsCheck = _ should contain theSameElementsInOrderAs Seq(
+      bs(height = 2, regularBalance = after2, deposits = 1) // Sent CommitToGeneration
+    )
+
+    override def after3KeyBlockWithNewEpochCheck = _ should contain theSameElementsInOrderAs Seq(
+      bs(height = 3, regularBalance = after2, deposits = 1) // Sent conflict endorsement
+    )
+
+    override def after3MicroBlockWithConflictEndorsementCheck = _ should contain theSameElementsInOrderAs Seq(
+      bs(height = 3, regularBalance = after2, deposits = 1) // Sent conflict endorsement
+    )
+
+    override def after4WithPunishmentCheck = _ should contain theSameElementsInOrderAs Seq(
+      bs(height = 4, regularBalance = after4), // Punishment
+      // height = 3 // Sent conflict endorsement
+      bs(height = 2, regularBalance = after2, deposits = 1) // Sent CommitToGeneration
+    )
+
+    override def after5WithNewEpochCheck = _ should contain theSameElementsInOrderAs Seq(
+      bs(height = 5, regularBalance = after4), // New epoch
+      bs(height = 4, regularBalance = after4), // Punishment
+      // height = 3 // Sent conflict endorsement
+      bs(height = 2, regularBalance = after2, deposits = 1) // Sent CommitToGeneration
+    )
   }.run()
 
   private type IgnorePosition[T] = Position ?=> T
@@ -147,8 +160,8 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
     def after2WithCommitmentsCheck: Check
     def after3KeyBlockWithNewEpochCheck: Check
     def after3MicroBlockWithConflictEndorsementCheck: Check
-    def after4EmptyCheck: Check
-    def after5WithNewEpochAndPunishmentCheck: Check
+    def after4WithPunishmentCheck: Check
+    def after5WithNewEpochCheck: Check
 
     private val otherAcc1 = TxHelpers.signer(1000)
     private val otherAcc2 = TxHelpers.signer(1001)
@@ -182,11 +195,11 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
       log.debug("Append block 4")
       val block4 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = validGenerator, strictTime = true)
       d.appender.appendBlock(block4)
-      after4EmptyCheck(data)
+      after4WithPunishmentCheck(data)
 
       log.debug("Append block 5 of new epoch, apply punishment")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = validGenerator, strictTime = true))
-      after5WithNewEpochAndPunishmentCheck(data)
+      after5WithNewEpochCheck(data)
     }
   }
 }

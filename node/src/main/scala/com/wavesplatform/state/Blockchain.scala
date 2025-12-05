@@ -180,12 +180,14 @@ object Blockchain {
     // TODO: lock?
     // TODO: not efficient? See RocksDBWriter.balanceSnapshots
     // TODO: optimize
-    def generationDeposit(address: Address, at: Height = Height(blockchain.height)): Long = blockchain.generationPeriodOf(at).fold(0L) { currPeriod =>
-      val committedOnCurrent = blockchain.committedGenerators(currPeriod)
-      val idxOnCurrent = committedOnCurrent.zipWithIndex
+    def generationDeposit(address: Address, at: Height = Height(blockchain.height)): Long = blockchain.generationPeriodOf(at).fold(0L) { period =>
+      val committed = blockchain.committedGenerators(period)
+      val conflict  = blockchain.conflictGenerators(period)
+      val idxOnCurrent = committed.zipWithIndex
         .collectFirst { case ((currentAddress, _), i) if currentAddress == address => GeneratorIndex(i) }
+        .filterNot { idx => conflict.hasInUpTo(at.prev, idx) } // Prev, because punishment on next height
 
-      val hasOnNext = blockchain.committedGenerators(currPeriod.next).exists { case (currentAddress, _) => currentAddress == address }
+      val hasOnNext = blockchain.committedGenerators(period.next).exists { case (currentAddress, _) => currentAddress == address }
 
       val committedTimes = idxOnCurrent.size + Numbers.when(hasOnNext)(1)
       committedTimes * CommitToGenerationTransaction.DepositInWavelets

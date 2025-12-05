@@ -66,29 +66,35 @@ class BalanceDiffValidationTest extends PropSpec with WithState {
   }
 
   property("commit to generation") {
-    val settings = DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(generationPeriodLength = 3)
+    val settings = DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(
+      generationPeriodLength = 3,
+      lightNodeBlockFieldsAbsenceInterval = 0
+    )
 
     val notBlockedAmount = 100_000.waves
     val initBalance      = notBlockedAmount + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee
 
-    assertDiffEi(
+    assertDiffEiTraced(
       Seq(TestBlock.create(Seq(TxHelpers.genesis(TxHelpers.defaultAddress, amount = initBalance)))),
       TestBlock.create(Seq(TxHelpers.commitToGeneration(Height(4)))),
       settings
     ) { snapshotEi =>
-      snapshotEi.explicitGet()
+      snapshotEi.resultE.explicitGet()
     }
   }
 
   property("cannot transfer more than own-generationDeposit") {
-    val settings = DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(generationPeriodLength = 3)
+    val settings = DomainPresets.DeterministicFinality.blockchainSettings.functionalitySettings.copy(
+      generationPeriodLength = 3,
+      lightNodeBlockFieldsAbsenceInterval = 0
+    )
 
     val notBlockedAmount = 100_000.waves
     val initBalance =
       notBlockedAmount + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee + TestValues.fee // for transfer
 
     val transferAmount = notBlockedAmount + 1
-    assertDiffEi(
+    assertDiffEiTraced(
       Seq(
         TestBlock.create(Seq(TxHelpers.genesis(TxHelpers.defaultAddress, amount = initBalance))),
         TestBlock.create(Seq(TxHelpers.commitToGeneration(Height(4))))
@@ -96,7 +102,7 @@ class BalanceDiffValidationTest extends PropSpec with WithState {
       TestBlock.create(Seq(TxHelpers.transfer(amount = transferAmount))),
       settings
     ) { snapshotEi =>
-      snapshotEi should produce("trying to spend a deposit")
+      snapshotEi.resultE should produce("trying to spend a deposit")
     }
   }
 }

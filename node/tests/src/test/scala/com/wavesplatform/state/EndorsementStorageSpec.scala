@@ -1,4 +1,4 @@
-package com.wavesplatform.network
+package com.wavesplatform.state
 
 import cats.syntax.traverse.*
 import com.wavesplatform.account.Address
@@ -6,6 +6,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
+import com.wavesplatform.network.EndorseBlock
 import com.wavesplatform.state.{EndorsementFilter, EndorsementStorage, GeneratorIndex, Height}
 import com.wavesplatform.test.{FreeSpec, NumericExt, produce}
 import com.wavesplatform.transaction.TxHelpers

@@ -20,8 +20,8 @@ import org.scalatest.Assertion
   * 1. Genesis
   * 2. With commitments from two generators
   * 3. First block at epoch #1 with one valid and one conflict endorsements
-  * 4. Empty block
-  * 5. First block at epoch #2 with punishment applied for a conflict endorser, no one committed
+  * 4. Empty block with punishment applied for a conflict endorser
+  * 5. First block at epoch #2, no one committed
   */
 class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
   private val validGenerator     = TxHelpers.signer(0)
@@ -50,8 +50,8 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
     // TODO: value instead of comparison?
     override def after2WithCommitmentsCheck             = notRemoved
     override def after3WithNewEpochAndEndorsementsCheck = removed
-    override def after4EmptyCheck                       = removed
-    override def after5WithNewEpochAndPunishmentCheck   = notRemoved
+    override def after4WithPunishmentCheck              = removed
+    override def after5WithNewEpochCheck                = notRemoved
   }.run()
 
   "waves amount" in new Scenario[Long] {
@@ -61,8 +61,8 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
 
     override def after2WithCommitmentsCheck             = _ shouldBe base(2)
     override def after3WithNewEpochAndEndorsementsCheck = _ shouldBe base(3)
-    override def after4EmptyCheck                       = _ shouldBe base(4)
-    override def after5WithNewEpochAndPunishmentCheck   = _ shouldBe (base(5) - DepositInWavelets)
+    override def after4WithPunishmentCheck              = _ shouldBe (base(4) - DepositInWavelets)
+    override def after5WithNewEpochCheck                = _ shouldBe (base(5) - DepositInWavelets)
   }.run()
 
   "waves portfolio" in new Scenario[Portfolio] {
@@ -74,8 +74,8 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
 
     override def after2WithCommitmentsCheck             = _ shouldBe portfolioAfter2
     override def after3WithNewEpochAndEndorsementsCheck = _ shouldBe portfolioAfter2
-    override def after4EmptyCheck                       = _ shouldBe portfolioAfter2
-    override def after5WithNewEpochAndPunishmentCheck   = _ shouldBe Portfolio(balance = after2 - DepositInWavelets)
+    override def after4WithPunishmentCheck              = _ shouldBe Portfolio(balance = after2 - DepositInWavelets)
+    override def after5WithNewEpochCheck                = _ shouldBe Portfolio(balance = after2 - DepositInWavelets)
   }.run()
 
   "balance at height" in new Scenario[(Int, Long)] {
@@ -86,8 +86,8 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
 
     override def after2WithCommitmentsCheck             = _ shouldBe (2, after2)
     override def after3WithNewEpochAndEndorsementsCheck = _ shouldBe (2, after2)
-    override def after4EmptyCheck                       = _ shouldBe (2, after2)
-    override def after5WithNewEpochAndPunishmentCheck   = _ shouldBe (5, after2 - DepositInWavelets)
+    override def after4WithPunishmentCheck              = _ shouldBe (4, after2 - DepositInWavelets)
+    override def after5WithNewEpochCheck                = _ shouldBe (4, after2 - DepositInWavelets)
   }.run()
 
   "current generator balances" in new Scenario[Seq[(Address, Long)]] {
@@ -106,8 +106,8 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
 
     override def after2WithCommitmentsCheck             = _ shouldBe Nil
     override def after3WithNewEpochAndEndorsementsCheck = _ shouldBe balancesAfter2
-    override def after4EmptyCheck                       = _ shouldBe balancesAfter2
-    override def after5WithNewEpochAndPunishmentCheck   = _ shouldBe Nil
+    override def after4WithPunishmentCheck              = _ shouldBe balancesAfter2
+    override def after5WithNewEpochCheck                = _ shouldBe Nil
   }.run()
 
   "generator balance from API" in new Scenario[Long] { // Collected before applying block
@@ -122,8 +122,8 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
 
     override def after2WithCommitmentsCheck             = _ shouldBe 0
     override def after3WithNewEpochAndEndorsementsCheck = _ shouldBe generatingBalanceAfter2
-    override def after4EmptyCheck                       = _ shouldBe generatingBalanceAfter2
-    override def after5WithNewEpochAndPunishmentCheck   = _ shouldBe 0 // Not committed
+    override def after4WithPunishmentCheck              = _ shouldBe generatingBalanceAfter2
+    override def after5WithNewEpochCheck                = _ shouldBe 0 // Not committed
   }.run()
 
   "generating balance" in new Scenario[Long] { // Collected after applying block
@@ -134,8 +134,8 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
 
     override def after2WithCommitmentsCheck             = _ shouldBe after2
     override def after3WithNewEpochAndEndorsementsCheck = _ shouldBe after2
-    override def after4EmptyCheck                       = _ shouldBe after2
-    override def after5WithNewEpochAndPunishmentCheck   = _ shouldBe after2 // Punished for deposit, but deposit gone, so no difference
+    override def after4WithPunishmentCheck              = _ shouldBe after2 // Punished for deposit, but deposit gone, so no difference
+    override def after5WithNewEpochCheck                = _ shouldBe after2
   }.run()
 
   "balance snapshots" in new Scenario[Seq[BalanceSnapshot]] {
@@ -143,18 +143,27 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
 
     val after1 = ENOUGH_AMT
     val after2 = after1 - TestValues.commitToGenerationFee
-    val after5 = after2 - DepositInWavelets
+    val after4 = after2 - DepositInWavelets
 
-    override def after2WithCommitmentsCheck             = _ => succeed
+    override def after2WithCommitmentsCheck = _ should contain theSameElementsInOrderAs Seq(
+      bs(height = 2, regularBalance = after2, deposits = 1) // Sent CommitToGeneration
+    )
+
+    // Different results for checks after append and rollback because of fix in SnapshotBlockchain (see height2Fix)
     override def after3WithNewEpochAndEndorsementsCheck = _ => succeed
-    override def after4EmptyCheck                       = _ => succeed
-    override def after5WithNewEpochAndPunishmentCheck =
-      _ should contain theSameElementsInOrderAs Seq(
-        bs(height = 5, regularBalance = after5), // Punishment
-        // height = 4 // Nothing happened
-        // height = 3 // Sent conflict endorsement
-        bs(height = 2, regularBalance = after2, deposits = 1) // Sent CommitToGeneration
-      )
+
+    override def after4WithPunishmentCheck = _ should contain theSameElementsInOrderAs Seq(
+      bs(height = 4, regularBalance = after4), // Punishment
+      // height = 3 // Sent conflict endorsement
+      bs(height = 2, regularBalance = after2, deposits = 1) // Sent CommitToGeneration
+    )
+
+    override def after5WithNewEpochCheck = _ should contain theSameElementsInOrderAs Seq(
+      bs(height = 5, regularBalance = after4), // New epoch
+      bs(height = 4, regularBalance = after4), // Punishment
+      // height = 3 // Sent conflict endorsement
+      bs(height = 2, regularBalance = after2, deposits = 1) // Sent CommitToGeneration
+    )
   }.run()
 
   private type IgnorePosition[T] = Position ?=> T
@@ -167,8 +176,8 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
 
     def after2WithCommitmentsCheck: Check
     def after3WithNewEpochAndEndorsementsCheck: Check
-    def after4EmptyCheck: Check
-    def after5WithNewEpochAndPunishmentCheck: Check
+    def after4WithPunishmentCheck: Check
+    def after5WithNewEpochCheck: Check
 
     def run(): Assertion = withDomain(
       defaultSettings,
@@ -196,15 +205,15 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
       log.debug("Append block 4")
       val block4 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = validGenerator, strictTime = true)
       d.appender.appendBlock(block4)
-      after4EmptyCheck(data)
+      after4WithPunishmentCheck(data)
 
       log.debug("Append block 5 of new epoch, apply punishment")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = validGenerator, strictTime = true))
-      after5WithNewEpochAndPunishmentCheck(data)
+      after5WithNewEpochCheck(data)
 
       log.debug("Rollback to 4")
       d.blockchain.removeAfter(block4.id()) should beRight
-      after4EmptyCheck(data)
+      after4WithPunishmentCheck(data)
 
       log.debug("Rollback to 3")
       d.blockchain.removeAfter(block3WithVotes.id()) should beRight
