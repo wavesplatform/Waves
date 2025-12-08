@@ -8,9 +8,9 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.{BaseFreeSpec, IntegrationSuiteWithThreeAddresses, NodeConfigs}
+import com.wavesplatform.state.Height
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.test.*
-import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
@@ -77,7 +77,7 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
     sponsorWavesBalanceAfterFirstXferTest =
       sponsorWavesBalance - 2 * issueFee - 2 * sponsorReducedFee - 2 * minFee - 2 * FeeValidation.FeeUnit * SmallFee / minSponsorFee
 
-    firstSponsorAssetId = sender
+    firstSponsorAssetId = sender // A-1
       .issue(
         sponsor,
         "AssetTxV1",
@@ -89,7 +89,7 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         waitForTx = true
       )
       .id
-    secondSponsorAssetId = sender
+    secondSponsorAssetId = sender // A-2
       .issue(
         sponsor,
         "AssetTxV2",
@@ -102,12 +102,12 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
       )
       .id
 
-    firstTransferTxToAlice =
+    firstTransferTxToAlice = // A-3
       sender.transfer(sponsor, aliceAddress, sponsorAssetTotal / 2, minFee, Some(firstSponsorAssetId), None, waitForTx = true).id
-    secondTransferTxToAlice =
+    secondTransferTxToAlice = // A-4
       sender.transfer(sponsor, aliceAddress, sponsorAssetTotal / 2, minFee, Some(secondSponsorAssetId), None, waitForTx = true).id
-    firstSponsorTxId = sender.sponsorAsset(sponsor, firstSponsorAssetId, baseFee = Token, fee = sponsorReducedFee, version = TxVersion.V1).id
-    secondSponsorTxId = sender.sponsorAsset(sponsor, secondSponsorAssetId, baseFee = Token, fee = sponsorReducedFee, version = TxVersion.V2).id
+    firstSponsorTxId = sender.sponsorAsset(sponsor, firstSponsorAssetId, baseFee = Token, fee = sponsorReducedFee, version = TxVersion.V1).id   // A-5
+    secondSponsorTxId = sender.sponsorAsset(sponsor, secondSponsorAssetId, baseFee = Token, fee = sponsorReducedFee, version = TxVersion.V2).id // A-6
   }
 
   "Fee in sponsored asset works fine for transaction" - {
@@ -157,9 +157,9 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
 
     "fee should be written off in issued asset" - {
       "alice transfer sponsored asset to bob using sponsored fee" in {
-        val firstTransferTxCustomFeeAlice =
+        val firstTransferTxCustomFeeAlice = // A-7
           sender.transfer(alice, bobAddress, 10 * Token, SmallFee, Some(firstSponsorAssetId), Some(firstSponsorAssetId)).id
-        val secondTransferTxCustomFeeAlice =
+        val secondTransferTxCustomFeeAlice = // A-8
           sender.transfer(alice, bobAddress, 10 * Token, SmallFee, Some(secondSponsorAssetId), Some(secondSponsorAssetId)).id
         nodes.waitForHeightArise()
         nodes.waitForTransaction(firstTransferTxCustomFeeAlice)
@@ -191,13 +191,13 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         minerTxs.size shouldBe 4
 
         val sponsorTxs = sender.transactionsByAddress(sponsorAddress, 100)
-        // 1 x genesis
-        // 3 x transfers in IntegrationSuiteWithThreeAddresses
-        // 2 x issue here
-        // 2 x sponsor here
-        // 2 x transfers with sponsored assets here
-        sponsorTxs.size shouldBe 10
-        sponsorTxs.count(tx => tx.sender.contains(sponsorAddress) || tx.recipient.contains(sponsorAddress)) shouldBe 8
+        // 1 x transfer in IntegrationSuiteWithThreeAddresses
+        // 2 x issue here: A-1, A-2
+        // 2 x transfer here: A-3, A-4
+        // 2 x sponsor here: A-5, A-6
+        // 2 x transfers with sponsored assets here: A-7, A-8
+        sponsorTxs.size shouldBe 9
+        sponsorTxs.count(tx => tx.sender.contains(sponsorAddress) || tx.recipient.contains(sponsorAddress)) shouldBe 7 // Without A-7, A-8
         sponsorTxs.map(_.id) should contain allElementsOf Seq(
           firstSponsorAssetId,
           secondSponsorAssetId,
@@ -336,9 +336,12 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         val transferTxCustomFeeAlice1 = sender.transfer(alice, bobAddress, 1.waves, TinyFee, None, Some(firstSponsorAssetId)).id
         val transferTxCustomFeeAlice2 = sender.transfer(alice, bobAddress, 1.waves, TinyFee, None, Some(secondSponsorAssetId)).id
         nodes.waitForHeight(
-          Height(sender.waitForTransaction(transferTxCustomFeeAlice1).height.max(
-            sender.waitForTransaction(transferTxCustomFeeAlice2).height
-          ) + 2)
+          Height(
+            sender
+              .waitForTransaction(transferTxCustomFeeAlice1)
+              .height
+              .max(sender.waitForTransaction(transferTxCustomFeeAlice2).height) + 2
+          )
         )
 
         val wavesFee = FeeValidation.FeeUnit * 2 * TinyFee / TinyFee

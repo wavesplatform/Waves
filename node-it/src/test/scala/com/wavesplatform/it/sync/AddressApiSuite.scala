@@ -1,20 +1,20 @@
 package com.wavesplatform.it.sync
 
-import java.net.URLDecoder
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation}
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.state.{Height, StringDataEntry}
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import play.api.libs.json.*
 
+import java.net.URLDecoder
 import scala.util.Random
 
 class AddressApiSuite extends BaseTransactionSuite with NTPTime {
   test("balance at height") {
-    val address = sender.createKeyPair().toAddress.toString
+    val address = TxHelpers.signer(1000).toAddress.toString
     sender.transfer(sender.keyPair, address, 1, waitForTx = true)
     nodes.waitForHeightArise()
     sender.transfer(sender.keyPair, address, 1, waitForTx = true)
@@ -105,7 +105,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
   }
 
   private def assertBalances(asset: Option[String]): Unit = {
-    val addressesAndBalances = (1 to 5).map(i => (miner.createKeyPair().toAddress.toString, (i * 100).toLong)).toList
+    val addressesAndBalances = (1 to 5).map(i => (TxHelpers.signer(1000 + i).toAddress.toString, (i * 100).toLong)).toList
 
     val firstAddresses   = addressesAndBalances.slice(0, 2)
     val secondAddresses  = addressesAndBalances.slice(2, 5)
