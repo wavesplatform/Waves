@@ -16,13 +16,13 @@ import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 trait IntegrationSuiteWithThreeAddresses extends BaseSuite with ScalaFutures with IntegrationPatience with RecoverMethods with ScorexLogging {
   this: TestSuite & Nodes =>
 
-  protected lazy val firstKeyPair: SeedKeyPair = sender.createKeyPair()
+  protected lazy val firstKeyPair: SeedKeyPair = SeedKeyPair("firstKeyPair".getBytes())
   protected lazy val firstAddress: String      = firstKeyPair.toAddress.toString
 
-  protected lazy val secondKeyPair: KeyPair = sender.createKeyPair()
+  protected lazy val secondKeyPair: KeyPair = SeedKeyPair("secondKeyPair".getBytes())
   protected lazy val secondAddress: String  = secondKeyPair.toAddress.toString
 
-  protected lazy val thirdKeyPair: KeyPair = sender.createKeyPair()
+  protected lazy val thirdKeyPair: KeyPair = SeedKeyPair("thirdKeyPair".getBytes())
   protected lazy val thirdAddress: String  = thirdKeyPair.toAddress.toString
 
   abstract protected override def beforeAll(): Unit = {

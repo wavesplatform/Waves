@@ -13,9 +13,10 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, C
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import monix.execution.atomic.AtomicInt
 
 import scala.concurrent.duration.*
 
@@ -27,6 +28,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       .buildNonConflicting()
   private val initialWavesBalance = 100.waves
   private val setScriptPrice      = 0.01.waves
+  private val accountCounter      = AtomicInt(1000)
 
   private val CallableMethod    = "@Callable"
   private val TransactionMethod = "Transaction"
@@ -312,7 +314,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
 
   def createDapp(scriptParts: String*): KeyPair = {
     val script  = scriptParts.mkString(" ")
-    val address = miner.createKeyPair()
+    val address = TxHelpers.signer(accountCounter.getAndIncrement())
     val compiledScript = ScriptCompiler
       .compile(
         script,
