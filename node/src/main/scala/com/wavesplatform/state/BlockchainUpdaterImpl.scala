@@ -747,13 +747,10 @@ class BlockchainUpdaterImpl(
   override def wavesAmount(height: Int): BigInt = readLock {
     ngState match {
       case Some(ng) if this.height == height =>
-        val punishedEndorsers = rocksdb.currentGenerationPeriod
-          .filter(p => p.next.start == Height(height))
-          .fold(0)(p => rocksdb.conflictGenerators(p).size)
-
+        val parentConflictEndorsements = rocksdb.lastBlockHeader.flatMap(_.header.finalizationVoting).fold(0)(_.conflict.size)
         rocksdb.wavesAmount(height - 1) +
           BigInt(ng.reward.getOrElse(0L)) * this.blockRewardBoost(Height(height)) -
-          punishedEndorsers * CommitToGenerationTransaction.DepositInWavelets
+          parentConflictEndorsements * CommitToGenerationTransaction.DepositInWavelets
       case _ =>
         rocksdb.wavesAmount(height)
     }

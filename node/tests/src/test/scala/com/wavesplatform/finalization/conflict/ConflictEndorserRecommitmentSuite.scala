@@ -50,38 +50,37 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
     )
     d.appender.appendBlock(block3WithVotes)
 
+    log.debug(s"Append block 3 with punishment and commitment")
     val block4Txs             = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(5), x))
     val block4WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = block4Txs, generator = validGenerator, strictTime = true)
     d.appender.appendBlock(block4WithCommitments)
 
-    val balanceAfter4 = ENOUGH_AMT - 2 * TestValues.commitToGenerationFee
+    val balanceAfter4 = ENOUGH_AMT - 2 * TestValues.commitToGenerationFee - DepositInWavelets
 
-    log.debug("Append block 5 of new epoch with punishment and commitment")
+    log.debug("Append block 5 of new epoch")
     d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = validGenerator, strictTime = true))
-
-    val balanceAfter5 = balanceAfter4 - DepositInWavelets
 
     withClue(s"checkCommitted: ") {
       d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map(_._1) should contain theSameElementsInOrderAs generatorAddrs
     }
 
-    d.blockchain.wavesPortfolio(conflictGeneratorAddr) shouldBe Portfolio(balance = balanceAfter5, generationDeposit = DepositInWavelets)
-    d.blockchain.balanceAtHeight(conflictGeneratorAddr, d.blockchain.height).value shouldBe (5, balanceAfter5)
+    d.blockchain.wavesPortfolio(conflictGeneratorAddr) shouldBe Portfolio(balance = balanceAfter4, generationDeposit = DepositInWavelets)
+    d.blockchain.balanceAtHeight(conflictGeneratorAddr, d.blockchain.height).value shouldBe (4, balanceAfter4)
 
     withClue(s"checkGeneratingBalance: ") {
-      d.blockchain.generatingBalance(conflictGeneratorAddr) shouldBe balanceAfter5 - DepositInWavelets
+      d.blockchain.generatingBalance(conflictGeneratorAddr) shouldBe balanceAfter4 - DepositInWavelets
     }
 
     withClue(s"checkGeneratorBalanceFromApi: ") {
       d.generatorsApi
         .generators(Height(d.blockchain.height))
         .collectFirst { case x if x.address == conflictGeneratorAddr => x.balance }
-        .getOrElse(0L) shouldBe balanceAfter5 - DepositInWavelets
+        .getOrElse(0L) shouldBe balanceAfter4 - DepositInWavelets
     }
 
     d.blockchain.balanceSnapshots(conflictGeneratorAddr, from = 2, to = None) should contain theSameElementsInOrderAs Seq(
-      bs(height = 5, regularBalance = balanceAfter5, deposits = 1), // Punished and committed on next
-      bs(height = 4, regularBalance = balanceAfter4, deposits = 2), // Commitment
+      bs(height = 5, regularBalance = balanceAfter4, deposits = 1), // New epoch
+      bs(height = 4, regularBalance = balanceAfter4, deposits = 1), // Punishment and commitment
       // height = 3 // Sent conflict endorsement
       bs(height = 2, regularBalance = balanceAfter2, deposits = 1) // Sent CommitToGeneration
     )

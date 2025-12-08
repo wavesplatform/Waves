@@ -3,7 +3,8 @@ package com.wavesplatform.state.diffs
 import cats.implicits.{catsSyntaxOption, catsSyntaxSemigroup, toFoldableOps}
 import cats.syntax.either.*
 import com.wavesplatform.account.Address
-import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot}
+import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, BlockSnapshot, FinalizationVoting, MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
@@ -183,8 +184,11 @@ object BlockDiffer {
         totalMinerPortfolio = Map(block.sender.toAddress -> totalMinerReward)
         nonMinerRewardPortfolios <- Portfolio.combine(daoPortfolio, xtnBuybackPortfolio)
         totalRewardPortfolios    <- Portfolio.combine(totalMinerPortfolio, nonMinerRewardPortfolios)
-        penalties                <- calculatePenalties(blockchain)
-        withPenaltiesPortfolios  <- Portfolio.combine(penalties, totalRewardPortfolios)
+        penalties <- maybePrevBlock match {
+          case Some(prevBlock) => calculatePenalties(blockchain, prevBlock)
+          case None            => Map.empty[Address, Portfolio].asRight[String]
+        }
+        withPenaltiesPortfolios <- Portfolio.combine(penalties, totalRewardPortfolios)
         patchesSnapshot = leasePatchesSnapshot(blockchainWithNewBlock)
         resultSnapshot <- patchesSnapshot.addBalances(withPenaltiesPortfolios, blockchainWithNewBlock)
       } yield resultSnapshot
@@ -289,22 +293,49 @@ object BlockDiffer {
     } yield r
   }
 
-  private def calculatePenalties(blockchain: Blockchain): Either[String, Map[Address, Portfolio]] = {
-    val empty      = Map.empty[Address, Portfolio].asRight[String]
-    val currHeight = Height(blockchain.height)
-    blockchain.generationPeriodOf(currHeight).filter(currHeight + 1 == _.next.start).fold(empty) { currPeriod =>
-      lazy val committed = blockchain.committedGenerators(currPeriod)
-      val conflictEndorsers = blockchain.conflictGenerators(currPeriod).all.map { c =>
-        committed(c.toInt)._1
-      }
+  private def calculatePenalties(blockchain: Blockchain, prevBlockId: BlockId): Either[String, Map[Address, Portfolio]] = {
+    val empty = Map.empty[Address, Portfolio].asRight[String]
+    val parentBlockInfo = for {
+      prevHeight <- blockchain.heightOf(prevBlockId)
+      period     <- blockchain.generationPeriodOf(Height(prevHeight))
+      voting     <- blockchain.blockHeader(prevHeight).flatMap(_.header.finalizationVoting)
+    } yield (period, voting)
 
-      conflictEndorsers.foldLeft(empty) {
-        case (r @ Left(_), _) => r
-        case (Right(r), addr) =>
-          val orig    = r.getOrElse(addr, Portfolio.empty)
-          val updated = orig.combine(Portfolio.waves(-CommitToGenerationTransaction.DepositInWavelets))
-          updated.map(r.updated(addr, _))
-      }
+    parentBlockInfo.fold(empty) { case (period, voting) =>
+      calculatePenalties(blockchain, period, voting)
+    }
+  }
+
+  private def calculatePenalties(blockchain: Blockchain, prevBlock: Block): Either[String, Map[Address, Portfolio]] = {
+    val empty = Map.empty[Address, Portfolio].asRight[String]
+    val parentBlockInfo = for {
+      voting     <- prevBlock.header.finalizationVoting
+      prevHeight <- blockchain.heightOf(prevBlock.id())
+      period     <- blockchain.generationPeriodOf(Height(prevHeight))
+    } yield (period, voting)
+
+    parentBlockInfo.fold(empty) { case (period, voting) =>
+      calculatePenalties(blockchain, period, voting)
+    }
+  }
+
+  private def calculatePenalties(
+      blockchain: Blockchain,
+      prevBlockPeriod: GenerationPeriod,
+      prevBlockVoting: FinalizationVoting
+  ): Either[String, Map[Address, Portfolio]] = {
+    val empty          = Map.empty[Address, Portfolio].asRight[String]
+    lazy val committed = blockchain.committedGenerators(prevBlockPeriod)
+    prevBlockVoting.conflict.foldLeft(empty) {
+      case (r @ Left(_), _) => r
+      case (Right(r), endorsement) =>
+        committed.lift(endorsement.endorserIndex.toInt) match {
+          case None => Left(s"Invalid endorsement index in $endorsement, valid: [0; ${committed.size}]")
+          case Some((addr, _)) =>
+            val orig    = r.getOrElse(addr, Portfolio.empty)
+            val updated = orig.combine(Portfolio.waves(-CommitToGenerationTransaction.DepositInWavelets))
+            updated.map(r.updated(addr, _))
+        }
     }
   }
 
@@ -340,7 +371,7 @@ object BlockDiffer {
         daoAddress.map(_ -> Portfolio.waves(rewardShares.daoAddress)) ++
         xtnBuybackAddress.map(_ -> Portfolio.waves(rewardShares.xtnBuybackAddress))
       withRewards   <- StateSnapshot.build(blockchain, portfolios = resultPf.filterNot(_._2.isEmpty))
-      penaltiesPf   <- calculatePenalties(blockchain).leftMap(GenericError(_))
+      penaltiesPf   <- calculatePenalties(blockchain, reference).leftMap(GenericError(_))
       withPenalties <- withRewards.addBalances(penaltiesPf, blockchain).leftMap(GenericError(_))
     } yield withPenalties
   }

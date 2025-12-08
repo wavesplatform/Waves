@@ -5,11 +5,11 @@ import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.state.{BalanceSnapshot, ConflictGenerators, GeneratorIndex, GenesisBlockHeight, Height}
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test.{FreeSpec, WithResourceManager}
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 import org.scalatest.EitherValues
 
-trait BaseFinalizationSpec extends FreeSpec, WithDomain, EitherValues {
+trait BaseFinalizationSpec extends FreeSpec, WithDomain, WithResourceManager, EitherValues {
   protected def mkConflictGenerators(h: Int, idxs: Int*): ConflictGenerators =
     ConflictGenerators.empty.appendAll(Height(h), GeneratorIndex.seq(idxs)*)
 

@@ -35,11 +35,10 @@ import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, Generi
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, EthTxGenerator, Transaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.{JsonMatchers, Schedulers, SharedSchedulerMixin}
+import com.wavesplatform.utils.{JsonMatchers, SharedSchedulerMixin}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
-import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
@@ -1603,7 +1602,7 @@ class BlockChallengeTest
         d.blockchain,
         DummyTransactionPublisher.accepting,
         testTime,
-        Schedulers.timeBoundedFixedPool(new HashedWheelTimer(), 5.seconds, 1, "rest-time-limited"),
+        Scheduler.global,
         new RouteTimeout(60.seconds)(using sharedScheduler),
         d.accountsApi,
         1000
@@ -1635,7 +1634,6 @@ class BlockChallengeTest
         route
       )
       checkBalances(challengedMiner.toAddress, initChallengedBalance, initChallengedBalance, 0, 1003, route)
-
     }
   }
 

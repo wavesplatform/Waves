@@ -1478,7 +1478,8 @@ class RocksDBWriter(
 
     val toInclCommitted = toIncl.next // A generator commits to a next period, this is what we see in DB
     committedHeights(db, addressId, fromIncl, toInclCommitted).foreach { committed =>
-      val releaseHeight = committed.period.next.start
+      val punishmentHeight = conflictGenerators(committed.period).heightOf(committed.index).map(_.next)
+      val releaseHeight    = punishmentHeight.getOrElse(committed.period.next.start)
 
       depositDiffHeights.updateWith(committed.height)(orig => Some(orig.getOrElse(0) + 1))
       depositDiffHeights.put(releaseHeight, -1)
