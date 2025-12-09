@@ -569,7 +569,9 @@ object Docker {
   private val jsonMapper  = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
 
-  val configTemplate: Config = parseResources("template.conf")
+  val configTemplate: Config   = parseResources("template.conf")
+  val initialWavesAmount: Long = configTemplate.getLong("waves.blockchain.custom.genesis.initial-balance")
+
   def genesisOverride(featuresConfig: Option[Config] = None): Config = {
     val genesisTs: Long = System.currentTimeMillis()
 

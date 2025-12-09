@@ -42,27 +42,25 @@ import scala.concurrent.duration.Duration
 import scala.language.reflectiveCalls
 import scala.util.{Failure, Success, Using}
 
-// @formatter:off
 /** Usage example: <pre>object Example extends App {
- *  val wavesSettings = Application.loadApplicationConfig(Some(new File("path-to-config-file")))
- *  val generator = new BlockchainGenerator(wavesSettings)
- *  val sender = KeyPair("123".getBytes)
- *  val recipient = Address.fromString("3FddHK1Y3vPdcVKZshWCWea4gS5th6G1UE6").getOrElse(sender.toAddress)
- *  val genBlocks = (1 to 10).map { idx =>
- *    GenBlock(
- *      (1 to 5).map(txIdx => GenTx(TxHelpers.transfer(sender, recipient, amount = (idx * 10 + txIdx) * 100000000L), Right(sender))),
- *      signer = sender
- *    )
- *  }
- *  generator.generateBinaryFile(genBlocks)
- *
- *  // only if you use Application.loadApplicationConfig method to create WavesSettings object
- *  Try(Await.result(Kamon.stopModules(), 10.seconds))
- *  Metrics.shutdown()
- *}
- * </pre>
- */
-// @formatter:on
+  *  val wavesSettings = Application.loadApplicationConfig(Some(new File("path-to-config-file")))
+  *  val generator = new BlockchainGenerator(wavesSettings)
+  *  val sender = KeyPair("123".getBytes)
+  *  val recipient = Address.fromString("3FddHK1Y3vPdcVKZshWCWea4gS5th6G1UE6").getOrElse(sender.toAddress)
+  *  val genBlocks = (1 to 10).map { idx =>
+  *    GenBlock(
+  *      (1 to 5).map(txIdx => GenTx(TxHelpers.transfer(sender, recipient, amount = (idx * 10 + txIdx) * 100000000L), Right(sender))),
+  *      signer = sender
+  *    )
+  *  }
+  *  generator.generateBinaryFile(genBlocks)
+  *
+  *  // only if you use Application.loadApplicationConfig method to create WavesSettings object
+  *  Try(Await.result(Kamon.stopModules(), 10.seconds))
+  *  Metrics.shutdown()
+  * }
+  * </pre>
+  */
 class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
   private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
 
@@ -100,15 +98,15 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
 
   private def generateBlockchain(genBlocks: Iterator[GenBlock], dbSettings: DBSettings, exportToFile: Block => Unit = _ => ()): Unit = {
     val scheduler = Schedulers.singleThread("appender")
-    val time = new FakeTime(settings.blockchainSettings.genesisSettings.timestamp)
+    val time      = new FakeTime(settings.blockchainSettings.genesisSettings.timestamp)
     Using.Manager { use =>
-      val db = use(RDB.open(dbSettings))
+      val db                         = use(RDB.open(dbSettings))
       val (blockchain, rdbWriterRaw) = StorageFactory(settings, db, time, BlockchainUpdateTriggers.noop)
       use(rdbWriterRaw)
-      val utxPool = use(new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable))
-      val pos = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
+      val utxPool     = use(new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable))
+      val pos         = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
       val extAppender = BlockAppender(blockchain, time, utxPool, pos, BlockEndorser.Disabled, scheduler)(_, None)
-      val utxEvents = ConcurrentSubject.publish[UtxEvent]
+      val utxEvents   = ConcurrentSubject.publish[UtxEvent]
 
       val miner = new MinerImpl(
         new DefaultChannelGroup("", null),
@@ -127,7 +125,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
 
       checkGenesis(settings, blockchain, Miner.Disabled)
       val result = genBlocks.foldLeft[Either[ValidationError, Unit]](Right(())) {
-        case (res@Left(_), _) => res
+        case (res @ Left(_), _) => res
         case (_, genBlock) =>
           time.time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, genBlock.signer).explicitGet()
           val correctedTimeTxs = genBlock.txs.map(correctTxTimestamp(_, time))
@@ -188,9 +186,9 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
 
   private def correctTxTimestamp(genTx: GenTx, time: Time): Transaction =
     genTx match {
-      case GenTx(t: BurnTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: BurnTransaction, Right(signer))        => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
       case GenTx(t: CreateAliasTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: DataTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: DataTransaction, Right(signer))        => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
       case GenTx(t: EthereumTransaction, Left(signer)) =>
         val correctedTimeRawTx = RawTransaction.createTransaction(
           BigInt(time.getTimestamp()).bigInteger,
@@ -201,33 +199,32 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
           t.underlying.getData
         )
         EthTxGenerator.signRawTransaction(signer, t.chainId)(correctedTimeRawTx)
-      case GenTx(t: ExchangeTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: ExchangeTransaction, Right(signer))     => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
       case GenTx(t: InvokeScriptTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: IssueTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: LeaseCancelTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: LeaseTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: IssueTransaction, Right(signer))        => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: LeaseCancelTransaction, Right(signer))  => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: LeaseTransaction, Right(signer))        => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
       case GenTx(t: MassTransferTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
       case GenTx(t: PaymentTransaction, Right(signer)) =>
         t.copy(timestamp = time.getTimestamp(), signature = crypto.sign(signer.privateKey, t.bodyBytes()))
-      case GenTx(t: ReissueTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: SetAssetScriptTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: SetScriptTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: SponsorFeeTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: TransferTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: ReissueTransaction, Right(signer))         => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: SetAssetScriptTransaction, Right(signer))  => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: SetScriptTransaction, Right(signer))       => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: SponsorFeeTransaction, Right(signer))      => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: TransferTransaction, Right(signer))        => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
       case GenTx(t: UpdateAssetInfoTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t, _) => t
+      case GenTx(t, _)                                         => t
     }
 }
 
 object BlockchainGenerator {
   case class GenBlock(
-                       txs: Seq[GenTx],
-                       signer: KeyPair = TxHelpers.defaultSigner,
-                       version: Byte = Block.ProtoBlockVersion
-                     )
-
+      txs: Seq[GenTx],
+      signer: KeyPair = TxHelpers.defaultSigner,
+      version: Byte = Block.ProtoBlockVersion
+  )
   case class GenTx(
-                    tx: Transaction,
-                    signer: Either[ECKeyPair, KeyPair]
-                  )
+      tx: Transaction,
+      signer: Either[ECKeyPair, KeyPair]
+  )
 }

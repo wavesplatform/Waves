@@ -3,10 +3,10 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
-import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
+import com.wavesplatform.it.{BaseFreeSpec, Docker}
 import com.wavesplatform.state.Height
 import org.scalatest.OptionValues
 
@@ -18,7 +18,7 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
   override protected def nodeConfigs: Seq[Config] = Configs
 
   lazy val initMinerBalance: Long = miner.balanceAtHeight(miner.address, Height(1))
-  val InitialAmount               = 6400000000000000L
+  val InitialAmount               = Docker.initialWavesAmount
 
   "reward changes accordingly node's votes and miner's balance changes by reward amount after block generation" - {
     "when miner votes for increase" in {
