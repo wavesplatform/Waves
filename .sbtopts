@@ -1,1 +1,4 @@
--mem 4096 -J--add-exports=java.base/sun.nio.ch=ALL-UNNAMED -J--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED
+-mem 4096
+-J--add-exports=java.base/sun.nio.ch=ALL-UNNAMED
+-J--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED
+-Djava.security.manager=allow # Won't work in JRE >= 24
