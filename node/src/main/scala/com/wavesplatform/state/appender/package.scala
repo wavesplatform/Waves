@@ -68,7 +68,7 @@ package object appender {
       // If no one commited, fallback to classic
       _ <- Either.raiseWhen(generatorSet.nonEmpty && !generatorSet.contains(minerAddress)) {
         s"$minerAddress is not allowed to generate a block, allowed: ${generatorSet.mkString(", ")}. " +
-          s"If it is your node: commit to generation for a next epoch"
+          s"If it is your node: commit to generation for a next period"
       }
     } yield (parentHeight, generatorBalances)
 

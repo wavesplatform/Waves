@@ -5,7 +5,7 @@ import com.wavesplatform.state
 import scala.collection.Searching.*
 import scala.collection.View
 
-/** Stores indexes of conflict generators by height in one generation epoch */
+/** Stores indexes of conflict generators by height in one generation period */
 case class ConflictGenerators private (private val heights: Vector[Height], private val generators: Vector[Seq[GeneratorIndex]]) {
   def appendAll(h: Height, idxs: GeneratorIndex*): ConflictGenerators = {
     require(

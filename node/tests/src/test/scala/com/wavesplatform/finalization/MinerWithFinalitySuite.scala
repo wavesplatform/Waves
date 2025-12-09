@@ -34,10 +34,10 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
 
   "If account not committed, its attempt to forge doesn't stop current mining of other account on same node" ignore {}
 
-  "Mining works on new epoch even" - {
+  "Mining works on new period even" - {
     "committed after scheduled time" ignore {}
 
-    "committed in the last block of epoch" in withManager { manager =>
+    "committed in the last block of period" in withManager { manager =>
       val channels     = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
       var miner: Miner = Miner.Disabled
       withDomain(
@@ -96,7 +96,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
       "all have no required balance" ignore {}
     }
 
-    "was conflict in previous epoch" in withManager { manager =>
+    "was conflict in previous period" in withManager { manager =>
       val minerScheduler    = TestScheduler()
       val appenderScheduler = TestScheduler()
 
@@ -223,7 +223,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
       }
     }
 
-    "on new epoch if not committed" in withManager { manager =>
+    "on new period if not committed" in withManager { manager =>
       val minerScheduler    = TestScheduler()
       val appenderScheduler = TestScheduler()
 
