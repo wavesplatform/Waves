@@ -23,30 +23,27 @@ object BalanceDiffValidation {
         newLease: LeaseBalance,
         additionalDeposit: Long
     ): Either[(Address, String), Unit] = {
-      val oldWaves            = b.balance(acc)
-      val oldDeposit          = b.generationDeposit(acc)
-      val oldWavesWithDeposit = oldWaves - oldDeposit
-      val oldLease            = b.leaseBalance(acc)
+      val oldWaves   = b.balance(acc)
+      val oldDeposit = b.generationDeposit(acc)
+      val oldLease   = b.leaseBalance(acc)
 
       val newDeposit          = oldDeposit + additionalDeposit
       val newWavesWithDeposit = newWaves - newDeposit
 
-      val wavesDiff    = newWavesWithDeposit - oldWavesWithDeposit
       val leaseOutDiff = newLease.out - oldLease.out
 
+      val stateChanges = s"old: w=$oldWaves, $oldLease, d=$oldDeposit, new: w=$newWaves, $newLease, d=$newDeposit"
+
+      // TODO: additional tests
       val errorMessage =
-        if (wavesDiff >= 0) Either.unit
+        if (newWaves < 0) s"negative waves balance: $acc, old: $oldWaves, new: $newWaves".asLeft
         else if (newWavesWithDeposit < 0) {
-          if (newDeposit > oldDeposit)
-            s"$acc not enough funds for deposit, old: ${(oldWaves, oldLease, oldDeposit)}, new: ${(newWaves, newLease, newDeposit)}".asLeft
-          else if (oldDeposit > 0)
-            s"$acc trying to spend a deposit, old: ${(oldWaves, oldLease, oldDeposit)}, new: ${(newWaves, newLease, newDeposit)}".asLeft
-          else s"negative waves balance: $acc, old: $oldWaves, new: $newWaves".asLeft
+          if (newDeposit > oldDeposit) s"$acc not enough funds for deposit, $stateChanges".asLeft
+          else s"$acc trying to spend a deposit, $stateChanges".asLeft
         } else if (newWavesWithDeposit < newLease.out && b.height > b.settings.functionalitySettings.allowLeasedBalanceTransferUntilHeight) {
-          if (newWavesWithDeposit + newLease.in - newLease.out < 0)
-            s"negative effective balance: $acc, old: ${(oldWaves, oldLease, oldDeposit)}, new: ${(newWaves, newLease, newDeposit)}".asLeft
+          if (newWavesWithDeposit + newLease.in - newLease.out < 0) s"negative effective balance: $acc, $stateChanges".asLeft
           else if (leaseOutDiff == 0) s"$acc trying to spend leased money".asLeft
-          else s"leased being more than own: $acc, old: ${(oldWaves, oldLease, oldDeposit)}, new: ${(newWaves, newLease, newDeposit)}".asLeft
+          else s"leased being more than own: $acc, $stateChanges".asLeft
         } else Either.unit
 
       errorMessage.leftMap(acc -> _)
