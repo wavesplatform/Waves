@@ -107,10 +107,6 @@ case class Block(
       case Some(ch) => copy(header = originalHeader(), signature = ch.headerSignature)
       case _        => this
     }
-
-  override def toString: String =
-    s"Block(${id()},${header.reference},${header.generator.toAddress}," +
-      s"${header.timestamp},${header.featureVotes.mkString("[", ",", "]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""})"
 }
 
 object Block {

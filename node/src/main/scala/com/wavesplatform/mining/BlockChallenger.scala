@@ -165,7 +165,7 @@ class BlockChallengerImpl(
 
     for {
       allAccounts  <- getChallengingAccounts(challengedBlock.sender.toAddress)
-      (acc, delay) <- pickBestAccount(allAccounts)
+      (bestMinerAccount, delay) <- pickBestAccount(allAccounts)
       blockTime = prevBlockHeader.timestamp + delay
       _ <- Either.cond(
         blockTime < challengedBlock.header.timestamp,
@@ -174,7 +174,7 @@ class BlockChallengerImpl(
       )
       consensusData <-
         pos.consensusData(
-          acc,
+          bestMinerAccount,
           blockchainUpdater.height,
           blockchainUpdater.settings.genesisSettings.averageBlockDelay,
           prevBlockHeader.baseTarget,
@@ -189,7 +189,7 @@ class BlockChallengerImpl(
         consensusData.baseTarget,
         consensusData.generationSignature,
         txs,
-        acc,
+        bestMinerAccount,
         blockFeatures(blockchainUpdater, settings),
         blockRewardVote(settings),
         stateHash = None,
@@ -206,13 +206,13 @@ class BlockChallengerImpl(
         blockchainUpdater.computeNextReward,
         None
       )
-      initialBlockSnapshot <- BlockDiffer.createInitialBlockSnapshot(blockchainUpdater, challengedBlock.header.reference, acc.toAddress)
+      initialBlockSnapshot <- BlockDiffer.createInitialBlockSnapshot(blockchainUpdater, challengedBlock.header.reference, bestMinerAccount.toAddress)
       stateHash <- TxStateSnapshotHashBuilder
         .computeStateHash(
           txs,
           TxStateSnapshotHashBuilder.createHashFromSnapshot(initialBlockSnapshot, None).createHash(prevStateHash),
           initialBlockSnapshot,
-          acc,
+          bestMinerAccount,
           Some(prevBlockHeader.timestamp),
           blockTime,
           isChallenging = true,
@@ -227,24 +227,22 @@ class BlockChallengerImpl(
           consensusData.baseTarget,
           consensusData.generationSignature,
           txs,
-          acc,
+          bestMinerAccount,
           blockFeatures(blockchainUpdater, settings),
           blockRewardVote(settings),
-          if (blockchainWithNewBlock.supportsLightNodeBlockFields()) Some(stateHash) else None,
-          if (blockchainWithNewBlock.supportsLightNodeBlockFields())
-            Some(
-              ChallengedHeader(
-                challengedBlock.header.timestamp,
-                challengedBlock.header.baseTarget,
-                challengedBlock.header.generationSignature,
-                challengedBlock.header.featureVotes,
-                challengedBlock.header.generator,
-                challengedBlock.header.rewardVote,
-                challengedStateHash,
-                challengedSignature
-              )
+          Some(stateHash),
+          Some(
+            ChallengedHeader(
+              challengedBlock.header.timestamp,
+              challengedBlock.header.baseTarget,
+              challengedBlock.header.generationSignature,
+              challengedBlock.header.featureVotes,
+              challengedBlock.header.generator,
+              challengedBlock.header.rewardVote,
+              challengedStateHash,
+              challengedSignature
             )
-          else None,
+          ),
           finalizationVoting = None
         )
     } yield {
