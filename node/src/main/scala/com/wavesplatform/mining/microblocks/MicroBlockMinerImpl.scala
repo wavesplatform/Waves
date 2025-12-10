@@ -119,16 +119,10 @@ class MicroBlockMinerImpl(
             accumulatedBlock,
             unconfirmed,
             stateHash.map { sh =>
-              val tpe                    = TransactionType.CreateAlias
-              val causesInvalidStateHash = unconfirmed.exists(_.tpe == tpe)
-              log.info(
-                s"Packed transaction types: ${unconfirmed.map(_.tpe.id).mkString("[", ",", "]")}, contains type $tpe = $causesInvalidStateHash"
-              )
-              if (causesInvalidStateHash) {
+              if (unconfirmed.exists(_.tpe == TransactionType.CreateAlias)) {
                 log.info("Filling state hash with zero bytes")
                 ByteStr(new Array[Byte](32))
               } else {
-                log.info("No transfer transactions were packed")
                 sh
               }
             }

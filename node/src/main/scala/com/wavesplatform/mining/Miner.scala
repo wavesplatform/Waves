@@ -152,7 +152,10 @@ class MinerImpl(
       BlockDiffer
         .createInitialBlockSnapshot(blockchainUpdater, reference, miner)
         .toOption
-        .map(initSnapshot => TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash))
+        .map(initSnapshot =>
+          if (initSnapshot == StateSnapshot.empty) prevHash
+          else TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash)
+        )
     }
 
     if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total, keyBlockStateHash)
