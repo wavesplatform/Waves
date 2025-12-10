@@ -36,6 +36,16 @@ object BlsSignature {
     GenericError(s"Unexpected BLS signature length: ${byteStr.arr.length}, expected: $SizeInBytes")
   )
 
+  def mayBeEmpty(arr: Array[Byte]): Either[ValidationError, BlsSignature] = mayBeEmpty(ByteStr(arr))
+  def mayBeEmpty(byteStr: ByteStr): Either[ValidationError, BlsSignature] =
+    if (byteStr.isEmpty) Right(BlsSignature.Empty)
+    else
+      Either.cond(
+        byteStr.arr.length == SizeInBytes,
+        NonEmpty.unsafe(byteStr),
+        GenericError(s"Unexpected BLS signature length: ${byteStr.arr.length}, expected: $SizeInBytes")
+      )
+
   extension (self: BlsSignature) {
     def isDefined: Boolean = self != Empty
 

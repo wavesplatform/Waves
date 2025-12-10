@@ -330,6 +330,7 @@ object PBTransactions {
         for {
           sig <- BlsSignature(commitmentSignature.toByteArray)
           tx <- CommitToGenerationTransaction.create(
+            version.toByte,
             sender.toPublicKey,
             BlsPublicKey(endorserPublicKey.toByteStr),
             Height(generationPeriodStart),
@@ -605,6 +606,19 @@ object PBTransactions {
           TxPositiveAmount.unsafeFrom(feeAmount),
           feeAssetId,
           timestamp,
+          proofs,
+          chainId
+        )
+
+      case Data.CommitToGeneration(CommitToGenerationTransactionData(generationPeriodStart, endorserPublicKey, commitmentSignature, `empty`)) =>
+        CommitToGenerationTransaction(
+          version.toByte,
+          sender.toPublicKey,
+          BlsPublicKey(endorserPublicKey.toByteStr),
+          Height(generationPeriodStart),
+          timestamp,
+          TxPositiveAmount.unsafeFrom(feeAmount),
+          BlsSignature.mayBeEmpty(commitmentSignature.toByteStr).explicitGet(),
           proofs,
           chainId
         )

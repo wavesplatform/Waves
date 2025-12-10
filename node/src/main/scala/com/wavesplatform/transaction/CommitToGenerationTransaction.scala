@@ -12,6 +12,7 @@ import monix.eval.Coeval
 import play.api.libs.json.*
 
 final case class CommitToGenerationTransaction(
+    override val version: TxVersion,
     sender: PublicKey,
     endorserPublicKey: BlsPublicKey,
     generationPeriodStart: Height,
@@ -53,6 +54,7 @@ object CommitToGenerationTransaction {
   }
 
   def create(
+      version: TxVersion,
       sender: PublicKey,
       endorserPublicKey: BlsPublicKey,
       generationPeriodStart: Height,
@@ -65,6 +67,7 @@ object CommitToGenerationTransaction {
     for {
       feeInWaves <- TxPositiveAmount(feeInWaves)(TxValidationError.InsufficientFee)
       tx <- CommitToGenerationTransaction(
+        version,
         sender,
         endorserPublicKey,
         generationPeriodStart,
@@ -77,14 +80,16 @@ object CommitToGenerationTransaction {
     } yield tx
 
   def selfSigned(
+      version: TxVersion,
       sender: KeyPair,
-      endorserPublicKey: BlsPublicKey,
+      endorserPublicKey: BlsPublicKey, // TODO: do we need this? because we take key from sender
       generationPeriodStart: Height,
       timestamp: TxTimestamp,
       feeInWaves: Long,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, CommitToGenerationTransaction] =
     create(
+      version,
       sender.publicKey,
       endorserPublicKey,
       generationPeriodStart,

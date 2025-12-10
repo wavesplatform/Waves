@@ -471,9 +471,11 @@ object TxHelpers {
       endorserPublicKey: BlsPublicKey = BlsKeyPair(defaultSigner.privateKey).publicKey,
       timestamp: TxTimestamp = timestamp,
       fee: Long = TestValues.commitToGenerationFee,
-      chainId: Byte = AddressScheme.current.chainId
+      chainId: Byte = AddressScheme.current.chainId,
+      version: TxVersion = TxVersion.V1
   ): CommitToGenerationTransaction = CommitToGenerationTransaction
     .selfSigned(
+      version,
       sender,
       endorserPublicKey,
       generationPeriodStart,
