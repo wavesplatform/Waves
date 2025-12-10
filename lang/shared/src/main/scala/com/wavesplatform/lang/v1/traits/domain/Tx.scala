@@ -2,12 +2,12 @@ package com.wavesplatform.lang.v1.traits.domain
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
-import com.wavesplatform.lang.v1.traits.domain.{Burn as BurnAction}
+import com.wavesplatform.lang.v1.traits.domain.Burn as BurnAction
 
 case class TransferItem(recipient: Recipient, amount: Long)
 
 sealed trait Tx
-sealed trait PseudoTx
+sealed trait PseudoTx // Created in script by user
 
 object Tx {
   case class ScriptTransfer(
@@ -108,4 +108,5 @@ object Tx {
   case class Exchange(p: Proven, amount: Long, price: Long, buyMatcherFee: Long, sellMatcherFee: Long, buyOrder: Ord, sellOrder: Ord) extends Tx
   case class Data(p: Proven, data: IndexedSeq[DataOp])                                                                                extends Tx
   case class UpdateAssetInfo(p: Proven, assetId: ByteStr, name: String, description: String)                                          extends Tx
+  case class CommitToGeneration(p: Proven, endorserPublicKey: ByteStr, generationPeriodStart: Long, commitmentSignature: ByteStr)     extends Tx
 }

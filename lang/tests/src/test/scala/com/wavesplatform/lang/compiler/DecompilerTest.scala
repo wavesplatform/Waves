@@ -21,7 +21,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.{PropSpec, produce}
 import org.scalatest.Assertion
 
 class DecompilerTest extends PropSpec {
@@ -578,13 +578,13 @@ class DecompilerTest extends PropSpec {
     val rev = Decompiler(expr, decompilerContextV3)
 
     rev `shouldEq` """match tv {
-                   |    case x: PointB|PointA => 
-                   |        x
-                   |    case x: PointC => 
-                   |        x
-                   |    case _ => 
-                   |        throw("Match error")
-                   |}""".stripMargin
+                     |    case x: PointB|PointA => 
+                     |        x
+                     |    case x: PointC => 
+                     |        x
+                     |    case _ => 
+                     |        throw("Match error")
+                     |}""".stripMargin
   }
 
   property("match with case without type") {
@@ -599,11 +599,11 @@ class DecompilerTest extends PropSpec {
     val rev = Decompiler(expr, decompilerContextV3)
 
     rev `shouldEq` """match tv {
-                   |    case _: PointB|PointA =>
-                   |        1
-                   |    case _ =>
-                   |        2
-                   |}""".stripMargin
+                     |    case _: PointB|PointA =>
+                     |        1
+                     |    case _ =>
+                     |        2
+                     |}""".stripMargin
   }
 
   property("match with case without var") {
@@ -618,11 +618,11 @@ class DecompilerTest extends PropSpec {
     val rev = Decompiler(expr, decompilerContextV3)
 
     rev `shouldEq` """match tv {
-                   |    case _: PointB|PointA => 
-                   |        1
-                   |    case x => 
-                   |        x
-                   |}""".stripMargin
+                     |    case _: PointB|PointA => 
+                     |        1
+                     |    case x => 
+                     |        x
+                     |}""".stripMargin
   }
 
   property("multiple value list") {
@@ -753,8 +753,8 @@ class DecompilerTest extends PropSpec {
     val expr = compileExpr(script, V4).explicitGet()._1
     val res  = Decompiler(expr, decompilerContextV4)
     res `shouldEq` """let a = 1
-                   |let b = 2
-                   |valueOrElse(a, b)""".stripMargin
+                     |let b = 2
+                     |valueOrElse(a, b)""".stripMargin
   }
 
   property("V4 - listAppend (:+)") {
@@ -823,7 +823,7 @@ class DecompilerTest extends PropSpec {
       WavesContext.build(Global, DirectiveSet(stdLibVersion, Account, DAppType).explicitGet(), fixBigScriptField = true)
     )
   )
-  
+
   property("V4 - new functions") {
     val sizes  = Seq(16, 32, 64, 128)
     val hashes = Seq("blake2b", "keccak", "sha")
@@ -907,7 +907,7 @@ class DecompilerTest extends PropSpec {
 
     val parsedExpr = Parser.parseContract(directives ++ script(types)).get.value
 
-    val ctx = ctxFor(V4)
+    val ctx  = ctxFor(V4)
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
     val res  = Decompiler(dApp, ctx.decompilerContext)
     res `shouldEq` script("")
@@ -1115,5 +1115,48 @@ class DecompilerTest extends PropSpec {
          |true
        """
     assertDecompile(script, script, V6)
+  }
+
+  property("CommitToGenerationTransaction not available before V9") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 8    #-}
+        | {-#CONTENT_TYPE    DAPP #-}
+        | func m (v: CommitToGenerationTransaction) =
+        |   match v {
+        |    case _: CommitToGenerationTransaction => nil
+        |    case _ => nil
+        |   }
+        |""".stripMargin
+
+    val parsedExpr = Parser.parseContract(script).get.value
+    val ctx        = ctxFor(V8)
+    compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V8) should produce("Undefined type")
+  }
+
+  property("V9 - CommitToGenerationTransaction") {
+    val directives =
+      """
+        | {-# STDLIB_VERSION 9    #-}
+        | {-#CONTENT_TYPE    DAPP #-}
+        |""".stripMargin
+
+    val types = ": CommitToGenerationTransaction"
+
+    def script(t: String) =
+      s"""
+         | func m (v$t) =
+         |   match v {
+         |    case _: CommitToGenerationTransaction => nil
+         |    case _ => nil
+         |   }
+         |""".stripMargin
+
+    val parsedExpr = Parser.parseContract(directives ++ script(types)).get.value
+
+    val ctx  = ctxFor(V9)
+    val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V9).explicitGet()
+    val res  = Decompiler(dApp, ctx.decompilerContext)
+    res `shouldEq` script("")
   }
 }

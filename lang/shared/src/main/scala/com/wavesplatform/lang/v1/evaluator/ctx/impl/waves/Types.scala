@@ -504,6 +504,19 @@ object Types {
     )
   )
 
+  def buildCommitToGenerationTransactionType(proofsEnabled: Boolean): CASETYPEREF =
+    CASETYPEREF(
+      "CommitToGenerationTransaction",
+      addProofsIfNeeded(
+        List(
+          "endorserPublicKey"     -> BYTESTR,
+          "generationPeriodStart" -> LONG,
+          "commitmentSignature"   -> BYTESTR
+        ) ++ header ++ proven,
+        proofsEnabled
+      )
+    )
+
   def buildObsoleteTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CASETYPEREF] = {
     val types = List(genesisTransactionType, buildPaymentTransactionType(proofsEnabled))
     if (v >= V6) types.map(_.copy(hideConstructor = true)) else types
@@ -534,7 +547,9 @@ object Types {
         buildSetScriptTransactionType(proofsEnabled),
         buildSponsorFeeTransactionType(proofsEnabled),
         buildDataTransactionType(proofsEnabled, v)
-      )
+      ) ++ {
+        if (v >= V9) List(buildCommitToGenerationTransactionType(proofsEnabled)) else Nil
+      }
     if (v >= V6) types.map(_.copy(hideConstructor = true)) else types
   }
 

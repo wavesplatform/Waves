@@ -2,14 +2,14 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5, V7, V8}
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.{DataEntrySize, NoLimit}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{converters, unit}
-import com.wavesplatform.lang.v1.traits.domain.Tx.*
 import com.wavesplatform.lang.v1.traits.domain.*
+import com.wavesplatform.lang.v1.traits.domain.Tx.*
 
 object Bindings {
 
@@ -354,6 +354,18 @@ object Bindings {
               "assetId"     -> assetId,
               "name"        -> name,
               "description" -> description
+            ),
+            provenTxPart(p, proofsEnabled, version)
+          )
+        )
+      case CommitToGeneration(p, endorserPublicKey, generationPeriodStart, commitmentSignature) =>
+        CaseObj(
+          buildCommitToGenerationTransactionType(proofsEnabled),
+          combine(
+            Map(
+              "endorserPublicKey"     -> endorserPublicKey,
+              "generationPeriodStart" -> generationPeriodStart,
+              "commitmentSignature"   -> commitmentSignature
             ),
             provenTxPart(p, proofsEnabled, version)
           )
