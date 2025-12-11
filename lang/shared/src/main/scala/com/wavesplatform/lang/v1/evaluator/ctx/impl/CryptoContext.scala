@@ -602,7 +602,6 @@ object CryptoContext {
     val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)
     val fromV4Ctx = fromV1Ctx |+| CTX[NoContext](v4Types, v4Vars, fromV4Functions(V4))
     val fromV6Ctx = fromV1Ctx |+| CTX[NoContext](v6Types, v4Vars, fromV4Functions(V6))
-
     val fromV9Ctx = fromV1Ctx |+| CTX[NoContext](v6Types, v4Vars, fromV9Functions)
 
     version match {

@@ -108,7 +108,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       }.run()
     }
 
-    "on new epoch if was conflict on previous" in new BaseTest {
+    "on new period if was conflict on previous" in new BaseTest {
       override def continue(d: Domain): Unit = {
         log.debug(s"Append block 3 with votes")
         val block3WithVotes = d.createBlock(
@@ -126,7 +126,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
           d.appender.appendBlock(block)
         }
 
-        log.debug(s"Append new epoch block")
+        log.debug(s"Append new period block")
         val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator1, strictTime = true)
         d.appender.appendBlock(block)
       }

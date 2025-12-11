@@ -164,7 +164,7 @@ class BlockChallengerImpl(
       .getOrElse(blockchainUpdater.lastBlockHeader.get.header)
 
     for {
-      allAccounts  <- getChallengingAccounts(challengedBlock.sender.toAddress)
+      allAccounts               <- getChallengingAccounts(challengedBlock.sender.toAddress)
       (bestMinerAccount, delay) <- pickBestAccount(allAccounts)
       blockTime = prevBlockHeader.timestamp + delay
       _ <- Either.cond(
@@ -172,16 +172,15 @@ class BlockChallengerImpl(
         (),
         GenericError(s"Challenging block timestamp ($blockTime) is not better than challenged block timestamp (${challengedBlock.header.timestamp})")
       )
-      consensusData <-
-        pos.consensusData(
-          bestMinerAccount,
-          blockchainUpdater.height,
-          blockchainUpdater.settings.genesisSettings.averageBlockDelay,
-          prevBlockHeader.baseTarget,
-          prevBlockHeader.timestamp,
-          blockchainUpdater.parentHeader(prevBlockHeader, 2).map(_.timestamp),
-          blockTime
-        )
+      consensusData <- pos.consensusData(
+        bestMinerAccount,
+        blockchainUpdater.height,
+        blockchainUpdater.settings.genesisSettings.averageBlockDelay,
+        prevBlockHeader.baseTarget,
+        prevBlockHeader.timestamp,
+        blockchainUpdater.parentHeader(prevBlockHeader, 2).map(_.timestamp),
+        blockTime
+      )
       blockWithoutChallengeAndStateHash <- Block.buildAndSign(
         challengedBlock.header.version,
         blockTime,
@@ -194,7 +193,7 @@ class BlockChallengerImpl(
         blockRewardVote(settings),
         stateHash = None,
         challengedHeader = None,
-        finalizationVoting = None
+        finalizationVoting = challengedBlock.header.finalizationVoting
       )
       hitSource <- pos.validateGenerationSignature(blockWithoutChallengeAndStateHash)
       blockchainWithNewBlock = SnapshotBlockchain(
@@ -219,32 +218,32 @@ class BlockChallengerImpl(
           blockchainWithNewBlock
         )
         .resultE
-      challengingBlock <-
-        Block.buildAndSign(
-          challengedBlock.header.version,
-          blockTime,
-          challengedBlock.header.reference,
-          consensusData.baseTarget,
-          consensusData.generationSignature,
-          txs,
-          bestMinerAccount,
-          blockFeatures(blockchainUpdater, settings),
-          blockRewardVote(settings),
-          Some(stateHash),
-          Some(
-            ChallengedHeader(
-              challengedBlock.header.timestamp,
-              challengedBlock.header.baseTarget,
-              challengedBlock.header.generationSignature,
-              challengedBlock.header.featureVotes,
-              challengedBlock.header.generator,
-              challengedBlock.header.rewardVote,
-              challengedStateHash,
-              challengedSignature
-            )
-          ),
-          finalizationVoting = None
-        )
+      challengingBlock <- Block.buildAndSign(
+        challengedBlock.header.version,
+        blockTime,
+        challengedBlock.header.reference,
+        consensusData.baseTarget,
+        consensusData.generationSignature,
+        txs,
+        bestMinerAccount,
+        blockFeatures(blockchainUpdater, settings),
+        blockRewardVote(settings),
+        Some(stateHash),
+        Some(
+          ChallengedHeader(
+            challengedBlock.header.timestamp,
+            challengedBlock.header.baseTarget,
+            challengedBlock.header.generationSignature,
+            challengedBlock.header.featureVotes,
+            challengedBlock.header.generator,
+            challengedBlock.header.rewardVote,
+            challengedStateHash,
+            challengedSignature,
+            challengedBlock.header.finalizationVoting
+          )
+        ),
+        finalizationVoting = None
+      )
     } yield {
       log.debug(s"Forged challenging block $challengingBlock")
       challengingBlock

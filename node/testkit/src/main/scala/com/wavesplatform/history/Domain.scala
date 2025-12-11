@@ -554,7 +554,8 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
             challengedBlock.sender,
             -1,
             challengedBlock.header.stateHash,
-            challengedBlock.signature
+            challengedBlock.signature,
+            challengedBlock.header.finalizationVoting
           )
         )
       ),

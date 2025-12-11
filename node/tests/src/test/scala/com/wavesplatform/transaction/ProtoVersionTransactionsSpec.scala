@@ -4,11 +4,13 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.Constants
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.*
@@ -97,7 +99,9 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
       val buyOrder =
         Order.buy(Order.V3, buyer, Account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime / 2, MinFee * 3).explicitGet()
       val sellOrder =
-        Order.sell(Order.V3, seller, Account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime / 2, MinFee * 3).explicitGet()
+        Order
+          .sell(Order.V3, seller, Account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime / 2, MinFee * 3)
+          .explicitGet()
 
       val exchangeTx =
         ExchangeTransaction
@@ -194,6 +198,14 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
       val asset = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
 
       val sponsorshipTx = SponsorFeeTransaction.selfSigned(TxVersion.V2, Account, asset, Some(100), MinFee, Now).explicitGet()
+      val base64Str     = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(sponsorshipTx)))
+
+      decode(base64Str) shouldBe sponsorshipTx
+    }
+
+    "CommitToGenerationTransaction" in {
+      val blsKp         = BlsKeyPair(Account.privateKey)
+      val sponsorshipTx = CommitToGenerationTransaction.selfSigned(TxVersion.V1, Account, blsKp.publicKey, Height(3001), Now, MinFee).explicitGet()
       val base64Str     = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(sponsorshipTx)))
 
       decode(base64Str) shouldBe sponsorshipTx

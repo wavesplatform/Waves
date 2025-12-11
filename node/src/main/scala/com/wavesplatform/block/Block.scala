@@ -44,7 +44,8 @@ case class ChallengedHeader(
     generator: PublicKey,
     rewardVote: Long,
     stateHash: Option[ByteStr],
-    headerSignature: ByteStr
+    headerSignature: ByteStr,
+    finalizationVoting: Option[FinalizationVoting]
 )
 
 case class Block(
@@ -84,7 +85,8 @@ case class Block(
             featureVotes = ch.featureVotes,
             rewardVote = ch.rewardVote,
             stateHash = ch.stateHash,
-            challengedHeader = None
+            challengedHeader = None,
+            finalizationVoting = ch.finalizationVoting
           )
         }
         .getOrElse(header)

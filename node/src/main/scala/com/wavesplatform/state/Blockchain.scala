@@ -234,6 +234,7 @@ object Blockchain {
 
     def isCommitted(height: Height, miner: Address): Boolean = blockchain.generationPeriodOf(height).fold(true) { p =>
       lazy val committed = blockchain.committedGenerators(p)
+      // TODO: or balance less than minimum
       committed.isEmpty || committed.exists { case (address, _) => address == miner }
     }
 

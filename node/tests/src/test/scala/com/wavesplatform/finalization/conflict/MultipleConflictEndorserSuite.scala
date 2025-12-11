@@ -68,7 +68,7 @@ class MultipleConflictEndorserSuite extends BaseFinalizationSpec {
     d.appender.appendBlock(block4)
     checkConflictGenerators()
 
-    log.debug("Append block 5 of new epoch")
+    log.debug("Append block 5 of new period")
     d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = validGenerator, strictTime = true))
     checkConflictGenerators(expected = Set.empty)
 
