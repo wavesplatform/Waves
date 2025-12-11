@@ -172,16 +172,15 @@ class BlockChallengerImpl(
         (),
         GenericError(s"Challenging block timestamp ($blockTime) is not better than challenged block timestamp (${challengedBlock.header.timestamp})")
       )
-      consensusData <-
-        pos.consensusData(
-          acc,
-          blockchainUpdater.height,
-          blockchainUpdater.settings.genesisSettings.averageBlockDelay,
-          prevBlockHeader.baseTarget,
-          prevBlockHeader.timestamp,
-          blockchainUpdater.parentHeader(prevBlockHeader, 2).map(_.timestamp),
-          blockTime
-        )
+      consensusData <- pos.consensusData(
+        acc,
+        blockchainUpdater.height,
+        blockchainUpdater.settings.genesisSettings.averageBlockDelay,
+        prevBlockHeader.baseTarget,
+        prevBlockHeader.timestamp,
+        blockchainUpdater.parentHeader(prevBlockHeader, 2).map(_.timestamp),
+        blockTime
+      )
       blockWithoutChallengeAndStateHash <- Block.buildAndSign(
         challengedBlock.header.version,
         blockTime,
@@ -194,7 +193,7 @@ class BlockChallengerImpl(
         blockRewardVote(settings),
         stateHash = None,
         challengedHeader = None,
-        finalizationVoting = None
+        finalizationVoting = challengedBlock.header.finalizationVoting
       )
       hitSource <- pos.validateGenerationSignature(blockWithoutChallengeAndStateHash)
       blockchainWithNewBlock = SnapshotBlockchain(
@@ -219,34 +218,34 @@ class BlockChallengerImpl(
           blockchainWithNewBlock
         )
         .resultE
-      challengingBlock <-
-        Block.buildAndSign(
-          challengedBlock.header.version,
-          blockTime,
-          challengedBlock.header.reference,
-          consensusData.baseTarget,
-          consensusData.generationSignature,
-          txs,
-          acc,
-          blockFeatures(blockchainUpdater, settings),
-          blockRewardVote(settings),
-          if (blockchainWithNewBlock.supportsLightNodeBlockFields()) Some(stateHash) else None,
-          if (blockchainWithNewBlock.supportsLightNodeBlockFields())
-            Some(
-              ChallengedHeader(
-                challengedBlock.header.timestamp,
-                challengedBlock.header.baseTarget,
-                challengedBlock.header.generationSignature,
-                challengedBlock.header.featureVotes,
-                challengedBlock.header.generator,
-                challengedBlock.header.rewardVote,
-                challengedStateHash,
-                challengedSignature
-              )
+      challengingBlock <- Block.buildAndSign(
+        challengedBlock.header.version,
+        blockTime,
+        challengedBlock.header.reference,
+        consensusData.baseTarget,
+        consensusData.generationSignature,
+        txs,
+        acc,
+        blockFeatures(blockchainUpdater, settings),
+        blockRewardVote(settings),
+        if (blockchainWithNewBlock.supportsLightNodeBlockFields()) Some(stateHash) else None,
+        if (blockchainWithNewBlock.supportsLightNodeBlockFields())
+          Some(
+            ChallengedHeader(
+              challengedBlock.header.timestamp,
+              challengedBlock.header.baseTarget,
+              challengedBlock.header.generationSignature,
+              challengedBlock.header.featureVotes,
+              challengedBlock.header.generator,
+              challengedBlock.header.rewardVote,
+              challengedStateHash,
+              challengedSignature,
+              challengedBlock.header.finalizationVoting
             )
-          else None,
-          finalizationVoting = None
-        )
+          )
+        else None,
+        finalizationVoting = None
+      )
     } yield {
       log.debug(s"Forged challenging block $challengingBlock")
       challengingBlock
