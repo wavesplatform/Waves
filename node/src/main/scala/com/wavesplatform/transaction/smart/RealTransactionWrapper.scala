@@ -148,6 +148,9 @@ object RealTransactionWrapper {
       case u: UpdateAssetInfoTransaction =>
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight
 
+      case ctg: CommitToGenerationTransaction =>
+        Tx.CommitToGeneration(proven(ctg), ctg.endorserPublicKey.byteStr, ctg.generationPeriodStart.toInt, ctg.commitmentSignature.byteStr).asRight
+
       case eth: EthereumTransaction =>
         Left(s"Unexpected $eth")
     }

@@ -57,7 +57,7 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
 
     val balanceAfter4 = ENOUGH_AMT - 2 * TestValues.commitToGenerationFee - DepositInWavelets
 
-    log.debug("Append block 5 of new epoch")
+    log.debug("Append block 5 of new period")
     d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = validGenerator, strictTime = true))
 
     withClue(s"checkCommitted: ") {
@@ -79,7 +79,7 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
     }
 
     d.blockchain.balanceSnapshots(conflictGeneratorAddr, from = 2, to = None) should contain theSameElementsInOrderAs Seq(
-      bs(height = 5, regularBalance = balanceAfter4, deposits = 1), // New epoch
+      bs(height = 5, regularBalance = balanceAfter4, deposits = 1), // New period
       bs(height = 4, regularBalance = balanceAfter4, deposits = 1), // Punishment and commitment
       // height = 3 // Sent conflict endorsement
       bs(height = 2, regularBalance = balanceAfter2, deposits = 1) // Sent CommitToGeneration

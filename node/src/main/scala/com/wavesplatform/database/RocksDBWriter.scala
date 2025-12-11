@@ -1510,12 +1510,12 @@ class RocksDBWriter(
       Keys.committedGenerators(at, Height(0)).keyBytes.dropRight(Ints.BYTES) // Drop height
 
     var r = Seq.empty[CommittedHeightsResult]
-    /* Because a generator can commit once in epoch, we can skip all heights in epoch, those are after committed.
+    /* Because a generator can commit once in period, we can skip all heights in period, those are after committed.
      How it works for a generator with addressId. E.g. it is g1:
-     periods:    |     p2     |      p3    |
-     heights:    |  h1   | h2 |   h3  | h4 |
-     generators: | g2,g1 | g3 | g3,g2 | g1 |
-     iterator    |  s,^  |    |   s   | ^  | s - seek
+     periods:    |       p2      |      p3    |
+     heights:    |  h1      | h2 |   h3  | h4 |
+     generators: | g2,   g1 | g3 | g3,g2 | g1 |
+     iterator    | s p2, ^  |    | s p3  | ^  | s - seek
      */
     Using.resource(db.newIterator) { committedIter =>
       committedIter.seek(getSeekBytes(fromIncl))

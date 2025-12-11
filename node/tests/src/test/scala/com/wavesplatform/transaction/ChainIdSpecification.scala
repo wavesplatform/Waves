@@ -6,8 +6,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction as PBSignedTransaction}
-import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.state.{Height, StringDataEntry}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -390,6 +391,24 @@ class ChainIdSpecification extends PropSpec {
           Proofs.empty,
           otherChainId
         ).signWith(sender.privateKey).validatedEither.explicitGet()
+      )
+    }
+  }
+
+  property("CommitToGenerationTransaction validation") {
+    forAll(addressOrAliasWithVersion) { case (_, version, sender, _, fee, ts) =>
+      validateFromOtherNetwork(
+        CommitToGenerationTransaction
+          .selfSigned(
+            version,
+            sender,
+            BlsKeyPair(sender.privateKey).publicKey,
+            Height(3001),
+            ts,
+            fee.value,
+            otherChainId
+          )
+          .explicitGet()
       )
     }
   }

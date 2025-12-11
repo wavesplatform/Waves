@@ -234,6 +234,7 @@ object Blockchain {
 
     def isCommitted(height: Height, miner: Address): Boolean = blockchain.generationPeriodOf(height).fold(true) { p =>
       lazy val committed = blockchain.committedGenerators(p)
+      // TODO: or balance less than minimum
       committed.isEmpty || committed.exists { case (address, _) => address == miner }
     }
 
@@ -300,6 +301,9 @@ object Blockchain {
     } yield p
 
     def currentGenerationPeriod: Option[GenerationPeriod] = this.generationPeriodOf(Height(blockchain.height))
+
+    def supportsFinalizationVoting(height: Int = blockchain.height): Boolean =
+      blockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality).exists(Height(height) >= _)
   }
 
   def finalizedHeightOrFallback(at: Height, latestFinalized: Option[Height], maxRollbackLength: Int): Height = {

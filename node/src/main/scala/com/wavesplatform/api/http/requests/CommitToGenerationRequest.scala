@@ -6,7 +6,7 @@ import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Height
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
-import com.wavesplatform.transaction.{CommitToGenerationTransaction, Proofs, TransactionType}
+import com.wavesplatform.transaction.{CommitToGenerationTransaction, Proofs, TransactionType, TxVersion}
 import play.api.libs.json.*
 
 object CommitToGenerationRequest {
@@ -15,6 +15,7 @@ object CommitToGenerationRequest {
 }
 
 case class CommitToGenerationRequest(
+    version: Option[TxVersion] = None,
     sender: Option[String],
     generationPeriodStart: Option[Height] = None,
     timestamp: Option[Long] = None,
@@ -23,6 +24,7 @@ case class CommitToGenerationRequest(
   def toTxFrom(sender: PublicKey, defaultGenerationPeriodStart: Height): Either[ValidationError, CommitToGenerationTransaction] =
     for {
       tx <- CommitToGenerationTransaction.create(
+        version.getOrElse(1.toByte),
         sender,
         BlsPublicKey(Array.emptyByteArray),
         generationPeriodStart.getOrElse(defaultGenerationPeriodStart),
@@ -36,6 +38,7 @@ case class CommitToGenerationRequest(
 }
 
 case class SignedCommitToGenerationRequest(
+    version: Option[TxVersion],
     senderPublicKey: String,
     endorserPublicKey: ByteStr,
     generationPeriodStart: Int,
@@ -49,6 +52,7 @@ case class SignedCommitToGenerationRequest(
       _senderPk <- PublicKey.fromBase58String(senderPublicKey)
       sig       <- BlsSignature(commitmentSignature)
       t <- CommitToGenerationTransaction.create(
+        version.getOrElse(1.toByte),
         _senderPk,
         BlsPublicKey(endorserPublicKey),
         Height(generationPeriodStart),

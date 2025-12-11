@@ -252,7 +252,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
           Json.obj(
             "type"      -> MassTransferTransaction.typeId,
             "version"   -> v,
-            "sender"    -> firstAddress,
+            "sender"    -> miner.address,
             "transfers" -> transfers,
             "fee"       -> fee
           )

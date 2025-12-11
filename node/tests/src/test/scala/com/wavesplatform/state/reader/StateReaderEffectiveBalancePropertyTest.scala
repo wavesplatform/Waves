@@ -202,7 +202,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
         bs(Height(7), regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 1), // Released the first deposit
         // 6 - Not changed
         bs(Height(5), regularBalance = initBalance - TestValues.commitToGenerationFee * 2, deposits = 2), // CommitToGenerationTransaction
-        // 4 - A first block of a new epoch, not changed
+        // 4 - A first block of a new period, not changed
         bs(Height(3), regularBalance = initBalance - TestValues.commitToGenerationFee, deposits = 1), // CommitToGenerationTransaction
         // 2 - Empty block
         bs(Height(1), regularBalance = initBalance) // Genesis

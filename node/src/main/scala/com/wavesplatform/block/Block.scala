@@ -43,7 +43,8 @@ case class ChallengedHeader(
     generator: PublicKey,
     rewardVote: Long,
     stateHash: Option[ByteStr],
-    headerSignature: ByteStr
+    headerSignature: ByteStr,
+    finalizationVoting: Option[FinalizationVoting]
 )
 
 case class Block(
@@ -83,7 +84,8 @@ case class Block(
             featureVotes = ch.featureVotes,
             rewardVote = ch.rewardVote,
             stateHash = ch.stateHash,
-            challengedHeader = None
+            challengedHeader = None,
+            finalizationVoting = ch.finalizationVoting
           )
         }
         .getOrElse(header)
@@ -109,8 +111,9 @@ case class Block(
     }
 
   override def toString: String =
-    s"Block(${id()},${header.reference},${header.generator.toAddress}," +
-      s"${header.timestamp},${header.featureVotes.mkString("[", ",", "]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""})"
+    s"Block(${id()},${header.reference},${header.generator.toAddress},${header.timestamp}," +
+      s"${header.featureVotes.mkString("[", ",", "]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""}" +
+      s"${header.finalizationVoting.fold("")(v => s",$v")})"
 }
 
 object Block {

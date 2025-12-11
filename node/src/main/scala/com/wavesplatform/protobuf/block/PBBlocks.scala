@@ -5,10 +5,10 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.{BlockHeader, ChallengedHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.protobuf.{toPublicKey, toByteStr, toByteString}
 import com.wavesplatform.protobuf.block.Block.Header as PBHeader
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
+import com.wavesplatform.protobuf.{toByteStr, toByteString, toPublicKey}
 
 import scala.util.Try
 
@@ -34,7 +34,8 @@ object PBBlocks {
           ch.generator.toPublicKey,
           ch.rewardVote,
           Option.unless(ch.stateHash.isEmpty)(ch.stateHash.toByteStr),
-          ch.headerSignature.toByteStr
+          ch.headerSignature.toByteStr,
+          ch.finalizationVoting.map(PBFinalizationVotings.vanilla(_).get)
         )
       },
       header.finalizationVoting.map(PBFinalizationVotings.vanilla(_).get)
@@ -58,7 +59,7 @@ object PBBlocks {
     header.transactionsRoot.toByteString,
     header.stateHash.getOrElse(ByteStr.empty).toByteString,
     header.challengedHeader.map { ch =>
-      PBBlock.Header.ChallengedHeader(
+      PBBlock.Header.ChallengedHeader.of(
         ch.baseTarget,
         ch.generationSignature.toByteString,
         ch.featureVotes.map(_.toInt),
@@ -66,7 +67,8 @@ object PBBlocks {
         ch.generator.toByteString,
         ch.rewardVote,
         ch.stateHash.getOrElse(ByteStr.empty).toByteString,
-        ch.headerSignature.toByteString
+        ch.headerSignature.toByteString,
+        ch.finalizationVoting.map(PBFinalizationVotings.protobuf)
       )
     },
     header.finalizationVoting.map(PBFinalizationVotings.protobuf)

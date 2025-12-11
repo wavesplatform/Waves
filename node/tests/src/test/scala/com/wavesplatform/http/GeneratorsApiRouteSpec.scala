@@ -58,7 +58,7 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
     domain.appender.appendBlock(block2)
     domain.appendBlock()
 
-    log.debug("Before epoch")
+    log.debug("Before period")
     Get(routePath(s"/at/${domain.blockchain.height}")) ~> route ~> check {
       responseAs[JsValue] shouldBe Json.arr()
     }

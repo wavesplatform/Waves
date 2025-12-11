@@ -1056,6 +1056,56 @@
       ]
     }
     {
+      name: CommitToGenerationTransaction
+      fields:
+      [
+        {
+          name: endorserPublicKey
+          type: ByteVector
+        }
+        {
+          name: generationPeriodStart
+          type: Int
+        }
+        {
+          name: commitmentSignature
+          type: ByteVector
+        }
+        {
+          name: id
+          type: ByteVector
+        }
+        {
+          name: fee
+          type: Int
+        }
+        {
+          name: timestamp
+          type: Int
+        }
+        {
+          name: version
+          type: Int
+        }
+        {
+          name: sender
+          type: Address
+        }
+        {
+          name: senderPublicKey
+          type: ByteVector
+        }
+        {
+          name: bodyBytes
+          type: ByteVector
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
+        }
+      ]
+    }
+    {
       name: BalanceDetails
       fields:
       [

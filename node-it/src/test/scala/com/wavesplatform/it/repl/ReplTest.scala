@@ -13,8 +13,8 @@ import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
@@ -33,8 +33,8 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
   def await[A](f: Future[A]): A = Await.result(f, 2 seconds)
 
   test("waves context") {
-    val issuer = miner.createKeyPair()
-    val sample = miner.createKeyPair()
+    val issuer = TxHelpers.signer(1000)
+    val sample = TxHelpers.signer(1001)
     val trans  = miner.transfer(miner.keyPair, issuer.toAddress.toString, 100.waves, 1.waves, version = TxVersion.V3, waitForTx = true)
     miner.transfer(miner.keyPair, sample.toAddress.toString, 100.waves, 1.waves, waitForTx = true)
     miner.createAlias(miner.keyPair, "aaaa", waitForTx = true)
