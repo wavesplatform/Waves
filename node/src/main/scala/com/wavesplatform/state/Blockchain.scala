@@ -301,6 +301,9 @@ object Blockchain {
     } yield p
 
     def currentGenerationPeriod: Option[GenerationPeriod] = this.generationPeriodOf(Height(blockchain.height))
+
+    def supportsFinalizationVoting(height: Int = blockchain.height): Boolean =
+      blockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality).exists(Height(height) >= _)
   }
 
   def finalizedHeightOrFallback(at: Height, latestFinalized: Option[Height], maxRollbackLength: Int): Height = {
