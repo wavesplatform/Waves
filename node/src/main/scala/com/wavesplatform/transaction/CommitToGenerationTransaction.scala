@@ -82,7 +82,7 @@ object CommitToGenerationTransaction {
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
-      endorserPublicKey: BlsPublicKey, // TODO: do we need this? because we take key from sender
+      endorserPublicKey: BlsPublicKey,
       generationPeriodStart: Height,
       timestamp: TxTimestamp,
       feeInWaves: Long,

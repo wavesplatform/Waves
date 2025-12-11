@@ -1,9 +1,11 @@
 package com.wavesplatform.transaction
 
+import com.wavesplatform.crypto
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -120,5 +122,34 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
 
     info("Second")
     d.appendBlockE(TxHelpers.commitToGeneration(Height(3001), sender)) should produce("is already committed")
+  }
+
+  "Can't commit with insufficient balance" in {
+    val newGenerator = TxHelpers.signer(1005)
+    withDomain(DeterministicFinality,
+      Seq(
+        AddrWithBalance(sender.toAddress, 1000000.waves),
+        AddrWithBalance(newGenerator.toAddress, GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2 + CommitToGenerationTransaction.DepositInWavelets),
+      )) { d =>
+      val tx = TxHelpers.commitToGeneration(Height(3001), newGenerator)
+
+      d.appendBlockE(tx) should produce(s"Generating balance ${GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2 - tx.fee.value} is less than 100000000000 required for block generation")
+    }
+  }
+
+  "Can't commit with invalid commitment signature" in {
+    val newGenerator = TxHelpers.signer(1006)
+    withDomain(DeterministicFinality,
+      Seq(
+        AddrWithBalance(sender.toAddress, 1000000.waves),
+        AddrWithBalance(newGenerator.toAddress, 10000.waves),
+      )) { d =>
+      val unsignedTx = TxHelpers.commitToGeneration(Height(3001), newGenerator).copy(commitmentSignature = BlsSignature.Empty)
+      val signedTx = unsignedTx.copy(proofs = Proofs(crypto.sign(newGenerator.privateKey, unsignedTx.bodyBytes())))
+
+
+      d.appendBlockE(unsignedTx) should produce("Proof doesn't validate as signature")
+      d.appendBlockE(signedTx) should produce("Invalid commitment signature")
+    }
   }
 }
