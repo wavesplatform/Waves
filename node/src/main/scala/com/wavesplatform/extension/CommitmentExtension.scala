@@ -43,18 +43,18 @@ class CommitmentExtension(context: Context) extends Extension with ScorexLogging
               if (wavesBalance < 100 * 100000000L) {
                 log.warn(s"Balance is low for account $accountAddress: $wavesBalance. It's less than 100 WAVES.")
               }
-
+              val commitPeriodStart = generationPeriodStart + 1
               val timestamp = context.time.getTimestamp()
 
               val blsKP      = BlsKeyPair(account.privateKey)
-              val blsMessage = blsKP.publicKey.arr ++ Ints.toByteArray(generationPeriodStart.toInt)
+              val blsMessage = blsKP.publicKey.arr ++ Ints.toByteArray(commitPeriodStart.toInt)
               val blsSig     = blsKP.sign(blsMessage)
-
               val commitToGenTxE = CommitToGenerationTransaction
                 .create(
+                  version = 1.toByte,
                   sender = account.publicKey,
                   endorserPublicKey = blsKP.publicKey,
-                  generationPeriodStart = generationPeriodStart+1,
+                  generationPeriodStart = commitPeriodStart,
                   timestamp = timestamp,
                   feeInWaves = fee,
                   commitmentSignature = blsSig,
