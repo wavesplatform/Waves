@@ -5,6 +5,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.*
 import com.wavesplatform.state
 import com.wavesplatform.state.*
@@ -21,16 +22,14 @@ import org.scalatest.time.SpanSugar.convertLongToGrainOfTime
 import scala.util.Using
 
 class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps with EitherValues {
-  private val seed         = ByteStr("last-microblock".getBytes())
-  private val thisNodeAcc  = Wallet.generateNewAccount(seed.arr, nonce = 0)
+  private val thisNodeAcc  = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 0)
   private val otherNodeAcc = TxHelpers.defaultSigner
 
   private val baseSettings       = DomainPresets.TransactionStateSnapshot
   private val microBlockInterval = 5.seconds
   private val minMicroBlockAge   = 3.seconds
   private val defaultSettings = baseSettings.copy(
-    minerSettings = baseSettings.minerSettings.copy(quorum = 0, microBlockInterval = microBlockInterval, minMicroBlockAge = minMicroBlockAge),
-    walletSettings = baseSettings.walletSettings.copy(seed = Some(seed))
+    minerSettings = baseSettings.minerSettings.copy(quorum = 0, microBlockInterval = microBlockInterval, minMicroBlockAge = minMicroBlockAge)
   )
 
   "Miner continues from the last micro block" in Using.Manager { manager =>

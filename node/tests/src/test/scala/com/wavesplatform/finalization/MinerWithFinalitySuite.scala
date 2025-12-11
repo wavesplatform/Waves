@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.*
@@ -20,16 +21,12 @@ import monix.reactive.Observable
 import org.scalatest.time.SpanSugar.convertLongToGrainOfTime
 
 class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
-  private val seed         = ByteStr("finality-test".getBytes())
-  private val thisNodeAcc  = Wallet.generateNewAccount(seed.arr, nonce = 0)
+  private val thisNodeAcc  = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 0)
   private val otherNodeAcc = TxHelpers.defaultSigner
 
   private val baseSettings = DomainPresets.DeterministicFinality.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
   private val defaultSettings = baseSettings
-    .copy(
-      minerSettings = baseSettings.minerSettings.copy(quorum = 0),
-      walletSettings = baseSettings.walletSettings.copy(seed = Some(seed))
-    )
+    .copy(minerSettings = baseSettings.minerSettings.copy(quorum = 0))
     .configure(_.copy(generationPeriodLength = 2))
 
   "If account not committed, its attempt to forge doesn't stop current mining of other account on same node" ignore {}
