@@ -46,7 +46,7 @@ object PBBlocks {
     VanillaBlock(vanilla(block.getHeader), block.signature.toByteStr, block.transactions.map(PBTransactions.vanilla(_, unsafe).explicitGet()))
   }
 
-  def protobuf(header: BlockHeader): PBHeader = PBBlock.Header(
+  def protobuf(header: BlockHeader): PBHeader = PBBlock.Header.of(
     AddressScheme.current.chainId,
     header.reference.toByteString,
     header.baseTarget,

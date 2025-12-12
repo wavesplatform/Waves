@@ -3,7 +3,7 @@ package com.wavesplatform.mining
 import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, SeedKeyPair}
-import com.wavesplatform.block.{Block, ChallengedHeader}
+import com.wavesplatform.block.{Block, ChallengedHeader, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.BlockchainFeatures
@@ -63,7 +63,8 @@ class BlockChallengerImpl(
             block.header.stateHash,
             block.signature,
             block.transactionData,
-            blockchainUpdater.lastStateHash(Some(block.header.reference))
+            blockchainUpdater.lastStateHash(Some(block.header.reference)),
+            block.header.finalizationVoting
           )
         )
         applyResult <- EitherT(appendBlock(challengingBlock))
@@ -96,7 +97,8 @@ class BlockChallengerImpl(
               md.microBlock.stateHash,
               md.microBlock.totalResBlockSig,
               txs,
-              blockchainUpdater.lastStateHash(Some(block.header.reference))
+              blockchainUpdater.lastStateHash(Some(block.header.reference)),
+              FinalizationVoting.combine(block.header.finalizationVoting, md.microBlock.finalizationVoting)
             )
           )
           applyResult <- EitherT(appendBlock(challengingBlock))
@@ -155,7 +157,8 @@ class BlockChallengerImpl(
       challengedStateHash: Option[ByteStr],
       challengedSignature: ByteStr,
       txs: Seq[Transaction],
-      prevStateHash: ByteStr
+      prevStateHash: ByteStr,
+      challengedFinalizationVoting: Option[FinalizationVoting]
   ): Task[Either[ValidationError, Block]] = Task {
     val prevBlockHeader = blockchainUpdater
       .heightOf(challengedBlock.header.reference)
@@ -164,8 +167,8 @@ class BlockChallengerImpl(
       .getOrElse(blockchainUpdater.lastBlockHeader.get.header)
 
     for {
-      allAccounts  <- getChallengingAccounts(challengedBlock.sender.toAddress)
-      (acc, delay) <- pickBestAccount(allAccounts)
+      allAccounts               <- getChallengingAccounts(challengedBlock.sender.toAddress)
+      (bestMinerAccount, delay) <- pickBestAccount(allAccounts)
       blockTime = prevBlockHeader.timestamp + delay
       _ <- Either.cond(
         blockTime < challengedBlock.header.timestamp,
@@ -173,7 +176,7 @@ class BlockChallengerImpl(
         GenericError(s"Challenging block timestamp ($blockTime) is not better than challenged block timestamp (${challengedBlock.header.timestamp})")
       )
       consensusData <- pos.consensusData(
-        acc,
+        bestMinerAccount,
         blockchainUpdater.height,
         blockchainUpdater.settings.genesisSettings.averageBlockDelay,
         prevBlockHeader.baseTarget,
@@ -188,12 +191,12 @@ class BlockChallengerImpl(
         consensusData.baseTarget,
         consensusData.generationSignature,
         txs,
-        acc,
+        bestMinerAccount,
         blockFeatures(blockchainUpdater, settings),
         blockRewardVote(settings),
         stateHash = None,
         challengedHeader = None,
-        finalizationVoting = challengedBlock.header.finalizationVoting
+        finalizationVoting = challengedFinalizationVoting
       )
       hitSource <- pos.validateGenerationSignature(blockWithoutChallengeAndStateHash)
       blockchainWithNewBlock = SnapshotBlockchain(
@@ -205,13 +208,13 @@ class BlockChallengerImpl(
         blockchainUpdater.computeNextReward,
         None
       )
-      initialBlockSnapshot <- BlockDiffer.createInitialBlockSnapshot(blockchainUpdater, challengedBlock.header.reference, acc.toAddress)
+      initialBlockSnapshot <- BlockDiffer.createInitialBlockSnapshot(blockchainUpdater, challengedBlock.header.reference, bestMinerAccount.toAddress)
       stateHash <- TxStateSnapshotHashBuilder
         .computeStateHash(
           txs,
           TxStateSnapshotHashBuilder.createHashFromSnapshot(initialBlockSnapshot, None).createHash(prevStateHash),
           initialBlockSnapshot,
-          acc,
+          bestMinerAccount,
           Some(prevBlockHeader.timestamp),
           blockTime,
           isChallenging = true,
@@ -225,7 +228,7 @@ class BlockChallengerImpl(
         consensusData.baseTarget,
         consensusData.generationSignature,
         txs,
-        acc,
+        bestMinerAccount,
         blockFeatures(blockchainUpdater, settings),
         blockRewardVote(settings),
         if (blockchainWithNewBlock.supportsLightNodeBlockFields()) Some(stateHash) else None,
@@ -240,7 +243,7 @@ class BlockChallengerImpl(
               challengedBlock.header.rewardVote,
               challengedStateHash,
               challengedSignature,
-              challengedBlock.header.finalizationVoting
+              challengedFinalizationVoting
             )
           )
         else None,
