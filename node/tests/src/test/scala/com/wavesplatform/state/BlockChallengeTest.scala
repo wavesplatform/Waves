@@ -4,11 +4,13 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.TransactionsApiRoute.{ApplicationStatus, Status}
-import com.wavesplatform.block.{Block, ChallengedHeader, MicroBlock}
+import com.wavesplatform.block.{Block, BlockEndorsement, ChallengedHeader, FinalizationVoting, MicroBlock}
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto.DigestLength
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -26,8 +28,8 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockRewardCalculator.BlockRewardShares
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
+import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.{TransactionStateSnapshot, WavesSettingsOps}
 import com.wavesplatform.transaction.Asset.Waves
@@ -36,6 +38,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, EthTxGenerator, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{JsonMatchers, SharedSchedulerMixin}
+import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
@@ -250,17 +253,50 @@ class BlockChallengeTest
   }
 
   property("NODE-888. ChallengedHeader should contain info from original block header") {
-    withDomain(settings, balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
-      val challengingMiner = d.wallet.generateNewAccount().get
-      d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
-      (1 to 999).foreach(_ => d.appendBlock())
+    val challengedMiner  = TxHelpers.signer(0)
+    val challengingMiner = Wallet.generateNewAccount(Domain.DefaultWalletSeed, 0)
+
+    val testSettings = settings
+      .addFeatures(BlockchainFeatures.DeterministicFinality)
+      .configure(_.copy(generationPeriodLength = 700))
+
+    withDomain(testSettings, balances = AddrWithBalance.enoughBalances(challengedMiner, challengingMiner)) { d =>
+      d.wallet.generateNewAccounts(2)
+
+      d.appendBlock(
+        TxHelpers.commitToGeneration(Height(701), challengedMiner),
+        TxHelpers.commitToGeneration(Height(701), challengingMiner)
+      )
+
+      (1 to 999).foreach(_ => d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = challengedMiner)))
+
+      val finalizedHeight = d.blockchain.finalizedHeight.value
+      val finalizedId     = d.blockchain.blockId(finalizedHeight.toInt).value
+
+      val aggSig = BlockEndorsement.sign(
+        BlsKeyPair(challengingMiner.privateKey),
+        finalizedId = finalizedId,
+        finalizedHeight = finalizedHeight,
+        endorsedId = d.lastBlockId
+      )
+
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
-        Seq.empty,
+        txs = Nil,
         strictTime = true,
+        generator = challengedMiner,
         stateHash = Some(Some(invalidStateHash)),
-        timestamp = Some(Long.MaxValue)
+        timestamp = Some(Long.MaxValue),
+        finalizationVoting = Some(
+          FinalizationVoting(
+            valid = Seq(GeneratorIndex(1)),
+            finalizedHeight = finalizedHeight,
+            aggregatedEndorsement = aggSig,
+            conflict = Vector.empty
+          )
+        )
       )
+
       appendAndCheck(originalBlock, d) { block =>
         block.header.challengedHeader shouldBe defined
         val challengedHeader = block.header.challengedHeader.get
@@ -273,7 +309,77 @@ class BlockChallengeTest
         challengedHeader.rewardVote shouldBe originalBlock.header.rewardVote
         challengedHeader.stateHash shouldBe originalBlock.header.stateHash
         challengedHeader.headerSignature shouldBe originalBlock.signature
+        challengedHeader.finalizationVoting shouldBe originalBlock.header.finalizationVoting
       }
+    }
+  }
+
+  property("NODE-888. ChallengedHeader should contain info from original block header - micro block") {
+    val challengedMiner  = TxHelpers.signer(0)
+    val challengingMiner = Wallet.generateNewAccount(Domain.DefaultWalletSeed, 0)
+
+    val testSettings = settings
+      .addFeatures(BlockchainFeatures.DeterministicFinality, BlockchainFeatures.SmallerMinimalGeneratingBalance)
+      .configure(_.copy(generationPeriodLength = 700))
+
+    val initBalances = Seq(
+      AddrWithBalance(challengingMiner.toAddress, ENOUGH_AMT),
+      AddrWithBalance(
+        challengedMiner.toAddress,
+        GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2 + CommitToGenerationTransaction.DepositInWavelets + 1.waves
+      )
+    )
+
+    withDomain(testSettings, balances = initBalances, time = testTime) { d =>
+      d.wallet.generateNewAccounts(2)
+
+      d.appendBlock(
+        TxHelpers.commitToGeneration(Height(701), challengedMiner),
+        TxHelpers.commitToGeneration(Height(701), challengingMiner)
+      )
+
+      (1 to 999).foreach(_ => d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = challengedMiner)))
+
+      val finalizedHeight = d.blockchain.finalizedHeight.value
+      val finalizedId     = d.blockchain.blockId(finalizedHeight.toInt).value
+
+      val aggSig = BlockEndorsement.sign(
+        BlsKeyPair(challengingMiner.privateKey),
+        finalizedId = finalizedId,
+        finalizedHeight = finalizedHeight,
+        endorsedId = d.lastBlockId
+      )
+
+      val ts = d.nextBlockTime(challengedMiner)
+      val originalBlock = d.createBlock(
+        Block.ProtoBlockVersion,
+        txs = Nil,
+        strictTime = true,
+        generator = challengedMiner,
+        timestamp = Some(ts)
+      )
+
+      testTime.setTime(ts)
+      d.appendBlock(originalBlock)
+
+      val appender = createMicroBlockAppender(d)
+      val channel  = new EmbeddedChannel()
+
+      val microBlock = d.createMicroBlock(
+        stateHash = Some(invalidStateHash),
+        signer = Some(challengedMiner),
+        finalizationVoting = Some(
+          FinalizationVoting(
+            valid = Seq(GeneratorIndex(1)),
+            finalizedHeight = finalizedHeight,
+            aggregatedEndorsement = aggSig,
+            conflict = Vector.empty
+          )
+        )
+      )(TxHelpers.transfer(challengedMiner, challengingMiner.toAddress))
+
+      appender(channel, microBlock).runSyncUnsafe()
+      d.blockchain.lastBlockHeader.value.header.challengedHeader shouldBe defined
     }
   }
 

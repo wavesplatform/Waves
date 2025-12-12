@@ -90,7 +90,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
   def createBlockEndorser(allChannels: ChannelGroup, storage: EndorsementStorage = endorsementStorage): BlockEndorser =
     new BlockEndorser.InMemory(blockchain, wallet, storage, allChannels)
 
-  lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
+  lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None, seed = Some(ByteStr(DefaultWalletSeed))))
 
   lazy val testTime: TestTime = TestTime()
   lazy val blockAppender: Block => Task[Either[ValidationError, BlockApplyResult]] =
@@ -646,6 +646,8 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
 }
 
 object Domain {
+  val DefaultWalletSeed = "wallet".getBytes
+
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater & Blockchain](bcu: A) {
     def processBlock(block: Block, snapshot: Option[BlockSnapshot] = None): Either[ValidationError, BlockApplyResult] = {
       val hitSourcesE =

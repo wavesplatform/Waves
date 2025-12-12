@@ -1,7 +1,7 @@
 package com.wavesplatform.block
 
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey, BlsSignature, BlsUtils}
 import com.wavesplatform.state.{GeneratorIndex, Height}
 
 case class BlockEndorsement(
@@ -10,7 +10,10 @@ case class BlockEndorsement(
     finalizedHeight: Height,
     endorsedId: BlockId,
     signature: BlsSignature.NonEmpty
-)
+) {
+  def signatureValid(endorserPublicKey: BlsPublicKey): Boolean =
+    BlsUtils.verifyBasic(signature.byteStr.arr, BlockEndorsement.mkMessage(finalizedId, finalizedHeight, endorsedId), endorserPublicKey.arr)
+}
 
 object BlockEndorsement {
   def signed(

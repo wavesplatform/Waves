@@ -644,7 +644,7 @@ class BlockchainUpdaterImpl(
           case _ =>
             for {
               _ <- microBlock.signaturesValid()
-              (totalSignatureValid, referencedComputedStateHash) <- ng
+              (totalBlock, referencedComputedStateHash) <- ng
                 .snapshotOf(microBlock.reference)
                 .toRight(GenericError(s"No referenced block exists: $microBlock"))
                 .map { case (accumulatedBlock, _, _, _, computedStateHash, _) =>
@@ -655,12 +655,12 @@ class BlockchainUpdaterImpl(
                       microBlock.totalResBlockSig,
                       microBlock.stateHash,
                       FinalizationVoting.combine(accumulatedBlock.header.finalizationVoting, microBlock.finalizationVoting)
-                    )
-                    .signatureValid() -> computedStateHash
+                    ) -> computedStateHash
                 }
-              _ <- Either.raiseUnless(totalSignatureValid) {
+              _ <- Either.raiseUnless(totalBlock.signatureValid()) {
                 MicroBlockAppendError("Invalid total block signature", microBlock)
               }
+              _ <- appender.validateFinalizationVoting(totalBlock, rocksdb)
               blockDifferResult <- BlockDiffer.fromMicroBlock(
                 this,
                 rocksdb.lastBlockTimestamp,

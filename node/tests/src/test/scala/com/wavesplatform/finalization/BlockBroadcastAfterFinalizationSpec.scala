@@ -2,7 +2,6 @@ package com.wavesplatform.finalization
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -30,8 +29,7 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
   private val appenderScheduler: SchedulerService = Schedulers.singleThread("appender")
   private val testTime: TestTime                  = TestTime()
 
-  private val seed   = ByteStr("finality-test".getBytes())
-  private val sender = Wallet.generateNewAccount(seed.arr, nonce = 0)
+  private val sender = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 0)
 
   private val defaultSettings = DomainPresets.DeterministicFinality
     .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
@@ -41,10 +39,9 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
         lightNodeBlockFieldsAbsenceInterval = 0
       )
     )
-    .copy(walletSettings = DomainPresets.DeterministicFinality.walletSettings.copy(seed = Some(seed)))
 
   private val generator1 = sender
-  private val generator2 = Wallet.generateNewAccount(seed.arr, nonce = 1)
+  private val generator2 = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 1)
 
   "should not broadcast a block endorsement" - {
     "before the feature activation" in withManager { manager =>
@@ -121,7 +118,7 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
   }
 
   "should broadcast a block endorsement if validator" in withManager { manager =>
-    val otherGenerator = Wallet.generateNewAccount(seed.arr :+ 1.toByte, nonce = 0)
+    val otherGenerator = Wallet.generateNewAccount(Domain.DefaultWalletSeed :+ 1.toByte, nonce = 0)
 
     def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
       private val xs = Vector(generator1, otherGenerator).map { g =>
@@ -171,7 +168,7 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
   }
 
   "voting height increased if surpass maxRollback blocks" in withManager { manager =>
-    val otherGenerator = Wallet.generateNewAccount(seed.arr :+ 1.toByte, nonce = 0)
+    val otherGenerator = Wallet.generateNewAccount(Domain.DefaultWalletSeed :+ 1.toByte, nonce = 0)
 
     def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
       private val xs = Vector(generator1, otherGenerator).map { g =>

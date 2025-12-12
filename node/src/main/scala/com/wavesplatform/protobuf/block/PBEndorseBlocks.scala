@@ -14,7 +14,7 @@ object PBEndorseBlocks {
     sig
   )
 
-  def protobuf(x: BlockEndorsement): PBEndorseBlock = new PBEndorseBlock(
+  def protobuf(x: BlockEndorsement): PBEndorseBlock = PBEndorseBlock.of(
     endorserIndex = x.endorserIndex.toInt,
     finalizedBlockId = x.finalizedId.toByteString,
     finalizedBlockHeight = x.finalizedHeight.toInt,

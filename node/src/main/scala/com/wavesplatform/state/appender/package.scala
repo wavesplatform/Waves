@@ -1,10 +1,13 @@
 package com.wavesplatform.state
 
+import cats.instances.seq.*
 import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.block.{Block, BlockSnapshot}
+import com.wavesplatform.block.{Block, BlockEndorsement, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
+import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsUtils}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
@@ -219,6 +222,7 @@ package object appender {
       r <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime())(block, parentHeight)
       _ <- validateStateHash(block, blockchainUpdater)
       _ <- validateChallengedHeader(block, blockchainUpdater)
+      _ <- validateFinalizationVoting(block, blockchainUpdater)
     } yield r
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long)(
@@ -293,6 +297,61 @@ package object appender {
       (),
       BlockAppendError("Block state hash is not supported yet", block)
     )
+
+  private def validateConflictingEndorsement(
+      commitedGenerators: IndexedSeq[(Address, BlsPublicKey)],
+      validEndorsements: Set[Address],
+      minerAddress: Address,
+      conflictingEndorsement: BlockEndorsement
+  ): Either[String, Unit] = for {
+    (address, blsPublicKey) <- commitedGenerators
+      .lift(conflictingEndorsement.endorserIndex.toInt)
+      .toRight(s"Invalid endorser index ${conflictingEndorsement.endorserIndex}")
+    _ <- Either.raiseWhen(address == minerAddress)("Conflicting endorsement from miner is not allowed")
+    _ <- Either.raiseWhen(validEndorsements.contains(address))(s"Block contains both conflicting and valid endorsement from $address")
+    _ <- Either.raiseUnless(conflictingEndorsement.signatureValid(blsPublicKey))("Invalid endorsement signature")
+  } yield ()
+
+  def validateFinalizationVoting(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
+    block.header.finalizationVoting
+      .fold(Right(())) { fv =>
+        for {
+          _ <- Either.raiseUnless(blockchain.supportsFinalizationVoting(blockchain.height + 1))(
+            "FinalizationVoting is not allowed before Deterministic Finality feature activation"
+          )
+          _ <- Either.raiseWhen(fv.valid.isEmpty && fv.conflict.isEmpty)("Finalization voting contains neither valid nor conflicting endorsements")
+          _ <- Either.raiseWhen(fv.valid.size > blockchain.settings.functionalitySettings.maxEndorsements)("Too many endorsements")
+          blockGenerationPeriod <- blockchain
+            .generationPeriodOf(Height(blockchain.height + 1))
+            .toRight(s"No period for height ${blockchain.height + 1}")
+          committedGenerators = blockchain.committedGenerators(blockGenerationPeriod)
+          _              <- Either.raiseWhen(fv.valid.toSet.size != fv.valid.length)("Duplicate endorser indexes in FinalizationVoting")
+          validEndorsers <- fv.valid.traverse(gi => committedGenerators.lift(gi.toInt).toRight(s"Invalid endorser index: $gi"))
+          validEndorserAddresses = validEndorsers.view.map(_._1).toSet
+          _ <- Either.raiseWhen(validEndorserAddresses.contains(block.header.generator.toAddress))("Miner can't endorse their own block")
+          _ <- fv.conflict
+            .traverse(ce => validateConflictingEndorsement(committedGenerators, validEndorserAddresses, block.header.generator.toAddress, ce))
+            .leftMap("Invalid conflicting endorsement: " + _)
+          _ <-
+            if (validEndorsers.isEmpty)
+              Either.raiseUnless(fv.aggregatedEndorsement.arr.isEmpty)(
+                "No endorsements are included, but aggregated endorsement signature is non-empty"
+              )
+            else
+              for {
+                finalizedBlockId <- blockchain.blockId(fv.finalizedHeight.toInt).toRight(s"Unable to get block ID at height ${fv.finalizedHeight}")
+                _ <-
+                  if (validEndorsers.isEmpty) Right(())
+                  else
+                    BlsUtils.verifyAgg(
+                      fv.aggregatedEndorsement.arr,
+                      BlockEndorsement.mkMessage(finalizedBlockId, fv.finalizedHeight, block.header.reference),
+                      validEndorsers.view.map(_._2.arr)
+                    )
+              } yield ()
+        } yield ()
+      }
+      .leftMap(s => BlockAppendError(s, block))
 
   private object metrics {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation").withoutTags()

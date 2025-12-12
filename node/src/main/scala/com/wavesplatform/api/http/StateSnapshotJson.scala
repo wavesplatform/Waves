@@ -1,4 +1,5 @@
 package com.wavesplatform.api.http
+
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.StateSnapshotJson.*
 import com.wavesplatform.common.state.ByteStr
@@ -51,6 +52,7 @@ object StateSnapshotJson {
         info.fold(AccountScriptJson(pk, None, 0))(i => AccountScriptJson(i.publicKey, Some(i.script), i.verifierComplexity))
       }.toSeq,
       s.accountData.map { case (address, data) => AccountDataJson(address, data.values.toSeq) }.toSeq
+      // TODO: nextCommittedGenerators
     )
   implicit val byteStrWrites: Writes[ByteStr]     = com.wavesplatform.utils.byteStrFormat
   implicit val writes: OWrites[StateSnapshotJson] = Json.writes

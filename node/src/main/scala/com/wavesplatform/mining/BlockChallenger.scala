@@ -3,7 +3,7 @@ package com.wavesplatform.mining
 import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, SeedKeyPair}
-import com.wavesplatform.block.{Block, ChallengedHeader}
+import com.wavesplatform.block.{Block, ChallengedHeader, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.BlockchainFeatures
@@ -63,7 +63,8 @@ class BlockChallengerImpl(
             block.header.stateHash,
             block.signature,
             block.transactionData,
-            blockchainUpdater.lastStateHash(Some(block.header.reference))
+            blockchainUpdater.lastStateHash(Some(block.header.reference)),
+            block.header.finalizationVoting
           )
         )
         applyResult <- EitherT(appendBlock(challengingBlock))
@@ -96,7 +97,8 @@ class BlockChallengerImpl(
               md.microBlock.stateHash,
               md.microBlock.totalResBlockSig,
               txs,
-              blockchainUpdater.lastStateHash(Some(block.header.reference))
+              blockchainUpdater.lastStateHash(Some(block.header.reference)),
+              FinalizationVoting.combine(block.header.finalizationVoting, md.microBlock.finalizationVoting)
             )
           )
           applyResult <- EitherT(appendBlock(challengingBlock))
@@ -155,7 +157,8 @@ class BlockChallengerImpl(
       challengedStateHash: Option[ByteStr],
       challengedSignature: ByteStr,
       txs: Seq[Transaction],
-      prevStateHash: ByteStr
+      prevStateHash: ByteStr,
+      challengedFinalizationVoting: Option[FinalizationVoting]
   ): Task[Either[ValidationError, Block]] = Task {
     val prevBlockHeader = blockchainUpdater
       .heightOf(challengedBlock.header.reference)
@@ -193,7 +196,7 @@ class BlockChallengerImpl(
         blockRewardVote(settings),
         stateHash = None,
         challengedHeader = None,
-        finalizationVoting = challengedBlock.header.finalizationVoting
+        finalizationVoting = challengedFinalizationVoting
       )
       hitSource <- pos.validateGenerationSignature(blockWithoutChallengeAndStateHash)
       blockchainWithNewBlock = SnapshotBlockchain(
@@ -239,7 +242,7 @@ class BlockChallengerImpl(
             challengedBlock.header.rewardVote,
             challengedStateHash,
             challengedSignature,
-            challengedBlock.header.finalizationVoting
+            challengedFinalizationVoting
           )
         ),
         finalizationVoting = None

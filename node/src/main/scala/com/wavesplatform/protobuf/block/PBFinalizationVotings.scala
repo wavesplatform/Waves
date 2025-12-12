@@ -26,11 +26,10 @@ object PBFinalizationVotings {
     )
   }
 
-  def protobuf(v: VanillaFinalizationVoting): PBFinalizationVoting =
-    PBFinalizationVoting.of(
-      GeneratorIndex.toInts(v.valid),
-      v.finalizedHeight.toInt,
-      v.aggregatedEndorsement.byteStr.toByteString,
-      v.conflict.map(PBEndorseBlocks.protobuf)
-    )
+  def protobuf(v: VanillaFinalizationVoting): PBFinalizationVoting = PBFinalizationVoting.of(
+    GeneratorIndex.toInts(v.valid),
+    v.finalizedHeight.toInt,
+    v.aggregatedEndorsement.byteStr.toByteString,
+    v.conflict.map(PBEndorseBlocks.protobuf)
+  )
 }
