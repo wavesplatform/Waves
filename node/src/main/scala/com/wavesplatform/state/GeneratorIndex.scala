@@ -20,4 +20,7 @@ object GeneratorIndex {
   }
 
   def toInts(xs: Seq[GeneratorIndex]): Seq[Int] = xs
+
+  given Ordering[GeneratorIndex]                            = Ordering[Int]
+  given Conversion[GeneratorIndex, Ordered[GeneratorIndex]] = scala.math.Ordered.orderingToOrdered(_)
 }

@@ -303,7 +303,7 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
       generator = signer
     )
     appendBlock(block) match {
-      case Applied(discardedSnapshots, _) =>
+      case Applied(discardedDiffs = discardedSnapshots) =>
         utxPool.setPrioritySnapshots(discardedSnapshots)
         utxPool.cleanUnconfirmed()
       case Ignored => ()

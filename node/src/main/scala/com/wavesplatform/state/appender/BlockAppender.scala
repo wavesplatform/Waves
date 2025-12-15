@@ -45,8 +45,8 @@ object BlockAppender extends ScorexLogging {
           appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
         } else {
           appendKeyBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot).tap {
-            case Right(_: Applied) => blockEndorser.vote()
-            case _                 =>
+            case Right(Applied(generatorBalances = gb)) => blockEndorser.vote(gb)
+            case _                                      =>
           }
         }
       } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
@@ -81,7 +81,7 @@ object BlockAppender extends ScorexLogging {
 
     val handle = append.flatMap {
       case Right(Ignored) => Task.unit // block already appended
-      case Right(Applied(_, _)) =>
+      case Right(_: Applied) =>
         Task {
           log.debug(s"${id(ch)} Appended $newBlock")
 

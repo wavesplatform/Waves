@@ -54,7 +54,7 @@ class BlockEndorserSpec extends FreeSpec, WithDomain, WithResourceManager {
           d.appender.appendBlock(block)
         }
 
-        endorser.vote()
+        endorser.vote(d.blockchain.currentGeneratorBalances.getOrElse(Seq.empty))
         actualFilter.value.finalizedHeight shouldBe Height(2) // 4 - maxRollback
       }
     }

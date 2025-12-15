@@ -70,7 +70,7 @@ class BlockChallengerImpl(
         applyResult <- EitherT(appendBlock(challengingBlock))
       } yield applyResult -> challengingBlock).value
     }.map {
-      case Right((Applied(_, _), challengingBlock)) =>
+      case Right((_: Applied, challengingBlock)) =>
         log.debug(s"Successfully challenged $block with $challengingBlock")
         BlockStats.challenged(challengingBlock, blockchainUpdater.height)
         if (blockchainUpdater.isLastBlockId(challengingBlock.id())) {
@@ -106,7 +106,7 @@ class BlockChallengerImpl(
       })
     } yield {
       applyResult match {
-        case Applied(_, _) =>
+        case _: Applied =>
           log.debug(s"Successfully challenged microblock $idStr with $challengingBlock")
           BlockStats.challenged(challengingBlock, blockchainUpdater.height)
           if (blockchainUpdater.isLastBlockId(challengingBlock.id())) {

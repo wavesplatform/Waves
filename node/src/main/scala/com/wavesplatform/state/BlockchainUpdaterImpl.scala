@@ -272,7 +272,7 @@ class BlockchainUpdaterImpl(
                       miner.scheduleMining(Some(updatedBlockchain))
                       blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, reward, hitSource, referencedBlockchain)
 
-                      val newFinalizedHeight = calculateFinalizationHeight(rocksdb).getOrElse {
+                      val newFinalizedHeight = calculateFinalizationHeight(rocksdb, generatorBalances).getOrElse {
                         Blockchain.finalizedHeightOrFallback(
                           at = Height(updatedBlockchain.height + 1),
                           latestFinalized = rocksdb.finalizedHeightAt(),
@@ -476,11 +476,11 @@ class BlockchainUpdaterImpl(
                   log.info(s"New height: $newHeight")
                 }
 
-                log.debug(s"Finalized height on $newHeight: $finalizedHeight")
+                log.debug(s"Finalized height at $newHeight: $finalizedHeight")
 
                 publishLastBlockInfo()
 
-                Applied(discDiffs, this.score)
+                Applied(discDiffs, this.score, generatorBalances)
             } getOrElse Ignored
           }
         )
@@ -489,55 +489,55 @@ class BlockchainUpdaterImpl(
   /** @param votingBlockchain Blockchain at votingBlock
     * @return None if not voted
     */
-  private def calculateFinalizationHeight(votingBlockchain: Blockchain): Option[Height] = votingBlockchain.lastBlockHeader.flatMap { votingBlock =>
-    val votingHeight   = Height(votingBlockchain.height)
-    val endorsedHeight = votingHeight.prev // Will be finalized or not
+  private def calculateFinalizationHeight(votingBlockchain: Blockchain, generatorBalances: GeneratorBalances): Option[Height] =
+    votingBlockchain.lastBlockHeader.flatMap { votingBlock =>
+      val votingHeight   = Height(votingBlockchain.height)
+      val endorsedHeight = votingHeight.prev // Will be finalized or not
 
-    def shouldFinalizeByVoting(): Boolean = votingBlockchain.generationPeriodOf(votingHeight).fold(false) { votingPeriod =>
-      val logPrefix         = s"Finalization of $endorsedHeight:"
-      val generatorBalances = votingBlockchain.currentGeneratorBalances()
-      if (generatorBalances.isEmpty) {
-        log.debug(s"$logPrefix no committed generators on $votingPeriod")
-        false
-      } else {
-        val validEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Seq.empty)(_.valid)
-        val conflictEndorserIndexes = conflictGenerators(votingPeriod).upTo(votingHeight)
+      def shouldFinalizeByVoting(): Boolean = votingBlockchain.generationPeriodOf(votingHeight).fold(false) { votingPeriod =>
+        val logPrefix = s"Finalization of $endorsedHeight:"
+        if (generatorBalances.isEmpty) {
+          log.debug(s"$logPrefix no committed generators on $votingPeriod")
+          false
+        } else {
+          val validEndorserIndexes    = votingBlock.header.finalizationVoting.fold(Seq.empty)(_.valid)
+          val conflictEndorserIndexes = conflictGenerators(votingPeriod).upTo(votingHeight)
 
-        val (totalBalance, endorsedBalance, minerIdx) = {
-          val votedIndexes            = validEndorserIndexes.toSet
-          val conflictIndexes         = conflictEndorserIndexes
-          val votingBlockMinerAddress = votingBlock.header.generator.toAddress
-          generatorBalances.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0), -1)) {
-            case (orig @ (totalBalance, endorsedBalance, minerIdx), ((endorserAddress, endorserBalance), i)) =>
-              val gi = GeneratorIndex(i)
-              if (conflictIndexes.contains(gi)) orig
-              else {
-                val isMiner    = endorserAddress == votingBlockMinerAddress
-                val isEndorser = votedIndexes.contains(gi)
-                (
-                  totalBalance + endorserBalance,
-                  if (isEndorser || isMiner) endorsedBalance + endorserBalance else endorsedBalance,
-                  if (isMiner) i else minerIdx
-                )
-              }
+          val (totalBalance, endorsedBalance, minerIdx) = {
+            val votedIndexes            = validEndorserIndexes.toSet
+            val conflictIndexes         = conflictEndorserIndexes
+            val votingBlockMinerAddress = votingBlock.header.generator.toAddress
+            generatorBalances.view.zipWithIndex.foldLeft((BigInt(0), BigInt(0), -1)) {
+              case (orig @ (totalBalance, endorsedBalance, minerIdx), (x, i)) =>
+                val gi = GeneratorIndex(i)
+                if (conflictIndexes.contains(gi)) orig
+                else {
+                  val isMiner    = x.address == votingBlockMinerAddress
+                  val isEndorser = votedIndexes.contains(gi)
+                  (
+                    totalBalance + x.balance,
+                    if (isEndorser || isMiner) endorsedBalance + x.balance else endorsedBalance,
+                    if (isMiner) i else minerIdx
+                  )
+                }
+            }
           }
+
+          val finalized = FinalizationVoting.isFinalized(endorsedBalance, totalBalance)
+          log.debug(
+            s"$logPrefix ${if (finalized) "" else "not "}reached, endorsed=$endorsedBalance, total=$totalBalance, " +
+              s"miner=$minerIdx" +
+              (if (validEndorserIndexes.isEmpty) "" else s", valid=[${validEndorserIndexes.mkString(", ")}]") +
+              (if (conflictEndorserIndexes.isEmpty) "" else s", conflict=[${conflictEndorserIndexes.mkString(", ")}]")
+          )
+
+          finalized
         }
-
-        val finalized = FinalizationVoting.isFinalized(endorsedBalance, totalBalance)
-        log.debug(
-          s"$logPrefix ${if (finalized) "" else "not "}reached, endorsed=$endorsedBalance, total=$totalBalance, " +
-            s"miner=$minerIdx" +
-            (if (validEndorserIndexes.isEmpty) "" else s", valid=[${validEndorserIndexes.mkString(", ")}]") +
-            (if (conflictEndorserIndexes.isEmpty) "" else s", conflict=[${conflictEndorserIndexes.mkString(", ")}]")
-        )
-
-        finalized
       }
-    }
 
-    if (votingHeight > GenesisBlockHeight && shouldFinalizeByVoting()) endorsedHeight.some
-    else none
-  }
+      if (votingHeight > GenesisBlockHeight && shouldFinalizeByVoting()) endorsedHeight.some
+      else none
+    }
 
   private def collectLeasesToCancel(newHeight: Height): Map[ByteStr, LeaseDetails] =
     if (rocksdb.isFeatureActivated(BlockchainFeatures.LeaseExpiration, newHeight.toInt)) {
@@ -659,7 +659,7 @@ class BlockchainUpdaterImpl(
               _ <- Either.raiseUnless(totalBlock.signatureValid()) {
                 MicroBlockAppendError("Invalid total block signature", microBlock)
               }
-              _ <- appender.validateFinalizationVoting(totalBlock, rocksdb)
+              b <- appender.validateFinalizationVoting(totalBlock, rocksdb, ng.finalizationState.generatorBalances)
               blockDifferResult <- BlockDiffer.fromMicroBlock(
                 this,
                 rocksdb.lastBlockTimestamp,
@@ -678,7 +678,7 @@ class BlockchainUpdaterImpl(
               val transactionsRoot = ng.createTransactionsRoot(microBlock)
               blockchainUpdateTriggers.onProcessMicroBlock(microBlock, keyBlockSnapshot, this, blockId, transactionsRoot)
 
-              this.ngState = Some(ng.append(microBlock, snapshot, carry, totalFee, time.monotonicMillis(), computedStateHash, Some(blockId)))
+              this.ngState = Some(ng.append(microBlock, snapshot, carry, totalFee, time.monotonicMillis(), computedStateHash, Some(blockId), b))
 
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${snapshot.hashString}")
               internalLastBlockInfo.onNext(
@@ -946,8 +946,8 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.conflictGenerators(at)
   }
 
-  override def currentGeneratorBalances(): Seq[(Address, Long)] = readLock {
-    snapshotBlockchain.currentGeneratorBalances()
+  override def currentGeneratorBalances: Option[GeneratorBalances] = readLock {
+    ngState.map(_.finalizationState.generatorBalances)
   }
 
   override def snapshotBlockchain: SnapshotBlockchain = readLock {
@@ -965,10 +965,9 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
-  sealed trait BlockApplyResult
-  object BlockApplyResult {
-    case object Ignored                                                   extends BlockApplyResult
-    case class Applied(discardedDiffs: Seq[StateSnapshot], score: BigInt) extends BlockApplyResult
+  enum BlockApplyResult {
+    case Ignored
+    case Applied(discardedDiffs: Seq[StateSnapshot], score: BigInt, generatorBalances: GeneratorBalances)
   }
 
   private def displayFeatures(s: Set[Short]): String =

@@ -68,8 +68,8 @@ object ExtensionAppender extends ScorexLogging {
                           extension.snapshots.get(b.id())
                         )
                           .map {
-                            case (Applied(_, _), height) => BlockStats.applied(b, BlockStats.Source.Ext, height)
-                            case _                       =>
+                            case (_: Applied, height) => BlockStats.applied(b, BlockStats.Source.Ext, height)
+                            case _                    =>
                           }
                       }
                       .zipWithIndex

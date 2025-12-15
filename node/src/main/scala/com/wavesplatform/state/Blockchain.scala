@@ -97,9 +97,6 @@ trait Blockchain {
 
   def conflictGenerators(at: GenerationPeriod): ConflictGenerators
 
-  /** @return Before applying transactions of this block, in commitment order */
-  def currentGeneratorBalances(): Seq[(Address, Long)]
-
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
   def lastStateHash(refId: Option[ByteStr]): ByteStr
@@ -196,8 +193,8 @@ object Blockchain {
     def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
 
-    def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
-      GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
+    def isGeneratingBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
+      GeneratingBalanceProvider.isGeneratingBalanceValid(blockchain, height, block, effectiveBalance)
 
     def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
 

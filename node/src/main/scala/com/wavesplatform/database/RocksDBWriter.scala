@@ -13,7 +13,6 @@ import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
@@ -340,26 +339,6 @@ class RocksDBWriter(
     }.toMap
   }
 
-  override protected def loadGeneratorBalances(): Seq[(Address, Long)] = readOnly { _ =>
-    if (lastBlock.isEmpty || Height(height) <= GenesisBlockHeight) Seq.empty
-    else {
-      val currentHeight = Height(height)
-      this.generationPeriodOf(currentHeight).fold(Nil) { currentPeriod =>
-        val currentCommGens = committedGenerators(currentPeriod)
-        if (currentCommGens.isEmpty) Seq.empty
-        else {
-          val currentBlock  = lastBlock.getOrElse(throw new IllegalStateException(s"No block on current height: $currentHeight"))
-          val parentBlockId = currentBlock.header.reference
-
-          // Use parentBlockId, because this is how it works in appender/minerBalance: we don't count transactions in current block
-          currentCommGens.map { case (addr, _) =>
-            addr -> GeneratingBalanceProvider.balance(this, addr, Some(parentBlockId))
-          }
-        }
-      }
-    }
-  }
-
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
     writableDB.withResource(r => database.loadAssetDescription(r, asset))
 
@@ -522,7 +501,7 @@ class RocksDBWriter(
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
-      generatorBalances: Seq[(Address, Long)],
+      generatorBalances: GeneratorBalances,
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey)],
       commitmentTransactionIds: Seq[TransactionId],
       conflictGenerators: Seq[GeneratorIndex],
@@ -756,7 +735,7 @@ class RocksDBWriter(
       }
 
       // TODO: Option to not store
-      rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances.map { case (_, b) => b }))
+      rw.put(Keys.generatorBalances(h, rdb.apiHandle), Some(generatorBalances.map(x => x.index -> x.balance)))
 
       // TODO: height
       rw.put(Keys.issuedAssets(Height(height)), snapshot.assetStatics.keySet.toSeq)

@@ -11,22 +11,22 @@ import io.netty.channel.group.ChannelGroup
 trait BlockEndorser {
 
   /** Voting happens
-    *   for block on endorserHeight
+    *   for block at endorserHeight
     *   with finalizedBlock at votingHeight
-    *   by generators, committed on votingHeight
+    *   by generators, committed at votingHeight
     */
-  def vote(): Unit
+  def vote(generatorBalances: GeneratorBalances): Unit
 }
 
 object BlockEndorser {
   object Disabled extends BlockEndorser {
-    override def vote(): Unit = {}
+    override def vote(generatorBalances: GeneratorBalances): Unit = {}
   }
 
   class InMemory(blockchain: Blockchain, wallet: Wallet, endorsementStorage: EndorsementStorage, allChannels: ChannelGroup)
-      extends BlockEndorser
-      with StrictLogging {
-    override def vote(): Unit = {
+      extends BlockEndorser,
+        StrictLogging {
+    override def vote(generatorBalances: GeneratorBalances): Unit = {
       val votingHeight   = Height(blockchain.height)
       val endorsedHeight = votingHeight - 1
       if (endorsedHeight > GenesisBlockHeight) for {
@@ -45,18 +45,12 @@ object BlockEndorser {
         committed        = blockchain.committedGenerators(votingPeriod)
         votingBlockMiner = votingBlockHeader.header.generator.toAddress
         filter = {
-          val isMiner  = wallet.privateKeyAccount(votingBlockMiner).isRight
-          val balances = blockchain.currentGeneratorBalances()
-          require(committed.size == balances.size, s"committed.size=${committed.size} == balances.size=${balances.size}")
-
+          val isMiner    = wallet.privateKeyAccount(votingBlockMiner).isRight
+          val balances   = generatorBalances.map(x => x.address -> x.balance).toMap
           val minerIndex = if (isMiner) committed.indexWhere { case (addr, _) => addr == votingBlockMiner } else -1
-          val endorsers = committed
-            .zip(balances)
-            .map { case ((addr1, blsPk), (addr2, balance)) =>
-              require(addr1 == addr2, s"addr1=$addr1 == addr2=$addr2")
-              (addr1, blsPk, balance)
-            }
-            .to(Vector)
+          val endorsers = committed.map { case (address, blsPk) =>
+            (address, blsPk, balances.getOrElse(address, 0L))
+          }.toVector
 
           val conflict = blockchain.conflictGenerators(votingPeriod).upTo(votingHeight)
           EndorsementFilter(GeneratorIndex.checked(minerIndex), finalizedId, finalizedHeight, endorsedId, endorsers, conflict)
