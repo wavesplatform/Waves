@@ -231,22 +231,20 @@ class BlockChallengerImpl(
         bestMinerAccount,
         blockFeatures(blockchainUpdater, settings),
         blockRewardVote(settings),
-        if (blockchainWithNewBlock.supportsLightNodeBlockFields()) Some(stateHash) else None,
-        if (blockchainWithNewBlock.supportsLightNodeBlockFields())
-          Some(
-            ChallengedHeader(
-              challengedBlock.header.timestamp,
-              challengedBlock.header.baseTarget,
-              challengedBlock.header.generationSignature,
-              challengedBlock.header.featureVotes,
-              challengedBlock.header.generator,
-              challengedBlock.header.rewardVote,
-              challengedStateHash,
-              challengedSignature,
-              challengedFinalizationVoting
-            )
+        Some(stateHash),
+        Some(
+          ChallengedHeader(
+            challengedBlock.header.timestamp,
+            challengedBlock.header.baseTarget,
+            challengedBlock.header.generationSignature,
+            challengedBlock.header.featureVotes,
+            challengedBlock.header.generator,
+            challengedBlock.header.rewardVote,
+            challengedStateHash,
+            challengedSignature,
+            challengedFinalizationVoting
           )
-        else None,
+        ),
         finalizationVoting = None
       )
     } yield {
