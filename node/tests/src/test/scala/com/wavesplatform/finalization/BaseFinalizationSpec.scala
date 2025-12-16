@@ -46,5 +46,19 @@ trait BaseFinalizationSpec extends FreeSpec, WithDomain, WithResourceManager, Ei
         finalizedHeight: Height = GenesisBlockHeight,
         finalizedId: BlockId = TxHelpers.randomBlockId
     ): FinalizationVoting = self.copy(conflict = self.conflict :+ mkConflictEndorsement(wavesAcc, idx, endorsedId, finalizedHeight, finalizedId))
+
+    def signed(endorsedId: BlockId, finalizedId: BlockId, validEndorsers: KeyPair*): FinalizationVoting = {
+      val aggSig = validEndorsers.foldLeft(BlsSignature.Empty: BlsSignature) { case (r, kp) =>
+        val sig = BlockEndorsement.sign(
+          BlsKeyPair(kp.privateKey),
+          finalizedId = finalizedId,
+          finalizedHeight = GenesisBlockHeight,
+          endorsedId = endorsedId
+        )
+        r.append(sig)
+      }
+
+      self.copy(aggregatedEndorsement = aggSig)
+    }
   }
 }

@@ -1,8 +1,7 @@
 package com.wavesplatform.finalization
 
-import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
+import com.wavesplatform.block.{Block, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
@@ -50,24 +49,14 @@ class FinalizationSuite extends BaseFinalizationSpec {
         d.checkFinalizedHeight()
 
         log.debug(s"Append block 4 with votes")
-        val aggSig = BlockEndorsement.sign(
-          BlsKeyPair(thisNodeAcc.privateKey),
-          finalizedId = genesisBlockId,
-          finalizedHeight = GenesisBlockHeight,
-          endorsedId = block3.id()
-        )
         val votingBlock = d.createBlock(
           version = Block.ProtoBlockVersion,
           txs = Nil,
           generator = otherNode1Acc,
           strictTime = true,
           finalizationVoting = Some(
-            FinalizationVoting(
-              valid = Seq(GeneratorIndex(1)),
-              finalizedHeight = GenesisBlockHeight,
-              aggregatedEndorsement = aggSig,
-              conflict = Vector.empty
-            )
+            mkFinalizationVoting(valid = Seq(GeneratorIndex(1)))
+              .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = thisNodeAcc)
           )
         )
         d.appender.appendBlock(votingBlock)
@@ -107,21 +96,11 @@ class FinalizationSuite extends BaseFinalizationSpec {
         )
 
         log.debug(s"Append microblock with votes")
-        val aggSig = BlockEndorsement.sign(
-          BlsKeyPair(thisNodeAcc.privateKey),
-          finalizedId = genesisBlockId,
-          finalizedHeight = GenesisBlockHeight,
-          endorsedId = block3.id()
-        )
         val microBlockWithTxn = d.createMicroBlock(
           signer = Some(otherNode1Acc),
           finalizationVoting = Some(
-            FinalizationVoting(
-              valid = Seq(GeneratorIndex(1)),
-              finalizedHeight = GenesisBlockHeight,
-              aggregatedEndorsement = aggSig,
-              conflict = Vector.empty
-            )
+            mkFinalizationVoting(valid = Seq(GeneratorIndex(1)))
+              .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = thisNodeAcc)
           )
         )(TxHelpers.transfer(otherNode2Acc, otherNode3Acc.toAddress))
         d.appendMicroBlock(microBlockWithTxn)
@@ -150,12 +129,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
       d.appendBlock(block3)
 
       log.debug(s"Append block 4 with votes and spending")
-      val aggSig = BlockEndorsement.sign(
-        BlsKeyPair(thisNodeAcc.privateKey),
-        finalizedId = genesisBlockId,
-        finalizedHeight = GenesisBlockHeight,
-        endorsedId = block3.id()
-      )
       d.appender.appendBlock(
         d.createBlock(
           version = Block.ProtoBlockVersion,
@@ -170,12 +143,8 @@ class FinalizationSuite extends BaseFinalizationSpec {
           generator = otherNode1Acc,
           strictTime = true,
           finalizationVoting = Some(
-            FinalizationVoting(
-              valid = Seq(GeneratorIndex(2)),
-              finalizedHeight = GenesisBlockHeight,
-              aggregatedEndorsement = aggSig,
-              conflict = Vector.empty
-            )
+            mkFinalizationVoting(valid = Seq(GeneratorIndex(2)))
+              .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = thisNodeAcc)
           )
         )
       )
@@ -264,19 +233,10 @@ class FinalizationSuite extends BaseFinalizationSpec {
         generator = otherNode1Acc
       )
       d.appendBlock(block3)
-      val endorsedBlock   = block3
-      val endorsedBlockId = endorsedBlock.id()
+      val endorsedBlock = block3
+      val endorsedId    = endorsedBlock.id()
 
       log.debug(s"Append block 4 with conflict vote")
-      val aggSig = Seq(otherNode2Acc).foldLeft(BlsSignature.Empty: BlsSignature) { case (r, kp) =>
-        val sig = BlockEndorsement.sign(
-          BlsKeyPair(kp.privateKey),
-          finalizedId = genesisBlockId,
-          finalizedHeight = GenesisBlockHeight,
-          endorsedId = endorsedBlockId
-        )
-        r.append(sig)
-      }
       d.appender.appendBlock(
         d.createBlock(
           version = Block.ProtoBlockVersion,
@@ -286,9 +246,10 @@ class FinalizationSuite extends BaseFinalizationSpec {
           finalizationVoting = Some(
             mkFinalizationVoting(
               valid = Seq(GeneratorIndex(1)),
-              finalizedHeight = GenesisBlockHeight,
-              aggregatedEndorsement = aggSig
-            ).withConflict(otherNode1Acc, GeneratorIndex(0), endorsedBlock.id())
+              finalizedHeight = GenesisBlockHeight
+            )
+              .withConflict(otherNode1Acc, GeneratorIndex(0), endorsedBlock.id())
+              .signed(endorsedId = endorsedId, finalizedId = genesisBlockId, otherNode2Acc)
           )
         )
       )
