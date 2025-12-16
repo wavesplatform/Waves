@@ -45,12 +45,21 @@ object CommitToGenerationTransaction {
   implicit val validator: TxValidator[CommitToGenerationTransaction] = CommitToGenerationTxValidator
 
   implicit def signed(tx: CommitToGenerationTransaction, privateKey: PrivateKey): CommitToGenerationTransaction = {
-    val blsKP      = BlsKeyPair(privateKey)
-    val blsMessage = blsKP.publicKey.arr ++ tx.generationPeriodStart.toByteArray
-    val blsSig     = blsKP.sign(blsMessage)
+    val blsKP  = BlsKeyPair(privateKey)
+    val blsSig = mkPopSignature(blsKP, tx.generationPeriodStart)
 
     val txWithBlsSig = tx.copy(endorserPublicKey = blsKP.publicKey, commitmentSignature = blsSig)
     txWithBlsSig.copy(proofs = Proofs(crypto.sign(privateKey, txWithBlsSig.bodyBytes())))
+  }
+
+  def withBls(tx: CommitToGenerationTransaction, blsKeyPair: BlsKeyPair): CommitToGenerationTransaction = {
+    val blsSig = mkPopSignature(blsKeyPair, tx.generationPeriodStart)
+    tx.copy(endorserPublicKey = blsKeyPair.publicKey, commitmentSignature = blsSig)
+  }
+
+  def mkPopSignature(blsKeyPair: BlsKeyPair, generationPeriodStart: Height): BlsSignature.NonEmpty = {
+    val blsMessage = blsKeyPair.publicKey.arr ++ generationPeriodStart.toByteArray
+    blsKeyPair.sign(blsMessage)
   }
 
   def create(

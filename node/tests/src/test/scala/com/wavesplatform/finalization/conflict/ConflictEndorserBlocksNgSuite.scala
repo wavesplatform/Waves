@@ -187,7 +187,7 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
       log.debug(s"Append microblock with conflict endorsement")
       val microBlockWithTxn = d.createMicroBlock(
         signer = Some(validGenerator),
-        finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(conflictGenerator, GeneratorIndex(1), block2WithCommitments)))
+        finalizationVoting = Some(mkFinalizationVoting().withConflict(conflictGenerator, GeneratorIndex(1), block2WithCommitments.id()))
       )(TxHelpers.transfer(otherAcc1, otherAcc2.toAddress))
       d.appendMicroBlock(microBlockWithTxn)
       after3MicroBlockWithConflictEndorsementCheck(data)

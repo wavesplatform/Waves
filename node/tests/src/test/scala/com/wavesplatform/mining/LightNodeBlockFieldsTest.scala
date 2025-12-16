@@ -72,6 +72,7 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
         challenger.challengeBlock(invalidBlock, null).runSyncUnsafe()
       }
 
+      log.debug("LightNode activation")
       appendBlock()
       d.blockchain.height shouldBe 2
       d.blockchain.isFeatureActivated(LightNode) shouldBe true
@@ -80,12 +81,12 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
       appendMicro()
       block(2).stateHash shouldBe None
 
-      challengeBlock()
+      appendBlock()
       d.blockchain.height shouldBe 3
       block(3).stateHash shouldBe None
       block(3).challengedHeader shouldBe None
 
-      (1 to 8).foreach(_ => appendBlock())
+      (4 to 11).foreach(_ => appendBlock())
       d.blockchain.height shouldBe 11
       block(11).stateHash shouldBe None
 
@@ -97,16 +98,19 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
       val hash1 = block(12).stateHash
       hash1 shouldBe defined
 
+      log.debug("After lightNodeBlockFieldsAbsenceInterval - 1")
       appendMicro()
       val hash2 = block(12).stateHash
       hash2 shouldBe defined
       hash2 should not be hash1
 
+      log.debug("Rollback before lightNodeBlockFieldsAbsenceInterval")
       d.rollbackTo(10)
-      challengeBlock()
+      appendBlock()
       block(11).stateHash shouldBe None
       block(11).challengedHeader shouldBe None
 
+      log.debug("After lightNodeBlockFieldsAbsenceInterval - 2")
       challengeBlock()
       block(12).stateHash shouldBe defined
       block(12).challengedHeader shouldBe defined

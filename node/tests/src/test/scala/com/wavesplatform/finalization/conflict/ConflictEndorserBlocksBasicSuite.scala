@@ -197,7 +197,7 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
         txs = Nil,
         generator = validGenerator,
         strictTime = true,
-        finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(conflictGenerator, GeneratorIndex(1), block2WithCommitments)))
+        finalizationVoting = Some(mkFinalizationVoting().withConflict(conflictGenerator, GeneratorIndex(1), block2WithCommitments.id()))
       )
       d.appender.appendBlock(block3WithVotes)
       after3WithNewPeriodAndEndorsementsCheck(data)
