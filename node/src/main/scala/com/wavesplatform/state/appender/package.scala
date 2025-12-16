@@ -337,10 +337,13 @@ package object appender {
             .generationPeriodOf(Height(blockchain.height + 1))
             .toRight(s"No period for height ${blockchain.height + 1}")
           committedGenerators = blockchain.committedGenerators(blockGenerationPeriod)
-          _              <- Either.raiseWhen(fv.valid.toSet.size != fv.valid.length)("Duplicate endorser indexes in FinalizationVoting")
+          _              <- Either.raiseWhen(fv.valid.toSet.size != fv.valid.length)("Duplicate valid endorser indexes in FinalizationVoting")
           validEndorsers <- fv.valid.traverse(gi => committedGenerators.lift(gi.toInt).toRight(s"Invalid endorser index: $gi"))
           validEndorserAddresses = validEndorsers.view.map(_._1).toSet
           _ <- Either.raiseWhen(validEndorserAddresses.contains(block.header.generator.toAddress))("Miner can't endorse their own block")
+          _ <- Either.raiseWhen(fv.conflict.map(_.endorserIndex).toSet.size != fv.conflict.length) {
+            "Duplicate conflicting endorser indexes in FinalizationVoting"
+          }
           _ <- fv.conflict
             .traverse { ce =>
               validateConflictingEndorsement(

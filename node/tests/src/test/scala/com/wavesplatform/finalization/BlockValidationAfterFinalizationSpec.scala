@@ -33,6 +33,18 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
     }.run()
 
     "conflict endorsement" - {
+      "duplicate" in new BaseTest {
+        override def continue(d: Domain): Unit = {
+          val block3WithVotes = d.createBlock(
+            mkFinalizationVoting(finalizedHeight = GenesisBlockHeight)
+              .withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlock.id(), GenesisBlockHeight)
+              .withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlock.id(), GenesisBlockHeight)
+          )
+
+          d.appender.appendBlockWithoutFallback(block3WithVotes) should produce("Duplicate conflicting endorser indexes in FinalizationVoting")
+        }
+      }.run()
+
       "finalization height is greater than in voting" in new BaseTest {
         override def continue(d: Domain): Unit = {
           val block3WithVotes = d.createBlock(
