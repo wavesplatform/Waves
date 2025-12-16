@@ -24,10 +24,8 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
       "finalization height is greater than in voting" in new BaseTest {
         override def continue(d: Domain): Unit = {
           val block3WithVotes = d.createBlock(
-            mkFinalizationVoting(
-              finalizedHeight = Height(1),
-              conflict = Seq(mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock.id(), Height(3)))
-            )
+            mkFinalizationVoting(finalizedHeight = GenesisBlockHeight)
+              .withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlock.id(), Height(3))
           )
 
           d.appender.appendBlock(block3WithVotes, requireAppended = false)
@@ -38,18 +36,14 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
       "finalized block exists (valid endorsement among conflict)" in new BaseTest {
         override def continue(d: Domain): Unit = {
           val block3WithVotes = d.createBlock(
-            mkFinalizationVoting(
-              finalizedHeight = GenesisBlockHeight,
-              conflict = Seq(
-                mkConflictEndorsement(
-                  committedGenerator2,
-                  committedGenerator2Idx,
-                  endorsedId = d.lastBlockId,
-                  finalizedHeight = GenesisBlockHeight,
-                  finalizedId = d.blockchain.blockId(GenesisBlockHeight.toInt).value
-                )
+            mkFinalizationVoting(finalizedHeight = GenesisBlockHeight)
+              .withConflict(
+                committedGenerator2,
+                committedGenerator2Idx,
+                endorsedId = d.lastBlockId,
+                finalizedHeight = GenesisBlockHeight,
+                finalizedId = d.blockchain.blockId(GenesisBlockHeight.toInt).value
               )
-            )
           )
 
           d.appender.appendBlock(block3WithVotes, requireAppended = false)

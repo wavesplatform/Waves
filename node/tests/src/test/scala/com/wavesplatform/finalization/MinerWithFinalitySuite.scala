@@ -138,7 +138,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
           txs = Nil,
           generator = otherNodeAcc,
           strictTime = true,
-          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(thisNodeAcc, GeneratorIndex(1), block2WithCommitments.id())))
+          finalizationVoting = Some(mkFinalizationVoting().withConflict(thisNodeAcc, GeneratorIndex(1), block2WithCommitments.id()))
         )
         d.appender.appendBlock(block3WithVotes)
 
@@ -204,7 +204,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
           txs = Nil,
           generator = otherNodeAcc,
           strictTime = true,
-          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(thisNodeAcc, GeneratorIndex(1), block2WithCommitments.id())))
+          finalizationVoting = Some(mkFinalizationVoting().withConflict(thisNodeAcc, GeneratorIndex(1), block2WithCommitments.id()))
         )
         d.appender.appendBlock(block3WithVotes)
 

@@ -284,12 +284,11 @@ class FinalizationSuite extends BaseFinalizationSpec {
           generator = otherNode3Acc,
           strictTime = true,
           finalizationVoting = Some(
-            FinalizationVoting(
+            mkFinalizationVoting(
               valid = Seq(GeneratorIndex(1)),
               finalizedHeight = GenesisBlockHeight,
-              aggregatedEndorsement = aggSig,
-              conflict = Vector(mkConflictEndorsement(otherNode1Acc, GeneratorIndex(0), endorsedBlock.id()))
-            )
+              aggregatedEndorsement = aggSig
+            ).withConflict(otherNode1Acc, GeneratorIndex(0), endorsedBlock.id())
           )
         )
       )

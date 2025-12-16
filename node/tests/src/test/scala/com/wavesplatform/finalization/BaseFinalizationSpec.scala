@@ -16,14 +16,10 @@ trait BaseFinalizationSpec extends FreeSpec, WithDomain, WithResourceManager, Ei
 
   protected def mkFinalizationVoting(
       valid: Seq[GeneratorIndex] = Nil,
-      finalizedHeight: Height = Height(0),
+      finalizedHeight: Height = GenesisBlockHeight,
       aggregatedEndorsement: BlsSignature = BlsSignature.Empty,
       conflict: Seq[BlockEndorsement] = Nil
   ): FinalizationVoting = FinalizationVoting(valid, finalizedHeight, aggregatedEndorsement, conflict)
-
-  protected def mkConflictVoting(conflict: BlockEndorsement*): FinalizationVoting = mkFinalizationVoting(
-    conflict = conflict.toIndexedSeq
-  )
 
   protected def mkConflictEndorsement(
       wavesAcc: KeyPair,
@@ -41,4 +37,14 @@ trait BaseFinalizationSpec extends FreeSpec, WithDomain, WithResourceManager, Ei
 
   protected def bs(height: Int, regularBalance: Long, deposits: Int = 0): BalanceSnapshot =
     BalanceSnapshot(Height(height), regularBalance, 0L, 0L, CommitToGenerationTransaction.DepositInWavelets * deposits)
+
+  extension (self: FinalizationVoting) {
+    def withConflict(
+        wavesAcc: KeyPair,
+        idx: GeneratorIndex,
+        endorsedId: BlockId,
+        finalizedHeight: Height = GenesisBlockHeight,
+        finalizedId: BlockId = TxHelpers.randomBlockId
+    ): FinalizationVoting = self.copy(conflict = self.conflict :+ mkConflictEndorsement(wavesAcc, idx, endorsedId, finalizedHeight, finalizedId))
+  }
 }

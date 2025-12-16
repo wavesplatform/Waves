@@ -43,10 +43,9 @@ class MultipleConflictEndorserSuite extends BaseFinalizationSpec {
       val microBlockWithTxn = d.createMicroBlock(
         signer = Some(validGenerator),
         finalizationVoting = Some(
-          mkConflictVoting(
-            mkConflictEndorsement(conflictGenerator1, conflictGenerator1Idx, block2WithCommitments.id()),
-            mkConflictEndorsement(conflictGenerator2, conflictGenerator2Idx, block2WithCommitments.id())
-          )
+          mkFinalizationVoting()
+            .withConflict(conflictGenerator1, conflictGenerator1Idx, block2WithCommitments.id())
+            .withConflict(conflictGenerator2, conflictGenerator2Idx, block2WithCommitments.id())
         )
       )(TxHelpers.transfer(conflictGenerator1, conflictGenerator2Addr))
       d.appendMicroBlock(microBlockWithTxn)
