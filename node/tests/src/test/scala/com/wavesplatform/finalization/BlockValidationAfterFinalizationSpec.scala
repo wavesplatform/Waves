@@ -6,7 +6,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test.{FreeSpec, produce}
 import com.wavesplatform.transaction.TxHelpers
 
 class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
@@ -20,6 +20,18 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
     )
 
   "should not append an invalid block" - {
+    "voting for finalized block" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        val finalizedHeight = Height(2)
+        val block3WithVotes = d.createBlock(
+          mkFinalizationVoting(valid = Seq(committedGenerator2Idx), finalizedHeight = finalizedHeight)
+            .signed(endorsedId = d.lastBlockId, finalizedId = d.blockchain.blockHeader(finalizedHeight.toInt).value.id(), committedGenerator2)
+        )
+
+        d.appender.appendBlockWithoutFallback(block3WithVotes) should produce("Voting for finalized block")
+      }
+    }.run()
+
     "conflict endorsement" - {
       "finalization height is greater than in voting" in new BaseTest {
         override def continue(d: Domain): Unit = {
@@ -28,8 +40,7 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
               .withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlock.id(), Height(3))
           )
 
-          d.appender.appendBlock(block3WithVotes, requireAppended = false)
-          d.blockchain.height shouldBe 2
+          d.appender.appendBlockWithoutFallback(block3WithVotes) should produce("Finalized height 3 is higher than expected 1")
         }
       }.run()
 
@@ -46,8 +57,7 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
               )
           )
 
-          d.appender.appendBlock(block3WithVotes, requireAppended = false)
-          d.blockchain.height shouldBe 2
+          d.appender.appendBlockWithoutFallback(block3WithVotes) should produce("Contains expected finalized block")
         }
       }.run()
     }

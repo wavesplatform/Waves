@@ -73,8 +73,8 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
           "Invalid signature"
         )
 
-        "an unexpected height" in test(
-          EndorseBlock.from(mk(finalizedHeight = Height(Int.MaxValue))),
+        "an unexpected finalized height" in test(
+          EndorseBlock.from(mk(finalizedHeight = expectedFinalizedHeight.next)),
           "Expected finalized height"
         )
 

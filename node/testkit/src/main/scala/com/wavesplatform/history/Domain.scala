@@ -705,7 +705,7 @@ class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
 
   private val blockEndorser = new BlockEndorser.InMemory(d.blockchain, d.wallet, d.endorsementStorage, allChannelGroup)
 
-  private val appender = BlockAppender(
+  private val appenderWithCatching = BlockAppender(
     d.blockchain,
     d.testTime,
     d.utxPool,
@@ -717,12 +717,28 @@ class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
     appenderScheduler
   )(new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp)), _, snapshot = None)
 
+  private val appenderWithoutCatching = BlockAppender(
+    d.blockchain,
+    d.testTime,
+    d.utxPool,
+    d.posSelector,
+    blockEndorser,
+    appenderScheduler
+  )(_, snapshot = None)
+
   def appendBlock(b: Block, requireAppended: Boolean = true, adjustTestTime: Boolean = true): Unit = {
-    if (adjustTestTime) {
-      val challengingTimestamp = b.header.challengedHeader.fold(Long.MinValue)(_.timestamp)
-      d.testTime.setTime(b.header.timestamp.max(challengingTimestamp))
-    }
-    appender(b).runSyncUnsafe()
+    if (adjustTestTime) adjustTime(b)
+    appenderWithCatching(b).runSyncUnsafe()
     if (requireAppended && d.lastBlockId != b.id()) fail(s"Can't apply block $b, see logs")
+  }
+
+  def appendBlockWithoutFallback(b: Block, adjustTestTime: Boolean = true): Either[ValidationError, BlockApplyResult] = {
+    if (adjustTestTime) adjustTime(b)
+    appenderWithoutCatching(b).runSyncUnsafe()
+  }
+
+  def adjustTime(b: Block): Unit = {
+    val challengingTimestamp = b.header.challengedHeader.fold(Long.MinValue)(_.timestamp)
+    d.testTime.setTime(b.header.timestamp.max(challengingTimestamp))
   }
 }

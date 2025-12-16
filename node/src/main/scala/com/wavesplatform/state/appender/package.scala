@@ -312,7 +312,7 @@ package object appender {
     _ <- Either.raiseWhen(address == minerAddress)("Conflicting endorsement from miner is not allowed")
     _ <- Either.raiseWhen(validEndorsements.contains(address))(s"Block contains both conflicting and valid endorsement from $address")
     _ <- Either.raiseWhen(conflictingEndorsement.finalizedHeight > validFinalizedHeight) {
-      s"Finalized height ${conflictingEndorsement.finalizedHeight} is more than expected $validFinalizedHeight"
+      s"Finalized height ${conflictingEndorsement.finalizedHeight} is higher than expected $validFinalizedHeight"
     }
     finalizedBlock <- blockchain
       .blockHeader(conflictingEndorsement.finalizedHeight.toInt)
@@ -328,8 +328,9 @@ package object appender {
       .fold(Right(())) { fv =>
         for {
           _ <- Either.raiseUnless(blockchain.supportsFinalizationVoting(blockchain.height + 1))(
-            "FinalizationVoting is not allowed before Deterministic Finality feature activation"
+            "Finalization voting is not allowed before Deterministic Finality feature activation"
           )
+          _ <- Either.raiseWhen(fv.finalizedHeight.toInt >= blockchain.height)("Voting for finalized block")
           _ <- Either.raiseWhen(fv.valid.isEmpty && fv.conflict.isEmpty)("Finalization voting contains neither valid nor conflicting endorsements")
           _ <- Either.raiseWhen(fv.valid.size > blockchain.settings.functionalitySettings.maxEndorsements)("Too many endorsements")
           blockGenerationPeriod <- blockchain
