@@ -288,7 +288,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
               valid = Seq(GeneratorIndex(1)),
               finalizedHeight = GenesisBlockHeight,
               aggregatedEndorsement = aggSig,
-              conflict = Vector(mkConflictEndorsement(otherNode1Acc, GeneratorIndex(0), endorsedBlock))
+              conflict = Vector(mkConflictEndorsement(otherNode1Acc, GeneratorIndex(0), endorsedBlock.id()))
             )
           )
         )

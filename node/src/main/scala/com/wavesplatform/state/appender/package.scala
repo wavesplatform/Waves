@@ -299,9 +299,11 @@ package object appender {
     )
 
   private def validateConflictingEndorsement(
+      blockchain: Blockchain,
       commitedGenerators: IndexedSeq[(Address, BlsPublicKey)],
       validEndorsements: Set[Address],
       minerAddress: Address,
+      validFinalizedHeight: Height,
       conflictingEndorsement: BlockEndorsement
   ): Either[String, Unit] = for {
     (address, blsPublicKey) <- commitedGenerators
@@ -309,6 +311,15 @@ package object appender {
       .toRight(s"Invalid endorser index ${conflictingEndorsement.endorserIndex}")
     _ <- Either.raiseWhen(address == minerAddress)("Conflicting endorsement from miner is not allowed")
     _ <- Either.raiseWhen(validEndorsements.contains(address))(s"Block contains both conflicting and valid endorsement from $address")
+    _ <- Either.raiseWhen(conflictingEndorsement.finalizedHeight > validFinalizedHeight) {
+      s"Finalized height ${conflictingEndorsement.finalizedHeight} is more than expected $validFinalizedHeight"
+    }
+    finalizedBlock <- blockchain
+      .blockHeader(conflictingEndorsement.finalizedHeight.toInt)
+      .toRight(s"Can't find block at ${conflictingEndorsement.finalizedHeight}")
+    _ <- Either.raiseWhen(conflictingEndorsement.finalizedId == finalizedBlock.id()) {
+      s"Contains right finalized block: ${conflictingEndorsement.finalizedId}"
+    }
     _ <- Either.raiseUnless(conflictingEndorsement.signatureValid(blsPublicKey))("Invalid endorsement signature")
   } yield ()
 
@@ -330,7 +341,16 @@ package object appender {
           validEndorserAddresses = validEndorsers.view.map(_._1).toSet
           _ <- Either.raiseWhen(validEndorserAddresses.contains(block.header.generator.toAddress))("Miner can't endorse their own block")
           _ <- fv.conflict
-            .traverse(ce => validateConflictingEndorsement(committedGenerators, validEndorserAddresses, block.header.generator.toAddress, ce))
+            .traverse { ce =>
+              validateConflictingEndorsement(
+                blockchain,
+                committedGenerators,
+                validEndorserAddresses,
+                block.header.generator.toAddress,
+                fv.finalizedHeight,
+                ce
+              )
+            }
             .leftMap("Invalid conflicting endorsement: " + _)
           _ <-
             if (validEndorsers.isEmpty)

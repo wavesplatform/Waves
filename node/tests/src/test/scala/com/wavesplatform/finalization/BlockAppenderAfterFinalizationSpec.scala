@@ -51,8 +51,8 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
             strictTime = true,
             finalizationVoting = Some(
               mkConflictVoting(
-                mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock),
-                mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock)
+                mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock.id()),
+                mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock.id())
               )
             )
           )
@@ -97,7 +97,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
             ),
             generator = committedGenerator1,
             strictTime = true,
-            finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock)))
+            finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator2, committedGenerator2Idx, d.lastBlock.id())))
           )
           d.appender.appendBlock(block3)
 
@@ -116,7 +116,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
           txs = Nil,
           generator = committedGenerator2,
           strictTime = true,
-          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock)))
+          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock.id())))
         )
         d.appender.appendBlock(block3WithVotes)
 
@@ -152,7 +152,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
           txs = Nil,
           generator = committedGenerator1,
           strictTime = true,
-          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock)))
+          finalizationVoting = Some(mkConflictVoting(mkConflictEndorsement(committedGenerator1, committedGenerator1Idx, d.lastBlock.id())))
         )
         d.appender.appendBlock(block3WithVotes)
 
