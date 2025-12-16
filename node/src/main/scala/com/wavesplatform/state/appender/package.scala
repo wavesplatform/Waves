@@ -318,7 +318,7 @@ package object appender {
       .blockHeader(conflictingEndorsement.finalizedHeight.toInt)
       .toRight(s"Can't find block at ${conflictingEndorsement.finalizedHeight}")
     _ <- Either.raiseWhen(conflictingEndorsement.finalizedId == finalizedBlock.id()) {
-      s"Contains right finalized block: ${conflictingEndorsement.finalizedId}"
+      s"Contains expected finalized block: ${conflictingEndorsement.finalizedId}"
     }
     _ <- Either.raiseUnless(conflictingEndorsement.signatureValid(blsPublicKey))("Invalid endorsement signature")
   } yield ()

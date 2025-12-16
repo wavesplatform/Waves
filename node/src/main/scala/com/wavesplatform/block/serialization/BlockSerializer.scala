@@ -4,7 +4,7 @@ import com.google.common.io.ByteStreams.newDataOutput
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.{NgBlockVersion, ProtoBlockVersion, RewardBlockVersion}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.{Block, BlockHeader, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.protobuf.block.PBBlocks
@@ -59,6 +59,25 @@ object BlockHeaderSerializer {
         case None     => JsObject.empty
       }
 
+    def createFinalizationJson(finalizationVoting: Option[FinalizationVoting]): JsObject = finalizationVoting match {
+      case None => JsObject.empty
+      case Some(fv) =>
+        val builder = Json.newBuilder
+        if (fv.valid.nonEmpty) builder += "endorserIndexes"                                 -> GeneratorIndex.toInts(fv.valid)
+        if (fv.aggregatedEndorsement.isDefined) builder += "aggregatedEndorsementSignature" -> fv.aggregatedEndorsement.base58
+        if (fv.finalizedHeight > Height(0)) builder += "finalizedHeight"                    -> fv.finalizedHeight
+        if (fv.conflict.nonEmpty) builder += "conflictEndorsements" -> fv.conflict.map { c =>
+          Json.obj(
+            "endorserIndex"    -> c.endorserIndex.toInt,
+            "finalizedBlockId" -> c.finalizedId.toString,
+            "finalizedHeight"  -> c.finalizedHeight.toInt,
+            "signature"        -> c.signature.base58
+          )
+        }
+
+        Json.obj("finalizationVoting" -> builder.result())
+    }
+
     val consensusJson =
       Json.obj(
         "nxt-consensus" -> Json.obj(
@@ -78,33 +97,18 @@ object BlockHeaderSerializer {
       blockHeader.challengedHeader match {
         case Some(ch) =>
           Json.obj(
-            "challengedHeader" -> (Json.obj(
-              "headerSignature" -> ch.headerSignature.toString
-            ) ++ createFeaturesJson(ch.featureVotes) ++ createGeneratorJson(ch.generator) ++ createRewardVoteJson(
-              ch.rewardVote
-            ) ++ createStateHashJson(ch.stateHash))
+            "challengedHeader" -> {
+              Json.obj(
+                "headerSignature" -> ch.headerSignature.toString
+              ) ++ createFeaturesJson(ch.featureVotes) ++ createGeneratorJson(ch.generator) ++ createRewardVoteJson(
+                ch.rewardVote
+              ) ++ createStateHashJson(ch.stateHash) ++ createFinalizationJson(ch.finalizationVoting)
+            }
           )
         case None => JsObject.empty
       }
 
-    val finalizationHeaderJson = blockHeader.finalizationVoting match {
-      case None => JsObject.empty
-      case Some(fh) =>
-        val builder = Json.newBuilder
-        if (fh.valid.nonEmpty) builder += "endorserIndexes"                                 -> GeneratorIndex.toInts(fh.valid)
-        if (fh.aggregatedEndorsement.isDefined) builder += "aggregatedEndorsementSignature" -> fh.aggregatedEndorsement.base58
-        if (fh.finalizedHeight > Height(0)) builder += "finalizedHeight"                    -> fh.finalizedHeight
-        if (fh.conflict.nonEmpty) builder += "conflictEndorsements" -> fh.conflict.map { x =>
-          Json.obj(
-            "endorserIndex"    -> x.endorserIndex.toInt,
-            "finalizedBlockId" -> x.finalizedId.toString,
-            "finalizedHeight"  -> x.finalizedHeight.toInt,
-            "signature"        -> x.signature.base58
-          )
-        }
-
-        Json.obj("finalizationVoting" -> builder.result())
-    }
+    val finalizationHeaderJson = createFinalizationJson(blockHeader.finalizationVoting)
 
     Json.obj(
       "version"   -> blockHeader.version,
