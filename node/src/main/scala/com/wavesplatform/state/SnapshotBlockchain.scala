@@ -274,9 +274,6 @@ case class SnapshotBlockchain(
       }
     }
   }
-
-  override def currentGeneratorBalances(): Seq[(Address, Long)] =
-    latestGeneratorBalances.fold(inner.currentGeneratorBalances())(_.map { case (addr, _, b) => addr -> b })
 }
 
 object SnapshotBlockchain {

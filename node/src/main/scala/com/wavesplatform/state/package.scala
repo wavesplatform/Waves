@@ -6,6 +6,7 @@ import com.google.common.primitives.Ints
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.bls.BlsPublicKey
+import com.wavesplatform.state.GeneratorIndex
 import com.wavesplatform.transaction.BlockchainUpdater
 import play.api.libs.json.*
 
@@ -74,7 +75,9 @@ package object state {
     given Conversion[TxNum, Ordered[TxNum]] = scala.math.Ordered.orderingToOrdered(_)
   }
 
-  type GeneratorBalances = Seq[(Address, BlsPublicKey, Long)]
+  case class GeneratorInfo(index: GeneratorIndex, address: Address, blsPublicKey: BlsPublicKey, balance: Long)
+
+  type GeneratorBalances = Seq[GeneratorInfo]
 
   val GenesisBlockHeight = Height(1)
 

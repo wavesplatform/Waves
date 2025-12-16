@@ -106,7 +106,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
       .when(*, *, *, *, *, *, *)
       .onCall { (block, _, _, _, _, _, _) =>
         minedBlock = block
-        Right(Applied(Nil, 0))
+        Right(Applied(Nil, 0, Seq.empty))
       }
       .once()
     (blockchainUpdater.balanceSnapshots).when(*, *, *).returning(Seq(BalanceSnapshot(Height(1), ENOUGH_AMT, 0, 0, 0)))

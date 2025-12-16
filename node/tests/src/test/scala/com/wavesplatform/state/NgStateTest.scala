@@ -23,7 +23,7 @@ class NgStateTest extends PropSpec {
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
     var ng = NgState(block, StateSnapshot.empty, 0L, 0L, ByteStr.empty, Set.empty, None, block.header.generationSignature, Map.empty)
-    microBlocks.foreach(m => ng = ng.append(m, StateSnapshot.empty, 0L, 0L, 0L, ByteStr.empty))
+    microBlocks.foreach(m => ng = ng.append(m, StateSnapshot.empty, 0L, 0L, 0L, ByteStr.empty, None, Seq.empty))
 
     ng.snapshotOf(microBlocks.last.totalResBlockSig)
     microBlocks.foreach { m =>
@@ -38,7 +38,7 @@ class NgStateTest extends PropSpec {
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
     var ng = NgState(block, StateSnapshot.empty, 0L, 0L, ByteStr.empty, Set.empty, None, block.header.generationSignature, Map.empty)
-    microBlocks.foreach(m => ng = ng.append(m, StateSnapshot.empty, 0L, 0L, 0L, ByteStr.empty))
+    microBlocks.foreach(m => ng = ng.append(m, StateSnapshot.empty, 0L, 0L, 0L, ByteStr.empty, None, Seq.empty))
 
     ng.bestLiquidBlock.id() shouldBe microBlocks.last.totalResBlockSig
 
@@ -54,7 +54,7 @@ class NgStateTest extends PropSpec {
     var ng = NgState(block, StateSnapshot.empty, 0L, 0L, ByteStr.empty, Set.empty, None, block.header.generationSignature, Map.empty)
 
     microBlocks.foldLeft(1000) { case (thisTime, m) =>
-      ng = ng.append(m, StateSnapshot.empty, 0L, 0L, thisTime, ByteStr.empty)
+      ng = ng.append(m, StateSnapshot.empty, 0L, 0L, thisTime, ByteStr.empty, None, Seq.empty)
       thisTime + 50
     }
 
@@ -73,7 +73,7 @@ class NgStateTest extends PropSpec {
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
     var ng = NgState(block, StateSnapshot.empty, 0L, 0L, ByteStr.empty, Set.empty, None, block.header.generationSignature, Map.empty)
-    microBlocks.foreach(m => ng = ng.append(m, StateSnapshot.empty, 1L, 0L, 0L, ByteStr.empty))
+    microBlocks.foreach(m => ng = ng.append(m, StateSnapshot.empty, 1L, 0L, 0L, ByteStr.empty, None, Seq.empty))
 
     ng.snapshotOf(block.id()).map(_._3) shouldBe Some(0L)
     microBlocks.zipWithIndex.foreach { case (m, i) =>

@@ -142,7 +142,7 @@ object MinerChallengeSimulator {
       miner.forgeBlock(bestMiner) match {
         case ForgeAttemptResult.Success(block, _) =>
           blockAppender(block, None).runSyncUnsafe() match {
-            case Right(BlockApplyResult.Applied(_, score)) => Some(score)
+            case Right(BlockApplyResult.Applied(score = score)) => Some(score)
             case other =>
               println(s"Error appending block: $other")
               quit = true

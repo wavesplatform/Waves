@@ -67,7 +67,6 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def lastStateHash(refId: Option[ByteStr]): BlockId                                           = ???
       override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)]           = ???
       override def conflictGenerators(at: GenerationPeriod): ConflictGenerators                             = ???
-      override def currentGeneratorBalances(): Seq[(Address, Long)]                                         = ???
     }
 
     val tx = TransferTransaction.selfSigned(1.toByte, accountGen.sample.get, accountGen.sample.get.toAddress, Waves, 1, Waves, 1, ByteStr.empty, 0)

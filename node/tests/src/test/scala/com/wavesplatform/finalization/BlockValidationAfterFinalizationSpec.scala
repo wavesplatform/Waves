@@ -41,7 +41,7 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
               .withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlock.id(), GenesisBlockHeight)
           )
 
-          d.appender.appendBlockWithoutFallback(block3WithVotes) should produce("Duplicate conflicting endorser indexes in FinalizationVoting")
+          d.appender.appendBlockWithoutFallback(block3WithVotes) should produce("Duplicate conflicting endorser indexes")
         }
       }.run()
 

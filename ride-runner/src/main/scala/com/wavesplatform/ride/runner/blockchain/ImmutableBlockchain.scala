@@ -202,8 +202,6 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = ConflictGenerators.empty
 
-  override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
-
   override def lastStateHash(refId: Option[BlockId]): BlockId = ???
 
   // Ride: transferTransactionById

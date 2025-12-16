@@ -37,7 +37,7 @@ object EndorsementStorage {
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = None
   }
 
-  class InMemory(blockAtHeight: (BlockId, Height) => Boolean) extends EndorsementStorage with StrictLogging {
+  class InMemory(blockAtHeight: (BlockId, Height) => Boolean) extends EndorsementStorage, StrictLogging {
     private var currentFilter = none[EndorsementFilter] // TODO: remove option?
 
     private val sharedWithNeighbors     = mutable.HashSet.empty[EndorseBlock]

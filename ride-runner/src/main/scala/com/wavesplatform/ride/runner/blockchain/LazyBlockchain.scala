@@ -207,8 +207,6 @@ class LazyBlockchain[TagT] private (
 
   override def conflictGenerators(at: GenerationPeriod): ConflictGenerators = ConflictGenerators.empty
 
-  override def currentGeneratorBalances(): Seq[(Address, Long)] = Seq.empty
-
   private def getTransactionHeight(id: TransactionId): Option[Height] = db.directReadWrite { implicit ctx =>
     memCache.getOrLoad(MemCacheKey.Transaction(id)) { key =>
       val cached = diskCaches.transactions.getHeight(key.id)

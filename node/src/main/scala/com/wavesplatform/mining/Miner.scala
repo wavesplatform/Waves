@@ -316,7 +316,7 @@ class MinerImpl(
             case Left(err) =>
               Task.raiseError(new RuntimeException(err.toString))
 
-            case Right(Applied(_, score)) =>
+            case Right(Applied(score = score)) =>
               log.debug(s"Forged and applied $block with cumulative score $score")
               BlockStats.mined(block, blockchainUpdater.height)
               if (blockchainUpdater.isLastBlockId(block.id())) {

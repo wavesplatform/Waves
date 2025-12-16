@@ -19,7 +19,7 @@ import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.protobuf.{PBSnapshots, toPublicKey, toByteStr, toByteString}
+import com.wavesplatform.protobuf.{PBSnapshots, toByteStr, toByteString, toPublicKey}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -359,13 +359,17 @@ package object database {
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ balance.prevHeight.toByteArray
 
-  def readGeneratorBalances(data: Array[Byte]): Seq[Long] =
-    data
-      .grouped(Longs.BYTES) // One entry (balance) size
-      .map(Longs.fromByteArray)
-      .toSeq
+  def readGeneratorBalances(data: Array[Byte]): Seq[(GeneratorIndex, Long)] = {
+    val bs = ByteBuffer.wrap(data)
+    Seq.fill(data.length / 12)(GeneratorIndex(bs.getInt) -> bs.getLong)
+  }
 
-  def writeGeneratorBalances(data: Seq[Long]): Array[Byte] = data.view.flatMap(Longs.toByteArray).toArray
+  def writeGeneratorBalances(data: Seq[(GeneratorIndex, Long)]): Array[Byte] =
+    data
+      .foldLeft(ByteBuffer.allocate(data.length * 12)) { case (bs, (idx, balance)) =>
+        bs.putInt(idx.toInt).putLong(balance)
+      }
+      .array()
 
   def readCommittedGenerators(data: Array[Byte]): Seq[(AddressId, BlsPublicKey)] = {
     val addressSize = Longs.BYTES

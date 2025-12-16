@@ -293,6 +293,6 @@ object Keys {
       writeCommitmentTransactions
     )
 
-  def generatorBalances(at: Height, cfh: RDB.ApiHandle): Key[Option[Seq[Long]]] =
+  def generatorBalances(at: Height, cfh: RDB.ApiHandle): Key[Option[Seq[(GeneratorIndex, Long)]]] =
     Key.opt(GeneratorBalances, h(at), readGeneratorBalances, writeGeneratorBalances, Some(cfh.handle))
 }

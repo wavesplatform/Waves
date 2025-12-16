@@ -47,13 +47,17 @@ object CommonGeneratorsApi {
 
         val addresses = ro.multiGet(addressIds.map(Keys.idToAddress), Address.AddressLength)
         val balances =
-          if (at.toInt == blockchain.height) blockchain.currentGeneratorBalances().map { case (_, b) => b }
-          else ro.get(Keys.generatorBalances(at, rdb.apiHandle)).getOrElse(Seq.empty) // TODO: fill with None if disabled
+          if (at.toInt == blockchain.height) blockchain.currentGeneratorBalances.fold(Map.empty)(_.map(x => x.index -> x.balance).toMap)
+          else {
+            // TODO: fill with None if disabled
+            val fromRdb = ro.get(Keys.generatorBalances(at, rdb.apiHandle)).getOrElse(Seq.empty)
+            fromRdb.toMap
+          }
 
         val conflictKey       = Keys.conflictGenerators(period, at)
         val conflictKeyPrefix = conflictKey.keyBytes.dropRight(Ints.BYTES) // Drop height
 
-        val conflict =
+        val conflict = {
           if (at == Height(blockchain.height)) blockchain.conflictGenerators(period)
           else {
             var conflict = ConflictGenerators.empty
@@ -67,29 +71,28 @@ object CommonGeneratorsApi {
                 true
               }
             }
+
             conflict
           }
+        }
 
         (addressIds, addresses, blsPks, txnIds, balances, conflict)
       }
 
       if (
         addressIds.size == addresses.size &&
-        addresses.size == balances.size &&
-        balances.size == blsPks.size &&
+        addresses.size == blsPks.size &&
         blsPks.size == txIds.size
-      )
+      ) {
         addressIds
           .lazyZip(addresses)
-          .lazyZip(balances)
-          .lazyZip(blsPks)
           .lazyZip(txIds)
           .lazyZip(Iterator.from(0).take(addressIds.size).map(GeneratorIndex(_)).to(Iterable))
-          .collect { case ((_, Some(address), balance, _), txnId, idx) => // TODO: address=None ?
-            GeneratorEntry(address, balance, txnId, conflict.heightOf(idx))
+          .collect { case (_, Some(address), txnId, idx) => // TODO: address=None ?
+            GeneratorEntry(address, balances.getOrElse(idx, 0L), txnId, conflict.heightOf(idx))
           }
           .toSeq
-      else {
+      } else {
         log.warn(s"Different size: addressIds=${addressIds.size}, addresses=${addresses.size}, balances=${balances.size}, blsPks=${blsPks.size}")
         Seq.empty
       }

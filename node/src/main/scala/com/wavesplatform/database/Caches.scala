@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.common.collect.ArrayListMultimap
 import com.google.protobuf.ByteString
+import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -25,7 +26,7 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
-abstract class Caches extends Blockchain, Storage {
+abstract class Caches extends Blockchain, Storage, StrictLogging {
   import Caches.*
 
   val dbSettings: DBSettings
@@ -247,16 +248,6 @@ abstract class Caches extends Blockchain, Storage {
     }
   protected def loadConflictGenerators(at: GenerationPeriod): ConflictGenerators
 
-  @volatile
-  private var currentGeneratorBalancesCache = Option.empty[Seq[(Address, Long)]]
-  override def currentGeneratorBalances(): Seq[(Address, Long)] =
-    currentGeneratorBalancesCache.getOrElse {
-      val r = loadGeneratorBalances()
-      currentGeneratorBalancesCache = Some(r)
-      r
-    }
-  protected def loadGeneratorBalances(): Seq[(Address, Long)]
-
   protected def doAppend(
       blockMeta: PBBlockMeta,
       snapshot: StateSnapshot,
@@ -270,7 +261,7 @@ abstract class Caches extends Blockchain, Storage {
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
-      generatorBalances: Seq[(Address, Long)],
+      generatorBalances: GeneratorBalances,
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey)],
       commitmentTransactionIds: Seq[TransactionId],
       conflictGenerators: Seq[GeneratorIndex],
@@ -390,9 +381,6 @@ abstract class Caches extends Blockchain, Storage {
           }
     }
 
-    val updatedCurrentGeneratorBalances = generatorBalances.map { case (addr, _, balance) => addr -> balance }
-    currentGeneratorBalancesCache = Some(updatedCurrentGeneratorBalances)
-
     val updatedBalanceNodes = for {
       case ((address, asset), amount) <- snapshot.balances
       key         = (address, asset)
@@ -442,7 +430,7 @@ abstract class Caches extends Blockchain, Storage {
     for ((assetId, sponsorship) <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
     for ((alias, address) <- snapshot.aliases) stateHash.addAlias(address, alias.name)
     snapshot.nextCommittedGenerators.foreach(stateHash.addNextCommittedGenerator)
-    stateHash.addCommittedGeneratorBalances(generatorBalances.map(_._3))
+    stateHash.addCommittedGeneratorBalances(generatorBalances.sortBy(_.index).map(_.balance))
 
     doAppend(
       newMeta,
@@ -457,7 +445,7 @@ abstract class Caches extends Blockchain, Storage {
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       newFinalizedHeight,
-      updatedCurrentGeneratorBalances,
+      generatorBalances,
       nextCommittedGenerators,
       commitmentTransactionIds,
       conflictGenerators,
@@ -507,7 +495,6 @@ abstract class Caches extends Blockchain, Storage {
 
       committedGeneratorsCache = Map.empty
       conflictGeneratorsCache = Map.empty
-      currentGeneratorBalancesCache = None
 
       discardedBlocks
     }

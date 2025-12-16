@@ -55,25 +55,31 @@ package object appender {
       currentPeriod = blockchain.generationPeriodOf(blockHeight)
       minerAddress  = newBlock.header.generator.toAddress
 
-      committedGenerators = currentPeriod.fold(Nil)(blockchain.committedGenerators)
-      conflictGenerators  = currentPeriod.fold(ConflictGenerators.empty)(blockchain.conflictGenerators).upTo(blockHeight)
+      conflictGenerators = currentPeriod.fold(ConflictGenerators.empty)(blockchain.conflictGenerators).upTo(blockHeight)
+      validGenerators = currentPeriod
+        .fold(Nil)(blockchain.committedGenerators)
+        .view
+        .map { case v @ (address, _) => v -> GeneratingBalanceProvider.balance(blockchain, address) }
+        .zipWithIndex
+        .collect {
+          case (((address, blsPk), balance), idx)
+              if !conflictGenerators.contains(GeneratorIndex(idx)) && blockchain.isGeneratingBalanceValid(
+                parentHeight.toInt,
+                newBlock,
+                balance
+              ) =>
+            GeneratorInfo(GeneratorIndex(idx), address, blsPk, balance)
+        }
+        .toSeq
 
-      generatorBalances = committedGenerators.map { case (addr, blsPk) =>
-        val balance = GeneratingBalanceProvider.balance(blockchain, addr, Some(parentBlockId))
-        (addr, blsPk, balance)
-      }
+      generatorSet = validGenerators.view.map(_.address).toSet
 
-      generatorSet = generatorBalances.view.zipWithIndex.collect {
-        case ((addr, _, balance), idx)
-            if !conflictGenerators.contains(GeneratorIndex(idx)) && blockchain.isEffectiveBalanceValid(parentHeight.toInt, newBlock, balance) =>
-          addr
-      }.toSet
       // If no one commited, fallback to classic
-      _ <- Either.raiseWhen(generatorSet.nonEmpty && !generatorSet.contains(minerAddress)) {
+      _ <- Either.raiseWhen(validGenerators.nonEmpty && !generatorSet.contains(minerAddress)) {
         s"$minerAddress is not allowed to generate a block, allowed: ${generatorSet.mkString(", ")}. " +
-          s"If it is your node: commit to generation for a next period"
+          s"If this is your node: commit to generation for the next period"
       }
-    } yield (parentHeight, generatorBalances)
+    } yield (parentHeight, validGenerators)
 
     r.leftMap(GenericError(_))
   }
@@ -89,9 +95,9 @@ package object appender {
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] =
     for {
       data <- findBlockAndGetGenerators(blockchainUpdater, block)
-      hitSource <-
-        if (verify) validateBlock(blockchainUpdater, pos, time)(block, data.parentHeight)
-        else pos.validateGenerationSignature(block)
+      (hitSource, balances) <-
+        if (verify) validateBlock(blockchainUpdater, pos, time, data.generatorBalances)(block, data.parentHeight)
+        else pos.validateGenerationSignature(block).map(_ -> Seq.empty)
       applyResult <-
         metrics.appendBlock
           .measureSuccessful(
@@ -100,14 +106,14 @@ package object appender {
                 block,
                 hitSource,
                 snapshot.map(responseToSnapshot(block, Height(blockchainUpdater.height + 1))),
-                data.generatorBalances,
+                balances,
                 challengedHitSource = None,
                 verify,
                 txSignParCheck
               )
           )
           .map {
-            case res @ Applied(discardedDiffs, _) =>
+            case res @ Applied(discardedDiffs = discardedDiffs) =>
               // TODO: move UTX cleanup from appender
               if (block.transactionData.nonEmpty) {
                 utx.removeAll(block.transactionData)
@@ -134,15 +140,15 @@ package object appender {
     } else {
       for {
         data <- findBlockAndGetGenerators(blockchainUpdater, block)
-        hitSource <-
-          if (verify) validateBlock(blockchainUpdater, pos, time)(block, data.parentHeight)
-          else pos.validateGenerationSignature(block)
+        (hitSource, balances) <-
+          if (verify) validateBlock(blockchainUpdater, pos, time, data.generatorBalances)(block, data.parentHeight)
+          else pos.validateGenerationSignature(block).map(_ -> Seq.empty)
         applyResult <- metrics.appendBlock.measureSuccessful(
           blockchainUpdater.processBlock(
             block,
             hitSource,
             snapshot.map(responseToSnapshot(block, Height(blockchainUpdater.height + 1))),
-            data.generatorBalances,
+            balances,
             challengedHitSource = None,
             verify,
             txSignParCheck
@@ -162,7 +168,7 @@ package object appender {
       txSignParCheck: Boolean
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] =
     processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block, snapshot).map {
-      case (res @ Applied(discardedDiffs, _), _) =>
+      case (res @ Applied(discardedDiffs = discardedDiffs), _) =>
         if (block.transactionData.nonEmpty) {
           utx.removeAll(block.transactionData)
           log.trace(
@@ -186,13 +192,13 @@ package object appender {
     for {
       data <- findBlockAndGetGenerators(blockchainUpdater, challengedBlock)
 
-      challengedHitSource <-
-        if (verify) validateBlock(blockchainUpdater, pos, time)(challengedBlock, data.parentHeight)
-        else pos.validateGenerationSignature(challengedBlock)
+      (challengedHitSource, _) <-
+        if (verify) validateBlock(blockchainUpdater, pos, time, data.generatorBalances)(challengedBlock, data.parentHeight)
+        else pos.validateGenerationSignature(challengedBlock).map(_ -> Seq.empty)
 
-      hitSource <-
-        if (verify) validateBlock(blockchainUpdater, pos, time)(block, data.parentHeight)
-        else pos.validateGenerationSignature(block)
+      (hitSource, balances) <-
+        if (verify) validateBlock(blockchainUpdater, pos, time, data.generatorBalances)(block, data.parentHeight)
+        else pos.validateGenerationSignature(block).map(_ -> Seq.empty)
 
       applyResult <-
         metrics.appendBlock
@@ -201,7 +207,7 @@ package object appender {
               block,
               hitSource,
               snapshot.map(responseToSnapshot(block, Height(blockchainUpdater.height + 1))),
-              data.generatorBalances,
+              balances,
               Some(challengedHitSource),
               verify,
               txSignParCheck
@@ -213,17 +219,17 @@ package object appender {
   /** @return
     *   Hit source
     */
-  private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time)(
+  private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time, generatorBalances: GeneratorBalances)(
       block: Block,
       parentHeight: Height
-  ): Either[ValidationError, ByteStr] =
+  ): Either[ValidationError, (ByteStr, GeneratorBalances)] =
     for {
       _ <- Miner.isAllowedForMining(block.sender.toAddress, blockchainUpdater).leftMap(BlockAppendError(_, block))
       r <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime())(block, parentHeight)
       _ <- validateStateHash(block, blockchainUpdater)
       _ <- validateChallengedHeader(block, blockchainUpdater)
-      _ <- validateFinalizationVoting(block, blockchainUpdater)
-    } yield r
+      b <- validateFinalizationVoting(block, blockchainUpdater, generatorBalances)
+    } yield (r, b)
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long)(
       block: Block,
@@ -258,7 +264,7 @@ package object appender {
     val parentBlockId = block.header.reference
     val balance       = blockchain.generatingBalance(minerAddress, Some(parentBlockId))
 
-    if (blockchain.isEffectiveBalanceValid(parentHeight.toInt, block, balance))
+    if (blockchain.isGeneratingBalanceValid(parentHeight.toInt, block, balance))
       Either.right(
         balance + block.header.challengedHeader.map(ch => blockchain.generatingBalance(ch.generator.toAddress, Some(parentBlockId))).getOrElse(0L)
       )
@@ -303,12 +309,17 @@ package object appender {
       commitedGenerators: IndexedSeq[(Address, BlsPublicKey)],
       validEndorsements: Set[Address],
       minerAddress: Address,
-      validFinalizedHeight: Height,
+      generatorsWithEnoughBalance: Set[GeneratorIndex],
+      validFinalizedHeight: Height
+  )(
       conflictingEndorsement: BlockEndorsement
   ): Either[String, Unit] = for {
     (address, blsPublicKey) <- commitedGenerators
       .lift(conflictingEndorsement.endorserIndex.toInt)
-      .toRight(s"Invalid endorser index ${conflictingEndorsement.endorserIndex}")
+      .toRight(s"Invalid conflicting endorser index ${conflictingEndorsement.endorserIndex}")
+    _ <- Either.raiseUnless(generatorsWithEnoughBalance.contains(conflictingEndorsement.endorserIndex))(
+      s"Conflicting endorsement sender $address has insufficient balance"
+    )
     _ <- Either.raiseWhen(address == minerAddress)("Conflicting endorsement from miner is not allowed")
     _ <- Either.raiseWhen(validEndorsements.contains(address))(s"Block contains both conflicting and valid endorsement from $address")
     _ <- Either.raiseWhen(conflictingEndorsement.finalizedHeight > validFinalizedHeight) {
@@ -320,44 +331,56 @@ package object appender {
     _ <- Either.raiseWhen(conflictingEndorsement.finalizedId == finalizedBlock.id()) {
       s"Contains expected finalized block: ${conflictingEndorsement.finalizedId}"
     }
-    _ <- Either.raiseUnless(conflictingEndorsement.signatureValid(blsPublicKey))("Invalid endorsement signature")
+    _ <- Either.raiseUnless(conflictingEndorsement.signatureValid(blsPublicKey))(s"Invalid conflicting endorsement signature from $address")
   } yield ()
 
-  def validateFinalizationVoting(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
+  def validateFinalizationVoting(
+      block: Block,
+      blockchain: Blockchain,
+      validGeneratorBalances: GeneratorBalances
+  ): Either[ValidationError, GeneratorBalances] =
     block.header.finalizationVoting
-      .fold(Right(())) { fv =>
+      .fold(Right(validGeneratorBalances)) { fv =>
         for {
           _ <- Either.raiseUnless(blockchain.supportsFinalizationVoting(blockchain.height + 1))(
             "Finalization voting is not allowed before Deterministic Finality feature activation"
           )
+          _ <- Either.raiseWhen(block.header.challengedHeader.nonEmpty && block.header.finalizationVoting.nonEmpty)(
+            "Finalization voting is not allowed in challenging block"
+          )
           _ <- Either.raiseWhen(fv.finalizedHeight.toInt >= blockchain.height)("Voting for finalized block")
           _ <- Either.raiseWhen(fv.valid.isEmpty && fv.conflict.isEmpty)("Finalization voting contains neither valid nor conflicting endorsements")
-          _ <- Either.raiseWhen(fv.valid.size > blockchain.settings.functionalitySettings.maxEndorsements)("Too many endorsements")
+          _ <- Either.raiseWhen(fv.valid.size > blockchain.settings.functionalitySettings.maxEndorsements)("Too many valid endorsements")
+          _ <- Either.raiseWhen(fv.valid.toSet.size != fv.valid.length)("Duplicate valid endorser indexes")
+          _ <- Either.raiseWhen(fv.conflict.groupBy(_.endorserIndex).size != fv.conflict.length)("Duplicate conflicting endorser indexes")
+
+          generatorsWithEnoughBalance = validGeneratorBalances.view.map(_._1).toSet
           blockGenerationPeriod <- blockchain
             .generationPeriodOf(Height(blockchain.height + 1))
             .toRight(s"No period for height ${blockchain.height + 1}")
-          committedGenerators = blockchain.committedGenerators(blockGenerationPeriod)
-          _              <- Either.raiseWhen(fv.valid.toSet.size != fv.valid.length)("Duplicate valid endorser indexes in FinalizationVoting")
-          validEndorsers <- fv.valid.traverse(gi => committedGenerators.lift(gi.toInt).toRight(s"Invalid endorser index: $gi"))
+          allCommittedGenerators = blockchain.committedGenerators(blockGenerationPeriod)
+
+          validEndorsers <- fv.valid.traverse(gi => allCommittedGenerators.lift(gi.toInt).toRight(s"Invalid endorser index: $gi"))
+          _ <- fv.valid.traverse { idx =>
+            Either.raiseUnless(generatorsWithEnoughBalance.contains(idx))(s"Valid endorsement sender $idx has insufficient balance")
+          }
           validEndorserAddresses = validEndorsers.view.map(_._1).toSet
           _ <- Either.raiseWhen(validEndorserAddresses.contains(block.header.generator.toAddress))("Miner can't endorse their own block")
-          _ <- Either.raiseWhen(fv.conflict.map(_.endorserIndex).toSet.size != fv.conflict.length) {
-            "Duplicate conflicting endorser indexes in FinalizationVoting"
-          }
           _ <- fv.conflict
-            .traverse { ce =>
+            .traverse(
               validateConflictingEndorsement(
                 blockchain,
-                committedGenerators,
+                allCommittedGenerators,
                 validEndorserAddresses,
                 block.header.generator.toAddress,
-                fv.finalizedHeight,
-                ce
+                generatorsWithEnoughBalance,
+                fv.finalizedHeight
               )
-            }
-            .leftMap("Invalid conflicting endorsement: " + _)
+            )
+          conflictingEndorsers            = fv.conflict.map(_.endorserIndex).toSet
+          nonConflictingGeneratorBalances = validGeneratorBalances.filterNot(x => conflictingEndorsers.contains(x.index))
           _ <-
-            if (validEndorsers.isEmpty)
+            if (fv.valid.isEmpty)
               Either.raiseUnless(fv.aggregatedEndorsement.arr.isEmpty)(
                 "No endorsements are included, but aggregated endorsement signature is non-empty"
               )
@@ -373,7 +396,7 @@ package object appender {
                       validEndorsers.view.map(_._2.arr)
                     )
               } yield ()
-        } yield ()
+        } yield nonConflictingGeneratorBalances
       }
       .leftMap(s => BlockAppendError(s, block))
 

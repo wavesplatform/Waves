@@ -116,7 +116,7 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
       ),
       Json.obj(
         "address"        -> generator2.toAddress.toString,
-        "balance"        -> (initBalance - depositAndFee),
+        "balance"        -> 0,
         "transactionId"  -> txns.last.id().toString,
         "conflictHeight" -> conflictEndorsementHeight
       )
