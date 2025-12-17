@@ -76,7 +76,7 @@ object StateSnapshotJson {
   given OWrites[AssetScriptJson] = Json.writes[AssetScriptJson]
 
   case class AccountScriptJson(publicKey: PublicKey, script: Option[Script], verifierComplexity: Long)
-  given Aux[MacroOptions]  = JsonConfiguration(optionHandlers = WritesNull)
+  given Aux[MacroOptions]          = JsonConfiguration(optionHandlers = WritesNull)
   given OWrites[AccountScriptJson] = Json.writes
 
   case class SponsorshipJson(id: IssuedAsset, minSponsoredAssetFee: Long)

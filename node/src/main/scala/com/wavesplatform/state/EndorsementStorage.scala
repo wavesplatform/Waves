@@ -93,7 +93,6 @@ object EndorsementStorage {
         }
     }
 
-    // TODO: if not activated
     override def startVoting(filter: EndorsementFilter): Boolean = synced {
       val isNewVoting = !currentFilter.exists(_.sameVoting(filter))
       if (isNewVoting) {

@@ -34,7 +34,7 @@ class TransactionSnapshotsRouteSpec
     with EthHelpers
     with SharedSchedulerMixin {
 
-  override def settings: WavesSettings = DeterministicFinality
+  override def settings: WavesSettings               = DeterministicFinality
   override def genesisBalances: Seq[AddrWithBalance] = AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
 
   private val transactionsApiRoute = new TransactionsApiRoute(
@@ -330,7 +330,7 @@ class TransactionSnapshotsRouteSpec
         },{
           "address":"${defaultSigner.toAddress}",
           "asset":null,
-          "balance":${ENOUGH_AMT + 200_000_000 + (setScriptTx.fee.value + removeScriptTx.fee.value  + commitToGenerationTx.fee.value) * 2 / 5 - (invokeTx.fee.value + issueTx.fee.value + aliasTx.fee.value + exchangeTx.fee.value) * 3 / 5}
+          "balance":${ENOUGH_AMT + 200_000_000 + (setScriptTx.fee.value + removeScriptTx.fee.value + commitToGenerationTx.fee.value) * 2 / 5 - (invokeTx.fee.value + issueTx.fee.value + aliasTx.fee.value + exchangeTx.fee.value) * 3 / 5}
         }],
         "nextCommittedGenerators":[{
           "publicKey":"${commitToGenerationTx.sender}",

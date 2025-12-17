@@ -1598,7 +1598,6 @@ class RocksDBWriter(
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] =
     readOnly(_.get(Keys.maliciousMinerBanHeights(address.bytes))).map(_.toInt)
 
-  // TODO: use rawCommittedGenerators?
   override def loadCommittedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
     val approxGenerators = settings.functionalitySettings.maxEndorsements // Rough buffer size
     val rawGenerators    = new mutable.ArrayBuffer[BlsPublicKey](approxGenerators)
@@ -1626,19 +1625,6 @@ class RocksDBWriter(
       }
       .toIndexedSeq
   }
-
-  // private def rawCommittedGenerators(at: GenerationPeriod): Map[BlsPublicKey, AddressId] =
-  //   rdb.db.readOnly { ro =>
-  //     val key = Keys.committedGenerators(at, Height(0))
-  //     var r   = Map.empty[BlsPublicKey, AddressId]
-  //     ro.iterateOver(key.keyBytes.dropRight(Ints.BYTES)) { dbEntry => // Drop height
-  //       val xs = key.parse(dbEntry.getValue).getOrElse(Seq.empty)
-  //       xs.foreach { (addressId, blsPK, _) =>
-  //         r += blsPK -> addressId
-  //       }
-  //     }
-  //     r
-  //   }
 
   override def loadConflictGenerators(at: GenerationPeriod): ConflictGenerators = {
     val key = Keys.conflictGenerators(at, at.start)
