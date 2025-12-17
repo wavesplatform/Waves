@@ -1,21 +1,23 @@
 package com.wavesplatform.http
 
-import org.apache.pekko.http.scaladsl.model.ContentTypes.`application/json`
-import org.apache.pekko.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
-import org.apache.pekko.http.scaladsl.model.{FormData, HttpEntity}
 import com.wavesplatform.BlockGen
 import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V8
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.Height
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
-import com.wavesplatform.test.DomainPresets.TransactionStateSnapshot
+import com.wavesplatform.test.DomainPresets.DeterministicFinality
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.utils.{EthHelpers, SharedSchedulerMixin}
+import org.apache.pekko.http.scaladsl.model.ContentTypes.`application/json`
+import org.apache.pekko.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
+import org.apache.pekko.http.scaladsl.model.{FormData, HttpEntity}
 import org.scalatest.OptionValues
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
@@ -32,8 +34,8 @@ class TransactionSnapshotsRouteSpec
     with EthHelpers
     with SharedSchedulerMixin {
 
-  override def settings        = TransactionStateSnapshot
-  override def genesisBalances = AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
+  override def settings: WavesSettings = DeterministicFinality
+  override def genesisBalances: Seq[AddrWithBalance] = AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
 
   private val transactionsApiRoute = new TransactionsApiRoute(
     settings.restAPISettings,
@@ -78,339 +80,269 @@ class TransactionSnapshotsRouteSpec
           | }
         """.stripMargin
       )
-      val setScriptTx    = setScript(secondSigner, script)
-      val invokeTx       = invoke(fee = 100500000)
-      val removeScriptTx = removeScript(secondSigner)
-      val issueTx        = issue(script = Some(TestCompiler(V8).compileExpression("true")))
-      val asset          = IssuedAsset(issueTx.id())
-      val aliasTx        = createAlias()
-      val order1         = order(BUY, asset, Waves, amount = 123, price = 40_000_000, fee = 777)
-      val order2         = order(SELL, asset, Waves, amount = 123, price = 40_000_000, fee = 888)
-      val exchangeTx     = exchange(order1, order2, amount = 123, price = 40_000_000, buyMatcherFee = 777, sellMatcherFee = 888)
-      val allTxs         = Seq(setScriptTx, invokeTx, issueTx, aliasTx, removeScriptTx, exchangeTx)
+      val setScriptTx          = setScript(secondSigner, script)
+      val invokeTx             = invoke(fee = 100500000)
+      val removeScriptTx       = removeScript(secondSigner)
+      val issueTx              = issue(script = Some(TestCompiler(V8).compileExpression("true")))
+      val asset                = IssuedAsset(issueTx.id())
+      val aliasTx              = createAlias()
+      val order1               = order(BUY, asset, Waves, amount = 123, price = 40_000_000, fee = 777)
+      val order2               = order(SELL, asset, Waves, amount = 123, price = 40_000_000, fee = 888)
+      val exchangeTx           = exchange(order1, order2, amount = 123, price = 40_000_000, buyMatcherFee = 777, sellMatcherFee = 888)
+      val commitToGenerationTx = commitToGeneration(Height(3001), secondSigner)
+      val allTxs               = Seq(setScriptTx, invokeTx, issueTx, aliasTx, removeScriptTx, exchangeTx, commitToGenerationTx)
 
       domain.appendBlock(allTxs*)
       val invokeAsset = domain.liquidSnapshot.assetStatics.head._1
       val leaseId     = domain.liquidSnapshot.newLeases.head._1
 
-      val setScriptJson = Json.parse(
-        s"""
-           | {
-           |  "applicationStatus": "succeeded",
-           |  "balances": [
-           |    {
-           |      "address": "$secondAddress",
-           |      "asset": null,
-           |      "balance": ${ENOUGH_AMT - setScriptTx.fee.value}
-           |    },
-           |    {
-           |      "address": "$defaultAddress",
-           |      "asset": null,
-           |      "balance": ${ENOUGH_AMT + 200_000_000 + setScriptTx.fee.value * 2 / 5}
-           |    }
-           |  ],
-           |  "leaseBalances": [],
-           |  "assetStatics": [],
-           |  "assetVolumes": [],
-           |  "assetNamesAndDescriptions": [],
-           |  "assetScripts": [],
-           |  "sponsorships": [],
-           |  "newLeases": [],
-           |  "cancelledLeases": [],
-           |  "aliases": [],
-           |  "orderFills": [],
-           |  "accountScripts": [
-           |    {
-           |      "publicKey": "${secondSigner.publicKey}",
-           |      "script": "${script.bytes().base64}",
-           |      "verifierComplexity": 0
-           |    }
-           |  ],
-           |  "accountData": []
-           | }
-         """.stripMargin
-      )
+      val baseJson = Json
+        .parse("""{
+        "applicationStatus": "succeeded",
+        "balances": [],
+        "leaseBalances": [],
+        "assetStatics": [],
+        "assetVolumes": [],
+        "assetNamesAndDescriptions": [],
+        "assetScripts": [],
+        "sponsorships": [],
+        "newLeases": [],
+        "cancelledLeases": [],
+        "aliases": [],
+        "orderFills": [],
+        "accountScripts": [],
+        "accountData": [],
+        "nextCommittedGenerators": []
+      }""")
+        .as[JsObject]
+
+      val setScriptJson = baseJson ++ Json
+        .parse(s"""{
+        "balances": [{
+          "address": "$secondAddress",
+          "asset": null,
+          "balance": ${ENOUGH_AMT - setScriptTx.fee.value}
+        },{
+          "address": "$defaultAddress",
+          "asset": null,
+          "balance": ${ENOUGH_AMT + 200_000_000 + setScriptTx.fee.value * 2 / 5}
+        }],
+        "accountScripts": [{
+          "publicKey": "${secondSigner.publicKey}",
+          "script": "${script.bytes().base64}",
+          "verifierComplexity": 0
+        }]
+      }""")
+        .as[JsObject]
       Get(routePath(s"/snapshot/${setScriptTx.id()}")) ~> route ~> check(
         responseAs[JsObject] shouldBe setScriptJson
       )
 
-      val invokeJson = Json.parse(
-        s"""
-           | {
-           |   "applicationStatus": "succeeded",
-           |   "balances": [
-           |     {
-           |       "address": "$defaultAddress",
-           |       "asset": null,
-           |       "balance": ${ENOUGH_AMT + 200_000_000 + setScriptTx.fee.value * 2 / 5 - invokeTx.fee.value * 3 / 5}
-           |     },
-           |     {
-           |       "address": "$secondAddress",
-           |       "asset": "$invokeAsset",
-           |       "balance": 1000
-           |     }
-           |   ],
-           |   "leaseBalances": [
-           |     {
-           |       "address": "$secondAddress",
-           |       "in": 0,
-           |       "out": 0
-           |     },
-           |     {
-           |       "address": "$defaultAddress",
-           |       "in": 0,
-           |       "out": 0
-           |     }
-           |   ],
-           |   "assetStatics": [
-           |     {
-           |       "id": "$invokeAsset",
-           |       "source": "${invokeTx.id()}",
-           |       "issuer": "${secondSigner.publicKey}",
-           |       "decimals": 4,
-           |       "nft": false
-           |     }
-           |   ],
-           |   "assetVolumes": [
-           |     {
-           |       "id": "$invokeAsset",
-           |       "isReissuable": true,
-           |       "volume": 1000
-           |     }
-           |   ],
-           |   "assetNamesAndDescriptions": [
-           |     {
-           |       "id": "$invokeAsset",
-           |       "name": "aaaa",
-           |       "description": "bbbb",
-           |       "lastUpdatedAt": 2
-           |     }
-           |   ],
-           |   "assetScripts": [],
-           |   "sponsorships": [
-           |     {
-           |       "id": "$invokeAsset",
-           |       "minSponsoredAssetFee": 1000
-           |     }
-           |   ],
-           |   "newLeases": [
-           |     {
-           |       "id": "$leaseId",
-           |       "sender": "${secondSigner.publicKey}",
-           |       "recipient": "$defaultAddress",
-           |       "amount": 123,
-           |       "txId": "${invokeTx.id()}",
-           |       "height": 2
-           |     }
-           |   ],
-           |   "cancelledLeases": [
-           |     {
-           |       "id": "$leaseId",
-           |       "txId": "${invokeTx.id()}",
-           |       "height": 2
-           |     }
-           |   ],
-           |   "aliases": [],
-           |   "orderFills": [],
-           |   "accountScripts": [],
-           |   "accountData": [
-           |     {
-           |       "address": "$secondAddress",
-           |       "data": [
-           |         {
-           |           "key": "bool",
-           |           "type": "boolean",
-           |           "value": true
-           |         },
-           |         {
-           |           "key": "str",
-           |           "type": "string",
-           |           "value": "text"
-           |         },
-           |         {
-           |           "key": "bytes",
-           |           "type": "binary",
-           |           "value": "base64:abc="
-           |         },
-           |         {
-           |           "key": "int",
-           |           "type": "integer",
-           |           "value": 777
-           |         },
-           |         {
-           |           "key": "delete",
-           |           "value": null
-           |         }
-           |       ]
-           |     }
-           |   ]
-           | }
-         """.stripMargin
-      )
+      val invokeJson = baseJson ++ Json
+        .parse(s"""{
+        "balances": [{
+          "address": "$defaultAddress",
+          "asset": null,
+          "balance": ${ENOUGH_AMT + 200_000_000 + setScriptTx.fee.value * 2 / 5 - invokeTx.fee.value * 3 / 5}
+        },{
+          "address": "$secondAddress",
+          "asset": "$invokeAsset",
+          "balance": 1000
+        }],
+        "leaseBalances": [{
+          "address": "$secondAddress",
+          "in": 0,
+          "out": 0
+        },{
+          "address": "$defaultAddress",
+          "in": 0,
+          "out": 0
+        }],
+        "assetStatics": [{
+          "id": "$invokeAsset",
+          "source": "${invokeTx.id()}",
+          "issuer": "${secondSigner.publicKey}",
+          "decimals": 4,
+          "nft": false
+        }],
+        "assetVolumes": [{
+          "id": "$invokeAsset",
+          "isReissuable": true,
+          "volume": 1000
+        }],
+        "assetNamesAndDescriptions": [{
+          "id": "$invokeAsset",
+          "name": "aaaa",
+          "description": "bbbb",
+          "lastUpdatedAt": 2
+        }],
+        "sponsorships": [{
+          "id": "$invokeAsset",
+          "minSponsoredAssetFee": 1000
+        }],
+        "newLeases": [{
+          "id": "$leaseId",
+          "sender": "${secondSigner.publicKey}",
+          "recipient": "$defaultAddress",
+          "amount": 123,
+          "txId": "${invokeTx.id()}",
+          "height": 2
+        }],
+        "cancelledLeases": [{
+          "id": "$leaseId",
+          "txId": "${invokeTx.id()}",
+          "height": 2
+        }],
+        "accountData": [{
+          "address": "$secondAddress",
+          "data": [{
+            "key": "bool",
+            "type": "boolean",
+            "value": true
+          },{
+            "key": "str",
+            "type": "string",
+            "value": "text"
+          },{
+            "key": "bytes",
+            "type": "binary",
+            "value": "base64:abc="
+          },{
+            "key": "int",
+            "type": "integer",
+            "value": 777
+          },{
+            "key": "delete",
+            "value": null
+          }]
+        }]
+      }""")
+        .as[JsObject]
       Get(routePath(s"/snapshot/${invokeTx.id()}")) ~> route ~> check(
         responseAs[JsObject] shouldBe invokeJson
       )
 
-      val issueJson = Json.parse(
-        s"""
-           | {
-           |  "applicationStatus": "succeeded",
-           |  "balances" : [ {
-           |    "address" : "$defaultAddress",
-           |    "asset" : "$asset",
-           |    "balance" : ${Long.MaxValue / 100}
-           |  }, {
-           |    "address" : "$defaultAddress",
-           |    "asset" : null,
-           |    "balance" : ${ENOUGH_AMT + 200_000_000 + setScriptTx.fee.value * 2 / 5 - (invokeTx.fee.value + issueTx.fee.value) * 3 / 5}
-           |  } ],
-           |  "leaseBalances" : [ ],
-           |  "assetStatics" : [ {
-           |    "id" : "$asset",
-           |    "source" : "${issueTx.id()}",
-           |    "issuer" : "${defaultSigner.publicKey}",
-           |    "decimals" : 0,
-           |    "nft" : false
-           |  } ],
-           |  "assetVolumes" : [ {
-           |    "id": "$asset",
-           |    "isReissuable": true,
-           |    "volume": 92233720368547758
-           |  } ],
-           |  "assetNamesAndDescriptions" : [ {
-           |    "id": "$asset",
-           |    "name" : "test",
-           |    "description" : "description",
-           |    "lastUpdatedAt" : 2
-           |  } ],
-           |  "assetScripts" : [ {
-           |    "id": "$asset",
-           |    "script" : "base64:CAEG32nosg==",
-           |    "complexity" : 0
-           |  } ],
-           |  "sponsorships" : [ ],
-           |  "newLeases" : [ ],
-           |  "cancelledLeases" : [ ],
-           |  "aliases" : [ ],
-           |  "orderFills" : [ ],
-           |  "accountScripts" : [ ],
-           |  "accountData" : [ ]
-           | }
-         """.stripMargin
-      )
+      val issueJson = baseJson ++ Json
+        .parse(s"""{
+        "balances" : [{
+          "address" : "$defaultAddress",
+          "asset" : "$asset",
+          "balance" : ${Long.MaxValue / 100}
+        },{
+          "address" : "$defaultAddress",
+          "asset" : null,
+          "balance" : ${ENOUGH_AMT + 200_000_000 + setScriptTx.fee.value * 2 / 5 - (invokeTx.fee.value + issueTx.fee.value) * 3 / 5}
+        }],
+        "assetStatics" : [{
+          "id" : "$asset",
+          "source" : "${issueTx.id()}",
+          "issuer" : "${defaultSigner.publicKey}",
+          "decimals" : 0,
+          "nft" : false
+        }],
+        "assetVolumes" : [{
+          "id": "$asset",
+          "isReissuable": true,
+          "volume": 92233720368547758
+        }],
+        "assetNamesAndDescriptions" : [{
+          "id": "$asset",
+          "name" : "test",
+          "description" : "description",
+          "lastUpdatedAt" : 2
+        }],
+        "assetScripts" : [{
+          "id": "$asset",
+          "script" : "base64:CAEG32nosg==",
+          "complexity" : 0
+        }]
+      }""")
+        .as[JsObject]
       Get(routePath(s"/snapshot/${issueTx.id()}")) ~> route ~> check(
         responseAs[JsObject] shouldBe issueJson
       )
 
-      val aliasJson = Json.parse(
-        s"""
-           | {
-           |  "applicationStatus": "succeeded",
-           |  "balances" : [ {
-           |    "address" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-           |    "asset" : null,
-           |    "balance" : ${ENOUGH_AMT + 200_000_000 + setScriptTx.fee.value * 2 / 5 - (invokeTx.fee.value + issueTx.fee.value + aliasTx.fee.value) * 3 / 5}
-           |  } ],
-           |  "leaseBalances" : [ ],
-           |  "assetStatics" : [ ],
-           |  "assetVolumes" : [ ],
-           |  "assetNamesAndDescriptions" : [ ],
-           |  "assetScripts" : [ ],
-           |  "sponsorships" : [ ],
-           |  "newLeases" : [ ],
-           |  "cancelledLeases" : [ ],
-           |  "aliases" : [ { "address": "$defaultAddress", "alias": "alias" } ],
-           |  "orderFills" : [ ],
-           |  "accountScripts" : [ ],
-           |  "accountData" : [ ]
-           | }
-         """.stripMargin
-      )
+      val aliasJson = baseJson ++ Json
+        .parse(s"""{
+        "balances": [{
+          "address": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+          "asset": null,
+          "balance": ${ENOUGH_AMT + 200_000_000 + setScriptTx.fee.value * 2 / 5 - (invokeTx.fee.value + issueTx.fee.value + aliasTx.fee.value) * 3 / 5}
+        }],
+        "aliases": [{ 
+          "address": "$defaultAddress",
+          "alias": "alias"
+        }]
+      }""")
+        .as[JsObject]
       Get(routePath(s"/snapshot/${aliasTx.id()}")) ~> route ~> check(responseAs[JsObject]) shouldBe aliasJson
 
-      val removeScriptJson = Json.parse(
-        s"""
-           | {
-           |  "applicationStatus": "succeeded",
-           |  "balances": [
-           |    {
-           |      "address": "$secondAddress",
-           |      "asset": null,
-           |      "balance": ${ENOUGH_AMT - setScriptTx.fee.value - removeScriptTx.fee.value}
-           |    },
-           |    {
-           |      "address": "$defaultAddress",
-           |      "asset": null,
-           |       "balance": ${ENOUGH_AMT + 200_000_000 + (setScriptTx.fee.value + removeScriptTx.fee.value) * 2 / 5 - (invokeTx.fee.value + issueTx.fee.value + aliasTx.fee.value) * 3 / 5}
-           |    }
-           |  ],
-           |  "leaseBalances": [],
-           |  "assetStatics": [],
-           |  "assetVolumes": [],
-           |  "assetNamesAndDescriptions": [],
-           |  "assetScripts": [],
-           |  "sponsorships": [],
-           |  "newLeases": [],
-           |  "cancelledLeases": [],
-           |  "aliases": [],
-           |  "orderFills": [],
-           |  "accountScripts": [
-           |    {
-           |      "publicKey": "${secondSigner.publicKey}",
-           |      "script": null,
-           |      "verifierComplexity": 0
-           |    }
-           |  ],
-           |  "accountData": []
-           | }
-         """.stripMargin
-      )
+      val removeScriptJson = baseJson ++ Json
+        .parse(s"""{
+        "balances": [{
+          "address": "$secondAddress",
+          "asset": null,
+          "balance": ${ENOUGH_AMT - setScriptTx.fee.value - removeScriptTx.fee.value}
+        },{
+          "address": "$defaultAddress",
+          "asset": null,
+          "balance": ${ENOUGH_AMT + 200_000_000 + (setScriptTx.fee.value + removeScriptTx.fee.value) * 2 / 5 - (invokeTx.fee.value + issueTx.fee.value + aliasTx.fee.value) * 3 / 5}
+        }],
+        "accountScripts": [{
+          "publicKey": "${secondSigner.publicKey}",
+          "script": null,
+          "verifierComplexity": 0
+        }]
+      }""")
+        .as[JsObject]
       Get(routePath(s"/snapshot/${removeScriptTx.id()}")) ~> route ~> check(
         responseAs[JsObject] shouldBe removeScriptJson
       )
 
-      val exchangeJson = Json.parse(
-        s"""
-           | {
-           |  "applicationStatus": "succeeded",
-           |  "balances": [
-           |    {
-           |      "address": "$defaultAddress",
-           |      "asset": null,
-           |      "balance": ${ENOUGH_AMT + 200_000_000 + (setScriptTx.fee.value + removeScriptTx.fee.value) * 2 / 5 - (invokeTx.fee.value + issueTx.fee.value + aliasTx.fee.value + exchangeTx.fee.value) * 3 / 5}
-           |    }
-           |  ],
-           |  "leaseBalances": [],
-           |  "assetStatics": [],
-           |  "assetVolumes": [],
-           |  "assetNamesAndDescriptions": [],
-           |  "assetScripts": [],
-           |  "sponsorships": [],
-           |  "newLeases": [],
-           |  "cancelledLeases": [],
-           |  "aliases": [],
-           |  "orderFills": [
-           |    {
-           |      "id": "${exchangeTx.order1.id()}",
-           |      "volume": 123,
-           |      "fee": 777
-           |    },
-           |    {
-           |      "id": "${exchangeTx.order2.id()}",
-           |      "volume": 123,
-           |      "fee": 888
-           |    }
-           |  ],
-           |  "accountScripts": [],
-           |  "accountData": []
-           | }
-         """.stripMargin
-      )
+      val exchangeJson = baseJson ++ Json
+        .parse(s"""{
+        "balances": [{
+          "address": "$defaultAddress",
+          "asset": null,
+          "balance": ${ENOUGH_AMT + 200_000_000 + (setScriptTx.fee.value + removeScriptTx.fee.value) * 2 / 5 - (invokeTx.fee.value + issueTx.fee.value + aliasTx.fee.value + exchangeTx.fee.value) * 3 / 5}
+        }],
+        "orderFills": [{
+          "id": "${exchangeTx.order1.id()}",
+          "volume": 123,
+          "fee": 777
+        },{
+          "id": "${exchangeTx.order2.id()}",
+          "volume": 123,
+          "fee": 888
+        }]
+      }""")
+        .as[JsObject]
       Get(routePath(s"/snapshot/${exchangeTx.id()}")) ~> route ~> check(
         responseAs[JsObject] shouldBe exchangeJson
       )
 
-      val allSnapshotsJson = JsArray(Seq(setScriptJson, invokeJson, issueJson, aliasJson, removeScriptJson, exchangeJson))
+      val commitToGenerationJson = baseJson ++ Json
+        .parse(s"""{
+        "balances":[{
+          "address":"${commitToGenerationTx.sender.toAddress}",
+          "asset":null,
+          "balance":${ENOUGH_AMT - setScriptTx.fee.value - removeScriptTx.fee.value - commitToGenerationTx.fee.value}
+        },{
+          "address":"${defaultSigner.toAddress}",
+          "asset":null,
+          "balance":${ENOUGH_AMT + 200_000_000 + (setScriptTx.fee.value + removeScriptTx.fee.value  + commitToGenerationTx.fee.value) * 2 / 5 - (invokeTx.fee.value + issueTx.fee.value + aliasTx.fee.value + exchangeTx.fee.value) * 3 / 5}
+        }],
+        "nextCommittedGenerators":[{
+          "publicKey":"${commitToGenerationTx.sender}",
+          "blsPublicKey":"${commitToGenerationTx.endorserPublicKey}"
+        }]
+      }""")
+        .as[JsObject]
+      Get(routePath(s"/snapshot/${commitToGenerationTx.id()}")) ~> route ~> check(
+        responseAs[JsObject] shouldBe commitToGenerationJson
+      )
+
+      val allSnapshotsJson = JsArray(Seq(setScriptJson, invokeJson, issueJson, aliasJson, removeScriptJson, exchangeJson, commitToGenerationJson))
       multipleJson(allTxs) ~> route ~> check(responseAs[JsArray] shouldBe allSnapshotsJson)
       multipleFormData(allTxs) ~> route ~> check(responseAs[JsArray] shouldBe allSnapshotsJson)
     }
@@ -431,7 +363,7 @@ class TransactionSnapshotsRouteSpec
       }
     }
 
-    "unexisting id" in {
+    "non-existent id" in {
       val tx = transfer()
       Get(routePath(s"/snapshot/${tx.id()}")) ~> route ~> check {
         status shouldEqual NotFound
