@@ -31,7 +31,7 @@ object Dependencies {
 
   // Node protobuf schemas
   lazy val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.6.0-90-SNAPSHOT" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.6.0" classifier "protobuf-src" intransitive ()
 
   private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.4.0"
 
@@ -129,10 +129,10 @@ object Dependencies {
     Seq(
       rocksdb,
       "commons-net"            % "commons-net"               % "3.12.0",
-      "commons-io"             % "commons-io"                % "2.20.0",
+      "commons-io"             % "commons-io"                % "2.21.0",
       "com.github.pureconfig" %% "pureconfig-core"           % "0.17.9",
       "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.9",
-      "net.logstash.logback"   % "logstash-logback-encoder"  % "8.1" % Runtime,
+      "net.logstash.logback"   % "logstash-logback-encoder"  % "9.0" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),
       kamonModule("influxdb"),
@@ -153,7 +153,7 @@ object Dependencies {
       "com.esaulpaugh"              % "headlong"      % "13.3.1",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
-      "com.wavesplatform" % "blst-java" % "0.3.15-SNAPSHOT"
+      "com.wavesplatform" % "blst-java" % "0.3.15"
     ) ++ console ++ logDeps ++ protobuf.value
   )
 
