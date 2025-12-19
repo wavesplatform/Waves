@@ -125,9 +125,14 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
   }
 
   "Can't commit public BLS key twice" in withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender, TxHelpers.secondSigner)) { d =>
-    def mkTx(sender: KeyPair, blsKP: BlsKeyPair): CommitToGenerationTransaction = {
-      val unsigned = CommitToGenerationTransaction.withBls(TxHelpers.commitToGeneration(Height(3001), sender), blsKP)
-      unsigned.copy(proofs = Proofs(crypto.sign(sender.privateKey, unsigned.bodyBytes())))
+    def mkTx(sender: KeyPair, blsKp: BlsKeyPair): CommitToGenerationTransaction = {
+      val baseTx = TxHelpers.commitToGeneration(Height(3001), sender)
+      val withPop = baseTx.copy(
+        endorserPublicKey = blsKp.publicKey,
+        commitmentSignature = CommitToGenerationTransaction.mkPopSignature(blsKp, baseTx.generationPeriodStart)
+      )
+
+      withPop.copy(proofs = Proofs(crypto.sign(sender.privateKey, withPop.bodyBytes())))
     }
 
     log.debug("First")
