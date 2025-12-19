@@ -5,9 +5,9 @@ import scalapb.compiler.Version.scalapbVersion
 
 //noinspection TypeAnnotation
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.7.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.9.Final"
 
-  val gProtoVersion = "4.33.1"
+  val gProtoVersion = "4.33.2"
   val gProto = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
   val overrides = Def.setting(
     Seq(
@@ -31,13 +31,13 @@ object Dependencies {
 
   // Node protobuf schemas
   lazy val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.6.0-90-SNAPSHOT" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.6.0" classifier "protobuf-src" intransitive ()
 
-  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.2.1"
+  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.4.0"
 
   private def pekkoHttpModule(module: String, version: String = "1.3.0") = "org.apache.pekko" %% module % version
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.7"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.8.0"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.20.1"
 
@@ -51,8 +51,7 @@ object Dependencies {
   val googleGuava     = "com.google.guava"    % "guava"             % "33.5.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.21"
-  val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.22"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.4"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
@@ -60,14 +59,14 @@ object Dependencies {
   val playJson = "org.playframework" %% "play-json" % "3.0.6"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
-  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.9.1" % Test)
+  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.9.4" % Test)
 
   private def sttp3Module(module: String) = "com.softwaremill.sttp.client3" %% module % "3.11.0"
 
   val sttp3      = sttp3Module("core")
   val sttp3Monix = sttp3Module("monix")
 
-  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.82"
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.83"
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 
@@ -119,7 +118,6 @@ object Dependencies {
 
   lazy val logDeps = Seq(
     logback              % Runtime,
-    janino               % Runtime,
     pekkoModule("slf4j") % Runtime
   )
 
@@ -131,10 +129,10 @@ object Dependencies {
     Seq(
       rocksdb,
       "commons-net"            % "commons-net"               % "3.12.0",
-      "commons-io"             % "commons-io"                % "2.20.0",
+      "commons-io"             % "commons-io"                % "2.21.0",
       "com.github.pureconfig" %% "pureconfig-core"           % "0.17.9",
       "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.9",
-      "net.logstash.logback"   % "logstash-logback-encoder"  % "8.1" % Runtime,
+      "net.logstash.logback"   % "logstash-logback-encoder"  % "9.0" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),
       kamonModule("influxdb"),
@@ -155,7 +153,7 @@ object Dependencies {
       "com.esaulpaugh"              % "headlong"      % "13.3.1",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
-      "com.wavesplatform" % "blst-java" % "0.3.15-SNAPSHOT"
+      "com.wavesplatform" % "blst-java" % "0.3.15"
     ) ++ console ++ logDeps ++ protobuf.value
   )
 
