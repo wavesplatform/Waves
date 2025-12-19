@@ -332,7 +332,7 @@ object PBTransactions {
           tx <- CommitToGenerationTransaction.create(
             version.toByte,
             sender.toPublicKey,
-            BlsPublicKey(endorserPublicKey.toByteStr),
+            BlsPublicKey(endorserPublicKey.toByteStr).explicitGet(),
             Height(generationPeriodStart),
             timestamp,
             feeAmount,
@@ -614,7 +614,7 @@ object PBTransactions {
         CommitToGenerationTransaction(
           version.toByte,
           sender.toPublicKey,
-          BlsPublicKey(endorserPublicKey.toByteStr),
+          BlsPublicKey(endorserPublicKey.toByteStr).explicitGet(),
           Height(generationPeriodStart),
           timestamp,
           TxPositiveAmount.unsafeFrom(feeAmount),

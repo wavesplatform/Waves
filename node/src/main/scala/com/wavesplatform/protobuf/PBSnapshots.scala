@@ -173,7 +173,7 @@ object PBSnapshots {
       }.toMap
 
     val nextCommittedGenerators = pbSnapshot.generationCommitment.map { x =>
-      x.senderPublicKey.toPublicKey -> BlsPublicKey(x.endorserPublicKey.toByteArray)
+      x.senderPublicKey.toPublicKey -> BlsPublicKey(x.endorserPublicKey.toByteArray).explicitGet()
     }.toSeq
 
     (

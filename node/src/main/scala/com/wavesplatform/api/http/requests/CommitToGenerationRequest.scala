@@ -38,10 +38,14 @@ case class CommitToGenerationRequest(
         case Some(r) => BlsSignature(r)
         case None    => Right(CommitToGenerationTransaction.mkPopSignature(defaultEndorserKp, exactGenerationPeriodStart))
       }
+      endorserPublicKey <- endorserPublicKey match {
+        case Some(endorserPublicKey) => BlsPublicKey(endorserPublicKey)
+        case None                    => Right(defaultEndorserKp.publicKey)
+      }
       tx <- CommitToGenerationTransaction.create(
         version.getOrElse(1.toByte),
         senderPk, // sender is address, we need a public key
-        endorserPublicKey.fold(defaultEndorserKp.publicKey)(BlsPublicKey.apply),
+        endorserPublicKey,
         exactGenerationPeriodStart,
         timestamp.getOrElse(defaultTimestamp),
         fee.getOrElse(FeeConstants(TransactionType.CommitToGeneration) * FeeUnit),
@@ -65,12 +69,13 @@ case class SignedCommitToGenerationRequest(
 ) {
   def toTx: Either[ValidationError, CommitToGenerationTransaction] =
     for {
-      _senderPk <- PublicKey.fromBase58String(senderPublicKey)
-      sig       <- BlsSignature(commitmentSignature)
+      _senderPk  <- PublicKey.fromBase58String(senderPublicKey)
+      sig        <- BlsSignature(commitmentSignature)
+      endorserPk <- BlsPublicKey(endorserPublicKey)
       t <- CommitToGenerationTransaction.create(
         version.getOrElse(1.toByte),
         _senderPk,
-        BlsPublicKey(endorserPublicKey),
+        endorserPk,
         Height(generationPeriodStart),
         timestamp,
         fee,

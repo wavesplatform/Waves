@@ -19,7 +19,7 @@ object BlsKeyPair {
 
 private final class BlsSeedKeyPair(private val wavesPrivateKey: Array[Byte]) extends BlsKeyPair {
   private lazy val sk: blst.SecretKey = BlsUtils.mkBlsSecretKey(wavesPrivateKey)
-  lazy val publicKey: BlsPublicKey    = BlsPublicKey(BlsUtils.mkBlsPublicKey(sk))
+  lazy val publicKey: BlsPublicKey    = BlsPublicKey.unsafe(ByteStr(BlsUtils.mkBlsPublicKey(sk)))
 
   def sign(message: Array[Byte]): BlsSignature = BlsSignature.unsafe(ByteStr(BlsUtils.signBasic(sk, message)))
 

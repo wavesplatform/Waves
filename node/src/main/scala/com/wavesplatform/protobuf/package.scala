@@ -3,7 +3,6 @@ package com.wavesplatform
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.TransactionId
 import com.wavesplatform.transaction.Asset
@@ -34,7 +33,6 @@ package object protobuf {
       PBRecipients
         .toAddress(bs.toByteArray, chainId)
         .fold(ve => throw new IllegalArgumentException(ve.toString), identity)
-    def toBlsPublicKey: BlsPublicKey     = BlsPublicKey(bs.toByteArray)
     def toIssuedAsset: Asset.IssuedAsset = Asset.IssuedAsset(toByteStr)
   }
 }

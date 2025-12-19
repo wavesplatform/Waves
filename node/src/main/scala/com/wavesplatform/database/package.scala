@@ -379,7 +379,7 @@ package object database {
         val (addressIdBytes, blsPublicKeyBytes) = data.splitAt(addressSize)
         (
           Longs.fromByteArray(addressIdBytes),
-          BlsPublicKey(blsPublicKeyBytes)
+          BlsPublicKey(blsPublicKeyBytes).explicitGet()
         )
       }
       .toSeq
