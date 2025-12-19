@@ -4,7 +4,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
@@ -204,11 +203,9 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
     }
 
     "CommitToGenerationTransaction" in {
-      val blsKp         = BlsKeyPair(Account.privateKey)
-      val sponsorshipTx = CommitToGenerationTransaction.selfSigned(TxVersion.V1, Account, blsKp.publicKey, Height(3001), Now, MinFee).explicitGet()
-      val base64Str     = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(sponsorshipTx)))
-
-      decode(base64Str) shouldBe sponsorshipTx
+      val tx        = TxHelpers.commitToGeneration(Height(3001), Account, Now, MinFee)
+      val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(tx)))
+      decode(base64Str) shouldBe tx
     }
 
     def decode(base64Str: String): Transaction = {

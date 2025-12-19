@@ -6,7 +6,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -879,8 +878,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
        """.stripMargin
 
     val account = accountGen.sample.get
-    val blsKp   = BlsKeyPair(account.privateKey)
-    val tx      = TxHelpers.commitToGeneration(Height(3001), account, blsKp.publicKey, timestamp = Random.nextLong())
+    val tx      = TxHelpers.commitToGeneration(Height(3001), account, timestamp = Random.nextLong())
 
     runScriptWithCustomContext[CONST_BOOLEAN](script(tx), tx, V9) shouldBe evaluated(true)
   }

@@ -6,7 +6,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction as PBSignedTransaction}
 import com.wavesplatform.state.{Height, StringDataEntry}
 import com.wavesplatform.test.PropSpec
@@ -398,17 +397,14 @@ class ChainIdSpecification extends PropSpec {
   property("CommitToGenerationTransaction validation") {
     forAll(addressOrAliasWithVersion) { case (_, version, sender, _, fee, ts) =>
       validateFromOtherNetwork(
-        CommitToGenerationTransaction
-          .selfSigned(
-            version,
-            sender,
-            BlsKeyPair(sender.privateKey).publicKey,
-            Height(3001),
-            ts,
-            fee.value,
-            otherChainId
-          )
-          .explicitGet()
+        TxHelpers.commitToGeneration(
+          generationPeriodStart = Height(3001),
+          sender = sender,
+          timestamp = ts,
+          fee = fee.value,
+          chainId = otherChainId,
+          version = version
+        )
       )
     }
   }

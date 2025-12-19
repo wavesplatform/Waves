@@ -6,7 +6,7 @@ import com.wavesplatform.account.*
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.crypto.{DigestLength, SignatureLength}
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -468,22 +468,25 @@ object TxHelpers {
   def commitToGeneration(
       generationPeriodStart: Height,
       sender: KeyPair = defaultSigner,
-      endorserPublicKey: BlsPublicKey = BlsKeyPair(defaultSigner.privateKey).publicKey,
       timestamp: TxTimestamp = timestamp,
       fee: Long = TestValues.commitToGenerationFee,
       chainId: Byte = AddressScheme.current.chainId,
       version: TxVersion = TxVersion.V1
-  ): CommitToGenerationTransaction = CommitToGenerationTransaction
-    .selfSigned(
-      version,
-      sender,
-      endorserPublicKey,
-      generationPeriodStart,
-      timestamp,
-      fee,
-      chainId
-    )
-    .explicitGet()
+  ): CommitToGenerationTransaction = {
+    val endorserKp = BlsKeyPair(sender.privateKey)
+    CommitToGenerationTransaction
+      .selfSigned(
+        version,
+        sender,
+        endorserKp.publicKey,
+        generationPeriodStart,
+        timestamp,
+        fee,
+        CommitToGenerationTransaction.mkPopSignature(endorserKp, generationPeriodStart),
+        chainId
+      )
+      .explicitGet()
+  }
 
   def ciFee(sc: Int = 0, nonNftIssue: Int = 0, freeCall: Boolean = false): Long =
     invokeFee(freeCall) + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeConstants(TransactionType.Issue) * FeeUnit

@@ -870,8 +870,10 @@ class TransactionsRouteSpec
       )
 
       Post(routePath("/sign"), unsignedTxnJson) ~> ApiKeyHeader ~> route ~> check {
-        status shouldEqual StatusCodes.OK
         val jsObject = responseAs[JsObject]
+        withClue(s"$jsObject ") {
+          status shouldEqual StatusCodes.OK
+        }
         (jsObject \ "generationPeriodStart").as[Int] shouldBe 3001
         (jsObject \ "senderPublicKey").as[String] shouldBe sender.publicKey.toString
         (jsObject \ "endorserPublicKey").as[String] shouldBe blsKP.publicKey.base58
@@ -1063,7 +1065,10 @@ class TransactionsRouteSpec
     "CommitToGeneration transaction" in {
       val txn = TxHelpers.commitToGeneration(Height(settings.blockchainSettings.functionalitySettings.generationPeriodLength + 1))
       Post(routePath("/broadcast"), txn.json()) ~> route ~> check {
-        status shouldEqual StatusCodes.OK
+        val jsObject = responseAs[JsObject]
+        withClue(s"$jsObject ") {
+          status shouldEqual StatusCodes.OK
+        }
       }
     }
   }

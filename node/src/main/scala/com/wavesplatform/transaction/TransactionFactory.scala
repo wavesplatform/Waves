@@ -8,6 +8,7 @@ import com.wavesplatform.api.http.requests.InvokeExpressionRequest.*
 import com.wavesplatform.api.http.requests.SponsorFeeRequest.*
 import com.wavesplatform.api.http.versionReads
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -288,10 +289,8 @@ class TransactionFactory(wallet: Wallet, time: Time, currentPeriod: Option[Gener
         case None         => Left(GenericError("invalid.sender"))
       }
       signer <- wallet.findPrivateKey(signerAddress)
-      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender.publicKey, defaultPeriod.start)
-    } yield {
-      tx.signWith(signer.privateKey)
-    }
+      tx     <- request.toTxFrom(sender.publicKey, BlsKeyPair(signer.privateKey), defaultPeriod.start, time.getTimestamp())
+    } yield tx.signWith(signer.privateKey)
   }
 
   def parseRequestAndSign(signerAddress: String, jsv: JsObject): Either[ValidationError, Transaction] = {
