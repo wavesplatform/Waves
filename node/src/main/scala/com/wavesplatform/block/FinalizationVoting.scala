@@ -3,15 +3,17 @@ package com.wavesplatform.block
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.state.{GeneratorIndex, Height}
 
+/** @param aggregatedEndorsement Empty if there is no valid endorsement (except miner's one)
+  */
 case class FinalizationVoting(
     valid: Seq[GeneratorIndex],
     finalizedHeight: Height,
-    aggregatedEndorsement: BlsSignature,
+    aggregatedEndorsement: Option[BlsSignature],
     conflict: Seq[BlockEndorsement]
 ) {
-  def withValid(endorser: GeneratorIndex, signature: BlsSignature.NonEmpty): FinalizationVoting = copy(
+  def withValid(endorser: GeneratorIndex, signature: BlsSignature): FinalizationVoting = copy(
     valid = valid :+ endorser,
-    aggregatedEndorsement = aggregatedEndorsement.append(signature)
+    aggregatedEndorsement = Some(aggregatedEndorsement.fold(signature)(_.append(signature)))
   )
 
   def nonEmpty: Boolean = valid.nonEmpty || conflict.nonEmpty

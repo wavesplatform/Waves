@@ -8,6 +8,7 @@ import com.wavesplatform.api.http.{BlocksApiRoute, CustomJson, RouteTimeout}
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockEndorsement, BlockHeader, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -104,7 +105,7 @@ class BlocksApiRouteSpec
         finalizationVoting = Some(
           FinalizationVoting(
             valid = GeneratorIndex.unsafeSeq(Seq(1, 0)),
-            aggregatedEndorsement = BlsSignature.NonEmpty(Array.fill[Byte](BlsSignature.SizeInBytes)(1)),
+            aggregatedEndorsement = Some(BlsSignature(Array.fill[Byte](BlsSignature.SizeInBytes)(1)).explicitGet()),
             finalizedHeight = Height(1),
             conflict = Vector(
               BlockEndorsement(
@@ -112,7 +113,7 @@ class BlocksApiRouteSpec
                 finalizedId = testBlock2.id(),
                 finalizedHeight = Height(1),
                 endorsedId = testBlock1.id(),
-                signature = BlsSignature.NonEmpty(Array.fill[Byte](BlsSignature.SizeInBytes)(2))
+                signature = BlsSignature(Array.fill[Byte](BlsSignature.SizeInBytes)(2)).explicitGet()
               )
             )
           )

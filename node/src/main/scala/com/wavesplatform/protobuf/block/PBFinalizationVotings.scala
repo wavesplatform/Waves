@@ -1,5 +1,6 @@
 package com.wavesplatform.protobuf.block
 
+import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.protobuf.*
@@ -10,8 +11,8 @@ import scala.util.Try
 object PBFinalizationVotings {
   def vanilla(pb: PBFinalizationVoting): Try[VanillaFinalizationVoting] = Try {
     val aggSig =
-      if (pb.aggregatedEndorsementSignature.isEmpty) BlsSignature.Empty
-      else BlsSignature(pb.aggregatedEndorsementSignature.toByteArray).explicitGet()
+      if (pb.aggregatedEndorsementSignature.isEmpty) None
+      else Option(BlsSignature(pb.aggregatedEndorsementSignature.toByteArray).explicitGet())
 
     VanillaFinalizationVoting(
       GeneratorIndex.seq(pb.endorserIndexes),
@@ -29,7 +30,7 @@ object PBFinalizationVotings {
   def protobuf(v: VanillaFinalizationVoting): PBFinalizationVoting = PBFinalizationVoting.of(
     GeneratorIndex.toInts(v.valid),
     v.finalizedHeight.toInt,
-    v.aggregatedEndorsement.byteStr.toByteString,
+    v.aggregatedEndorsement.fold(ByteString.EMPTY)(_.byteStr.toByteString),
     v.conflict.map(PBEndorseBlocks.protobuf)
   )
 }

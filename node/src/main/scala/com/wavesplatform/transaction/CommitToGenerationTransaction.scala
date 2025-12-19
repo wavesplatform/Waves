@@ -47,7 +47,7 @@ object CommitToGenerationTransaction {
   implicit def signed(tx: CommitToGenerationTransaction, privateKey: PrivateKey): CommitToGenerationTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  def mkPopSignature(blsKeyPair: BlsKeyPair, generationPeriodStart: Height): BlsSignature.NonEmpty = {
+  def mkPopSignature(blsKeyPair: BlsKeyPair, generationPeriodStart: Height): BlsSignature = {
     val blsMessage = blsKeyPair.publicKey.arr ++ generationPeriodStart.toByteArray
     blsKeyPair.sign(blsMessage)
   }

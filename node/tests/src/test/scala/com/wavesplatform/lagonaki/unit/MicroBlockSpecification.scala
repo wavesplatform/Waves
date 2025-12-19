@@ -66,7 +66,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
     val transactions = Seq(tr, tr2)
 
-    val aggregatedEndorsement = BlsSignature.NonEmpty(Array.fill(BlsSignature.SizeInBytes)(1.toByte))
+    val aggregatedEndorsement = Some(BlsSignature(Array.fill(BlsSignature.SizeInBytes)(1.toByte)).explicitGet())
 
     val finalizedHeight = Height(5)
     val finalizedId     = ByteStr(Array.fill(Block.BlockIdLength)(2.toByte))
@@ -108,12 +108,12 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
     val referenceId = decode("37ex9gonRZtUddDHgSzSes5Ds9UeQyS74DyAXtGFrDpJnEg7sjGdi2ncaV4rVpZnLboQmid3whcbZUWS49FV3ZCs")
     val endorsedId  = decode("5GszB5vY2KTxLvYq4zAFQvRkJxv5Rt5BcuTGHZrxgSLTzPtni7eY5k1DN1mJ7mY4ixP5fiHD9z1AfM99AA8yxhjg")
-    val aggregatedSig = BlsSignature.NonEmpty(
+    val aggregatedSig = BlsSignature(
       decode("nBWfaRLW7EdcwxhDMaXuZZFMhHyowAxY7476rkBsUUeguTXrMSNuTVkuWLmZjRmRfgMXEGuvdHiu1V7joRFSLz3X6MQBF8m88kHJEj6Tc2ktBnMTzihh2JMGpuuWBLSK8rv")
-    )
-    val conflictSig = BlsSignature.NonEmpty(
+    ).explicitGet()
+    val conflictSig = BlsSignature(
       decode("RNMTkL736x3TmXfjQufKnxSgySaaoec3WYnxmujcum9BHEmCdjmwvjoUehghqYCWJcNj5CNfb9QdnujV9o2DRitbLgq2bnLdTU5s1DLBWBkVx8mBayvdfx7rPZ3mtUWeh5L")
-    )
+    ).explicitGet()
 
     val conflictFinalizedHeight = 12345
     val conflictEndorsement = BlockEndorsement(
@@ -127,7 +127,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
     val finalizationVoting = FinalizationVoting(
       valid = Seq(GeneratorIndex(1), GeneratorIndex(2), GeneratorIndex(3)),
       finalizedHeight = GenesisBlockHeight,
-      aggregatedEndorsement = aggregatedSig,
+      aggregatedEndorsement = Some(aggregatedSig),
       conflict = IndexedSeq(conflictEndorsement)
     )
 
@@ -142,12 +142,12 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
     val referenceId = decode("37ex9gonRZtUddDHgSzSes5Ds9UeQyS74DyAXtGFrDpJnEg7sjGdi2ncaV4rVpZnLboQmid3whcbZUWS49FV3ZCs")
     val endorsedId  = decode("5GszB5vY2KTxLvYq4zAFQvRkJxv5Rt5BcuTGHZrxgSLTzPtni7eY5k1DN1mJ7mY4ixP5fiHD9z1AfM99AA8yxhjg")
-    val aggregatedSig = BlsSignature.NonEmpty(
+    val aggregatedSig = BlsSignature(
       decode("nBWfaRLW7EdcwxhDMaXuZZFMhHyowAxY7476rkBsUUeguTXrMSNuTVkuWLmZjRmRfgMXEGuvdHiu1V7joRFSLz3X6MQBF8m88kHJEj6Tc2ktBnMTzihh2JMGpuuWBLSK8rv")
-    )
-    val conflictSig = BlsSignature.NonEmpty(
+    ).explicitGet()
+    val conflictSig = BlsSignature(
       decode("RNMTkL736x3TmXfjQufKnxSgySaaoec3WYnxmujcum9BHEmCdjmwvjoUehghqYCWJcNj5CNfb9QdnujV9o2DRitbLgq2bnLdTU5s1DLBWBkVx8mBayvdfx7rPZ3mtUWeh5L")
-    )
+    ).explicitGet()
 
     val conflictFinalizedHeight = 12345
     val conflictEndorsement = BlockEndorsement(
@@ -161,7 +161,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
     val finalizationVoting = FinalizationVoting(
       valid = Seq(GeneratorIndex(1), GeneratorIndex(2), GeneratorIndex(3)),
       finalizedHeight = GenesisBlockHeight,
-      aggregatedEndorsement = aggregatedSig,
+      aggregatedEndorsement = Some(aggregatedSig),
       conflict = IndexedSeq(conflictEndorsement)
     )
 

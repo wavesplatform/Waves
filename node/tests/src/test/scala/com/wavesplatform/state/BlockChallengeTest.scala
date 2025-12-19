@@ -291,7 +291,7 @@ class BlockChallengeTest
           FinalizationVoting(
             valid = Seq(GeneratorIndex(1)),
             finalizedHeight = finalizedHeight,
-            aggregatedEndorsement = aggSig,
+            aggregatedEndorsement = Some(aggSig),
             conflict = Vector.empty
           )
         )
@@ -372,7 +372,7 @@ class BlockChallengeTest
           FinalizationVoting(
             valid = Seq(GeneratorIndex(1)),
             finalizedHeight = finalizedHeight,
-            aggregatedEndorsement = aggSig,
+            aggregatedEndorsement = Some(aggSig),
             conflict = Vector.empty
           )
         )

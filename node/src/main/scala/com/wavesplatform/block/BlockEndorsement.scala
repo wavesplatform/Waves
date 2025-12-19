@@ -9,7 +9,7 @@ case class BlockEndorsement(
     finalizedId: BlockId,
     finalizedHeight: Height,
     endorsedId: BlockId,
-    signature: BlsSignature.NonEmpty
+    signature: BlsSignature
 ) {
   def signatureValid(endorserPublicKey: BlsPublicKey): Boolean =
     BlsUtils.verifyBasic(signature.byteStr.arr, BlockEndorsement.mkMessage(finalizedId, finalizedHeight, endorsedId), endorserPublicKey.arr)
@@ -25,7 +25,7 @@ object BlockEndorsement {
   ): BlockEndorsement =
     BlockEndorsement(endorserIndex, finalizedId, finalizedHeight, endorsedId, sign(endorserAccount, finalizedId, finalizedHeight, endorsedId))
 
-  def sign(kp: BlsKeyPair, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId): BlsSignature.NonEmpty =
+  def sign(kp: BlsKeyPair, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId): BlsSignature =
     kp.sign(mkMessage(finalizedId, finalizedHeight, endorsedId))
 
   def mkMessage(finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId): Array[Byte] =

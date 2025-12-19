@@ -43,7 +43,7 @@ object EndorsementStorage {
     private val sharedWithNeighbors     = mutable.HashSet.empty[EndorseBlock]
     private val processedValidEndorsers = mutable.HashSet.empty[GeneratorIndex]
 
-    private var valid    = immutable.IntMap.empty[BlsSignature.NonEmpty]
+    private var valid    = immutable.IntMap.empty[BlsSignature]
     private var conflict = immutable.IntMap.empty[BlockEndorsement]
 
     private var latestResult = FinalizationResult.empty
@@ -59,7 +59,7 @@ object EndorsementStorage {
         _             <- Either.raiseWhen(msg.endorserIndex >= filter.endorsers.size)(s"There are only ${filter.endorsers.size} endorsers")
         endorserIndex <- GeneratorIndex.checked(msg.endorserIndex).toRight(s"Invalid endorser index: ${msg.endorserIndex}")
         (_, endorserPk, _) = filter.endorsers(msg.endorserIndex)
-        sig <- verifySig(msg, endorserPk).toRight("Invalid signature")
+        sig <- verifySig(msg, endorserPk)
       } yield
         if (sharedWithNeighbors.contains(msg) || conflict.isDefinedAt(msg.endorserIndex) || filter.conflict.contains(endorserIndex)) false
         else {
@@ -143,7 +143,7 @@ object EndorsementStorage {
       val votingWithoutValid = FinalizationVoting(
         valid = Seq.empty,
         finalizedHeight = currentFilter.finalizedHeight,
-        aggregatedEndorsement = BlsSignature.Empty,
+        aggregatedEndorsement = None,
         conflict = conflict.values.toIndexedSeq
       )
 
@@ -154,10 +154,12 @@ object EndorsementStorage {
       FinalizationResult(simulationResult.reachedFinalization, voting)
     }
 
-    private def verifySig(msg: EndorseBlock, pk: BlsPublicKey): Option[BlsSignature.NonEmpty] =
+    private def verifySig(msg: EndorseBlock, pk: BlsPublicKey): Either[String, BlsSignature] =
       for {
-        sig <- BlsSignature(msg.signature).toOption
-        _   <- Option.when(pk.verify(BlockEndorsement.mkMessage(msg.finalizedId, msg.finalizedHeight, msg.endorsedId), sig))(sig)
+        sig <- BlsSignature(msg.signature).leftMap(_.err)
+        _ <- Either.raiseUnless(pk.verify(BlockEndorsement.mkMessage(msg.finalizedId, msg.finalizedHeight, msg.endorsedId), sig)) {
+          "BLS signature is invalid"
+        }
       } yield sig
   }
 
@@ -169,7 +171,7 @@ object EndorsementStorage {
         FinalizationVoting(
           valid = Seq.empty,
           finalizedHeight = GenesisBlockHeight,
-          aggregatedEndorsement = BlsSignature.Empty,
+          aggregatedEndorsement = None,
           conflict = IndexedSeq.empty
         )
       )

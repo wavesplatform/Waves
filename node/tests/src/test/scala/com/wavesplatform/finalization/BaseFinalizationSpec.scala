@@ -17,9 +17,8 @@ trait BaseFinalizationSpec extends FreeSpec, WithDomain, WithResourceManager, Ei
   protected def mkFinalizationVoting(
       valid: Seq[GeneratorIndex] = Nil,
       finalizedHeight: Height = GenesisBlockHeight,
-      aggregatedEndorsement: BlsSignature = BlsSignature.Empty,
       conflict: Seq[BlockEndorsement] = Nil
-  ): FinalizationVoting = FinalizationVoting(valid, finalizedHeight, aggregatedEndorsement, conflict)
+  ): FinalizationVoting = FinalizationVoting(valid, finalizedHeight, aggregatedEndorsement = None, conflict)
 
   protected def mkConflictEndorsement(
       wavesAcc: KeyPair,
@@ -48,15 +47,19 @@ trait BaseFinalizationSpec extends FreeSpec, WithDomain, WithResourceManager, Ei
     ): FinalizationVoting = self.copy(conflict = self.conflict :+ mkConflictEndorsement(wavesAcc, idx, endorsedId, finalizedHeight, finalizedId))
 
     def signed(endorsedId: BlockId, finalizedId: BlockId, validEndorsers: KeyPair*): FinalizationVoting = {
-      val aggSig = validEndorsers.foldLeft(BlsSignature.Empty: BlsSignature) { case (r, kp) =>
-        val sig = BlockEndorsement.sign(
-          BlsKeyPair(kp.privateKey),
-          finalizedId = finalizedId,
-          finalizedHeight = GenesisBlockHeight,
-          endorsedId = endorsedId
-        )
-        r.append(sig)
-      }
+      val aggSig = validEndorsers
+        .map { kp =>
+          BlockEndorsement.sign(
+            BlsKeyPair(kp.privateKey),
+            finalizedId = finalizedId,
+            finalizedHeight = GenesisBlockHeight,
+            endorsedId = endorsedId
+          )
+        }
+        .foldLeft(Option.empty[BlsSignature]) {
+          case (None, s)    => Some(s)
+          case (Some(r), s) => Some(r.append(s))
+        }
 
       self.copy(aggregatedEndorsement = aggSig)
     }

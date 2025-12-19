@@ -618,7 +618,7 @@ object PBTransactions {
           Height(generationPeriodStart),
           timestamp,
           TxPositiveAmount.unsafeFrom(feeAmount),
-          BlsSignature.mayBeEmpty(commitmentSignature.toByteStr).explicitGet(),
+          BlsSignature(commitmentSignature.toByteStr).explicitGet(),
           proofs,
           chainId
         )

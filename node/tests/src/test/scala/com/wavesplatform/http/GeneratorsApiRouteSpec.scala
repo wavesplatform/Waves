@@ -5,7 +5,7 @@ import com.wavesplatform.api.common.CommonGeneratorsApi
 import com.wavesplatform.api.http.{GeneratorsApiRoute, RouteTimeout}
 import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithState
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.settings.{WalletSettings, WavesSettings}
@@ -93,7 +93,7 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with RestAPISettin
         FinalizationVoting(
           valid = Nil,
           finalizedHeight = Height(1),
-          aggregatedEndorsement = BlsSignature.Empty,
+          aggregatedEndorsement = None,
           conflict = Vector(
             BlockEndorsement.signed(
               BlsKeyPair(generator2.privateKey),

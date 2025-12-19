@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 case class BlsPublicKey private (byteStr: ByteStr) extends AnyVal {
   def arr: Array[Byte] = byteStr.arr
 
-  def verify(message: Array[Byte], signature: BlsSignature.NonEmpty): Boolean =
+  def verify(message: Array[Byte], signature: BlsSignature): Boolean =
     BlsUtils.verifyBasic(signature.arr, message, arr)
 
   def base58: String            = byteStr.toString
@@ -16,6 +16,6 @@ object BlsPublicKey {
   val SizeInBytes = 48
 
   // TODO: check size
-  def apply(arr: Array[Byte]): BlsPublicKey = new BlsPublicKey(ByteStr(arr))
+  def apply(arr: Array[Byte]): BlsPublicKey = apply(ByteStr(arr))
   def apply(byteStr: ByteStr): BlsPublicKey = new BlsPublicKey(byteStr)
 }

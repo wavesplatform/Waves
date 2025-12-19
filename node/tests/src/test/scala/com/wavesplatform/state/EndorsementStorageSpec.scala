@@ -70,7 +70,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
         "a wrong signature" in test(
           EndorseBlock(activeGeneratorIndex.toInt, expectedFinalizedId, expectedFinalizedHeight, expectedEndorsedId, ByteStr.empty),
-          "Invalid signature"
+          "Unexpected BLS signature length: 0, expected: 96"
         )
 
         "an unexpected finalized height" in test(
@@ -283,18 +283,19 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
           withClue("conflict: ") {
             v.conflict.map(_.endorserIndex) should contain theSameElementsAs conflict
           }
-          v.aggregatedEndorsement match {
-            case BlsSignature.Empty =>
-              if (valid.nonEmpty) fail(s"Signature can't be empty if endorsers nonempty: [${valid.mkString(", ")}]")
-            case aggEnd: BlsSignature.NonEmpty =>
-              withClue("signature: ") {
-                aggEnd
-                  .verifyAgg(
-                    BlockEndorsement.mkMessage(expectedFinalizedId, expectedFinalizedHeight, endorsedId),
-                    valid.map(generators(_).blsKp.publicKey)
-                  )
-                  .value shouldBe true
-              }
+          withClue("signature and valid endorsements: ") {
+            v.aggregatedEndorsement match {
+              case None => if (valid.nonEmpty) fail(s"Signature can't be empty if endorsers nonempty: [${valid.mkString(", ")}]")
+              case Some(aggEnd) =>
+                if (valid.isEmpty) fail(s"Signature must be empty if endorsers empty: $aggEnd, [${valid.mkString(", ")}]")
+                else
+                  aggEnd
+                    .verifyAgg(
+                      BlockEndorsement.mkMessage(expectedFinalizedId, expectedFinalizedHeight, endorsedId),
+                      valid.map(generators(_).blsKp.publicKey)
+                    )
+                    .value shouldBe true
+            }
           }
         case _ =>
       }

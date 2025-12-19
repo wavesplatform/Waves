@@ -379,23 +379,23 @@ package object appender {
             )
           conflictingEndorsers            = fv.conflict.map(_.endorserIndex).toSet
           nonConflictingGeneratorBalances = validGeneratorBalances.filterNot(x => conflictingEndorsers.contains(x.index))
-          _ <-
-            if (fv.valid.isEmpty)
-              Either.raiseUnless(fv.aggregatedEndorsement.arr.isEmpty)(
-                "No endorsements are included, but aggregated endorsement signature is non-empty"
-              )
-            else
-              for {
-                finalizedBlockId <- blockchain.blockId(fv.finalizedHeight.toInt).toRight(s"Unable to get block ID at height ${fv.finalizedHeight}")
-                _ <-
-                  if (validEndorsers.isEmpty) Right(())
-                  else
-                    BlsUtils.verifyAgg(
-                      fv.aggregatedEndorsement.arr,
-                      BlockEndorsement.mkMessage(finalizedBlockId, fv.finalizedHeight, block.header.reference),
-                      validEndorsers.view.map(_._2.arr)
-                    )
-              } yield ()
+          _ <- fv.aggregatedEndorsement match {
+            case None => Either.raiseWhen(fv.valid.nonEmpty)("No endorsements are included, but aggregated endorsement signature is non-empty")
+            case Some(aggregatedEndorsement) =>
+              if (fv.valid.isEmpty) Left("Endorsements are included, but aggregated endorsement signature is empty")
+              else
+                for {
+                  finalizedBlockId <- blockchain.blockId(fv.finalizedHeight.toInt).toRight(s"Unable to get block ID at height ${fv.finalizedHeight}")
+                  _ <-
+                    if (validEndorsers.isEmpty) Either.unit
+                    else
+                      BlsUtils.verifyAgg(
+                        aggregatedEndorsement.arr,
+                        BlockEndorsement.mkMessage(finalizedBlockId, fv.finalizedHeight, block.header.reference),
+                        validEndorsers.view.map(_._2.arr)
+                      )
+                } yield ()
+          }
         } yield nonConflictingGeneratorBalances
       }
       .leftMap(s => BlockAppendError(s, block))

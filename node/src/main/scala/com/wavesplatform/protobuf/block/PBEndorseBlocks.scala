@@ -6,7 +6,7 @@ import com.wavesplatform.protobuf.*
 import com.wavesplatform.state.{GeneratorIndex, Height}
 
 object PBEndorseBlocks {
-  def vanilla(x: PBEndorseBlock, sig: BlsSignature.NonEmpty): BlockEndorsement = BlockEndorsement(
+  def vanilla(x: PBEndorseBlock, sig: BlsSignature): BlockEndorsement = BlockEndorsement(
     GeneratorIndex(x.endorserIndex),
     x.finalizedBlockId.toByteStr,
     Height(x.finalizedBlockHeight),

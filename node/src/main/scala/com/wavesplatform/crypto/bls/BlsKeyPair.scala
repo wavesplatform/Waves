@@ -9,10 +9,8 @@ import java.util
 sealed trait BlsKeyPair {
   def publicKey: BlsPublicKey
 
-  // TODO: move to package?
-  def sign(message: Array[Byte]): BlsSignature.NonEmpty
-  // TODO: empty => false ?
-  def verify(message: Array[Byte], signature: BlsSignature.NonEmpty): Boolean = publicKey.verify(message, signature)
+  def sign(message: Array[Byte]): BlsSignature
+  def verify(message: Array[Byte], signature: BlsSignature): Boolean = publicKey.verify(message, signature)
 }
 
 object BlsKeyPair {
@@ -23,7 +21,7 @@ private final class BlsSeedKeyPair(private val wavesPrivateKey: Array[Byte]) ext
   private lazy val sk: blst.SecretKey = BlsUtils.mkBlsSecretKey(wavesPrivateKey)
   lazy val publicKey: BlsPublicKey    = BlsPublicKey(BlsUtils.mkBlsPublicKey(sk))
 
-  def sign(message: Array[Byte]): BlsSignature.NonEmpty = BlsSignature.NonEmpty.unsafe(ByteStr(BlsUtils.signBasic(sk, message)))
+  def sign(message: Array[Byte]): BlsSignature = BlsSignature.unsafe(ByteStr(BlsUtils.signBasic(sk, message)))
 
   override def equals(other: Any): Boolean = other match {
     case other: BlsSeedKeyPair => util.Arrays.equals(other.wavesPrivateKey, wavesPrivateKey)
