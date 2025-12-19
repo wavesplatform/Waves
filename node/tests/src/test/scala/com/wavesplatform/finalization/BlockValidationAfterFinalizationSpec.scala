@@ -19,6 +19,19 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
       )
     )
 
+  "should append a valid block" - {
+    "with finalization voting" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        val block3WithVotes = d.createBlock(
+          mkFinalizationVoting(valid = Seq(committedGenerator2Idx))
+            .signed(endorsedId = d.lastBlockId, finalizedId = d.blockchain.blockHeader(GenesisBlockHeight.toInt).value.id(), committedGenerator2)
+        )
+
+        d.appender.appendBlockWithoutFallback(block3WithVotes) should beRight
+      }
+    }.run()
+  }
+
   "should not append an invalid block" - {
     "voting for finalized block" in new BaseTest {
       override def continue(d: Domain): Unit = {
@@ -29,6 +42,30 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
         )
 
         d.appender.appendBlockWithoutFallback(block3WithVotes) should produce("Voting for finalized block")
+      }
+    }.run()
+
+    "nonempty aggregated signature, but empty valid endorsers" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        val block3WithVotes = d.createBlock(
+          mkFinalizationVoting()
+            .withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlock.id(), GenesisBlockHeight)
+            .signed(endorsedId = d.lastBlockId, finalizedId = d.blockchain.blockHeader(GenesisBlockHeight.toInt).value.id(), committedGenerator3)
+        )
+
+        d.appender.appendBlockWithoutFallback(block3WithVotes) should produce(
+          "Endorsements are included, but aggregated endorsement signature is empty"
+        )
+      }
+    }.run()
+
+    "empty aggregated signature, but nonempty valid endorsers" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        val block3WithVotes = d.createBlock(mkFinalizationVoting(valid = Seq(committedGenerator2Idx)))
+
+        d.appender.appendBlockWithoutFallback(block3WithVotes) should produce(
+          "No endorsements are included, but aggregated endorsement signature is non-empty"
+        )
       }
     }.run()
 
@@ -84,10 +121,14 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
     val committedGenerator2Addr = committedGenerator2.toAddress
     val committedGenerator2Idx  = GeneratorIndex(1)
 
-    val notCommittedGenerator     = TxHelpers.signer(2)
+    val committedGenerator3     = TxHelpers.signer(2)
+    val committedGenerator3Addr = committedGenerator3.toAddress
+    val committedGenerator3Idx  = GeneratorIndex(2)
+
+    val notCommittedGenerator     = TxHelpers.signer(3)
     val notCommittedGeneratorAddr = notCommittedGenerator.toAddress
 
-    val committedGenerators = Seq(committedGenerator1, committedGenerator2)
+    val committedGenerators = Seq(committedGenerator1, committedGenerator2, committedGenerator3)
     val allGenerators       = notCommittedGenerator +: committedGenerators
 
     def continue(d: Domain): Unit

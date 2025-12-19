@@ -380,9 +380,9 @@ package object appender {
           conflictingEndorsers            = fv.conflict.map(_.endorserIndex).toSet
           nonConflictingGeneratorBalances = validGeneratorBalances.filterNot(x => conflictingEndorsers.contains(x.index))
           _ <- fv.aggregatedEndorsement match {
-            case None => Either.raiseWhen(fv.valid.nonEmpty)("No endorsements are included, but aggregated endorsement signature is non-empty")
+            case None => Either.raiseWhen(validEndorsers.nonEmpty)("No endorsements are included, but aggregated endorsement signature is non-empty")
             case Some(aggregatedEndorsement) =>
-              if (fv.valid.isEmpty) Left("Endorsements are included, but aggregated endorsement signature is empty")
+              if (validEndorsers.isEmpty) Left("Endorsements are included, but aggregated endorsement signature is empty")
               else
                 for {
                   finalizedBlockId <- blockchain.blockId(fv.finalizedHeight.toInt).toRight(s"Unable to get block ID at height ${fv.finalizedHeight}")
