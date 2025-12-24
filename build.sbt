@@ -52,6 +52,8 @@ lazy val `lang-jvm` = lang.jvm
     description    := "The RIDE smart contract language compiler",
     libraryDependencies ++= Seq(
       "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
+      Dependencies.logback,
+      Dependencies.scalaLogging,
       Dependencies.gProto,
       Dependencies.gProto % "protobuf"
     )
@@ -69,7 +71,7 @@ lazy val `lang-testkit` = project
   .enablePlugins(PublishedModule)
   .settings(
     libraryDependencies ++=
-      Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps ++ Dependencies.logDeps :+
+      Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.logDeps :+
         Dependencies.scalaLogging
   )
 
@@ -148,6 +150,7 @@ lazy val `repl-js` = repl.js
 lazy val `curve25519-test` = project.dependsOn(node)
 
 lazy val `waves-node` = (project in file("."))
+  .configs(Dependencies.DebArm64, Dependencies.DebAmd64)
   .aggregate(
     `lang-js`,
     `lang-jvm`,
@@ -201,10 +204,9 @@ inScope(Global)(
      * F - show full stack traces
      * u - select the JUnit XML reporter with output directory
      */
-    testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports", "-C", "com.wavesplatform.report.QaseReporter"),
+    testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network         := Network.default(),
-    instrumentation := false,
     resolvers ++= Resolver.sonatypeCentralSnapshots +: Seq(Resolver.mavenLocal),
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),

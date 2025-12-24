@@ -337,5 +337,27 @@
       ]
       complexity: 3
     }
+    {
+      name: "p256Verify"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "Verifies a P-256 signature."
+      paramsDoc: [
+        "message."
+        "signature (64 bytes)."
+        "public key (64 bytes)."
+      ]
+      complexity: 43
+    }
+    {
+      name: "validateCertificateChain"
+      params: [ "List[ByteVector]", "List[ByteVector]", "Int" ]
+      doc: "Validates TDX certificate chain."
+      paramsDoc: [
+        "certificate chain, from the most specific to the root."
+        "CRLs for the respective certificates."
+        "timestamp."
+      ]
+      complexity: 43
+    }
   ]
 }

@@ -6,7 +6,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.state.Blockchain
 
 object RideVersionProvider {
-  val actualVersionByFeature =
+  val actualVersionByFeature: Seq[(BlockchainFeature, StdLibVersion)] =
     List(
       DeterministicFinality   -> V9,
       LightNode               -> V8,

@@ -3,9 +3,7 @@ package com.wavesplatform.crypto
 import org.bouncycastle.crypto.Digest
 
 private[crypto] abstract class BCDigest(initial: () => Digest, digestSize: Int) {
-  protected val digest: ThreadLocal[Digest] = new ThreadLocal[Digest] {
-    override def initialValue(): Digest = initial()
-  }
+  protected val digest: ThreadLocal[Digest] = ThreadLocal.withInitial(() => initial())
 
   def hash(message: Array[Byte]): Array[Byte] = {
     val d = digest.get()

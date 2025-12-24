@@ -341,6 +341,18 @@ trait BaseGlobal {
 
   def ecrecover(messageHash: Array[Byte], signature: Array[Byte], handleLeadingZerosInPublicKey: Boolean): Array[Byte]
 
+  def p256verify(
+      message: Array[Byte],
+      signature: Array[Byte],
+      publicKey: Array[Byte]
+  ): Either[String, Boolean]
+
+  def validateTDXCertChain(
+      certChain: Seq[Array[Byte]],
+      crls: Seq[Array[Byte]],
+      timestamp: Long
+  ): Either[String, Array[Byte]]
+
   def median[@specialized T](seq: Array[T])(implicit num: Integral[T]): T = {
     import num.*
     @tailrec

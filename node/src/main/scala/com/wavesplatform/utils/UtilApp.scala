@@ -4,7 +4,9 @@ import com.google.common.io.ByteStreams
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
+import com.wavesplatform.crypto.{P256Curve, Sha256}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.script.{Script, ScriptReader}
@@ -21,22 +23,14 @@ import scopt.OParser
 import java.io.{ByteArrayInputStream, File, FileInputStream, FileOutputStream}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
+import java.util
 import scala.annotation.nowarn
 
 //noinspection ScalaStyle
 // TODO: Consider remove implemented methods from REST API
 object UtilApp {
-  object Command {
-    sealed trait Mode
-    case object CompileScript   extends Mode
-    case object DecompileScript extends Mode
-    case object SignBytes       extends Mode
-    case object VerifySignature extends Mode
-    case object CreateKeyPair   extends Mode
-    case object Hash            extends Mode
-    case object SerializeTx     extends Mode
-    case object SignTx          extends Mode
-    case object SignTxWithSk    extends Mode
+  enum Mode {
+    case CompileScript, DecompileScript, SignBytes, VerifySignature, CreateKeyPair, Hash, SerializeTx, SignTx, SignTxWithSk, SmokeTest
   }
 
   case class CompileOptions(assetScript: Boolean = false)
@@ -46,17 +40,14 @@ object UtilApp {
   case class SignTxOptions(signerAddress: String = "", currentHeight: Height = Height(1), finalityActivationHeight: Option[Height] = None)
   case class KeyPairOptions(seedType: String = "account", nonce: Int = 0)
 
-  sealed trait Input
-  object Input {
-    case object StdIn                   extends Input
-    final case class File(file: String) extends Input
-    final case class Str(str: String)   extends Input
+  enum Input {
+    case StdIn
+    case File(file: String) extends Input
+    case Str(str: String)   extends Input
   }
 
-  sealed trait SeedType
-
   case class Command(
-      mode: Command.Mode = null,
+      mode: Mode = null,
       configFile: Option[String] = None,
       inputData: Input = Input.StdIn,
       outputFile: Option[String] = None,
@@ -71,28 +62,25 @@ object UtilApp {
   )
 
   def main(args: Array[String]): Unit = {
-    OParser.parse(commandParser, args, Command()) match {
-      case Some(cmd) =>
-        val settings = Application.loadApplicationConfig(cmd.configFile.map(new File(_)))
-        val inBytes  = IO.readInput(cmd)
-        val result = cmd.mode match {
-          case Command.CompileScript   => Actions.doCompile(settings)(cmd, inBytes)
-          case Command.DecompileScript => Actions.doDecompile(inBytes)
-          case Command.SignBytes       => Actions.doSign(cmd, inBytes)
-          case Command.VerifySignature => Actions.doVerify(cmd, inBytes)
-          case Command.CreateKeyPair   => Actions.doCreateKeyPair(cmd, inBytes)
-          case Command.Hash            => Actions.doHash(cmd, inBytes)
-          case Command.SerializeTx     => Actions.doSerializeTx(inBytes)
-          case Command.SignTx          => Actions.doSignTx(new NodeState(cmd))(cmd, inBytes)
-          case Command.SignTxWithSk    => Actions.doSignTxWithSK(cmd, inBytes)
-        }
+    OParser.parse(commandParser, args, Command()).foreach { cmd =>
+      val inBytes = IO.readInput(cmd)
+      val result = cmd.mode match {
+        case Mode.CompileScript   => Actions.doCompile(Application.loadApplicationConfig(cmd.configFile.map(new File(_))))(cmd, inBytes)
+        case Mode.DecompileScript => Actions.doDecompile(inBytes)
+        case Mode.SignBytes       => Actions.doSign(cmd, inBytes)
+        case Mode.VerifySignature => Actions.doVerify(cmd, inBytes)
+        case Mode.CreateKeyPair   => Actions.doCreateKeyPair(cmd, inBytes)
+        case Mode.Hash            => Actions.doHash(cmd, inBytes)
+        case Mode.SerializeTx     => Actions.doSerializeTx(inBytes)
+        case Mode.SignTx          => Actions.doSignTx(new NodeState(cmd))(cmd, inBytes)
+        case Mode.SignTxWithSk    => Actions.doSignTxWithSK(cmd, inBytes)
+        case Mode.SmokeTest       => Actions.doSmokeTest()
+      }
 
-        result match {
-          case Left(value)     => System.err.println(s"Error executing command: $value")
-          case Right(outBytes) => IO.writeOutput(cmd, outBytes)
-        }
-
-      case None =>
+      result match {
+        case Left(value)     => System.err.println(s"Error executing command: $value")
+        case Right(outBytes) => IO.writeOutput(cmd, outBytes)
+      }
     }
   }
 
@@ -142,10 +130,10 @@ object UtilApp {
       ),
       cmd("script").children(
         cmd("compile")
-          .action((_, c) => c.copy(mode = Command.CompileScript))
+          .action((_, c) => c.copy(mode = Mode.CompileScript))
           .text("Compiles RIDE script"),
         cmd("decompile")
-          .action((_, c) => c.copy(mode = Command.DecompileScript))
+          .action((_, c) => c.copy(mode = Mode.DecompileScript))
           .text("Decompiles binary script to RIDE code")
       ),
       cmd("hash")
@@ -154,7 +142,7 @@ object UtilApp {
             .valueName("<fast|secure>")
             .action((m, c) => c.copy(hashOptions = c.hashOptions.copy(mode = m)))
         )
-        .action((_, c) => c.copy(mode = Command.Hash)),
+        .action((_, c) => c.copy(mode = Mode.Hash)),
       cmd("crypto").children(
         cmd("sign")
           .children(
@@ -164,7 +152,7 @@ object UtilApp {
               .action((s, c) => c.copy(signOptions = c.signOptions.copy(privateKey = PrivateKey(Base58.decode(s)))))
           )
           .text("Sign bytes with provided private key")
-          .action((_, c) => c.copy(mode = Command.SignBytes)),
+          .action((_, c) => c.copy(mode = Mode.SignBytes)),
         cmd("verify")
           .children(
             opt[String]('k', "public-key")
@@ -182,10 +170,10 @@ object UtilApp {
               .action((checkPk, c) => c.copy(verifyOptions = c.verifyOptions.copy(checkWeakPk = checkPk)))
           )
           .text("Sign bytes with provided private key")
-          .action((_, c) => c.copy(mode = Command.SignBytes)),
+          .action((_, c) => c.copy(mode = Mode.SignBytes)),
         cmd("create-keys")
           .text("Generate key pair from seed")
-          .action((_, c) => c.copy(mode = Command.CreateKeyPair))
+          .action((_, c) => c.copy(mode = Mode.CreateKeyPair))
           .children(
             opt[String]("seed-type")
               .validate {
@@ -200,10 +188,10 @@ object UtilApp {
       cmd("transaction").children(
         cmd("serialize")
           .text("Serialize JSON transaction")
-          .action((_, c) => c.copy(mode = Command.SerializeTx)),
+          .action((_, c) => c.copy(mode = Mode.SerializeTx)),
         cmd("sign")
           .text("Sign JSON transaction")
-          .action((_, c) => c.copy(mode = Command.SignTx))
+          .action((_, c) => c.copy(mode = Mode.SignTx))
           .children(
             opt[String]("signer-address")
               .abbr("sa")
@@ -220,7 +208,7 @@ object UtilApp {
           ),
         cmd("sign-with-sk")
           .text("Sign JSON transaction with private key")
-          .action((_, c) => c.copy(mode = Command.SignTxWithSk))
+          .action((_, c) => c.copy(mode = Mode.SignTxWithSk))
           .children(
             opt[String]("private-key")
               .abbr("sk")
@@ -228,6 +216,7 @@ object UtilApp {
               .action((a, c) => c.copy(signOptions = c.signOptions.copy(privateKey = PrivateKey(Base58.decode(a)))))
           )
       ),
+      cmd("smoke").action((_, c) => c.copy(mode = Mode.SmokeTest, inputData = Input.Str(""))),
       help("help").hidden(),
       checkConfig(_.mode match {
         case null => failure("Command should be provided")
@@ -362,6 +351,18 @@ object UtilApp {
         case UpdateAssetInfo => json.as[SignedUpdateAssetInfoRequest].toTx.map(_.signWith(c.signOptions.privateKey))
         case other           => GenericError(s"Signing $other is not supported").asLeft[Transaction]
       }).leftMap(_.toString).map(_.json().toString().getBytes())
+    }
+
+    def doSmokeTest(): ActionResult = {
+      val message = Base64.decode(
+        "AgIZGwP/AAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFQAAAAAAAADnAAAAAAAAALeumraedvd5Slaw2xkVKB1DXUiMkdQG7TOnk5yvhzD4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADcnip8b5SPF0dONKf8Q+0DD3wVY/G6vd9jQMguDlSoxQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIABwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADQ0PMxCMjQs6H9Ericuy2oMAj6fPa7h5C7H86EurUIgwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      )
+      val hash      = Base64.decode("byVxECFChy7CfjIuiAdGqX625cRK6npkOD1LUtqD4Yk=")
+      val signature = Base64.decode("90ctulEo2RFhfKMLLgT9WHnx+TnmytOCWNSNwEWsVTjkEhNEMU0lyOtP2XESdwTFUAlRJwryIkWjYZR53H4FyQ==")
+      val publicKey = Base64.decode("KdU/1vG5aM0TC1WRHYmV8ByD6oabSRj7vHVvqIWYn0h60Ihc/FT/NvVgBTMG8rnVnEF+AeojruMo22LjhGDo7A==")
+      require(util.Arrays.equals(hash, Sha256.hash(message)), "hash mismatch")
+      require(P256Curve.verify(message, signature, publicKey).explicitGet(), "invalid signature")
+      Right(Array.emptyByteArray)
     }
   }
 

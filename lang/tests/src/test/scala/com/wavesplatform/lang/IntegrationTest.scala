@@ -5,6 +5,7 @@ import cats.kernel.Monoid
 import cats.syntax.either.*
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.Keccak256
 import com.wavesplatform.lang.Common.*
@@ -31,7 +32,7 @@ import org.scalatest.Inside
 import org.web3j.crypto.Keys
 
 import java.nio.charset.StandardCharsets
-import scala.util.Random
+import scala.util.{Random, Using}
 
 class IntegrationTest extends PropSpec with Inside {
   private def eval[T <: EVALUATED](
@@ -1321,11 +1322,12 @@ class IntegrationTest extends PropSpec with Inside {
       ii <- 0 to 16
       n  <- Seq(0, (8 + ii) * 48 + 1, (8 + ii) * 48 - 1)
     } {
-      val lets = s"""
-                    |let vk = base16'${"AA" * n}'
-                    |let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d'
-                    |let inputs = base16'${"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" * ii}'
-                    |""".stripMargin
+      val lets =
+        s"""
+           |let vk = base16'${"AA" * n}'
+           |let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d'
+           |let inputs = base16'${"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" * ii}'
+           |""".stripMargin
       val i = if (ii == 0) {
         1
       } else {
@@ -1622,7 +1624,12 @@ class IntegrationTest extends PropSpec with Inside {
         "base16'a57deea68952929239bd764d1f6966ea982af65fa6305f3bb71819a0376bd0ff42887b4496780434bd954af05f2b24ab54f10d63ba11e3ce0a2c73c6e25a77cd1c')",
       version = V4,
       fixEcrecover = true
-    ).shouldBe(Right(CONST_BYTESTR(ByteStr.decodeBase58("Fco3a9D9kvzVR5gbnTciJX46f3jLLDEqSmGcah7dNB6Py3NPqcv1iiNgCnAwvnaf4RJyD1mJjLtrgihwyCEV2AJ").get).explicitGet()))
+    ).shouldBe(
+      Right(
+        CONST_BYTESTR(ByteStr.decodeBase58("Fco3a9D9kvzVR5gbnTciJX46f3jLLDEqSmGcah7dNB6Py3NPqcv1iiNgCnAwvnaf4RJyD1mJjLtrgihwyCEV2AJ").get)
+          .explicitGet()
+      )
+    )
   }
 
   property("n-size generic tuple") {
@@ -1861,11 +1868,12 @@ class IntegrationTest extends PropSpec with Inside {
       ii <- 0 to 16
       n  <- Seq(0, (8 + ii) * 48 + 1, (8 + ii) * 48 - 1)
     } {
-      val lets = s"""
-                    |let vk = base16'${"AA" * n}'
-                    |let proof = base64'CfEpVT6b8+4NAeDs3QwiSN7zqfxzAkQdIu8eBXzoAQIS+AgJcYppUx7COvtbWa7TDtaER1ydtoYWBcBtRMvrHQJ64u4XmLooTwikzECPz+VRcYknrGEoyGeZanNFWEwgplf9bX3JvW1RshlAfN7iJESdqBCmUNsrObHNxhHFJRo='
-                    |let inputs = base16'${"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" * ii}'
-                    |""".stripMargin
+      val lets =
+        s"""
+           |let vk = base16'${"AA" * n}'
+           |let proof = base64'CfEpVT6b8+4NAeDs3QwiSN7zqfxzAkQdIu8eBXzoAQIS+AgJcYppUx7COvtbWa7TDtaER1ydtoYWBcBtRMvrHQJ64u4XmLooTwikzECPz+VRcYknrGEoyGeZanNFWEwgplf9bX3JvW1RshlAfN7iJESdqBCmUNsrObHNxhHFJRo='
+           |let inputs = base16'${"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" * ii}'
+           |""".stripMargin
       val i = if (ii == 0) {
         1
       } else {
@@ -2172,5 +2180,27 @@ class IntegrationTest extends PropSpec with Inside {
       """.stripMargin
     eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
     eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(6)
+  }
+
+  property("p256Verify") {
+    Using.Manager { use =>
+      def res(name: String) = s"base64'${Base64.encode(use(getClass.getResourceAsStream(name)).readAllBytes())}'"
+
+      val script = s"""
+        p256Verify(
+          ${res("qe-report.bin")},
+          ${res("qe-report.sig.bin")},
+          validateCertificateChain(
+            [${res("sgx-cert.bin")}, ${res("platform-cert.bin")}, ${res("root-cert.bin")}],
+            [${res("IntelSGXRootCA.der")}, ${res("pckcrl")}],
+            1769499118300
+          )
+        )"""
+
+      eval[CONST_BOOLEAN](
+        script,
+        version = V9
+      ) shouldBe evaluated(true)
+    }.get
   }
 }

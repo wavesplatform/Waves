@@ -127,8 +127,10 @@ object FunctionIds {
   val BLS12_GROTH16_VERIFY: Short = 800
   val BN256_GROTH16_VERIFY: Short = 801
 
-  val ECRECOVER: Short       = 900
-  val CALCULATE_DELAY: Short = 901
+  val ECRECOVER: Short           = 900
+  val CALCULATE_DELAY: Short     = 901
+  val VALIDATE_CERT_CHAIN: Short = 902
+  val SECP256VERIFY: Short       = 903
 
   val BLS12_GROTH16_VERIFY_LIM: Short = 2400 // Reserved n id for generated limited functions
   val BN256_GROTH16_VERIFY_LIM: Short = 2450 // Reserved n id for generated limited functions

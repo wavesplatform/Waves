@@ -1,3 +1,5 @@
+import com.typesafe.sbt.SbtNativePackager.Debian
+
 enablePlugins(
   RunApplicationSettings,
   JavaServerAppPackaging,
@@ -10,6 +12,9 @@ enablePlugins(
 )
 
 libraryDependencies ++= Dependencies.node.value
+
+instrumentation := false
+debArchitecture := Amd64
 
 javaAgents ++= {
   if (instrumentation.value) {
@@ -43,7 +48,15 @@ inConfig(Compile)(
   )
 )
 
-inTask(assembly)(Seq(name := "waves") ++ CommonSettings.assemblySettings)
+inTask(assembly)(
+  Seq(
+    name := "waves",
+    fullClasspath := {
+      val optional = (Optional / update).value.select(configurationFilter("optional")).toSet
+      (Runtime / fullClasspath).value.filterNot(item => optional.contains(item.data))
+    }
+  ) ++ CommonSettings.assemblySettings
+)
 
 // Adds "$lib_dir/*" to app_classpath in the executable file, this is needed for extensions
 scriptClasspath += "*"
@@ -57,9 +70,9 @@ bashScriptExtraDefines +=
     |    --) shift && no_more_snp_opts=1 && break ;;
     |    -no-version-check) no_version_check=1 && shift ;;
     |    -java-home) require_arg path "$1" "$2" && jre=$(eval echo $2) && java_cmd="$jre/bin/java" && shift 2 ;;
-    |    -D* | -agentlib* | -XX*) addJava "$1" && shift ;;
-    |    -J*) addJava "${1:2}" && shift ;;
-    |    *) addResidual "$1" && shift ;;
+    |     -D*|-agentlib*|-agentpath*|-javaagent*|-XX*) addJava "$1" && shift ;;
+    |                                             -J*) addJava "${1:2}" && shift ;;
+    |                                               *) addResidual "$1" && shift ;;
     |    esac
     |  done
     |
@@ -144,11 +157,26 @@ linuxPackageSymlinks := linuxPackageSymlinks.value.map { lsl =>
 
 inConfig(Debian)(
   Seq(
+    packageArchitecture      := debArchitecture.value.debString,
     maintainer               := "com.wavesplatform",
     packageSource            := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java11-runtime-headless",
-    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm"))
+    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm")),
+    linuxPackageMappings := {
+      val classifier = if (packageArchitecture.value == "amd64") "linux-x86_64" else "linux-aarch_64"
+      val platformSpecificMappings = packageMapping(
+        (Optional / update).value
+          .select(artifactFilter(classifier = classifier))
+          .map(_ -> (defaultLinuxInstallLocation.value + "/" + (Debian / packageName).value)): _*
+      )
+
+      linuxPackageMappings.value.map(m =>
+        m.copy(mappings = m.mappings.filterNot { case (f, _) =>
+          f.name.contains("AmazonCorretto") || f.name.contains("conscrypt")
+        })
+      ) :+ platformSpecificMappings
+    }
   )
 )
 

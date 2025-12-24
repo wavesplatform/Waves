@@ -23,14 +23,37 @@ jobs:
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
       - uses: sbt/setup-sbt@v1
       - name: Check PR
-        run: sbt -J-Xlog:gc*=debug:file=./gc.log --batch "scalafmtCheck;checkPR;completeQaseRun"
-        env:
-          QASE_ENABLE: true
-          QASE_RUN_NAME: checkPR
-          QASE_RUN_ID: 1
-          QASE_PROJECT_CODE: PR
-          QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
-          CHECKPR_RUN_ID: ${{ github.run_id }}
+        run: sbt -J-Xlog:gc*=debug:file=./gc.log --batch "scalafmtCheck;checkPR"
+      - if: always()
+        name: Fix test names and durations for Qase
+        run: |
+          find node/tests/target/test-reports -name "*.xml" -exec sed -E -i \
+            -e 's/time="(0(\.0+)?|-0\.[0-9]+)"/time="0.001"/g' \
+            -e 's/name="([^"]*)(NODE-[0-9]+ )([^"]*)"/name="\2 \1\3"/g' {} +
+      - uses: qase-tms/gh-actions/run-create@v1
+        if: always()
+        id: qase-run-create
+        with:
+          token: ${{ secrets.QASE_API_TOKEN }}
+          project: NODE
+          title: Check PR ${{ github.run_id }} — ${{ github.head_ref || github.ref_name }}
+          description: |
+            PR [#${{ github.event.number }}](https://github.com/wavesplatform/Waves/pulls/${{ github.event.number }}) — Run [#${{ github.run_number }}](https://github.com/wavesplatform/Waves/actions/runs/${{ github.run_id }})
+      - uses: qase-tms/gh-actions/report@v1
+        if: always() && steps.qase-run-create.outcome == 'success'
+        with:
+          token: ${{ secrets.QASE_API_TOKEN }}
+          project: NODE
+          id: ${{ steps.qase-run-create.outputs.id }}
+          format: junit
+          path: node/tests/target/test-reports
+          batch: 100
+      - uses: qase-tms/gh-actions/run-complete@v1
+        if: always() && steps.qase-run-create.outcome == 'success'
+        with:
+          token: ${{ secrets.QASE_API_TOKEN }}
+          project: NODE
+          id: ${{ steps.qase-run-create.outputs.id }}
       - uses: scacap/action-surefire-report@5609ce4db72c09db044803b344a8968fd1f315da
         if: always()
         with:
@@ -46,6 +69,10 @@ jobs:
               - 'build.sbt'
               - 'project/*'
       - uses: actions/upload-artifact@v4
+        with:
+          name: waves-fat-jar
+          path: node/target/waves-all-*.jar
+      - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.lang == 'true'
         with:
           name: file-compiler
@@ -60,6 +87,23 @@ jobs:
             gc.log*
             hs*.log
             core*
+
+  run-smoke-tests:
+    needs: check-pr
+    name: Run Smoke Tests ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-15-intel, macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2022]
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      - uses: actions/download-artifact@v7
+        with:
+          name: waves-fat-jar
+      - run: java -cp '*' com.wavesplatform.utils.UtilApp smoke
 
   compile-contracts:
     name: Compile ${{ matrix.repo }}
@@ -81,7 +125,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '11'
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v7
         with:
           name: file-compiler
       - run: find -name "*.ride" -type f -exec java -jar file-compiler.jar {} +;

@@ -1,14 +1,14 @@
 package com.wavesplatform.common
 
-import java.security.{KeyPairGenerator, SecureRandom, Signature as JavaSignature}
-import java.util.concurrent.TimeUnit
 import com.wavesplatform.common.RSAVerifyBenchmark.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.*
-import com.wavesplatform.utils.randomBytes
-import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
+import com.wavesplatform.utils.randomBytes
+
+import java.security.{KeyPairGenerator, Signature as JavaSignature}
+import java.util.concurrent.TimeUnit
 
 trait AlgSHA3512 {
   def alg: DigestAlgorithm = SHA3512
@@ -20,9 +20,9 @@ trait AlgSHA3256 {
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
-@Fork(1)
-@Warmup(iterations = 30)
-@Measurement(iterations = 30)
+@Fork(value = 1, jvmArgsAppend = Array("-XX:+UnlockDiagnosticVMOptions", "-XX:-UseSHA3Intrinsics"))
+@Warmup(iterations = 10, time = 1)
+@Measurement(iterations = 10, time = 1)
 class RSAVerifyBenchmark {
   @Benchmark
   def rsaVerify_SHA3512_16384_32Kb(st: RSASt_SHA3512_32Kb, bh: Blackhole): Unit =
@@ -81,23 +81,18 @@ object RSAVerifyBenchmark {
   @State(Scope.Benchmark)
   class RSASt_SHA3256_128Kb extends RSASt(SHA3256, 128)
 
-  val pair = {
-    val generator = KeyPairGenerator.getInstance("RSA")
-    generator.initialize(16 * 1024, new SecureRandom)
-    generator.generateKeyPair()
-  }
+  val pair = KeyPairGenerator.getInstance("RSA").generateKeyPair()
 
-  class RSASt(val alg: DigestAlgorithm, val  messageSize: Int) {
+  class RSASt(val alg: DigestAlgorithm, val messageSize: Int) {
     val message = randomBytes(messageSize * 1024)
 
     val publicKey = pair.getPublic.getEncoded
 
     val signature = {
       val privateKey = pair.getPrivate
-      val prefix = RSA.digestAlgorithmPrefix(alg)
-      val provider = new BouncyCastleProvider()
+      val prefix     = RSA.digestAlgorithmPrefix(alg)
 
-      val privateSignature = JavaSignature.getInstance(s"${prefix}withRSA", provider)
+      val privateSignature = JavaSignature.getInstance(s"${prefix}withRSA", "SunRsaSign")
       privateSignature.initSign(privateKey)
       privateSignature.update(message)
       privateSignature.sign
