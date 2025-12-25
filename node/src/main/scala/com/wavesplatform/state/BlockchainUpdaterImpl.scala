@@ -659,6 +659,7 @@ class BlockchainUpdaterImpl(
               _ <- Either.raiseUnless(totalBlock.signatureValid()) {
                 MicroBlockAppendError("Invalid total block signature", microBlock)
               }
+              _ = log.trace(s"processMicroblock: Valid generator balances = [${ng.finalizationState.generatorBalances.map(x => s"${x.index}:${x.balance}").mkString(",")}]")
               b <- appender.validateFinalizationVoting(totalBlock, rocksdb, ng.finalizationState.generatorBalances)
               blockDifferResult <- BlockDiffer.fromMicroBlock(
                 this,
@@ -671,6 +672,12 @@ class BlockchainUpdaterImpl(
                 verify
               )
             } yield {
+              val prevConflictingGenerators = ngState.fold(Set.empty)(_.finalizationState.conflictGenerators)
+              val newConflictingGenerators = totalBlock.header.finalizationVoting.fold(Set.empty)(_.conflict.map(_.endorserIndex).toSet)
+              log.trace(s"Prev conflict: [${prevConflictingGenerators.mkString(",")}], new conflict: [${newConflictingGenerators.mkString(",")}], ${if prevConflictingGenerators != newConflictingGenerators then "" else "NOT " }rescheduling mining")
+              if (prevConflictingGenerators != newConflictingGenerators) {
+                miner.scheduleMining(Some(snapshotBlockchain))
+              }
               val BlockDiffer.Result(snapshot, carry, totalFee, updatedMdConstraint, keyBlockSnapshot, computedStateHash) = blockDifferResult
               restTotalConstraint = updatedMdConstraint
               val blockId = ng.createBlockId(microBlock)

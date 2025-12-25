@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import cats.instances.seq.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
+import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.{Block, BlockEndorsement, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
@@ -22,7 +23,7 @@ import com.wavesplatform.utils.{LoggerFacade, Time}
 import com.wavesplatform.utx.UtxPool
 import kamon.Kamon
 
-package object appender {
+package object appender extends StrictLogging {
 
   val MaxTimeDrift: Long = 100 // millis
 
@@ -228,6 +229,7 @@ package object appender {
       r <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime())(block, parentHeight)
       _ <- validateStateHash(block, blockchainUpdater)
       _ <- validateChallengedHeader(block, blockchainUpdater)
+      _ = logger.trace(s"validateBlock: Valid generator balances = [${generatorBalances.map(x => s"${x.index}:${x.balance}").mkString(",")}]")
       b <- validateFinalizationVoting(block, blockchainUpdater, generatorBalances)
     } yield (r, b)
 
