@@ -87,10 +87,8 @@ object FinalizationState extends ScorexLogging {
 
     for {
       c <- voting.conflict
-      idx = c.endorserIndex.toInt
-      if 0 <= idx && idx < generatorBalances.size
-      x = generatorBalances(idx)
-    } log.debug(s"New conflict endorser ${x.address} with index $idx and balance ${x.balance}")
+      x <- generatorBalances.find(_.index == c.endorserIndex)
+    } log.debug(s"New conflict endorser ${x.address} with index ${x.index} and balance ${x.balance}")
 
     val r = FinalizationVoting.isFinalized(endorsedBalance, totalBalance)
     log.debug(

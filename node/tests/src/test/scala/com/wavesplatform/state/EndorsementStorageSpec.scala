@@ -61,7 +61,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
     }
 
     "don't rebroadcast if miner" in {
-      started(minerIndex = 1).tryAddEndorsement(mk()).value shouldBe false
+      started(minerIndex = 1).tryAddEndorsement(mk()) should produce("Ignoring endorsement from miner")
     }
 
     "ignore if" - {
