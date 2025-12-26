@@ -672,12 +672,6 @@ class BlockchainUpdaterImpl(
                 verify
               )
             } yield {
-              val prevConflictingGenerators = ngState.fold(Set.empty)(_.finalizationState.conflictGenerators)
-              val newConflictingGenerators = totalBlock.header.finalizationVoting.fold(Set.empty)(_.conflict.map(_.endorserIndex).toSet)
-              log.trace(s"Prev conflict: [${prevConflictingGenerators.mkString(",")}], new conflict: [${newConflictingGenerators.mkString(",")}], ${if prevConflictingGenerators != newConflictingGenerators then "" else "NOT " }rescheduling mining")
-              if (prevConflictingGenerators != newConflictingGenerators) {
-                miner.scheduleMining(Some(snapshotBlockchain))
-              }
               val BlockDiffer.Result(snapshot, carry, totalFee, updatedMdConstraint, keyBlockSnapshot, computedStateHash) = blockDifferResult
               restTotalConstraint = updatedMdConstraint
               val blockId = ng.createBlockId(microBlock)
