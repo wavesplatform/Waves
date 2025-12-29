@@ -1,7 +1,6 @@
 package com.wavesplatform.state.appender
 
 import cats.data.EitherT
-import cats.syntax.traverse.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
@@ -32,11 +31,9 @@ object BlockAppender extends ScorexLogging {
       utxStorage: UtxPool,
       pos: PoSSelector,
       blockEndorser: BlockEndorser,
-      scheduler: Scheduler,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
-  )(newBlock: Block, snapshot: Option[BlockSnapshotResponse]): Task[Either[ValidationError, BlockApplyResult]] =
-    Task {
+  )(newBlock: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] = {
       if (
         blockchainUpdater.isLastBlockId(newBlock.header.reference) ||
         blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
@@ -53,7 +50,7 @@ object BlockAppender extends ScorexLogging {
         Right(Ignored)
       else
         Left(BlockAppendError("Block is not a child of the last block or its parent", newBlock))
-    }.executeOn(scheduler)
+    }
 
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
@@ -76,7 +73,7 @@ object BlockAppender extends ScorexLogging {
       (for {
         _ <- EitherT(Task(Either.cond(newBlock.signatureValid(), (), GenericError("Invalid block signature"))))
         _ = span.markNtp("block.signatures-validated")
-        validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, blockEndorser, scheduler)(newBlock, snapshot))
+        validApplication <- EitherT(Task(apply(blockchainUpdater, time, utxStorage, pos, blockEndorser)(newBlock, snapshot)).executeOn(scheduler))
       } yield validApplication).value
 
     val handle = append.flatMap {
@@ -103,7 +100,7 @@ object BlockAppender extends ScorexLogging {
         BlockStats.declined(newBlock, BlockStats.Source.Broadcast)
 
         if (newBlock.header.challengedHeader.isEmpty) {
-          blockChallenger.traverse(_.challengeBlock(newBlock, ch).executeOn(scheduler)).void
+          blockChallenger.fold(Task.unit)(c => Task(c.challengeBlock(newBlock, ch)).executeOn(scheduler))
         } else Task.unit
 
       case Left(ve) =>

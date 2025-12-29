@@ -47,7 +47,7 @@ import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
 
-  type AppendBlock = (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]]
+  type AppendBlock = (Block, Option[BlockSnapshotResponse]) => Either[ValidationError, BlockApplyResult]
 
   final case class ImportOptions(
       configFile: Option[File] = None,
@@ -193,7 +193,6 @@ object Importer extends ScorexLogging {
       appendBlock: AppendBlock,
       importOptions: ImportOptions,
       skipBlocks: Boolean,
-      appender: Scheduler
   ): Unit = {
     val lenBlockBytes     = new Array[Byte](Ints.BYTES)
     val lenSnapshotsBytes = if (snapshotsInputStream.isDefined) Some(new Array[Byte](Ints.BYTES)) else None
@@ -303,7 +302,7 @@ object Importer extends ScorexLogging {
         lock.synchronized {
           val (block, snapshot) = queue.dequeue()
           if (blockchain.lastBlockId.contains(block.header.reference)) {
-            Await.result(appendBlock(block, snapshot).runAsyncLogErr(using appender), Duration.Inf) match {
+            appendBlock(block, snapshot) match {
               case Left(ve) =>
                 log.error(s"Error appending block: $ve")
                 queue.clear()
@@ -353,8 +352,8 @@ object Importer extends ScorexLogging {
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-    val extAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]] =
-      BlockAppender(blockchainUpdater, time, utxPool, pos, BlockEndorser.Disabled, scheduler, importOptions.verify, txSignParCheck = false)
+    val extAppender: (Block, Option[BlockSnapshotResponse]) => Either[ValidationError, BlockApplyResult] =
+      BlockAppender(blockchainUpdater, time, utxPool, pos, BlockEndorser.Disabled, importOptions.verify, txSignParCheck = false)
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
@@ -439,7 +438,6 @@ object Importer extends ScorexLogging {
       extAppender,
       importOptions,
       blocksFileOffset == 0,
-      scheduler
     )
     Await.result(Kamon.stopModules(), 10.seconds)
   }

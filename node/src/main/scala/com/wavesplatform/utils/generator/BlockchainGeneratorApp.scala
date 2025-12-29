@@ -168,7 +168,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       scheduler,
       utxEvents.collect { case _: UtxEvent.TxAdded => () }
     )
-    val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, BlockEndorser.Disabled, scheduler, verify = false)(_, None)
+    val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, BlockEndorser.Disabled, verify = false)(_, None)
 
     object Output {
       private var first = true
@@ -250,7 +250,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
 
       miner.forgeBlock(bestMiner) match {
         case ForgeAttemptResult.Success(block, _) =>
-          blockAppender(block).runSyncUnsafe() match {
+          blockAppender(block) match {
             case Right(_) =>
               blocks += block
               Output.writeBlock(block)

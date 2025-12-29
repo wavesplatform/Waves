@@ -105,7 +105,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
       use(rdbWriterRaw)
       val utxPool     = use(new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable))
       val pos         = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
-      val extAppender = BlockAppender(blockchain, time, utxPool, pos, BlockEndorser.Disabled, scheduler)(_, None)
+      val extAppender = BlockAppender(blockchain, time, utxPool, pos, BlockEndorser.Disabled)(_, None)
       val utxEvents   = ConcurrentSubject.publish[UtxEvent]
 
       val miner = new MinerImpl(
@@ -147,8 +147,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
                   block.header.challengedHeader,
                   block.header.finalizationVoting
                 )
-                _ <- Await
-                  .result(extAppender(blockWithTxs).runAsyncLogErr, Duration.Inf)
+                _ <- extAppender(blockWithTxs)
               } yield exportToFile(blockWithTxs)
 
             case ForgeAttemptResult.TemporaryFailure(err) => Left(GenericError(err))

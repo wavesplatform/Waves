@@ -52,10 +52,9 @@ trait WithMiner extends WithDomain { suite: Suite =>
       Observable(),
       timeDrift
     )
-    def appendBlock(b: Block) = {
-      val appendTask = BlockAppender(blockchain, time, utxPool, pos, BlockEndorser.Disabled, appenderScheduler, verify)(b, None)
-      Await.result(appendTask.runToFuture(using appenderScheduler), Inf)
-    }
+    def appendBlock(b: Block) =
+      BlockAppender(blockchain, time, utxPool, pos, BlockEndorser.Disabled, verify)(b, None)
+
     f(miner, appendBlock)
     appenderScheduler.shutdown()
     minerScheduler.shutdown()

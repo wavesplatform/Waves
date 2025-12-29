@@ -22,7 +22,6 @@ import com.wavesplatform.utils.{Schedulers, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
-import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.ConcurrentSubject
 import org.apache.commons.io.FileUtils
@@ -124,7 +123,7 @@ object MinerChallengeSimulator {
       blockchain: BlockchainUpdaterImpl,
       rdb: RDB,
       miner: MinerImpl,
-      blockAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]],
+      blockAppender: (Block, Option[BlockSnapshotResponse]) => Either[ValidationError, BlockApplyResult],
       fakeTime: FakeTime,
       isChallenging: Boolean
   ) {
@@ -141,7 +140,7 @@ object MinerChallengeSimulator {
 
       miner.forgeBlock(bestMiner) match {
         case ForgeAttemptResult.Success(block, _) =>
-          blockAppender(block, None).runSyncUnsafe() match {
+          blockAppender(block, None) match {
             case Right(BlockApplyResult.Applied(score = score)) => Some(score)
             case other =>
               println(s"Error appending block: $other")
@@ -240,7 +239,7 @@ object MinerChallengeSimulator {
         (
             com.wavesplatform.block.Block,
             Option[com.wavesplatform.network.BlockSnapshotResponse]
-        ) => monix.eval.Task[Either[com.wavesplatform.lang.ValidationError, com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult]]
+        ) => Either[com.wavesplatform.lang.ValidationError, com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult]
     ) = {
       val utx = new UtxPoolImpl(fakeTime, blockchain, wavesSettings.utxSettings, wavesSettings.maxTxErrorLogSize, wavesSettings.minerSettings.enable)
       val posSelector = PoSSelector(blockchain, None)
@@ -259,7 +258,7 @@ object MinerChallengeSimulator {
         scheduler,
         utxEvents.collect { case _: UtxEvent.TxAdded => () }
       )
-      val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, BlockEndorser.Disabled, scheduler, verify = false)
+      val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, BlockEndorser.Disabled, verify = false)
 
       miner -> blockAppender
     }

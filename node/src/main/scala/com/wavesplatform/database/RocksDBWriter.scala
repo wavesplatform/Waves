@@ -6,6 +6,7 @@ import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
 import com.google.common.util.concurrent.MoreExecutors
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block.BlockId
@@ -34,7 +35,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, *}
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
 import org.rocksdb.Status
 import org.slf4j.LoggerFactory
@@ -160,7 +161,7 @@ class RocksDBWriter(
     with AutoCloseable {
   import rdb.db as writableDB
 
-  private val log = LoggerFacade(LoggerFactory.getLogger(classOf[RocksDBWriter]))
+  private val log = Logger(LoggerFactory.getLogger(classOf[RocksDBWriter]))
 
   private var disabledAliases = writableDB.get(Keys.disabledAliases)
 

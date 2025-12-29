@@ -1,6 +1,7 @@
 package com.wavesplatform.generator
 
 import cats.Show
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
@@ -24,7 +25,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.utils.{LoggerFacade, NTP}
+import com.wavesplatform.utils.NTP
 import org.slf4j.LoggerFactory
 import org.web3j.crypto.Bip32ECKeyPair
 import pureconfig.ConfigReader
@@ -48,7 +49,7 @@ class NarrowTransactionGenerator(
 ) extends TransactionGenerator {
   import NarrowTransactionGenerator.*
 
-  private val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
+  private val log     = Logger(LoggerFactory.getLogger(getClass))
   private val typeGen = DistributedRandomGenerator(settings.probabilities)
 
   private def correctVersion(v: TxVersion): TxVersion =

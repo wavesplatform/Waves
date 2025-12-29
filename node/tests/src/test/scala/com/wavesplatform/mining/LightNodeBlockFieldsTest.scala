@@ -54,10 +54,8 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
         new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
         d.wallet,
         d.settings,
-        d.testTime,
         d.posSelector,
-        b => Task.now(append(b)),
-        timeDrift = Int.MaxValue
+        b => append(b)
       ) {
         override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = Right((defaultSigner, 0))
       }
@@ -69,7 +67,7 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
       }
       def challengeBlock() = {
         val invalidBlock = d.createBlock(ProtoBlockVersion, Seq(), strictTime = true, stateHash = invalidStateHash)
-        challenger.challengeBlock(invalidBlock, null).runSyncUnsafe()
+        challenger.challengeBlock(invalidBlock, null)
       }
 
       log.debug("LightNode activation")

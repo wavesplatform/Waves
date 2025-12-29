@@ -221,7 +221,7 @@ class MinerImpl(
             consensusData.generationSignature,
             unconfirmed,
             account,
-            blockFeatures(version),
+            Miner.blockFeatures(blockchainUpdater, settings),
             blockRewardVote(version),
             if (blockchainUpdater.supportsLightNodeBlockFields(height + 1)) stateHash else None,
             challengedHeader = None,
@@ -241,17 +241,6 @@ class MinerImpl(
   private def checkQuorumAvailable(): Either[String, Int] =
     Right(allChannels.size())
       .ensureOr(chanCount => s"Quorum not available ($chanCount/${minerSettings.quorum}), not forging block.")(_ >= minerSettings.quorum)
-
-  private def blockFeatures(version: Byte): Seq[Short] =
-    if (version <= PlainBlockVersion) Nil
-    else {
-      val exclude = blockchainUpdater.approvedFeatures.keySet ++ settings.blockchainSettings.functionalitySettings.preActivatedFeatures.keySet
-
-      settings.featuresSettings.supported
-        .filterNot(exclude)
-        .filter(BlockchainFeatures.implemented)
-        .sorted
-    }
 
   private def blockRewardVote(version: Byte): Long =
     if (version < RewardBlockVersion) -1L
@@ -309,7 +298,7 @@ class MinerImpl(
         }
 
         def appendTask(block: Block, totalConstraint: MiningConstraint) = // TODO: accept blockAppender instead all these dependencies?
-          BlockAppender(blockchainUpdater, timeService, utx, pos, blockEndorser, appenderScheduler)(block, None).flatMap {
+          Task(BlockAppender(blockchainUpdater, timeService, utx, pos, blockEndorser)(block, None)).executeOn(appenderScheduler).flatMap {
             case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
               generateBlockTask(account, None)
 
@@ -397,4 +386,15 @@ object Miner {
       s"Account($address) is scripted and not allowed to forge blocks"
     )
   }
+
+  def blockFeatures(blockchain: Blockchain, settings: WavesSettings): Seq[Short] =
+    if (blockchain.nextBlockVersion <= PlainBlockVersion) Nil
+    else {
+      val exclude = blockchain.approvedFeatures.keySet ++ settings.blockchainSettings.functionalitySettings.preActivatedFeatures.keySet
+
+      settings.featuresSettings.supported
+        .filterNot(exclude)
+        .filter(BlockchainFeatures.implemented)
+        .sorted
+    }
 }

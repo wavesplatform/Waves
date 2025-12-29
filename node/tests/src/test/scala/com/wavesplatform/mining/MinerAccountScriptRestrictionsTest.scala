@@ -35,7 +35,7 @@ import scala.concurrent.duration.*
 
 class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
 
-  type Appender = Block => Task[Either[ValidationError, BlockApplyResult]]
+  type Appender = Block => Either[ValidationError, BlockApplyResult]
 
   val time: TestTime            = TestTime()
   val minerAcc: SeedKeyPair     = TxHelpers.signer(1)
@@ -58,7 +58,7 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
         DomainPresets.RideV5.setFeaturesHeight((BlockchainFeatures.RideV6, activationHeight)),
         AddrWithBalance.enoughBalances(minerAcc, invoker)
       ) { d =>
-        withMiner(d) { (miner, appender, scheduler) =>
+        withMiner(d) { (miner, appender) =>
           d.appendBlock(setScript(script))
           if (hasCallable) {
             d.appendAndAssertSucceed(
@@ -75,11 +75,11 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
             d.appendAndCatchError(TxHelpers.transfer(minerAcc, invoker.toAddress)).toString should include("TransactionNotAllowedByScript")
           }
           miner.getNextBlockGenerationOffset(minerAcc) should produce(errMsgBeforeRideV6)
-          forgeAndAppendBlock(d, miner, appender)(using scheduler) should produce(errMsgBeforeRideV6)
+          forgeAndAppendBlock(d, miner, appender) should produce(errMsgBeforeRideV6)
 
           d.appendBlock()
           miner.getNextBlockGenerationOffset(minerAcc) should beRight
-          forgeAndAppendBlock(d, miner, appender)(using scheduler) should beRight
+          forgeAndAppendBlock(d, miner, appender) should beRight
         }
       }
     }
@@ -90,7 +90,7 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
 
   private def ts: Long = System.currentTimeMillis()
 
-  private def withMiner(d: Domain)(f: (MinerImpl, Appender, Scheduler) => Unit): Unit = {
+  private def withMiner(d: Domain)(f: (MinerImpl, Appender) => Unit): Unit = {
     val defaultSettings = WavesSettings.default()
     val wavesSettings   = defaultSettings.copy(minerSettings = defaultSettings.minerSettings.copy(quorum = 0))
 
@@ -118,15 +118,15 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
       Observable.empty
     )
 
-    val appender = BlockAppender(d.blockchainUpdater, time, utx, d.posSelector, BlockEndorser.Disabled, appenderScheduler)(_, None)
+    val appender = BlockAppender(d.blockchainUpdater, time, utx, d.posSelector, BlockEndorser.Disabled)(_, None)
 
-    f(miner, appender, appenderScheduler)
+    f(miner, appender)
 
     appenderScheduler.shutdown()
     utx.close()
   }
 
-  private def forgeAndAppendBlock(d: Domain, miner: MinerImpl, appender: Appender)(implicit scheduler: Scheduler) = {
+  private def forgeAndAppendBlock(d: Domain, miner: MinerImpl, appender: Appender) = {
     time.setTime(
       d.lastBlock.header.timestamp + d.posSelector
         .getValidBlockDelay(d.blockchain.height, minerAcc, d.lastBlock.header.baseTarget, d.blockchain.generatingBalance(minerAcc.toAddress))
@@ -135,7 +135,7 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
 
     for {
       forge <- miner.forgeBlock(minerAcc).toEither
-      r     <- appender(forge.newBlock).runSyncUnsafe(10.seconds)
+      r     <- appender(forge.newBlock)
     } yield r
   }
 

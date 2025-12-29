@@ -1,7 +1,6 @@
 package com.wavesplatform.state.appender
 
-import cats.data.EitherT
-import cats.syntax.traverse.*
+import cats.syntax.either.*
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.lang.ValidationError
@@ -15,7 +14,6 @@ import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{InvalidSignature, InvalidStateHash}
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
-import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
@@ -26,11 +24,11 @@ import scala.util.{Left, Right}
 object MicroblockAppender extends ScorexLogging {
   private val microblockProcessingTimeStats = Kamon.timer("microblock-appender.processing-time").withoutTags()
 
-  def apply(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
+  def apply(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPool, verify: Boolean)(
       microBlock: MicroBlock,
       snapshot: Option[MicroBlockSnapshot]
-  ): Task[Either[ValidationError, BlockId]] =
-    Task(microblockProcessingTimeStats.measureSuccessful {
+  ): Either[ValidationError, BlockId] =
+    microblockProcessingTimeStats.measureSuccessful {
       blockchainUpdater
         .processMicroBlock(microBlock, snapshot, verify)
         .map { totalBlockId =>
@@ -44,7 +42,59 @@ object MicroblockAppender extends ScorexLogging {
           utxStorage.scheduleCleanup()
           totalBlockId
         }
-    }).executeOn(scheduler)
+    }
+
+  def apply(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
+      microBlock: MicroBlock,
+      snapshot: Option[MicroBlockSnapshot]
+  ): Task[Either[ValidationError, BlockId]] =
+    Task(apply(blockchainUpdater, utxStorage, verify)(microBlock, snapshot)).executeOn(scheduler)
+
+  def apply2(
+      blockchainUpdater: BlockchainUpdater & Blockchain,
+      utxStorage: UtxPool,
+      allChannels: ChannelGroup,
+      peerDatabase: PeerDatabase,
+      blockChallenger: Option[BlockChallenger],
+  )(md: MicroblockData): Unit = {
+    val microblockTotalResBlockSig = md.microBlock.totalResBlockSig
+
+    val blockIdAfterApplyingMicroblock = for {
+      _ <- Either.raiseUnless(md.microBlock.signatureValid())(InvalidSignature(md.microBlock))
+      microBlockSnapshot = md.snapshot
+        .map(s =>
+          md.microBlock.transactionData.zip(s.snapshotResponse.snapshots).map { case (tx, pbs) =>
+            PBSnapshots.fromProtobuf(pbs, tx.id(), Height(blockchainUpdater.height))
+          }
+        )
+        .map(ss => MicroBlockSnapshot(microblockTotalResBlockSig, ss))
+      blockId <- apply(blockchainUpdater, utxStorage, verify = true)(md.microBlock, microBlockSnapshot)
+    } yield blockId
+
+    blockIdAfterApplyingMicroblock match {
+      case Right(blockId) =>
+        allChannels.broadcast(md.inv, except = md.owners())
+        BlockStats.applied(md.microBlock, blockId)
+      case Left(is: InvalidSignature) =>
+        md.source.foreach(source => peerDatabase.blacklistAndClose(source, s"Could not append microblock ${md.inv.totalBlockId}: $is"))
+      case Left(ish: InvalidStateHash) =>
+        (md.source ++ md.snapshot.map(_.snapshotSource)).foreach { ch =>
+          peerDatabase.blacklistAndClose(
+            ch,
+            s"Could not append microblock ${md.inv.totalBlockId}: $ish"
+          )
+        }
+
+        BlockStats.declined(md.inv.totalBlockId)
+
+        blockChallenger.foreach(_.challengeMicroblock(md))
+
+      case Left(ve) =>
+        BlockStats.declined(md.inv.totalBlockId)
+        log.debug(s"${md.source.fold("")(src => id(src) + " ")}Could not append microblock ${md.inv.totalBlockId}: $ve")
+    }
+
+  }
 
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
@@ -53,51 +103,6 @@ object MicroblockAppender extends ScorexLogging {
       peerDatabase: PeerDatabase,
       blockChallenger: Option[BlockChallenger],
       scheduler: Scheduler
-  )(ch: Channel, md: MicroblockData, snapshot: Option[(Channel, MicroBlockSnapshotResponse)]): Task[Unit] = {
-    import md.microBlock
-    val microblockTotalResBlockSig = microBlock.totalResBlockSig
-    (for {
-      _ <- EitherT(Task.now(microBlock.signaturesValid()))
-      microBlockSnapshot = snapshot
-        .map { case (_, mbs) =>
-          microBlock.transactionData.zip(mbs.snapshots).map { case (tx, pbs) =>
-            PBSnapshots.fromProtobuf(pbs, tx.id(), Height(blockchainUpdater.height))
-          }
-        }
-        .map(ss => MicroBlockSnapshot(microblockTotalResBlockSig, ss))
-
-      blockId <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock, microBlockSnapshot))
-    } yield blockId).value.flatMap {
-      case Right(blockId) =>
-        Task {
-          md.invOpt match {
-            case Some(mi) => allChannels.broadcast(mi, except = md.microblockOwners())
-            case None     => log.warn(s"${id(ch)} Not broadcasting MicroBlockInv")
-          }
-          BlockStats.applied(microBlock, blockId)
-        }
-      case Left(is: InvalidSignature) =>
-        Task {
-          val idOpt = md.invOpt.map(_.totalBlockId)
-          peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $is")
-        }
-      case Left(ish: InvalidStateHash) =>
-        val channelToBlacklist = snapshot.map(_._1).getOrElse(ch)
-        val idOpt              = md.invOpt.map(_.totalBlockId)
-        peerDatabase.blacklistAndClose(
-          channelToBlacklist,
-          s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ish"
-        )
-        md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
-
-        blockChallenger.traverse(_.challengeMicroblock(md, channelToBlacklist).executeOn(scheduler)).void
-
-      case Left(ve) =>
-        Task {
-          md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
-          val idOpt = md.invOpt.map(_.totalBlockId)
-          log.debug(s"${id(ch)} Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ve")
-        }
-    }
-  }
+  )(md: MicroblockData.Remote): Task[Unit] =
+    Task(apply2(blockchainUpdater, utxStorage, allChannels, peerDatabase, blockChallenger)(md)).executeOn(scheduler)
 }

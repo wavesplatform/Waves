@@ -21,7 +21,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec with RxScheduler with BlockGen
           PS[ByteStr],
           PS[(Channel, MicroBlockInv)],
           PS[(Channel, MicroBlockResponse)],
-          Observable[(Channel, MicroBlockSynchronizer.MicroblockData, Option[(Channel, MicroBlockSnapshotResponse)])]
+          Observable[MicroBlockSynchronizer.MicroblockData.Remote]
       ) => Any
   ) = {
     val peers          = PeerDatabase.NoOp

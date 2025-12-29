@@ -39,7 +39,6 @@ import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.ExecutionModel.SynchronousExecution
-import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers.*
@@ -93,8 +92,8 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None, seed = Some(ByteStr(DefaultWalletSeed))))
 
   lazy val testTime: TestTime = TestTime()
-  lazy val blockAppender: Block => Task[Either[ValidationError, BlockApplyResult]] =
-    BlockAppender(blockchain, testTime, utxPool, posSelector, BlockEndorser.Disabled, Scheduler.singleThread("appender"))(_, None) // TODO:
+  lazy val blockAppender: Block => Either[ValidationError, BlockApplyResult] =
+    BlockAppender(blockchain, testTime, utxPool, posSelector, BlockEndorser.Disabled)(_, None) // TODO:
   lazy val blockChallenger: Option[BlockChallenger] =
     if (!settings.enableLightMode)
       Some(
@@ -103,7 +102,6 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
           new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
           wallet,
           settings,
-          testTime,
           posSelector,
           blockAppender
         )
@@ -698,7 +696,6 @@ class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
     allChannelGroup,
     d.wallet,
     d.settings,
-    d.testTime,
     d.posSelector,
     _ => throw new RuntimeException("Unexpected call in block challenger")
   )
@@ -722,8 +719,7 @@ class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
     d.testTime,
     d.utxPool,
     d.posSelector,
-    blockEndorser,
-    appenderScheduler
+    blockEndorser
   )(_, snapshot = None)
 
   def appendBlock(b: Block, requireAppended: Boolean = true, adjustTestTime: Boolean = true): Unit = {
@@ -734,7 +730,7 @@ class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
 
   def appendBlockWithoutFallback(b: Block, adjustTestTime: Boolean = true): Either[ValidationError, BlockApplyResult] = {
     if (adjustTestTime) adjustTime(b)
-    appenderWithoutCatching(b).runSyncUnsafe()
+    appenderWithoutCatching(b)
   }
 
   def adjustTime(b: Block): Unit = {

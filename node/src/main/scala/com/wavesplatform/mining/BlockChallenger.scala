@@ -1,12 +1,10 @@
 package com.wavesplatform.mining
 
-import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.block.{Block, ChallengedHeader, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network.*
@@ -14,24 +12,21 @@ import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
-import com.wavesplatform.state.appender.MaxTimeDrift
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{Blockchain, Height, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
-import monix.eval.Task
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 trait BlockChallenger {
-  def challengeBlock(block: Block, ch: Channel): Task[Unit]
-  def challengeMicroblock(md: MicroblockData, ch: Channel): Task[Unit]
+  def challengeBlock(block: Block, ch: Channel): Unit
+  def challengeMicroblock(md: MicroblockData): Unit
   def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)]
   def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]]
   def getProcessingTx(id: ByteStr): Option[Transaction]
@@ -43,55 +38,51 @@ class BlockChallengerImpl(
     allChannels: ChannelGroup,
     wallet: Wallet,
     settings: WavesSettings,
-    timeService: Time,
     pos: PoSSelector,
-    appendBlock: Block => Task[Either[ValidationError, BlockApplyResult]],
-    timeDrift: Long = MaxTimeDrift
+    appendBlock: Block => Either[ValidationError, BlockApplyResult]
 ) extends BlockChallenger
     with ScorexLogging {
 
   private val processingTxs: ConcurrentHashMap[ByteStr, Transaction] = new ConcurrentHashMap()
 
-  override def challengeBlock(block: Block, ch: Channel): Task[Unit] = {
+  override def challengeBlock(block: Block, ch: Channel): Unit = {
     log.debug(s"Challenging block $block")
 
     withProcessingTxs(block.transactionData) {
       (for {
-        challengingBlock <- EitherT(
-          createChallengingBlock(
-            block,
-            block.header.stateHash,
-            block.signature,
-            block.transactionData,
-            blockchainUpdater.lastStateHash(Some(block.header.reference)),
-            block.header.finalizationVoting
-          )
+        challengingBlock <- createChallengingBlock(
+          block,
+          block.header.stateHash,
+          block.signature,
+          block.transactionData,
+          blockchainUpdater.lastStateHash(Some(block.header.reference)),
+          block.header.finalizationVoting
         )
-        applyResult <- EitherT(appendBlock(challengingBlock))
-      } yield applyResult -> challengingBlock).value
-    }.map {
-      case Right((_: Applied, challengingBlock)) =>
-        log.debug(s"Successfully challenged $block with $challengingBlock")
-        BlockStats.challenged(challengingBlock, blockchainUpdater.height)
-        if (blockchainUpdater.isLastBlockId(challengingBlock.id())) {
-          allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
-        }
-      case Right((_, challengingBlock)) => log.debug(s"Ignored challenging block $challengingBlock")
-      case Left(err)                    => log.debug(s"Could not challenge $block: $err")
+        applyResult <- appendBlock(challengingBlock)
+      } yield (applyResult -> challengingBlock)) match {
+        case Right((_: Applied, challengingBlock)) =>
+          log.debug(s"Successfully challenged $block with $challengingBlock")
+          BlockStats.challenged(challengingBlock, blockchainUpdater.height)
+          if (blockchainUpdater.isLastBlockId(challengingBlock.id())) {
+            allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+          }
+        case Right((_, challengingBlock)) => log.debug(s"Ignored challenging block $challengingBlock")
+        case Left(err)                    => log.debug(s"Could not challenge $block: $err")
+      }
     }
   }
 
-  override def challengeMicroblock(md: MicroblockData, ch: Channel): Task[Unit] = {
-    val idStr = md.invOpt.map(_.totalBlockId.toString).getOrElse(s"(sig=${md.microBlock.totalResBlockSig})")
+  override def challengeMicroblock(md: MicroblockData): Unit = {
+    val idStr = md.inv.totalBlockId.toString
     log.debug(s"Challenging microblock $idStr")
 
     (for {
-      discarded <- EitherT(Task(blockchainUpdater.removeAfter(blockchainUpdater.lastBlockHeader.get.header.reference)))
-      block     <- EitherT(Task(discarded.headOption.map(_._1).toRight(GenericError("Liquid block wasn't discarded"))))
+      discarded <- blockchainUpdater.removeAfter(blockchainUpdater.lastBlockHeader.get.header.reference)
+      block     <- discarded.headOption.map(_._1).toRight(GenericError("Liquid block wasn't discarded"))
       txs = block.transactionData ++ md.microBlock.transactionData
-      (applyResult, challengingBlock) <- EitherT(withProcessingTxs(txs) {
-        (for {
-          challengingBlock <- EitherT(
+      (applyResult, challengingBlock) <- withProcessingTxs(txs) {
+        for {
+          challengingBlock <-
             createChallengingBlock(
               block,
               md.microBlock.stateHash,
@@ -100,17 +91,16 @@ class BlockChallengerImpl(
               blockchainUpdater.lastStateHash(Some(block.header.reference)),
               FinalizationVoting.combine(block.header.finalizationVoting, md.microBlock.finalizationVoting)
             )
-          )
-          applyResult <- EitherT(appendBlock(challengingBlock))
-        } yield applyResult -> challengingBlock).value
-      })
+          applyResult <- appendBlock(challengingBlock)
+        } yield applyResult -> challengingBlock
+      }
     } yield {
       applyResult match {
         case _: Applied =>
           log.debug(s"Successfully challenged microblock $idStr with $challengingBlock")
           BlockStats.challenged(challengingBlock, blockchainUpdater.height)
           if (blockchainUpdater.isLastBlockId(challengingBlock.id())) {
-            allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+            allChannels.broadcast(BlockForged(challengingBlock))
           }
         case _ =>
           log.debug(s"Ignored challenging block $challengingBlock")
@@ -130,7 +120,7 @@ class BlockChallengerImpl(
         pk -> blockchainUpdater.generatingBalance(pk.toAddress)
       }
       .filter { case (pk, balance) =>
-        blockchainUpdater.isCommitted(Height(blockchainUpdater.height), pk.toAddress) // Only a committed generator can challenge on current height
+        blockchainUpdater.isCommitted(Height(blockchainUpdater.height), pk.toAddress) // Only a committed generator can challenge at current height
         && blockchainUpdater.isMiningAllowed(blockchainUpdater.height, balance)
       }
       .traverse { case (acc, initGenBalance) =>
@@ -148,9 +138,12 @@ class BlockChallengerImpl(
 
   override def allProcessingTxs: Seq[Transaction] = processingTxs.values.asScala.toSeq
 
-  private def withProcessingTxs[A](txs: Seq[Transaction])(body: Task[A]): Task[A] =
-    Task(processingTxs.putAll(txs.map(tx => tx.id() -> tx).toMap.asJava))
-      .bracket(_ => body)(_ => Task(processingTxs.clear()))
+  private def withProcessingTxs[A](txs: Seq[Transaction])(body: => A): A = {
+    processingTxs.putAll(txs.map(tx => tx.id() -> tx).toMap.asJava)
+    val result = body
+    processingTxs.clear()
+    result
+  }
 
   private def createChallengingBlock(
       challengedBlock: Block,
@@ -159,7 +152,7 @@ class BlockChallengerImpl(
       txs: Seq[Transaction],
       prevStateHash: ByteStr,
       challengedFinalizationVoting: Option[FinalizationVoting]
-  ): Task[Either[ValidationError, Block]] = Task {
+  ): Either[ValidationError, Block] = {
     val prevBlockHeader = blockchainUpdater
       .heightOf(challengedBlock.header.reference)
       .flatMap(blockchainUpdater.blockHeader)
@@ -192,8 +185,8 @@ class BlockChallengerImpl(
         consensusData.generationSignature,
         txs,
         bestMinerAccount,
-        blockFeatures(blockchainUpdater, settings),
-        blockRewardVote(settings),
+        challengedBlock.header.featureVotes,
+        challengedBlock.header.rewardVote,
         stateHash = None,
         challengedHeader = None,
         finalizationVoting = challengedFinalizationVoting
@@ -229,8 +222,8 @@ class BlockChallengerImpl(
         consensusData.generationSignature,
         txs,
         bestMinerAccount,
-        blockFeatures(blockchainUpdater, settings),
-        blockRewardVote(settings),
+        Miner.blockFeatures(blockchainUpdater, settings),
+        settings.rewardsSettings.desired.getOrElse(-1L),
         Some(stateHash),
         Some(
           ChallengedHeader(
@@ -251,32 +244,5 @@ class BlockChallengerImpl(
       log.debug(s"Forged challenging block $challengingBlock")
       challengingBlock
     }
-  }.flatMap {
-    case res @ Right(block) => waitForTimeAlign(block.header.timestamp, timeDrift).map(_ => res)
-    case err @ Left(_)      => Task(err)
   }
-
-  private def blockFeatures(blockchain: Blockchain, settings: WavesSettings): Seq[Short] = {
-    val exclude = blockchain.approvedFeatures.keySet ++ settings.blockchainSettings.functionalitySettings.preActivatedFeatures.keySet
-
-    settings.featuresSettings.supported
-      .filterNot(exclude)
-      .filter(BlockchainFeatures.implemented)
-      .sorted
-  }
-
-  private def blockRewardVote(settings: WavesSettings): Long =
-    settings.rewardsSettings.desired.getOrElse(-1L)
-
-  private def waitForTimeAlign(blockTime: Long, timeDrift: Long): Task[Unit] =
-    Task {
-      val currentTime = timeService.correctedTime()
-      blockTime - currentTime - timeDrift
-    }.flatMap { timeDiff =>
-      if (timeDiff > 0) {
-        Task.sleep(timeDiff.millis)
-      } else {
-        Task.unit
-      }
-    }
 }

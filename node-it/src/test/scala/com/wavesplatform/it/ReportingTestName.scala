@@ -1,9 +1,10 @@
 package com.wavesplatform.it
 
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.api.http.DebugMessage
 import com.wavesplatform.it.ReportingTestName.CaptureCancel
 import com.wavesplatform.it.api.AsyncHttpApi.*
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.events.*
 import org.scalatest.*
 import org.slf4j.LoggerFactory
@@ -13,7 +14,7 @@ import scala.concurrent.{Await, Future}
 
 trait ReportingTestName extends SuiteMixin with ScorexLogging {
   th: Suite & Nodes =>
-  override protected lazy val log = LoggerFacade(LoggerFactory.getLogger("Test"))
+  override protected lazy val log = Logger(LoggerFactory.getLogger("Test"))
 
   abstract override protected def runTest(testName: String, args: Args): Status = {
     printTestWorkflow(s"Test '$testName' started")

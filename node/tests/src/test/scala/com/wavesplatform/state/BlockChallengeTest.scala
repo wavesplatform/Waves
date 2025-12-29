@@ -398,7 +398,7 @@ class BlockChallengeTest
         d.createChallengingBlock(challengingMiner, challengedBlock, strictTime = true)
 
       testTime.setTime(blockWithChallenge.header.timestamp.max(challengedBlock.header.timestamp))
-      createBlockAppender(d)(blockWithChallenge).runSyncUnsafe() shouldBe Left(
+      createBlockAppender(d)(blockWithChallenge) shouldBe Left(
         BlockAppendError("Challenged header is not supported yet", blockWithChallenge)
       )
     }
@@ -575,7 +575,7 @@ class BlockChallengeTest
         timestamp = Some(d.nextBlockTime(challengingMiner))
       )
       d.testTime.setTime(newBlock.header.timestamp + GetTimeStampAdjustment)
-      d.blockAppender(newBlock).runSyncUnsafe() should beRight
+      d.blockAppender(newBlock) should beRight
       d.blockchain.height shouldBe 1003 // Same generation period as 1002
 
       val expectedEffectiveBalance = effBalanceBefore - 1.waves - TestValues.fee
@@ -1797,7 +1797,6 @@ class BlockChallengeTest
             new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
             d.wallet,
             d.settings,
-            testTime,
             d.posSelector,
             createBlockAppender(d)
           ) {
@@ -1987,11 +1986,11 @@ class BlockChallengeTest
     def tryToAppendBlock(
         d: Domain,
         generator: KeyPair,
-        appender: Block => Task[Either[ValidationError, BlockApplyResult]]
+        appender: Block => Either[ValidationError, BlockApplyResult]
     ): Either[ValidationError, BlockApplyResult] = {
       val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = generator)
       testTime.setTime(block.header.timestamp)
-      appender(block).runSyncUnsafe()
+      appender(block)
     }
 
     val challengedMiner = TxHelpers.signer(1)
@@ -2062,7 +2061,7 @@ class BlockChallengeTest
 
       val appender = createBlockAppender(d)
       testTime.setTime(betterBlock.header.timestamp)
-      appender(betterBlock).runSyncUnsafe() should beRight
+      appender(betterBlock) should beRight
       d.lastBlock shouldBe betterBlock
       d.utxPool.size shouldBe txs.size
       d.utxPool.all.toSet shouldBe txs.toSet
@@ -2095,15 +2094,15 @@ class BlockChallengeTest
     else fail("block should be defined")
   }
 
-  private def createBlockAppender(d: Domain): Block => Task[Either[ValidationError, BlockApplyResult]] =
-    BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, BlockEndorser.Disabled, appenderScheduler)(_, None)
+  private def createBlockAppender(d: Domain): Block => Either[ValidationError, BlockApplyResult] =
+    BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, BlockEndorser.Disabled)(_, None)
 
   private def createMicroBlockAppender(d: Domain): (Channel, MicroBlock) => Task[Unit] = { (ch, mb) =>
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
     MicroblockAppender(d.blockchain, d.utxPool, channels, PeerDatabase.NoOp, Some(createBlockChallenger(d, channels)), appenderScheduler)(
       ch,
-      MicroblockData(None, mb, Coeval.now(Set.empty)),
+      MicroblockData.Remote(None, mb, Coeval.now(Set.empty)),
       None
     )
   }
@@ -2114,7 +2113,6 @@ class BlockChallengeTest
       allChannels,
       d.wallet,
       d.settings,
-      testTime,
       d.posSelector,
       createBlockAppender(d)
     )

@@ -4,6 +4,7 @@ import cats.instances.seq.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.typesafe.scalalogging.StrictLogging
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.{Block, BlockEndorsement, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
@@ -19,7 +20,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
-import com.wavesplatform.utils.{LoggerFacade, Time}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import kamon.Kamon
 
@@ -90,7 +91,7 @@ package object appender extends StrictLogging {
       utx: UtxPool,
       pos: PoSSelector,
       time: Time,
-      log: LoggerFacade,
+      log: Logger,
       verify: Boolean,
       txSignParCheck: Boolean
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] =
@@ -164,7 +165,7 @@ package object appender extends StrictLogging {
       utx: UtxPool,
       pos: PoSSelector,
       time: Time,
-      log: LoggerFacade,
+      log: Logger,
       verify: Boolean,
       txSignParCheck: Boolean
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] =

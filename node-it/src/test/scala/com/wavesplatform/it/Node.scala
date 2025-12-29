@@ -1,24 +1,24 @@
 package com.wavesplatform.it
 
-import java.net.{InetSocketAddress, URL}
-import scala.concurrent.duration.FiniteDuration
 import com.typesafe.config.Config
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{KeyPair, PublicKey, SeedKeyPair}
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TransactionType
-import com.wavesplatform.utils.LoggerFacade
 import com.wavesplatform.wallet.Wallet
 import io.grpc.{ManagedChannel, ManagedChannelBuilder}
 import org.asynchttpclient.*
 import org.asynchttpclient.Dsl.{config as clientConfig, *}
 import org.slf4j.LoggerFactory
 
+import java.net.{InetSocketAddress, URL}
+import scala.concurrent.duration.FiniteDuration
+
 abstract class Node(val config: Config) extends AutoCloseable {
-  lazy val log: LoggerFacade =
-    LoggerFacade(LoggerFactory.getLogger(this.name))
+  lazy val log: Logger = Logger(LoggerFactory.getLogger(this.name))
 
   val settings: WavesSettings = WavesSettings.fromRootConfig(config)
   val client: AsyncHttpClient = asyncHttpClient(
@@ -51,7 +51,7 @@ abstract class Node(val config: Config) extends AutoCloseable {
     * inaccessible from the host.
     */
   def networkAddress: InetSocketAddress
-  
+
   def networkAddressAccessibleFromHost: InetSocketAddress
 
   override def close(): Unit = client.close()

@@ -28,14 +28,14 @@ object MicroBlockSynchronizer extends ScorexLogging {
       microblockResponses: ChannelObservable[MicroBlockResponse],
       microblockSnapshots: ChannelObservable[MicroBlockSnapshotResponse],
       scheduler: SchedulerService
-  ): (Observable[(Channel, MicroblockData, Option[(Channel, MicroBlockSnapshotResponse)])], Coeval[CacheSizes]) = {
+  ): (Observable[MicroblockData.Remote], Coeval[CacheSizes]) = {
 
     implicit val schdlr: SchedulerService = scheduler
 
     val microBlockOwners     = cache[MicroBlockSignature, MSet[Channel]](settings.invCacheTimeout)
     val nextInvs             = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
     val awaiting             = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
-    val waitingForSnapshot   = cache[MicroBlockSignature, (Channel, MicroblockData)](settings.invCacheTimeout)
+    val waitingForSnapshot   = cache[MicroBlockSignature, MicroblockData.Remote](settings.invCacheTimeout)
     val successfullyReceived = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
     val receivedSnapshots    = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
 
@@ -131,29 +131,28 @@ object MicroBlockSynchronizer extends ScorexLogging {
       .logErr
       .subscribe()
 
-    val mbResponsesObservable = microblockResponses.observeOn(scheduler).flatMap { case (ch, MicroBlockResponse(mb, totalRef)) =>
-      successfullyReceived.put(totalRef, dummy)
-      BlockStats.received(mb, ch, totalRef)
-      Option(awaiting.getIfPresent(totalRef)) match {
-        case None =>
-          log.trace(s"${id(ch)} Received unexpected ${mb.stringRepr(totalRef)}")
-          Observable.empty
-        case Some(mi) =>
-          log.trace(s"${id(ch)} Received ${mb.stringRepr(totalRef)}, as expected")
-          awaiting.invalidate(totalRef)
-          Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalRef)))))
-      }
-    }
-
-    val observable = if (isLightMode) {
-      mbResponsesObservable
-        .mapEval {
-          case (ch, mbd @ MicroblockData(Some(mbInv), _, _)) =>
-            Task.evalAsync {
-              requestData(mbInv.totalBlockId, ch -> mbd, waitingForSnapshot, receivedSnapshots, MicroSnapshotRequest.apply, "microblock snapshot")
-            }
-          case _ => Task.unit
+    val mbResponsesObservable: Observable[MicroblockData.Remote] =
+      microblockResponses.observeOn(scheduler).flatMap { case (ch, MicroBlockResponse(mb, totalRef)) =>
+        successfullyReceived.put(totalRef, dummy)
+        BlockStats.received(mb, ch, totalRef)
+        Option(awaiting.getIfPresent(totalRef)) match {
+          case None =>
+            log.trace(s"${id(ch)} Received unexpected ${mb.stringRepr(totalRef)}")
+            Observable.empty
+          case Some(mi) =>
+            log.trace(s"${id(ch)} Received ${mb.stringRepr(totalRef)}, as expected")
+            awaiting.invalidate(totalRef)
+            Observable(MicroblockData.Remote(mb, mi, ch, () => owners(totalRef), None))
         }
+      }
+
+    val observable: Observable[MicroblockData.Remote] = if (isLightMode) {
+      mbResponsesObservable
+        .mapEval(mbd =>
+          Task.evalAsync {
+            requestData(mbd.inv.totalBlockId, mbd, waitingForSnapshot, receivedSnapshots, MicroSnapshotRequest.apply, "microblock snapshot")
+          }
+        )
         .executeOn(scheduler)
         .logErr
         .subscribe()
@@ -167,11 +166,11 @@ object MicroBlockSynchronizer extends ScorexLogging {
             Observable.empty
           case None =>
             Option(waitingForSnapshot.getIfPresent(snapshot.totalBlockId)) match {
-              case Some((mbdCh, mbd)) =>
+              case Some(mbd) =>
                 receivedSnapshots.put(snapshot.totalBlockId, dummy)
                 waitingForSnapshot.invalidate(snapshot.totalBlockId)
                 log.trace(s"${id(ch)} Received microblock snapshot ${snapshot.totalBlockId}, as expected")
-                Observable((mbdCh, mbd, Some(ch -> snapshot)))
+                Observable(mbd.copy(snapshot = Some(ch -> snapshot)))
               case None =>
                 log.trace(s"${id(ch)} Received unexpected snapshot ${snapshot.totalBlockId}")
                 Observable.empty
@@ -179,15 +178,43 @@ object MicroBlockSynchronizer extends ScorexLogging {
         }
       }
     } else {
-      mbResponsesObservable.map { case (ch, mbData) =>
-        (ch, mbData, None)
-      }
+      mbResponsesObservable
     }
 
     (observable, cacheSizesReporter)
   }
 
-  case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock, microblockOwners: Coeval[Set[Channel]])
+  enum MicroblockData {
+    def microBlock: MicroBlock
+    def inv: MicroBlockInv
+    case Local(microBlock: MicroBlock, inv: MicroBlockInv)
+    case Remote(
+        microBlock: MicroBlock,
+        inv: MicroBlockInv,
+        source: Channel,
+        owners: () => Set[Channel],
+        snapshot: Option[(snapshotSource: Channel, snapshotResponse: MicroBlockSnapshotResponse)]
+    )
+  }
+
+  object MicroblockData {
+    extension (m: MicroblockData) {
+      def snapshot: Option[(snapshotSource: Channel, snapshotResponse: MicroBlockSnapshotResponse)] = m match {
+        case r: MicroblockData.Remote => r.snapshot
+        case _                        => None
+      }
+      
+      def source: Option[Channel] = m match {
+        case MicroblockData.Remote(source = source) => Some(source)
+        case _ => None
+      }
+      
+      def owners(): Set[Channel] = m match {
+        case MicroblockData.Remote(owners = owners) => owners()
+        case _ => Set.empty
+      }
+    }
+  }
 
   type MicroBlockSignature = ByteStr
 

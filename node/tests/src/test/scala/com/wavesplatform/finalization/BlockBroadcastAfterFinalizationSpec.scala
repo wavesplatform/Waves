@@ -51,7 +51,6 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
           new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
           d.wallet,
           d.settings,
-          testTime,
           d.posSelector,
           _ => throw new RuntimeException("Unexpected call in block challenger")
         )

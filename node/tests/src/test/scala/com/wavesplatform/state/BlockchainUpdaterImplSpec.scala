@@ -306,16 +306,16 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
       val scheduler = Schedulers.singleThread("appender")
       val appender =
-        BlockAppender(d.blockchainUpdater, SystemTime, d.utxPool, d.posSelector, BlockEndorser.Disabled, scheduler, verify = false)(_, None)
+        BlockAppender(d.blockchainUpdater, SystemTime, d.utxPool, d.posSelector, BlockEndorser.Disabled, verify = false)(_, None)
 
-      appender(worseBlock).runSyncUnsafe(1.minute) shouldBe Left(
+      appender(worseBlock) shouldBe Left(
         BlockAppendError(
           s"Competitors liquid block $worseBlock(timestamp=${worseBlock.header.timestamp}) is not better than existing (ng.base $currentBlock(timestamp=${currentBlock.header.timestamp}))",
           worseBlock
         )
       )
 
-      appender(betterBlock).runSyncUnsafe(1.minute) should beRight
+      appender(betterBlock) should beRight
       d.lastBlock shouldBe betterBlock
       scheduler.shutdown()
     }

@@ -1,5 +1,6 @@
 package com.wavesplatform.generator.utils
 
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
@@ -13,7 +14,6 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Transaction, TxNonNegativeAmount}
-import com.wavesplatform.utils.LoggerFacade
 import org.slf4j.LoggerFactory
 
 import java.util.concurrent.ThreadLocalRandom
@@ -21,7 +21,7 @@ import java.util.concurrent.ThreadLocalRandom
 object Gen {
   private def random = ThreadLocalRandom.current
 
-  val log = LoggerFacade(LoggerFactory.getLogger("Gen"))
+  val log = Logger(LoggerFactory.getLogger("Gen"))
 
   def script(complexity: Boolean = true, estimator: ScriptEstimator): Script = {
     val s = if (complexity) s"""
