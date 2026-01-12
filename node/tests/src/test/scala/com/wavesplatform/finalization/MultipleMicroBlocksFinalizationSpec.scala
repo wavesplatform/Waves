@@ -1,0 +1,87 @@
+package com.wavesplatform.finalization
+
+import com.wavesplatform.block.Block
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.finalization.BaseFinalizationSpec
+import com.wavesplatform.state.{GeneratorIndex, GenesisBlockHeight, Height}
+import com.wavesplatform.test.DomainPresets.WavesSettingsOps
+import com.wavesplatform.test.produce
+import com.wavesplatform.transaction.TxHelpers
+import org.scalactic.source.Position
+
+class MultipleMicroBlocksFinalizationSpec extends BaseFinalizationSpec {
+  private val generator1     = TxHelpers.signer(0)
+  private val generator1Addr = generator1.toAddress
+  private val generator1Idx  = GeneratorIndex(0)
+
+  private val generator2    = TxHelpers.signer(1)
+  private val generator2Idx = GeneratorIndex(1)
+
+  private val baseSettings = DomainPresets.DeterministicFinality.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
+  private val defaultSettings = baseSettings.configure(
+    _.copy(
+      generationPeriodLength = 2,
+      lightNodeBlockFieldsAbsenceInterval = 0
+    )
+  )
+
+  private val generators = Seq(generator1, generator2)
+
+  "second microblock appended if first contains" - {
+    "invalid endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
+      log.debug(s"Append block 2 with commitments")
+      val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
+      d.appender.appendBlock(block2WithCommitments)
+
+      val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
+      log.debug(s"Append block 3")
+      d.appender.appendBlock(block3)
+
+      log.debug(s"Append microblock with conflict endorsement")
+      val microBlockWithTxn1 = d.createMicroBlock(
+        signer = Some(generator1),
+        finalizationVoting = Some(
+          mkFinalizationVoting(valid = Seq(generator1Idx)).signed(
+            endorsedId = d.blockchain.blockId(2).value,
+            finalizedId = d.blockchain.blockId(GenesisBlockHeight.toInt).value,
+            validEndorsers = generator1 // Should not sign its block
+          )
+        )
+      )(TxHelpers.transfer(generator2, generator1Addr))
+      d.appendMicroBlockE(microBlockWithTxn1) should produce("Miner can't endorse their own block")
+
+      log.debug(s"Append microblock without endorsements")
+      d.appendMicroBlockE(TxHelpers.transfer(generator2, generator1Addr)) should beRight
+    }
+
+    "conflict endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
+      log.debug(s"Append block 2 with commitments")
+      val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
+      d.appender.appendBlock(block2WithCommitments)
+
+      val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
+      log.debug(s"Append block 3")
+      d.appender.appendBlock(block3)
+
+      log.debug(s"Append microblock with conflict endorsement")
+      val microBlockWithTxn1 = d.createMicroBlock(
+        signer = Some(generator1),
+        finalizationVoting = Some(mkFinalizationVoting().withConflict(generator2, generator2Idx, block2WithCommitments.id()))
+      )(TxHelpers.transfer(generator2, generator1Addr))
+      d.appendMicroBlock(microBlockWithTxn1)
+
+      log.debug(s"Can't append microblock with same conflict endorsement")
+      val microBlockWithTxn2 = d.createMicroBlock(
+        signer = Some(generator1),
+        finalizationVoting = Some(mkFinalizationVoting().withConflict(generator2, generator2Idx, block2WithCommitments.id()))
+      )(TxHelpers.transfer(generator2, generator1Addr))
+      d.appendMicroBlockE(microBlockWithTxn2) should produce("Duplicate conflicting endorser indexes")
+
+      log.debug(s"Append microblock without endorsements")
+      d.appendMicroBlockE(TxHelpers.transfer(generator2, generator1Addr)) should beRight
+    }
+  }
+}
