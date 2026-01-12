@@ -4,7 +4,7 @@ import cats.instances.seq.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.block.{Block, BlockEndorsement, BlockSnapshot}
+import com.wavesplatform.block.{Block, BlockEndorsement, BlockSnapshot, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsUtils}
@@ -306,6 +306,7 @@ package object appender {
 
   private def validateConflictingEndorsement(
       blockchain: Blockchain,
+      finalizationVoting: FinalizationVoting,
       commitedGenerators: IndexedSeq[(Address, BlsPublicKey)],
       validEndorsements: Set[Address],
       minerAddress: Address,
@@ -317,9 +318,12 @@ package object appender {
     (address, blsPublicKey) <- commitedGenerators
       .lift(conflictingEndorsement.endorserIndex.toInt)
       .toRight(s"Invalid conflicting endorser index ${conflictingEndorsement.endorserIndex}")
-    _ <- Either.raiseUnless(generatorsWithEnoughBalance.contains(conflictingEndorsement.endorserIndex))(
+    _ <- Either.raiseUnless(
+      generatorsWithEnoughBalance.contains(conflictingEndorsement.endorserIndex) ||
+        finalizationVoting.conflict.exists(_.endorserIndex == conflictingEndorsement.endorserIndex)
+    ) {
       s"Conflicting endorsement sender $address has insufficient balance"
-    )
+    }
     _ <- Either.raiseWhen(address == minerAddress)("Conflicting endorsement from miner is not allowed")
     _ <- Either.raiseWhen(validEndorsements.contains(address))(s"Block contains both conflicting and valid endorsement from $address")
     _ <- Either.raiseWhen(conflictingEndorsement.finalizedHeight > validFinalizedHeight) {
@@ -370,6 +374,7 @@ package object appender {
             .traverse(
               validateConflictingEndorsement(
                 blockchain,
+                fv,
                 allCommittedGenerators,
                 validEndorserAddresses,
                 block.header.generator.toAddress,
