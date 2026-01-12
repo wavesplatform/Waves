@@ -22,7 +22,8 @@ class MultipleMicroBlocksFinalizationSpec extends BaseFinalizationSpec {
   private val defaultSettings = baseSettings.configure(
     _.copy(
       generationPeriodLength = 2,
-      lightNodeBlockFieldsAbsenceInterval = 0
+      lightNodeBlockFieldsAbsenceInterval = 0,
+      maxEndorsements = 1
     )
   )
 
@@ -54,6 +55,39 @@ class MultipleMicroBlocksFinalizationSpec extends BaseFinalizationSpec {
 
       log.debug(s"Append microblock without endorsements")
       d.appendMicroBlockE(TxHelpers.transfer(generator2, generator1Addr)) should beRight
+    }
+
+    "more than max endorsements" in {
+      val generator3    = TxHelpers.signer(2)
+      val generator3Idx = GeneratorIndex(2)
+      val generators    = Seq(generator1, generator2, generator3)
+      withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
+        log.debug(s"Append block 2 with commitments")
+        val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+        val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
+        d.appender.appendBlock(block2WithCommitments)
+
+        val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
+        log.debug(s"Append block 3")
+        d.appender.appendBlock(block3)
+
+        log.debug(s"Append microblock with conflict endorsement")
+        val microBlockWithTxn1 = d.createMicroBlock(
+          signer = Some(generator1),
+          finalizationVoting = Some(
+            mkFinalizationVoting(valid = Seq(generator1Idx, generator2Idx, generator3Idx)).signed(
+              endorsedId = d.blockchain.blockId(2).value,
+              finalizedId = d.blockchain.blockId(GenesisBlockHeight.toInt).value,
+              validEndorsers = generator2,
+              generator3
+            )
+          )
+        )(TxHelpers.transfer(generator2, generator1Addr))
+        d.appendMicroBlockE(microBlockWithTxn1) should produce("Too many valid endorsements")
+
+        log.debug(s"Append microblock without endorsements")
+        d.appendMicroBlockE(TxHelpers.transfer(generator2, generator1Addr)) should beRight
+      }
     }
 
     "conflict endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
