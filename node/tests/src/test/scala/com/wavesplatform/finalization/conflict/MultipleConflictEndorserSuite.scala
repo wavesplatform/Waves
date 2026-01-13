@@ -6,6 +6,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
 import com.wavesplatform.state.{GeneratorIndex, Height}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
+import com.wavesplatform.test.produce
 import com.wavesplatform.transaction.TxHelpers
 import org.scalactic.source.Position
 
@@ -78,5 +79,28 @@ class MultipleConflictEndorserSuite extends BaseFinalizationSpec {
 
     appendConflictEndorsements()
     checkConflictGenerators()
+  }
+
+  "reject a second conflict endorsement in epoch" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
+    log.debug(s"Append block 2 with commitments")
+    val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+    val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = validGenerator, strictTime = true)
+    d.appender.appendBlock(block2WithCommitments)
+
+    log.debug(s"Append block 3 with conflict endorsement")
+    def appendConflictEndorsements() = {
+      val block = d.createBlock(
+        version = Block.ProtoBlockVersion,
+        txs = Seq(TxHelpers.transfer(conflictGenerator1, conflictGenerator2Addr)),
+        generator = validGenerator,
+        strictTime = true,
+        finalizationVoting = Some(mkFinalizationVoting().withConflict(conflictGenerator1, conflictGenerator1Idx, block2WithCommitments.id()))
+      )
+      d.appender.appendBlockWithoutFallback(block)
+    }
+    appendConflictEndorsements() should beRight
+
+    log.debug(s"Append block 4 with same conflict endorsement")
+    appendConflictEndorsements() should produce("Second conflicting endorsement from one generator")
   }
 }

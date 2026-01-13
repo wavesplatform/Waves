@@ -308,6 +308,7 @@ package object appender {
       blockchain: Blockchain,
       finalizationVoting: FinalizationVoting,
       commitedGenerators: IndexedSeq[(Address, BlsPublicKey)],
+      conflictingGenerators: Set[GeneratorIndex],
       validEndorsements: Set[Address],
       minerAddress: Address,
       generatorsWithEnoughBalance: Set[GeneratorIndex],
@@ -318,9 +319,12 @@ package object appender {
     (address, blsPublicKey) <- commitedGenerators
       .lift(conflictingEndorsement.endorserIndex.toInt)
       .toRight(s"Invalid conflicting endorser index ${conflictingEndorsement.endorserIndex}")
+    _ <- Either.raiseWhen(conflictingGenerators.contains(conflictingEndorsement.endorserIndex)) {
+      "Second conflicting endorsement from one generator"
+    }
     _ <- Either.raiseUnless(
       generatorsWithEnoughBalance.contains(conflictingEndorsement.endorserIndex) ||
-        finalizationVoting.conflict.exists(_.endorserIndex == conflictingEndorsement.endorserIndex)
+        finalizationVoting.conflict.exists(_.endorserIndex == conflictingEndorsement.endorserIndex) // Allow in NG
     ) {
       s"Conflicting endorsement sender $address has insufficient balance"
     }
@@ -359,9 +363,10 @@ package object appender {
           _ <- Either.raiseWhen(fv.conflict.groupBy(_.endorserIndex).size != fv.conflict.length)("Duplicate conflicting endorser indexes")
 
           generatorsWithEnoughBalance = validGeneratorBalances.view.map(_._1).toSet
+          blockHeight                 = Height(blockchain.height + 1)
           blockGenerationPeriod <- blockchain
-            .generationPeriodOf(Height(blockchain.height + 1))
-            .toRight(s"No period for height ${blockchain.height + 1}")
+            .generationPeriodOf(blockHeight)
+            .toRight(s"No period for height $blockHeight")
           allCommittedGenerators = blockchain.committedGenerators(blockGenerationPeriod)
 
           validEndorsers <- fv.valid.traverse(gi => allCommittedGenerators.lift(gi.toInt).toRight(s"Invalid endorser index: $gi"))
@@ -370,12 +375,15 @@ package object appender {
           }
           validEndorserAddresses = validEndorsers.view.map(_._1).toSet
           _ <- Either.raiseWhen(validEndorserAddresses.contains(block.header.generator.toAddress))("Miner can't endorse their own block")
+
+          knownConflictGenerators = blockchain.conflictGenerators(blockGenerationPeriod).upTo(blockHeight)
           _ <- fv.conflict
             .traverse(
               validateConflictingEndorsement(
                 blockchain,
                 fv,
                 allCommittedGenerators,
+                knownConflictGenerators,
                 validEndorserAddresses,
                 block.header.generator.toAddress,
                 generatorsWithEnoughBalance,
