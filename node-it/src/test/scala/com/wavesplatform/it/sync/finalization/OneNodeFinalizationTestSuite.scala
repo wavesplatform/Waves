@@ -106,12 +106,12 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec with OptionValues {
     finalizedHeightBefore1 should be < finalizedHeight1
 
     step("Finalization voting in a block header")
-    val blockHeader        = node.blockHeaderAt(node.height - 1)
-    val finalizationVoting = blockHeader.finalizationVoting.value
+    val votingBlockHeader  = node.blockHeaderAt(finalizedHeight1 + 1)
+    val finalizationVoting = votingBlockHeader.finalizationVoting.value
 
-    val generators: Seq[(data: GeneratorsResponse.Entry, index: Int)] = node.generators(blockHeader.height).zipWithIndex
+    val generators: Seq[(data: GeneratorsResponse.Entry, index: Int)] = node.generators(votingBlockHeader.height).zipWithIndex
 
-    val minerEndorser = generators.find { g => g.data.address == blockHeader.generator }.value
+    val minerEndorser = generators.find { g => g.data.address == votingBlockHeader.generator }.value
 
     withClue(s"endorsers=[${finalizationVoting.endorserIndexes.mkString(", ")}], miner=${minerEndorser.index}: ") {
       finalizationVoting.endorserIndexes should not contain minerEndorser.index
