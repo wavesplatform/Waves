@@ -137,15 +137,24 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
   "tryCollectAndClear" - {
     "returns None" - {
-      "if not reached finalization" in {
-        val s = started(minerIndex = 3, defaultGenerators)
+      "if not reached finalization" - {
+        "basic case" in {
+          val s = started(minerIndex = 3, defaultGenerators)
 
-        log.info("no endorsements")
-        s.checkTryCollect(expectedEndorsedId)
+          log.info("no endorsements")
+          s.checkTryCollect(expectedEndorsedId)
 
-        log.info("after endorsement #0")
-        s.addValidVote(0) // 0 and miner
-        s.checkTryCollect(expectedEndorsedId)
+          log.info("after endorsement #0")
+          s.addValidVote(0) // 0 and miner
+          s.checkTryCollect(expectedEndorsedId)
+        }
+
+        "reached the limit" in {
+          val s = started(minerIndex = 4, mkGenerators(5), maxValidEndorsers = 1)
+
+          s.addValidVote(0 to 4*)
+          s.checkTryCollect(expectedEndorsedId)
+        }
       }
 
       "on second request if we already reached finalization even we have a new valid vote" in {
@@ -244,12 +253,14 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
       minerIndex: Int = -1,
       generators: IndexedSeq[GeneratorBalance] = mkGenerators(2),
       conflict: Set[GeneratorIndex] = Set.empty,
-      hasSameBlockBeforeFinalizationHeight: Boolean = true
+      hasSameBlockBeforeFinalizationHeight: Boolean = true,
+      maxValidEndorsers: Int = 2
   ): ExtendedEndorsementStorage = {
     require(minerIndex == -1 || minerIndex >= 0 && minerIndex < generators.size, s"Invalid miner index $minerIndex")
     val r = new EndorsementStorage.InMemory((_, _) => hasSameBlockBeforeFinalizationHeight)
     r.startVoting(
       EndorsementFilter(
+        maxValidEndorsers,
         GeneratorIndex.checked(minerIndex),
         expectedFinalizedId,
         expectedFinalizedHeight,

@@ -53,7 +53,15 @@ object BlockEndorser {
           }.toVector
 
           val conflict = blockchain.conflictGenerators(votingPeriod).upTo(votingHeight)
-          EndorsementFilter(GeneratorIndex.checked(minerIndex), finalizedId, finalizedHeight, endorsedId, endorsers, conflict)
+          EndorsementFilter(
+            blockchain.settings.functionalitySettings.maxValidEndorsers,
+            GeneratorIndex.checked(minerIndex),
+            finalizedId,
+            finalizedHeight,
+            endorsedId,
+            endorsers,
+            conflict
+          )
         }
         if endorsementStorage.startVoting(filter)
 

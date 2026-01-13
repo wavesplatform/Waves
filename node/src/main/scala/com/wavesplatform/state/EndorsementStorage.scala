@@ -16,7 +16,7 @@ import scala.collection.{immutable, mutable}
 // TODO: .switch: use in appender when changed height
 trait EndorsementStorage {
 
-  /** @return true, if it can be shared with neighbours
+  /** @return true, if it can be shared with neighbors
     */
   def tryAdd(msg: EndorseBlock): Either[String, Boolean]
 

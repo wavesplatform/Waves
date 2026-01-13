@@ -11,6 +11,7 @@ import scala.collection.mutable
 /** @param endorsers All, including conflict
   */
 case class EndorsementFilter(
+    maxValidEndorsers: Int,
     miner: Option[GeneratorIndex],
     finalizedId: BlockId,
     finalizedHeight: Height,
@@ -50,7 +51,7 @@ case class EndorsementFilter(
     var endorserIndexes = Vector.empty[GeneratorIndex]
     var endorsedBalance = BigInt(minerBalance)
     var reached         = false
-    while (richest.nonEmpty && !reached) {
+    while (endorserIndexes.size <= maxValidEndorsers && richest.nonEmpty && !reached) {
       val x = richest.dequeue()
       endorserIndexes = endorserIndexes.appended(x.idx)
       endorsedBalance += x.balance
