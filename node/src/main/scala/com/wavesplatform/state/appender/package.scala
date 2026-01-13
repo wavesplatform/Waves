@@ -356,6 +356,7 @@ package object appender {
           _ <- Either.raiseWhen(block.header.challengedHeader.nonEmpty && block.header.finalizationVoting.nonEmpty)(
             "Finalization voting is not allowed in challenging block"
           )
+          _ <- Either.raiseWhen(fv.finalizedHeight < GenesisBlockHeight)(s"Finalized block height is less than $GenesisBlockHeight")
           _ <- Either.raiseWhen(fv.finalizedHeight.toInt >= blockchain.height)("Voting for finalized block")
           _ <- Either.raiseWhen(fv.valid.isEmpty && fv.conflict.isEmpty)("Finalization voting contains neither valid nor conflicting endorsements")
           _ <- Either.raiseWhen(fv.valid.size > blockchain.settings.functionalitySettings.maxValidEndorsers)("Too many valid endorsements")

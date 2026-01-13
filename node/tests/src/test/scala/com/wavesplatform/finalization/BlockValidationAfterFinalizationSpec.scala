@@ -33,6 +33,17 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
   }
 
   "should not append an invalid block" - {
+    "finalization height is less than genesis height" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        val block3WithVotes = d.createBlock(
+          mkFinalizationVoting(finalizedHeight = GenesisBlockHeight.prev)
+            .withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlock.id(), Height(3))
+        )
+
+        d.appender.appendBlockWithoutFallback(block3WithVotes) should produce("Finalized block height is less than 1")
+      }
+    }.run()
+
     "voting for finalized block" in new BaseTest {
       override def continue(d: Domain): Unit = {
         val finalizedHeight = Height(2)

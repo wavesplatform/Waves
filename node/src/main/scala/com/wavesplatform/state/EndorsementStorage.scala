@@ -54,8 +54,10 @@ object EndorsementStorage {
 
     override def tryAdd(msg: EndorseBlock): Either[String, Boolean] = synced {
       for {
-        filter        <- currentFilter.toRight("Voting hasn't started")
-        _             <- Either.raiseWhen(msg.finalizedHeight > filter.finalizedHeight)(s"Expected finalized height <= ${filter.finalizedHeight}")
+        filter <- currentFilter.toRight("Voting hasn't started")
+        _ <- Either.raiseWhen(msg.finalizedHeight < GenesisBlockHeight || msg.finalizedHeight > filter.finalizedHeight) {
+          s"Expected finalized height >= $GenesisBlockHeight and <= ${filter.finalizedHeight}"
+        }
         _             <- Either.raiseWhen(msg.endorserIndex >= filter.endorsers.size)(s"There are only ${filter.endorsers.size} endorsers")
         endorserIndex <- GeneratorIndex.checked(msg.endorserIndex).toRight(s"Invalid endorser index: ${msg.endorserIndex}")
         (_, endorserPk, _) = filter.endorsers(msg.endorserIndex)
