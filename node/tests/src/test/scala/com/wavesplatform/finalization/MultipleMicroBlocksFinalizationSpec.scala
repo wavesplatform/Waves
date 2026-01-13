@@ -23,7 +23,7 @@ class MultipleMicroBlocksFinalizationSpec extends BaseFinalizationSpec {
     _.copy(
       generationPeriodLength = 2,
       lightNodeBlockFieldsAbsenceInterval = 0,
-      maxEndorsements = 1
+      maxValidEndorsers = 1
     )
   )
 

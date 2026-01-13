@@ -1599,7 +1599,7 @@ class RocksDBWriter(
     readOnly(_.get(Keys.maliciousMinerBanHeights(address.bytes))).map(_.toInt)
 
   override def loadCommittedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
-    val approxGenerators = settings.functionalitySettings.maxEndorsements // Rough buffer size
+    val approxGenerators = settings.functionalitySettings.maxValidEndorsers // Rough buffer size
     val rawGenerators    = new mutable.ArrayBuffer[BlsPublicKey](approxGenerators)
     val addressIds       = new mutable.ArrayBuffer[AddressId](approxGenerators)
 

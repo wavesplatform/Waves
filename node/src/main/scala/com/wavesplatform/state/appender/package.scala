@@ -358,7 +358,7 @@ package object appender {
           )
           _ <- Either.raiseWhen(fv.finalizedHeight.toInt >= blockchain.height)("Voting for finalized block")
           _ <- Either.raiseWhen(fv.valid.isEmpty && fv.conflict.isEmpty)("Finalization voting contains neither valid nor conflicting endorsements")
-          _ <- Either.raiseWhen(fv.valid.size > blockchain.settings.functionalitySettings.maxEndorsements)("Too many valid endorsements")
+          _ <- Either.raiseWhen(fv.valid.size > blockchain.settings.functionalitySettings.maxValidEndorsers)("Too many valid endorsements")
           _ <- Either.raiseWhen(fv.valid.toSet.size != fv.valid.length)("Duplicate valid endorser indexes")
           _ <- Either.raiseWhen(fv.conflict.groupBy(_.endorserIndex).size != fv.conflict.length)("Duplicate conflicting endorser indexes")
 

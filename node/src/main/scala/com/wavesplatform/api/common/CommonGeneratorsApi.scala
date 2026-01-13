@@ -16,7 +16,7 @@ trait CommonGeneratorsApi {
 
 object CommonGeneratorsApi {
   def apply(rdb: RDB, blockchain: Blockchain & NG): CommonGeneratorsApi = new CommonGeneratorsApi with ScorexLogging {
-    private val approxGenerators = blockchain.settings.functionalitySettings.maxEndorsements // Rough buffer size
+    private val approxGenerators = blockchain.settings.functionalitySettings.maxValidEndorsers // Rough buffer size
 
     /** @note Doesn't work correctly for future heights
       */
