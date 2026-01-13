@@ -29,7 +29,7 @@ class MultipleMicroBlocksFinalizationSpec extends BaseFinalizationSpec {
 
   private val generators = Seq(generator1, generator2)
 
-  "second microblock appended if first contains" - {
+  "second microblock appended if first is invalid" - {
     "invalid endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
       log.debug(s"Append block 2 with commitments")
       val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
@@ -40,7 +40,7 @@ class MultipleMicroBlocksFinalizationSpec extends BaseFinalizationSpec {
       log.debug(s"Append block 3")
       d.appender.appendBlock(block3)
 
-      log.debug(s"Append microblock with conflict endorsement")
+      log.debug(s"Append microblock with conflicting endorsement")
       val microBlockWithTxn1 = d.createMicroBlock(
         signer = Some(generator1),
         finalizationVoting = Some(
@@ -71,7 +71,7 @@ class MultipleMicroBlocksFinalizationSpec extends BaseFinalizationSpec {
         log.debug(s"Append block 3")
         d.appender.appendBlock(block3)
 
-        log.debug(s"Append microblock with conflict endorsement")
+        log.debug(s"Append microblock with conflicting endorsement")
         val microBlockWithTxn1 = d.createMicroBlock(
           signer = Some(generator1),
           finalizationVoting = Some(
@@ -90,7 +90,7 @@ class MultipleMicroBlocksFinalizationSpec extends BaseFinalizationSpec {
       }
     }
 
-    "conflict endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
+    "duplicate conflicting endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
       log.debug(s"Append block 2 with commitments")
       val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
       val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
@@ -100,14 +100,14 @@ class MultipleMicroBlocksFinalizationSpec extends BaseFinalizationSpec {
       log.debug(s"Append block 3")
       d.appender.appendBlock(block3)
 
-      log.debug(s"Append microblock with conflict endorsement")
+      log.debug(s"Append microblock with conflicting endorsement")
       val microBlockWithTxn1 = d.createMicroBlock(
         signer = Some(generator1),
         finalizationVoting = Some(mkFinalizationVoting().withConflict(generator2, generator2Idx, block2WithCommitments.id()))
       )(TxHelpers.transfer(generator2, generator1Addr))
       d.appendMicroBlock(microBlockWithTxn1)
 
-      log.debug(s"Can't append microblock with same conflict endorsement")
+      log.debug(s"Can't append microblock with same conflicting endorsement")
       val microBlockWithTxn2 = d.createMicroBlock(
         signer = Some(generator1),
         finalizationVoting = Some(mkFinalizationVoting().withConflict(generator2, generator2Idx, block2WithCommitments.id()))
