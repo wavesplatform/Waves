@@ -57,6 +57,17 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
       }
     }.run()
 
+    "miner endorsement" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        val block3WithVotes = d.createBlock(
+          mkFinalizationVoting(valid = Seq(committedGenerator1Idx))
+            .signed(endorsedId = d.lastBlockId, finalizedId = d.blockchain.blockHeader(GenesisBlockHeight.toInt).value.id(), committedGenerator1)
+        )
+
+        d.appender.appendBlockWithoutFallback(block3WithVotes) should produce("Miner can't endorse its own block")
+      }
+    }.run()
+
     "nonempty aggregated signature, but empty valid endorsers" in new BaseTest {
       override def continue(d: Domain): Unit = {
         val block3WithVotes = d.createBlock(

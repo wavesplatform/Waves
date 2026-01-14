@@ -375,7 +375,7 @@ package object appender {
             Either.raiseUnless(generatorsWithEnoughBalance.contains(idx))(s"Valid endorsement sender $idx has insufficient balance")
           }
           validEndorserAddresses = validEndorsers.view.map(_._1).toSet
-          _ <- Either.raiseWhen(validEndorserAddresses.contains(block.header.generator.toAddress))("Miner can't endorse their own block")
+          _ <- Either.raiseWhen(validEndorserAddresses.contains(block.header.generator.toAddress))("Miner can't endorse its own block")
 
           knownConflictGenerators = blockchain.conflictGenerators(blockGenerationPeriod).upTo(blockHeight)
           _ <- fv.conflict

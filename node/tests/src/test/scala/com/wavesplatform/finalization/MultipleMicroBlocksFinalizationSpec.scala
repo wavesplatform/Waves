@@ -51,7 +51,7 @@ class MultipleMicroBlocksFinalizationSpec extends BaseFinalizationSpec {
           )
         )
       )(TxHelpers.transfer(generator2, generator1Addr))
-      d.appendMicroBlockE(microBlockWithTxn1) should produce("Miner can't endorse their own block")
+      d.appendMicroBlockE(microBlockWithTxn1) should produce("Miner can't endorse its own block")
 
       log.debug(s"Append microblock without endorsements")
       d.appendMicroBlockE(TxHelpers.transfer(generator2, generator1Addr)) should beRight
