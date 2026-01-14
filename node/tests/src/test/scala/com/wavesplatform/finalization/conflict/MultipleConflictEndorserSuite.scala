@@ -6,7 +6,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
 import com.wavesplatform.state.{GeneratorIndex, Height}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.produce
 import com.wavesplatform.transaction.TxHelpers
 import org.scalactic.source.Position
 
