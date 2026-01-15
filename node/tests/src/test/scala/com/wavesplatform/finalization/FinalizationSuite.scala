@@ -12,7 +12,6 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.wallet.Wallet
 import org.scalactic.source.Position
 
-// TODO: move to valid
 class FinalizationSuite extends BaseFinalizationSpec {
   private val seed          = ByteStr("finality-test".getBytes())
   private val thisNodeAcc   = Wallet.generateNewAccount(seed.arr, nonce = 0)
@@ -110,6 +109,47 @@ class FinalizationSuite extends BaseFinalizationSpec {
         d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
         d.checkFinalizedHeight(3)
       }
+    }
+
+    "even a key block references a previous one" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(otherNode1Acc, thisNodeAcc)) { d =>
+      val genesisBlockId = d.blockchain.lastBlockId.value
+      d.blockchain.finalizedHeightAt().value shouldBe GenesisBlockHeight
+      d.blockchain.finalizedHeight.value shouldBe GenesisBlockHeight
+
+      d.appendBlock()
+      d.checkFinalizedHeight()
+
+      log.debug(s"Append block 3 with commitments")
+      val endorsers = Seq(otherNode1Acc, thisNodeAcc)
+      val block3 = d.createBlock(
+        version = Block.ProtoBlockVersion,
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
+        generator = otherNode1Acc
+      )
+      d.appendBlock(block3)
+      d.checkFinalizedHeight()
+
+      log.debug(s"Append key block 4")
+      val block4 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true)
+      d.appender.appendBlock(block4)
+      d.checkFinalizedHeight()
+
+      log.debug(s"Append microblock with votes")
+      val microBlockWithTxn = d.createMicroBlock(
+        signer = Some(otherNode1Acc),
+        finalizationVoting = Some(
+          mkFinalizationVoting(valid = Seq(GeneratorIndex(1)))
+            .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = thisNodeAcc)
+        )
+      )(TxHelpers.transfer(otherNode1Acc, thisNodeAcc.toAddress))
+      d.appendMicroBlockE(microBlockWithTxn) should beRight
+      d.checkFinalizedHeight(3)
+
+      log.debug("Append key block 5 that references key block 4")
+      d.appender.appendBlock(
+        d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true, ref = Some(block4.id()))
+      )
+      d.checkFinalizedHeight(3)
     }
 
     "spending balance after voting doesn't affect finalization" in withDomain(

@@ -10,7 +10,7 @@ import com.wavesplatform.test.produce
 import com.wavesplatform.transaction.TxHelpers
 import org.scalactic.source.Position
 
-class MultipleMicroBlocksFinalizationSpec extends BaseFinalizationSpec {
+class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
   private val generator1     = TxHelpers.signer(0)
   private val generator1Addr = generator1.toAddress
   private val generator1Idx  = GeneratorIndex(0)
