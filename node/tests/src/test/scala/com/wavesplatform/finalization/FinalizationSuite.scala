@@ -111,6 +111,50 @@ class FinalizationSuite extends BaseFinalizationSpec {
       }
     }
 
+    "even got a conflict endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(otherNode1Acc, otherNode2Acc, thisNodeAcc)) { d =>
+      val genesisBlockId = d.blockchain.lastBlockId.value
+      d.blockchain.finalizedHeightAt().value shouldBe GenesisBlockHeight
+      d.blockchain.finalizedHeight.value shouldBe GenesisBlockHeight
+
+      d.appendBlock()
+      d.checkFinalizedHeight()
+
+      log.debug(s"Append block 3 with commitments")
+      val endorsers = Seq(otherNode1Acc, otherNode2Acc, thisNodeAcc)
+      val block3 = d.createBlock(
+        version = Block.ProtoBlockVersion,
+        txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
+        generator = otherNode1Acc
+      )
+      d.appendBlock(block3)
+      d.checkFinalizedHeight()
+
+      log.debug(s"Append key block 4")
+      val block4 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true)
+      d.appender.appendBlock(block4)
+      d.checkFinalizedHeight()
+
+      log.debug(s"Append microblock with valid votes")
+      val microBlockWithTxn1 = d.createMicroBlock(
+        signer = Some(otherNode1Acc),
+        finalizationVoting = Some( // voted: otherNode1Acc, otherNode2Acc; not voted: thisNodeAcc
+          mkFinalizationVoting(valid = Seq(GeneratorIndex(1)))
+            .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = otherNode2Acc)
+        )
+      )(TxHelpers.transfer(otherNode1Acc, thisNodeAcc.toAddress))
+      d.appendMicroBlockE(microBlockWithTxn1) should beRight
+      d.checkFinalizedHeight(3)
+
+      log.debug(s"Append microblock with conflicting vote")
+      val microBlockWithTxn2 = d.createMicroBlock(
+        signer = Some(otherNode1Acc),
+        // voted: otherNode1Acc; conflict: otherNode2Acc; not voted: thisNodeAcc
+        finalizationVoting = Some(mkFinalizationVoting().withConflict(otherNode2Acc, GeneratorIndex(1), block3.id()))
+      )(TxHelpers.transfer(otherNode1Acc, thisNodeAcc.toAddress))
+      d.appendMicroBlockE(microBlockWithTxn2) should beRight
+      d.checkFinalizedHeight(3) // Still finalized
+    }
+
     "even a key block references a previous one" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(otherNode1Acc, thisNodeAcc)) { d =>
       val genesisBlockId = d.blockchain.lastBlockId.value
       d.blockchain.finalizedHeightAt().value shouldBe GenesisBlockHeight
