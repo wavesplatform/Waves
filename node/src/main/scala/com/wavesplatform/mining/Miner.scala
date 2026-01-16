@@ -181,18 +181,18 @@ class MinerImpl(
 
     metrics.blockBuildTimeStats.measureSuccessful {
       val stopReasons = for {
-        _ <- isAllowedForMining(address, blockchainUpdater)
-        _ <- Either.raiseUnless(blockchainUpdater.isCommitted(Height(height + 1), address)) {
+        _ <- isAllowedForMiningByAccountScript(address, blockchainUpdater)
+        balance = blockchainUpdater.generatingBalance(address, Some(reference))
+        _ <- Either.raiseUnless(blockchainUpdater.isMiningAllowed(Height(height + 1), address, balance)) {
           s"$address is not committed on ${height + 1}. Try to commit to generation on next period"
         }
         _ <- Either.raiseWhen(blockchainUpdater.isConflict(Height(height + 1), address)) {
           s"$address is conflict on ${height + 1}. Try to commit to generation on next period"
         }
-      } yield ()
+      } yield balance
 
-      lazy val retryReasons = for {
+      def retryReasons(balance: Long) = for {
         _ <- checkQuorumAvailable()
-        balance = blockchainUpdater.generatingBalance(address, Some(reference))
         validBlockDelay <- pos
           .getValidBlockDelay(height, account, lastBlockHeader.baseTarget, balance)
           .leftMap(_.toString)
@@ -232,8 +232,8 @@ class MinerImpl(
 
       stopReasons
         .leftMap(ForgeAttemptResult.PermanentFailure.apply)
-        .flatMap { _ =>
-          retryReasons.leftMap(ForgeAttemptResult.TemporaryFailure.apply)
+        .flatMap { balance =>
+          retryReasons(balance).leftMap(ForgeAttemptResult.TemporaryFailure.apply)
         }
     }.merge
   }
@@ -260,7 +260,7 @@ class MinerImpl(
   def nextBlockGenerationTime(blockchain: Blockchain, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
     val balance = blockchain.generatingBalance(account.toAddress, Some(block.id()))
 
-    if (blockchain.isMiningAllowed(height, balance)) {
+    if (blockchain.isMiningAllowed(Height(height), account.toAddress, balance)) {
       val blockDelayE = pos.copy(blockchain = blockchain).getValidBlockDelay(height, account, block.header.baseTarget, balance)
       for {
         delay <- blockDelayE.leftMap(_.toString)
@@ -276,8 +276,8 @@ class MinerImpl(
     val height    = blockchain.height
     val lastBlock = blockchain.lastBlockHeader.get
     for {
-      _  <- checkAge(height, blockchain.lastBlockTimestamp.get) // lastBlock ?
-      _  <- isAllowedForMining(account.toAddress, blockchain)
+      _  <- checkAge(height, lastBlock.header.timestamp)
+      _  <- isAllowedForMiningByAccountScript(account.toAddress, blockchain)
       ts <- nextBlockGenerationTime(blockchain, height, lastBlock, account)
       calculatedOffset = ts - timeService.correctedTime()
       offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
@@ -387,14 +387,10 @@ object Miner {
     override val state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
   }
 
-  def hasAllowedForMiningScript(address: Address, blockchain: Blockchain): Boolean =
-    blockchain.isFeatureActivated(BlockchainFeatures.RideV6) || !blockchain.hasAccountScript(address)
-
-  def isAllowedForMining(address: Address, blockchain: Blockchain): Either[String, Unit] = {
+  def isAllowedForMiningByAccountScript(address: Address, blockchain: Blockchain): Either[String, Unit] =
     Either.cond(
-      hasAllowedForMiningScript(address, blockchain),
+      blockchain.isFeatureActivated(BlockchainFeatures.RideV6) || !blockchain.hasAccountScript(address),
       (),
       s"Account($address) is scripted and not allowed to forge blocks"
     )
-  }
 }

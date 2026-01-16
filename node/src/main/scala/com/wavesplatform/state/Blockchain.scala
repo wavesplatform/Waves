@@ -190,10 +190,14 @@ object Blockchain {
       committedTimes * CommitToGenerationTransaction.DepositInWavelets
     }
 
-    def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
+    def isMiningAllowed(height: Height, miner: Address, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
+        && blockchain.generationPeriodOf(height).fold(true) { p =>
+          val committed = blockchain.committedGenerators(p)
+          committed.isEmpty || committed.exists { case (address, _) => address == miner }
+        }
 
-    def isGeneratingBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
+    def isGeneratingBalanceValid(height: Height, block: Block, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isGeneratingBalanceValid(blockchain, height, block, effectiveBalance)
 
     def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
@@ -228,12 +232,6 @@ object Blockchain {
       if (blockchain.activatedFeatures.get(feature).exists(_ <= Height(height))) BlockchainFeatureStatus.Activated
       else if (blockchain.approvedFeatures.get(feature).exists(_ <= Height(height))) BlockchainFeatureStatus.Approved
       else BlockchainFeatureStatus.Undefined
-
-    def isCommitted(height: Height, miner: Address): Boolean = blockchain.generationPeriodOf(height).fold(true) { p =>
-      lazy val committed = blockchain.committedGenerators(p)
-      // TODO: or balance less than minimum
-      committed.isEmpty || committed.exists { case (address, _) => address == miner }
-    }
 
     def isConflict(height: Height, generator: Address): Boolean = {
       val maybeConflict = for {

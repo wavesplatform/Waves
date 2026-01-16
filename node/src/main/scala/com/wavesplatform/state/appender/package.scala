@@ -63,11 +63,8 @@ package object appender {
         .zipWithIndex
         .collect {
           case (((address, blsPk), balance), idx)
-              if !conflictGenerators.contains(GeneratorIndex(idx)) && blockchain.isGeneratingBalanceValid(
-                parentHeight.toInt,
-                newBlock,
-                balance
-              ) =>
+              if !conflictGenerators.contains(GeneratorIndex(idx))
+                && blockchain.isGeneratingBalanceValid(parentHeight, newBlock, balance) =>
             GeneratorInfo(GeneratorIndex(idx), address, blsPk, balance)
         }
         .toSeq
@@ -224,7 +221,7 @@ package object appender {
       parentHeight: Height
   ): Either[ValidationError, (ByteStr, GeneratorBalances)] =
     for {
-      _ <- Miner.isAllowedForMining(block.sender.toAddress, blockchainUpdater).leftMap(BlockAppendError(_, block))
+      _ <- Miner.isAllowedForMiningByAccountScript(block.sender.toAddress, blockchainUpdater).leftMap(BlockAppendError(_, block))
       r <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime())(block, parentHeight)
       _ <- validateStateHash(block, blockchainUpdater)
       _ <- validateChallengedHeader(block, blockchainUpdater)
@@ -264,7 +261,7 @@ package object appender {
     val parentBlockId = block.header.reference
     val balance       = blockchain.generatingBalance(minerAddress, Some(parentBlockId))
 
-    if (blockchain.isGeneratingBalanceValid(parentHeight.toInt, block, balance))
+    if (blockchain.isGeneratingBalanceValid(parentHeight, block, balance))
       Either.right(
         balance + block.header.challengedHeader.map(ch => blockchain.generatingBalance(ch.generator.toAddress, Some(parentBlockId))).getOrElse(0L)
       )

@@ -130,8 +130,7 @@ class BlockChallengerImpl(
         pk -> blockchainUpdater.generatingBalance(pk.toAddress)
       }
       .filter { case (pk, balance) =>
-        blockchainUpdater.isCommitted(Height(blockchainUpdater.height), pk.toAddress) // Only a committed generator can challenge on current height
-        && blockchainUpdater.isMiningAllowed(blockchainUpdater.height, balance)
+        blockchainUpdater.isMiningAllowed(Height(blockchainUpdater.height), pk.toAddress, balance)
       }
       .traverse { case (acc, initGenBalance) =>
         pos
