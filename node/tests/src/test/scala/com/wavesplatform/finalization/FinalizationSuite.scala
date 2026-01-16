@@ -66,6 +66,50 @@ class FinalizationSuite extends BaseFinalizationSpec {
         d.checkFinalizedHeight(3)
       }
 
+      "better key block" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(otherNode1Acc, otherNode2Acc, thisNodeAcc)) { d =>
+        val genesisBlockId = d.blockchain.lastBlockId.value
+        d.blockchain.finalizedHeightAt().value shouldBe GenesisBlockHeight
+        d.blockchain.finalizedHeight.value shouldBe GenesisBlockHeight
+
+        d.appendBlock()
+        d.checkFinalizedHeight()
+
+        log.debug(s"Append block 3 with commitments")
+        val endorsers = Seq(otherNode1Acc, otherNode2Acc, thisNodeAcc)
+        val block3 = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
+          generator = thisNodeAcc
+        )
+        d.appendBlock(block3)
+        d.checkFinalizedHeight()
+
+        log.debug(s"Append worse key block 4")
+        val betterBlock4 = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = otherNode1Acc,
+          strictTime = true,
+          finalizationVoting = Some( // voted: otherNode1Acc, thisNodeAcc; not voted: otherNode2Acc
+            mkFinalizationVoting(valid = Seq(GeneratorIndex(2)))
+              .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = thisNodeAcc)
+          )
+        )
+        val worseBlock4 = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = otherNode2Acc,
+          strictTime = true,
+          timestamp = Some(d.nextBlockTime(otherNode2Acc) + 100)
+        )
+        d.appender.appendBlock(worseBlock4)
+        d.checkFinalizedHeight()
+
+        log.debug(s"Append better key block 4")
+        d.appender.appendBlock(betterBlock4)
+        d.checkFinalizedHeight(3)
+      }
+
       "microblock" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(otherNode1Acc, otherNode2Acc, thisNodeAcc)) { d =>
         val genesisBlockId = d.blockchain.lastBlockId.value
         d.blockchain.finalizedHeightAt().value shouldBe GenesisBlockHeight
@@ -194,6 +238,93 @@ class FinalizationSuite extends BaseFinalizationSpec {
         d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true, ref = Some(block4.id()))
       )
       d.checkFinalizedHeight(3)
+    }
+
+    "even a key block is replaced" - {
+      "votes in the key block" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(otherNode1Acc, otherNode2Acc, thisNodeAcc)) { d =>
+        val genesisBlockId = d.blockchain.lastBlockId.value
+        d.blockchain.finalizedHeightAt().value shouldBe GenesisBlockHeight
+        d.blockchain.finalizedHeight.value shouldBe GenesisBlockHeight
+
+        d.appendBlock()
+        d.checkFinalizedHeight()
+
+        log.debug(s"Append block 3 with commitments")
+        val endorsers = Seq(otherNode1Acc, otherNode2Acc, thisNodeAcc)
+        val block3 = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
+          generator = otherNode1Acc
+        )
+        d.appendBlock(block3)
+        d.checkFinalizedHeight()
+
+        log.debug(s"Append worse key block 4")
+        val betterBlock4 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode2Acc, strictTime = true)
+        val worseBlock4 = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = otherNode1Acc,
+          strictTime = true,
+          timestamp = Some(d.nextBlockTime(otherNode1Acc) + 100),
+          finalizationVoting = Some( // voted: otherNode1Acc, thisNodeAcc; not voted: otherNode2Acc
+            mkFinalizationVoting(valid = Seq(GeneratorIndex(2)))
+              .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = thisNodeAcc)
+          )
+        )
+        d.appender.appendBlock(worseBlock4)
+        d.checkFinalizedHeight(3)
+
+        log.debug(s"Append better key block 4")
+        d.appender.appendBlock(betterBlock4)
+        d.checkFinalizedHeight(3) // Still finalized
+      }
+
+      "votes in a microblock" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(otherNode1Acc, otherNode2Acc, thisNodeAcc)) { d =>
+        val genesisBlockId = d.blockchain.lastBlockId.value
+        d.blockchain.finalizedHeightAt().value shouldBe GenesisBlockHeight
+        d.blockchain.finalizedHeight.value shouldBe GenesisBlockHeight
+
+        d.appendBlock()
+        d.checkFinalizedHeight()
+
+        log.debug(s"Append block 3 with commitments")
+        val endorsers = Seq(otherNode1Acc, otherNode2Acc, thisNodeAcc)
+        val block3 = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
+          generator = otherNode1Acc
+        )
+        d.appendBlock(block3)
+        d.checkFinalizedHeight()
+
+        log.debug(s"Append worse key block 4")
+        val betterBlock4 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode2Acc, strictTime = true)
+        val worseBlock4 = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = otherNode1Acc,
+          strictTime = true,
+          timestamp = Some(d.nextBlockTime(otherNode1Acc) + 100)
+        )
+        d.appender.appendBlock(worseBlock4)
+        d.checkFinalizedHeight()
+
+        log.debug(s"Append microblock with valid votes")
+        val microBlock = d.createMicroBlock(
+          signer = Some(otherNode1Acc),
+          finalizationVoting = Some( // voted: otherNode1Acc, thisNodeAcc; not voted: otherNode2Acc
+            mkFinalizationVoting(valid = Seq(GeneratorIndex(2)))
+              .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = thisNodeAcc)
+          )
+        )(TxHelpers.transfer(otherNode1Acc, thisNodeAcc.toAddress))
+        d.appendMicroBlockE(microBlock) should beRight
+        d.checkFinalizedHeight(3)
+
+        log.debug(s"Append better key block 4")
+        d.appender.appendBlock(betterBlock4)
+        d.checkFinalizedHeight(3) // Still finalized
+      }
     }
 
     "spending balance after voting doesn't affect finalization" in withDomain(
