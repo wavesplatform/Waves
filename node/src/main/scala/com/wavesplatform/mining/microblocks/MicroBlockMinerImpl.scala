@@ -5,7 +5,7 @@ import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, FinalizationVoting, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.*
@@ -160,7 +160,6 @@ class MicroBlockMinerImpl(
   ): Either[MicroBlockMiningError, (Block, MicroBlock)] =
     microBlockBuildTimeStats.measureSuccessful {
       val currentFinalizationVoting = endorsementStorage.tryCollectAndClear(accumulatedBlock.header.reference)
-      // TODO: collect balances and write log
       for {
         signedBlock <- Block
           .buildAndSign(
@@ -175,7 +174,7 @@ class MicroBlockMinerImpl(
             rewardVote = accumulatedBlock.header.rewardVote,
             stateHash = if (blockchainUpdater.supportsLightNodeBlockFields()) stateHash else None,
             challengedHeader = None,
-            finalizationVoting = currentFinalizationVoting.orElse(accumulatedBlock.header.finalizationVoting)
+            finalizationVoting = FinalizationVoting.combine(accumulatedBlock.header.finalizationVoting, currentFinalizationVoting)
           )
           .leftMap(BlockBuildError.apply)
         microBlock <- MicroBlock

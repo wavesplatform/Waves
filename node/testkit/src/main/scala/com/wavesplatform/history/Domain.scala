@@ -51,7 +51,13 @@ import scala.concurrent.duration.*
 import scala.util.Try
 import scala.util.control.NonFatal
 
-case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksDBWriter: RocksDBWriter, settings: WavesSettings) {
+case class Domain(
+    rdb: RDB,
+    blockchainUpdater: CompleteBlockchainUpdater,
+    rocksDBWriter: RocksDBWriter,
+    settings: WavesSettings,
+    testTime: TestTime = TestTime()
+) {
   import Domain.*
   private given scheduler: SchedulerService = Schedulers.singleThread("domain", executionModel = SynchronousExecution)
 
@@ -92,7 +98,6 @@ case class Domain(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater, rocksD
 
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None, seed = Some(ByteStr(DefaultWalletSeed))))
 
-  lazy val testTime: TestTime = TestTime()
   lazy val blockAppender: Block => Task[Either[ValidationError, BlockApplyResult]] =
     BlockAppender(blockchain, testTime, utxPool, posSelector, BlockEndorser.Disabled, Scheduler.singleThread("appender"))(_, None) // TODO:
   lazy val blockChallenger: Option[BlockChallenger] =

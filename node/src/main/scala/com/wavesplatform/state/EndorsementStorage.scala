@@ -146,7 +146,7 @@ object EndorsementStorage {
         valid = Seq.empty,
         finalizedHeight = currentFilter.finalizedHeight,
         aggregatedEndorsement = None,
-        conflict = conflict.values.toIndexedSeq
+        conflict = (conflict -- latestResult.voting.conflict.map(_.endorserIndex.toInt)).values.toIndexedSeq
       )
 
       val voting =

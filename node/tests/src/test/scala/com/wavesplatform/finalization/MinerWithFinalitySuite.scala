@@ -1,17 +1,19 @@
 package com.wavesplatform.finalization
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockEndorsement}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.network.EndorseBlock
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.{CatchLogs, FreeSpec, TestSchedulerOps}
+import com.wavesplatform.test.{CatchLogs, FreeSpec, NumericExt, TestSchedulerOps, TestTime}
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
@@ -26,7 +28,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
 
   private val baseSettings = DomainPresets.DeterministicFinality.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
   private val defaultSettings = baseSettings
-    .copy(minerSettings = baseSettings.minerSettings.copy(quorum = 0))
+   .copy(minerSettings = baseSettings.minerSettings.copy(quorum = 0, microBlockInterval = 100.millis))
     .configure(_.copy(generationPeriodLength = 2))
 
   "If account not committed, its attempt to forge doesn't stop current mining of other account on same node" ignore {}
@@ -269,6 +271,119 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         d.blockchain.lastBlockId.value shouldBe lastBlockId // Not changed
         minerImpl.inMemoryLog.getMessages.find(_.contains("is not committed on 3")) should not be empty
       }
+    }
+  }
+
+  "Correct total block signature" in withManager { manager =>
+    val generator1    = TxHelpers.signer(1)
+    val generator1Idx = GeneratorIndex(0)
+
+    val generator2     = thisNodeAcc
+    val generator2Addr = generator2.toAddress
+
+    val generator3    = TxHelpers.signer(2)
+    val generator3Idx = GeneratorIndex(2)
+
+    val generators = Seq(generator1, generator2, generator3)
+    val initBalances = Seq(
+      AddrWithBalance(generator1.toAddress, 5000.waves),
+      AddrWithBalance(generator2.toAddress, 2000.waves),
+      AddrWithBalance(generator3.toAddress, 3000.waves)
+    )
+
+    val minerScheduler    = TestScheduler()
+    val appenderScheduler = TestScheduler()
+
+    val channels     = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
+    var miner: Miner = Miner.Disabled
+    val time         = TestTime()
+    withDomain(defaultSettings, initBalances, miner = x => miner.scheduleMining(x), time = time) { d =>
+      d.wallet.generateNewAccounts(1).map(_.toAddress)
+
+      val endorsementStorage = EndorsementStorage.InMemory((blockId, h) => blockId == d.blockchain.blockId(h.toInt))
+      val blockEndorser      = BlockEndorser.InMemory(d.blockchain, d.wallet, endorsementStorage, channels)
+      val minerImpl = new MinerImpl(
+        channels,
+        d.blockchain,
+        d.settings,
+        time,
+        d.utxPool,
+        blockEndorser,
+        endorsementStorage,
+        d.wallet,
+        d.posSelector,
+        minerScheduler,
+        appenderScheduler,
+        Observable.empty
+      ) with CatchLogs
+      miner = minerImpl
+
+      val genesisBlockId = d.blockchain.lastBlockId.value
+
+      log.debug(s"Append block 2 with commitments")
+      val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator2, strictTime = true)
+      d.appender.appendBlock(block2WithCommitments)
+
+      log.debug(s"Trigger forging block 3")
+      time.advance((d.nextBlockTime(thisNodeAcc) - d.testTime.getTimestamp()).millis)
+      appenderScheduler.tickNext("appender-1")
+      minerScheduler.tickNext("miner-1")
+      appenderScheduler.tickNext("appender-2")
+
+      log.debug(s"Trigger forging micro block 1 of block 3, reaching finalization")
+      endorsementStorage.tryAdd(
+        EndorseBlock(
+          endorserIndex = generator1Idx.toInt,
+          finalizedId = genesisBlockId,
+          finalizedHeight = GenesisBlockHeight,
+          endorsedId = block2WithCommitments.id(),
+          signature = BlockEndorsement.sign(BlsKeyPair(generator1.privateKey), genesisBlockId, GenesisBlockHeight, block2WithCommitments.id()).byteStr
+        )
+      ) should beRight
+      d.utxPool.putIfNew(TxHelpers.transfer(generator1, generator2Addr))
+
+      time.advance(1.millis)
+      minerScheduler.tickNext("miner-1")
+      appenderScheduler.tickNext("appender-2")
+
+      log.debug(s"Trigger forging micro block 2 of block 3, losing finalization")
+      val otherFinalizedBlockId = TxHelpers.randomBlockId
+      endorsementStorage.tryAdd(
+        EndorseBlock(
+          endorserIndex = generator1Idx.toInt,
+          finalizedId = otherFinalizedBlockId,
+          finalizedHeight = GenesisBlockHeight,
+          endorsedId = block2WithCommitments.id(),
+          signature =
+            BlockEndorsement.sign(BlsKeyPair(generator1.privateKey), otherFinalizedBlockId, GenesisBlockHeight, block2WithCommitments.id()).byteStr
+        )
+      ) should beRight
+      d.utxPool.putIfNew(TxHelpers.transfer(generator1, generator2Addr))
+
+      time.advance(defaultSettings.minerSettings.microBlockInterval + 1.millis)
+      minerScheduler.tickNext("miner-1")
+      appenderScheduler.tickNext("appender-2")
+      val microBlock2TotalId = d.lastBlockId
+
+      log.debug(s"Trigger forging micro block 3 of block 3, reaching finalization")
+      endorsementStorage.tryAdd(
+        EndorseBlock(
+          endorserIndex = generator3Idx.toInt,
+          finalizedId = genesisBlockId,
+          finalizedHeight = GenesisBlockHeight,
+          endorsedId = block2WithCommitments.id(),
+          signature = BlockEndorsement.sign(BlsKeyPair(generator3.privateKey), genesisBlockId, GenesisBlockHeight, block2WithCommitments.id()).byteStr
+        )
+      ) should beRight
+      d.utxPool.putIfNew(TxHelpers.transfer(generator1, generator2Addr))
+
+      time.advance(defaultSettings.minerSettings.microBlockInterval + 1.millis)
+      minerScheduler.tickNext("miner-1")
+      appenderScheduler.tickNext("appender-2")
+      val microBlock3TotalId = d.lastBlockId
+
+      microBlock2TotalId shouldNot be(microBlock3TotalId) // Appended
     }
   }
 }

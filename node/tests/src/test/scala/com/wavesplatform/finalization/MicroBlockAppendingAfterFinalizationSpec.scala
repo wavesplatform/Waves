@@ -4,9 +4,10 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
+import com.wavesplatform.history.Domain
 import com.wavesplatform.state.{GeneratorIndex, GenesisBlockHeight, Height}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.produce
+import com.wavesplatform.test.{NumericExt, produce}
 import com.wavesplatform.transaction.TxHelpers
 import org.scalactic.source.Position
 
@@ -15,8 +16,9 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
   private val generator1Addr = generator1.toAddress
   private val generator1Idx  = GeneratorIndex(0)
 
-  private val generator2    = TxHelpers.signer(1)
-  private val generator2Idx = GeneratorIndex(1)
+  private val generator2     = TxHelpers.signer(1)
+  private val generator2Addr = generator2.toAddress
+  private val generator2Idx  = GeneratorIndex(1)
 
   private val baseSettings = DomainPresets.DeterministicFinality.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
   private val defaultSettings = baseSettings.configure(
@@ -116,6 +118,68 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
 
       log.debug(s"Append microblock without endorsements")
       d.appendMicroBlockE(TxHelpers.transfer(generator2, generator1Addr)) should beRight
+    }
+  }
+
+  "reaching, losing and reaching again finalization" in {
+    val generator3    = TxHelpers.signer(2)
+    val generator3Idx = GeneratorIndex(2)
+
+    val generators = Seq(generator1, generator2, generator3)
+    val initBalances = Seq(
+      AddrWithBalance(generator1.toAddress, 5000.waves),
+      AddrWithBalance(generator2.toAddress, 2000.waves),
+      AddrWithBalance(generator3.toAddress, 3000.waves)
+    )
+
+    withDomain(defaultSettings, initBalances) { d =>
+      val genesisBlockId = d.blockchain.lastBlockId.value
+
+      log.debug(s"Append block 2 with commitments")
+      val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator2, strictTime = true)
+      d.appender.appendBlock(block2WithCommitments)
+
+      log.debug(s"Append block 3")
+      val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true)
+      d.appender.appendBlock(block3)
+
+      log.debug(s"Append microblock with valid endorsements, reaching finalization")
+      val microBlockWithTxn1 = d.createMicroBlock(
+        signer = Some(generator2),
+        finalizationVoting = Some(
+          mkFinalizationVoting(valid = Seq(generator1Idx))
+            .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = generator1)
+        )
+      )(TxHelpers.transfer(generator1, generator2Addr))
+      d.appendMicroBlockE(microBlockWithTxn1) should beRight
+      d.checkFinalizedHeight(2)
+
+      log.debug(s"Append microblock with conflicting endorsement, losing finalization (but it preserved)")
+      val microBlockWithTxn2 = d.createMicroBlock(
+        signer = Some(generator2),
+        finalizationVoting = Some(mkFinalizationVoting().withConflict(generator1, generator1Idx, genesisBlockId))
+      )(TxHelpers.transfer(generator1, generator2Addr))
+      d.appendMicroBlockE(microBlockWithTxn2) should beRight
+      d.checkFinalizedHeight(2)
+
+      log.debug(s"Append microblock with valid endorsement, reaching finalization again")
+      val microBlockWithTxn3 = d.createMicroBlock(
+        signer = Some(generator2),
+        finalizationVoting = Some(
+          mkFinalizationVoting(valid = Seq(generator3Idx))
+            .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = generator3)
+        )
+      )(TxHelpers.transfer(generator1, generator2Addr))
+      d.appendMicroBlockE(microBlockWithTxn3) should beRight
+      d.checkFinalizedHeight(2)
+    }
+  }
+
+  extension (d: Domain)(using Position) {
+    def checkFinalizedHeight(h: Int = GenesisBlockHeight.toInt): Unit = {
+      d.blockchain.finalizedHeightAt().value shouldBe Height(h)
+      d.blockchain.finalizedHeight.value shouldBe Height(h)
     }
   }
 }

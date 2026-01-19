@@ -197,6 +197,10 @@ class FinalizationSuite extends BaseFinalizationSpec {
       )(TxHelpers.transfer(otherNode1Acc, thisNodeAcc.toAddress))
       d.appendMicroBlockE(microBlockWithTxn2) should beRight
       d.checkFinalizedHeight(3) // Still finalized
+
+      log.debug("Append block 5")
+      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
+      d.checkFinalizedHeight(3)
     }
 
     "even a key block references a previous one" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(otherNode1Acc, thisNodeAcc)) { d =>
