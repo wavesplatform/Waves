@@ -25,10 +25,12 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
   private val expectedFinalizedId, unexpectedFinalizedId, expectedEndorsedId = TxHelpers.randomBlockId
 
-  private def mkGenerators(n: Int): IndexedSeq[GeneratorBalance] = (0 until n).map { i =>
+  private def mkGenerators(n: Int): IndexedSeq[GeneratorBalance] = (0 until n).map(mkGenerator(_, 100_000.waves))
+
+  private def mkGenerator(i: Int, initBalance: Long): GeneratorBalance = {
     val wavesKp = TxHelpers.signer(i)
     val blsKp   = BlsKeyPair(wavesKp.privateKey)
-    (wavesKp.toAddress, blsKp, 100_000.waves)
+    (wavesKp.toAddress, blsKp, initBalance)
   }
 
   private val defaultGenerators: IndexedSeq[GeneratorBalance] = mkGenerators(4)
@@ -204,16 +206,27 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
           s.checkTryCollect(expectedEndorsedId, valid = Seq(0), conflict = Seq(1, 2))
         }
 
-        "and lost finalization because of conflict votes" in {
-          val s = started(minerIndex = 3, defaultGenerators)
+        "then lost finalization because of conflict votes, then reached again" in {
+          val s = started(
+            minerIndex = 1,
+            generators = Vector(
+              mkGenerator(0, 5000.waves),
+              mkGenerator(1, 2000.waves),
+              mkGenerator(2, 3000.waves)
+            )
+          )
 
-          log.debug("reached finalization because of valid votes")
-          s.addValidVote(0, 1)
-          s.checkTryCollect(expectedEndorsedId, Seq(0, 1))
+          log.debug("reached finalization because of valid vote")
+          s.addValidVote(0)
+          s.checkTryCollect(expectedEndorsedId, Seq(0))
 
           log.debug("lost finalization, removes from valid")
-          s.addConflictVote(0, 1)
-          s.checkTryCollect(expectedEndorsedId, conflict = Seq(0, 1))
+          s.addConflictVote(0)
+          s.checkTryCollect(expectedEndorsedId, conflict = Seq(0))
+
+          log.debug("reached again")
+          s.addValidVote(2)
+          s.checkTryCollect(expectedEndorsedId, valid = Seq(2)) // No new conflict endorsements
         }
       }
 
