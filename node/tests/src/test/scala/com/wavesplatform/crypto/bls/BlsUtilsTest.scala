@@ -4,6 +4,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.crypto.bls.BlsUtils.*
 import com.wavesplatform.test.FreeSpec
 import org.scalatest.EitherValues
+import supranational.blst
 import supranational.blst.SecretKey
 
 import scala.util.Random
@@ -42,6 +43,80 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
       val aggSig = Seq(sig1, sig2, sig3).reduceLeft(BlsUtils.aggSign)
 
       BlsUtils.verifyAgg(aggSig, message, Seq(publicKey2, publicKey1, publicKey3)).value shouldBe true
+    }
+  }
+
+  "zero secret/public keys and signatures" - {
+    val message = "test".getBytes()
+
+    val zeroSk = BlsUtils.mkBlsSecretKey(Array.fill[Byte](31)(1))
+    val zeroPk = new blst.P1(zeroSk)
+    val zeroSig = new blst.P2()
+      .hash_to(message, BlsDomainSeparationTag)
+      .sign_with(zeroSk)
+
+    val okSk = BlsUtils.mkBlsSecretKey(Array.fill[Byte](32)(0))
+    val okPk = new blst.P1(okSk)
+    val okSig = new blst.P2()
+      .hash_to(message, BlsDomainSeparationTag)
+      .sign_with(okSk)
+
+    "can't create pk from zero bytes" in {
+      val bytes = Array.fill[Byte](zeroPk.serialize().length)(0)
+      intercept[RuntimeException] { new blst.P1(bytes) }.getMessage should include("point is not on curve")
+    }
+
+    "zeroSk" in {
+      zeroSk.to_bendian() shouldBe Array.fill[Byte](32)(0)
+    }
+
+    "zeroPk in group" in {
+      zeroPk.is_inf() shouldBe true
+      zeroPk.in_group() shouldBe true
+    }
+
+    "zeroSk in group" in {
+      zeroSig.is_inf() shouldBe true
+      zeroSig.in_group() shouldBe true
+    }
+
+    "zeroSig not verified" - {
+      "by zeroPk" in {
+        BlsUtils.verifyBasic(zeroSig.serialize(), message, zeroPk.serialize()) shouldBe false
+      }
+
+      "by okPk" in {
+        BlsUtils.verifyBasic(zeroSig.serialize(), message, okPk.serialize()) shouldBe false
+      }
+    }
+
+    "okSig not verified by zeroPk" in {
+      BlsUtils.verifyBasic(okSig.serialize(), message, zeroPk.serialize()) shouldBe false
+    }
+
+    "aggregated pk" - {
+      "okPk + zeroPk == okPk" in {
+        okPk.dup().add(zeroPk).is_equal(okPk) shouldBe true
+      }
+
+      "zeroPk + okPk == okPk" in {
+        zeroPk.dup().add(okPk).is_equal(okPk) shouldBe true
+      }
+    }
+
+    "aggSig" - {
+      "okSig + zeroSig == okSig" in {
+        okSig.dup().add(zeroSig).is_equal(okSig) shouldBe true
+      }
+
+      "zeroSig + okSig == okSig" in {
+        zeroSig.dup().add(okSig).is_equal(okSig) shouldBe true
+      }
+    }
+
+    "aggSig verification with zeroSk" in {
+      val aggSig = okSig.dup().add(zeroSig)
+      BlsUtils.verifyAgg(aggSig.serialize(), message, Seq(okPk.serialize(), zeroPk.serialize())).value shouldBe true
     }
   }
 

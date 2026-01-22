@@ -472,21 +472,29 @@ object TxHelpers {
       fee: Long = TestValues.commitToGenerationFee,
       chainId: Byte = AddressScheme.current.chainId,
       version: TxVersion = TxVersion.V1
-  ): CommitToGenerationTransaction = {
-    val endorserKp = BlsKeyPair(sender.privateKey)
-    CommitToGenerationTransaction
-      .selfSigned(
-        version,
-        sender,
-        endorserKp.publicKey,
-        generationPeriodStart,
-        timestamp,
-        fee,
-        CommitToGenerationTransaction.mkPopSignature(endorserKp, generationPeriodStart),
-        chainId
-      )
-      .explicitGet()
-  }
+  ): CommitToGenerationTransaction =
+    commitToGenerationWithEndorserKey(generationPeriodStart, BlsKeyPair(sender.privateKey), sender, timestamp, fee, chainId, version)
+
+  def commitToGenerationWithEndorserKey(
+      generationPeriodStart: Height,
+      endorserKp: BlsKeyPair,
+      sender: KeyPair = defaultSigner,
+      timestamp: TxTimestamp = timestamp,
+      fee: Long = TestValues.commitToGenerationFee,
+      chainId: Byte = AddressScheme.current.chainId,
+      version: TxVersion = TxVersion.V1
+  ): CommitToGenerationTransaction = CommitToGenerationTransaction
+    .selfSigned(
+      version,
+      sender,
+      endorserKp.publicKey,
+      generationPeriodStart,
+      timestamp,
+      fee,
+      CommitToGenerationTransaction.mkPopSignature(endorserKp, generationPeriodStart),
+      chainId
+    )
+    .explicitGet()
 
   def ciFee(sc: Int = 0, nonNftIssue: Int = 0, freeCall: Boolean = false): Long =
     invokeFee(freeCall) + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeConstants(TransactionType.Issue) * FeeUnit

@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey, BlsSignature, TestBlsKeyPair}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -116,71 +116,80 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
     d.blockchain.wavesPortfolio(sender.toAddress).generationDeposit shouldBe CommitToGenerationTransaction.DepositInWavelets
   }
 
-  "Can't commit twice" in withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender)) { d =>
-    log.info("First")
-    d.appendBlock(TxHelpers.commitToGeneration(Height(3001), sender))
-
-    log.info("Second")
-    d.appendBlockE(TxHelpers.commitToGeneration(Height(3001), sender)) should produce("is already committed")
-  }
-
-  "Can't commit public BLS key twice" in withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender, TxHelpers.secondSigner)) { d =>
-    def mkTx(sender: KeyPair, blsKp: BlsKeyPair): CommitToGenerationTransaction = {
-      val baseTx = TxHelpers.commitToGeneration(Height(3001), sender)
-      val withPop = baseTx.copy(
-        endorserPublicKey = blsKp.publicKey,
-        commitmentSignature = CommitToGenerationTransaction.mkPopSignature(blsKp, baseTx.generationPeriodStart)
-      )
-
-      withPop.copy(proofs = Proofs(crypto.sign(sender.privateKey, withPop.bodyBytes())))
+  "Can't commit" - {
+    "zero public key" in withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender)) { d =>
+      log.info("First")
+      val zeroBlsKp = TestBlsKeyPair.unsafe(Array.emptyByteArray)
+      val txn       = TxHelpers.commitToGenerationWithEndorserKey(Height(3001), zeroBlsKp, sender)
+      d.appendBlockE(txn) should produce("Invalid commitment signature")
     }
 
-    log.debug("First")
-    val blsKP = BlsKeyPair(sender.privateKey)
-    d.appendBlock(mkTx(sender, blsKP))
+    "twice" in withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender)) { d =>
+      log.info("First")
+      d.appendBlock(TxHelpers.commitToGeneration(Height(3001), sender))
 
-    log.debug("Second")
-    d.appendBlockE(mkTx(TxHelpers.secondSigner, blsKP)) should produce("is already committed, try another key")
-  }
+      log.info("Second")
+      d.appendBlockE(TxHelpers.commitToGeneration(Height(3001), sender)) should produce("is already committed")
+    }
 
-  "Can't commit with insufficient balance" in {
-    val newGenerator = TxHelpers.signer(1005)
-    withDomain(
-      DeterministicFinality,
-      Seq(
-        AddrWithBalance(sender.toAddress, 1000000.waves),
-        AddrWithBalance(
-          newGenerator.toAddress,
-          GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2 + CommitToGenerationTransaction.DepositInWavelets
+    "public BLS key twice" in withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender, TxHelpers.secondSigner)) { d =>
+      def mkTx(sender: KeyPair, blsKp: BlsKeyPair): CommitToGenerationTransaction = {
+        val baseTx = TxHelpers.commitToGeneration(Height(3001), sender)
+        val withPop = baseTx.copy(
+          endorserPublicKey = blsKp.publicKey,
+          commitmentSignature = CommitToGenerationTransaction.mkPopSignature(blsKp, baseTx.generationPeriodStart)
         )
-      )
-    ) { d =>
-      val tx = TxHelpers.commitToGeneration(Height(3001), newGenerator)
 
-      d.appendBlockE(tx) should produce(
-        s"Generating balance ${GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2 - tx.fee.value} is less than 100000000000 required for block generation"
-      )
+        withPop.copy(proofs = Proofs(crypto.sign(sender.privateKey, withPop.bodyBytes())))
+      }
+
+      log.debug("First")
+      val blsKP = BlsKeyPair(sender.privateKey)
+      d.appendBlock(mkTx(sender, blsKP))
+
+      log.debug("Second")
+      d.appendBlockE(mkTx(TxHelpers.secondSigner, blsKP)) should produce("is already committed, try another key")
     }
-  }
 
-  "Can't commit with invalid commitment signature" in {
-    val newGenerator     = TxHelpers.signer(1006)
-    val otherGeneratorKp = BlsKeyPair(TxHelpers.signer(1007).privateKey)
-    withDomain(
-      DeterministicFinality,
-      Seq(
-        AddrWithBalance(sender.toAddress, 1000000.waves),
-        AddrWithBalance(newGenerator.toAddress, 10000.waves)
-      )
-    ) { d =>
-      val periodStart = Height(3001)
-      val unsignedTx = TxHelpers
-        .commitToGeneration(periodStart, newGenerator)
-        .copy(commitmentSignature = CommitToGenerationTransaction.mkPopSignature(otherGeneratorKp, periodStart))
-      val signedTx = unsignedTx.copy(proofs = Proofs(crypto.sign(newGenerator.privateKey, unsignedTx.bodyBytes())))
+    "with insufficient balance" in {
+      val newGenerator = TxHelpers.signer(1005)
+      withDomain(
+        DeterministicFinality,
+        Seq(
+          AddrWithBalance(sender.toAddress, 1000000.waves),
+          AddrWithBalance(
+            newGenerator.toAddress,
+            GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2 + CommitToGenerationTransaction.DepositInWavelets
+          )
+        )
+      ) { d =>
+        val tx = TxHelpers.commitToGeneration(Height(3001), newGenerator)
 
-      d.appendBlockE(unsignedTx) should produce("Proof doesn't validate as signature")
-      d.appendBlockE(signedTx) should produce("Invalid commitment signature")
+        d.appendBlockE(tx) should produce(
+          s"Generating balance ${GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2 - tx.fee.value} is less than 100000000000 required for block generation"
+        )
+      }
+    }
+
+    "with invalid commitment signature" in {
+      val newGenerator     = TxHelpers.signer(1006)
+      val otherGeneratorKp = BlsKeyPair(TxHelpers.signer(1007).privateKey)
+      withDomain(
+        DeterministicFinality,
+        Seq(
+          AddrWithBalance(sender.toAddress, 1000000.waves),
+          AddrWithBalance(newGenerator.toAddress, 10000.waves)
+        )
+      ) { d =>
+        val periodStart = Height(3001)
+        val unsignedTx = TxHelpers
+          .commitToGeneration(periodStart, newGenerator)
+          .copy(commitmentSignature = CommitToGenerationTransaction.mkPopSignature(otherGeneratorKp, periodStart))
+        val signedTx = unsignedTx.copy(proofs = Proofs(crypto.sign(newGenerator.privateKey, unsignedTx.bodyBytes())))
+
+        d.appendBlockE(unsignedTx) should produce("Proof doesn't validate as signature")
+        d.appendBlockE(signedTx) should produce("Invalid commitment signature")
+      }
     }
   }
 }
