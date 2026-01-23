@@ -21,7 +21,7 @@ case class FinalizationState(
   ): FinalizationState = {
     val newConflictGenerators = conflictGenerators ++ totalFinalizationVoting.fold(Set.empty)(_.conflict.map(_.endorserIndex))
     val (updatedParentFinalized, updatedFinalizedHeight) = totalFinalizationVoting
-      .filterNot(v => parentFinalized && v.conflict.isEmpty)
+      .filterNot(parentFinalized && _.conflict.isEmpty)
       .fold((parentFinalized, finalizedHeight)) { v =>
         val updatedParentFinalized = FinalizationState.isFinalized(updatedBalances, newConflictGenerators, baseGenerator, v)
         (
@@ -62,7 +62,7 @@ object FinalizationState extends ScorexLogging {
 
   // TODO: add already known as conflict, or better: generator balances without conflict
   // TODO: easier to create lambda?
-  def isFinalized(
+  private def isFinalized(
       generatorBalances: GeneratorBalances,
       knownConflict: Set[GeneratorIndex],
       votingBlockMinerAddress: Address,

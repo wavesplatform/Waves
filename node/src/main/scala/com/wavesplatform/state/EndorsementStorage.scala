@@ -60,7 +60,7 @@ object EndorsementStorage {
         }
         _             <- Either.raiseWhen(msg.endorserIndex >= filter.endorsers.size)(s"There are only ${filter.endorsers.size} endorsers")
         endorserIndex <- GeneratorIndex.checked(msg.endorserIndex).toRight(s"Invalid endorser index: ${msg.endorserIndex}")
-        (_, endorserPk, _) = filter.endorsers(msg.endorserIndex)
+        (endorserAddr, endorserPk, _) = filter.endorsers(msg.endorserIndex)
         sig <- verifySig(msg, endorserPk)
       } yield
         if (sharedWithNeighbors.contains(msg) || conflict.isDefinedAt(msg.endorserIndex) || filter.conflict.contains(endorserIndex)) false
@@ -71,7 +71,7 @@ object EndorsementStorage {
             msg.finalizedHeight < filter.finalizedHeight && !blockAtHeight(msg.finalizedId, msg.finalizedHeight)
           }
 
-          val share = if (isConflict) {
+          val isNew = if (isConflict) {
             conflict = conflict.updated(
               msg.endorserIndex,
               BlockEndorsement(GeneratorIndex(msg.endorserIndex), msg.finalizedId, msg.finalizedHeight, msg.endorsedId, sig)
@@ -86,12 +86,16 @@ object EndorsementStorage {
             true
           } else false
 
-          if (share) {
+          val share = isNew && filter.miner.isEmpty
+          if (isNew) {
+            val kindStr = if (isConflict) "conflict" else "valid"
+            logger.info(s"New $kindStr endorsement from #$endorserIndex $endorserAddr will${if (share) "" else " not"} be shared")
+
             hasChanges = true
             sharedWithNeighbors += msg
           }
 
-          share && filter.miner.isEmpty
+          share
         }
     }
 
@@ -119,6 +123,7 @@ object EndorsementStorage {
     }
 
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = synced {
+      logger.debug(s"Collecting votes for $endorsedId")
       for {
         currentFilter <- currentFilter
         if currentFilter.endorsedId == endorsedId && hasChanges
@@ -129,6 +134,7 @@ object EndorsementStorage {
         moreConflict   = conflict.size > latestResult.voting.conflict.size
         moreValid      = valid.size > latestResult.voting.valid.size
         couldFinalized = !latestResult.reachedFinalization && moreValid
+        _              = logger.debug(s"moreConflict=$moreConflict, moreValid=$moreValid, couldFinalized=$couldFinalized, latestResult=$latestResult")
         if moreConflict || couldFinalized
 
         origResult = latestResult
@@ -137,6 +143,7 @@ object EndorsementStorage {
           latestResult = createVoting(currentFilter, simulation)
         }
         changedFinalizationStatus = latestResult.reachedFinalization != origResult.reachedFinalization
+        _                         = logger.debug(s"changedFinalizationStatus=$changedFinalizationStatus, updatedLatestResult=$latestResult")
         if moreConflict || changedFinalizationStatus
       } yield latestResult.voting
     }

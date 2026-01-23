@@ -70,12 +70,11 @@ object BlockEndorser {
           if !filter.miner.contains(idx) // A miner doesn’t need to endorse its own blocks - a mining is already an endorsement
           pk <- wallet.privateKeyAccount(committedAddr).toSeq
         } yield (pk, GeneratorIndex(idx))
-        _ = logger.debug(s"Found ${account.toAddress} in generator set") // TODO: remove from prod
+        _ = logger.debug(s"Found ${account.toAddress} in generator set")
 
         endorsement = BlockEndorsement.signed(BlsKeyPair(account.privateKey), idx, finalizedId, finalizedHeight, endorsedId)
         networkMsg  = EndorseBlock.from(endorsement)
         broadcast <- endorsementStorage.tryAdd(networkMsg).toSeq
-        _ = logger.debug(s"Will ${if (broadcast) "" else "not "}broadcast endorsement from ${account.toAddress}") // TODO: remove from prod
         if broadcast
       } allChannels.broadcast(networkMsg)
     }
