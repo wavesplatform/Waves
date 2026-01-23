@@ -1,12 +1,14 @@
 package com.wavesplatform.crypto.bls
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.crypto.bls.BlsUtils.*
 import com.wavesplatform.test.FreeSpec
 import org.scalatest.EitherValues
 import supranational.blst
 import supranational.blst.SecretKey
 
+import java.nio.charset.StandardCharsets
 import scala.util.Random
 
 class BlsUtilsTest extends FreeSpec with EitherValues {
@@ -118,6 +120,28 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
       val aggSig = okSig.dup().add(zeroSig)
       BlsUtils.verifyAgg(aggSig.serialize(), message, Seq(okPk.serialize(), zeroPk.serialize())).value shouldBe true
     }
+  }
+
+  "expected public keys" in forAll(
+    Table(
+      ("seed", "expected sk in base64", "expected pk in base64"),
+      (
+        "-EXACTLY-32-BYTES-LENGTH-STRING-",
+        "ELIahWN5dDHoS9hScLMgGSNwF1qpuikaqNrdxZHCIuE=",
+        "qSUdS6J92V1nNOdx4TafRu4U17qhqwVXKNyy2IVV9GWnUzUYlk/uH4l8fOoupSJj"
+      ),
+      (
+        "a string longer than 32 bytes is used as the seed here",
+        "TmpPD8kiXQtRzvpQ+TJm6RUqjy5N3t9WZlv40iA66cw=",
+        "o2DzLHA7PG7BvHXTqnz4c8arX/tjiU11YuHsQnfUH0Lo/+ksy1toSYXFFy5auEJT"
+      )
+    )
+  ) { (seed, expectedSkInBase64, expectedPkInBase64) =>
+    val sk = BlsUtils.mkBlsSecretKey(seed.getBytes(StandardCharsets.UTF_8))
+    Base64.encode(sk.to_bendian()) shouldBe expectedSkInBase64
+
+    val pk = BlsUtils.mkBlsPublicKey(sk)
+    Base64.encode(pk) shouldBe expectedPkInBase64
   }
 
   private def mkRandomSecretKey(): SecretKey  = mkBlsSecretKey(mkRandomWavesKeyPair().privateKey.arr)
