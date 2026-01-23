@@ -3,14 +3,16 @@ package com.wavesplatform.crypto.bls
 import supranational.blst
 import supranational.blst.BLST_ERROR
 
+import java.nio.charset.StandardCharsets
 import scala.util.control.NonFatal
 
 object BlsUtils {
-  val BlsDomainSeparationTag = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_" // We have a non-standard PoP
+  val BlsDomainSeparationTag = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_"           // We have a non-standard PoP
+  private val BlsKeyGenSalt  = "BLS-SIG-KEYGEN-SALT-".getBytes(StandardCharsets.UTF_8) // From v4
 
   def mkBlsSecretKey(arr: Array[Byte]): blst.SecretKey = {
     val sk = new blst.SecretKey()
-    sk.keygen(arr)
+    sk.keygen_v5(arr, BlsKeyGenSalt)
     sk
   }
 
