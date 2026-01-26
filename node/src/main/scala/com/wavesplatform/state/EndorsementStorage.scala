@@ -123,8 +123,7 @@ object EndorsementStorage {
     }
 
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = synced {
-      logger.debug(s"Collecting votes for $endorsedId")
-      for {
+      val r = for {
         currentFilter <- currentFilter
         if currentFilter.endorsedId == endorsedId && hasChanges
         _ = {
@@ -146,6 +145,13 @@ object EndorsementStorage {
         _                         = logger.debug(s"changedFinalizationStatus=$changedFinalizationStatus, updatedLatestResult=$latestResult")
         if moreConflict || changedFinalizationStatus
       } yield latestResult.voting
+
+      r match {
+        case Some(r) => logger.debug(s"Collected endorsements for $endorsedId: ${r.valid.length} valid, ${r.conflict.length} conflict")
+        case None    => logger.debug(s"Not found new significant endorsements for $endorsedId")
+      }
+
+      r
     }
 
     private def createVoting(currentFilter: EndorsementFilter, simulationResult: SimulationResult): FinalizationResult = {
