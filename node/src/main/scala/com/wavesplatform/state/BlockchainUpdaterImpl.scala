@@ -452,6 +452,10 @@ class BlockchainUpdaterImpl(
                   )
                 )
 
+                rocksdb.finalizedHeightAt(Height(rocksdb.height)).foreach { h =>
+                  log.debug(s"Finalized height at ${rocksdb.height}: $h")
+                }
+
                 if (
                   (block.header.timestamp > time
                     .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight.toInt % 100 == 0)
@@ -459,7 +463,6 @@ class BlockchainUpdaterImpl(
                   log.info(s"New height: $newHeight")
                 }
 
-                log.debug(s"Finalized height at $newHeight: $finalizedHeight")
                 publishLastBlockInfo()
 
                 Applied(discDiffs, this.score, generatorBalances)

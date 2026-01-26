@@ -133,7 +133,6 @@ object EndorsementStorage {
         moreConflict   = conflict.size > latestResult.voting.conflict.size
         moreValid      = valid.size > latestResult.voting.valid.size
         couldFinalized = !latestResult.reachedFinalization && moreValid
-        _              = logger.debug(s"moreConflict=$moreConflict, moreValid=$moreValid, couldFinalized=$couldFinalized, latestResult=$latestResult")
         if moreConflict || couldFinalized
 
         origResult = latestResult
@@ -142,15 +141,10 @@ object EndorsementStorage {
           latestResult = createVoting(currentFilter, simulation)
         }
         changedFinalizationStatus = latestResult.reachedFinalization != origResult.reachedFinalization
-        _                         = logger.debug(s"changedFinalizationStatus=$changedFinalizationStatus, updatedLatestResult=$latestResult")
         if moreConflict || changedFinalizationStatus
       } yield latestResult.voting
 
-      r match {
-        case Some(r) => logger.debug(s"Collected endorsements for $endorsedId: ${r.valid.length} valid, ${r.conflict.length} conflict")
-        case None    => logger.debug(s"Not found new significant endorsements for $endorsedId")
-      }
-
+      if (r.isEmpty) logger.debug(s"Not found new significant endorsements for $endorsedId")
       r
     }
 

@@ -76,7 +76,7 @@ object BlockEndorser {
         broadcast <- endorsementStorage.tryAdd(networkMsg) match {
           case Right(r) => Some(r)
           case Left(err) =>
-            logger.info(s"Can't add endorsement from #$idx ${account.toAddress}: $err")
+            logger.warn(s"Can't add endorsement from #$idx ${account.toAddress}: $err")
             None
         }
         if broadcast

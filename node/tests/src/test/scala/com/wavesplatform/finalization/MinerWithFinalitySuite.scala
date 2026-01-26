@@ -28,7 +28,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
 
   private val baseSettings = DomainPresets.DeterministicFinality.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
   private val defaultSettings = baseSettings
-   .copy(minerSettings = baseSettings.minerSettings.copy(quorum = 0, microBlockInterval = 100.millis))
+    .copy(minerSettings = baseSettings.minerSettings.copy(quorum = 0, microBlockInterval = 100.millis))
     .configure(_.copy(generationPeriodLength = 2))
 
   "If account not committed, its attempt to forge doesn't stop current mining of other account on same node" ignore {}
@@ -52,7 +52,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         val minerScheduler    = TestScheduler()
         val appenderScheduler = TestScheduler()
 
-        d.wallet.generateNewAccounts(1).map(_.toAddress)
+        d.wallet.generateNewAccounts(1)
 
         val minerImpl = new MinerImpl(
           channels,
@@ -111,7 +111,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         ),
         miner = x => miner.scheduleMining(x)
       ) { d =>
-        d.wallet.generateNewAccounts(1).map(_.toAddress)
+        d.wallet.generateNewAccounts(1)
 
         val minerImpl = new MinerImpl(
           channels,
@@ -177,7 +177,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         ),
         miner = x => miner.scheduleMining(x)
       ) { d =>
-        d.wallet.generateNewAccounts(1).map(_.toAddress)
+        d.wallet.generateNewAccounts(1)
 
         val minerImpl = new MinerImpl(
           channels,
@@ -238,7 +238,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         ),
         miner = x => miner.scheduleMining(x)
       ) { d =>
-        d.wallet.generateNewAccounts(1).map(_.toAddress)
+        d.wallet.generateNewAccounts(1)
 
         val minerImpl = new MinerImpl(
           channels,
@@ -298,7 +298,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
     var miner: Miner = Miner.Disabled
     val time         = TestTime()
     withDomain(defaultSettings, initBalances, miner = x => miner.scheduleMining(x), time = time) { d =>
-      d.wallet.generateNewAccounts(1).map(_.toAddress)
+      d.wallet.generateNewAccounts(1)
 
       val endorsementStorage = EndorsementStorage.InMemory((blockId, h) => blockId == d.blockchain.blockId(h.toInt))
       val blockEndorser      = BlockEndorser.InMemory(d.blockchain, d.wallet, endorsementStorage, channels)

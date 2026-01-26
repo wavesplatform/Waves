@@ -6,7 +6,7 @@ import com.wavesplatform.crypto.bls.BlsUtils.*
 import com.wavesplatform.test.FreeSpec
 import org.scalatest.EitherValues
 import supranational.blst
-import supranational.blst.SecretKey
+import supranational.blst.{P1, SecretKey}
 
 import java.nio.charset.StandardCharsets
 import scala.util.Random
@@ -142,6 +142,20 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
 
     val pk = BlsUtils.mkBlsPublicKey(sk)
     Base64.encode(pk) shouldBe expectedPkInBase64
+  }
+
+  "pk restore" in {
+    val sk = BlsUtils.mkBlsSecretKey("-EXACTLY-32-BYTES-LENGTH-STRING-".getBytes(StandardCharsets.UTF_8))
+    val pk = BlsUtils.mkBlsPublicKey(sk)
+
+    val pkRestored1 = new P1(pk).compress()
+    pkRestored1 shouldBe pk
+
+    val skRestored = new SecretKey()
+    skRestored.from_bendian(sk.to_bendian())
+
+    val pkRestored2 = BlsUtils.mkBlsPublicKey(skRestored)
+    pkRestored2 shouldBe pk
   }
 
   private def mkRandomSecretKey(): SecretKey  = mkBlsSecretKey(mkRandomWavesKeyPair().privateKey.arr)
