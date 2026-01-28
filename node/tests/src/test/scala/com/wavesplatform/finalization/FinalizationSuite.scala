@@ -47,7 +47,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
         generator = otherNode1Acc,
         strictTime = true,
         finalizationVoting = Some(
-          mkFinalizationVoting(valid = Seq(GeneratorIndex(1)))
+          mkFinalizationVoting(valid = Seq(GeneratorIndex(0)))
             .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = otherNode0Acc)
         )
       )
@@ -89,7 +89,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
       val microBlockWithTxn = d.createMicroBlock(
         signer = Some(otherNode1Acc),
         finalizationVoting = Some(
-          mkFinalizationVoting(valid = Seq(GeneratorIndex(1)))
+          mkFinalizationVoting(valid = Seq(GeneratorIndex(0)))
             .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = otherNode0Acc)
         )
       )(TxHelpers.transfer(otherNode2Acc, otherNode3Acc.toAddress))
@@ -125,7 +125,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
       generator = otherNode1Acc,
       strictTime = true,
       finalizationVoting = Some( // voted: otherNode1Acc, otherNode0Acc; not voted: otherNode2Acc
-        mkFinalizationVoting(valid = Seq(GeneratorIndex(2)))
+        mkFinalizationVoting(valid = Seq(GeneratorIndex(0)))
           .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = otherNode0Acc)
       )
     )
@@ -265,7 +265,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
     val block3 = d.createBlock(
       version = Block.ProtoBlockVersion,
       txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
-      generator = otherNode1Acc
+      generator = otherNode3Acc
     )
     d.appendBlock(block3)
     val endorsedBlock = block3
@@ -280,10 +280,10 @@ class FinalizationSuite extends BaseFinalizationSpec {
         strictTime = true,
         finalizationVoting = Some(
           mkFinalizationVoting(
-            valid = Seq(GeneratorIndex(1)),
+            valid = Seq(GeneratorIndex(2)),
             finalizedHeight = GenesisBlockHeight
           )
-            .withConflict(otherNode1Acc, GeneratorIndex(0), endorsedBlock.id())
+            .withConflict(otherNode0Acc, GeneratorIndex(0), endorsedBlock.id())
             .signed(endorsedId = endorsedId, finalizedId = genesisBlockId, otherNode2Acc)
         )
       )
@@ -327,7 +327,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
         generator = otherNode1Acc,
         strictTime = true,
         finalizationVoting = Some(
-          mkFinalizationVoting(valid = Seq(GeneratorIndex(2)))
+          mkFinalizationVoting(valid = Seq(GeneratorIndex(0)))
             .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = otherNode0Acc)
         )
       )
@@ -339,7 +339,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
   }
 
   "increasing generating balance" - {
-    "leads to finalization" - {
+    "reaching finalization" - {
       "miner" in withDomain(
         defaultSettings,
         AddrWithBalance(otherNode3Acc.toAddress, 6000.waves) +:
@@ -350,7 +350,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
         d.appendBlock(
           TxHelpers.transfer(
             otherNode3Acc,                                                                            // Not endorser
-            to = otherNode1Acc.toAddress,                                                             // Endorser
+            to = otherNode1Acc.toAddress,                                                             // Miner
             amount = d.blockchain.wavesPortfolio(otherNode3Acc.toAddress).spendableBalance - 1.waves, // Enough for finalization
             fee = 1.waves
           )
@@ -424,12 +424,63 @@ class FinalizationSuite extends BaseFinalizationSpec {
             )
           ) // 52
 
-          log.debug(s"Append block without votes, but increased endorser's generating balance")
+          log.debug("Append block to calculate finalization height")
           d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true)) // 53
           d.allFinalizedHeightIs(51)
         }
       }
     }
+
+    "not reaching finalization" in withDomain(
+      defaultSettings,
+      AddrWithBalance(otherNode3Acc.toAddress, 6000.waves) +:
+        Seq(otherNode0Acc, otherNode1Acc, otherNode2Acc).map(kp => AddrWithBalance(kp.toAddress, 2000.waves))
+    ) { d =>
+      val genesisBlockId = d.blockchain.lastBlockId.value
+
+      // This is block #2
+      // Generating balance of otherNode1Acc increased on 2 + 50 (generationBalanceDepthFrom50To1000AfterHeight) = 52
+      d.appendBlock(
+        TxHelpers.transfer(
+          otherNode3Acc,                // Not endorser
+          to = otherNode2Acc.toAddress, // Not voting
+          amount = d.blockchain.wavesPortfolio(otherNode3Acc.toAddress).spendableBalance - 1.waves,
+          fee = 1.waves
+        )
+      )
+
+      log.debug("Append empty blocks to reach the required period")
+      (3 to 50).foreach(_ => d.appendBlock())
+
+      log.debug("Append block with commitments")
+      val endorsers = Seq(otherNode0Acc, otherNode1Acc, otherNode2Acc)
+      d.appendBlock(
+        d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(52), x)),
+          generator = otherNode1Acc
+        )
+      ) // 51
+
+      log.debug(s"Append block with vote, balance of non-voting endorser increased")
+      d.appender.appendBlock(
+        d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = otherNode1Acc,
+          strictTime = true,
+          finalizationVoting = Some(
+            mkFinalizationVoting(valid = Seq(GeneratorIndex(0)))
+              .signed(endorsedId = d.blockchain.lastBlockId.value, finalizedId = genesisBlockId, validEndorsers = otherNode0Acc)
+          )
+        )
+      ) // 52
+
+      log.debug("Append block to calculate finalization height")
+      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true)) // 53
+      d.allFinalizedHeightIs(1)
+    }
+
   }
 
   extension (d: Domain)(using Position) {
