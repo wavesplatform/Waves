@@ -121,7 +121,7 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
     }
   }
 
-  "reaching, losing and reaching again finalization" in {
+  "reaching, losing and reaching again finalization, calculation in keyblock" in {
     val generator3    = TxHelpers.signer(2)
     val generator3Idx = GeneratorIndex(2)
 
@@ -153,7 +153,7 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
         )
       )(TxHelpers.transfer(generator1, generator2Addr))
       d.appendMicroBlockE(microBlockWithTxn1) should beRight
-      d.checkFinalizedHeight(2)
+      d.checkFinalizedHeight()
 
       log.debug(s"Append microblock with conflicting endorsement, losing finalization (but it preserved)")
       val microBlockWithTxn2 = d.createMicroBlock(
@@ -161,7 +161,7 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
         finalizationVoting = Some(mkFinalizationVoting().withConflict(generator1, generator1Idx, genesisBlockId))
       )(TxHelpers.transfer(generator1, generator2Addr))
       d.appendMicroBlockE(microBlockWithTxn2) should beRight
-      d.checkFinalizedHeight(2)
+      d.checkFinalizedHeight()
 
       log.debug(s"Append microblock with valid endorsement, reaching finalization again")
       val microBlockWithTxn3 = d.createMicroBlock(
@@ -172,6 +172,10 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
         )
       )(TxHelpers.transfer(generator1, generator2Addr))
       d.appendMicroBlockE(microBlockWithTxn3) should beRight
+      d.checkFinalizedHeight()
+      
+      log.debug("Append block 4")
+      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true))
       d.checkFinalizedHeight(2)
     }
   }

@@ -367,7 +367,9 @@ package object appender {
             .toRight(s"No period for height $blockHeight")
           allCommittedGenerators = blockchain.committedGenerators(blockGenerationPeriod)
 
-          validEndorsers <- fv.valid.traverse(gi => allCommittedGenerators.lift(gi.toInt).toRight(s"Invalid endorser index: $gi"))
+          validEndorsers <- fv.valid.traverse { gi =>
+            allCommittedGenerators.lift(gi.toInt).toRight(s"Invalid endorser index: $gi, expected < ${allCommittedGenerators.length}")
+          }
           _ <- fv.valid.traverse { idx =>
             Either.raiseUnless(generatorsWithEnoughBalance.contains(idx))(s"Valid endorsement sender $idx has insufficient balance")
           }

@@ -40,12 +40,12 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
   private val generators             = Seq(validGenerator, conflictGenerator)
   private val conflictGeneratorIndex = GeneratorIndex(1)
 
-  "finalization happens after microblock" in new Scenario[Height] {
+  "finalization happens in next keyblock" in new Scenario[Height] {
     override def getData = d => d.blockchain.finalizedHeight.value
 
     override def after2WithCommitmentsCheck                   = _ shouldBe Height(1)
     override def after3KeyBlockWithNewPeriodCheck             = _ shouldBe Height(1)
-    override def after3MicroBlockWithConflictEndorsementCheck = _ shouldBe Height(2)
+    override def after3MicroBlockWithConflictEndorsementCheck = _ shouldBe Height(1)
     override def after4WithPunishmentCheck                    = _ shouldBe Height(2)
     override def after5WithNewPeriodCheck                     = _ shouldBe Height(2)
   }.run()

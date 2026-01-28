@@ -75,7 +75,13 @@ object CommonBlocksApi {
 
     def currentFinalizedHeight: Height = blockchain.finalizedHeightOrFallback(maxSyncRollbackLength)
 
-    def finalizedHeightAt(at: Height): Option[Height] = blockchain.finalizedHeightAt(at)
+    def finalizedHeightAt(at: Height): Option[Height] = Option.when(at < currentHeight) {
+      Blockchain.finalizedHeightOrFallback(
+        at = at,
+        latestFinalized = blockchain.finalizedHeightAt(at),
+        maxRollbackLength = maxSyncRollbackLength
+      )
+    }
 
     def blockAtHeight(height: Height): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = blockInfoAt(height)
 

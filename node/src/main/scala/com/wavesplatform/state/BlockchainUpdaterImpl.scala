@@ -383,14 +383,6 @@ class BlockchainUpdaterImpl(
                           metrics.microBlockForkHeightStats.record(discarded.size)
                         }
 
-                        val newFinalizedHeight = finalizedHeight.getOrElse {
-                          Blockchain.finalizedHeightOrFallback(
-                            at = Height(rocksdb.height + 1), // +1 because we append a new block
-                            latestFinalized = rocksdb.finalizedHeightAt(),
-                            maxRollbackLength = wavesSettings.synchronizationSettings.maxRollback
-                          )
-                        }
-
                         // Careful! This affects referencedBlockchain and extendedBlockchain, e.g. height
                         rocksdb.append(
                           liquidSnapshotWithCancelledLeases,
@@ -400,7 +392,7 @@ class BlockchainUpdaterImpl(
                           prevHitSource,
                           referencedComputedStateHash,
                           referencedForgedBlock, // It writes the referencedForgedBlock, not a block!
-                          newFinalizedHeight,
+                          ng.finalizationState.finalizedHeight,
                           ng.finalizationState.generatorBalances
                         )
                         BlockStats.appended(referencedForgedBlock, referencedLiquidSnapshot.scriptsComplexity)
@@ -447,7 +439,11 @@ class BlockchainUpdaterImpl(
                       conflictGenerators = this.generationPeriodOf(newHeight).fold(ConflictGenerators.empty)(this.conflictGenerators).upTo(newHeight),
                       block,
                       parentHeight = Height(rocksdb.height),
-                      finalizedHeight = this.finalizedHeightOrFallback(maxSyncRollbackLength)
+                      finalizedHeight = Blockchain.finalizedHeightOrFallback(
+                        at = newHeight,
+                        latestFinalized = rocksdb.finalizedHeightAt(),
+                        maxRollbackLength = maxSyncRollbackLength
+                      )
                     )
                   )
                 )
@@ -690,14 +686,11 @@ class BlockchainUpdaterImpl(
   }
 
   override def finalizedHeight: Option[Height] = readLock {
-    ngState.map(_.finalizationState.finalizedHeight).orElse(rocksdb.finalizedHeight)
+    rocksdb.finalizedHeight
   }
 
   override def finalizedHeightAt(at: Height): Option[Height] = readLock {
-    ngState
-      .filter(_ => at == Height(height))
-      .map(_.finalizationState.finalizedHeight)
-      .orElse(rocksdb.finalizedHeightAt(at))
+    rocksdb.finalizedHeightAt(at)
   }
 
   override def heightOf(blockId: BlockId): Option[Int] = readLock {
