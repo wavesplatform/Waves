@@ -23,7 +23,7 @@ object BlockEndorser {
     override def vote(generatorBalances: GeneratorBalances): Unit = {}
   }
 
-  class InMemory(blockchain: Blockchain, wallet: Wallet, endorsementStorage: EndorsementStorage, allChannels: ChannelGroup)
+  class InMemory(maxSyncRollbackLength: Int, blockchain: Blockchain, wallet: Wallet, endorsementStorage: EndorsementStorage, allChannels: ChannelGroup)
       extends BlockEndorser,
         StrictLogging {
     override def vote(generatorBalances: GeneratorBalances): Unit = {
@@ -35,7 +35,7 @@ object BlockEndorser {
         votingBlockHeader   <- blockchain.blockHeader(votingHeight.toInt).toSeq
         endorsedBlockHeader <- blockchain.blockHeader(endorsedHeight.toInt).toSeq
 
-        finalizedHeight = blockchain.finalizedHeightAtOrFallback(votingHeight.toInt)
+        finalizedHeight = blockchain.finalizedHeightAtOrFallback(maxSyncRollbackLength, votingHeight)
         finalizedId <- blockchain
           .blockId(finalizedHeight.toInt)
           .toSeq

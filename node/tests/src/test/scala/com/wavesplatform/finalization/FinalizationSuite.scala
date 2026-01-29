@@ -3,7 +3,6 @@ package com.wavesplatform.finalization
 import com.wavesplatform.block.{Block, FinalizationVoting}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.Domain
 import com.wavesplatform.state.{Blockchain, GeneratorIndex, GenesisBlockHeight, Height}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{FreeSpec, NumericExt}
@@ -94,7 +93,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
         )
       )(TxHelpers.transfer(otherNode2Acc, otherNode3Acc.toAddress))
       d.appendMicroBlock(microBlockWithTxn)
-      d.allFinalizedHeightIs(1) // Increased only on keyblock
+      d.allFinalizedHeightIs(1)
 
       log.debug("Append block 5")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
@@ -183,6 +182,10 @@ class FinalizationSuite extends BaseFinalizationSpec {
     log.debug(s"Append better key block 4")
     d.appender.appendBlock(betterBlock4)
     d.allFinalizedHeightIs(1)
+
+    log.debug("Append block 5")
+    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
+    d.allFinalizedHeightIs(1)
   }
 
   "not finalized if not voted" in withDomain(
@@ -193,6 +196,39 @@ class FinalizationSuite extends BaseFinalizationSpec {
 
     log.debug(s"Append block 3 with commitments")
     val endorsers = Seq(otherNode0Acc, otherNode1Acc)
+    val block3 = d.createBlock(
+      version = Block.ProtoBlockVersion,
+      txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
+      generator = otherNode1Acc
+    )
+    d.appendBlock(block3)
+
+    log.debug(s"Append block 4 without votes (only miner)")
+    d.appender.appendBlock(
+      d.createBlock(
+        version = Block.ProtoBlockVersion,
+        txs = Nil,
+        generator = otherNode1Acc,
+        strictTime = true,
+        finalizationVoting = None
+      )
+    )
+
+    log.debug("Append block 5")
+    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
+    d.allFinalizedHeightIs(1)
+  }
+
+  "same finalized height if mines a generator not from generator set" - pending
+
+  "finalized if surpass maxRollback blocks even no votes" in withDomain(
+    defaultSettings.copy(synchronizationSettings = defaultSettings.synchronizationSettings.copy(maxRollback = 2)),
+    AddrWithBalance.enoughBalances(otherNode0Acc, otherNode1Acc)
+  ) { d =>
+    d.appendBlock()
+
+    log.debug(s"Append block 3 with commitments")
+    val endorsers = Seq(otherNode1Acc, otherNode0Acc)
     val block3 = d.createBlock(
       version = Block.ProtoBlockVersion,
       txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
@@ -213,49 +249,14 @@ class FinalizationSuite extends BaseFinalizationSpec {
 
     log.debug("Append block 5")
     d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-    d.allFinalizedHeightIs(1)
+    d.allFinalizedHeightIs(2) // 4 - maxRollback = 2, 4 because we calculate finalization based on votes in a previous block
   }
 
-  "same finalized height if mines a generator not from generator set" ignore {} // TODO: implement
-
-  "finalized if surpass maxRollback blocks even" - {
-    "no votes" in withDomain(
-      defaultSettings.copy(synchronizationSettings = defaultSettings.synchronizationSettings.copy(maxRollback = 2)),
-      AddrWithBalance.enoughBalances(otherNode0Acc, otherNode1Acc)
-    ) { d =>
-      d.appendBlock()
-
-      log.debug(s"Append block 3 with commitments")
-      val endorsers = Seq(otherNode1Acc, otherNode0Acc)
-      val block3 = d.createBlock(
-        version = Block.ProtoBlockVersion,
-        txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
-        generator = otherNode1Acc
-      )
-      d.appendBlock(block3)
-
-      log.debug(s"Append block 4 without votes (only miner committed)")
-      d.appender.appendBlock(
-        d.createBlock(
-          version = Block.ProtoBlockVersion,
-          txs = Nil,
-          generator = otherNode1Acc,
-          strictTime = true,
-          finalizationVoting = None
-        )
-      )
-
-      log.debug("Append block 5")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true))
-      d.allFinalizedHeightIs(2) // 4 - maxRollback = 2, 4 because we calculate finalization based on votes in a previous block
-    }
-
-    "generator set is empty" ignore {}
-  }
+  "finalized by rollback length if generator set is empty" - pending
 
   "finalized with less votes after conflict endorsement" in withDomain(
     defaultSettings,
-    Seq(otherNode0Acc, otherNode1Acc, otherNode2Acc, otherNode3Acc).map(kp => AddrWithBalance(kp.toAddress, 200_100.1.waves))
+    Seq(otherNode0Acc, otherNode1Acc, otherNode2Acc, otherNode3Acc).map(kp => AddrWithBalance(kp.toAddress, 2000.waves))
   ) { d =>
     val genesisBlockId = d.blockchain.lastBlockId.value
     d.appendBlock()
@@ -318,7 +319,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
         version = Block.ProtoBlockVersion,
         txs = Seq(
           TxHelpers.transfer(
-            otherNode0Acc,
+            otherNode0Acc,                                                                            // Endorser
             to = otherNode3Acc.toAddress,                                                             // Not endorser
             amount = d.blockchain.wavesPortfolio(otherNode0Acc.toAddress).spendableBalance - 1.waves, // All waves
             fee = 1.waves
@@ -480,34 +481,5 @@ class FinalizationSuite extends BaseFinalizationSpec {
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = otherNode1Acc, strictTime = true)) // 53
       d.allFinalizedHeightIs(1)
     }
-
-  }
-
-  extension (d: Domain)(using Position) {
-    def finalizedHeightIsEmpty(): Domain = withClue("finalizedHeightIsEmpty: ") {
-      d.blockchain.finalizedHeight shouldBe empty
-      d
-    }
-
-    def finalizedHeightIs(h: Int): Domain = withClue("finalizedHeightIs: ") {
-      d.blockchain.finalizedHeight.value.toInt shouldBe h
-      d
-    }
-
-    def finalizedHeightAtPrevIsEmpty(): Domain = withClue("finalizedHeightAtIsEmpty: ") {
-      val prevHeight = Height(d.blockchain.height - 1)
-      if (prevHeight >= GenesisBlockHeight) d.blockchain.finalizedHeightAt(prevHeight) shouldBe empty
-      d
-    }
-
-    def finalizedHeightAtPrevIs(h: Int): Domain = withClue("finalizedHeightAtIs: ") {
-      val prevHeight = Height(d.blockchain.height - 1)
-      d.blockchain.finalizedHeightAt(prevHeight).value.toInt shouldBe h
-      d
-    }
-
-    def allFinalizedHeightIs(h: Int): Domain = d
-      .finalizedHeightIs(h)
-      .finalizedHeightAtPrevIs(h)
   }
 }

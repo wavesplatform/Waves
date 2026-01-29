@@ -21,6 +21,7 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import monix.execution.schedulers.SchedulerService
+import org.scalactic.source.Position
 
 import scala.jdk.CollectionConverters.*
 
@@ -78,7 +79,7 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
         testTime.setTime(block.header.timestamp)
         appender(block).runSyncUnsafe()
 
-        channel1.sentEndorsementsNumber shouldBe 0
+        channel1.sentEndorsements.length shouldBe 0
       }
     }
 
@@ -106,13 +107,13 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
         testTime.setTime(endorsedBlock.header.timestamp)
         appender(endorsedBlock).runSyncUnsafe()
         if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply endorsedBlock $endorsedBlock, see logs")
-        channel1.sentEndorsementsNumber shouldBe 0
+        channel1.sentEndorsements.length shouldBe 0
 
         val nextBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator2, strictTime = true)
         testTime.setTime(nextBlock.header.timestamp)
         appender(nextBlock).runSyncUnsafe()
         if (d.lastBlockId != nextBlock.id()) fail(s"Can't apply nextBlock $nextBlock, see logs")
-        channel1.sentEndorsementsNumber shouldBe 0
+        channel1.sentEndorsements.length shouldBe 0
       }
     }
   }
@@ -157,13 +158,13 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
       testTime.setTime(endorsedBlock.header.timestamp)
       appender(endorsedBlock).runSyncUnsafe()
       if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply endorsedBlock $endorsedBlock, see logs")
-      channel1.sentEndorsementsNumber shouldBe 0
+      channel1.sentEndorsements.length shouldBe 0
 
       val nextBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = otherGenerator, strictTime = true)
       testTime.setTime(nextBlock.header.timestamp)
       appender(nextBlock).runSyncUnsafe()
       if (d.lastBlockId != nextBlock.id()) fail(s"Can't apply nextBlock $nextBlock, see logs")
-      channel1.sentEndorsementsNumber shouldBe 1
+      channel1.sentEndorsements.length shouldBe 1
     }
   }
 
@@ -219,7 +220,7 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
       appender(block4).runSyncUnsafe()
       if (d.lastBlockId != block4.id()) fail(s"Can't apply block4 $block4, see logs")
 
-      channel1.sentEndorsement.value.finalizedHeight shouldBe Height(2) // 4 - maxRollback
+      channel1.sentEndorsements.head.finalizedHeight shouldBe Height(2) // 4 - maxRollback
     }
   }
 
@@ -240,25 +241,25 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
   }
 
   extension (self: EmbeddedChannel) {
-    def sentEndorsement: Option[EndorseBlock] = {
-      val xs = self.outboundMessages().asScala.collect {
-        case x: RawBytes if x.code == EndorseBlockSpec.messageCode => EndorseBlockSpec.deserializeData(x.data).get
-      }
+    def sentEndorsements: Seq[EndorseBlock] = {
+      val xs = self
+        .outboundMessages()
+        .asScala
+        .collect {
+          case x: RawBytes if x.code == EndorseBlockSpec.messageCode => EndorseBlockSpec.deserializeData(x.data).get
+        }
+        .toSeq
       self.outboundMessages().clear()
+      xs
+    }
 
-      withClue("only one endorsement: ") {
+    def sentOneEndorsement(using Position): Option[EndorseBlock] = {
+      val xs = sentEndorsements
+
+      withClue("sent only one endorsement: ") {
         xs.size should be <= 1
       }
       xs.headOption
-    }
-
-    def sentEndorsementsNumber: Long = {
-      val r = self.outboundMessages().asScala.count {
-        case x: RawBytes if x.code == EndorseBlockSpec.messageCode => true
-        case _                                                     => false
-      }
-      self.outboundMessages().clear()
-      r
     }
   }
 

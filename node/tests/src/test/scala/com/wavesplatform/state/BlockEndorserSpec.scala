@@ -41,7 +41,8 @@ class BlockEndorserSpec extends FreeSpec, WithDomain, WithResourceManager {
         }
 
         val channels = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
-        val endorser = new BlockEndorser.InMemory(d.blockchain, d.wallet, endorsementStorage, channels)
+        val endorser =
+          new BlockEndorser.InMemory(d.settings.synchronizationSettings.maxRollback, d.blockchain, d.wallet, endorsementStorage, channels)
 
         log.debug(s"Append block 2 with commitments")
         val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))

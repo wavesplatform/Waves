@@ -47,7 +47,7 @@ class ConflictEndorserBlocksNgSuite extends BaseFinalizationSpec {
     override def after3KeyBlockWithNewPeriodCheck             = _ shouldBe Height(1)
     override def after3MicroBlockWithConflictEndorsementCheck = _ shouldBe Height(1)
     override def after4WithPunishmentCheck                    = _ shouldBe Height(2)
-    override def after5WithNewPeriodCheck                     = _ shouldBe Height(2)
+    override def after5WithNewPeriodCheck                     = _ shouldBe Height(3) // Miner has enough generating balance
   }.run()
 
   "removed from generator set" in new Scenario[Set[GeneratorIndex]] {

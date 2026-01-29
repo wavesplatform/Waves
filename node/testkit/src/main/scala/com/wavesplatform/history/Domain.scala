@@ -94,7 +94,7 @@ case class Domain(
 
   lazy val endorsementStorage: EndorsementStorage = EndorsementStorage.Disabled
   def createBlockEndorser(allChannels: ChannelGroup, storage: EndorsementStorage = endorsementStorage): BlockEndorser =
-    new BlockEndorser.InMemory(blockchain, wallet, storage, allChannels)
+    new BlockEndorser.InMemory(settings.synchronizationSettings.maxRollback, blockchain, wallet, storage, allChannels)
 
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None, seed = Some(ByteStr(DefaultWalletSeed))))
 
@@ -708,7 +708,8 @@ class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
     _ => throw new RuntimeException("Unexpected call in block challenger")
   )
 
-  private val blockEndorser = new BlockEndorser.InMemory(d.blockchain, d.wallet, d.endorsementStorage, allChannelGroup)
+  private val blockEndorser =
+    new BlockEndorser.InMemory(d.settings.synchronizationSettings.maxRollback, d.blockchain, d.wallet, d.endorsementStorage, allChannelGroup)
 
   private val appenderWithCatching = BlockAppender(
     d.blockchain,

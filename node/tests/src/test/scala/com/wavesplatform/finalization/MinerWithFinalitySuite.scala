@@ -31,10 +31,10 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
     .copy(minerSettings = baseSettings.minerSettings.copy(quorum = 0, microBlockInterval = 100.millis))
     .configure(_.copy(generationPeriodLength = 2))
 
-  "If account not committed, its attempt to forge doesn't stop current mining of other account on same node" ignore {}
+  "If account not committed, its attempt to forge doesn't stop current mining of other account on same node" - pending
 
   "Mining works on new period even" - {
-    "committed after scheduled time" ignore {}
+    "committed after scheduled time" - pending
 
     "committed in the last block of period" in withManager { manager =>
       val channels     = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
@@ -90,9 +90,9 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
 
     // TODO:
     "all generators have no right to mine" - {
-      "some conflict, some have no required balance" ignore {}
+      "some conflict, some have no required balance" - pending
 
-      "all have no required balance" ignore {}
+      "all have no required balance" - pending
     }
 
     "was conflict in previous period" in withManager { manager =>
@@ -301,7 +301,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
       d.wallet.generateNewAccounts(1)
 
       val endorsementStorage = EndorsementStorage.InMemory((blockId, h) => blockId == d.blockchain.blockId(h.toInt))
-      val blockEndorser      = BlockEndorser.InMemory(d.blockchain, d.wallet, endorsementStorage, channels)
+      val blockEndorser = BlockEndorser.InMemory(d.settings.synchronizationSettings.maxRollback, d.blockchain, d.wallet, endorsementStorage, channels)
       val minerImpl = new MinerImpl(
         channels,
         d.blockchain,

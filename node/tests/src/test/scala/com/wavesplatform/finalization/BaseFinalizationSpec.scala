@@ -5,9 +5,11 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.history.Domain
 import com.wavesplatform.state.{BalanceSnapshot, ConflictGenerators, GeneratorIndex, GenesisBlockHeight, Height}
 import com.wavesplatform.test.{FreeSpec, WithResourceManager}
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
+import org.scalactic.source.Position
 import org.scalatest.EitherValues
 
 trait BaseFinalizationSpec extends FreeSpec, WithDomain, WithResourceManager, EitherValues {
@@ -63,5 +65,33 @@ trait BaseFinalizationSpec extends FreeSpec, WithDomain, WithResourceManager, Ei
 
       self.copy(aggregatedEndorsement = aggSig)
     }
+  }
+
+  extension (d: Domain)(using Position) {
+    def finalizedHeightIsEmpty(): Domain = withClue("finalizedHeightIsEmpty: ") {
+      d.blockchain.finalizedHeight shouldBe empty
+      d
+    }
+
+    def finalizedHeightIs(h: Int): Domain = withClue("finalizedHeightIs: ") {
+      d.blockchain.finalizedHeight.value.toInt shouldBe h
+      d
+    }
+
+    def finalizedHeightAtPrevIsEmpty(): Domain = withClue("finalizedHeightAtIsEmpty: ") {
+      val prevHeight = Height(d.blockchain.height - 1)
+      if (prevHeight >= GenesisBlockHeight) d.blockchain.finalizedHeightAt(prevHeight) shouldBe empty
+      d
+    }
+
+    def finalizedHeightAtPrevIs(h: Int): Domain = withClue("finalizedHeightAtIs: ") {
+      val prevHeight = Height(d.blockchain.height - 1)
+      d.blockchain.finalizedHeightAt(prevHeight).value.toInt shouldBe h
+      d
+    }
+
+    def allFinalizedHeightIs(h: Int): Domain = d
+      .finalizedHeightIs(h)
+      .finalizedHeightAtPrevIs(h)
   }
 }
