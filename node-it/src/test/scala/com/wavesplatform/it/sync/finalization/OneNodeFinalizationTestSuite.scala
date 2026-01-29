@@ -65,6 +65,11 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec with OptionValues {
     var finalizedHeight1       = node.finalizedHeight
     val waitingFinalizedHeight = finalizedHeight1 + 2
 
+    withClue("Finalized height is unknown: ") {
+      node.finalizedHeightAt(node.height) shouldBe empty
+      node.finalizedHeightAt(node.height + 10) shouldBe empty
+    }
+
     var done = false
     while (!done && deadline.hasTimeLeft()) {
       val currHeight = node.height
@@ -98,12 +103,7 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec with OptionValues {
     step("Finalized block header and height checks")
     val finalizedBlock1 = node.finalizedBlockHeader()
     finalizedBlock1.height should be >= finalizedHeight1
-
-    val finalizedHeight2 = node.finalizedHeightAt(node.height)
-    finalizedHeight2 should be >= finalizedHeight1
-
-    val finalizedHeightBefore1 = node.finalizedHeightAt(finalizedBlock1.height)
-    finalizedHeightBefore1 should be < finalizedHeight1
+    node.finalizedHeightAt(finalizedBlock1.height).value should be <= finalizedBlock1.height
 
     step("Finalization voting in a block header")
     val votingBlockHeader  = node.blockHeaderAt(finalizedHeight1 + 1)

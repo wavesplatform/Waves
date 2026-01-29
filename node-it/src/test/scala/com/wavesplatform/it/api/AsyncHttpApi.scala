@@ -226,7 +226,7 @@ object AsyncHttpApi extends Assertions {
 
     def finalizedHeight: Future[Height] = get("/blocks/height/finalized").as[JsValue].map(v => (v \ "height").as[Height])
 
-    def finalizedHeightAt(at: Height): Future[Height] = get(s"/blocks/finalized/at/$at").as[JsValue].map(v => (v \ "height").as[Height])
+    def finalizedHeightAt(at: Height): Future[Option[Height]] = get(s"/blocks/finalized/at/$at").as[JsValue].map(v => (v \ "height").asOpt[Height])
 
     def blockAt(height: Height, amountsAsStrings: Boolean = false): Future[Block] =
       get(s"/blocks/at/$height", amountsAsStrings).as[Block](amountsAsStrings)
