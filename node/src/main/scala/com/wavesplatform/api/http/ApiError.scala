@@ -1,14 +1,14 @@
 package com.wavesplatform.api.http
 
-import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.Height
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Transaction, *}
+import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import play.api.libs.json.*
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -408,6 +408,12 @@ object ApiError {
     override val id: Int          = 405
     override val message: String  = msg
     override val code: StatusCode = StatusCodes.BadRequest
+  }
+
+  case object NotFinalized extends ApiError {
+    override val id: Int          = 406
+    override val code: StatusCode = StatusCodes.NotFound
+    override val message: String  = "Not finalized"
   }
 
   object ScriptErrorJson {

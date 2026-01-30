@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import cats.syntax.either.*
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, NotFinalized, TooBigArrayAllocation}
 import com.wavesplatform.block.Block
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Height, TxMeta}
@@ -71,7 +71,12 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       }
     } ~ pathPrefix("finalized") {
       path("at" / IntNumber) { height =>
-        complete(Json.obj("height" -> commonApi.finalizedHeightAt(Height(height))))
+        complete {
+          commonApi
+            .finalizedHeightAt(Height(height))
+            .map(h => Json.obj("height" -> h))
+            .toRight(NotFinalized)
+        }
       }
     } ~ path("heightByTimestamp" / LongNumber) { timestamp =>
       val heightE = for {

@@ -8,6 +8,7 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.NumericExt
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.scalatest.OptionValues
 
 import scala.concurrent.duration.DurationInt
@@ -66,8 +67,15 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec with OptionValues {
     val waitingFinalizedHeight = finalizedHeight1 + 2
 
     withClue("Finalized height is unknown: ") {
-      node.finalizedHeightAt(node.height) shouldBe empty
-      node.finalizedHeightAt(node.height + 10) shouldBe empty
+      try node.finalizedHeightAt(node.height)
+      catch {
+        case ApiCallException(e: UnexpectedStatusCodeException) => e.statusCode shouldBe StatusCodes.NotFound.intValue
+      }
+
+      try node.finalizedHeightAt(node.height + 10)
+      catch {
+        case ApiCallException(e: UnexpectedStatusCodeException) => e.statusCode shouldBe StatusCodes.NotFound.intValue
+      }
     }
 
     var done = false
@@ -103,7 +111,7 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec with OptionValues {
     step("Finalized block header and height checks")
     val finalizedBlock1 = node.finalizedBlockHeader()
     finalizedBlock1.height should be >= finalizedHeight1
-    node.finalizedHeightAt(finalizedBlock1.height).value should be <= finalizedBlock1.height
+    node.finalizedHeightAt(finalizedBlock1.height) should be <= finalizedBlock1.height
 
     step("Finalization voting in a block header")
     val votingBlockHeader  = node.blockHeaderAt(finalizedHeight1 + 1)
