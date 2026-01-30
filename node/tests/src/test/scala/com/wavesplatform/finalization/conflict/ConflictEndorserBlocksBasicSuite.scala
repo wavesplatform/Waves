@@ -23,7 +23,7 @@ import org.scalatest.Assertion
   * 5. First block at period #2, no one committed
   */
 class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
-  private val validGenerator     = TxHelpers.signer(0)
+  private val validGenerator = TxHelpers.signer(0)
 
   private val conflictGenerator     = TxHelpers.signer(1)
   private val conflictGeneratorAddr = conflictGenerator.toAddress
@@ -45,7 +45,6 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
     private val removed: IgnorePositionCheck    = _ shouldBe Set(conflictGeneratorIndex)
     private val notRemoved: IgnorePositionCheck = _ shouldBe empty
 
-    // TODO: value instead of comparison?
     override def after2WithCommitmentsCheck              = notRemoved
     override def after3WithNewPeriodAndEndorsementsCheck = removed
     override def after4WithPunishmentCheck               = removed

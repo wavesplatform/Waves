@@ -88,11 +88,70 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
       }
     }
 
-    // TODO:
-    "all generators have no right to mine" - {
-      "some conflict, some have no required balance" - pending
+    // TODO: will be fixed later
+    "not committed, but all generators have no right to mine" ignore withManager { manager =>
+      val channels     = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
+      var miner: Miner = Miner.Disabled
+      withDomain(
+        defaultSettings,
+        AddrWithBalance.enoughBalances(otherNodeAcc, thisNodeAcc),
+        miner = x => miner.scheduleMining(x)
+      ) { d =>
+        val minerScheduler    = TestScheduler()
+        val appenderScheduler = TestScheduler()
 
-      "all have no required balance" - pending
+        d.wallet.generateNewAccounts(1)
+
+        val minerImpl = new MinerImpl(
+          channels,
+          d.blockchain,
+          d.settings,
+          d.testTime,
+          d.utxPool,
+          BlockEndorser.Disabled,
+          EndorsementStorage.Disabled,
+          d.wallet,
+          d.posSelector,
+          minerScheduler,
+          appenderScheduler,
+          Observable.empty
+        ) with CatchLogs
+        miner = minerImpl
+
+        log.debug("Append block2")
+        val block2 = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Seq(TxHelpers.commitToGeneration(Height(3), sender = otherNodeAcc)),
+          generator = otherNodeAcc,
+          strictTime = true
+        )
+        d.appender.appendBlock(block2)
+
+        log.debug("Append block3 with spending all waves by miner")
+        val block3 = d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Seq(
+            TxHelpers.transfer(
+              otherNodeAcc,
+              thisNodeAcc.toAddress,
+              amount = d.blockchain.balance(thisNodeAcc.toAddress) - CommitToGenerationTransaction.DepositInWavelets - 1.waves,
+              fee = 1.waves
+            )
+          ),
+          generator = otherNodeAcc,
+          strictTime = true
+        )
+        d.appender.appendBlock(block3)
+
+        log.debug("Trigger thisNode forging")
+        val nextBlockIn = (d.nextBlockTime(thisNodeAcc) - d.testTime.getTimestamp()).millis
+        d.testTime.advance(nextBlockIn)
+        appenderScheduler.tickNext("appender-1")
+        minerScheduler.tickNext("miner-1")
+        appenderScheduler.tickNext("appender-2")
+
+        d.blockchain.lastBlockHeader.value.header.generator.toAddress shouldBe thisNodeAcc.toAddress
+      }
     }
 
     "was conflict in previous period" in withManager { manager =>
@@ -344,8 +403,8 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
       d.utxPool.putIfNew(TxHelpers.transfer(generator1, generator2Addr))
 
       time.advance(1.millis)
-      minerScheduler.tickNext("miner-1")
-      appenderScheduler.tickNext("appender-2")
+      minerScheduler.tickNext("miner-2")
+      appenderScheduler.tickNext("appender-3")
 
       log.debug(s"Trigger forging micro block 2 of block 3, losing finalization")
       val otherFinalizedBlockId = TxHelpers.randomBlockId
@@ -362,8 +421,8 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
       d.utxPool.putIfNew(TxHelpers.transfer(generator1, generator2Addr))
 
       time.advance(defaultSettings.minerSettings.microBlockInterval + 1.millis)
-      minerScheduler.tickNext("miner-1")
-      appenderScheduler.tickNext("appender-2")
+      minerScheduler.tickNext("miner-3")
+      appenderScheduler.tickNext("appender-4")
       val microBlock2TotalId = d.lastBlockId
 
       log.debug(s"Trigger forging micro block 3 of block 3, reaching finalization")
@@ -379,8 +438,8 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
       d.utxPool.putIfNew(TxHelpers.transfer(generator1, generator2Addr))
 
       time.advance(defaultSettings.minerSettings.microBlockInterval + 1.millis)
-      minerScheduler.tickNext("miner-1")
-      appenderScheduler.tickNext("appender-2")
+      minerScheduler.tickNext("miner-4")
+      appenderScheduler.tickNext("appender-5")
       val microBlock3TotalId = d.lastBlockId
 
       microBlock2TotalId shouldNot be(microBlock3TotalId) // Appended

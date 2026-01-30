@@ -20,7 +20,10 @@ object GeneratingBalanceProvider {
         .exists(height >= _) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2
 
   def isGeneratingBalanceValid(blockchain: Blockchain, height: Height, block: Block, effectiveBalance: Long): Boolean =
-    block.header.timestamp < blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter
+    isGeneratingBalanceValid(blockchain, height, block.header.timestamp, effectiveBalance)
+
+  def isGeneratingBalanceValid(blockchain: Blockchain, height: Height, timestampMs: Long, effectiveBalance: Long): Boolean =
+    timestampMs < blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter
       || isMiningAllowed(blockchain, height, effectiveBalance)
 
   def balance(blockchain: Blockchain, account: Address, blockId: Option[BlockId] = None): Long = {
