@@ -6,8 +6,8 @@ import com.wavesplatform.block.{Block, FinalizationVoting}
 import com.wavesplatform.utils.ScorexLogging
 
 case class FinalizationState(
-    generatorBalances: GeneratorBalances = Seq.empty,    // TODO: Empty - not finalized?
-    conflictGenerators: Set[GeneratorIndex] = Set.empty, // TODO: hide in lambda?
+    generatorBalances: GeneratorBalances = Seq.empty,
+    conflictGenerators: Set[GeneratorIndex] = Set.empty,
     parentHeight: Height = GenesisBlockHeight,
     finalizedHeight: Height = GenesisBlockHeight,
     finalizationVoting: Map[BlockId, FinalizationVoting] = Map.empty,
@@ -21,7 +21,7 @@ case class FinalizationState(
   ): FinalizationState = {
     val newConflictGenerators = conflictGenerators ++ totalFinalizationVoting.fold(Set.empty)(_.conflict.map(_.endorserIndex))
     val (updatedParentFinalized, updatedFinalizedHeight) = totalFinalizationVoting
-      .filterNot(parentFinalized && _.conflict.isEmpty) // TODO: parent can lose finalization, parentFinalized is wrong here
+      .filterNot(parentFinalized && _.conflict.isEmpty)
       .fold((parentFinalized, finalizedHeight)) { _ =>
         val updatedParentFinalized =
           FinalizationState.isParentFinalized(updatedBalances, newConflictGenerators, baseGenerator, totalFinalizationVoting)
