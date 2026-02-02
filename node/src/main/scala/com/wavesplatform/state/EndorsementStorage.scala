@@ -124,8 +124,8 @@ object EndorsementStorage {
 
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = synced {
       val r = for {
-        currentFilter <- currentFilter
-        if currentFilter.endorsedId == endorsedId && hasChanges
+        currentFilter <- currentFilter.toRight("Voting not started")
+        _ <- Either.raiseUnless(currentFilter.endorsedId == endorsedId && hasChanges)("No changes")
         _ = {
           hasChanges = false
         }
@@ -133,19 +133,23 @@ object EndorsementStorage {
         moreConflict   = conflict.size > latestResult.voting.conflict.size
         moreValid      = valid.size > latestResult.voting.valid.size
         couldFinalized = !latestResult.reachedFinalization && moreValid
-        if moreConflict || couldFinalized
+        _ <- Either.raiseUnless(moreConflict || couldFinalized) {
+          s"Could not be changed: finalized=${latestResult.reachedFinalization}, more valid=$moreValid, more conflict=$moreConflict"
+        }
 
         origResult = latestResult
+        simulation = currentFilter.simulate(valid.keys, conflict.keySet)
         _ = {
-          val simulation = currentFilter.simulate(valid.keys, conflict.keySet)
           latestResult = createVoting(currentFilter, simulation)
         }
         changedFinalizationStatus = latestResult.reachedFinalization != origResult.reachedFinalization
-        if moreConflict || changedFinalizationStatus
+        _ <- Either.raiseUnless(moreConflict || changedFinalizationStatus) {
+          s"Status not changed, endorsed=${simulation.endorsedBalance}, total=${simulation.totalBalance}"
+        }
       } yield latestResult.voting
 
-      if (r.isEmpty) logger.debug(s"Not found new significant endorsements for $endorsedId")
-      r
+      r.left.foreach(err => logger.debug(s"Not found new significant endorsements for $endorsedId: $err"))
+      r.toOption
     }
 
     private def createVoting(currentFilter: EndorsementFilter, simulationResult: SimulationResult): FinalizationResult = {

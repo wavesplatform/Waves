@@ -23,8 +23,13 @@ object BlockEndorser {
     override def vote(generatorBalances: GeneratorBalances): Unit = {}
   }
 
-  class InMemory(maxSyncRollbackLength: Int, blockchain: Blockchain, wallet: Wallet, endorsementStorage: EndorsementStorage, allChannels: ChannelGroup)
-      extends BlockEndorser,
+  class InMemory(
+      maxSyncRollbackLength: Int,
+      blockchain: Blockchain,
+      wallet: Wallet,
+      endorsementStorage: EndorsementStorage,
+      allChannels: ChannelGroup
+  ) extends BlockEndorser,
         StrictLogging {
     override def vote(generatorBalances: GeneratorBalances): Unit = {
       val votingHeight   = Height(blockchain.height)

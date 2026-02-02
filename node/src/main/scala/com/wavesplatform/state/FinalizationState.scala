@@ -24,7 +24,7 @@ case class FinalizationState(
       .filterNot(parentFinalized && _.conflict.isEmpty)
       .fold((parentFinalized, finalizedHeight)) { _ =>
         val updatedParentFinalized =
-          FinalizationState.isParentFinalized(updatedBalances, newConflictGenerators, baseGenerator, totalFinalizationVoting)
+          FinalizationState.isParentFinalized(updatedBalances, newConflictGenerators, baseGenerator, totalFinalizationVoting, parentHeight)
         (
           updatedParentFinalized,
           if (updatedParentFinalized) parentHeight else finalizedHeight
@@ -50,7 +50,7 @@ object FinalizationState extends ScorexLogging {
       finalizedHeight: Height = GenesisBlockHeight
   ): FinalizationState = {
     val v               = base.header.finalizationVoting
-    val parentFinalized = isParentFinalized(generatorBalances, conflictGenerators, base.header.generator.toAddress, v)
+    val parentFinalized = isParentFinalized(generatorBalances, conflictGenerators, base.header.generator.toAddress, v, parentHeight)
     FinalizationState(
       generatorBalances,
       conflictGenerators,
@@ -67,7 +67,8 @@ object FinalizationState extends ScorexLogging {
       generatorBalances: GeneratorBalances,
       knownConflict: Set[GeneratorIndex],
       votingBlockMinerAddress: Address,
-      voting: Option[FinalizationVoting]
+      voting: Option[FinalizationVoting],
+      parentHeight: Height
   ): Boolean = generatorBalances.nonEmpty && {
     val votedIndexes       = voting.fold(Seq.empty)(_.valid)
     val votedIndexesSet    = votedIndexes.toSet
@@ -96,7 +97,7 @@ object FinalizationState extends ScorexLogging {
 
     val r = FinalizationVoting.isFinalized(endorsedBalance, totalBalance)
     log.debug(
-      s"${if (r) "Reached" else "Not reached"}, endorsed=$endorsedBalance, total=$totalBalance, " +
+      s"${if (r) "Reached" else "Not reached"} for $parentHeight, endorsed=$endorsedBalance, total=$totalBalance, " +
         s"miner=$minerIdx" +
         (if (votedIndexes.isEmpty) "" else s", valid=[${votedIndexes.mkString(", ")}]") +
         (if (allConflictIndexes.isEmpty) "" else s", conflict=[${allConflictIndexes.mkString(", ")}]")

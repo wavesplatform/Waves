@@ -421,6 +421,9 @@ class BlockchainUpdaterImpl(
                     hitSource
                   ) =>
                 val newHeight = Height(rocksdb.height + 1)
+                rocksdb.finalizedHeightAt(Height(rocksdb.height)).foreach { h =>
+                  log.debug(s"Finalized height at ${rocksdb.height}: $h")
+                }
 
                 restTotalConstraint = updatedTotalConstraint
                 ngState = Some(
@@ -447,10 +450,6 @@ class BlockchainUpdaterImpl(
                     )
                   )
                 )
-
-                rocksdb.finalizedHeightAt(Height(rocksdb.height)).foreach { h =>
-                  log.debug(s"Finalized height at ${rocksdb.height}: $h")
-                }
 
                 if (
                   (block.header.timestamp > time

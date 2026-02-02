@@ -24,7 +24,7 @@ case class EndorsementFilter(
     conflict.view.map(i => endorsers(i.toInt)._3).sum
 
   override def toString: String = {
-    val endorsersStr = endorsers.view.map { case (addr, _, b) => s"($addr, $b)" }.mkString(", ")
+    val endorsersStr = endorsers.view.map { case (addr, _, b) => s"$addr -> $b" }.mkString(", ")
     s"EndorsementFilter(${miner.fold("")(i => s"m=$i, ")}fid=$finalizedId, fh=$finalizedHeight, eid=$endorsedId, e={$endorsersStr})"
   }
 
