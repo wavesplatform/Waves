@@ -20,6 +20,7 @@ import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.execution.schedulers.TestScheduler
 import monix.reactive.Observable
+import monix.reactive.subjects.ConcurrentSubject
 import org.scalatest.time.SpanSugar.convertLongToGrainOfTime
 
 class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
@@ -330,6 +331,95 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         d.blockchain.lastBlockId.value shouldBe lastBlockId // Not changed
         minerImpl.inMemoryLog.getMessages.find(_.contains("is not committed on 3")) should not be empty
       }
+    }
+  }
+
+  "Finalization on miner" in withManager { manager =>
+    val generator1    = thisNodeAcc
+    val generator2    = TxHelpers.signer(1)
+    val generator3    = TxHelpers.signer(2)
+    val generator3Idx = GeneratorIndex(2)
+
+    val otherAcc1 = TxHelpers.signer(100)
+    val otherAcc2 = TxHelpers.signer(101)
+
+    val generators = Seq(generator1, generator2, generator3)
+    val initBalances = Seq(
+      AddrWithBalance(generator1.toAddress, 2000.waves), // this node miner
+      AddrWithBalance(generator2.toAddress, 3000.waves),
+      AddrWithBalance(generator3.toAddress, 5000.waves), // endorser
+      AddrWithBalance(otherAcc1.toAddress, 2000.waves)
+    ).map(x => x.copy(balance = x.balance + CommitToGenerationTransaction.DepositInWavelets + TestValues.commitToGenerationFee))
+
+    val minerScheduler    = TestScheduler()
+    val appenderScheduler = TestScheduler()
+
+    val channels     = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
+    var miner: Miner = Miner.Disabled
+    val time         = TestTime()
+    withDomain(defaultSettings, initBalances, miner = x => miner.scheduleMining(x), time = time) { d =>
+      d.wallet.generateNewAccounts(1)
+
+      val endorsementStorage = EndorsementStorage.InMemory((blockId, h) => blockId == d.blockchain.blockId(h.toInt))
+      val blockEndorser = BlockEndorser.InMemory(d.settings.synchronizationSettings.maxRollback, d.blockchain, d.wallet, endorsementStorage, channels)
+      val utxEvents     = ConcurrentSubject.publish[Unit](using minerScheduler)
+      val minerImpl = new MinerImpl(
+        channels,
+        d.blockchain,
+        d.settings,
+        time,
+        d.utxPool,
+        blockEndorser,
+        endorsementStorage,
+        d.wallet,
+        d.posSelector,
+        minerScheduler,
+        appenderScheduler,
+        utxEvents
+      ) with CatchLogs
+      miner = minerImpl
+
+      val genesisBlockId = d.blockchain.lastBlockId.value
+
+      log.debug(s"Append block 2 with commitments")
+      val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = otherAcc1, strictTime = true)
+      d.appender.appendBlock(block2WithCommitments)
+
+      log.debug(s"Trigger forging block 3")
+      time.advance((d.nextBlockTime(generator1) - d.testTime.getTimestamp()).millis)
+      appenderScheduler.tickNext("appender-1")
+      minerScheduler.tickNext("miner-1")
+      appenderScheduler.tickNext("appender-2")
+
+      log.debug(s"Trigger forging micro block 1 of block 3, reaching finalization")
+      endorsementStorage.tryAdd(
+        EndorseBlock(
+          endorserIndex = generator3Idx.toInt,
+          finalizedId = genesisBlockId,
+          finalizedHeight = GenesisBlockHeight,
+          endorsedId = block2WithCommitments.id(),
+          signature = BlockEndorsement.sign(BlsKeyPair(generator3.privateKey), genesisBlockId, GenesisBlockHeight, block2WithCommitments.id()).byteStr
+        )
+      ) should beRight
+
+      d.utxPool.putIfNew(TxHelpers.transfer(otherAcc1, otherAcc2.toAddress))
+      utxEvents.onNext(())
+      time.advance(1.millis)
+      minerScheduler.tickNext("miner-2")
+      appenderScheduler.tickNext("appender-3")
+
+      log.debug("Append block 3 and calculate finalization")
+      val block3 =
+        d.createBlock(
+          version = Block.ProtoBlockVersion,
+          txs = Nil,
+          generator = generator2,
+          strictTime = true,
+          ref = Some(d.blockchain.lastBlockId.value)
+        )
+      d.appender.appendBlock(block3)
+      d.finalizedHeightIs(2)
     }
   }
 

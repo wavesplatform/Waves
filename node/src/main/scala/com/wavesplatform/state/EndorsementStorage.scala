@@ -93,7 +93,7 @@ object EndorsementStorage {
 
             hasChanges = true
             sharedWithNeighbors += msg
-          }
+          } else logger.trace(s"Neither valid, nor conflict endorsement from #$endorserIndex")
 
           share
         }
@@ -125,7 +125,7 @@ object EndorsementStorage {
     override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = synced {
       val r = for {
         currentFilter <- currentFilter.toRight("Voting not started")
-        _ <- Either.raiseUnless(currentFilter.endorsedId == endorsedId && hasChanges)("No changes")
+        _             <- Either.raiseUnless(currentFilter.endorsedId == endorsedId && hasChanges)("No changes")
         _ = {
           hasChanges = false
         }
