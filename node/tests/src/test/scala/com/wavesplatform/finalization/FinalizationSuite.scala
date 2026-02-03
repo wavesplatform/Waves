@@ -253,7 +253,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
   }
 
   "empty generator set" - {
-    def test(settings: WavesSettings = defaultSettings)(continue: Domain => Unit): Unit = withDomain(
+    def test(settings: WavesSettings)(continue: Domain => Unit): Unit = withDomain(
       settings,
       AddrWithBalance.enoughBalances(node0Acc, node1Acc, node2Acc)
     ) { d =>

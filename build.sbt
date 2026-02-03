@@ -245,10 +245,29 @@ buildRIDERunnerForDocker := {
   )
 }
 
-lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
-checkPRRaw := Def
+lazy val compilePRRaw = taskKey[Unit]("Compile the project")
+compilePRRaw := Def
   .sequential(
     clean,
+    Def.task {
+      (`lang-tests` / Test / compile).value
+      (`repl-jvm` / Test / compile).value
+      (`lang-tests-js` / Test / compile).value
+      (`grpc-server` / Test / compile).value
+      (`node-tests` / Test / compile).value
+      (`node-it` / Test / compile).value
+      (benchmark / Test / compile).value
+      (`node-generator` / Compile / compile).value
+      (`ride-runner` / Test / compile).value
+      (`lang-jvm` / Test / compile).value
+    }
+  )
+  .value
+
+lazy val checkPRRaw = taskKey[Unit]("Compile the project and run unit tests")
+checkPRRaw := Def
+  .sequential(
+    compilePRRaw,
     Def.task {
       (`lang-tests` / Test / test).value
       (`repl-jvm` / Test / test).value
@@ -257,9 +276,6 @@ checkPRRaw := Def
       (`grpc-server` / Test / test).value
       (`node-tests` / Test / test).value
       (`repl-js` / Compile / fullOptJS).value
-      (`node-it` / Test / compile).value
-      (benchmark / Test / compile).value
-      (`node-generator` / Compile / compile).value
       (`ride-runner` / Test / test).value
       (node / assembly).value
       buildTarballsForDocker.value
@@ -268,16 +284,20 @@ checkPRRaw := Def
   )
   .value
 
-def checkPR: Command = Command.command("checkPR") { state =>
-  val newState = Project
-    .extract(state)
-    .appendWithoutSession(
+def commandWithFatalWarnings(commandName: String, task: TaskKey[Unit]): Command =
+  Command.command(commandName) { state =>
+    val extracted = Project.extract(state)
+    val newState = extracted.appendWithoutSession(
       Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")),
       state
     )
-  Project.extract(newState).runTask(checkPRRaw, newState)
-  state
-}
+
+    Project.extract(newState).runTask(task, newState)
+    state
+  }
+
+def compilePR = commandWithFatalWarnings("compilePR", compilePRRaw)
+def checkPR   = commandWithFatalWarnings("checkPR", checkPRRaw)
 
 lazy val completeQaseRun = taskKey[Unit]("Complete Qase run")
 completeQaseRun := Def.task {
@@ -345,4 +365,4 @@ def generateGenesisCommand: Command =
     state
   }
 
-commands ++= Seq(checkPR, buildReleaseArtifacts, generateGenesisCommand)
+commands ++= Seq(compilePR, checkPR, buildReleaseArtifacts, generateGenesisCommand)
