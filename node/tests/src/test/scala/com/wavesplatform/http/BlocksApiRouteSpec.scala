@@ -211,6 +211,14 @@ class BlocksApiRouteSpec
     }
   }
 
+  routePath("/finalized/at/{height}") in {
+    (blocksApi.finalizedHeightAt).expects(Height(4)).returning(Some(Height(3))).once()
+    Get(routePath("/finalized/at/4/")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      response shouldBe Json.obj("height" -> 3)
+    }
+  }
+
   routePath("/headers/{id}") in {
     (blocksApi.meta).expects(testBlock1.id()).returning(Some(testBlock1Meta)).once()
     (blocksApi.meta).expects(testBlock2.id()).returning(Some(testBlock2Meta)).once()

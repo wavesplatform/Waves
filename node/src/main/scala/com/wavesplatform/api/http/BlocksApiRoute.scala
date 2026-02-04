@@ -69,14 +69,12 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       } ~ path(BlockId) { id =>
         complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
       }
-    } ~ pathPrefix("finalized") {
-      path("at" / IntNumber) { height =>
-        complete {
-          commonApi
-            .finalizedHeightAt(Height(height))
-            .map(h => Json.obj("height" -> h))
-            .toRight(NotFinalized)
-        }
+    } ~ path("finalized" / "at" / IntNumber) { height =>
+      complete {
+        commonApi
+          .finalizedHeightAt(Height(height))
+          .map(h => Json.obj("height" -> h))
+          .toRight(NotFinalized)
       }
     } ~ path("heightByTimestamp" / LongNumber) { timestamp =>
       val heightE = for {
