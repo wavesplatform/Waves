@@ -10,7 +10,7 @@ object Dependencies {
 
   private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.9.Final"
 
-  val gProtoVersion = "4.33.2"
+  val gProtoVersion = "4.33.5"
   val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
   val overrides = Def.setting(
     Seq(
@@ -42,21 +42,21 @@ object Dependencies {
 
   private def pekkoHttpModule(module: String, version: String = "1.3.0") = "org.apache.pekko" %% module % version
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.8.0"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.8.1"
 
-  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.20.1"
+  private def jacksonModule(group: String, module: String, version: String = "2.20.1") = s"com.fasterxml.jackson.$group" % s"jackson-$module" % version
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.9.8" // 4.10+ requires Java 17 https://github.com/web3j/web3j/issues/1907
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.77.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.79.0"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.5.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.26"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.27"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.6"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
@@ -64,7 +64,7 @@ object Dependencies {
   val playJson = "org.playframework" %% "play-json" % "3.0.6"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
-  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.9.4" % Test)
+  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.9.5" % Test)
 
   private def sttp3Module(module: String) = "com.softwaremill.sttp.client3" %% module % "3.11.0"
 
@@ -112,7 +112,7 @@ object Dependencies {
     logback,
     "com.github.jnr" % "jnr-unixsocket" % "0.38.24", // To support Apple ARM
     "com.spotify"    % "docker-client"  % "8.16.0",
-    jacksonModule("dataformat", "dataformat-properties"),
+    jacksonModule("dataformat", "dataformat-properties", "2.21.0"),
     asyncHttpClient
   ).map(_ % Test)
 
@@ -138,8 +138,8 @@ object Dependencies {
       rocksdb,
       "commons-net"            % "commons-net"               % "3.12.0",
       "commons-io"             % "commons-io"                % "2.21.0",
-      "com.github.pureconfig" %% "pureconfig-core"           % "0.17.9",
-      "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.9",
+      "com.github.pureconfig" %% "pureconfig-core"           % "0.17.10",
+      "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.10",
       "net.logstash.logback"   % "logstash-logback-encoder"  % "9.0" % Runtime,
       kamonCore,
       kamonModule("pekko-http"),

@@ -91,10 +91,12 @@ object CryptoContext {
     }
 
     val sha256F: BaseFunction[NoContext] = {
-      val complexity =
+      val complexity = {
         if (version < V4) 10
         else if (version < V6) 200
-        else 118
+        else if (version < V9) 118
+        else 36
+      }
       hashFunction("sha256", SHA256, complexity)(global.sha256)
     }
 
@@ -163,7 +165,14 @@ object CryptoContext {
       hashLimFunction(
         "sha256",
         SHA256_LIM,
-        if (version >= V6)
+        if (version >= V9)
+          List(
+            (16, 5),
+            (32, 9),
+            (64, 17),
+            (128, 32)
+          )
+        else if (version >= V6)
           List(
             (16, 12),
             (32, 23),
