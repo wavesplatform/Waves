@@ -22,7 +22,7 @@ case class SnapshotBlockchain(
     carry: Long = 0,
     reward: Option[Long] = None,
     stateHash: Option[ByteStr] = None,
-    latestGeneratorBalances: Option[GeneratorBalances] = None
+    latestGeneratorSet: Option[GeneratorSet] = None
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
   lazy val snapshot: StateSnapshot          = maybeSnapshot.orEmpty
@@ -285,7 +285,7 @@ object SnapshotBlockchain {
       ngState.carryFee,
       ngState.reward,
       Some(ngState.bestLiquidComputedStateHash),
-      Some(ngState.finalizationState.generatorBalances)
+      Some(ngState.finalizationState.generatorSet)
     )
 
   def apply(inner: Blockchain, reward: Option[Long]): SnapshotBlockchain =

@@ -161,7 +161,7 @@ case class NgState(
       timestamp: Long,
       computedStateHash: ByteStr,
       totalBlockId: Option[BlockId] = None,
-      updatedGeneratorBalances: GeneratorBalances
+      updatedGeneratorSet: GeneratorSet
   ): NgState = {
     val fixedTotalBlockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
 
@@ -176,7 +176,7 @@ case class NgState(
       microSnapshots = microSnapshots,
       microBlocks = microBlocks,
       finalizationState =
-        finalizationState.append(base.header.generator.toAddress, fixedTotalBlockId, createFinalizationVoting(microBlock), updatedGeneratorBalances)
+        finalizationState.append(base.header.generator.toAddress, fixedTotalBlockId, createFinalizationVoting(microBlock), updatedGeneratorSet)
     )
   }
 

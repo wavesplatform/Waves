@@ -6,7 +6,7 @@ import com.wavesplatform.block.{Block, FinalizationVoting}
 import com.wavesplatform.utils.ScorexLogging
 
 case class FinalizationState(
-    generatorBalances: GeneratorBalances = Seq.empty,
+    generatorSet: GeneratorSet = Seq.empty,
     conflictGenerators: Set[GeneratorIndex] = Set.empty,
     parentHeight: Height = GenesisBlockHeight,
     finalizedHeight: Height = GenesisBlockHeight,
@@ -17,14 +17,14 @@ case class FinalizationState(
       baseGenerator: Address,
       totalBlockId: BlockId,
       totalFinalizationVoting: Option[FinalizationVoting],
-      updatedBalances: GeneratorBalances
+      updatedGeneratorSet: GeneratorSet
   ): FinalizationState = {
     val newConflictGenerators = conflictGenerators ++ totalFinalizationVoting.fold(Set.empty)(_.conflict.map(_.endorserIndex))
     val (updatedParentFinalized, updatedFinalizedHeight) = totalFinalizationVoting
       .filterNot(parentFinalized && _.conflict.isEmpty)
       .fold((parentFinalized, finalizedHeight)) { _ =>
         val updatedParentFinalized =
-          FinalizationState.isParentFinalized(updatedBalances, newConflictGenerators, baseGenerator, totalFinalizationVoting, parentHeight)
+          FinalizationState.isParentFinalized(updatedGeneratorSet, newConflictGenerators, baseGenerator, totalFinalizationVoting, parentHeight)
         (
           updatedParentFinalized,
           if (updatedParentFinalized) parentHeight else finalizedHeight
@@ -32,7 +32,7 @@ case class FinalizationState(
       }
 
     copy(
-      generatorBalances = updatedBalances,
+      generatorSet = updatedGeneratorSet,
       finalizationVoting = totalFinalizationVoting.foldLeft(finalizationVoting)(_.updated(totalBlockId, _)),
       finalizedHeight = updatedFinalizedHeight,
       parentFinalized = updatedParentFinalized,
@@ -43,16 +43,16 @@ case class FinalizationState(
 
 object FinalizationState extends ScorexLogging {
   def init(
-      generatorBalances: GeneratorBalances,
+      generatorSet: GeneratorSet,
       conflictGenerators: Set[GeneratorIndex],
       base: Block,
       parentHeight: Height = GenesisBlockHeight,
       finalizedHeight: Height = GenesisBlockHeight
   ): FinalizationState = {
     val v               = base.header.finalizationVoting
-    val parentFinalized = isParentFinalized(generatorBalances, conflictGenerators, base.header.generator.toAddress, v, parentHeight)
+    val parentFinalized = isParentFinalized(generatorSet, conflictGenerators, base.header.generator.toAddress, v, parentHeight)
     FinalizationState(
-      generatorBalances,
+      generatorSet,
       conflictGenerators,
       parentHeight,
       finalizedHeight = if (parentFinalized) parentHeight else finalizedHeight,
@@ -64,16 +64,16 @@ object FinalizationState extends ScorexLogging {
   // TODO: add already known as conflict, or better: generator balances without conflict
   // TODO: easier to create lambda?
   private def isParentFinalized(
-      generatorBalances: GeneratorBalances,
+      generatorSet: GeneratorSet,
       knownConflict: Set[GeneratorIndex],
       votingBlockMinerAddress: Address,
       voting: Option[FinalizationVoting],
       parentHeight: Height
-  ): Boolean = generatorBalances.nonEmpty && {
+  ): Boolean = generatorSet.nonEmpty && {
     val votedIndexes       = voting.fold(Seq.empty)(_.valid)
     val votedIndexesSet    = votedIndexes.toSet
     val allConflictIndexes = knownConflict ++ voting.fold(Set.empty)(_.conflict.view.map(_.endorserIndex))
-    val (totalBalance, endorsedBalance, minerIdx) = generatorBalances.foldLeft((BigInt(0), BigInt(0), -1)) {
+    val (totalBalance, endorsedBalance, minerIdx) = generatorSet.foldLeft((BigInt(0), BigInt(0), -1)) {
       case (orig @ (totalBalance, endorsedBalance, minerIdx), x) =>
         val gi = x.index
         if (allConflictIndexes.contains(gi)) orig
@@ -91,8 +91,8 @@ object FinalizationState extends ScorexLogging {
     for {
       c <- voting.fold(Seq.empty)(_.conflict)
       idx = c.endorserIndex.toInt
-      if 0 <= idx && idx < generatorBalances.size
-      x = generatorBalances(idx)
+      if 0 <= idx && idx < generatorSet.size
+      x = generatorSet(idx)
     } log.debug(s"New conflict endorser ${x.address} with index $idx and balance ${x.balance}")
 
     val r = FinalizationVoting.isFinalized(endorsedBalance, totalBalance)

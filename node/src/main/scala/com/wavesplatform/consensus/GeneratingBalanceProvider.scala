@@ -1,7 +1,6 @@
 package com.wavesplatform.consensus
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.{Blockchain, Height}

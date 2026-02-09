@@ -77,7 +77,7 @@ package object state {
 
   case class GeneratorInfo(index: GeneratorIndex, address: Address, blsPublicKey: BlsPublicKey, balance: Long)
 
-  type GeneratorBalances = Seq[GeneratorInfo]
+  type GeneratorSet = Seq[GeneratorInfo]
 
   val GenesisBlockHeight = Height(1)
 

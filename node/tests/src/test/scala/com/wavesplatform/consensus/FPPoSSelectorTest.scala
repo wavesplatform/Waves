@@ -240,7 +240,7 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
               .verifyVRF(blockToApply.header.generationSignature, blockchain.hitSource(blockCount + 1).get.arr, blockToApply.sender)
               .explicitGet(),
             snapshot = None,
-            generatorBalances = Seq.empty
+            generatorSet = Seq.empty
           ) should beRight
 
           blockchain.lastBlockId shouldBe Some(blockToApply.id())
@@ -262,7 +262,7 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
         blockToApply,
         blockchain.blockHeader(2).get.header.generationSignature,
         snapshot = None,
-        generatorBalances = Seq.empty
+        generatorSet = Seq.empty
       ) should beRight
 
       blockchain.lastBlockId shouldBe Some(blockToApply.id())
@@ -294,7 +294,7 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
           block,
           block.header.generationSignature.take(Block.HitSourceLength),
           snapshot = None,
-          generatorBalances = Seq.empty
+          generatorSet = Seq.empty
         ) should beRight
       }
 

@@ -90,7 +90,7 @@ trait BaseState {
       differResult.computedStateHash,
       next,
       newFinalizedHeight = GenesisBlockHeight,
-      generatorBalances = Seq.empty
+      generatorSet = Seq.empty
     )
   }
 

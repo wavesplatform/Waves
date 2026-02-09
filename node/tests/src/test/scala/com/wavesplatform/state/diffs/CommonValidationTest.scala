@@ -63,7 +63,7 @@ class CommonValidationTest extends PropSpec with WithState {
           computedStateHash,
           genesisBlock,
           newFinalizedHeight = GenesisBlockHeight,
-          generatorBalances = Seq.empty
+          generatorSet = Seq.empty
         )
 
         f(FeeValidation(blockchain, transferTx))
@@ -94,7 +94,7 @@ class CommonValidationTest extends PropSpec with WithState {
         computedStateHash,
         genesisBlock,
         newFinalizedHeight = GenesisBlockHeight,
-        generatorBalances = Seq.empty
+        generatorSet = Seq.empty
       )
 
       f(FeeValidation(blockchain, transferTx))
@@ -179,7 +179,7 @@ class CommonValidationTest extends PropSpec with WithState {
         computedStateHash,
         genesisBlock,
         newFinalizedHeight = GenesisBlockHeight,
-        generatorBalances = Seq.empty
+        generatorSet = Seq.empty
       )
 
       f(FeeValidation(blockchain, transferTx))

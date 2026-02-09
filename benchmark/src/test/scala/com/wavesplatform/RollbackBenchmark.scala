@@ -84,7 +84,7 @@ object RollbackBenchmark extends ScorexLogging {
       computedBlockStateHash = ByteStr.empty,
       genesisBlock,
       newFinalizedHeight = GenesisBlockHeight,
-      generatorBalances = Seq.empty
+      generatorSet = Seq.empty
     )
 
     val nextBlock =
@@ -117,7 +117,7 @@ object RollbackBenchmark extends ScorexLogging {
       computedBlockStateHash = ByteStr.empty,
       nextBlock,
       newFinalizedHeight = GenesisBlockHeight,
-      generatorBalances = Seq.empty
+      generatorSet = Seq.empty
     )
 
     log.info("Rolling back")

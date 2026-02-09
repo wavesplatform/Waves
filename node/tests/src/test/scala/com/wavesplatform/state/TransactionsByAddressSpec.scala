@@ -73,7 +73,7 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
     setup.foreach { case (sender, r1, r2, blocks) =>
       withDomain() { d =>
         for (b <- blocks) {
-          d.blockchainUpdater.processBlock(b, b.header.generationSignature, snapshot = None, generatorBalances = Seq.empty, verify = false)
+          d.blockchainUpdater.processBlock(b, b.header.generationSignature, snapshot = None, generatorSet = Seq.empty, verify = false)
         }
 
         Seq[Address](sender.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
@@ -82,7 +82,7 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
           TestBlock.create(System.currentTimeMillis(), blocks.last.signature, Seq.empty).block,
           ByteStr(new Array[Byte](32)),
           snapshot = None,
-          generatorBalances = Seq.empty,
+          generatorSet = Seq.empty,
           verify = false
         )
 

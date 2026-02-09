@@ -124,7 +124,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
           .sample
           .get
 
-      bcu.processBlock(firstBlock, firstBlock.header.generationSignature, snapshot = None, generatorBalances = Seq.empty).explicitGet()
+      bcu.processBlock(firstBlock, firstBlock.header.generationSignature, snapshot = None, generatorSet = Seq.empty).explicitGet()
 
       f(Env(settings, pos, bcu, utxPoolStub, schedulerService, account, secondBlock))
     } finally {

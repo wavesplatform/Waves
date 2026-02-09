@@ -100,7 +100,7 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
           computedStateHash,
           block,
           newFinalizedHeight = GenesisBlockHeight,
-          generatorBalances = Seq.empty
+          generatorSet = Seq.empty
         )
       }
       f((FeeValidation(blockchain, txs._1), FeeValidation(blockchain, txs._2), FeeValidation(blockchain, txs._3)))

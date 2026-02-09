@@ -38,7 +38,7 @@ object BaseTargetChecker {
             blockchainUpdater.isFeatureActivated(BlockchainFeatures.LightNode)
           )
           .explicitGet()
-      blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature, snapshot = None, generatorBalances = Seq.empty)
+      blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature, snapshot = None, generatorSet = Seq.empty)
 
       NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
         case cfg if ConfigSource.fromConfig(cfg).at("waves.miner.enable").loadOrThrow[Boolean] =>

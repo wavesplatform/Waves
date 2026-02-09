@@ -15,12 +15,12 @@ trait BlockEndorser {
     *   with finalizedBlock at votingHeight
     *   by generators, committed at votingHeight
     */
-  def vote(generatorBalances: GeneratorBalances): Unit
+  def vote(generatorSet: GeneratorSet): Unit
 }
 
 object BlockEndorser {
   object Disabled extends BlockEndorser {
-    override def vote(generatorBalances: GeneratorBalances): Unit = {}
+    override def vote(generatorSet: GeneratorSet): Unit = {}
   }
 
   class InMemory(
@@ -31,7 +31,7 @@ object BlockEndorser {
       allChannels: ChannelGroup
   ) extends BlockEndorser,
         StrictLogging {
-    override def vote(generatorBalances: GeneratorBalances): Unit = {
+    override def vote(generatorSet: GeneratorSet): Unit = {
       val votingHeight   = Height(blockchain.height)
       val endorsedHeight = votingHeight - 1
       if (endorsedHeight > GenesisBlockHeight) for {
@@ -51,7 +51,7 @@ object BlockEndorser {
         votingBlockMiner = votingBlockHeader.header.generator.toAddress
         filter = {
           val isMiner    = wallet.privateKeyAccount(votingBlockMiner).isRight
-          val balances   = generatorBalances.map(x => x.address -> x.balance).toMap
+          val balances   = generatorSet.map(x => x.address -> x.balance).toMap
           val minerIndex = if (isMiner) committed.indexWhere { case (addr, _) => addr == votingBlockMiner } else -1
           val endorsers = committed.map { case (address, blsPk) =>
             (address, blsPk, balances.getOrElse(address, 0L))

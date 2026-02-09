@@ -225,7 +225,7 @@ class BlockchainUpdaterImpl(
       block: Block,
       hitSource: ByteStr,
       snapshot: Option[BlockSnapshot],
-      generatorBalances: GeneratorBalances,
+      generatorSet: GeneratorSet,
       challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
@@ -393,7 +393,7 @@ class BlockchainUpdaterImpl(
                           referencedComputedStateHash,
                           referencedForgedBlock, // It writes the referencedForgedBlock, not a block!
                           ng.finalizationState.finalizedHeight,
-                          ng.finalizationState.generatorBalances
+                          ng.finalizationState.generatorSet
                         )
                         BlockStats.appended(referencedForgedBlock, referencedLiquidSnapshot.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
@@ -438,7 +438,7 @@ class BlockchainUpdaterImpl(
                     hitSource,
                     cancelLeases(collectLeasesToCancel(newHeight), newHeight),
                     finalizationState = FinalizationState.init(
-                      generatorBalances,
+                      generatorSet,
                       conflictGenerators = this.generationPeriodOf(newHeight).fold(ConflictGenerators.empty)(this.conflictGenerators).upTo(newHeight),
                       block,
                       parentHeight = Height(rocksdb.height),
@@ -460,7 +460,7 @@ class BlockchainUpdaterImpl(
 
                 publishLastBlockInfo()
 
-                Applied(discDiffs, this.score, generatorBalances)
+                Applied(discDiffs, this.score, generatorSet)
             } getOrElse Ignored
           }
         )
@@ -529,7 +529,7 @@ class BlockchainUpdaterImpl(
                 )
               )
             } else None
-            DiscardedBlock(block, ng.hitSource, snapshot, generatorBalances = Seq.empty)
+            DiscardedBlock(block, ng.hitSource, snapshot, generatorSet = Seq.empty)
           }.toSeq
           blocks ++ liquidBlockData
         }
@@ -586,7 +586,7 @@ class BlockchainUpdaterImpl(
               _ <- Either.raiseUnless(totalBlock.signatureValid()) {
                 MicroBlockAppendError("Invalid total block signature", microBlock)
               }
-              b <- appender.validateFinalizationVoting(totalBlock, rocksdb, ng.finalizationState.generatorBalances)
+              b <- appender.validateFinalizationVoting(totalBlock, rocksdb, ng.finalizationState.generatorSet)
               blockDifferResult <- BlockDiffer.fromMicroBlock(
                 this,
                 rocksdb.lastBlockTimestamp,
@@ -871,8 +871,8 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.conflictGenerators(at)
   }
 
-  override def currentGeneratorBalances: Option[GeneratorBalances] = readLock {
-    ngState.map(_.finalizationState.generatorBalances)
+  override def currentGeneratorSet: Option[GeneratorSet] = readLock {
+    ngState.map(_.finalizationState.generatorSet)
   }
 
   override def snapshotBlockchain: SnapshotBlockchain = readLock {
@@ -892,7 +892,7 @@ class BlockchainUpdaterImpl(
 object BlockchainUpdaterImpl {
   enum BlockApplyResult {
     case Ignored
-    case Applied(discardedDiffs: Seq[StateSnapshot], score: BigInt, generatorBalances: GeneratorBalances)
+    case Applied(discardedDiffs: Seq[StateSnapshot], score: BigInt, generatorSet: GeneratorSet)
   }
 
   private def displayFeatures(s: Set[Short]): String =

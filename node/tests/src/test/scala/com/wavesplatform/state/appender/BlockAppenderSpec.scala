@@ -56,7 +56,7 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
             .verifyVRF(block.header.generationSignature, d.blockchain.hitSource(1).get.arr, block.sender)
             .explicitGet(),
           snapshot = None,
-          generatorBalances = Seq.empty
+          generatorSet = Seq.empty
         )
         .explicitGet() shouldBe Ignored
 

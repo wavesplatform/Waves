@@ -673,7 +673,7 @@ object Domain {
               crypto.verifyVRF(ch.generationSignature, prevHs.arr, ch.generator, bcu.isFeatureActivated(RideV6, parentHeight))
             )
             data <- findBlockAndGetGenerators(bcu, block)
-          } yield (hs, challengedHs, data.generatorBalances)
+          } yield (hs, challengedHs, data.generatorSet)
         }
 
       hitSourcesE.flatMap { case (hitSource, challengedHitSource, generatorBalances) =>

@@ -413,7 +413,7 @@ object Importer extends ScorexLogging {
             ByteStr.empty,
             Nil
           )
-          blockchainUpdater.processBlock(pseudoBlock, hitSource = ByteStr.empty, snapshot = None, generatorBalances = Seq.empty, verify = false)
+          blockchainUpdater.processBlock(pseudoBlock, hitSource = ByteStr.empty, snapshot = None, generatorSet = Seq.empty, verify = false)
         }
 
         // Terminate appender

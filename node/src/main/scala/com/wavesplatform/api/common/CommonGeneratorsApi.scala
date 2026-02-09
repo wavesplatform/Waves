@@ -47,7 +47,7 @@ object CommonGeneratorsApi {
 
         val addresses = ro.multiGet(addressIds.map(Keys.idToAddress), Address.AddressLength)
         val balances =
-          if (at.toInt == blockchain.height) blockchain.currentGeneratorBalances.fold(Map.empty)(_.map(x => x.index -> x.balance).toMap)
+          if (at.toInt == blockchain.height) blockchain.currentGeneratorSet.fold(Map.empty)(_.map(x => x.index -> x.balance).toMap)
           else {
             // TODO: fill with None if disabled
             val fromRdb = ro.get(Keys.generatorBalances(at, rdb.apiHandle)).getOrElse(Seq.empty)

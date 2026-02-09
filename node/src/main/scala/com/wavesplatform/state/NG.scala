@@ -29,5 +29,5 @@ trait NG {
 
   def snapshotBlockchain: SnapshotBlockchain
 
-  def currentGeneratorBalances: Option[GeneratorBalances]
+  def currentGeneratorSet: Option[GeneratorSet]
 }

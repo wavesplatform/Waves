@@ -261,7 +261,7 @@ abstract class Caches extends Blockchain, Storage, StrictLogging {
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       newFinalizedHeight: Height,
-      generatorBalances: GeneratorBalances,
+      generatorSet: GeneratorSet,
       nextCommittedGenerators: Seq[(AddressId, BlsPublicKey)],
       commitmentTransactionIds: Seq[TransactionId],
       conflictGenerators: Seq[GeneratorIndex],
@@ -277,7 +277,7 @@ abstract class Caches extends Blockchain, Storage, StrictLogging {
       computedBlockStateHash: ByteStr,
       block: Block,
       newFinalizedHeight: Height,
-      generatorBalances: GeneratorBalances
+      generatorSet: GeneratorSet
   ): Unit = {
     val newHeight = current.height + 1
     val newScore  = block.blockScore() + current.score
@@ -430,7 +430,7 @@ abstract class Caches extends Blockchain, Storage, StrictLogging {
     for ((assetId, sponsorship) <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
     for ((alias, address) <- snapshot.aliases) stateHash.addAlias(address, alias.name)
     snapshot.nextCommittedGenerators.foreach(stateHash.addNextCommittedGenerator)
-    stateHash.addCommittedGeneratorBalances(generatorBalances.sortBy(_.index).map(_.balance))
+    stateHash.addCommittedGeneratorBalances(generatorSet.sortBy(_.index).map(_.balance))
 
     doAppend(
       newMeta,
@@ -445,7 +445,7 @@ abstract class Caches extends Blockchain, Storage, StrictLogging {
       addressTransactions.asMap(),
       snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       newFinalizedHeight,
-      generatorBalances,
+      generatorSet,
       nextCommittedGenerators,
       commitmentTransactionIds,
       conflictGenerators,

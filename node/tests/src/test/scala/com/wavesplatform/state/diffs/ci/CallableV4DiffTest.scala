@@ -365,11 +365,11 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     withDomain(balances = AddrWithBalance.enoughBalances(invoker, master)) { d =>
       val tb1 = TestBlock.create(System.currentTimeMillis(), d.blockchain.lastBlockId.get, Seq(setScript)).block
       d.blockchainUpdater
-        .processBlock(tb1, ByteStr(new Array[Byte](32)), snapshot = None, generatorBalances = Seq.empty, verify = false)
+        .processBlock(tb1, ByteStr(new Array[Byte](32)), snapshot = None, generatorSet = Seq.empty, verify = false)
         .explicitGet()
       val tb2 = TestBlock.create(System.currentTimeMillis(), tb1.signature, Seq(invoke)).block
       d.blockchainUpdater
-        .processBlock(tb2, ByteStr(new Array[Byte](32)), snapshot = None, generatorBalances = Seq.empty, verify = false)
+        .processBlock(tb2, ByteStr(new Array[Byte](32)), snapshot = None, generatorSet = Seq.empty, verify = false)
         .explicitGet()
 
       d.portfolio(master.toAddress).map(_._2) shouldEqual Seq(amount)
@@ -379,7 +379,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
         TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty).block,
         ByteStr(new Array[Byte](32)),
         snapshot = None,
-        generatorBalances = Seq.empty,
+        generatorSet = Seq.empty,
         verify = false
       )
 

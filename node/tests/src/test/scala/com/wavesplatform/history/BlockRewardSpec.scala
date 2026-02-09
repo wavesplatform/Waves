@@ -280,7 +280,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
             computedStateHash,
             curBlock,
             newFinalizedHeight = GenesisBlockHeight,
-            generatorBalances = Seq.empty
+            generatorSet = Seq.empty
           )
           Some(curBlock)
         }

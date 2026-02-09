@@ -98,7 +98,7 @@ object ExtensionAppender extends ScorexLogging {
                     case Left(e) =>
                       blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
                       droppedBlocks.foreach { x =>
-                        blockchainUpdater.processBlock(x.block, x.hitSource, x.snapshot, x.generatorBalances).explicitGet()
+                        blockchainUpdater.processBlock(x.block, x.hitSource, x.snapshot, x.generatorSet).explicitGet()
                       }
                       Left(e)
 

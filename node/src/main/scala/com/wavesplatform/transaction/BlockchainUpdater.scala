@@ -5,7 +5,7 @@ import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnap
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
-import com.wavesplatform.state.{Blockchain, GeneratorBalances, Height}
+import com.wavesplatform.state.{Blockchain, GeneratorSet, Height}
 import monix.reactive.Observable
 
 trait BlockchainUpdater {
@@ -13,7 +13,7 @@ trait BlockchainUpdater {
       block: Block,
       hitSource: ByteStr,
       snapshot: Option[BlockSnapshot],
-      generatorBalances: GeneratorBalances,
+      generatorSet: GeneratorSet,
       challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
