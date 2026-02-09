@@ -213,7 +213,7 @@ class BlocksApiRouteSpec
 
   routePath("/finalized/at/{height}") in {
     (blocksApi.finalizedHeightAt).expects(Height(4)).returning(Some(Height(3))).once()
-    Get(routePath("/finalized/at/4/")) ~> route ~> check {
+    Get(routePath("/finalized/at/4")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe Json.obj("height" -> 3)
     }

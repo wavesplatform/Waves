@@ -37,7 +37,7 @@ class BlockchainUpdaterImpl(
     time: Time,
     blockchainUpdateTriggers: BlockchainUpdateTriggers,
     collectActiveLeases: (Height, Height) => Map[ByteStr, LeaseDetails],
-    miner: Miner = _ => ()
+    miner: Miner = Miner.StrictDisabledMiner
 ) extends Blockchain
     with BlockchainUpdater
     with NG
@@ -612,6 +612,7 @@ class BlockchainUpdaterImpl(
                 LastBlockInfo(blockId, Height(height), score, this.finalizedHeightAtOrFallback(maxSyncRollbackLength), ready = true)
               )
 
+              miner.scheduleMining(blockchain = None, cancelMicroBlockMining = false)
               blockId
             }
         }

@@ -123,11 +123,11 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
         utxEvents.collect { case _: UtxEvent.TxAdded => () }
       )
 
-      checkGenesis(settings, blockchain, Miner.Disabled)
+      checkGenesis(settings, blockchain, Miner.StrictDisabledMiner)
       val result = genBlocks.foldLeft[Either[ValidationError, Unit]](Right(())) {
         case (res @ Left(_), _) => res
         case (_, genBlock) =>
-          time.time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, genBlock.signer).explicitGet()
+          time.time = miner.nextBlockGenerationTime(blockchain, blockchain.lastBlockHeader.get, genBlock.signer).explicitGet()
           val correctedTimeTxs = genBlock.txs.map(correctTxTimestamp(_, time))
 
           miner.forgeBlock(genBlock.signer) match {

@@ -36,12 +36,12 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     manager.acquire(channels)(using _.close())
 
-    var miner: Miner = Miner.Disabled
-    val time         = TestTime() // TODO: migrate to d.testTime
+    var miner = Miner.StrictDisabledMiner
+    val time  = TestTime() // TODO: migrate to d.testTime
     withDomain(
       defaultSettings,
       AddrWithBalance.enoughBalances(thisNodeAcc, otherNodeAcc),
-      miner = x => miner.scheduleMining(x),
+      miner = Miner.forwardTo(miner),
       time = time
     ) { d =>
       val minerScheduler    = TestScheduler()
@@ -86,8 +86,9 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       val waitExtra = d.nextBlockTime(thisNodeAcc) - time.getTimestamp()
       if (waitExtra > 0) time.advance(waitExtra.millis)
 
-      minerScheduler.tickNext("this-miner-1")
       appenderScheduler.tickNext("this-appender-3")
+      minerScheduler.tickNext("this-miner-1")
+      appenderScheduler.tickNext("this-appender-4")
 
       val lastBlock = d.blockchain.lastBlockHeader.value
       lastBlock.header.reference shouldBe refLiquidBlockId
@@ -98,12 +99,12 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     manager.acquire(channels)(using _.close())
 
-    var miner: Miner = Miner.Disabled
-    val time         = TestTime() // TODO: migrate to d.testTime
+    var miner = Miner.StrictDisabledMiner
+    val time  = TestTime() // TODO: migrate to d.testTime
     withDomain(
       defaultSettings,
       AddrWithBalance.enoughBalances(thisNodeAcc, otherNodeAcc),
-      miner = x => miner.scheduleMining(x),
+      miner = Miner.forwardTo(miner),
       time = time
     ) { d =>
       val minerScheduler    = TestScheduler()
@@ -156,8 +157,9 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
           liquidBlock2Id
         }
 
-      minerScheduler.tickNext("this-miner-1")
       appenderScheduler.tickNext("this-appender-3")
+      minerScheduler.tickNext("this-miner-1")
+      appenderScheduler.tickNext("this-appender-4")
 
       val lastBlock = d.blockchain.lastBlockHeader.value
       lastBlock.header.reference shouldBe refLiquidBlockId

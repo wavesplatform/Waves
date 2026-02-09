@@ -4,7 +4,7 @@ import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter, loadActiveLe
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{Height, BlockchainUpdaterImpl}
+import com.wavesplatform.state.{BlockchainUpdaterImpl, Height}
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import org.rocksdb.RocksDB
 
@@ -16,7 +16,7 @@ object StorageFactory extends ScorexLogging {
       rdb: RDB,
       time: Time,
       blockchainUpdateTriggers: BlockchainUpdateTriggers,
-      miner: Miner = _ => ()
+      miner: Miner = Miner.StrictDisabledMiner
   ): (BlockchainUpdaterImpl, RocksDBWriter) = {
     checkVersion(rdb.db)
     val rocksDBWriter = RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)

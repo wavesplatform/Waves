@@ -424,7 +424,7 @@ trait WithDomain extends WithState { suite: Suite =>
       balances: Seq[AddrWithBalance] = Seq.empty,
       wrapDB: RocksDB => RocksDB = identity,
       wrapBU: CompleteBlockchainUpdater => CompleteBlockchainUpdater = identity,
-      miner: Miner = _ => (),
+      miner: Miner = Miner.StrictDisabledMiner,
       time: TestTime = TestTime()
   )(test: Domain => A): A =
     withRocksDBWriter(settings) { blockchain =>

@@ -123,7 +123,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       val rdb = RDB.open(wavesSettings.dbSettings)
       val (blockchainUpdater, rdbWriter) =
         StorageFactory(wavesSettings, rdb, fakeTime, BlockchainUpdateTriggers.noop)
-      com.wavesplatform.checkGenesis(wavesSettings, blockchainUpdater, Miner.Disabled)
+      com.wavesplatform.checkGenesis(wavesSettings, blockchainUpdater, Miner.StrictDisabledMiner)
       sys.addShutdownHook(synchronized {
         blockchainUpdater.shutdown()
         rdbWriter.close()
@@ -229,7 +229,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
 
     while (!Thread.currentThread().isInterrupted && !quit) synchronized {
       val times = miners.flatMap { kp =>
-        val time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, kp)
+        val time = miner.nextBlockGenerationTime(blockchain, blockchain.lastBlockHeader.get, kp)
         time.toOption.map(kp -> _)
       }
 

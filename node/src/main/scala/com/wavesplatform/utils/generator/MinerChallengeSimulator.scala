@@ -158,7 +158,7 @@ object MinerChallengeSimulator {
 
     private def getBlockMiningTimes(miners: List[SeedKeyPair]): Seq[(SeedKeyPair, Long)] =
       miners.flatMap { kp =>
-        val time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, kp)
+        val time = miner.nextBlockGenerationTime(blockchain, blockchain.lastBlockHeader.get, kp)
         time.toOption.map(kp -> _)
       }
   }
@@ -169,7 +169,7 @@ object MinerChallengeSimulator {
       val fakeTime = createFakeTime(startTime)
       val (blockchainUpdater, _) =
         StorageFactory(wavesSettings, rdb, fakeTime, BlockchainUpdateTriggers.noop)
-      com.wavesplatform.checkGenesis(wavesSettings, blockchainUpdater, Miner.Disabled)
+      com.wavesplatform.checkGenesis(wavesSettings, blockchainUpdater, Miner.StrictDisabledMiner)
       sys.addShutdownHook(synchronized {
         blockchainUpdater.shutdown()
         rdb.close()
@@ -220,7 +220,7 @@ object MinerChallengeSimulator {
         }
       }
 
-      com.wavesplatform.checkGenesis(fixedWavesSettings, blockchainUpdater, Miner.Disabled)
+      com.wavesplatform.checkGenesis(fixedWavesSettings, blockchainUpdater, Miner.StrictDisabledMiner)
       sys.addShutdownHook(synchronized {
         blockchainUpdater.shutdown()
         rdb.close()

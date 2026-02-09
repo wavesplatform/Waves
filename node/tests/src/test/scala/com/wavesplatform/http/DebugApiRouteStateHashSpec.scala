@@ -7,7 +7,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.mining.{Miner, MinerDebugInfo}
+import com.wavesplatform.mining.TestMiner
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, Height}
@@ -20,7 +20,7 @@ import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.scalatest.OptionValues
 import play.api.libs.json.{JsObject, Json}
 
-import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.*
 
 class DebugApiRouteStateHashSpec
@@ -54,14 +54,6 @@ class DebugApiRouteStateHashSpec
     AddrWithBalance(thirdGenerator.toAddress, 12_000.waves)
   )
 
-  val miner: Miner & MinerDebugInfo = new Miner with MinerDebugInfo {
-    override def scheduleMining(blockchain: Option[Blockchain]): Unit = ()
-
-    override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Right(FiniteDuration(0, TimeUnit.SECONDS))
-
-    override def state: MinerDebugInfo.State = MinerDebugInfo.Disabled
-  }
-
   val block: Block = TestBlock.create(Nil).block
 
   val debugApiRoute: DebugApiRoute =
@@ -77,7 +69,7 @@ class DebugApiRouteStateHashSpec
       new ConcurrentHashMap(),
       (blockId, _) => Task(domain.blockchain.removeAfter(blockId).map(_ => ())),
       domain.utxPool,
-      miner,
+      TestMiner.SafelyDisabled,
       null,
       null,
       null,

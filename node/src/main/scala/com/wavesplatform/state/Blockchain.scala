@@ -197,8 +197,11 @@ object Blockchain {
           committed.isEmpty || committed.exists { case (address, _) => address == miner }
         }
 
-    def isGeneratingBalanceValid(height: Height, block: Block, effectiveBalance: Long): Boolean =
-      GeneratingBalanceProvider.isGeneratingBalanceValid(blockchain, height, block, effectiveBalance)
+    def isGeneratingBalanceValid(height: Height, block: Block, balance: Long): Boolean =
+      this.isGeneratingBalanceValid(height, block.header.timestamp, balance)
+
+    def isGeneratingBalanceValid(height: Height, timestampMs: Long, balance: Long): Boolean =
+      GeneratingBalanceProvider.isGeneratingBalanceValid(blockchain, height, timestampMs, balance)
 
     def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
 

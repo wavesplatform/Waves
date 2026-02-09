@@ -5,8 +5,8 @@ import com.wavesplatform.account.{Address, KeyPair, PKKeyPair}
 import com.wavesplatform.block.Block.*
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.metrics.{BlockStats, Instrumented, *}
 import com.wavesplatform.mining.Miner.*
@@ -34,7 +34,7 @@ import java.time.LocalTime
 import scala.concurrent.duration.*
 
 trait Miner {
-  def scheduleMining(blockchain: Option[Blockchain] = None): Unit
+  def scheduleMining(blockchain: Option[Blockchain] = None, cancelMicroBlockMining: Boolean = true): Unit
 }
 
 trait MinerDebugInfo {
@@ -93,10 +93,8 @@ class MinerImpl(
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =
     this.nextBlockGenOffsetWithConditions(account, blockchainUpdater)
 
-  def scheduleMining(tempBlockchain: Option[Blockchain]): Unit =
+  def scheduleMining(tempBlockchain: Option[Blockchain], cancelMicroBlockMining: Boolean): Unit =
     if (!settings.enableLightMode || blockchainUpdater.supportsLightNodeBlockFields()) {
-      Miner.blockMiningStarted.increment()
-
       val accounts = if (settings.minerSettings.privateKeys.nonEmpty) {
         settings.minerSettings.privateKeys.map(PKKeyPair(_))
       } else {
@@ -105,12 +103,15 @@ class MinerImpl(
 
       scheduledAttempts := CompositeCancelable.fromSet(accounts.map { account =>
         generateBlockTask(account, tempBlockchain)
-          .onErrorHandle(err => log.warn(s"Error mining Block by ${account.toAddress}", err))
+          .onErrorHandle(err => log.warn(s"Error mining block by ${account.toAddress}", err))
           .runAsyncLogErr(using appenderScheduler)
       }.toSet)
-      microBlockAttempt := SerialCancelable()
 
-      debugStateRef = MinerDebugInfo.MiningBlocks
+      if (cancelMicroBlockMining) {
+        Miner.blockMiningStarted.increment()
+        microBlockAttempt := SerialCancelable()
+        debugStateRef = MinerDebugInfo.MiningBlocks
+      }
     }
 
   override def state: MinerDebugInfo.State = debugStateRef
@@ -183,7 +184,7 @@ class MinerImpl(
       val stopReasons = for {
         _ <- isAllowedForMiningByAccountScript(address, blockchainUpdater)
         balance = blockchainUpdater.generatingBalance(address, Some(reference))
-        _ <- Either.raiseUnless(blockchainUpdater.isMiningAllowed(Height(height + 1), address, balance)) {
+        _ <- Either.raiseUnless(GeneratingBalanceProvider.isMiningAllowed(blockchainUpdater, Height(height + 1), balance)) {
           s"$address is not committed on ${height + 1}. Try to commit to generation on next period"
         }
         _ <- Either.raiseWhen(blockchainUpdater.isConflict(Height(height + 1), address)) {
@@ -257,11 +258,11 @@ class MinerImpl(
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
-  def nextBlockGenerationTime(blockchain: Blockchain, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
+  def nextBlockGenerationTime(blockchain: Blockchain, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
     val balance = blockchain.generatingBalance(account.toAddress, Some(block.id()))
 
-    if (blockchain.isMiningAllowed(Height(height), account.toAddress, balance)) {
-      val blockDelayE = pos.copy(blockchain = blockchain).getValidBlockDelay(height, account, block.header.baseTarget, balance)
+    if (GeneratingBalanceProvider.isMiningAllowed(blockchain, Height(blockchain.height), balance)) {
+      val blockDelayE = pos.copy(blockchain = blockchain).getValidBlockDelay(blockchain.height, account, block.header.baseTarget, balance)
       for {
         delay <- blockDelayE.leftMap(_.toString)
         expectedTS = delay + block.header.timestamp
@@ -278,7 +279,7 @@ class MinerImpl(
     for {
       _  <- checkAge(height, lastBlock.header.timestamp)
       _  <- isAllowedForMiningByAccountScript(account.toAddress, blockchain)
-      ts <- nextBlockGenerationTime(blockchain, height, lastBlock, account)
+      ts <- nextBlockGenerationTime(blockchain, lastBlock, account)
       calculatedOffset = ts - timeService.correctedTime()
       offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
     } yield offset
@@ -381,10 +382,14 @@ object Miner {
 
   val MaxTransactionsPerMicroblock: Int = 500
 
-  case object Disabled extends Miner with MinerDebugInfo {
-    override def scheduleMining(blockchain: Option[Blockchain]): Unit                           = ()
-    override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Left("Disabled")
-    override val state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
+  val StrictDisabledMiner: Miner & MinerDebugInfo = new Miner with MinerDebugInfo {
+    override def scheduleMining(blockchain: Option[Blockchain], cancelMicroBlockMining: Boolean): Unit = {}
+    override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration]        = Left("Disabled")
+    override val state: MinerDebugInfo.State                                                           = MinerDebugInfo.Disabled
+  }
+
+  def forwardTo(underlying: => Miner): Miner = { (blockchain: Option[Blockchain], cancelMicroBlockMining: Boolean) =>
+    underlying.scheduleMining(blockchain, cancelMicroBlockMining)
   }
 
   def isAllowedForMiningByAccountScript(address: Address, blockchain: Blockchain): Either[String, Unit] =

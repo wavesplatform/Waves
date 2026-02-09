@@ -55,11 +55,10 @@ package object appender {
       currentPeriod = blockchain.generationPeriodOf(blockHeight)
       minerAddress  = newBlock.header.generator.toAddress
 
-      conflictGenerators = currentPeriod.fold(ConflictGenerators.empty)(blockchain.conflictGenerators).upTo(blockHeight)
-      validGenerators = currentPeriod
-        .fold(Nil)(blockchain.committedGenerators)
-        .view
-        .map { case v @ (address, _) => v -> GeneratingBalanceProvider.balance(blockchain, address) }
+      conflictGenerators  = currentPeriod.fold(ConflictGenerators.empty)(blockchain.conflictGenerators).upTo(blockHeight)
+      committedGenerators = currentPeriod.fold(Nil)(blockchain.committedGenerators)
+      validGenerators = committedGenerators.view
+        .map { case v @ (address, _) => v -> blockchain.generatingBalance(address, Some(parentBlockId)) }
         .zipWithIndex
         .collect {
           case (((address, blsPk), balance), idx)

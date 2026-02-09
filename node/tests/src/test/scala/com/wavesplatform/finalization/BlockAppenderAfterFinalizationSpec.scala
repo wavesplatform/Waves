@@ -7,11 +7,22 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test.{FreeSpec, NumericExt, produce}
 import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 
 class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
+  protected val committedGenerator1     = TxHelpers.signer(0)
+  protected val committedGenerator1Addr = committedGenerator1.toAddress
+  protected val committedGenerator1Idx  = GeneratorIndex(0)
+
+  protected val committedGenerator2     = TxHelpers.signer(1)
+  protected val committedGenerator2Addr = committedGenerator2.toAddress
+  protected val committedGenerator2Idx  = GeneratorIndex(1)
+
+  protected val notCommittedGenerator     = TxHelpers.signer(2)
+  protected val notCommittedGeneratorAddr = notCommittedGenerator.toAddress
+
   private val defaultSettings = DomainPresets.DeterministicFinality
     .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
     .configure(
@@ -164,18 +175,41 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     }.run())
   }
 
+  "can't append block without microblocks with spending transactions" in withDomain(
+    defaultSettings,
+    AddrWithBalance.enoughBalances(committedGenerator1, notCommittedGenerator)
+  ) { d =>
+    log.debug(s"Append block 2 with commitments")
+    val block2 = d.createBlock(
+      version = Block.ProtoBlockVersion,
+      txs = Seq(TxHelpers.commitToGeneration(Height(3), committedGenerator1)),
+      generator = committedGenerator1
+    )
+    d.appendBlock(block2)
+
+    log.debug(s"Append key block 3")
+    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+    val keyBlockId = d.lastBlockId
+
+    log.debug(s"Append micro block with spending")
+    d.appendMicroBlock(
+      d.createMicroBlock(signer = Some(committedGenerator1))(
+        TxHelpers.transfer(
+          from = committedGenerator1,
+          to = notCommittedGeneratorAddr,
+          amount = d.blockchain.balance(committedGenerator1Addr) - CommitToGenerationTransaction.DepositInWavelets - 1.waves,
+          fee = 1.waves
+        )
+      )
+    )
+
+    log.debug("Append block 4")
+    d.appender.appendBlockWithoutFallback(
+      d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, ref = Some(keyBlockId), generator = notCommittedGenerator, strictTime = true)
+    ) should produce("is not allowed to generate a block")
+  }
+
   private trait BaseTest {
-    protected val committedGenerator1     = TxHelpers.signer(0)
-    protected val committedGenerator1Addr = committedGenerator1.toAddress
-    protected val committedGenerator1Idx  = GeneratorIndex(0)
-
-    protected val committedGenerator2     = TxHelpers.signer(1)
-    protected val committedGenerator2Addr = committedGenerator2.toAddress
-    protected val committedGenerator2Idx  = GeneratorIndex(1)
-
-    protected val notCommittedGenerator     = TxHelpers.signer(2)
-    protected val notCommittedGeneratorAddr = notCommittedGenerator.toAddress
-
     protected val committedGenerators = Seq(committedGenerator1, committedGenerator2)
     protected val allGenerators       = notCommittedGenerator +: committedGenerators
 

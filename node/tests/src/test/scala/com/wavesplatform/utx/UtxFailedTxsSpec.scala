@@ -230,7 +230,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     }
   }
 
-  it should s"not  cleanup transaction when script result changes and complexity > ${ContractLimits.FailFreeInvokeComplexity}" in withFS(
+  it should s"not cleanup transaction when script result changes and complexity > ${ContractLimits.FailFreeInvokeComplexity}" in withFS(
     TestFunctionalitySettings
       .withFeatures(
         BlockchainFeatures.NG,

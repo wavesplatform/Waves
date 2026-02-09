@@ -357,7 +357,7 @@ object Importer extends ScorexLogging {
       BlockAppender(blockchainUpdater, time, utxPool, pos, BlockEndorser.Disabled, scheduler, importOptions.verify, txSignParCheck = false)
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb)
-    checkGenesis(settings, blockchainUpdater, Miner.Disabled)
+    checkGenesis(settings, blockchainUpdater, Miner.StrictDisabledMiner)
 
     val blocksFileOffset =
       importOptions.format match {

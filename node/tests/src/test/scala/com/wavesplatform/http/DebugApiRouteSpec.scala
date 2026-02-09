@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
-import com.wavesplatform.mining.{Miner, MinerDebugInfo}
+import com.wavesplatform.mining.TestMiner
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.StateHash.SectionId
@@ -34,7 +34,7 @@ import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCod
 import org.scalatest.OptionValues
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
-import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.*
 import scala.util.Random
 
@@ -59,14 +59,6 @@ class DebugApiRouteSpec
 
   override def genesisBalances: Seq[AddrWithBalance] = Seq(AddrWithBalance(richAccount.toAddress, 50_000.waves))
 
-  val miner: Miner & MinerDebugInfo = new Miner with MinerDebugInfo {
-    override def scheduleMining(blockchain: Option[Blockchain]): Unit = ()
-
-    override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Right(FiniteDuration(0, TimeUnit.SECONDS))
-
-    override def state: MinerDebugInfo.State = MinerDebugInfo.Disabled
-  }
-
   val block: Block = TestBlock.create(Nil).block
   val testStateHash: StateHash = {
     import com.wavesplatform.utils.byteStrOrdering
@@ -89,7 +81,7 @@ class DebugApiRouteSpec
       new ConcurrentHashMap(),
       (blockId, _) => Task(domain.blockchain.removeAfter(blockId).map(_ => ())),
       domain.utxPool,
-      miner,
+      TestMiner.SafelyDisabled,
       null,
       null,
       null,
@@ -175,7 +167,7 @@ class DebugApiRouteSpec
         }
 
         val lastButOneHeight               = domain.blockchain.height - 1
-        val lastButOneHeader               = domain.blockchain.blockHeader(lastButOneHeight.toInt).value
+        val lastButOneHeader               = domain.blockchain.blockHeader(lastButOneHeight).value
         val lastButOneStateHash            = domain.rocksDBWriter.loadStateHash(Height(lastButOneHeight)).value
         val deterministicFinalityActivated = domain.blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality, lastButOneHeight)
         val lastButOneStateHashJson        = StateHash.toJson(lastButOneStateHash, deterministicFinalityActivated)

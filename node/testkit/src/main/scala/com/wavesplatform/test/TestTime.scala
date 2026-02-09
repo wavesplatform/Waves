@@ -11,6 +11,14 @@ case class TestTime(@volatile private var t: Long = System.currentTimeMillis(), 
     this
   }
 
+  def setTimeIfGreater(tt: Long): this.type = {
+    if (tt > t) {
+      monotonicMs += tt - t
+      t = tt
+    }
+    this
+  }
+
   def advance(d: FiniteDuration): this.type = {
     t += d.toMillis
     monotonicMs += d.toMillis
