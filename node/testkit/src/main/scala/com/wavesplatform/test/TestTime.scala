@@ -2,7 +2,7 @@ package com.wavesplatform.test
 
 import com.wavesplatform.utils.Time
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 case class TestTime(@volatile private var t: Long = System.currentTimeMillis(), private var monotonicMs: Long = System.nanoTime() / 1_000_000)
     extends Time {
@@ -19,7 +19,8 @@ case class TestTime(@volatile private var t: Long = System.currentTimeMillis(), 
     this
   }
 
-  def advance(d: FiniteDuration): this.type = {
+  def advance(d: FiniteDuration): this.type = if (d <= 0.millis) this
+  else {
     t += d.toMillis
     monotonicMs += d.toMillis
     this

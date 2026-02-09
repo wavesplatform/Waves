@@ -10,20 +10,15 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
-import com.wavesplatform.mining.{MinerImpl, MiningConstraint}
+import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer.Result
-import com.wavesplatform.state.{BlockEndorser, Blockchain, EndorsementStorage, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.{TransactionStateSnapshot, WavesSettingsOps}
 import com.wavesplatform.test.node.*
 import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
-import com.wavesplatform.utils.Schedulers
-import io.netty.channel.group.DefaultChannelGroup
-import monix.reactive.Observable
-
-import scala.concurrent.duration.DurationInt
 
 class BlockDifferTest extends FreeSpec with WithDomain {
   private val TransactionFee = 10
@@ -280,31 +275,15 @@ class BlockDifferTest extends FreeSpec with WithDomain {
         d.appendBlock()
         time.setTime(d.lastBlock.header.timestamp)
 
-        val miner = new MinerImpl(
-          new DefaultChannelGroup("", null),
-          d.blockchain,
-          d.settings,
-          time,
-          d.utxPool,
-          BlockEndorser.Disabled,
-          EndorsementStorage.Disabled,
-          d.wallet,
-          d.posSelector,
-          Schedulers.singleThread("miner"),
-          Schedulers.singleThread("appender"),
-          Observable.empty
-        )
-
         time.advance(d.settings.minerSettings.minMicroBlockAge)
         val refId = d.appendMicroBlock(TxHelpers.transfer(sender, amount = 1))
 
         time.advance(d.settings.minerSettings.minMicroBlockAge)
         d.appendMicroBlock(TxHelpers.transfer(sender, amount = 2))
 
-        time.advance(d.settings.minerSettings.minMicroBlockAge - 1.millis)
-        val block = miner.forgeBlock(minerAcc).toEither.explicitGet().newBlock
-        block.header.reference shouldBe refId
-        d.appendBlockE(block) should beRight
+        d.appender.appendBlock(
+          d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, ref = Some(refId), strictTime = true, generator = minerAcc)
+        )
       }
     }
   }

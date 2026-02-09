@@ -22,7 +22,8 @@ import org.scalatest.time.SpanSugar.convertLongToGrainOfTime
 import scala.util.Using
 
 class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps with EitherValues {
-  private val thisNodeAcc  = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 0)
+  private val thisNodeAcc1 = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 0)
+  private val thisNodeAcc2 = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 1)
   private val otherNodeAcc = TxHelpers.defaultSigner
 
   private val baseSettings       = DomainPresets.TransactionStateSnapshot
@@ -32,23 +33,22 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
     minerSettings = baseSettings.minerSettings.copy(quorum = 0, microBlockInterval = microBlockInterval, minMicroBlockAge = minMicroBlockAge)
   )
 
-  "Miner continues from the last micro block" in Using.Manager { manager =>
+  "Same node accounts - next account mining with minMicroblockAge" in Using.Manager { manager =>
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     manager.acquire(channels)(using _.close())
 
     var miner = Miner.StrictDisabledMiner
-    val time  = TestTime() // TODO: migrate to d.testTime
+    val time  = TestTime()
     withDomain(
       defaultSettings,
-      AddrWithBalance.enoughBalances(thisNodeAcc, otherNodeAcc),
+      AddrWithBalance.enoughBalances(thisNodeAcc1, thisNodeAcc2, otherNodeAcc),
       miner = Miner.forwardTo(miner),
       time = time
     ) { d =>
       val minerScheduler    = TestScheduler()
       val appenderScheduler = TestScheduler()
 
-      d.wallet.generateNewAccounts(1).map(_.toAddress)
-      log.debug(s"thisNodeAcc=${thisNodeAcc.toAddress}, otherNodeAcc=${otherNodeAcc.toAddress}")
+      d.wallet.generateNewAccounts(2)
 
       miner = new MinerImpl(
         channels,
@@ -66,26 +66,23 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       )
 
       log.debug("Append block2")
-      val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = Seq.empty, generator = otherNodeAcc, strictTime = true)
+      val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = Seq.empty, generator = thisNodeAcc1, strictTime = true)
       d.appender.appendBlock(block2)
+      time.setTime(block2.header.timestamp)
       appenderScheduler.tickNext("this-appender-1", failIfNoTasks = false)
 
       log.debug("Append microBlock1")
       time.advance(microBlockInterval)
-      val microBlock1 = d.createMicroBlock(signer = otherNodeAcc.some)(TxHelpers.transfer(to = otherNodeAcc.toAddress))
+      val microBlock1 = d.createMicroBlock(signer = thisNodeAcc1.some)(TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc2.toAddress))
       d.appendMicroBlock(microBlock1)
+      val refLiquidBlockId = d.lastBlockId
       appenderScheduler.tickNext("this-appender-2", failIfNoTasks = false)
 
-      log.debug("Append microBlock2 (ref for next block)")
+      log.debug("Append microBlock2")
       time.advance(microBlockInterval)
-      d.appendMicroBlock(d.createMicroBlock(signer = otherNodeAcc.some)(TxHelpers.transfer(to = otherNodeAcc.toAddress)))
-      val refLiquidBlockId = d.lastBlockId
+      d.appendMicroBlock(d.createMicroBlock(signer = thisNodeAcc1.some)(TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc2.toAddress)))
 
       log.debug("Trigger thisNode forging")
-      time.advance(minMicroBlockAge)
-      val waitExtra = d.nextBlockTime(thisNodeAcc) - time.getTimestamp()
-      if (waitExtra > 0) time.advance(waitExtra.millis)
-
       appenderScheduler.tickNext("this-appender-3")
       minerScheduler.tickNext("this-miner-1")
       appenderScheduler.tickNext("this-appender-4")
@@ -95,23 +92,22 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
     }
   }.get
 
-  "Miner references a previous micro block" in Using.Manager { manager =>
+  "Different node accounts - next account mining without minMicroblockAge" in Using.Manager { manager =>
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     manager.acquire(channels)(using _.close())
 
     var miner = Miner.StrictDisabledMiner
-    val time  = TestTime() // TODO: migrate to d.testTime
+    val time  = TestTime()
     withDomain(
       defaultSettings,
-      AddrWithBalance.enoughBalances(thisNodeAcc, otherNodeAcc),
+      AddrWithBalance.enoughBalances(thisNodeAcc1, otherNodeAcc),
       miner = Miner.forwardTo(miner),
       time = time
     ) { d =>
       val minerScheduler    = TestScheduler()
       val appenderScheduler = TestScheduler()
 
-      d.wallet.generateNewAccounts(1).map(_.toAddress)
-      log.debug(s"thisNodeAcc=${thisNodeAcc.toAddress}, otherNodeAcc=${otherNodeAcc.toAddress}")
+      d.wallet.generateNewAccounts(1)
 
       miner = new MinerImpl(
         channels,
@@ -131,32 +127,21 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       log.debug("Append block2")
       val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = Seq.empty, generator = otherNodeAcc, strictTime = true)
       d.appender.appendBlock(block2)
+      time.setTime(block2.header.timestamp)
       appenderScheduler.tickNext("this-appender-1", failIfNoTasks = false)
-      def appendMicroBlock(): Unit =
-        d.appendMicroBlock(d.createMicroBlock(signer = otherNodeAcc.some)(TxHelpers.transfer(to = otherNodeAcc.toAddress)))
 
-      log.debug("Append microBlock1 (ref for next block)")
+      log.debug("Append microBlock1")
       time.advance(microBlockInterval)
-      appendMicroBlock()
-      val liquidBlock1Id = d.lastBlockId
+      val microBlock1 = d.createMicroBlock(signer = otherNodeAcc.some)(TxHelpers.transfer(to = otherNodeAcc.toAddress))
+      d.appendMicroBlock(microBlock1)
       appenderScheduler.tickNext("this-appender-2", failIfNoTasks = false)
 
       log.debug("Append microBlock2")
       time.advance(microBlockInterval)
-      appendMicroBlock()
-      val liquidBlock2Id = d.lastBlockId
+      d.appendMicroBlock(d.createMicroBlock(signer = otherNodeAcc.some)(TxHelpers.transfer(to = otherNodeAcc.toAddress)))
+      val refLiquidBlockId = d.lastBlockId
 
       log.debug("Trigger thisNode forging")
-      time.advance(minMicroBlockAge / 2)
-      val waitExtra = d.nextBlockTime(thisNodeAcc) - time.getTimestamp()
-      val refLiquidBlockId =
-        if (waitExtra <= 0) liquidBlock1Id
-        else {
-          time.advance(waitExtra.millis)
-          appendMicroBlock()
-          liquidBlock2Id
-        }
-
       appenderScheduler.tickNext("this-appender-3")
       minerScheduler.tickNext("this-miner-1")
       appenderScheduler.tickNext("this-appender-4")

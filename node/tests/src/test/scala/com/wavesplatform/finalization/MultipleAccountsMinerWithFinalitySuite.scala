@@ -220,10 +220,6 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
       val minerAcc               = acc1
       val notCommittedAcc        = acc2
       val otherNodeCommittedAcc1 = otherNodeAcc1
-      println(s"""accs:
-                 |  minerAcc:        ${minerAcc.toAddress}
-                 |  notCommittedAcc: ${notCommittedAcc.toAddress}
-                 |""".stripMargin)
 
       val channels = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
       var miner    = Miner.StrictDisabledMiner
@@ -300,8 +296,6 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
         }
 
         log.debug("Trigger next micro block forging")
-        val t1 = d.nextBlockTime(notCommittedAcc)
-        println(s"--> T1: $t1")
         d.utxPool.putIfNew(
           TxHelpers.transfer(
             otherNodeCommittedAcc1,
@@ -324,7 +318,8 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
         }
 
         log.debug("Trigger next block forging - second attempt")
-        time.setTimeIfGreater(d.nextBlockTime(notCommittedAcc).max(defaultSettings.minerSettings.minMicroBlockAge.toMillis))
+        time.advance(defaultSettings.minerSettings.minMicroBlockAge)
+        time.setTimeIfGreater(d.nextBlockTime(notCommittedAcc))
         minerScheduler.tickNext("miner-7")
         appenderScheduler.tickNext("appender-7")
         withClue("Not committed forged: ") {

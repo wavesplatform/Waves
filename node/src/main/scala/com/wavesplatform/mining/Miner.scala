@@ -176,9 +176,14 @@ class MinerImpl(
     val height          = blockchainUpdater.height
     val version         = blockchainUpdater.nextBlockVersion
     val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
-    val lastBlockInfo   = blockchainUpdater.bestLastBlockInfo(timeService.monotonicMillis() - minMicroBlockDurationMills)
-    val reference       = referenceOpt.getOrElse(lastBlockInfo.get.blockId)
-    val address         = account.toAddress
+
+    val maxMicroblockTimestampOffsetMs = // see min-micro-block-age in application.conf
+      if (wallet.privateKeyAccount(lastBlockHeader.generator.toAddress).isRight) minMicroBlockDurationMills
+      else 0L
+    val lastBlockInfo = blockchainUpdater.bestLastBlockInfo(timeService.monotonicMillis() - maxMicroblockTimestampOffsetMs)
+
+    val reference = referenceOpt.getOrElse(lastBlockInfo.get.blockId)
+    val address   = account.toAddress
 
     metrics.blockBuildTimeStats.measureSuccessful {
       val stopReasons = for {

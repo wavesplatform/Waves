@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.Transaction
 trait NG {
   def microBlock(id: ByteStr): Option[MicroBlock]
 
-  def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo]
+  def bestLastBlockInfo(maxMicroblockTimestampMs: Long): Option[BlockMinerInfo]
 
   def microblockIds: Seq[BlockId]
 

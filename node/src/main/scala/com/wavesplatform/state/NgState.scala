@@ -17,7 +17,7 @@ object NgState {
     def idEquals(id: ByteStr): Boolean = totalBlockId == id
   }
 
-  case class CachedMicroDiff(snapshot: StateSnapshot, carryFee: Long, totalFee: Long, computedStateHash: ByteStr, timestamp: Long)
+  case class CachedMicroDiff(snapshot: StateSnapshot, carryFee: Long, totalFee: Long, computedStateHash: ByteStr, receivedTimestampMs: Long)
 
   class NgStateCaches {
     val blockSnapshotCache = CacheBuilder
@@ -147,7 +147,7 @@ case class NgState(
 
   def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
     val blockId = microBlocks
-      .find(mi => microSnapshots(mi.totalBlockId).timestamp <= maxTimeStamp)
+      .find(mi => microSnapshots(mi.totalBlockId).receivedTimestampMs <= maxTimeStamp)
       .fold(base.id())(_.totalBlockId)
 
     BlockMinerInfo(base.header.baseTarget, base.header.generationSignature, base.header.timestamp, blockId)

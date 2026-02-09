@@ -712,9 +712,9 @@ class BlockchainUpdaterImpl(
     ngState.fold(Seq.empty[BlockId])(_.microBlockIds)
   }
 
-  override def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo] = readLock {
+  override def bestLastBlockInfo(maxMicroblockTimestampMs: Long): Option[BlockMinerInfo] = readLock {
     ngState
-      .map(_.bestLastBlockInfo(maxTimestamp))
+      .map(_.bestLastBlockInfo(maxMicroblockTimestampMs))
       .orElse(
         rocksdb.lastBlockHeader.map { sh =>
           BlockMinerInfo(sh.header.baseTarget, sh.header.generationSignature, sh.header.timestamp, sh.id())
