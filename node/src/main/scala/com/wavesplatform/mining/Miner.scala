@@ -279,14 +279,16 @@ class MinerImpl(
   }
 
   private def nextBlockGenOffsetWithConditions(account: KeyPair, blockchain: Blockchain): Either[String, FiniteDuration] = {
-    val height    = blockchain.height
-    val lastBlock = blockchain.lastBlockHeader.get
+    val height      = blockchain.height
+    val lastBlock   = blockchain.lastBlockHeader.get
+    val prevBlockTs = lastBlock.header.timestamp
     for {
-      _  <- checkAge(height, lastBlock.header.timestamp)
-      _  <- isAllowedForMiningByAccountScript(account.toAddress, blockchain)
-      ts <- nextBlockGenerationTime(blockchain, lastBlock, account)
-      calculatedOffset = ts - timeService.correctedTime()
-      offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
+      _           <- checkAge(height, prevBlockTs)
+      _           <- isAllowedForMiningByAccountScript(account.toAddress, blockchain)
+      nextBlockTs <- nextBlockGenerationTime(blockchain, lastBlock, account)
+      minNextBlockTs  = prevBlockTs + minerSettings.minimalBlockGenerationOffset.toMillis
+      adjustedBlockTs = nextBlockTs.max(minNextBlockTs)
+      offset          = 0L.max(adjustedBlockTs - timeService.correctedTime()).millis
     } yield offset
   }
 
