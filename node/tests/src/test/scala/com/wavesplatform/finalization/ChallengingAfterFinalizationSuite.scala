@@ -49,6 +49,11 @@ class ChallengingAfterFinalizationSuite extends BaseFinalizationSpec, TestSchedu
       d.blockchain.height shouldBe 3
       d.lastBlockId should not be invalidBlock.id()
       d.lastBlock.header.generator.toAddress shouldBe thisNodeAcc.toAddress
+      d.lastBlock.header.challengedHeader should not be empty
+    }
+
+    withClue("Empty finalization header: ") {
+      d.lastBlock.header.finalizationVoting shouldBe empty
     }
   }
 }
