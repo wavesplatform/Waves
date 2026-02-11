@@ -71,7 +71,6 @@ case class Domain(
     val parentHeight = blockchain.height
     val parent       = blockchain.blockHeader(parentHeight).map(_.header).getOrElse(lastBlock.header)
 
-    // TODO: challenging balance?
     posSelector
       .getValidBlockDelay(parentHeight, generator, parent.baseTarget, blockchain.generatingBalance(generator.toAddress))
       .map(_ + parent.timestamp)
@@ -705,7 +704,7 @@ class DefaultAppender(d: Domain)(implicit appenderScheduler: SchedulerService) {
     d.settings,
     d.testTime,
     d.posSelector,
-    _ => throw new RuntimeException("Unexpected call in block challenger")
+    appendBlock = b => d.blockAppender(b)
   )
 
   private val blockEndorser =

@@ -190,18 +190,8 @@ object Blockchain {
       committedTimes * CommitToGenerationTransaction.DepositInWavelets
     }
 
-    def isMiningAllowed(height: Height, miner: Address, effectiveBalance: Long): Boolean =
-      GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
-        && blockchain.generationPeriodOf(height).fold(true) { p =>
-          val committed = blockchain.committedGenerators(p)
-          committed.isEmpty || committed.exists { case (address, _) => address == miner }
-        }
-
     def isGeneratingBalanceValid(height: Height, block: Block, balance: Long): Boolean =
-      this.isGeneratingBalanceValid(height, block.header.timestamp, balance)
-
-    def isGeneratingBalanceValid(height: Height, timestampMs: Long, balance: Long): Boolean =
-      GeneratingBalanceProvider.isGeneratingBalanceValid(blockchain, height, timestampMs, balance)
+      GeneratingBalanceProvider.isGeneratingBalanceValid(blockchain, height, block.header.timestamp, balance)
 
     def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
 

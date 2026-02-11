@@ -220,6 +220,7 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
       appender(block4).runSyncUnsafe()
       if (d.lastBlockId != block4.id()) fail(s"Can't apply block4 $block4, see logs")
 
+      d.blockchain.finalizedHeight.value shouldBe Height(1)
       channel1.sentEndorsements.head.finalizedHeight shouldBe Height(2) // 4 - maxRollback
     }
   }

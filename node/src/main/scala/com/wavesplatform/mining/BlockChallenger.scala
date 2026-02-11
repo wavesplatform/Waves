@@ -5,7 +5,7 @@ import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.block.{Block, ChallengedHeader, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.BlockStats
@@ -124,13 +124,14 @@ class BlockChallengerImpl(
   override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] =
     accounts.minByOption(_._2).toRight(GenericError("No suitable account in wallet"))
 
-  override def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] =
+  override def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] = {
+    lazy val challengedBalance = blockchainUpdater.generatingBalance(challengedMiner)
     wallet.privateKeyAccounts
-      .map { pk =>
-        pk -> blockchainUpdater.generatingBalance(pk.toAddress)
+      .map { kp =>
+        kp -> blockchainUpdater.generatingBalance(kp.toAddress)
       }
-      .filter { case (pk, balance) =>
-        blockchainUpdater.isMiningAllowed(Height(blockchainUpdater.height), pk.toAddress, balance)
+      .filter { case (_, balance) =>
+        GeneratingBalanceProvider.isMiningAllowed(blockchainUpdater, Height(blockchainUpdater.height), balance)
       }
       .traverse { case (acc, initGenBalance) =>
         pos
@@ -138,10 +139,11 @@ class BlockChallengerImpl(
             blockchainUpdater.height,
             acc,
             blockchainUpdater.lastBlockHeader.get.header.baseTarget,
-            initGenBalance + blockchainUpdater.generatingBalance(challengedMiner)
+            initGenBalance + challengedBalance
           )
           .map((acc, _))
       }
+  }
 
   override def getProcessingTx(id: ByteStr): Option[Transaction] = Option(processingTxs.get(id))
 
