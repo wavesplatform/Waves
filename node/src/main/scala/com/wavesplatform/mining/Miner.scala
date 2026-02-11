@@ -286,7 +286,7 @@ class MinerImpl(
       _           <- checkAge(height, prevBlockTs)
       _           <- isAllowedForMiningByAccountScript(account.toAddress, blockchain)
       nextBlockTs <- nextBlockGenerationTime(blockchain, lastBlock, account)
-      minNextBlockTs  = prevBlockTs + minerSettings.minimalBlockGenerationOffset.toMillis
+      minNextBlockTs  = if (height == 1) 0L else prevBlockTs + minerSettings.minimalBlockGenerationOffset.toMillis
       adjustedBlockTs = nextBlockTs.max(minNextBlockTs)
       offset          = 0L.max(adjustedBlockTs - timeService.correctedTime()).millis
     } yield offset
