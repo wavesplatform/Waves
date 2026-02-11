@@ -195,6 +195,12 @@ class BlockChallengeTest
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner1.toAddress, 1001.waves))
       (1 to 999).foreach(_ => d.appendBlock())
 
+      def check(block: Block): Unit = {
+        block.header.challengedHeader shouldBe defined
+        // Anyone can challenge
+        Set(challengingMiner1, challengingMiner2).map(_.publicKey) should contain(block.header.generator)
+      }
+
       appendAndCheck(
         d.createBlock(
           Block.ProtoBlockVersion,
@@ -205,10 +211,7 @@ class BlockChallengeTest
           timestamp = Some(Long.MaxValue)
         ),
         d
-      ) { block =>
-        block.header.challengedHeader shouldBe defined
-        block.header.generator shouldBe challengingMiner1.publicKey
-      }
+      )(check)
 
       d.appendBlock(TxHelpers.transfer(challengingMiner1, challengingMiner2.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
@@ -223,10 +226,7 @@ class BlockChallengeTest
           timestamp = Some(Long.MaxValue)
         ),
         d
-      ) { block =>
-        block.header.challengedHeader shouldBe defined
-        block.header.generator shouldBe challengingMiner2.publicKey
-      }
+      )(check)
     }
   }
 

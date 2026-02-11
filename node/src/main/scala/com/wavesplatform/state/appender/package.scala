@@ -257,13 +257,13 @@ package object appender {
       }
 
   private def minerBalance(blockchain: Blockchain, minerAddress: Address, parentHeight: Height, block: Block): Either[String, Long] = {
-    val parentBlockId = block.header.reference
-    val balance       = blockchain.generatingBalance(minerAddress, Some(parentBlockId))
+    val parentBlockId = Some(block.header.reference)
 
-    if (blockchain.isGeneratingBalanceValid(parentHeight, block, balance))
-      Either.right(
-        balance + block.header.challengedHeader.map(ch => blockchain.generatingBalance(ch.generator.toAddress, Some(parentBlockId))).getOrElse(0L)
-      )
+    val ownBalance        = blockchain.generatingBalance(minerAddress, parentBlockId)
+    val challengedBalance = block.header.challengedHeader.map(ch => blockchain.generatingBalance(ch.generator.toAddress, parentBlockId)).getOrElse(0L)
+    val balance           = ownBalance + challengedBalance
+
+    if (blockchain.isGeneratingBalanceValid(parentHeight, block, balance)) Either.right(balance)
     else if (minerAddress == block.sender.toAddress) Either.left(s"generator's effective balance $balance is less that required for generation")
     else Either.right(0L) // Ignore for a regular generator, not a miner
   }
