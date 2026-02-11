@@ -1,5 +1,6 @@
 package com.wavesplatform.block
 
+import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.serialization.BlockSerializer
 import com.wavesplatform.common.merkle.Merkle.{hash, mkProofs, verify}
@@ -51,7 +52,7 @@ case class Block(
     header: BlockHeader,
     signature: ByteStr,
     transactionData: Seq[Transaction]
-) {
+) extends StrictLogging {
   import Block.*
 
   val id: Coeval[ByteStr] = Coeval.evalOnce(Block.idFromHeader(header, signature))
@@ -92,9 +93,9 @@ case class Block(
     )
 
   val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
-    crypto.verify(signature, bodyBytes(), header.generator, checkWeakPk = true) &&
-    (header.version < Block.ProtoBlockVersion || transactionsMerkleTree().transactionsRoot == header.transactionsRoot) &&
-    header.challengedHeader.forall { ch =>
+    val bodyBytesValid        = crypto.verify(signature, bodyBytes(), header.generator, checkWeakPk = true)
+    val transactionsRootValid = header.version < Block.ProtoBlockVersion || transactionsMerkleTree().transactionsRoot == header.transactionsRoot
+    val challengedHeaderSignatureValid = header.challengedHeader.forall { ch =>
       crypto.verify(
         ch.headerSignature,
         PBBlocks.protobuf(originalHeader()).toByteArray,
@@ -102,6 +103,20 @@ case class Block(
         checkWeakPk = true
       )
     }
+
+    if (!bodyBytesValid) {
+      logger.warn(s"Invalid body bytes signature in $this")
+    }
+    if (!transactionsRootValid) {
+      logger.warn(s"Computed transactions root ${transactionsMerkleTree().transactionsRoot} does not match provided ${header.transactionsRoot}")
+    }
+    if (!challengedHeaderSignatureValid) {
+      logger.warn(s"Original header ${originalHeader()} has invalid signature")
+    }
+
+    bodyBytesValid &&
+    transactionsRootValid &&
+    challengedHeaderSignatureValid
   }
 
   def toOriginal: Block =
@@ -109,11 +124,6 @@ case class Block(
       case Some(ch) => copy(header = originalHeader(), signature = ch.headerSignature)
       case _        => this
     }
-
-  override def toString: String =
-    s"Block(${id()},${header.reference},${header.generator.toAddress},${header.timestamp}," +
-      s"${header.featureVotes.mkString("[", ",", "]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""}" +
-      s"${header.finalizationVoting.fold("")(v => s",$v")})"
 }
 
 object Block {

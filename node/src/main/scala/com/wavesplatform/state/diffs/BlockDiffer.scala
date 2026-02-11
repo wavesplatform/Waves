@@ -231,6 +231,7 @@ object BlockDiffer {
       snapshot: Option[MicroBlockSnapshot],
       constraint: MiningConstraint,
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
+      checkSH: Boolean = true,
       verify: Boolean = true,
       enableExecutionLog: Boolean = false
   ): Either[ValidationError, Result] =
@@ -242,6 +243,7 @@ object BlockDiffer {
       snapshot,
       constraint,
       loadCacheData,
+      checkSH,
       verify,
       enableExecutionLog
     ).resultE
@@ -254,6 +256,7 @@ object BlockDiffer {
       snapshot: Option[MicroBlockSnapshot],
       constraint: MiningConstraint,
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
+      checkSH: Boolean,
       verify: Boolean,
       enableExecutionLog: Boolean
   ): TracedResult[ValidationError, Result] = {
@@ -286,7 +289,7 @@ object BlockDiffer {
             txSignParCheck = true
           )
       }
-      _ <- checkStateHash(blockchain, micro.stateHash, r.computedStateHash)
+      _ <- if (checkSH) checkStateHash(blockchain, micro.stateHash, r.computedStateHash) else TracedResult.wrapValue(())
     } yield r
   }
 

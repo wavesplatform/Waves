@@ -14,7 +14,7 @@ import com.wavesplatform.network.{MicroBlockInv, *}
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.appender.MicroblockAppender
 import com.wavesplatform.state.{Blockchain, EndorsementStorage}
-import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
+import com.wavesplatform.transaction.{BlockchainUpdater, Transaction, TransactionType}
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.utx.UtxPool.PackStrategy
@@ -114,7 +114,19 @@ class MicroBlockMinerImpl(
           _ <- Task.now(if (delay > Duration.Zero) log.trace(s"Sleeping ${delay.toMillis} ms before applying microBlock"))
           _ <- Task.sleep(delay)
           _ = log.trace(s"Generating microBlock for ${account.toAddress}, constraints: $updatedTotalConstraint")
-          blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed, stateHash)
+          blocks <- forgeBlocks(
+            account,
+            accumulatedBlock,
+            unconfirmed,
+            stateHash.map { sh =>
+              if (unconfirmed.exists(_.tpe == TransactionType.CreateAlias)) {
+                log.info("Filling state hash with zero bytes")
+                ByteStr(new Array[Byte](32))
+              } else {
+                sh
+              }
+            }
+          )
             .leftWiden[Throwable]
             .liftTo[Task]
           (signedBlock, microBlock) = blocks
@@ -146,7 +158,7 @@ class MicroBlockMinerImpl(
     Task(if (allChannels != null) allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
 
   private def appendMicroBlock(microBlock: MicroBlock): Task[BlockId] =
-    MicroblockAppender(blockchainUpdater, utx, appenderScheduler)(microBlock, None)
+    MicroblockAppender(blockchainUpdater, utx, appenderScheduler, checkSH = false)(microBlock, None)
       .flatMap {
         case Left(err) => Task.raiseError(MicroBlockAppendError(microBlock, err))
         case Right(v)  => Task.now(v)

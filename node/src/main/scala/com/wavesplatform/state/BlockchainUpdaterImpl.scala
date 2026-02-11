@@ -554,6 +554,7 @@ class BlockchainUpdaterImpl(
   override def processMicroBlock(
       microBlock: MicroBlock,
       snapshot: Option[MicroBlockSnapshot],
+      checkSH: Boolean = true,
       verify: Boolean = true
   ): Either[ValidationError, BlockId] = writeLock {
     ngState match {
@@ -598,6 +599,7 @@ class BlockchainUpdaterImpl(
                 snapshot,
                 restTotalConstraint,
                 rocksdb.loadCacheData,
+                checkSH,
                 verify
               )
             } yield {

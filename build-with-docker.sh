@@ -1,6 +1,6 @@
 #!/bin/bash
 
-WAVES_VERSION=$(cut -d\" -f2 version.sbt)
+WAVES_VERSION=1.5.10 # $(cut -d\" -f2 version.sbt)
 
 docker run \
   -v "$PWD":/src \
