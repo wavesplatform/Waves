@@ -58,9 +58,12 @@ object EndorsementStorage {
         _ <- Either.raiseWhen(msg.finalizedHeight < GenesisBlockHeight || msg.finalizedHeight > filter.finalizedHeight) {
           s"Expected finalized height >= $GenesisBlockHeight and <= ${filter.finalizedHeight}"
         }
-        _             <- Either.raiseWhen(msg.endorserIndex >= filter.endorsers.size)(s"There are only ${filter.endorsers.size} endorsers")
+        _ <- Either.raiseWhen(msg.endorserIndex >= filter.normalizedGeneratorSet.size)(
+          s"There are only ${filter.normalizedGeneratorSet.size} endorsers"
+        )
         endorserIndex <- GeneratorIndex.checked(msg.endorserIndex).toRight(s"Invalid endorser index: ${msg.endorserIndex}")
-        (endorserAddr, endorserPk, _) = filter.endorsers(msg.endorserIndex)
+        (endorserAddr, endorserPk, balance) = filter.normalizedGeneratorSet(msg.endorserIndex)
+        _   <- Either.raiseWhen(balance == 0)(s"Endorser #$endorserIndex $endorserAddr has no enough balance")
         sig <- verifySig(msg, endorserPk)
       } yield
         if (sharedWithNeighbors.contains(msg) || conflict.isDefinedAt(msg.endorserIndex) || filter.conflict.contains(endorserIndex)) false
@@ -111,7 +114,7 @@ object EndorsementStorage {
         latestResult = FinalizationResult.empty
         hasChanges = false
 
-        currentFilter = if (filter.endorsers.isEmpty) {
+        currentFilter = if (filter.normalizedGeneratorSet.isEmpty) {
           logger.info("Generator set is empty, don't collect endorsements")
           none
         } else {

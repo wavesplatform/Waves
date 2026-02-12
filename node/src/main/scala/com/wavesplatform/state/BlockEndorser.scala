@@ -56,7 +56,7 @@ object BlockEndorser {
         filter = {
           val isMiner    = wallet.privateKeyAccount(votingBlockMiner).isRight
           val minerIndex = if (isMiner) committed.indexWhere { case (addr, _) => addr == votingBlockMiner } else -1
-          val endorsers = committed.map { case (address, blsPk) =>
+          val normalizedEndorsers = committed.map { case (address, blsPk) =>
             (address, blsPk, balances.getOrElse(address, 0L))
           }.toVector
 
@@ -67,7 +67,7 @@ object BlockEndorser {
             finalizedId,
             finalizedHeight,
             endorsedId,
-            endorsers,
+            normalizedEndorsers,
             conflict
           )
         }

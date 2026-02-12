@@ -14,7 +14,7 @@ import org.scalactic.source.Position
 import org.scalatest.EitherValues
 
 class EndorsementStorageSpec extends FreeSpec with EitherValues {
-  private type GeneratorBalance = (addr: Address, blsKp: BlsKeyPair, balance: Long)
+  private type TestGenerator = (addr: Address, blsKp: BlsKeyPair, balance: Long)
 
   private val committedGenerator = BlsKeyPair(TxHelpers.signer(0).privateKey) // GeneratorIndex(0)
 
@@ -25,15 +25,17 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
   private val expectedFinalizedId, unexpectedFinalizedId, expectedEndorsedId = TxHelpers.randomBlockId
 
-  private def mkGenerators(n: Int): IndexedSeq[GeneratorBalance] = (0 until n).map(mkGenerator(_, 100_000.waves))
+  private def mkGeneratorSet(n: Int): IndexedSeq[TestGenerator] = (0 until n).map(mkGenerator(_, 100_000.waves))
 
-  private def mkGenerator(i: Int, initBalance: Long): GeneratorBalance = {
+  private def mkPoorGenerator(i: Int): TestGenerator = mkGenerator(i, 0L)
+
+  private def mkGenerator(i: Int, initBalance: Long): TestGenerator = {
     val wavesKp = TxHelpers.signer(i)
     val blsKp   = BlsKeyPair(wavesKp.privateKey)
     (wavesKp.toAddress, blsKp, initBalance)
   }
 
-  private val defaultGenerators: IndexedSeq[GeneratorBalance] = mkGenerators(4)
+  private val defaultGenerators: IndexedSeq[TestGenerator] = mkGeneratorSet(4)
 
   "tryAddVote" - {
     def mk(
@@ -136,7 +138,16 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
       }
 
       "generator set is empty from beginning of period" in {
-        started(generators = Vector.empty).tryAddEndorsement(mk()) should produce("Voting hasn't started")
+        started(normalizedGeneratorSet = Vector.empty).tryAddEndorsement(mk()) should produce("Voting hasn't started")
+      }
+
+      "not enough generator balance" in {
+        started(
+          normalizedGeneratorSet = Vector(
+            mkGenerator(0, 100_000.waves),
+            mkPoorGenerator(1) // activeGenerator
+          )
+        ).tryAddEndorsement(mk()) should produce("has no enough balance") // activeGenerator
       }
     }
   }
@@ -156,7 +167,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         }
 
         "reached the limit" in {
-          val s = started(minerIndex = 4, mkGenerators(5), maxValidEndorsers = 1)
+          val s = started(minerIndex = 4, mkGeneratorSet(5), maxValidEndorsers = 1)
 
           s.addValidVote(0 to 4*)
           s.checkTryCollect(expectedEndorsedId)
@@ -213,7 +224,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         "then lost finalization because of conflict votes, then reached again" in {
           val s = started(
             minerIndex = 1,
-            generators = Vector(
+            normalizedGeneratorSet = Vector(
               mkGenerator(0, 5000.waves),
               mkGenerator(1, 2000.waves),
               mkGenerator(2, 3000.waves)
@@ -243,7 +254,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         }
 
         "even insufficient valid votes" in {
-          val s = started(minerIndex = 3, mkGenerators(5))
+          val s = started(minerIndex = 3, mkGeneratorSet(5))
 
           s.addValidVote(0)
           s.addConflictVote(2)
@@ -268,12 +279,12 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
   private def started(
       minerIndex: Int = -1,
-      generators: IndexedSeq[GeneratorBalance] = mkGenerators(2),
+      normalizedGeneratorSet: IndexedSeq[TestGenerator] = mkGeneratorSet(2),
       conflict: Set[GeneratorIndex] = Set.empty,
       hasSameBlockBeforeFinalizationHeight: Boolean = true,
       maxValidEndorsers: Int = 2
   ): ExtendedEndorsementStorage = {
-    require(minerIndex == -1 || minerIndex >= 0 && minerIndex < generators.size, s"Invalid miner index $minerIndex")
+    require(minerIndex == -1 || minerIndex >= 0 && minerIndex < normalizedGeneratorSet.size, s"Invalid miner index $minerIndex")
     val r = new EndorsementStorage.InMemory((_, _) => hasSameBlockBeforeFinalizationHeight)
     r.startVoting(
       EndorsementFilter(
@@ -282,14 +293,14 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         expectedFinalizedId,
         expectedFinalizedHeight,
         expectedEndorsedId,
-        generators.map(x => (x.addr, x.blsKp.publicKey, x.balance)),
+        normalizedGeneratorSet.map(x => (x.addr, x.blsKp.publicKey, x.balance)),
         conflict
       )
     ) shouldBe true
-    new ExtendedEndorsementStorage(r, generators)
+    new ExtendedEndorsementStorage(r, normalizedGeneratorSet)
   }
 
-  class ExtendedEndorsementStorage(inner: EndorsementStorage, generators: IndexedSeq[GeneratorBalance]) {
+  class ExtendedEndorsementStorage(inner: EndorsementStorage, generators: IndexedSeq[TestGenerator]) {
     export inner.*
 
     def addValidVote(generatorIndexes: Int*): Either[String, Boolean]    = addVotes(expectedFinalizedId, generatorIndexes)
