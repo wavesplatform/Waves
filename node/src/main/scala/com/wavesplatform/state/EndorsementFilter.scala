@@ -8,8 +8,6 @@ import com.wavesplatform.state.Height
 
 import scala.collection.mutable
 
-/** @param endorsers All, including conflict
-  */
 case class EndorsementFilter(
     maxValidEndorsers: Int,
     miner: Option[GeneratorIndex],

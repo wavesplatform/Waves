@@ -63,7 +63,7 @@ package object appender {
         .collect {
           case (((address, blsPk), balance), idx)
               if !conflictGenerators.contains(GeneratorIndex(idx))
-                && blockchain.isGeneratingBalanceValid(parentHeight, newBlock, balance) =>
+                && blockchain.isGeneratingBalanceValid(parentHeight, newBlock.header, balance) =>
             GeneratorInfo(GeneratorIndex(idx), address, blsPk, balance)
         }
         .toSeq
@@ -263,7 +263,7 @@ package object appender {
     val challengedBalance = block.header.challengedHeader.map(ch => blockchain.generatingBalance(ch.generator.toAddress, parentBlockId)).getOrElse(0L)
     val balance           = ownBalance + challengedBalance
 
-    if (blockchain.isGeneratingBalanceValid(parentHeight, block, balance)) Either.right(balance)
+    if (blockchain.isGeneratingBalanceValid(parentHeight, block.header, balance)) Either.right(balance)
     else if (minerAddress == block.sender.toAddress) Either.left(s"generator's effective balance $balance is less that required for generation")
     else Either.right(0L) // Ignore for a regular generator, not a miner
   }

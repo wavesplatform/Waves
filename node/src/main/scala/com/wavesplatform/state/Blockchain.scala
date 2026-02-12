@@ -190,8 +190,8 @@ object Blockchain {
       committedTimes * CommitToGenerationTransaction.DepositInWavelets
     }
 
-    def isGeneratingBalanceValid(height: Height, block: Block, balance: Long): Boolean =
-      GeneratingBalanceProvider.isGeneratingBalanceValid(blockchain, height, block.header.timestamp, balance)
+    def isGeneratingBalanceValid(height: Height, blockHeader: BlockHeader, balance: Long): Boolean =
+      GeneratingBalanceProvider.isGeneratingBalanceValid(blockchain, height, blockHeader.timestamp, balance)
 
     def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
 

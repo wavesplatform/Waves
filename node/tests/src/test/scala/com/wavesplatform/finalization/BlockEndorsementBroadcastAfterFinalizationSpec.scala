@@ -7,13 +7,13 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.mining.BlockChallengerImpl
-import com.wavesplatform.network.{EndorseBlock, EndorseBlockSpec, MessageCodec, PeerDatabase, RawBytes}
+import com.wavesplatform.network.{MessageCodec, PeerDatabase}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{FreeSpec, TestTime}
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.utils.{EmbeddedChannelOps, Schedulers}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.group.DefaultChannelGroup
@@ -23,10 +23,7 @@ import monix.execution.Scheduler.Implicits.global
 import monix.execution.schedulers.SchedulerService
 import org.scalactic.source.Position
 
-import scala.jdk.CollectionConverters.*
-
-// TODO: remove bu
-class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
+class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpec, EmbeddedChannelOps {
   private val appenderScheduler: SchedulerService = Schedulers.singleThread("appender")
   private val testTime: TestTime                  = TestTime()
 
@@ -238,29 +235,6 @@ class BlockBroadcastAfterFinalizationSpec extends BaseFinalizationSpec {
       }
 
       f(d)
-    }
-  }
-
-  extension (self: EmbeddedChannel) {
-    def sentEndorsements: Seq[EndorseBlock] = {
-      val xs = self
-        .outboundMessages()
-        .asScala
-        .collect {
-          case x: RawBytes if x.code == EndorseBlockSpec.messageCode => EndorseBlockSpec.deserializeData(x.data).get
-        }
-        .toSeq
-      self.outboundMessages().clear()
-      xs
-    }
-
-    def sentOneEndorsement(using Position): Option[EndorseBlock] = {
-      val xs = sentEndorsements
-
-      withClue("sent only one endorsement: ") {
-        xs.size should be <= 1
-      }
-      xs.headOption
     }
   }
 

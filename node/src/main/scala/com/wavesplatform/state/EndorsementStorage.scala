@@ -112,7 +112,7 @@ object EndorsementStorage {
         hasChanges = false
 
         currentFilter = if (filter.endorsers.isEmpty) {
-          logger.info("No committed generators, don't collect endorsements")
+          logger.info("Generator set is empty, don't collect endorsements")
           none
         } else {
           logger.info(s"Started voting with $filter")

@@ -134,6 +134,10 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
         s.tryAddEndorsement(mk(finalizedId = unexpectedFinalizedId)).value
         s.tryAddEndorsement(mk()).value shouldBe false
       }
+
+      "generator set is empty from beginning of period" in {
+        started(generators = Vector.empty).tryAddEndorsement(mk()) should produce("Voting hasn't started")
+      }
     }
   }
 
