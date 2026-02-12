@@ -504,6 +504,14 @@ class Docker(
     log.info(s"New ports: ${ports.toString}")
     client.restartContainer(id, 10)
 
+    node.nodeInfo = Iterator
+      .continually {
+        Thread.sleep(1.second.toMillis)
+        getNodeInfo(node.containerId, node.settings)
+      }
+      .dropWhile(_.ports.isEmpty)
+      .next()
+
     node.nodeInfo = getNodeInfo(node.containerId, node.settings)
     Await.result(
       node.waitForStartup().flatMap(_ => connectToAll(node)),
