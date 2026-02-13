@@ -8,7 +8,7 @@ import com.wavesplatform.state.Height
 
 import scala.collection.mutable
 
-/** @param normalizedGeneratorSet All, including conflict. Zero balance means it not enough for mining and endorsing
+/** @param normalizedGeneratorSet All, including conflict. Zero balance means it is not enough for mining and endorsing
   */
 case class EndorsementFilter(
     maxValidEndorsers: Int,

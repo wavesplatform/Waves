@@ -177,7 +177,7 @@ class MinerImpl(
     val version         = blockchainUpdater.nextBlockVersion
     val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
 
-    val maxMicroblockTimestampOffsetMs = // see min-micro-block-age in application.conf
+    val maxMicroblockTimestampOffsetMs = // See min-micro-block-age in application.conf
       if (wallet.privateKeyAccount(lastBlockHeader.generator.toAddress).isRight) minMicroBlockDurationMills
       else 0L
     val lastBlockInfo = blockchainUpdater.bestLastBlockInfo(timeService.monotonicMillis() - maxMicroblockTimestampOffsetMs)
