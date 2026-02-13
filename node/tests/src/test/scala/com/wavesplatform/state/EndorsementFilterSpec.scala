@@ -42,6 +42,21 @@ class EndorsementFilterSpec extends FreeSpec {
     r.endorsedBalance shouldBe BigInt(33397104552086L)
   }
 
+  "takes only maxValidEndorsers" in {
+    val filter = EndorsementFilter(
+      maxValidEndorsers = 5,
+      miner = Some(GeneratorIndex(1)),
+      finalizedId = TxHelpers.randomBlockId,
+      finalizedHeight = Height(1),
+      endorsedId = TxHelpers.randomBlockId,
+      normalizedGeneratorSet = (0 to 7).map(mkItem(_, 125000000000L)).toVector,
+      conflict = Set.empty
+    )
+
+    val r = filter.simulate(0 to 7, Set.empty)
+    r.chosenValid.size shouldBe filter.maxValidEndorsers
+  }
+
   private def mkItem(i: Int, balance: Long): (Address, BlsPublicKey, Long) = {
     val kp = TxHelpers.signer(i)
     (kp.toAddress, BlsKeyPair(kp.privateKey).publicKey, balance)

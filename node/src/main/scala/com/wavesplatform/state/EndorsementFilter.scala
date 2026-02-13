@@ -52,7 +52,7 @@ case class EndorsementFilter(
     var endorserIndexes = Vector.empty[GeneratorIndex]
     var endorsedBalance = BigInt(minerBalance)
     var reached         = false
-    while (endorserIndexes.size <= maxValidEndorsers && richest.nonEmpty && !reached) {
+    while (endorserIndexes.size < maxValidEndorsers && richest.nonEmpty && !reached) {
       val x = richest.dequeue()
       endorserIndexes = endorserIndexes.appended(x.idx)
       endorsedBalance += x.balance
