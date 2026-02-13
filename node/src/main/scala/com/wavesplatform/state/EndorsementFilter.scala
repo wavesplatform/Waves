@@ -37,6 +37,7 @@ case class EndorsementFilter(
     val items = for {
       i                   <- validIndexes.view
       (_, blsPk, balance) <- lifted(i)
+      if balance > 0
 
       gi = GeneratorIndex(i)
       if !(conflict.contains(gi) || newConflictIndexes.contains(i))
@@ -45,7 +46,7 @@ case class EndorsementFilter(
     val totalBalanceWithoutNewConflict = totalBalance - newConflictIndexes.view.map(normalizedGeneratorSet(_)._3).sum
     val doubledTotalBalance            = totalBalanceWithoutNewConflict * 2
 
-    val richest = mutable.PriorityQueue.empty[Item](using Ordering.by(-_.balance))
+    val richest = mutable.PriorityQueue.empty[Item](using Ordering.by[Item, Long](_.balance))
     richest.addAll(items)
 
     var endorserIndexes = Vector.empty[GeneratorIndex]

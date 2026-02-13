@@ -1,0 +1,49 @@
+package com.wavesplatform.state
+
+import com.wavesplatform.account.Address
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
+import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.transaction.TxHelpers
+import org.scalactic.source.Position
+
+class EndorsementFilterSpec extends FreeSpec {
+  "takes with higher balance first" in {
+    val filter = EndorsementFilter(
+      maxValidEndorsers = 10,
+      miner = Some(GeneratorIndex(15)),
+      finalizedId = TxHelpers.randomBlockId,
+      finalizedHeight = Height(1),
+      endorsedId = TxHelpers.randomBlockId,
+      normalizedGeneratorSet = Vector(
+        mkItem(0, 239130000000L),
+        mkItem(1, 239510000000L),
+        mkItem(2, 239730000000L),
+        mkItem(3, 240320000000L),
+        mkItem(4, 240531660000L),
+        mkItem(5, 239270000000L),
+        mkItem(6, 241149180000L),
+        mkItem(7, 240310000000L),
+        mkItem(8, 239230000000L),
+        mkItem(9, 240330000000L),
+        mkItem(10, 240670780000L),
+        mkItem(11, 239230000000L),
+        mkItem(12, 239230000000L),
+        mkItem(13, 240570000000L),
+        mkItem(14, 11823820170545L),
+        mkItem(15, 10315750064535L),
+        mkItem(16, 11257534317006L),
+        mkItem(17, 8125473001579L)
+      ),
+      conflict = Set.empty
+    )
+
+    val r = filter.simulate(0 to 17, Set.empty)
+    r.chosenValid.map(_.toInt) shouldBe Seq(14, 16)
+    r.endorsedBalance shouldBe BigInt(33397104552086L)
+  }
+
+  private def mkItem(i: Int, balance: Long): (Address, BlsPublicKey, Long) = {
+    val kp = TxHelpers.signer(i)
+    (kp.toAddress, BlsKeyPair(kp.privateKey).publicKey, balance)
+  }
+}
