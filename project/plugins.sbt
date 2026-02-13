@@ -17,8 +17,7 @@ Seq(
   "org.portable-scala" % "sbt-scalajs-crossproject" % "1.3.2",
   "org.scala-js"       % "sbt-scalajs"              % "1.20.1",
   "org.scalameta"      % "sbt-scalafmt"             % "2.5.5",
-  "pl.project13.scala" % "sbt-jmh"                  % "0.4.8",
-  "se.marcuslonnberg"  % "sbt-docker"               % "1.11.0"
+  "pl.project13.scala" % "sbt-jmh"                  % "0.4.8"
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(
