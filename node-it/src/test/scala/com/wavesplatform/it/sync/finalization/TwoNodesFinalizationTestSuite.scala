@@ -15,7 +15,6 @@ import scala.concurrent.duration.DurationInt
 class TwoNodesFinalizationTestSuite extends BaseFreeSpec with OptionValues {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
       .overrideBase(_.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0))))
       .overrideBase(_.raw("waves.miner.minimal-block-generation-offset = 10s"))
       .withDefault(2)
