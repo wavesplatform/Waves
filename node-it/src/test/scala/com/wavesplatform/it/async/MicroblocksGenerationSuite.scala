@@ -2,12 +2,13 @@ package com.wavesplatform.it.async
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.AsyncHttpApi.*
-import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs, TransferSending}
+import com.wavesplatform.it.{BaseFreeSpec, LoadTest, NodeConfigs, TransferSending}
 import com.wavesplatform.state.Height
 
 import scala.concurrent.Await.result
 import scala.concurrent.duration.*
 
+@LoadTest
 class MicroblocksGenerationSuite extends BaseFreeSpec with TransferSending {
   import MicroblocksGenerationSuite.*
 

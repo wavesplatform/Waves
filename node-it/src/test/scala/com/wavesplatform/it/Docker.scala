@@ -581,7 +581,19 @@ object Docker {
   val initialWavesAmount: Long = configTemplate.getLong("waves.blockchain.custom.genesis.initial-balance")
 
   def genesisOverride(featuresConfig: Option[Config] = None): Config = {
-    val genesisTs: Long = System.currentTimeMillis()
+    // Starting a node and applying the genesis block takes a non-negligible amount of time. If we do not introduce an offset,
+    // the system will treat the genesis block as if it was created in the past. In CI runs, this time gap can reach up
+    // to 30 seconds.
+    //
+    // Block mining starts immediately after genesis is applied. As a result, there may be less time available for a
+    // second block than some tests require (for example, to populate it with transactions).
+    //
+    // If the genesis block timestamp is slightly in the future, it will still be accepted. The only side effect is a
+    // delayed start of mining.
+    //
+    // The chosen offset represents a compromise between realistic timing and test stability.
+    val offsetMs        = 12_000
+    val genesisTs: Long = System.currentTimeMillis() + offsetMs
 
     val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
                                             |  timestamp = $genesisTs

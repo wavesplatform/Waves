@@ -151,7 +151,9 @@ object EndorsementStorage {
         }
       } yield latestResult.voting
 
-      r.left.foreach(err => logger.debug(s"Not found new significant endorsements for $endorsedId: $err"))
+      r.left.foreach { err =>
+        if (currentFilter.nonEmpty) logger.debug(s"Not found new significant endorsements for $endorsedId: $err")
+      }
       r.toOption
     }
 
