@@ -35,7 +35,7 @@ class HashBenchmark {
 object HashBenchmark {
   @State(Scope.Benchmark)
   class HashData(functionId: Short) {
-    @Param(Array("16384", "32768", "65536", "131072"))
+    @Param(Array("16384", "32768", "65536", "131072", "153600"))
     var dataSize   = 0
     var expr: EXPR = uninitialized
 

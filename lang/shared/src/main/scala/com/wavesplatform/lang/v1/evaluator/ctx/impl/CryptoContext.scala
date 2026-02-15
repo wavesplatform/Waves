@@ -91,10 +91,12 @@ object CryptoContext {
     }
 
     val sha256F: BaseFunction[NoContext] = {
-      val complexity =
+      val complexity = {
         if (version < V4) 10
         else if (version < V6) 200
-        else 118
+        else if (version < V9) 118
+        else 36
+      }
       hashFunction("sha256", SHA256, complexity)(global.sha256)
     }
 
@@ -163,7 +165,14 @@ object CryptoContext {
       hashLimFunction(
         "sha256",
         SHA256_LIM,
-        if (version >= V6)
+        if (version >= V9)
+          List(
+            (16, 5),
+            (32, 9),
+            (64, 17),
+            (128, 32)
+          )
+        else if (version >= V6)
           List(
             (16, 12),
             (32, 23),
@@ -545,6 +554,64 @@ object CryptoContext {
 
       }
 
+    val validateCertificateChain: BaseFunction[NoContext] =
+      NativeFunction(
+        "validateCertificateChain",
+        43,
+        VALIDATE_CERT_CHAIN,
+        BYTESTR,
+        ("certificateChain", LIST(BYTESTR)),
+        ("crls", LIST(BYTESTR)),
+        ("timestamp", LONG)
+      ) {
+        case ARR(certChain) :: ARR(crls) :: CONST_LONG(timestamp) :: Nil =>
+          (for {
+            _ <- Either.raiseWhen(certChain.isEmpty)("Certificate chain must contain at least one certificate")
+            _ <- Either.raiseWhen(certChain.length > 5)("Certificate chain can not contain more than 5 certificates")
+            _ <- Either.raiseWhen(certChain.size - 1 != crls.size)(
+              s"Certificate chain contains ${certChain.size} certificates and requires ${certChain.size - 1} CRLs, ${crls.size} provided"
+            )
+            certChainBytes <- Either.cond(
+              certChain.forall(_.isInstanceOf[CONST_BYTESTR]),
+              certChain.map((_.asInstanceOf[CONST_BYTESTR].bs.arr)),
+              "Certificates must be byte vectors"
+            )
+            crlBytes <- Either.cond(
+              crls.forall(_.isInstanceOf[CONST_BYTESTR]),
+              crls.map(_.asInstanceOf[CONST_BYTESTR].bs.arr),
+              "CRLs must be ByteVectors"
+            )
+
+            pk <- global.validateTDXCertChain(certChainBytes, crlBytes, timestamp)
+          } yield ByteStr(pk)).left.map(s => CommonError(s)).flatMap(bs => CONST_BYTESTR(bs))
+        case xs =>
+          notImplemented[Id, EVALUATED](
+            "validateCertificateChain(certificateChain:List[ByteVector], crls:List[ByteVector], timestamp:Int)",
+            xs
+          )
+      }
+
+    val secP256verify: BaseFunction[NoContext] =
+      NativeFunction(
+        "p256Verify",
+        43,
+        SECP256VERIFY,
+        BOOLEAN,
+        ("message", BYTESTR),
+        ("signature", BYTESTR),
+        ("publicKey", BYTESTR)
+      ) {
+        case CONST_BYTESTR(msg) :: CONST_BYTESTR(signature) :: CONST_BYTESTR(pk) :: Nil =>
+          (for {
+            res <- global.p256verify(msg.arr, signature.arr, pk.arr)
+          } yield CONST_BOOLEAN(res)).left.map(s => CommonError(s))
+        case xs =>
+          notImplemented[Id, EVALUATED](
+            "p256Verify(message:ByteVector, signature:ByteVector, publicKey:ByteVector)",
+            xs
+          )
+      }
+
     val v1Functions =
       Array(
         keccak256F,
@@ -595,7 +662,9 @@ object CryptoContext {
       fromBase64String_1C,
       fromBase16String_1C,
       toBase64String_1C,
-      toBase16String_1C
+      toBase16String_1C,
+      secP256verify,
+      validateCertificateChain
     )
 
     val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)

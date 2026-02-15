@@ -3,18 +3,23 @@ import sbt.Keys.scalaVersion
 import sbt.{Def, *}
 import scalapb.compiler.Version.scalapbVersion
 
-//noinspection TypeAnnotation
 object Dependencies {
+  val DebAmd64 = config("DebAmd64")
+  val DebArm64 = config("DebArm64")
+
+
   private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.9.Final"
 
-  val gProtoVersion = "4.33.2"
-  val gProto = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
+  val gProtoVersion = "4.33.5"
+  val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
   val overrides = Def.setting(
     Seq(
       "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
       "com.google.code.gson"      % "gson"           % "2.13.2",
-      "com.squareup.okio"         % "okio-jvm"       % "3.16.0",
+      "com.squareup.okio"         % "okio-jvm"       % "3.16.4",
       "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
+      "org.slf4j"                 % "slf4j-api"      % "2.0.17",
+      "org.msgpack"               % "msgpack-core"   % "0.9.11",
       nettyModule("codec-http2"),
       nettyModule("codec-http"),
       nettyModule("handler-proxy"),
@@ -37,38 +42,47 @@ object Dependencies {
 
   private def pekkoHttpModule(module: String, version: String = "1.3.0") = "org.apache.pekko" %% module % version
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.8.0"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.8.1"
 
-  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.20.1"
+  private def jacksonModule(group: String, module: String, version: String = "2.20.1") = s"com.fasterxml.jackson.$group" % s"jackson-$module" % version
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.9.8" // 4.10+ requires Java 17 https://github.com/web3j/web3j/issues/1907
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.77.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.79.0"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.5.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.22"
-  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.4"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.27"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.6"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
 
   val playJson = "org.playframework" %% "play-json" % "3.0.6"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
-  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.9.4" % Test)
+  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.9.5" % Test)
 
   private def sttp3Module(module: String) = "com.softwaremill.sttp.client3" %% module % "3.11.0"
 
   val sttp3      = sttp3Module("core")
   val sttp3Monix = sttp3Module("monix")
 
-  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.83"
-
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
+
+  def amazonCorretto(c: String): ModuleID = "software.amazon.cryptools" % "AmazonCorrettoCryptoProvider" % "2.5.0" classifier c
+
+  val cryptoProviders = Seq(
+    // Windows x86_64, Windows x86, macOS x86_64, linux x86_64
+    "org.conscrypt" % "conscrypt-openjdk-uber" % "2.5.2",
+    // macOS aarch64
+    amazonCorretto("osx-aarch_64"),
+    // fallback Java
+    "org.bouncycastle" % "bcprov-jdk18on" % "1.83"
+  )
 
   val lang = Def.setting(
     Seq(
@@ -81,11 +95,10 @@ object Dependencies {
       "ch.obermuhlner"  % "big-math"   % "2.3.2",
       googleGuava, // BaseEncoding.base16()
       curve25519,
-      bouncyCastleProvider,
       "com.wavesplatform" % "zwaves" % "0.2.1",
       web3jModule("crypto").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
       protoSchemasLib % "protobuf"
-    )
+    ) ++ cryptoProviders
   )
 
   lazy val scalapbRuntimeJS = Def.setting(
@@ -99,7 +112,7 @@ object Dependencies {
     logback,
     "com.github.jnr" % "jnr-unixsocket" % "0.38.24", // To support Apple ARM
     "com.spotify"    % "docker-client"  % "8.16.0",
-    jacksonModule("dataformat", "dataformat-properties"),
+    jacksonModule("dataformat", "dataformat-properties", "2.21.0"),
     asyncHttpClient
   ).map(_ % Test)
 
@@ -110,11 +123,6 @@ object Dependencies {
     "org.mockito"        % "mockito-all"     % "1.10.19",
     "org.scalamock"     %% "scalamock"       % "6.2.0"
   ).map(_ % Test)
-
-  lazy val qaseReportDeps = Seq(
-    playJson,
-    ("io.qase" % "qase-api" % "3.2.1").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
-  )
 
   lazy val logDeps = Seq(
     logback              % Runtime,
@@ -130,12 +138,10 @@ object Dependencies {
       rocksdb,
       "commons-net"            % "commons-net"               % "3.12.0",
       "commons-io"             % "commons-io"                % "2.21.0",
-      "com.github.pureconfig" %% "pureconfig-core"           % "0.17.9",
-      "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.9",
+      "com.github.pureconfig" %% "pureconfig-core"           % "0.17.10",
+      "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.10",
       "net.logstash.logback"   % "logstash-logback-encoder"  % "9.0" % Runtime,
       kamonCore,
-      kamonModule("system-metrics"),
-      kamonModule("influxdb"),
       kamonModule("pekko-http"),
       kamonModule("executors"),
       "org.influxdb" % "influxdb-java" % "2.25",
@@ -149,11 +155,13 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       scalaLogging,
-      "eu.timepit"                 %% "refined"       % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "13.3.1",
-      "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
+      "eu.timepit"        %% "refined"  % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "com.esaulpaugh"     % "headlong" % "13.3.1",
+      "com.github.jbellis" % "jamm"     % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
-      "com.wavesplatform" % "blst-java" % "0.3.15"
+      "com.wavesplatform"         % "blst-java"                    % "0.3.15",
+      amazonCorretto("linux-x86_64") % Optional,
+      amazonCorretto("linux-aarch_64") % Optional
     ) ++ console ++ logDeps ++ protobuf.value
   )
 

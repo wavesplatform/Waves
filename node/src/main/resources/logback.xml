@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true" scanPeriod="30 seconds">
     <property name="default.pattern" value="%date %-5level [%.25thread] %logger{26} - %msg%n"/>
-    <property name="logback.file.final-directory" value="${logback.file.directory:-${waves.directory}/log}"/>
 
     <logger name="io.grpc.netty" level="ERROR"/>
     <logger name="io.netty" level="INFO"/>
@@ -22,7 +21,28 @@
 
     <root level="TRACE"/>
 
-    <property name="logback.file.enabled" value="true"/>
+    <property name="logback.file.enabled" value="false"/>
+
+    <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+        <key>waves.directory</key>
+    </condition>
+    <if>
+        <then>
+            <property name="logback.file.enabled" value="true"/>
+            <property name="logback.file.final-directory" value="${waves.directory}/log"/>
+        </then>
+    </if>
+
+    <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+        <key>logback.file.directory</key>
+    </condition>
+    <if>
+        <then>
+            <property name="logback.file.enabled" value="true"/>
+            <property name="logback.file.final-directory" value="${logback.file.directory}"/>
+        </then>
+    </if>
+
     <property name="logback.stdout.enabled" value="true"/>
     <property name="logback.utx-trace.enabled" value="false"/>
 

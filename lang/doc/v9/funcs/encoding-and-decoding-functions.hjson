@@ -75,35 +75,35 @@
       params: [ "ByteVector" ]
       doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function."
       paramsDoc: [ "The array of bytes to encode." ]
-      complexity: 118
+      complexity: 36
     }
     {
       name: "sha256_16Kb"
       params: [ "ByteVector" ]
       doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 16Kb."
       paramsDoc: [ "The array of bytes to encode." ]
-      complexity: 12
+      complexity: 5
     }
     {
       name: "sha256_32Kb"
       params: [ "ByteVector" ]
       doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 32Kb."
       paramsDoc: [ "The array of bytes to encode." ]
-      complexity: 23
+      complexity: 9
     }
     {
       name: "sha256_64Kb"
       params: [ "ByteVector" ]
       doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 64Kb."
       paramsDoc: [ "The array of bytes to encode." ]
-      complexity: 47
+      complexity: 17
     }
     {
       name: "sha256_128Kb"
       params: [ "ByteVector" ]
       doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 128Kb."
       paramsDoc: [ "The array of bytes to encode." ]
-      complexity: 93
+      complexity: 32
     }
     {
       name: "toBase16String"

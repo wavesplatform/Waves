@@ -10,6 +10,10 @@ on:
       base-image:
         description: 'Base image'
         required: false
+      publish-private-node:
+        description: 'Publish private node'
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       raw-docker-tags:
@@ -28,7 +32,7 @@ on:
         value: ${{ jobs.publish.outputs.digest }}
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}
+  IMAGE_NAME: ghcr.io/wavesplatform/waves
 
 jobs:
   publish:
@@ -42,6 +46,7 @@ jobs:
       id-token: write
     outputs:
       digest: ${{ steps.push.outputs.digest }}
+      node-version: ${{ steps.versions.outputs.node-version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -85,7 +90,6 @@ jobs:
           {
             echo 'TAGS<<EOF'
             echo ${{ inputs.docker-tags }} | tr ',' '\n' | sed -e 's/^/type=raw,value=/'
-            echo type=sha
             echo EOF
           } >> "$GITHUB_ENV"
           echo "IMAGES=${{ env.IMAGE_NAME }}" >> "$GITHUB_ENV"
@@ -143,3 +147,58 @@ jobs:
             echo '- Base image: `${{ steps.versions.outputs.base-image }}@${{ steps.versions.outputs.base-image-digest }}`'
             echo '- Version: `${{ steps.versions.outputs.node-version }}`'
           } >> $GITHUB_STEP_SUMMARY
+
+  publish-private-node:
+    needs: [publish]
+    name: Publish private node image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    if: ${{ inputs.publish-private-node }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: |
+          {
+            echo 'description<<EOF'
+            cat docker/private/README.md
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+        id: description
+      - run: |
+          {
+            echo 'TAGS<<EOF'
+            echo ${{ inputs.docker-tags }} | tr ',' '\n' | sed -e 's/^/type=raw,value=/'
+            echo EOF
+          } >> "$GITHUB_ENV"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta-private
+        uses: docker/metadata-action@v5
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index,manifest-descriptor,index-descriptor
+        with:
+          images: ghcr.io/wavesplatform/waves-private-node
+          flavor: latest=false
+          tags: ${{ env.TAGS }}
+          annotations: |
+            org.opencontainers.image.description=Waves Private Node
+            org.opencontainers.image.documentation=https://github.com/wavesplatform/Waves/blob/${{ github.sha }}/docker/README.md#waves-private-node
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.publish.outputs.node-version }}
+            org.opencontainers.image.base.digest=${{ needs.publish.outputs.digest }}
+      - uses: docker/build-push-action@v5
+        with:
+          platforms: linux/amd64,linux/arm64
+          context: ./docker/private
+          push: true
+          pull: true
+          tags: ${{ steps.meta-private.outputs.tags }}
+          build-args: |
+            baseImage=ghcr.io/wavesplatform/waves@${{ needs.publish.outputs.digest }}

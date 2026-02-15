@@ -5,7 +5,7 @@ import ch.obermuhlner.math.big.BigDecimalMath
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.utils.{Base58, Base64}
-import com.wavesplatform.crypto.{Blake2b256, Curve25519, Keccak256, Sha256}
+import com.wavesplatform.crypto.{Blake2b256, Curve25519, Keccak256, P256Curve, Sha256}
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
@@ -187,4 +187,17 @@ object Global extends BaseGlobal {
       base16Codec.decode(pk.toString(16))
     }
   }
+
+  override def p256verify(
+      message: Array[Byte],
+      signature: Array[Byte],
+      publicKey: Array[Byte]
+  ): Either[String, Boolean] = P256Curve.verify(message, signature, publicKey)
+
+  override def validateTDXCertChain(
+      certChain: Seq[Array[Byte]],
+      crls: Seq[Array[Byte]],
+      timestamp: Long
+  ): Either[String, Array[Byte]] = P256Curve.validateCertChain(certChain, crls, timestamp)
+
 }

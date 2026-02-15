@@ -56,8 +56,10 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with I
        | let feeAssetId = t.feeAssetId == unit
        | let checkFunc  = t.function == "default"
        | let checkArgs  = t.args == [$passingArg]
-       | let payments   = ${if (version > V3) s"t.payments == [$payments]"
-    else s"t.payment == ${if (payments.nonEmpty) payments else GlobalValNames.Unit}"}
+       | let payments   = ${
+        if (version > V3) s"t.payments == [$payments]"
+        else s"t.payment == ${if (payments.nonEmpty) payments else GlobalValNames.Unit}"
+      }
        | ${assertProvenPart("t", proofs = false)} && dAppAddress && feeAssetId && checkFunc && checkArgs && payments && checkId
      """.stripMargin
   }
@@ -144,7 +146,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with I
     val (preparingTxs, ethInvoke, dApp, dApp2, assets) = preconditions(dAppVersion, assetScriptVersion, paymentCount, syncCall)
     val settings =
       if (dAppVersion >= V9 || assetScriptVersion >= V9) DeterministicFinality
-      else if (dAppVersion >= V8 || assetScriptVersion >= V8) TransactionStateSnapshot 
+      else if (dAppVersion >= V8 || assetScriptVersion >= V8) TransactionStateSnapshot
       else BlockRewardDistribution
 
     withDomain(settings) { d =>
