@@ -26,7 +26,7 @@ trait Blockchain {
   def height: Int
 
   def finalizedHeight: Option[Height]
-  def finalizedHeightAt(at: Height = Height(height)): Option[Height]
+  def finalizedHeightAt(at: Height): Option[Height]
 
   def score: BigInt
 
@@ -118,7 +118,7 @@ object Blockchain {
     def contains(block: Block): Boolean     = blockchain.contains(block.id())
     def contains(blockId: BlockId): Boolean = blockchain.heightOf(blockId).isDefined
 
-    def finalizedHeightAtOrFallback(maxRollbackLength: Int, at: Height = Height(blockchain.height)): Height = {
+    def finalizedHeightAtOrFallback(maxRollbackLength: Int, at: Height): Height = {
       val finalizedAt = blockchain.finalizedHeightAt(at)
       Blockchain.finalizedHeightOrFallback(at, finalizedAt, maxRollbackLength)
     }

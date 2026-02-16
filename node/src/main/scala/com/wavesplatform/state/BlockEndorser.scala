@@ -40,7 +40,8 @@ object BlockEndorser {
         votingBlockHeader   <- blockchain.blockHeader(votingHeight.toInt).toSeq
         endorsedBlockHeader <- blockchain.blockHeader(endorsedHeight.toInt).toSeq
 
-        finalizedHeight = blockchain.finalizedHeightAtOrFallback(maxSyncRollbackLength, votingHeight)
+        finalizedHeightAtEndorsed = blockchain.finalizedHeightAt(endorsedHeight)
+        finalizedHeight           = Blockchain.finalizedHeightOrFallback(votingHeight, finalizedHeightAtEndorsed, maxSyncRollbackLength)
         finalizedId <- blockchain
           .blockId(finalizedHeight.toInt)
           .toSeq

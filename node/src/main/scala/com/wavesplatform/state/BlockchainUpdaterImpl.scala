@@ -72,7 +72,7 @@ class BlockchainUpdaterImpl(
   private def publishLastBlockInfo(): Unit =
     for (id <- this.lastBlockId; ts <- ngState.map(_.base.header.timestamp).orElse(rocksdb.lastBlockTimestamp)) {
       val blockchainReady = ts + maxBlockReadinessAge > time.correctedTime()
-      internalLastBlockInfo.onNext(LastBlockInfo(id, Height(height), score, this.finalizedHeightAtOrFallback(maxSyncRollbackLength), blockchainReady))
+      internalLastBlockInfo.onNext(LastBlockInfo(id, Height(height), score, this.finalizedHeightOrFallback(maxSyncRollbackLength), blockchainReady))
     }
 
   publishLastBlockInfo()
@@ -420,8 +420,9 @@ class BlockchainUpdaterImpl(
                     reward,
                     hitSource
                   ) =>
-                val newHeight = Height(rocksdb.height + 1)
-                rocksdb.finalizedHeightAt(Height(rocksdb.height)).foreach { h =>
+                val newHeight              = Height(rocksdb.height + 1)
+                val currentFinalizedHeight = rocksdb.finalizedHeightAt(Height(rocksdb.height))
+                currentFinalizedHeight.foreach { h =>
                   log.debug(s"Finalized height at ${rocksdb.height}: $h")
                 }
 
@@ -444,7 +445,7 @@ class BlockchainUpdaterImpl(
                       parentHeight = Height(rocksdb.height),
                       finalizedHeight = Blockchain.finalizedHeightOrFallback(
                         at = newHeight,
-                        latestFinalized = rocksdb.finalizedHeightAt(),
+                        latestFinalized = currentFinalizedHeight,
                         maxRollbackLength = maxSyncRollbackLength
                       )
                     )
@@ -609,7 +610,7 @@ class BlockchainUpdaterImpl(
 
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${snapshot.hashString}")
               internalLastBlockInfo.onNext(
-                LastBlockInfo(blockId, Height(height), score, this.finalizedHeightAtOrFallback(maxSyncRollbackLength), ready = true)
+                LastBlockInfo(blockId, Height(height), score, this.finalizedHeightOrFallback(maxSyncRollbackLength), ready = true)
               )
 
               miner.scheduleMining(blockchain = None, cancelMicroBlockMining = false)
