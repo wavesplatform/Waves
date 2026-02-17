@@ -1485,8 +1485,10 @@ paths:
           JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation)
           including
           [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and
-          `sender`. If `timestamp` is omitted, current node's time is used.
-          `senderPublicKey` is ignored.
+          `sender`.
+          If `timestamp` is omitted, current node's time is used. 
+          If `generationPeriodStart` is omitted, the next period height is used. 
+          `senderPublicKey` and `endorserPublicKey` are ignored.
         content:
           application/json:
             schema:
@@ -3426,6 +3428,17 @@ components:
     PublicKey:
       type: string
       example: 2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY
+    BlsPublicKey:
+      type: string
+      example: 6CagLT3FjEcaNHPYCaG2dcfEfzDj6ynVeZbxbLHkHdfzvbfBmBMkkatTYcBXD9cHMU
+    BlsSignature:
+      type: string
+      example: oJUBPLXnqejpwkkifzBbyQp63mPwypYq9GV7eAYqQGAvsE2LxU6csrrwLWgK1HdW28Ygku7vfkcMW1TCDCFymVXoqi7SpCwWGp3P6gegHusSPBsuVQQiQ5BWTYpUpSJjiBL
+    GeneratorIndex:
+      type: integer
+      format: int32
+      minimum: 0
+      example: 0
     Amount:
       type: integer
       format: int64
@@ -3909,6 +3922,8 @@ components:
           type: string
         stateHash:
           type: string
+        finalizationVoting:
+          $ref: '#/components/schemas/FinalizationVoting'
     BlockHeaderLSF:
       required:
         - blocksize
@@ -3986,6 +4001,55 @@ components:
           type: string
         stateHash:
           type: string
+        finalizationVoting:
+          $ref: '#/components/schemas/FinalizationVoting'
+    BlockEndorsement:
+      type: object
+      required:
+        - endorserIndex
+        - finalizedId
+        - finalizedHeight
+        - endorsedId
+        - signature
+      properties:
+        endorserIndex:
+          $ref: '#/components/schemas/GeneratorIndex'
+        finalizedId:
+          $ref: '#/components/schemas/BlockId'
+        finalizedHeight:
+          $ref: '#/components/schemas/Height'
+        endorsedId:
+          $ref: '#/components/schemas/BlockId'
+        signature:
+          $ref: '#/components/schemas/BlsSignature'
+    FinalizationVoting:
+      type: object
+      required:
+        - finalizedHeight
+      properties:
+        valid:
+          type: array
+          items:
+            $ref: '#/components/schemas/GeneratorIndex'
+        finalizedHeight:
+          $ref: '#/components/schemas/Height'
+        aggregatedEndorsement:
+          $ref: '#/components/schemas/BlsSignature'
+          nullable: true
+        conflict:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlockEndorsement'
+      example:
+        valid: [ 2 ]
+        aggregatedEndorsement: 25D5M96CYmdiuragjjJNGY9thrZL5sgUVjHrfamoi9B7XMUU7e7qFHejX49Qe4FdQxYkrb8v4f6MhgAEj6D3YbEB7xxAfLbA4HqwvuQeKTrZoMnLTcNfujQ8QGbsyqMT28Cn
+        finalizedHeight: 1609990
+        conflict:
+          - endorserIndex: 0
+            finalizedId: 2Sf5yJ4AAuMRaVr6vQUyGPE7mkFLaBbkz3quLoB2dseBJdneGDPqioiFsDKcXVVpDK6LXMA1RTY8WfWio1MPXt8c
+            finalizedHeight: 1
+            endorsedId: 2Sf5yJ4AAuMRaVr6vQUyGPE7mkFLaBbkz3quLoB2dseBJdneGDPqioiFsDKcXVVpDK6LXMA1RTY8WfWio1MPXt8c
+            signature: oGETTvn8Mggi1cULSEEDGuDG7rPeY1tEE11Vc4FwR3f5fPwVLGTWo6M5XFTtwqSabNpWjzh4FNuoGssDVK1Y23mdiCKYCkt2D6mvnWDfrLpM3JUxP7yRGrv4LfzfCTXnJxF
     Block:
       allOf:
         - $ref: '#/components/schemas/BlockHeader'
