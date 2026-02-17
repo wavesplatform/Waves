@@ -4480,6 +4480,7 @@ components:
         - $ref: '#/components/schemas/SetScriptTransaction'
         - $ref: '#/components/schemas/SponsorFeeTransaction'
         - $ref: '#/components/schemas/TransferTransaction'
+        - $ref: '#/components/schemas/CommitToGenerationTransaction'
         - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
     NonGenesisTransactionLSF:
       required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature, feeAssetId ]
@@ -4501,6 +4502,7 @@ components:
         - $ref: '#/components/schemas/SetScriptTransaction'
         - $ref: '#/components/schemas/SponsorFeeTransactionLSF'
         - $ref: '#/components/schemas/TransferTransactionLSF'
+        - $ref: '#/components/schemas/CommitToGenerationTransaction'
         - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
     Transaction:
       oneOf:
@@ -5179,6 +5181,19 @@ components:
           $ref: '#/components/schemas/AssetName'
         description:
           $ref: '#/components/schemas/AssetDescription'
+    CommitToGenerationTransaction:
+      type: object
+      required:
+        - endorserPublicKey
+        - generationPeriodStart
+        - commitmentSignature
+      properties:
+        endorserPublicKey:
+          $ref: '#/components/schemas/BlsPublicKey'
+        generationPeriodStart:
+          $ref: '#/components/schemas/Height'
+        commitmentSignature:
+          $ref: '#/components/schemas/BlsSignature'
     DataAction:
       oneOf:
         - $ref: '#/components/schemas/DataEntry'
