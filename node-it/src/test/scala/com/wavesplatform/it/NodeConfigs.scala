@@ -51,7 +51,11 @@ object NodeConfigs {
       val totalEntities = defaultEntities + specialsConfigs.size
       require(totalEntities <= NonConflictingNodes.size)
 
-      val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = baseConfigs.zipWithIndex
+      val bc =
+        if (totalEntities > 1) baseConfigs
+        else baseConfigs.map(ConfigFactory.parseString("waves.network.max-outbound-connections = 0").withFallback)
+
+      val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = bc.zipWithIndex
         .collect { case (x, i) if NonConflictingNodes.contains(i + 1) => x }
         .splitAt(defaultEntities)
 

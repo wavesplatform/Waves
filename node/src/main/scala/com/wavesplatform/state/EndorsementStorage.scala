@@ -38,7 +38,7 @@ object EndorsementStorage {
   }
 
   class InMemory(blockAtHeight: (BlockId, Height) => Boolean) extends EndorsementStorage, StrictLogging {
-    private var currentFilter = none[EndorsementFilter] // TODO: remove option?
+    private var currentFilter = none[EndorsementFilter]
 
     private val sharedWithNeighbors     = mutable.HashSet.empty[EndorseBlock]
     private val processedValidEndorsers = mutable.HashSet.empty[GeneratorIndex]
@@ -62,6 +62,7 @@ object EndorsementStorage {
           s"There are only ${filter.normalizedGeneratorSet.size} endorsers"
         )
         endorserIndex <- GeneratorIndex.checked(msg.endorserIndex).toRight(s"Invalid endorser index: ${msg.endorserIndex}")
+        _             <- Either.raiseWhen(msg.endorserIndex == filter.miner.toInt)("Miner can't sent endorsements")
         (endorserAddr, endorserPk, balance) = filter.normalizedGeneratorSet(msg.endorserIndex)
         _   <- Either.raiseWhen(balance == 0)(s"Endorser #$endorserIndex $endorserAddr has no enough balance")
         sig <- verifySig(msg, endorserPk)
@@ -89,7 +90,7 @@ object EndorsementStorage {
             true
           } else false
 
-          val share = isNew && filter.miner.isEmpty
+          val share = isNew && !filter.isMiner
           if (isNew) {
             val kindStr = if (isConflict) "conflict" else "valid"
             logger.info(s"New $kindStr endorsement from #$endorserIndex $endorserAddr will${if (share) "" else " not"} be shared")
@@ -147,7 +148,7 @@ object EndorsementStorage {
         }
         changedFinalizationStatus = latestResult.reachedFinalization != origResult.reachedFinalization
         _ <- Either.raiseUnless(moreConflict || changedFinalizationStatus) {
-          s"Status not changed, endorsed=${simulation.endorsedBalance}, total=${simulation.totalBalance}"
+          s"Status not changed, endorsed=${simulation.endorsedBalance}, total=${simulation.totalBalance}, chosen valid=[${simulation.chosenValid.mkString(", ")}], valid=[${valid.keysIterator.mkString(", ")}]"
         }
       } yield latestResult.voting
 

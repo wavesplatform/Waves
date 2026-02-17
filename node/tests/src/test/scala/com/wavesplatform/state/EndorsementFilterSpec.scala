@@ -10,7 +10,8 @@ class EndorsementFilterSpec extends FreeSpec {
   "takes with higher balance first" in {
     val filter = EndorsementFilter(
       maxValidEndorsers = 10,
-      miner = Some(GeneratorIndex(15)),
+      miner = GeneratorIndex(15),
+      isMiner = true,
       finalizedId = TxHelpers.randomBlockId,
       finalizedHeight = Height(1),
       endorsedId = TxHelpers.randomBlockId,
@@ -42,10 +43,40 @@ class EndorsementFilterSpec extends FreeSpec {
     r.endorsedBalance shouldBe BigInt(33397104552086L)
   }
 
+  "corner case" in {
+    val filter = EndorsementFilter(
+      maxValidEndorsers = 20,
+      miner = GeneratorIndex(1),
+      isMiner = true,
+      finalizedId = TxHelpers.randomBlockId,
+      finalizedHeight = Height(1),
+      endorsedId = TxHelpers.randomBlockId,
+      normalizedGeneratorSet = Vector(
+        mkItem(0, 4996038000000L),
+        mkItem(2, 4989990000000L),
+        mkItem(3, 4989990000000L),
+        mkItem(4, 4989990000000L),
+        mkItem(5, 4989990000000L),
+        mkItem(1, 4989990000000L),
+        mkItem(6, 4989990000000L),
+        mkItem(7, 4989990000000L),
+        mkItem(8, 4989990000000L),
+        mkItem(9, 4989990000000L),
+        mkItem(10, 199989990000000L),
+        mkItem(11, 199989990000000L)
+      ),
+      conflict = Set.empty
+    )
+
+    val r = filter.simulate(Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), Set.empty)
+    r.endorsedBalance shouldBe BigInt(49905948000000L)
+  }
+
   "takes only maxValidEndorsers" in {
     val filter = EndorsementFilter(
       maxValidEndorsers = 5,
-      miner = Some(GeneratorIndex(1)),
+      miner = GeneratorIndex(1),
+      isMiner = true,
       finalizedId = TxHelpers.randomBlockId,
       finalizedHeight = Height(1),
       endorsedId = TxHelpers.randomBlockId,

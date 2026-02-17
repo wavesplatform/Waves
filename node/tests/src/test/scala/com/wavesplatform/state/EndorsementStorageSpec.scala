@@ -65,7 +65,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
     }
 
     "don't rebroadcast if miner" in {
-      started(minerIndex = 1).tryAddEndorsement(mk()).value shouldBe false
+      started(isMiner = true).tryAddEndorsement(mk()).value shouldBe false
     }
 
     "ignore if" - {
@@ -278,18 +278,20 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
   }
 
   private def started(
-      minerIndex: Int = -1,
+      minerIndex: Int = 0,
       normalizedGeneratorSet: IndexedSeq[TestGenerator] = mkGeneratorSet(2),
       conflict: Set[GeneratorIndex] = Set.empty,
       hasSameBlockBeforeFinalizationHeight: Boolean = true,
+      isMiner: Boolean = false,
       maxValidEndorsers: Int = 2
   ): ExtendedEndorsementStorage = {
-    require(minerIndex == -1 || minerIndex >= 0 && minerIndex < normalizedGeneratorSet.size, s"Invalid miner index $minerIndex")
+    require(normalizedGeneratorSet.isEmpty || minerIndex >= 0 && minerIndex < normalizedGeneratorSet.size, s"Invalid miner index $minerIndex")
     val r = new EndorsementStorage.InMemory((_, _) => hasSameBlockBeforeFinalizationHeight)
     r.startVoting(
       EndorsementFilter(
         maxValidEndorsers,
-        GeneratorIndex.checked(minerIndex),
+        GeneratorIndex(minerIndex),
+        isMiner,
         expectedFinalizedId,
         expectedFinalizedHeight,
         expectedEndorsedId,

@@ -12,20 +12,21 @@ import scala.collection.mutable
   */
 case class EndorsementFilter(
     maxValidEndorsers: Int,
-    miner: Option[GeneratorIndex],
+    miner: GeneratorIndex,
+    isMiner: Boolean,
     finalizedId: BlockId,
     finalizedHeight: Height,
     endorsedId: BlockId,
-    normalizedGeneratorSet: IndexedSeq[(Address, BlsPublicKey, Long)],
+    normalizedGeneratorSet: IndexedSeq[(address: Address, blsPk: BlsPublicKey, generatingBalance: Long)],
     conflict: Set[GeneratorIndex]
 ) {
-  private val minerBalance = miner.fold(0L)(i => normalizedGeneratorSet(i.toInt)._3)
+  private val minerBalance = normalizedGeneratorSet.lift(miner.toInt).fold(0L)(_.generatingBalance)
   private val totalBalance = normalizedGeneratorSet.foldLeft(BigInt(0L)) { case (r, (_, _, b)) => r + b } -
-    conflict.view.map(i => normalizedGeneratorSet(i.toInt)._3).sum
+    conflict.view.map(i => normalizedGeneratorSet(i.toInt).generatingBalance).sum
 
   override def toString: String = {
     val endorsersStr = normalizedGeneratorSet.view.map { case (addr, _, b) => s"$addr -> $b" }.mkString(", ")
-    s"EndorsementFilter(${miner.fold("")(i => s"m=$i, ")}fid=$finalizedId, fh=$finalizedHeight, eid=$endorsedId, e={$endorsersStr})"
+    s"EndorsementFilter(m=$miner, fid=$finalizedId, fh=$finalizedHeight, eid=$endorsedId, e={$endorsersStr})"
   }
 
   def sameVoting(other: EndorsementFilter): Boolean =
@@ -40,15 +41,13 @@ case class EndorsementFilter(
       if balance > 0
 
       gi = GeneratorIndex(i)
-      if !(conflict.contains(gi) || newConflictIndexes.contains(i))
+      if !(gi == miner || conflict.contains(gi) || newConflictIndexes.contains(i)) // Miner is included below, ignore conflicting
     } yield (GeneratorIndex(i), blsPk, balance): Item
 
-    val totalBalanceWithoutNewConflict = totalBalance - newConflictIndexes.view.map(normalizedGeneratorSet(_)._3).sum
+    val totalBalanceWithoutNewConflict = totalBalance - newConflictIndexes.view.map(normalizedGeneratorSet(_).generatingBalance).sum
     val doubledTotalBalance            = totalBalanceWithoutNewConflict * 2
 
-    val richest = mutable.PriorityQueue.empty[Item](using Ordering.by[Item, Long](_.balance))
-    richest.addAll(items)
-
+    val richest         = mutable.PriorityQueue.from(items)(using Ordering.by[Item, Long](_.balance))
     var endorserIndexes = Vector.empty[GeneratorIndex]
     var endorsedBalance = BigInt(minerBalance)
     var reached         = false
