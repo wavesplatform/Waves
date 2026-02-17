@@ -112,25 +112,37 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
   }
 
   override def nextCandidate(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
-    def excludeAddress(isa: InetSocketAddress): Boolean = {
+    def excludeAddress(isa: InetSocketAddress): Boolean =
       excluded(isa) || isBlacklisted(isa.getAddress) || isSuspended(isa.getAddress)
-    }
 
     @tailrec
-    def nextUnverified(): Option[InetSocketAddress] = {
+    def nextUnverified(): Option[InetSocketAddress] =
       unverifiedPeers.poll() match {
         case null => None
         case nonNull =>
           if (!excludeAddress(nonNull)) Some(nonNull) else nextUnverified()
       }
-    }
 
-    settings.knownPeers
+    val resolvedPeersFromConfig = settings.knownPeers
       .flatMap(p => resolvePeerAddress(p))
+
+    val selectedNextUnverified = nextUnverified()
+
+    val randomKnownPeer = Random.shuffle(knownPeers.keySet.filterNot(excludeAddress)).headOption
+
+    val selectedCandidate = resolvedPeersFromConfig
       .filterNot(excludeAddress)
       .headOption
-      .orElse(nextUnverified())
-      .orElse(Random.shuffle(knownPeers.keySet.filterNot(excludeAddress)).headOption)
+      .orElse(selectedNextUnverified)
+      .orElse(randomKnownPeer)
+
+    if (selectedCandidate.isEmpty)
+      log.trace(
+        s"No candidate, excluded: [${excluded.mkString(",")}], known-peers = [${resolvedPeersFromConfig.mkString(",")}], " +
+          s"unverified size: ${unverifiedPeers.size()}, peer cache size: ${peersPersistence.size()}, blacklist size: ${blacklist.size()}, suspension size: ${suspension.size()}"
+      )
+
+    selectedCandidate
   }
 
   def clearBlacklist(): Unit = {

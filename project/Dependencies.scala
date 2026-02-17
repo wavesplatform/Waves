@@ -8,7 +8,7 @@ object Dependencies {
   val DebArm64 = config("DebArm64")
 
 
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.9.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.10.Final"
 
   val gProtoVersion = "4.33.5"
   val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
@@ -56,8 +56,8 @@ object Dependencies {
   val googleGuava     = "com.google.guava"    % "guava"             % "33.5.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.27"
-  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.6"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.31"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.7"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
 
