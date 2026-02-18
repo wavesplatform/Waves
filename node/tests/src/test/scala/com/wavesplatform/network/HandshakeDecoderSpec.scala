@@ -8,9 +8,8 @@ import io.netty.buffer.Unpooled
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalamock.scalatest.MockFactory
 
-class HandshakeDecoderSpec extends FreeSpec with MockFactory {
+class HandshakeDecoderSpec extends FreeSpec {
 
   "should read a handshake and remove itself from the pipeline" in {
     var mayBeDecodedHandshake: Option[Handshake] = None

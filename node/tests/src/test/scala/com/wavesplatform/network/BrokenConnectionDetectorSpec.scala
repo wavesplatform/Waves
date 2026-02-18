@@ -2,11 +2,10 @@ package com.wavesplatform.network
 
 import com.wavesplatform.test.FreeSpec
 import io.netty.channel.embedded.EmbeddedChannel
-import org.scalamock.scalatest.MockFactory
 
 import scala.concurrent.duration.DurationInt
 
-class BrokenConnectionDetectorSpec extends FreeSpec with MockFactory {
+class BrokenConnectionDetectorSpec extends FreeSpec {
 
   "should not close an active connection until the timeout" in {
     val handler = new BrokenConnectionDetector(400.millis)

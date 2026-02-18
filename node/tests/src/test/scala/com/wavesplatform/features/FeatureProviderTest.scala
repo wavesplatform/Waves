@@ -4,10 +4,10 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.test.FlatSpec
+import com.wavesplatform.utils.EmptyBlockchain
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
 
-class FeatureProviderTest extends FlatSpec with MockFactory {
+class FeatureProviderTest extends FlatSpec {
   "blockVersionAt" should "return valid version" in {
     val fs                 = FunctionalitySettings.MAINNET
     val v3ActivationHeight = Height(fs.blockVersion3AfterHeight)
@@ -24,10 +24,11 @@ class FeatureProviderTest extends FlatSpec with MockFactory {
       BlockchainFeatures.BlockV5.id     -> v5ActivationHeight
     )
 
-    val blockchain = mock[Blockchain]
-    (() => blockchain.height).expects().anyNumberOfTimes().returning(1)
-    (() => blockchain.activatedFeatures).expects().anyNumberOfTimes().returning(features)
-    (() => blockchain.settings).expects().anyNumberOfTimes().returning(BlockchainSettings('W', fs, GenesisSettings.MAINNET, RewardsSettings.MAINNET))
+    val blockchain = new EmptyBlockchain {
+      override def height: Int                           = 1
+      override def activatedFeatures: Map[Short, Height] = features
+      override lazy val settings: BlockchainSettings     = BlockchainSettings('W', fs, GenesisSettings.MAINNET, RewardsSettings.MAINNET)
+    }
 
     forAll(Gen.choose(1, v5ActivationHeight.toInt * 2)) { h =>
       if (h == genesisAt) blockchain.blockVersionAt(h) shouldBe Block.GenesisBlockVersion

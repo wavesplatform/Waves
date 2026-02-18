@@ -16,7 +16,6 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils.SharedSchedulerMixin
 import com.wavesplatform.{BlockGen, TestWallet}
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import play.api.libs.json.JsObject
 
@@ -25,7 +24,6 @@ import scala.concurrent.duration.*
 class SpentComplexitySpec
     extends RouteSpec("/transactions")
     with RestAPISettingsHelper
-    with MockFactory
     with BlockGen
     with OptionValues
     with TestWallet

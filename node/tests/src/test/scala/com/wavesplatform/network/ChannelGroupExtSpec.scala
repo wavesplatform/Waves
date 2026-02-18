@@ -7,12 +7,11 @@ import io.netty.channel.*
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
-import org.scalamock.scalatest.MockFactory
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
-class ChannelGroupExtSpec extends FreeSpec with MockFactory {
+class ChannelGroupExtSpec extends FreeSpec {
   "broadcast" - {
     "should not send a message to the excluded channels" in {
       val message = "test"
