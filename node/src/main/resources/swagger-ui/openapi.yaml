@@ -844,6 +844,16 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Height'
+  /blocks/height/finalized:
+    get:
+      tags:
+        - blocks
+      summary: Finalized blockchain height
+      description: Get the current finalized blockchain height
+      operationId: getFinalizedHeight
+      responses:
+        '200':
+          $ref: '#/components/responses/Height'
   '/blocks/at/{height}':
     get:
       tags:
@@ -930,6 +940,26 @@ paths:
               examples:
                 largeSignificandBlock:
                   $ref: '#/components/examples/largeSignificandBlock'
+  /blocks/headers/finalized:
+    get:
+      tags:
+        - blocks
+      summary: Finalized block headers
+      description: Get headers of the finalized block
+      operationId: getFinalizedBlockHeaders
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockHeader'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/BlockHeaderLSF'
+              examples:
+                largeSignificandBlock:
+                  $ref: '#/components/examples/largeSignificandBlock'
   '/blocks/headers/{id}':
     get:
       tags:
@@ -1003,6 +1033,32 @@ paths:
               examples:
                 largeSignificandBlock:
                   $ref: '#/components/examples/largeSignificandBlock'
+  '/blocks/finalized/at/{height}':
+    get:
+      tags:
+        - blocks
+      summary: Finalized height at blockchain height
+      description: Get finalized height at a given blockchain height
+      operationId: getFinalizedHeightAt
+      parameters:
+        - name: height
+          in: path
+          description: Block height
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          $ref: '#/components/responses/Height'
+        '404':
+          description: Not finalized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error: 406
+                message: Not finalized
   /peers/connect:
     post:
       tags:

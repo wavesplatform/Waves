@@ -29,6 +29,8 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       at(commonApi.currentHeight, includeTransactions = true)
     } ~ path("height") {
       complete(Json.obj("height" -> commonApi.currentHeight.toInt))
+    } ~ path("height" / "finalized") {
+      complete(Json.obj("height" -> commonApi.currentFinalizedHeight))
     } ~ path("delay" / BlockId / IntNumber) { (blockId, count) =>
       if (count > MaxBlocksForDelay) {
         complete(TooBigArrayAllocation(MaxBlocksForDelay))
@@ -40,8 +42,6 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
             .toRight(BlockDoesNotExist)
         )
       }
-    } ~ path("height" / "finalized") {
-      complete(Json.obj("height" -> commonApi.currentFinalizedHeight))
     } ~ path("height" / BlockId) { signature =>
       complete(for {
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
