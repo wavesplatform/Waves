@@ -3089,6 +3089,14 @@ paths:
                     type: string
                   stateHash:
                     type: string
+                  nextCommittedGeneratorsHash:
+                    type: string
+                    nullable: true
+                    description: Available after deterministic finality feature activation
+                  committedGeneratorBalancesHash:
+                    type: string
+                    nullable: true
+                    description: Available after deterministic finality feature activation
   '/debug/stateHash/last':
     get:
       tags:
@@ -3128,6 +3136,14 @@ paths:
                     type: string
                   stateHash:
                     type: string
+                  nextCommittedGeneratorsHash:
+                    type: string
+                    nullable: true
+                    description: Available after deterministic finality feature activation
+                  committedGeneratorBalancesHash:
+                    type: string
+                    nullable: true
+                    description: Available after deterministic finality feature activation
   /debug/blacklist:
     post:
       tags:
