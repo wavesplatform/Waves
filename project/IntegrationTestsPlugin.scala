@@ -1,18 +1,18 @@
+import com.github.dockerjava.core.{DefaultDockerClientConfig, DockerClientImpl}
+import com.github.dockerjava.httpclient5.ApacheDockerHttpClient
+import sbt.*
+import sbt.Keys.*
+import sbt.Tests.Group
+
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-
-import com.spotify.docker.client.DefaultDockerClient
-import sbt.Keys._
-import sbt.Tests.Group
-import sbt._
-
 import scala.util.control.NonFatal
 
 // Separate projects for integration tests because of IDEA: https://youtrack.jetbrains.com/issue/SCL-14363#focus=streamItem-27-3061842.0-0
 object IntegrationTestsPlugin extends AutoPlugin {
 
   object autoImport extends ItKeys
-  import autoImport._
+  import autoImport.*
 
   override def projectSettings: Seq[Def.Setting[_]] =
     inConfig(Test)(
@@ -74,12 +74,17 @@ object IntegrationTestsPlugin extends AutoPlugin {
         maxParallelSuites := Option(Integer.getInteger("waves.it.max-parallel-suites"))
           .getOrElse[Integer] {
             try {
-              val docker = DefaultDockerClient.fromEnv().build()
+              val config       = DefaultDockerClientConfig.createDefaultConfigBuilder().build()
+              val httpClient   = new ApacheDockerHttpClient.Builder().dockerHost(config.getDockerHost).build()
+              val dockerClient = DockerClientImpl.getInstance(config, httpClient)
               try {
-                val dockerCpu: Int = docker.info().cpus()
+                val dockerCpu = dockerClient.infoCmd().exec().getNCPU
                 sLog.value.info(s"Docker CPU count: $dockerCpu")
                 dockerCpu * 2
-              } finally docker.close()
+              } finally {
+                httpClient.close()
+                dockerClient.close()
+              }
             } catch {
               case NonFatal(e) =>
                 sLog.value.warn(s"Could not connect to Docker, is the daemon running? ${e.getMessage}")

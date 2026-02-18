@@ -1,16 +1,15 @@
 package com.wavesplatform.curve25519.test
 
-import java.io.*
-import java.util
-import java.util.concurrent.*
-import java.util.concurrent.atomic.AtomicLong
-
 import com.google.common.io.{BaseEncoding, CountingOutputStream}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
 import monix.execution.Scheduler
 import org.whispersystems.curve25519.{Curve25519Provider, JavaCurve25519Provider, NativeCurve25519Provider}
 
+import java.io.*
+import java.util
+import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicLong
 import scala.annotation.tailrec
 import scala.concurrent.duration.*
 import scala.reflect.ClassTag
@@ -127,8 +126,8 @@ object App extends StrictLogging {
     ctor.newInstance().asInstanceOf[A]
   }
 
-  private val multiplier       = 0x5DEECE66DL
-  private val addend           = 0xBL
+  private val multiplier       = 0x5deece66dL
+  private val addend           = 0xbL
   private val mask             = (1L << 48) - 1
   private val MaxMessageLength = 150 * 1024
 
@@ -141,10 +140,10 @@ object App extends StrictLogging {
     val nv    = (seqNr * multiplier + addend) & mask
     val value = nv << 32 | nv
     Bytes.concat(
-      Longs.toByteArray(value ^ (randomSeed & 0xF000F000F000F000L)),
-      Longs.toByteArray(value ^ (randomSeed & 0x0F000F000F000F00L)),
-      Longs.toByteArray(value ^ (randomSeed & 0x00F000F000F000F0L)),
-      Longs.toByteArray(value ^ (randomSeed & 0x000F000F000F000FL))
+      Longs.toByteArray(value ^ (randomSeed & 0xf000f000f000f000L)),
+      Longs.toByteArray(value ^ (randomSeed & 0x0f000f000f000f00L)),
+      Longs.toByteArray(value ^ (randomSeed & 0x00f000f000f000f0L)),
+      Longs.toByteArray(value ^ (randomSeed & 0x000f000f000f000fL))
     )
   }
 
@@ -231,7 +230,7 @@ object App extends StrictLogging {
   def main(args: Array[String]): Unit = {
     val nativeProvider = provider[NativeCurve25519Provider]
     val javaProvider   = provider[JavaCurve25519Provider]
-    val latch      = new CountDownLatch(workerCount)
+    val latch          = new CountDownLatch(workerCount)
 
     args(0).toLowerCase match {
       case "verify" =>
@@ -323,11 +322,10 @@ object App extends StrictLogging {
         )
         latch.await()
 
-        maybeOut.foreach {
-          case (out, writer, _) =>
-            writer.join()
-            out.flush()
-            out.close()
+        maybeOut.foreach { case (out, writer, _) =>
+          writer.join()
+          out.flush()
+          out.close()
         }
     }
   }

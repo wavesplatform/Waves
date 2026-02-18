@@ -358,7 +358,7 @@ object Terms {
       else
         caseType
 
-    override def hashCode(): Int = MurmurHash3.productHash(this)
+    override def hashCode(): Int = MurmurHash3.caseClassHash(this)
 
     override def equals(obj: Any): Boolean = obj match {
       case CaseObj(`caseType`, `fields`) => true

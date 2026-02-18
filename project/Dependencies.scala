@@ -46,7 +46,7 @@ object Dependencies {
 
   private def jacksonModule(group: String, module: String, version: String = "2.20.1") = s"com.fasterxml.jackson.$group" % s"jackson-$module" % version
 
-  private def web3jModule(module: String) = "org.web3j" % module % "4.9.8" // 4.10+ requires Java 17 https://github.com/web3j/web3j/issues/1907
+  private def web3jModule(module: String) = "org.web3j" % module % "4.13.0" // 4.14+ requires Java 21 https://github.com/LFDT-web3j/web3j/releases/tag/v4.14.0
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
@@ -56,7 +56,7 @@ object Dependencies {
   val googleGuava     = "com.google.guava"    % "guava"             % "33.5.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.31"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.32"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.7"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")

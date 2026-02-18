@@ -4,6 +4,7 @@ import cats.Eq
 import cats.instances.bigInt.*
 import cats.syntax.option.*
 import com.typesafe.config.*
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.api.BlockMeta
@@ -130,7 +131,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeUtx = Some(utxStorage)
 
     val timer                 = new HashedWheelTimer()
-    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[TransactionPublisher]))
+    val utxSynchronizerLogger = Logger(LoggerFactory.getLogger(classOf[TransactionPublisher]))
     val timedTxValidator =
       Schedulers.timeBoundedFixedPool(
         timer,
@@ -673,7 +674,7 @@ object Application extends ScorexLogging {
     import com.wavesplatform.settings.Constants
     val settings = loadApplicationConfig(configFile.map(new File(_)))
 
-    val log      = LoggerFacade(LoggerFactory.getLogger(getClass))
+    val log      = Logger(LoggerFactory.getLogger(getClass))
     val modeInfo = if (settings.enableLightMode) "in light mode" else "in full mode"
     log.info(s"Starting $modeInfo...")
     sys.addShutdownHook {

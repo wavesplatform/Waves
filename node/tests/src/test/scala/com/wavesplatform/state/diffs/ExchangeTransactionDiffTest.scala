@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import cats.Order as _
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PrivateKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr

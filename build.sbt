@@ -171,7 +171,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "3.7.4",
+    scalaVersion         := "3.8.1",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -206,7 +206,7 @@ inScope(Global)(
      */
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
-    network         := Network.default(),
+    network := Network.default(),
     resolvers ++= Resolver.sonatypeCentralSnapshots +: Seq(Resolver.mavenLocal),
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
@@ -250,19 +250,9 @@ buildRIDERunnerForDocker := {
 lazy val compilePRRaw = taskKey[Unit]("Compile the project")
 compilePRRaw := Def
   .sequential(
-    clean,
-    Def.task {
-      (`lang-tests` / Test / compile).value
-      (`repl-jvm` / Test / compile).value
-      (`lang-tests-js` / Test / compile).value
-      (`grpc-server` / Test / compile).value
-      (`node-tests` / Test / compile).value
-      (`node-it` / Test / compile).value
-      (benchmark / Test / compile).value
-      (`node-generator` / Compile / compile).value
-      (`ride-runner` / Test / compile).value
-      (`lang-jvm` / Test / compile).value
-    }
+    clean.all(ScopeFilter(inAnyProject)),
+    scalafmtCheck.all(ScopeFilter(inAnyProject, inConfigurations(Compile))),
+    compile.all(ScopeFilter(inAnyProject, inConfigurations(Test)))
   )
   .value
 
@@ -270,19 +260,14 @@ lazy val checkPRRaw = taskKey[Unit]("Compile the project and run unit tests")
 checkPRRaw := Def
   .sequential(
     compilePRRaw,
-    Def.task {
-      (`lang-tests` / Test / test).value
-      (`repl-jvm` / Test / test).value
-      (`lang-js` / Compile / fullOptJS).value
-      (`lang-tests-js` / Test / test).value
-      (`grpc-server` / Test / test).value
-      (`node-tests` / Test / test).value
-      (`repl-js` / Compile / fullOptJS).value
-      (`ride-runner` / Test / test).value
-      (node / assembly).value
-      buildTarballsForDocker.value
-      (`lang-jvm` / assembly).value
-    }
+    Def.sequential(
+      test.all(
+        ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `lang-tests-js`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
+      ),
+      fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
+      assembly.all(ScopeFilter(inProjects(node, `lang-jvm`))),
+      buildTarballsForDocker
+    )
   )
   .value
 
@@ -290,7 +275,7 @@ def commandWithFatalWarnings(commandName: String, task: TaskKey[Unit]): Command 
   Command.command(commandName) { state =>
     val extracted = Project.extract(state)
     val newState = extracted.appendWithoutSession(
-      Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")),
+      Seq(Global / scalacOptions ++= Seq("-Werror")),
       state
     )
 

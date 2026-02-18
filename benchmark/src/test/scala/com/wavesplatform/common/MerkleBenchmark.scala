@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BYTESTR, CONST_LONG, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.eval
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import org.openjdk.jmh.annotations.{Level as _, *}
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 import java.util.concurrent.TimeUnit

@@ -160,9 +160,9 @@ object Verifier extends ScorexLogging {
       execResult: Either[String, EVALUATED]
   ): Unit =
     result match {
-      case Left(_) if log.logger.isDebugEnabled => log.debug(buildLogs(id, execLog, execResult))
-      case _ if log.logger.isTraceEnabled       => log.trace(buildLogs(id, execLog, execResult))
-      case _                                    => ()
+      case Left(_) if log.underlying.isDebugEnabled => log.debug(buildLogs(id, execLog, execResult))
+      case _ if log.underlying.isTraceEnabled       => log.trace(buildLogs(id, execLog, execResult))
+      case _                                        => ()
     }
 
   private def verifyTx(

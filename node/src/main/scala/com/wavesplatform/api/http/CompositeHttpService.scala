@@ -45,7 +45,7 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
   private val CorsAllowAllOrigin = "origin-from-request"
 
   private def logRequestResponse(req: HttpRequest): PartialFunction[RouteResult, RouteResult] = { case r @ Complete(resp) =>
-    log.logger
+    log.underlying
       .atLevel(if (resp.status == StatusCodes.OK) Level.INFO else Level.WARN)
       .log { () =>
         s"HTTP ${resp.status.value} from ${req.method.value} ${req.uri}${req.attribute(requestTimestamp).fold("")(ts => f" in ${(System.nanoTime() - ts) * 1e-6}%.3f ms")}"

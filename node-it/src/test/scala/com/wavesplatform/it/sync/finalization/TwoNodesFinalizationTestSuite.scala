@@ -8,11 +8,12 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.NumericExt
+import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.OptionValues
 
 import scala.concurrent.duration.DurationInt
 
-class TwoNodesFinalizationTestSuite extends BaseFreeSpec with OptionValues {
+class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLogging {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0))))

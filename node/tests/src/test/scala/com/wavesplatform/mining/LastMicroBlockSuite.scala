@@ -6,7 +6,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
-import com.wavesplatform.settings.*
 import com.wavesplatform.state
 import com.wavesplatform.state.*
 import com.wavesplatform.test.{FreeSpec, TestSchedulerOps, TestTime}

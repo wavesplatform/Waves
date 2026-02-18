@@ -13,15 +13,11 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Transaction, TxNonNegativeAmount}
-import com.wavesplatform.utils.LoggerFacade
-import org.slf4j.LoggerFactory
 
 import java.util.concurrent.ThreadLocalRandom
 
 object Gen {
   private def random = ThreadLocalRandom.current
-
-  val log = LoggerFacade(LoggerFactory.getLogger("Gen"))
 
   def script(complexity: Boolean = true, estimator: ScriptEstimator): Script = {
     val s = if (complexity) s"""

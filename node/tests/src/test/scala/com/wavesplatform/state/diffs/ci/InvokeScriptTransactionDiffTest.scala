@@ -43,7 +43,7 @@ import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{Asset, utils as _, *}
+import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.EmptyBlockchain
 import org.scalatest.{EitherValues, Inside}
 

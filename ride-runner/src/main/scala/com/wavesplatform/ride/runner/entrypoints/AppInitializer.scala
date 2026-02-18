@@ -5,7 +5,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigParseOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.ride.runner.entrypoints.settings.RideRunnerGlobalSettings
-import com.wavesplatform.settings.{loadConfig as _, *}
+import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.utils.{Misconfiguration, ScorexLogging, forceStopApplication}
 
 import java.io.File

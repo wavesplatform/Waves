@@ -12,7 +12,7 @@ import org.web3j.crypto.Sign.SignatureData
 import org.web3j.crypto.{ECDSASignature, ECKeyPair, Sign, StructuredDataEncoder}
 import play.api.libs.json.{JsObject, Json}
 
-object EthOrders extends App {
+object EthOrders {
   private lazy val toSnakeCase = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.UPPER_UNDERSCORE)
 
   def toEip712Json(order: Order): JsObject = {

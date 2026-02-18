@@ -2,6 +2,7 @@ package com.wavesplatform.ride.runner.caches.disk
 
 import cats.syntax.option.*
 import com.github.benmanes.caffeine.cache.{Cache, Caffeine}
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.collections.syntax.*
@@ -13,7 +14,7 @@ import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
 import com.wavesplatform.state.{DataEntry, EmptyDataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.utils.ScorexLogging
 import org.slf4j.LoggerFactory
 
 import java.lang.Long as JLong
@@ -402,7 +403,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
     log.trace("setActivatedFeatures")
   }
 
-  private def mkLogger(name: String) = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.$name"))
+  private def mkLogger(name: String) = Logger(LoggerFactory.getLogger(s"${getClass.getName}.$name"))
 }
 
 object DefaultDiskCaches {
