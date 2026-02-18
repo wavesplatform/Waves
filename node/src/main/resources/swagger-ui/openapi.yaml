@@ -19,6 +19,7 @@ tags:
   - name: blocks
   - name: peers
   - name: blockchain
+  - name: generators
   - name: transactions
   - name: utils
   - name: wallet
@@ -27,7 +28,6 @@ tags:
   - name: leasing
   - name: activation
   - name: debug
-  - name: generators
   - name: node
 paths:
   /addresses:
@@ -5739,6 +5739,16 @@ components:
                 nullable: true
         state:
           $ref: '#/components/schemas/BlockchainOverrides'
+    CommittedGenerator:
+      type: object
+      required:
+        - publicKey
+        - blsPublicKey
+      properties:
+        publicKey:
+          $ref: '#/components/schemas/PublicKey'
+        blsPublicKey:
+          $ref: '#/components/schemas/BlsPublicKey'
     TransactionSnapshot:
       type: object
       properties:
@@ -5911,6 +5921,10 @@ components:
                   oneOf:
                     - $ref: '#/components/schemas/DataEntry'
                     - $ref: '#/components/schemas/DeleteEntry'
+        nextCommittedGenerators:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommittedGenerator'
 
   responses:
     Height:
