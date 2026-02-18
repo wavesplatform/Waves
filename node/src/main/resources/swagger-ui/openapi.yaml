@@ -27,6 +27,7 @@ tags:
   - name: leasing
   - name: activation
   - name: debug
+  - name: generators
   - name: node
 paths:
   /addresses:
@@ -1059,6 +1060,43 @@ paths:
               example:
                 error: 406
                 message: Not finalized
+  '/generators/at/{height}':
+    get:
+      tags:
+        - generators
+      summary: Generators at height
+      description: Get generators data at a given height
+      operationId: getGeneratorsAtHeight
+      parameters:
+        - name: height
+          in: path
+          description: Target block height
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GeneratorData'
+            application/json;large-significand-format=string:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GeneratorDataLSF'
+        '404':
+          description: Height is above current blockchain height
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+              example: [ ]
   /peers/connect:
     post:
       tags:
@@ -4552,6 +4590,36 @@ components:
           type: string
         xtnBuybackAddress:
           type: string
+    GeneratorData:
+      type: object
+      required:
+        - address
+        - balance
+        - transactionId
+      properties:
+        address:
+          $ref: '#/components/schemas/Address'
+        balance:
+          $ref: '#/components/schemas/Amount'
+        transactionId:
+          $ref: '#/components/schemas/TransactionId'
+        conflictHeight:
+          $ref: '#/components/schemas/Height'
+    GeneratorDataLSF:
+      type: object
+      required:
+        - address
+        - balance
+        - transactionId
+      properties:
+        address:
+          $ref: '#/components/schemas/Address'
+        balance:
+          type: string
+        transactionId:
+          $ref: '#/components/schemas/TransactionId'
+        conflictHeight:
+          $ref: '#/components/schemas/Height'
     Signed:
       type: object
       properties:
