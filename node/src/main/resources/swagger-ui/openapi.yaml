@@ -131,6 +131,36 @@ paths:
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
         - APIKey: [ ]
+  '/addresses/bls/{address}':
+    get:
+      tags:
+        - addresses
+      summary: BLS public key
+      description: Get BLS public key for the {address}
+      operationId: getBlsPublicKeyByAddress
+      parameters:
+        - $ref: '#/components/parameters/address'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                required:
+                  - blsPublicKey
+                type: object
+                properties:
+                  blsPublicKey:
+                    $ref: '#/components/schemas/BlsPublicKey'
+        '400':
+          description: No private key for sender address in wallet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error: 115
+                message: no private key for sender address in wallet
   '/addresses/publicKey/{publicKey}':
     get:
       tags:

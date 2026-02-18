@@ -83,7 +83,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     )
   }
 
-  test("requests to the illegal height should be handled correctly ") {
+  test("requests to the illegal height should be handled correctly") {
     val height = miner.height + 100
     assertApiError(
       miner.get(s"/addresses/balance?height=$height&address=$firstKeyPair"),

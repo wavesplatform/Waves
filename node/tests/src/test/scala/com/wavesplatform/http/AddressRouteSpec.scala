@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, MissingSenderPrivateKey, TooBigArrayAllocation}
 import com.wavesplatform.api.http.{AddressApiRoute, RouteTimeout}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -164,6 +164,11 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
     val kp                   = wallet.privateKeyAccounts.head
     val address              = kp.toAddress
     val expectedBlsPublicKey = BlsKeyPair(kp.privateKey).publicKey
+
+    Get(routePath(s"/bls/${TxHelpers.address(100)}")) ~> route ~> check {
+      response.status shouldBe MissingSenderPrivateKey.code
+      (responseAs[JsObject] \ "error").as[Int] shouldBe MissingSenderPrivateKey.id
+    }
 
     Get(routePath(s"/bls/$address")) ~> route ~> check {
       val r = responseAs[JsObject]
