@@ -148,7 +148,7 @@ object EndorsementStorage {
         }
         changedFinalizationStatus = latestResult.reachedFinalization != origResult.reachedFinalization
         _ <- Either.raiseUnless(moreConflict || changedFinalizationStatus) {
-          s"Status not changed, endorsed=${simulation.endorsedBalance}, total=${simulation.totalBalance}, chosen valid=[${simulation.chosenValid.mkString(", ")}], valid=[${valid.keysIterator.mkString(", ")}]"
+          s"Status not changed, endorsed=${simulation.endorsedBalance}, total=${simulation.totalBalance}, chosen valid=[${simulation.chosenValid.sorted.mkString(", ")}], valid=[${valid.keysIterator.mkString(", ")}]"
         }
       } yield latestResult.voting
 

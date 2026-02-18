@@ -202,7 +202,7 @@ object NetworkServer extends ScorexLogging {
       )
     }
 
-    def scheduleConnectTask(): Unit = if (!shutdownInitiated && networkSettings.maxOutboundConnections > 0) {
+    def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
       val delay = (if (peerConnectionsMap.isEmpty || networkSettings.minConnections.exists(_ > peerConnectionsMap.size())) AverageHandshakePeriod
                    else 5.seconds) +
         (Random.nextInt(1000) - 500).millis // add some noise so that nodes don't attempt to connect to each other simultaneously
