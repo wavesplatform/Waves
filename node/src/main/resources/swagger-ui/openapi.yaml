@@ -3617,10 +3617,6 @@ components:
           $ref: '#/components/schemas/Signature'
         fee:
           $ref: '#/components/schemas/Amount'
-        feeAssetId:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
     TransactionBaseLSF:
       type: object
       required: [ id, timestamp, type, fee ]
@@ -3655,15 +3651,6 @@ components:
           $ref: '#/components/schemas/Signature'
         fee:
           type: string
-        feeAssetId:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
-    TransactionInfo:
-      allOf:
-        - $ref: '#/components/schemas/TransactionBase'
-        - type: object
-          required: [ height, sender, senderPublicKey, proofs, signature ]
     ApiError:
       required:
         - error
@@ -4631,7 +4618,7 @@ components:
         signature:
           $ref: '#/components/schemas/Signature'
     NonGenesisTransaction:
-      required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature, feeAssetId ]
+      required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature ]
       allOf:
         - $ref: '#/components/schemas/TransactionBase'
       oneOf:
@@ -4653,7 +4640,7 @@ components:
         - $ref: '#/components/schemas/CommitToGenerationTransaction'
         - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
     NonGenesisTransactionLSF:
-      required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature, feeAssetId ]
+      required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature ]
       allOf:
         - $ref: '#/components/schemas/TransactionBaseLSF'
       oneOf:
@@ -4975,6 +4962,7 @@ components:
         - payment
         - call
         - stateChanges
+        - feeAssetId
       properties:
         dApp:
           $ref: '#/components/schemas/AddressOrAlias'
@@ -5018,6 +5006,10 @@ components:
                       value } objects
         stateChanges:
           $ref: '#/components/schemas/StateChanges'
+        feeAssetId:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          nullable: true
     InvokeScriptTransactionLSF:
       type: object
       required:
@@ -5025,6 +5017,7 @@ components:
         - payment
         - call
         - stateChanges
+        - feeAssetId
       properties:
         dApp:
           $ref: '#/components/schemas/AddressOrAlias'
@@ -5068,6 +5061,10 @@ components:
                       value } objects
         stateChanges:
           $ref: '#/components/schemas/StateChangesLSF'
+        feeAssetId:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          nullable: true
     IssueTransaction:
       type: object
       required:
@@ -5300,6 +5297,7 @@ components:
         - amount
         - attachment
         - feeAsset
+        - feeAssetId
       properties:
         recipient:
           $ref: '#/components/schemas/AddressOrAlias'
@@ -5308,6 +5306,12 @@ components:
             - $ref: '#/components/schemas/AssetId'
           nullable: true
         feeAsset:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          nullable: true
+          description: Legacy v0.11.1 compatibility field. Use `assetId` instead
+          deprecated: true
+        feeAssetId:
           allOf:
             - $ref: '#/components/schemas/AssetId'
           nullable: true
@@ -5323,6 +5327,7 @@ components:
         - amount
         - attachment
         - feeAsset
+        - feeAssetId
       properties:
         recipient:
           $ref: '#/components/schemas/AddressOrAlias'
@@ -5331,6 +5336,12 @@ components:
             - $ref: '#/components/schemas/AssetId'
           nullable: true
         feeAsset:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          nullable: true
+          description: Legacy v0.11.1 compatibility field. Use `assetId` instead
+          deprecated: true
+        feeAssetId:
           allOf:
             - $ref: '#/components/schemas/AssetId'
           nullable: true
@@ -5344,6 +5355,7 @@ components:
         - assetId
         - name
         - description
+        - feeAssetId
       properties:
         assetId:
           $ref: '#/components/schemas/AssetId'
@@ -5351,6 +5363,10 @@ components:
           $ref: '#/components/schemas/AssetName'
         description:
           $ref: '#/components/schemas/AssetDescription'
+        feeAssetId:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          nullable: true
     CommitToGenerationTransaction:
       type: object
       required:
