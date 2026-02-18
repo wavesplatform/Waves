@@ -254,7 +254,10 @@ object Keys {
   val finalizedHeight: Key[Option[Height]] = Key.opt(
     FinalizedBlockHeight,
     Array.emptyByteArray,
-    bytes => com.wavesplatform.state.Height(Ints.fromByteArray(bytes)),
+    { bytes =>
+      if (bytes.isEmpty) GenesisBlockHeight // HACK: Workaround for an incorrectly written empty finalized height
+      else com.wavesplatform.state.Height(Ints.fromByteArray(bytes))
+    },
     _.toByteArray
   )
 

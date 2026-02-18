@@ -1016,7 +1016,8 @@ class RocksDBWriter(
           val blockchainHeight = currentHeight.prev
           rw.put(Keys.height, blockchainHeight)
 
-          if (finalizedHeight.forall(blockchainHeight < _)) { // Happens only during a force rollback
+          // Happens only during a forced rollback. Reset only if we had a finalized height before
+          if (finalizedHeight.exists(blockchainHeight < _)) {
             val atBlockchainHeight = rw.get(Keys.finalizedHeightAt(blockchainHeight))
             rw.put(Keys.finalizedHeight, atBlockchainHeight)
           }
