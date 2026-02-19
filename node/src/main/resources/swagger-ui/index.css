@@ -18,3 +18,7 @@ body {
 .try-out {
   display: none !important;
 }
+
+.schemes-server-container div {
+    display: none;
+}
