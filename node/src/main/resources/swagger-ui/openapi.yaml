@@ -287,9 +287,7 @@ paths:
                     from the current height is set by
                     `rest-api.distribution-address-limit`, 1000 by default.
                 asset:
-                  allOf:
-                    - $ref: '#/components/schemas/AssetId'
-                  description: Base58 encoded asset ID. Not defined for WAVES asset
+                  $ref: '#/components/schemas/WavesOrAssetId'
       responses:
         '200':
           description: successful operation
@@ -481,11 +479,9 @@ paths:
                   script:
                     type: string
                     format: byte
-                    nullable: true
                     description: Compiled script in base64 representation
                   scriptText:
                     type: string
-                    nullable: true
                     description: Compiled script in text representation
                   complexity:
                     type: integer
@@ -1770,11 +1766,10 @@ paths:
               schema:
                 required:
                   - feeAmount
-                  - feeAssetId
                 type: object
                 properties:
                   feeAssetId:
-                    type: string
+                    - $ref: '#/components/schemas/WavesOrAssetId'
                   feeAmount:
                     type: integer
                     format: int64
@@ -1782,12 +1777,10 @@ paths:
               schema:
                 required:
                   - feeAmount
-                  - feeAssetId
                 type: object
                 properties:
                   feeAssetId:
-                    type: string
-                    example: 'AGHJgjhHJGGKHJGKbjk1789jlkjl'
+                    - $ref: '#/components/schemas/WavesOrAssetId'
                   feeAmount:
                     type: string
                     example: '50000'
@@ -2109,8 +2102,6 @@ paths:
             application/json:
               schema:
                 required:
-                  - script
-                  - scriptText
                   - complexity
                   - verifierComplexity
                   - callableComplexities
@@ -2120,11 +2111,9 @@ paths:
                   script:
                     type: string
                     format: byte
-                    nullable: true
                     description: Compiled script in base64 script representation
                   scriptText:
                     type: string
-                    nullable: true
                     description: Compiled script in text representation
                   complexity:
                     type: integer
@@ -2607,7 +2596,7 @@ paths:
                   address:
                     type: string
                   assetId:
-                    type: string
+                    $ref: '#/components/schemas/AssetId'
                   balance:
                     type: integer
                     format: int64
@@ -2622,7 +2611,7 @@ paths:
                   address:
                     type: string
                   assetId:
-                    type: string
+                    $ref: '#/components/schemas/AssetId'
                   balance:
                     type: string
   '/assets/{assetId}/distribution':
@@ -3103,38 +3092,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  blockId:
-                    type: string
-                  wavesBalanceHash:
-                    type: string
-                  assetsBalanceHash:
-                    type: string
-                  dataEntryHash:
-                    type: string
-                  accountScriptHash:
-                    type: string
-                  assetScriptHash:
-                    type: string
-                  leaseBalanceHash:
-                    type: string
-                  leaseStatusHash:
-                    type: string
-                  sponsorshipHash:
-                    type: string
-                  aliasHash:
-                    type: string
-                  stateHash:
-                    type: string
-                  nextCommittedGeneratorsHash:
-                    type: string
-                    nullable: true
-                    description: Available after deterministic finality feature activation
-                  committedGeneratorBalancesHash:
-                    type: string
-                    nullable: true
-                    description: Available after deterministic finality feature activation
+                $ref: '#/components/schemas/DebugStateHashes'
   '/debug/stateHash/last':
     get:
       tags:
@@ -3150,38 +3108,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  blockId:
-                    type: string
-                  wavesBalanceHash:
-                    type: string
-                  assetsBalanceHash:
-                    type: string
-                  dataEntryHash:
-                    type: string
-                  accountScriptHash:
-                    type: string
-                  assetScriptHash:
-                    type: string
-                  leaseBalanceHash:
-                    type: string
-                  leaseStatusHash:
-                    type: string
-                  sponsorshipHash:
-                    type: string
-                  aliasHash:
-                    type: string
-                  stateHash:
-                    type: string
-                  nextCommittedGeneratorsHash:
-                    type: string
-                    nullable: true
-                    description: Available after deterministic finality feature activation
-                  committedGeneratorBalancesHash:
-                    type: string
-                    nullable: true
-                    description: Available after deterministic finality feature activation
+                $ref: '#/components/schemas/DebugStateHashes'
   /debug/blacklist:
     post:
       tags:
@@ -3529,8 +3456,15 @@ components:
     Proof:
       type: string
     AssetId:
+      title: AssetId
       allOf:
         - $ref: '#/components/schemas/Hash'
+    WavesOrAssetId:
+      description: Asset identifier. Absence or null means WAVES
+      anyOf:
+        - type: 'null'
+        - allOf:
+            - $ref: '#/components/schemas/AssetId'
     BlockId:
       oneOf:
         - $ref: '#/components/schemas/Signature'
@@ -3838,15 +3772,12 @@ components:
         - assetId
         - balance
         - issueTransaction
-        - minSponsoredAssetFee
         - quantity
         - reissuable
-        - sponsorBalance
       type: object
       properties:
         assetId:
-          type: string
-          description: Asset ID base58 encoded
+          $ref: '#/components/schemas/AssetId'
         balance:
           type: integer
           format: int64
@@ -3857,7 +3788,6 @@ components:
         minSponsoredAssetFee:
           type: integer
           format: int64
-          nullable: true
           description: >-
             For [sponsored
             asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
@@ -3865,7 +3795,6 @@ components:
         sponsorBalance:
           type: integer
           format: int64
-          nullable: true
           description: >-
             For [sponsored
             asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
@@ -3881,15 +3810,12 @@ components:
         - assetId
         - balance
         - issueTransaction
-        - minSponsoredAssetFee
         - quantity
         - reissuable
-        - sponsorBalance
       type: object
       properties:
         assetId:
-          type: string
-          description: Asset ID base58 encoded
+          $ref: '#/components/schemas/AssetId'
         balance:
           type: string
           description: Account balance in the asset
@@ -3898,14 +3824,12 @@ components:
           description: Indicates if the asset is reissuable
         minSponsoredAssetFee:
           type: string
-          nullable: true
           description: >-
             For [sponsored
             asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
             only: the equivalent of 0.001 WAVES
         sponsorBalance:
           type: string
-          nullable: true
           description: >-
             For [sponsored
             asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
@@ -4162,7 +4086,6 @@ components:
           $ref: '#/components/schemas/Height'
         aggregatedEndorsement:
           $ref: '#/components/schemas/BlsSignature'
-          nullable: true
         conflict:
           type: array
           items:
@@ -4201,7 +4124,6 @@ components:
                 $ref: '#/components/schemas/TransactionLSF'
     CompiledScript:
       required:
-        - script
         - complexity
         - verifierComplexity
         - callableComplexities
@@ -4211,7 +4133,6 @@ components:
         script:
           type: string
           format: byte
-          nullable: true
           description: Compiled script in base64 representation
         complexity:
           type: integer
@@ -4379,7 +4300,7 @@ components:
         key:
           type: string
         value:
-          nullable: true
+          type: 'null'
           description: null for entry deletion
     HashedMessage:
       required:
@@ -4411,11 +4332,9 @@ components:
           type: object
           properties:
             amountAsset:
-              type: string
-              nullable: true
+              $ref: '#/components/schemas/WavesOrAssetId'
             priceAsset:
-              type: string
-              nullable: true
+              $ref: '#/components/schemas/WavesOrAssetId'
         orderType:
           type: string
           enum:
@@ -4438,7 +4357,7 @@ components:
           items:
             $ref: '#/components/schemas/Signature'
         matcherFeeAssetId:
-          $ref: '#/components/schemas/AssetId'
+          $ref: '#/components/schemas/WavesOrAssetId'
     OrderLSF:
       type: object
       properties:
@@ -4459,11 +4378,9 @@ components:
           type: object
           properties:
             amountAsset:
-              type: string
-              nullable: true
+              $ref: '#/components/schemas/WavesOrAssetId'
             priceAsset:
-              type: string
-              nullable: true
+              $ref: '#/components/schemas/WavesOrAssetId'
         orderType:
           type: string
           enum:
@@ -4486,7 +4403,7 @@ components:
           items:
             $ref: '#/components/schemas/Signature'
         matcherFeeAssetId:
-          $ref: '#/components/schemas/AssetId'
+          $ref: '#/components/schemas/WavesOrAssetId'
     RewardStatus:
       required:
         - currentReward
@@ -4631,44 +4548,44 @@ components:
       allOf:
         - $ref: '#/components/schemas/TransactionBase'
         - oneOf:
-          - $ref: '#/components/schemas/BurnTransaction'
-          - $ref: '#/components/schemas/CreateAliasTransaction'
-          - $ref: '#/components/schemas/DataTransaction'
-          - $ref: '#/components/schemas/ExchangeTransaction'
-          - $ref: '#/components/schemas/InvokeScriptTransaction'
-          - $ref: '#/components/schemas/IssueTransaction'
-          - $ref: '#/components/schemas/LeaseCancelTransaction'
-          - $ref: '#/components/schemas/LeaseTransaction'
-          - $ref: '#/components/schemas/MassTransferTransaction'
-          - $ref: '#/components/schemas/ReissueTransaction'
-          - $ref: '#/components/schemas/SetAssetScriptTransaction'
-          - $ref: '#/components/schemas/SetScriptTransaction'
-          - $ref: '#/components/schemas/SponsorFeeTransaction'
-          - $ref: '#/components/schemas/TransferTransaction'
-          - $ref: '#/components/schemas/CommitToGenerationTransaction'
-          - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
+            - $ref: '#/components/schemas/BurnTransaction'
+            - $ref: '#/components/schemas/CreateAliasTransaction'
+            - $ref: '#/components/schemas/DataTransaction'
+            - $ref: '#/components/schemas/ExchangeTransaction'
+            - $ref: '#/components/schemas/InvokeScriptTransaction'
+            - $ref: '#/components/schemas/IssueTransaction'
+            - $ref: '#/components/schemas/LeaseCancelTransaction'
+            - $ref: '#/components/schemas/LeaseTransaction'
+            - $ref: '#/components/schemas/MassTransferTransaction'
+            - $ref: '#/components/schemas/ReissueTransaction'
+            - $ref: '#/components/schemas/SetAssetScriptTransaction'
+            - $ref: '#/components/schemas/SetScriptTransaction'
+            - $ref: '#/components/schemas/SponsorFeeTransaction'
+            - $ref: '#/components/schemas/TransferTransaction'
+            - $ref: '#/components/schemas/CommitToGenerationTransaction'
+            - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
     NonGenesisTransactionLSF:
       title: NonGenesisTransactionLSF
       required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature ]
       allOf:
         - $ref: '#/components/schemas/TransactionBaseLSF'
         - oneOf:
-          - $ref: '#/components/schemas/BurnTransactionLSF'
-          - $ref: '#/components/schemas/CreateAliasTransaction'
-          - $ref: '#/components/schemas/DataTransactionLSF'
-          - $ref: '#/components/schemas/ExchangeTransactionLSF'
-          - $ref: '#/components/schemas/InvokeScriptTransactionLSF'
-          - $ref: '#/components/schemas/IssueTransactionLSF'
-          - $ref: '#/components/schemas/LeaseCancelTransactionLSF'
-          - $ref: '#/components/schemas/LeaseTransactionLSF'
-          - $ref: '#/components/schemas/MassTransferTransactionLSF'
-          - $ref: '#/components/schemas/ReissueTransactionLSF'
-          - $ref: '#/components/schemas/SetAssetScriptTransaction'
-          - $ref: '#/components/schemas/SetScriptTransaction'
-          - $ref: '#/components/schemas/SponsorFeeTransactionLSF'
-          - $ref: '#/components/schemas/TransferTransactionLSF'
-          - $ref: '#/components/schemas/CommitToGenerationTransaction'
-          - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
+            - $ref: '#/components/schemas/BurnTransactionLSF'
+            - $ref: '#/components/schemas/CreateAliasTransaction'
+            - $ref: '#/components/schemas/DataTransactionLSF'
+            - $ref: '#/components/schemas/ExchangeTransactionLSF'
+            - $ref: '#/components/schemas/InvokeScriptTransactionLSF'
+            - $ref: '#/components/schemas/IssueTransactionLSF'
+            - $ref: '#/components/schemas/LeaseCancelTransactionLSF'
+            - $ref: '#/components/schemas/LeaseTransactionLSF'
+            - $ref: '#/components/schemas/MassTransferTransactionLSF'
+            - $ref: '#/components/schemas/ReissueTransactionLSF'
+            - $ref: '#/components/schemas/SetAssetScriptTransaction'
+            - $ref: '#/components/schemas/SetScriptTransaction'
+            - $ref: '#/components/schemas/SponsorFeeTransactionLSF'
+            - $ref: '#/components/schemas/TransferTransactionLSF'
+            - $ref: '#/components/schemas/CommitToGenerationTransaction'
+            - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
     Transaction:
       oneOf:
         - $ref: '#/components/schemas/GenesisTransaction'
@@ -4980,7 +4897,6 @@ components:
         - payment
         - call
         - stateChanges
-        - feeAssetId
       properties:
         dApp:
           $ref: '#/components/schemas/AddressOrAlias'
@@ -4992,9 +4908,7 @@ components:
               amount:
                 $ref: '#/components/schemas/Amount'
               assetId:
-                allOf:
-                  - $ref: '#/components/schemas/AssetId'
-                nullable: true
+                $ref: '#/components/schemas/WavesOrAssetId'
         call:
           type: object
           properties:
@@ -5025,9 +4939,7 @@ components:
         stateChanges:
           $ref: '#/components/schemas/StateChanges'
         feeAssetId:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
     InvokeScriptTransactionLSF:
       title: InvokeScriptTransactionLSF
       type: object
@@ -5036,7 +4948,6 @@ components:
         - payment
         - call
         - stateChanges
-        - feeAssetId
       properties:
         dApp:
           $ref: '#/components/schemas/AddressOrAlias'
@@ -5048,9 +4959,7 @@ components:
               amount:
                 type: string
               assetId:
-                allOf:
-                  - $ref: '#/components/schemas/AssetId'
-                nullable: true
+                $ref: '#/components/schemas/WavesOrAssetId'
         call:
           type: object
           properties:
@@ -5081,9 +4990,7 @@ components:
         stateChanges:
           $ref: '#/components/schemas/StateChangesLSF'
         feeAssetId:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
     IssueTransaction:
       title: IssueTransaction
       type: object
@@ -5191,15 +5098,13 @@ components:
       title: MassTransferTransaction
       type: object
       required:
-        - assetId
         - attachment
         - transfersCount
         - totalAmount
         - transfers
       properties:
         assetId:
-          type: string
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
         attachment:
           type: string
         transferCount:
@@ -5223,15 +5128,13 @@ components:
       title: MassTransferTransactionLSF
       type: object
       required:
-        - assetId
         - attachment
         - transfersCount
         - totalAmount
         - transfers
       properties:
         assetId:
-          type: string
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
         attachment:
           type: string
         transferCount:
@@ -5327,28 +5230,19 @@ components:
       type: object
       required:
         - recipient
-        - assetId
         - amount
         - attachment
-        - feeAsset
-        - feeAssetId
       properties:
         recipient:
           $ref: '#/components/schemas/AddressOrAlias'
         assetId:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
         feeAsset:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
           description: Legacy v0.11.1 compatibility field. Use `assetId` instead
           deprecated: true
         feeAssetId:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
         amount:
           $ref: '#/components/schemas/Amount'
         attachment:
@@ -5358,28 +5252,19 @@ components:
       type: object
       required:
         - recipient
-        - assetId
         - amount
         - attachment
-        - feeAsset
-        - feeAssetId
       properties:
         recipient:
           $ref: '#/components/schemas/AddressOrAlias'
         assetId:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
         feeAsset:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
           description: Legacy v0.11.1 compatibility field. Use `assetId` instead
           deprecated: true
         feeAssetId:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
         amount:
           type: string
         attachment:
@@ -5391,7 +5276,6 @@ components:
         - assetId
         - name
         - description
-        - feeAssetId
       properties:
         assetId:
           $ref: '#/components/schemas/AssetId'
@@ -5400,9 +5284,7 @@ components:
         description:
           $ref: '#/components/schemas/AssetDescription'
         feeAssetId:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
     CommitToGenerationTransaction:
       title: CommitToGenerationTransaction
       type: object
@@ -5429,30 +5311,24 @@ components:
       type: object
       required:
         - address
-        - asset
         - amount
       properties:
         address:
           $ref: '#/components/schemas/Address'
         asset:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
         amount:
           $ref: '#/components/schemas/Amount'
     TransferActionLSF:
       type: object
       required:
         - address
-        - asset
         - amount
       properties:
         address:
           $ref: '#/components/schemas/Address'
         asset:
-          allOf:
-            - $ref: '#/components/schemas/AssetId'
-          nullable: true
+          $ref: '#/components/schemas/WavesOrAssetId'
         amount:
           type: string
     IssueAction:
@@ -5751,34 +5627,27 @@ components:
           type: object
           properties:
             function:
-              type: string
+              type: [ string, 'null' ]
               default: "default"
-              nullable: true
             args:
-              type: array
+              type: [ array, 'null' ]
               items:
                 $ref: '#/components/schemas/RideFunctionCallArg'
-              nullable: true
         id:
-          type: string
+          type: [ string, 'null' ]
           example: "C8AgSFP8y91XUTpGtEQAQyjsSemxoY61ocGM852DFKF6"
-          nullable: true
         fee:
-          type: number
+          type: [ number, 'null' ]
           example: 500000
-          nullable: true
         feeAssetId:
-          type: string
+          type: [ string, 'null' ]
           example: null
-          nullable: true
         sender:
-          type: string
+          type: [ string, 'null' ]
           example: "3Mds6m8XZf4biC72NRkFx2kyoBdC9UvYRUR"
-          nullable: true
         senderPublicKey:
-          type: string
+          type: [ string, 'null' ]
           example: "3T9fL3XpeaHYbumohePPUmeuUqhyEeyzifi9vKouV8QoNtAT6kYV1oPAe9e2KCVquPcyXJpr2QwUiQKEUQPGZnc6"
-          nullable: true
         payment:
           type: array
           items:
@@ -5787,9 +5656,7 @@ components:
               amount:
                 $ref: '#/components/schemas/Amount'
               assetId:
-                allOf:
-                  - $ref: '#/components/schemas/AssetId'
-                nullable: true
+                $ref: '#/components/schemas/WavesOrAssetId'
         state:
           $ref: '#/components/schemas/BlockchainOverrides'
     CommittedGenerator:
@@ -5978,6 +5845,50 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommittedGenerator'
+    DebugStateHashes:
+      type: object
+      description: Hashes representing blockchain state at a specific block
+      required:
+        - blockId
+        - wavesBalanceHash
+        - assetsBalanceHash
+        - dataEntryHash
+        - accountScriptHash
+        - assetScriptHash
+        - leaseBalanceHash
+        - leaseStatusHash
+        - sponsorshipHash
+        - aliasHash
+        - stateHash
+      properties:
+        blockId:
+          type: string
+        wavesBalanceHash:
+          type: string
+        assetsBalanceHash:
+          type: string
+        dataEntryHash:
+          type: string
+        accountScriptHash:
+          type: string
+        assetScriptHash:
+          type: string
+        leaseBalanceHash:
+          type: string
+        leaseStatusHash:
+          type: string
+        sponsorshipHash:
+          type: string
+        aliasHash:
+          type: string
+        stateHash:
+          type: string
+        nextCommittedGeneratorsHash:
+          type: string
+          description: Available after deterministic finality feature activation.
+        committedGeneratorBalancesHash:
+          type: string
+          description: Available after deterministic finality feature activation.
 
   responses:
     Height:
