@@ -8,13 +8,14 @@ window.onload = function() {
     dom_id: '#swagger-ui',
     deepLinking: true,
     presets: [
-      SwaggerUIBundle.presets.apis,
-      SwaggerUIStandalonePreset
+      SwaggerUIBundle.presets.apis
     ],
     plugins: [
       SwaggerUIBundle.plugins.DownloadUrl
     ],
-    layout: "StandaloneLayout",
+    // Hide "Explore" button and input field. StandaloneLayout shows them
+    // See https://github.com/swagger-api/swagger-ui/blob/master/src/standalone/presets/standalone/index.js
+    layout: "BaseLayout",
     tagsSorter: "alpha",
     operationsSorter: "alpha",
     tryItOutEnabled: true // Always show "Execute" button
