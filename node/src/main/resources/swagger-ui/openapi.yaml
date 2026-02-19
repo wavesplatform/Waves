@@ -4260,6 +4260,7 @@ components:
                 type:
                   type: string
     BinaryEntry:
+      title: BinaryEntry
       required:
         - key
         - type
@@ -4276,6 +4277,7 @@ components:
           type: string
           format: byte
     BooleanEntry:
+      title: BooleanEntry
       required:
         - key
         - type
@@ -4291,6 +4293,7 @@ components:
         value:
           type: boolean
     IntegerEntry:
+      title: IntegerEntry
       required:
         - key
         - type
@@ -4307,6 +4310,7 @@ components:
           type: integer
           format: int64
     IntegerEntryLSF:
+      title: IntegerEntryLSF
       required:
         - key
         - type
@@ -4322,6 +4326,7 @@ components:
         value:
           type: string
     StringEntry:
+      title: StringEntry
       required:
         - key
         - type
@@ -4337,6 +4342,7 @@ components:
         value:
           type: string
     DataEntry:
+      title: DataEntry
       oneOf:
         - $ref: '#/components/schemas/BinaryEntry'
         - $ref: '#/components/schemas/BooleanEntry'
@@ -4350,6 +4356,7 @@ components:
           integer: '#/components/schemas/IntegerEntry'
           string: '#/components/schemas/StringEntry'
     DataEntryLSF:
+      title: DataEntryLSF
       oneOf:
         - $ref: '#/components/schemas/BinaryEntry'
         - $ref: '#/components/schemas/BooleanEntry'
@@ -4363,6 +4370,7 @@ components:
           integer: '#/components/schemas/IntegerEntryLSF'
           string: '#/components/schemas/StringEntry'
     DeleteEntry:
+      title: DeleteEntry
       required:
         - key
         - value
@@ -4618,49 +4626,49 @@ components:
         signature:
           $ref: '#/components/schemas/Signature'
     NonGenesisTransaction:
+      title: NonGenesisTransaction
       required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature ]
       allOf:
         - $ref: '#/components/schemas/TransactionBase'
-      oneOf:
-        - $ref: '#/components/schemas/BurnTransaction'
-        - $ref: '#/components/schemas/CreateAliasTransaction'
-        - $ref: '#/components/schemas/DataTransaction'
-        - $ref: '#/components/schemas/ExchangeTransaction'
-        - $ref: '#/components/schemas/GenesisTransaction'
-        - $ref: '#/components/schemas/InvokeScriptTransaction'
-        - $ref: '#/components/schemas/IssueTransaction'
-        - $ref: '#/components/schemas/LeaseCancelTransaction'
-        - $ref: '#/components/schemas/LeaseTransaction'
-        - $ref: '#/components/schemas/MassTransferTransaction'
-        - $ref: '#/components/schemas/ReissueTransaction'
-        - $ref: '#/components/schemas/SetAssetScriptTransaction'
-        - $ref: '#/components/schemas/SetScriptTransaction'
-        - $ref: '#/components/schemas/SponsorFeeTransaction'
-        - $ref: '#/components/schemas/TransferTransaction'
-        - $ref: '#/components/schemas/CommitToGenerationTransaction'
-        - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
+        - oneOf:
+          - $ref: '#/components/schemas/BurnTransaction'
+          - $ref: '#/components/schemas/CreateAliasTransaction'
+          - $ref: '#/components/schemas/DataTransaction'
+          - $ref: '#/components/schemas/ExchangeTransaction'
+          - $ref: '#/components/schemas/InvokeScriptTransaction'
+          - $ref: '#/components/schemas/IssueTransaction'
+          - $ref: '#/components/schemas/LeaseCancelTransaction'
+          - $ref: '#/components/schemas/LeaseTransaction'
+          - $ref: '#/components/schemas/MassTransferTransaction'
+          - $ref: '#/components/schemas/ReissueTransaction'
+          - $ref: '#/components/schemas/SetAssetScriptTransaction'
+          - $ref: '#/components/schemas/SetScriptTransaction'
+          - $ref: '#/components/schemas/SponsorFeeTransaction'
+          - $ref: '#/components/schemas/TransferTransaction'
+          - $ref: '#/components/schemas/CommitToGenerationTransaction'
+          - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
     NonGenesisTransactionLSF:
+      title: NonGenesisTransactionLSF
       required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature ]
       allOf:
         - $ref: '#/components/schemas/TransactionBaseLSF'
-      oneOf:
-        - $ref: '#/components/schemas/BurnTransactionLSF'
-        - $ref: '#/components/schemas/CreateAliasTransaction'
-        - $ref: '#/components/schemas/DataTransactionLSF'
-        - $ref: '#/components/schemas/ExchangeTransactionLSF'
-        - $ref: '#/components/schemas/GenesisTransactionLSF'
-        - $ref: '#/components/schemas/InvokeScriptTransactionLSF'
-        - $ref: '#/components/schemas/IssueTransactionLSF'
-        - $ref: '#/components/schemas/LeaseCancelTransactionLSF'
-        - $ref: '#/components/schemas/LeaseTransactionLSF'
-        - $ref: '#/components/schemas/MassTransferTransactionLSF'
-        - $ref: '#/components/schemas/ReissueTransactionLSF'
-        - $ref: '#/components/schemas/SetAssetScriptTransaction'
-        - $ref: '#/components/schemas/SetScriptTransaction'
-        - $ref: '#/components/schemas/SponsorFeeTransactionLSF'
-        - $ref: '#/components/schemas/TransferTransactionLSF'
-        - $ref: '#/components/schemas/CommitToGenerationTransaction'
-        - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
+        - oneOf:
+          - $ref: '#/components/schemas/BurnTransactionLSF'
+          - $ref: '#/components/schemas/CreateAliasTransaction'
+          - $ref: '#/components/schemas/DataTransactionLSF'
+          - $ref: '#/components/schemas/ExchangeTransactionLSF'
+          - $ref: '#/components/schemas/InvokeScriptTransactionLSF'
+          - $ref: '#/components/schemas/IssueTransactionLSF'
+          - $ref: '#/components/schemas/LeaseCancelTransactionLSF'
+          - $ref: '#/components/schemas/LeaseTransactionLSF'
+          - $ref: '#/components/schemas/MassTransferTransactionLSF'
+          - $ref: '#/components/schemas/ReissueTransactionLSF'
+          - $ref: '#/components/schemas/SetAssetScriptTransaction'
+          - $ref: '#/components/schemas/SetScriptTransaction'
+          - $ref: '#/components/schemas/SponsorFeeTransactionLSF'
+          - $ref: '#/components/schemas/TransferTransactionLSF'
+          - $ref: '#/components/schemas/CommitToGenerationTransaction'
+          - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
     Transaction:
       oneOf:
         - $ref: '#/components/schemas/GenesisTransaction'
@@ -4822,6 +4830,7 @@ components:
           items:
             $ref: '#/components/schemas/Hash'
     BurnTransaction:
+      title: BurnTransaction
       type: object
       required: [ assetId, amount ]
       properties:
@@ -4830,6 +4839,7 @@ components:
         amount:
           $ref: '#/components/schemas/Amount'
     BurnTransactionLSF:
+      title: BurnTransactionLSF
       type: object
       required: [ assetId, amount ]
       properties:
@@ -4838,6 +4848,7 @@ components:
         amount:
           type: string
     CreateAliasTransaction:
+      title: CreateAliasTransaction
       type: object
       required: [ alias ]
       properties:
@@ -4845,6 +4856,7 @@ components:
           type: string
           pattern: '^[\-\.0-9@_a-z]{4,30}$'
     DataTransaction:
+      title: DataTransaction
       type: object
       required: [ data ]
       properties:
@@ -4855,6 +4867,7 @@ components:
               - $ref: '#/components/schemas/DataEntry'
               - $ref: '#/components/schemas/DeleteEntry'
     DataTransactionLSF:
+      title: DataTransactionLSF
       type: object
       required: [ data ]
       properties:
@@ -4865,6 +4878,7 @@ components:
               - $ref: '#/components/schemas/DataEntryLSF'
               - $ref: '#/components/schemas/DeleteEntry'
     ExchangeTransaction:
+      title: ExchangeTransaction
       type: object
       required:
         - order1
@@ -4887,6 +4901,7 @@ components:
         sellMatcherFee:
           $ref: '#/components/schemas/Amount'
     ExchangeTransactionLSF:
+      title: ExchangeTransactionLSF
       type: object
       required:
         - order1
@@ -4909,6 +4924,7 @@ components:
         sellMatcherFee:
           type: string
     GenesisTransaction:
+      title: GenesisTransaction
       type: object
       required:
         - id
@@ -4934,6 +4950,7 @@ components:
         amount:
           $ref: '#/components/schemas/Amount'
     GenesisTransactionLSF:
+      title: GenesisTransactionLSF
       type: object
       required:
         - id
@@ -4956,6 +4973,7 @@ components:
         amount:
           type: string
     InvokeScriptTransaction:
+      title: InvokeScriptTransaction
       type: object
       required:
         - dApp
@@ -5011,6 +5029,7 @@ components:
             - $ref: '#/components/schemas/AssetId'
           nullable: true
     InvokeScriptTransactionLSF:
+      title: InvokeScriptTransactionLSF
       type: object
       required:
         - dApp
@@ -5066,6 +5085,7 @@ components:
             - $ref: '#/components/schemas/AssetId'
           nullable: true
     IssueTransaction:
+      title: IssueTransaction
       type: object
       required:
         - assetId
@@ -5095,6 +5115,7 @@ components:
           type: string
           format: byte
     IssueTransactionLSF:
+      title: IssueTransactionLSF
       type: object
       required:
         - assetId
@@ -5123,6 +5144,7 @@ components:
           type: string
           format: byte
     LeaseCancelTransaction:
+      title: LeaseCancelTransaction
       type: object
       required:
         - leaseId
@@ -5133,6 +5155,7 @@ components:
         lease:
           $ref: '#/components/schemas/LeaseInfo'
     LeaseCancelTransactionLSF:
+      title: LeaseCancelTransactionLSF
       type: object
       required:
         - leaseId
@@ -5143,6 +5166,7 @@ components:
         lease:
           $ref: '#/components/schemas/LeaseInfoLSF'
     LeaseTransaction:
+      title: LeaseTransaction
       type: object
       required:
         - amount
@@ -5153,6 +5177,7 @@ components:
         recipient:
           $ref: '#/components/schemas/AddressOrAlias'
     LeaseTransactionLSF:
+      title: LeaseTransactionLSF
       type: object
       required:
         - amount
@@ -5163,6 +5188,7 @@ components:
         recipient:
           $ref: '#/components/schemas/AddressOrAlias'
     MassTransferTransaction:
+      title: MassTransferTransaction
       type: object
       required:
         - assetId
@@ -5194,6 +5220,7 @@ components:
               amount:
                 $ref: '#/components/schemas/Amount'
     MassTransferTransactionLSF:
+      title: MassTransferTransactionLSF
       type: object
       required:
         - assetId
@@ -5223,6 +5250,7 @@ components:
               amount:
                 type: string
     ReissueTransaction:
+      title: ReissueTransaction
       type: object
       required:
         - assetId
@@ -5236,6 +5264,7 @@ components:
         reissuable:
           type: boolean
     ReissueTransactionLSF:
+      title: ReissueTransactionLSF
       type: object
       required:
         - assetId
@@ -5249,6 +5278,7 @@ components:
         reissuable:
           type: boolean
     SetAssetScriptTransaction:
+      title: SetAssetScriptTransaction
       type: object
       required:
         - assetId
@@ -5260,6 +5290,7 @@ components:
           type: string
           format: byte
     SetScriptTransaction:
+      title: SetScriptTransaction
       type: object
       required:
         - script
@@ -5268,6 +5299,7 @@ components:
           type: string
           format: byte
     SponsorFeeTransaction:
+      title: SponsorFeeTransaction
       type: object
       required:
         - assetId
@@ -5280,6 +5312,7 @@ components:
           format: int64
           minimum: 1
     SponsorFeeTransactionLSF:
+      title: SponsorFeeTransactionLSF
       type: object
       required:
         - assetId
@@ -5290,6 +5323,7 @@ components:
         minSponsoredAssetFee:
           type: string
     TransferTransaction:
+      title: TransferTransaction
       type: object
       required:
         - recipient
@@ -5320,6 +5354,7 @@ components:
         attachment:
           type: string
     TransferTransactionLSF:
+      title: TransferTransactionLSF
       type: object
       required:
         - recipient
@@ -5350,6 +5385,7 @@ components:
         attachment:
           type: string
     UpdateAssetInfoTransaction:
+      title: UpdateAssetInfoTransaction
       type: object
       required:
         - assetId
@@ -5368,6 +5404,7 @@ components:
             - $ref: '#/components/schemas/AssetId'
           nullable: true
     CommitToGenerationTransaction:
+      title: CommitToGenerationTransaction
       type: object
       required:
         - endorserPublicKey
