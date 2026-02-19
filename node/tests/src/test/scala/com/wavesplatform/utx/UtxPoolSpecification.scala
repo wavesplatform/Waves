@@ -1029,7 +1029,8 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
           txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee.value < tx1.fee.value))
         } yield (acc, acc1, tx1, txs)
 
-        forAll(gen) { case (acc, acc1, tx1, rest) =>
+        forAll(gen) { case (acc, _, tx1, rest) =>
+
           var utx: UtxPool = null // this is needed to resolve circular references between UTX and blockchain stub
           val blockchain = new EmptyBlockchain {
             override lazy val settings: BlockchainSettings                    = WavesSettings.default().blockchainSettings
@@ -1056,7 +1057,7 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
             )
 
             override def accountScript(address: Address): Option[AccountScriptInfo] = {
-              utx.removeAll(rest)
+              if (address == acc.toAddress) utx.removeAll(rest)
               None
             }
           }

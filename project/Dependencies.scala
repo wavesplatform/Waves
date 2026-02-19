@@ -4,10 +4,6 @@ import sbt.{Def, *}
 import scalapb.compiler.Version.scalapbVersion
 
 object Dependencies {
-  val DebAmd64 = config("DebAmd64")
-  val DebArm64 = config("DebArm64")
-
-
   private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.10.Final"
 
   val gProtoVersion = "4.33.5"
@@ -217,5 +213,5 @@ object Dependencies {
   // https://github.com/sbt/sbt-javaagent#scopes
   // dist (only sbt-native-packager), because causes using logs before needed, so System.setProperty in RideRunnerWithPreparedStateApp has no effect.
   lazy val kanela =
-    Seq("io.kamon" % "kanela-agent" % "1.0.18" % "dist")
+    Seq("io.kamon" % "kanela-agent" % "2.0.0" % "dist")
 }

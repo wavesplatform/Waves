@@ -14,7 +14,7 @@ enablePlugins(
 libraryDependencies ++= Dependencies.node.value
 
 instrumentation := false
-debArchitecture := Amd64
+debArchitecture := Arm64
 
 javaAgents ++= {
   if (instrumentation.value) {
@@ -168,7 +168,7 @@ inConfig(Debian)(
       val platformSpecificMappings = packageMapping(
         (Optional / update).value
           .select(artifactFilter(classifier = classifier))
-          .map(_ -> (defaultLinuxInstallLocation.value + "/" + (Debian / packageName).value)): _*
+          .map(f => f -> (defaultLinuxInstallLocation.value + "/" + (Debian / packageName).value + "/lib/software.amazon.cryptools." + f.getName)): _*
       )
 
       linuxPackageMappings.value.map(m =>

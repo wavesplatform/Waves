@@ -2,18 +2,21 @@ package com.wavesplatform.mining
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.WithNewDBForEachTest
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.api.BlockMeta
+import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BalanceSnapshot, BlockEndorser, BlockMinerInfo, Blockchain, EndorsementStorage, Height, NG}
+import com.wavesplatform.state.*
 import com.wavesplatform.test.FlatSpec
-import com.wavesplatform.transaction.BlockchainUpdater
+import com.wavesplatform.transaction.{BlockchainUpdater, DiscardedBlocks, LastBlockInfo, Transaction}
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
+import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
@@ -21,16 +24,95 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
+import monix.execution.atomic.AtomicInt
 import monix.reactive.Observable
-import org.scalamock.scalatest.PathMockFactory
 
-class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBForEachTest {
+class MiningFailuresSuite extends FlatSpec, WithNewDBForEachTest {
   trait BlockchainUpdaterNG extends Blockchain with BlockchainUpdater with NG
 
   behavior of "Miner"
 
   it should "generate valid blocks ignoring time errors " in {
-    val blockchainUpdater = stub[BlockchainUpdaterNG]
+    @volatile var minedBlock: Block = null
+    val genesis                     = TestBlock.create(System.currentTimeMillis(), Nil).block
+    val blockchainUpdater = new EmptyBlockchain with BlockchainUpdater with NG {
+      override def height: Int = 1
+
+      override def heightOf(blockId: ByteStr): Option[Int] = Some(1)
+
+      override def hitSource(height: Int): Option[ByteStr] = Some(ByteStr(new Array[Byte](32)))
+
+      override def blockHeader(height: Int): Option[SignedBlockHeader] = Some(SignedBlockHeader(genesis.header, genesis.signature))
+
+      override def balanceSnapshots(address: Address, from: Int, to: Option[ByteStr]): Seq[BalanceSnapshot] =
+        Seq(BalanceSnapshot(Height(1), ENOUGH_AMT, 0, 0, 0))
+
+      override def bestLastBlockInfo(maxMicroblockTimestampMs: Long): Option[BlockMinerInfo] = Some(
+        BlockMinerInfo(
+          genesis.header.baseTarget,
+          genesis.header.generationSignature,
+          genesis.header.timestamp,
+          genesis.id()
+        )
+      )
+
+      override def isLastBlockId(id: ByteStr): Boolean = true
+
+      private val counter = AtomicInt(0)
+
+      override def processBlock(
+          block: Block,
+          hitSource: ByteStr,
+          snapshot: Option[BlockSnapshot],
+          generatorSet: GeneratorSet,
+          challengedHitSource: Option[ByteStr],
+          verify: Boolean,
+          txSignParCheck: Boolean
+      ): Either[ValidationError, BlockchainUpdaterImpl.BlockApplyResult] =
+        if (counter.getAndIncrement() >= 9) {
+          minedBlock = block
+          Right(Applied(Nil, 0, Seq.empty))
+        } else
+          Left(BlockFromFuture(100, 100))
+
+      override def processMicroBlock(
+          microBlock: MicroBlock,
+          snapshot: Option[MicroBlockSnapshot],
+          verify: Boolean
+      ): Either[ValidationError, Block.BlockId] = ???
+
+      override def computeNextReward: Option[Long] = Some(0)
+
+      override def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks] = Right(Seq.empty)
+
+      override def lastBlockInfo: Observable[LastBlockInfo] = Observable.empty
+
+      override def referencedBlockchain(reference: ByteStr): Blockchain = this
+
+      override def shutdown(): Unit = {}
+
+      override def microBlock(id: ByteStr): Option[MicroBlock] = None
+
+      override def microblockIds: Seq[Block.BlockId] = Seq.empty
+
+      override def liquidBlock(id: ByteStr): Option[Block] = None
+
+      override def liquidBlockSnapshot(id: ByteStr): Option[StateSnapshot] = None
+
+      override def microBlockSnapshot(totalBlockId: ByteStr): Option[StateSnapshot] = None
+
+      override def liquidTransactions(id: ByteStr): Option[Seq[(TxMeta, Transaction)]] = None
+
+      override def liquidBlockMeta: Option[BlockMeta] = None
+
+      override def bestLiquidSnapshot: Option[StateSnapshot] = None
+
+      override def bestLiquidSnapshotAndFees: Option[(StateSnapshot, Long, Long)] = None
+
+      override def snapshotBlockchain: SnapshotBlockchain = ???
+
+      override def currentGeneratorSet: Option[GeneratorSet] = ???
+    }
 
     val wavesSettings = {
       val config = ConfigFactory
@@ -75,42 +157,6 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
         Observable.empty
       ) -> scheduler
     }
-
-    val genesis = TestBlock.create(System.currentTimeMillis(), Nil).block
-    (blockchainUpdater.isLastBlockId).when(genesis.id()).returning(true)
-    (blockchainUpdater.heightOf).when(genesis.id()).returning(Some(1)).anyNumberOfTimes()
-    (blockchainUpdater.heightOf).when(genesis.header.reference).returning(Some(1)).anyNumberOfTimes()
-    (() => blockchainUpdater.height).when().returning(1)
-    (() => blockchainUpdater.settings).when().returning(blockchainSettings)
-    (blockchainUpdater.blockHeader).when(*).returns(Some(SignedBlockHeader(genesis.header, genesis.signature)))
-    (() => blockchainUpdater.activatedFeatures).when().returning(Map.empty)
-    (() => blockchainUpdater.approvedFeatures).when().returning(Map.empty)
-    (blockchainUpdater.hitSource).when(*).returns(Some(ByteStr(new Array[Byte](32))))
-    (blockchainUpdater.effectiveBalanceBanHeights).when(*).returns(Seq.empty)
-    (blockchainUpdater.bestLastBlockInfo)
-      .when(*)
-      .returning(
-        Some(
-          BlockMinerInfo(
-            genesis.header.baseTarget,
-            genesis.header.generationSignature,
-            genesis.header.timestamp,
-            genesis.id()
-          )
-        )
-      )
-
-    var minedBlock: Block = null
-    (blockchainUpdater.processBlock).when(*, *, *, *, *, *, *).returning(Left(BlockFromFuture(100, 100))).repeated(10)
-    (blockchainUpdater.processBlock)
-      .when(*, *, *, *, *, *, *)
-      .onCall { (block, _, _, _, _, _, _) =>
-        minedBlock = block
-        Right(Applied(Nil, 0, Seq.empty))
-      }
-      .once()
-    (blockchainUpdater.balanceSnapshots).when(*, *, *).returning(Seq(BalanceSnapshot(Height(1), ENOUGH_AMT, 0, 0, 0)))
-    (blockchainUpdater.committedGenerators).when(*).returning(IndexedSeq.empty)
 
     val account       = accountGen.sample.get
     val generateBlock = generateBlockTask(miner)(account)

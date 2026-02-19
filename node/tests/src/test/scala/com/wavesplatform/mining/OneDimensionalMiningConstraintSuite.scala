@@ -1,6 +1,6 @@
 package com.wavesplatform.mining
 
-import com.wavesplatform.state.{Blockchain, StateSnapshot}
+import com.wavesplatform.state.StateSnapshot
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.EmptyBlockchain

@@ -128,7 +128,9 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
 
     val selectedNextUnverified = nextUnverified()
 
-    val randomKnownPeer = Random.shuffle(knownPeers.keySet.filterNot(excludeAddress)).headOption
+    val filteredKnownPeers = knownPeers.keySet.filterNot(excludeAddress)
+    val randomKnownPeer =
+      (if (filteredKnownPeers.size > 1) filteredKnownPeers.view.drop(Random.nextInt(filteredKnownPeers.size)) else filteredKnownPeers).headOption
 
     val selectedCandidate = resolvedPeersFromConfig
       .filterNot(excludeAddress)

@@ -150,7 +150,6 @@ lazy val `repl-js` = repl.js
 lazy val `curve25519-test` = project.dependsOn(node)
 
 lazy val `waves-node` = (project in file("."))
-  .configs(Dependencies.DebArm64, Dependencies.DebAmd64)
   .aggregate(
     `lang-js`,
     `lang-jvm`,
@@ -219,12 +218,8 @@ inScope(Global)(
   )
 )
 
-lazy val packageAll = taskKey[Unit]("Package all artifacts")
-packageAll := {
-  (node / assembly).value
-  (`ride-runner` / assembly).value
-  buildDebPackages.value
-  buildTarballsForDocker.value
+commands += Command.command("packageAll"){ state =>
+  "node / assembly" :: "ride-runner / assembly" :: "buildDebPackages" :: "buildTarballsForDocker" :: state
 }
 
 lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server tarballs and copy them to docker/target")
@@ -283,18 +278,16 @@ def commandWithFatalWarnings(commandName: String, task: TaskKey[Unit]): Command 
     state
   }
 
-def compilePR = commandWithFatalWarnings("compilePR", compilePRRaw)
-def checkPR   = commandWithFatalWarnings("checkPR", checkPRRaw)
+def compilePR: Command = commandWithFatalWarnings("compilePR", compilePRRaw)
+def checkPR: Command   = commandWithFatalWarnings("checkPR", checkPRRaw)
 
-lazy val completeQaseRun = taskKey[Unit]("Complete Qase run")
-completeQaseRun := Def.task {
-  (`lang-testkit` / Test / runMain).toTask(" com.wavesplatform.report.QaseRunCompleter").value
-}.value
-
-lazy val buildDebPackages = taskKey[Unit]("Build DEB packages")
-buildDebPackages := {
-  (`grpc-server` / Debian / packageBin).value
-  (node / Debian / packageBin).value
+commands += Command.command("buildDebPackages") { state =>
+  "set node / Debian / packageArchitecture := \"arm64\"" ::
+    "node/ Debian / packageBin" ::
+    "set node / Debian / packageArchitecture := \"amd64\"" ::
+    "node / Debian / packageBin" ::
+    "grpc-server / Debian / packageBin" ::
+    state
 }
 
 lazy val buildPlatformIndependentArtifacts = taskKey[Unit]("Build fat JARs for node and ride-runner and TGZ for grpc-server")
@@ -304,20 +297,10 @@ buildPlatformIndependentArtifacts := {
   (`grpc-server` / Universal / packageZipTarball).value
 }
 
-lazy val buildReleaseArtifacts: Command = Command("buildReleaseArtifacts")(_ => Network.networkParser) { (state, args) =>
-  args.toSet[Network].foreach { n =>
-    val newState = Project
-      .extract(state)
-      .appendWithoutSession(
-        Seq(Global / network := n),
-        state
-      )
-    Project.extract(newState).runTask(buildDebPackages, newState)
-  }
-
-  Project.extract(state).runTask(buildPlatformIndependentArtifacts, state)
-
-  state
+commands += Command("buildReleaseArtifacts")(_ => Network.networkParser) { (state, args) =>
+  args.toSet[Network].toList.flatMap { n =>
+    s"set Global / network := $n" :: "buildDebPackages" :: Nil
+  } ::: "buildPlatformIndependentArtifacts" :: state
 }
 
 /** Command: generateGenesis <path-to-config>
@@ -352,4 +335,4 @@ def generateGenesisCommand: Command =
     state
   }
 
-commands ++= Seq(compilePR, checkPR, buildReleaseArtifacts, generateGenesisCommand)
+commands ++= Seq(compilePR, checkPR, generateGenesisCommand)

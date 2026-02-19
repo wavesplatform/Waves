@@ -2,67 +2,58 @@ package com.wavesplatform.utils
 
 import com.google.common.base.Ticker
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+import com.wavesplatform.test.FreeSpec
+import monix.reactive.Observer
+import org.apache.commons.io.output.WriterOutputStream
 
+import java.io.{PrintStream, StringWriter}
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
-import com.wavesplatform.test.FreeSpec
-import monix.execution.Ack
-import monix.reactive.Observer
-import org.scalamock.scalatest.MockFactory
-
-import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
-class ObservedLoadingCacheSpecification extends FreeSpec with MockFactory {
+class ObservedLoadingCacheSpecification extends FreeSpec {
   import com.wavesplatform.utils.ObservedLoadingCacheSpecification.FakeTicker
   private val ExpiringTime = 10.minutes
 
   "notifies" - {
     "on refresh" in test { (loadingCache, changes, _) =>
-      (changes.onNext).expects("foo").returning(Future.successful(Ack.Continue)).once()
-
-        loadingCache.refresh("foo")
+      loadingCache.refresh("foo")
+      changes.toString shouldBe "0:  --> foo\n"
     }
 
     "on put" in test { (loadingCache, changes, _) =>
-      (changes.onNext).expects("foo").returning(Future.successful(Ack.Continue)).once()
-
-        loadingCache.put("foo", 10)
+      loadingCache.put("foo", 10)
+      changes.toString shouldBe "0:  --> foo\n"
     }
 
     "on putAll" in test { (loadingCache, changes, _) =>
-      (changes.onNext).expects("foo").returning(Future.successful(Ack.Continue)).once()
-      (changes.onNext).expects("bar").returning(Future.successful(Ack.Continue)).once()
-
-        loadingCache.putAll(Map[String, Integer]("foo" -> 10, "bar" -> 11).asJava)
+      loadingCache.putAll(Map[String, Integer]("foo" -> 10, "bar" -> 11).asJava)
+      changes.toString shouldBe "0:  --> foo\n1:  --> bar\n"
     }
 
     "on invalidate" in test { (loadingCache, changes, _) =>
-      (changes.onNext).expects("foo").returning(Future.successful(Ack.Continue)).once()
-
-        loadingCache.invalidate("foo")
+      loadingCache.invalidate("foo")
+      changes.toString shouldBe "0:  --> foo\n"
     }
 
     "on invalidateAll" in test { (loadingCache, changes, _) =>
-      (changes.onNext).expects("foo").returning(Future.successful(Ack.Continue)).once()
-      (changes.onNext).expects("bar").returning(Future.successful(Ack.Continue)).once()
-
-        loadingCache.invalidateAll(Seq("foo", "bar").asJava)
+      loadingCache.invalidateAll(Seq("foo", "bar").asJava)
+      changes.toString shouldBe "0:  --> foo\n1:  --> bar\n"
     }
   }
 
   "don't notify" - {
-    "on cache expiration" in test { (loadingCache, changes, ticker) =>
-      (changes.onNext).expects("foo").returning(Future.successful(Ack.Continue)).once()
+    "on cache expiration" in test {
+      (loadingCache, changes, ticker) =>
         loadingCache.put("foo", 1)
         ticker.advance(ExpiringTime.toMillis + 100, TimeUnit.MILLISECONDS)
+      changes.toString shouldBe "0:  --> foo\n"
     }
   }
 
-  private def test(f: (LoadingCache[String, Integer], Observer[String], FakeTicker) => Unit): Unit = {
-    val changes = mock[Observer[String]]
-    val ticker  = new FakeTicker()
+  private def test(f: (LoadingCache[String, Integer], StringWriter, FakeTicker) => Unit): Unit = {
+    val ticker = new FakeTicker()
 
     val delegate = CacheBuilder
       .newBuilder()
@@ -72,9 +63,13 @@ class ObservedLoadingCacheSpecification extends FreeSpec with MockFactory {
         override def load(key: String): Integer = key.length
       })
 
-    val loadingCache = new ObservedLoadingCache(delegate, changes)
+    val sw = new StringWriter()
+    val loadingCache = new ObservedLoadingCache(
+      delegate,
+      Observer.dump("", new PrintStream(WriterOutputStream.builder().setWriter(sw).setWriteImmediately(true).get()))
+    )
 
-    f(loadingCache, changes, ticker)
+    f(loadingCache, sw, ticker)
   }
 }
 
