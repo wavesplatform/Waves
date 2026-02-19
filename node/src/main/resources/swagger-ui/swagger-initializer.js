@@ -16,7 +16,8 @@ window.onload = function() {
     ],
     layout: "StandaloneLayout",
     tagsSorter: "alpha",
-    operationsSorter: "alpha"
+    operationsSorter: "alpha",
+    tryItOutEnabled: true // Always show "Execute" button
   });
 
   //</editor-fold>

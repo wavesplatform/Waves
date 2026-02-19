@@ -14,3 +14,7 @@ body {
     margin: 0;
     background: #fafafa;
 }
+
+.try-out {
+  display: none !important;
+}
