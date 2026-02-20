@@ -1766,6 +1766,7 @@ paths:
               schema:
                 required:
                   - feeAmount
+                  - feeAssetId
                 type: object
                 properties:
                   feeAssetId:
@@ -1777,6 +1778,7 @@ paths:
               schema:
                 required:
                   - feeAmount
+                  - feeAssetId
                 type: object
                 properties:
                   feeAssetId:
@@ -2102,6 +2104,8 @@ paths:
             application/json:
               schema:
                 required:
+                  - script
+                  - scriptText
                   - complexity
                   - verifierComplexity
                   - callableComplexities
@@ -3457,7 +3461,7 @@ components:
       type: string
     AssetId:
       title: AssetId
-      allOf:
+      allOf: # Generators can't handle this: https://github.com/OpenAPITools/openapi-generator/issues/21469
         - $ref: '#/components/schemas/Hash'
     WavesOrAssetId:
       description: Asset identifier. Absence or null means WAVES
@@ -3771,7 +3775,6 @@ components:
       required:
         - assetId
         - balance
-        - issueTransaction
         - quantity
         - reissuable
       type: object
@@ -3809,7 +3812,6 @@ components:
       required:
         - assetId
         - balance
-        - issueTransaction
         - quantity
         - reissuable
       type: object
@@ -4075,8 +4077,10 @@ components:
           $ref: '#/components/schemas/BlsSignature'
     FinalizationVoting:
       type: object
-      required:
-        - finalizedHeight
+      oneOf:
+        - required: [ valid, finalizedHeight, aggregatedEndorsement, conflict ]
+        - required: [ valid, finalizedHeight, aggregatedEndorsement ]
+        - required: [ finalizedHeight, conflict ]
       properties:
         valid:
           type: array
@@ -4124,6 +4128,7 @@ components:
                 $ref: '#/components/schemas/TransactionLSF'
     CompiledScript:
       required:
+        - script
         - complexity
         - verifierComplexity
         - callableComplexities
@@ -4559,8 +4564,8 @@ components:
             - $ref: '#/components/schemas/SetScriptTransaction'
             - $ref: '#/components/schemas/SponsorFeeTransaction'
             - $ref: '#/components/schemas/TransferTransaction'
-            - $ref: '#/components/schemas/CommitToGenerationTransaction'
             - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
+            - $ref: '#/components/schemas/CommitToGenerationTransaction'
     NonGenesisTransactionLSF:
       title: NonGenesisTransactionLSF
       required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature ]
@@ -4581,8 +4586,8 @@ components:
             - $ref: '#/components/schemas/SetScriptTransaction'
             - $ref: '#/components/schemas/SponsorFeeTransactionLSF'
             - $ref: '#/components/schemas/TransferTransactionLSF'
-            - $ref: '#/components/schemas/CommitToGenerationTransaction'
             - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
+            - $ref: '#/components/schemas/CommitToGenerationTransaction'
     Transaction:
       oneOf:
         - $ref: '#/components/schemas/GenesisTransaction'
@@ -5095,6 +5100,7 @@ components:
       title: MassTransferTransaction
       type: object
       required:
+        - assetId
         - attachment
         - transfersCount
         - totalAmount
@@ -5125,6 +5131,7 @@ components:
       title: MassTransferTransactionLSF
       type: object
       required:
+        - assetId
         - attachment
         - transfersCount
         - totalAmount
