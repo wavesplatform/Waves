@@ -4312,6 +4312,13 @@ components:
           type: string
         hash:
           $ref: '#/components/schemas/Hash'
+    AssetPair:
+      type: object
+      properties:
+        amountAsset:
+          $ref: '#/components/schemas/WavesOrAssetId'
+        priceAsset:
+          $ref: '#/components/schemas/WavesOrAssetId'
     Order:
       type: object
       properties:
@@ -4329,12 +4336,7 @@ components:
         matcherPublicKey:
           $ref: '#/components/schemas/PublicKey'
         assetPair:
-          type: object
-          properties:
-            amountAsset:
-              $ref: '#/components/schemas/WavesOrAssetId'
-            priceAsset:
-              $ref: '#/components/schemas/WavesOrAssetId'
+          $ref: '#/components/schemas/AssetPair'
         orderType:
           type: string
           enum:
@@ -4375,12 +4377,7 @@ components:
         matcherPublicKey:
           $ref: '#/components/schemas/PublicKey'
         assetPair:
-          type: object
-          properties:
-            amountAsset:
-              $ref: '#/components/schemas/WavesOrAssetId'
-            priceAsset:
-              $ref: '#/components/schemas/WavesOrAssetId'
+          $ref: '#/components/schemas/AssetPair'
         orderType:
           type: string
           enum:
