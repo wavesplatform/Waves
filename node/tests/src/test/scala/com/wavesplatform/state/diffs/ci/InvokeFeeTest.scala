@@ -90,7 +90,7 @@ class InvokeFeeTest extends PropSpec with WithDomain {
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(issueTx, sponsorTx)
       d.appendBlockE(invoke(feeAssetId = asset)) should produce(
-        s"${signer(9).toAddress} -> negative waves balance, before: spendable=0, after: spendable=-$invokeFee"
+        s"${signer(9).toAddress} -> negative waves balance: before=0, after=-$invokeFee"
       )
     }
   }
