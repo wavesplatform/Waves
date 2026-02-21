@@ -39,7 +39,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
       "testCase",
       Seq(CONST_BOOLEAN(true))
     )((tx, leaseId, assetId) =>
-      s"""FailedTransactionError(code = 1, error = AccountBalanceError(VectorMap(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
+      s"""FailedTransactionError(code = 1, error = AccountBalanceError(VectorMap(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance, before=999000010, after=-98900999990)), log =
          |	@invokedDApp = Address(
          |		bytes = base58'3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy'
          |	)
@@ -473,7 +473,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
       "testCase",
       Seq(CONST_BOOLEAN(false))
     )((tx, leaseId, assetId) =>
-      s"""InvokeRejectError(error = AccountBalanceError(VectorMap(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
+      s"""InvokeRejectError(error = AccountBalanceError(VectorMap(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance, before: spendable=999000010, waves=999000010, after: spendable=-98900999990, waves=-98900999990)), log = 
          |	@invokedDApp = Address(
          |		bytes = base58'3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy'
          |	)

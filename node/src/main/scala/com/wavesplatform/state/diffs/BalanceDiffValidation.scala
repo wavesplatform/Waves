@@ -19,34 +19,40 @@ object BalanceDiffValidation {
   def apply(b: Blockchain)(snapshot: StateSnapshot): Either[AccountBalanceError, StateSnapshot] = {
     def checkWaves(
         acc: Address,
-        newWaves: Long,
-        newLease: LeaseBalance,
+        wavesAfter: Long,
+        leaseAfter: LeaseBalance,
         additionalDeposit: Long
     ): Either[(Address, String), Unit] = {
-      val oldWaves   = b.balance(acc)
-      val oldDeposit = b.generationDeposit(acc)
-      val oldLease   = b.leaseBalance(acc)
+      val wavesBefore   = b.balance(acc)
+      val depositBefore = b.generationDeposit(acc)
+      val leaseBefore   = b.leaseBalance(acc)
 
-      val newDeposit          = oldDeposit + additionalDeposit
-      val newWavesWithDeposit = newWaves - newDeposit
+      val depositAfter             = depositBefore + additionalDeposit
+      val wavesWithoutDepositAfter = wavesAfter - depositAfter
 
-      val leaseOutDiff = newLease.out - oldLease.out
+      val leaseOutDiff = leaseAfter.out - leaseBefore.out
 
-      val stateChanges = s"old: w=$oldWaves, $oldLease, d=$oldDeposit, new: w=$newWaves, $newLease, d=$newDeposit"
+      @inline def ifNotZero(label: String, value: Long): String = if (value == 0) "" else s", $label=$value"
+      @inline def balancesStr(waves: Long, lease: LeaseBalance, deposit: Long): String =
+        s"spendable=${waves - lease.out - deposit}" + ifNotZero("waves", waves) + ifNotZero("lease", lease.out) + ifNotZero("deposit", deposit)
 
-      // TODO: additional tests
+      lazy val stateChanges =
+        s"before: ${balancesStr(wavesBefore, leaseBefore, depositBefore)}, after: ${balancesStr(wavesAfter, leaseAfter, depositAfter)}"
+
       val errorMessage =
-        if (newWaves < 0) s"negative waves balance: $acc, old: $oldWaves, new: $newWaves".asLeft
-        else if (newWavesWithDeposit < 0) {
-          if (newDeposit > oldDeposit) s"$acc not enough funds for deposit, $stateChanges".asLeft
-          else s"$acc trying to spend a deposit, $stateChanges".asLeft
-        } else if (newWavesWithDeposit < newLease.out && b.height > b.settings.functionalitySettings.allowLeasedBalanceTransferUntilHeight) {
-          if (newWavesWithDeposit + newLease.in - newLease.out < 0) s"negative effective balance: $acc, $stateChanges".asLeft
-          else if (leaseOutDiff == 0) s"$acc trying to spend leased money".asLeft
-          else s"leased being more than own: $acc, $stateChanges".asLeft
-        } else Either.unit
+        if (wavesAfter < 0) s"negative waves balance: before=$wavesBefore, after=$wavesAfter".asLeft
+        else if (wavesWithoutDepositAfter < 0) {
+          if (depositAfter > depositBefore) s"not enough funds for deposit, $stateChanges".asLeft
+          else s"trying to spend a deposit, $stateChanges".asLeft
+        } else if (wavesWithoutDepositAfter < leaseAfter.out && b.height > b.settings.functionalitySettings.allowLeasedBalanceTransferUntilHeight) {
+          if (wavesWithoutDepositAfter + leaseAfter.in - leaseAfter.out < 0) s"negative effective balance, $stateChanges".asLeft
+          else if (leaseOutDiff == 0) s"trying to spend leased money, $stateChanges".asLeft
+          else s"leased being more than own, $stateChanges".asLeft
+        } else if (wavesWithoutDepositAfter - leaseAfter.out < 0 && depositBefore > 0)
+          s"trying to spend either a deposit or leased money, $stateChanges".asLeft
+        else Either.unit
 
-      errorMessage.leftMap(acc -> _)
+      errorMessage.leftMap(err => acc -> s"$err")
     }
 
     val wavesCheck =
@@ -69,14 +75,9 @@ object BalanceDiffValidation {
         }
         .getOrElse(Map())
 
-    val positiveBalanceErrors =
-      wavesCheck ++ assetsCheck
-
-    if (positiveBalanceErrors.isEmpty) {
-      Right(snapshot)
-    } else {
-      Left(AccountBalanceError(positiveBalanceErrors))
-    }
+    val positiveBalanceErrors = wavesCheck ++ assetsCheck
+    if (positiveBalanceErrors.isEmpty) Right(snapshot)
+    else Left(AccountBalanceError(positiveBalanceErrors))
   }
 
   private def negativeAssetsInfo(
