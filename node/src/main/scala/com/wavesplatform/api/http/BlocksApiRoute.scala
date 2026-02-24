@@ -37,14 +37,14 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       } else {
         complete(
           commonApi
-            .blockDelay(blockId, count)
+            .blockDelay(blockId(), count)
             .map(delay => Json.obj("delay" -> delay))
             .toRight(BlockDoesNotExist)
         )
       }
     } ~ path("height" / BlockId) { signature =>
       complete(for {
-        meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
+        meta <- commonApi.meta(signature()).toRight(BlockDoesNotExist)
       } yield Json.obj("height" -> meta.height))
     } ~ path("address" / AddrSegment / IntNumber / IntNumber) { (address, start, end) =>
       if (end >= 0 && start >= 0 && end - start >= 0 && end - start < settings.blocksRequestLimit) {
@@ -67,7 +67,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       } ~ path("finalized") {
         at(commonApi.currentFinalizedHeight, includeTransactions = false)
       } ~ path(BlockId) { id =>
-        complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
+        complete(commonApi.meta(id()).map(_.json()).toRight(BlockDoesNotExist))
       }
     } ~ path("finalized" / "at" / IntNumber) { height =>
       complete {
@@ -86,7 +86,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
 
       complete(heightE.bimap(GenericError(_), h => Json.obj("height" -> h.toInt)))
     } ~ path(BlockId) { id =>
-      complete(commonApi.block(id).map(toJson).toRight(BlockDoesNotExist))
+      complete(commonApi.block(id()).map(toJson).toRight(BlockDoesNotExist))
     }
   }
 

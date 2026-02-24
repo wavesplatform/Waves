@@ -41,7 +41,7 @@ case class LeaseApiRoute(
   private def leaseInfo: Route = pathPrefix("info") {
     (get & path(TransactionId)) { leaseId =>
       val result = commonAccountApi
-        .leaseInfo(leaseId)
+        .leaseInfo(leaseId())
         .toRight(TransactionDoesNotExist)
 
       complete(result)

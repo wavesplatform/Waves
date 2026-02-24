@@ -76,7 +76,7 @@ case class TransactionsApiRoute(
 
   def info: Route = pathPrefix("info") {
     (get & path(TransactionId)) { id =>
-      complete(commonApi.transactionById(id).toRight(ApiError.TransactionDoesNotExist))
+      complete(commonApi.transactionById(id()).toRight(ApiError.TransactionDoesNotExist))
     } ~ (pathEndOrSingleSlash & anyParam("id", limit = settings.transactionsByAddressLimit)) { ids =>
       val result = for {
         _    <- Either.cond(ids.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
@@ -93,7 +93,7 @@ case class TransactionsApiRoute(
         .transactionSnapshot(id)
         .toRight(TransactionDoesNotExist)
         .map { case (snapshot, txStatus) => StateSnapshotJson.fromSnapshot(snapshot, txStatus) }
-    val single = (get & path(TransactionId))(id => complete(readSnapshot(id)))
+    val single = (get & path(TransactionId))(id => complete(readSnapshot(id())))
     val multiple = (pathEndOrSingleSlash & anyParam("id", limit = settings.transactionSnapshotsLimit))(rawIds =>
       complete(
         for {
@@ -126,7 +126,7 @@ case class TransactionsApiRoute(
 
   def status: Route = pathPrefix("status") {
     path(TransactionId) { id =>
-      complete(loadTransactionStatus(id))
+      complete(loadTransactionStatus(id()))
     } ~ pathEndOrSingleSlash {
       anyParam("id").filter(_.nonEmpty) { ids =>
         if (ids.toSeq.length > settings.transactionsByAddressLimit)
@@ -160,7 +160,7 @@ case class TransactionsApiRoute(
       complete(InvalidSignature)
     } ~
       path(TransactionId) { id =>
-        commonApi.unconfirmedTransactionById(id) match {
+        commonApi.unconfirmedTransactionById(id()) match {
           case Some(tx) =>
             complete(serializer.unconfirmedTxExtendedJson(tx))
           case None =>

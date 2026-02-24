@@ -1,10 +1,5 @@
 package com.wavesplatform.api
 
-import org.apache.pekko
-import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
-import org.apache.pekko.http.scaladsl.model.StatusCodes
-import org.apache.pekko.http.scaladsl.server.*
-import org.apache.pekko.http.scaladsl.server.Directives.*
 import cats.syntax.either.*
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, PublicKey}
@@ -18,7 +13,13 @@ import com.wavesplatform.crypto
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import monix.eval.Coeval
 import monix.execution.Scheduler
+import org.apache.pekko
+import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.server.*
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.slf4j.LoggerFactory
 import play.api.libs.json.*
 
@@ -112,21 +113,23 @@ package object http {
     }
   }
 
-  private def idOrHash(error: String => ApiError): PathMatcher1[ByteStr] = Segment.map { str =>
-    ByteStr.decodeBase58(str) match {
-      case Success(value) =>
-        if (value.arr.length == crypto.DigestLength || value.arr.length == crypto.SignatureLength) value
-        else
-          throw ApiException(
-            error(s"$str has invalid length ${value.arr.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}")
-          )
-      case Failure(exception) =>
-        throw ApiException(error(exception.getMessage))
+  private def idOrHash(error: String => ApiError): PathMatcher1[Coeval[ByteStr]] = Segment.map { str =>
+    Coeval.evalOnce {
+      ByteStr.decodeBase58(str) match {
+        case Success(value) =>
+          if (value.arr.length == crypto.DigestLength || value.arr.length == crypto.SignatureLength) value
+          else
+            throw ApiException(
+              error(s"$str has invalid length ${value.arr.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}")
+            )
+        case Failure(exception) =>
+          throw ApiException(error(exception.getMessage))
+      }
     }
   }
 
-  val TransactionId: PathMatcher1[ByteStr] = idOrHash(InvalidTransactionId.apply)
-  val BlockId: PathMatcher1[ByteStr]       = idOrHash(InvalidBlockId.apply)
+  val TransactionId: PathMatcher1[Coeval[ByteStr]] = idOrHash(InvalidTransactionId.apply)
+  val BlockId: PathMatcher1[Coeval[ByteStr]]       = idOrHash(InvalidBlockId.apply)
 
   val AssetId: PathMatcher1[IssuedAsset] = base58Segment(Some(crypto.DigestLength), _ => InvalidAssetId).map(IssuedAsset(_))
 
