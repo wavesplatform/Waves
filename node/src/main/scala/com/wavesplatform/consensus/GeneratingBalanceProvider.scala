@@ -12,6 +12,12 @@ object GeneratingBalanceProvider {
   private val FirstDepth  = 50
   private val SecondDepth = 1000
 
+  def minMiningBalance(blockchain: Blockchain, height: Height): Long = {
+    val activated = blockchain.activatedFeatures.get(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(height >= _)
+    if (activated) MinimalEffectiveBalanceForGenerator2
+    else MinimalEffectiveBalanceForGenerator1
+  }
+
   def isMiningAllowed(blockchain: Blockchain, height: Height, generatingBalance: Long): Boolean =
     generatingBalance >= MinimalEffectiveBalanceForGenerator1
       || blockchain.activatedFeatures

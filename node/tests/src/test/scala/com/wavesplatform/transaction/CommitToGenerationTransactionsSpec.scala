@@ -153,20 +153,21 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
 
     "with insufficient balance" in {
       val newGenerator = TxHelpers.signer(1005)
+      val txFee        = 1.waves
       withDomain(
-        DeterministicFinality,
+        DeterministicFinality.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance),
         Seq(
           AddrWithBalance(sender.toAddress, 1000000.waves),
           AddrWithBalance(
             newGenerator.toAddress,
-            GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2 + CommitToGenerationTransaction.DepositInWavelets
+            GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2 + CommitToGenerationTransaction.DepositInWavelets + txFee - 1
           )
         )
       ) { d =>
-        val tx = TxHelpers.commitToGeneration(Height(3001), newGenerator)
+        val tx = TxHelpers.commitToGeneration(Height(3001), newGenerator, fee = txFee)
 
         d.appendBlockE(tx) should produce(
-          s"Generating balance ${GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2 - tx.fee.value} is less than 100000000000 required for block generation"
+          s"is less than ${GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2} required for block generation"
         )
       }
     }
