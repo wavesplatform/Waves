@@ -77,16 +77,16 @@ class BlockchainUpdaterImpl(
 
   publishLastBlockInfo()
 
-  override def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.snapshotOf(id).map(_._1)))
+  override def liquidBlock(totalBlockId: BlockId): Option[Block] = readLock(ngState.flatMap(_.snapshotOf(totalBlockId).map(_._1)))
 
-  override def liquidBlockSnapshot(id: ByteStr): Option[StateSnapshot] = readLock(ngState.flatMap(_.snapshotOf(id).map(_._2)))
+  override def liquidBlockSnapshot(totalBlockId: BlockId): Option[StateSnapshot] = readLock(ngState.flatMap(_.snapshotOf(totalBlockId).map(_._2)))
 
-  override def microBlockSnapshot(totalBlockId: ByteStr): Option[StateSnapshot] = readLock(
+  override def microBlockSnapshot(totalBlockId: BlockId): Option[StateSnapshot] = readLock(
     ngState.flatMap(_.microSnapshots.get(totalBlockId).map(_.snapshot))
   )
 
-  override def liquidTransactions(id: ByteStr): Option[Seq[(TxMeta, Transaction)]] =
-    liquidBlockSnapshot(id).map { snapshot =>
+  override def liquidTransactions(totalBlockId: BlockId): Option[Seq[(TxMeta, Transaction)]] =
+    liquidBlockSnapshot(totalBlockId).map { snapshot =>
       snapshot.transactions.toSeq.map { case (_, info) => (TxMeta(Height(height), info.status, info.spentComplexity), info.transaction) }
     }
 
@@ -613,7 +613,7 @@ class BlockchainUpdaterImpl(
                 LastBlockInfo(blockId, Height(height), score, this.finalizedHeightOrFallback(maxSyncRollbackLength), ready = true)
               )
 
-              miner.scheduleMining(blockchain = None, cancelMicroBlockMining = false)
+              miner.scheduleMining(baseBlockchain = None, cancelMicroBlockMining = false)
               blockId
             }
         }
@@ -702,10 +702,10 @@ class BlockchainUpdaterImpl(
       .orElse(rocksdb.heightOf(blockId))
   }
 
-  override def microBlock(id: BlockId): Option[MicroBlock] = readLock {
+  override def microBlock(totalBlockId: BlockId): Option[MicroBlock] = readLock {
     for {
       ng <- ngState
-      mb <- ng.microBlock(id)
+      mb <- ng.microBlock(totalBlockId)
     } yield mb
   }
 

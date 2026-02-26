@@ -154,6 +154,32 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       }
     }.run()
 
+    "if committed in the last microblock, that removed" in {
+      val committedGenerators = Seq(committedGenerator1, committedGenerator2)
+      val allGenerators       = notCommittedGenerator +: committedGenerators
+
+      withDomain(
+        defaultSettings.configure(_.copy(generationPeriodLength = 2)),
+        AddrWithBalance.enoughBalances(allGenerators*)
+      ) { d =>
+        log.debug(s"Append block 2 with commitments")
+        val txs    = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+        val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = notCommittedGenerator, strictTime = true)
+        d.appender.appendBlock(block2)
+        d.appendMicroBlock(
+          d.createMicroBlock(
+            signer = Some(notCommittedGenerator)
+          )(TxHelpers.commitToGeneration(generationPeriodStart = Height(3), notCommittedGenerator))
+        )
+
+        log.debug(s"Append block 3 of not committed generator")
+        val newBlock1 =
+          d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(block2.id()), generator = notCommittedGenerator, strictTime = true)
+        d.appender.appendBlock(newBlock1, requireAppended = false)
+        d.blockchain.isLastBlockId(newBlock1.id()) shouldBe false
+      }
+    }
+
     "if conflict" in pendingUntilFixed(new BaseTest {
       override def continue(d: Domain): Unit = {
         log.debug(s"Append block 3 with votes")

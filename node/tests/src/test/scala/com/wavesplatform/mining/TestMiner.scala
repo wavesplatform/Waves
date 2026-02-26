@@ -8,8 +8,8 @@ import scala.concurrent.duration.FiniteDuration
 
 object TestMiner {
   object SafelyDisabled extends Miner with MinerDebugInfo {
-    override def scheduleMining(blockchain: Option[Blockchain], cancelMicroBlockMining: Boolean): Unit = {}
-    override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration]        = Right(FiniteDuration(0, TimeUnit.SECONDS))
-    override def state: MinerDebugInfo.State                                                           = MinerDebugInfo.Disabled
+    override def scheduleMining(baseBlockchain: Option[Blockchain], cancelMicroBlockMining: Boolean): Unit = {}
+    override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Right(FiniteDuration(0, TimeUnit.SECONDS))
+    override def state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
   }
 }

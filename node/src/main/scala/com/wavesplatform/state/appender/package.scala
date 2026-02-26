@@ -80,19 +80,22 @@ package object appender {
     r.leftMap(GenericError(_))
   }
 
+  /** @param blockchain The keyblock can reference not only the latest liquid block. We will validate new block against this blockchain.
+    */
   private[appender] def appendKeyBlock(
-      blockchainUpdater: BlockchainUpdater & Blockchain,
+      blockchain: Blockchain,
+      blockchainUpdater: BlockchainUpdater,
       utx: UtxPool,
-      pos: PoSSelector,
+      pos: PoSSelector, // No need to .copy(blockchain = blockchain), because it doesn't depend on committed/conflict endorsers
       time: Time,
       log: LoggerFacade,
       verify: Boolean,
       txSignParCheck: Boolean
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] =
     for {
-      data <- findBlockAndGetGenerators(blockchainUpdater, block)
+      data <- findBlockAndGetGenerators(blockchain, block)
       (hitSource, balances) <-
-        if (verify) validateBlock(blockchainUpdater, pos, time, data.generatorSet)(block, data.parentHeight)
+        if (verify) validateBlock(blockchain, pos, time, data.generatorSet)(block, data.parentHeight)
         else pos.validateGenerationSignature(block).map(_ -> Seq.empty)
       applyResult <-
         metrics.appendBlock
@@ -101,7 +104,7 @@ package object appender {
               .processBlock(
                 block,
                 hitSource,
-                snapshot.map(responseToSnapshot(block, Height(blockchainUpdater.height + 1))),
+                snapshot.map(responseToSnapshot(block, Height(blockchain.height + 1))),
                 balances,
                 challengedHitSource = None,
                 verify,
@@ -215,16 +218,16 @@ package object appender {
   /** @return
     *   Hit source
     */
-  private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time, generatorSet: GeneratorSet)(
+  private def validateBlock(blockchain: Blockchain, pos: PoSSelector, time: Time, generatorSet: GeneratorSet)(
       block: Block,
       parentHeight: Height
   ): Either[ValidationError, (ByteStr, GeneratorSet)] =
     for {
-      _ <- Miner.isAllowedForMiningByAccountScript(block.sender.toAddress, blockchainUpdater).leftMap(BlockAppendError(_, block))
-      r <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime())(block, parentHeight)
-      _ <- validateStateHash(block, blockchainUpdater)
-      _ <- validateChallengedHeader(block, blockchainUpdater)
-      b <- validateFinalizationVoting(block, blockchainUpdater, generatorSet)
+      _ <- Miner.isAllowedForMiningByAccountScript(block.sender.toAddress, blockchain).leftMap(BlockAppendError(_, block))
+      r <- blockConsensusValidation(blockchain, pos, time.correctedTime())(block, parentHeight)
+      _ <- validateStateHash(block, blockchain)
+      _ <- validateChallengedHeader(block, blockchain)
+      b <- validateFinalizationVoting(block, blockchain, generatorSet)
     } yield (r, b)
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long)(

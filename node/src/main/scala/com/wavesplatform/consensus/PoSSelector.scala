@@ -1,7 +1,5 @@
 package com.wavesplatform.consensus
 
-import scala.concurrent.duration.FiniteDuration
-
 import cats.syntax.either.*
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -13,7 +11,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.utils.{forceStopApplication, BaseTargetReachedMaximum, ScorexLogging}
+import com.wavesplatform.utils.{BaseTargetReachedMaximum, ScorexLogging, forceStopApplication}
+
+import scala.concurrent.duration.FiniteDuration
 
 case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) extends ScorexLogging {
   import PoSCalculator.*
@@ -84,7 +84,7 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
   def validateGenerationSignature(block: Block): Either[ValidationError, ByteStr] = {
     val blockGenSig = block.header.generationSignature
 
-    // TODO: we already check this
+    // TODO: we already checked this
     blockchain.heightOf(block.header.reference).toRight(GenericError(s"Block reference ${block.header.reference} doesn't exist")).flatMap { height =>
       if (vrfActivated(height + 1)) {
         getHitSource(height)

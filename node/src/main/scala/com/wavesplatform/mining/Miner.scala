@@ -34,7 +34,7 @@ import java.time.LocalTime
 import scala.concurrent.duration.*
 
 trait Miner {
-  def scheduleMining(blockchain: Option[Blockchain] = None, cancelMicroBlockMining: Boolean = true): Unit
+  def scheduleMining(baseBlockchain: Option[Blockchain] = None, cancelMicroBlockMining: Boolean = true): Unit
 }
 
 trait MinerDebugInfo {
@@ -93,7 +93,7 @@ class MinerImpl(
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =
     this.nextBlockGenOffsetWithConditions(account, blockchainUpdater)
 
-  def scheduleMining(tempBlockchain: Option[Blockchain], cancelMicroBlockMining: Boolean): Unit =
+  def scheduleMining(baseBlockchain: Option[Blockchain], cancelMicroBlockMining: Boolean): Unit =
     if (!settings.enableLightMode || blockchainUpdater.supportsLightNodeBlockFields()) {
       val accounts = if (settings.minerSettings.privateKeys.nonEmpty) {
         settings.minerSettings.privateKeys.map(PKKeyPair(_))
@@ -102,7 +102,7 @@ class MinerImpl(
       }
 
       scheduledAttempts := CompositeCancelable.fromSet(accounts.map { account =>
-        generateBlockTask(account, tempBlockchain)
+        generateBlockTask(account, baseBlockchain)
           .onErrorHandle(err => log.warn(s"Error mining block by ${account.toAddress}: ${err.getMessage}"))
           .runAsyncLogErr(using appenderScheduler)
       }.toSet)
@@ -292,26 +292,30 @@ class MinerImpl(
     } yield offset
   }
 
-  private[mining] def generateBlockTask(account: KeyPair, maybeBlockchain: Option[Blockchain]): Task[Unit] = {
+  /** @param baseBlockchain If specified - wait for last block appended
+    */
+  private[mining] def generateBlockTask(account: KeyPair, baseBlockchain: Option[Blockchain]): Task[Unit] = {
     (for {
-      offset <- nextBlockGenOffsetWithConditions(account, maybeBlockchain.getOrElse(blockchainUpdater))
+      offset <- nextBlockGenOffsetWithConditions(account, baseBlockchain.getOrElse(blockchainUpdater))
       quorumAvailable = checkQuorumAvailable().isRight
     } yield {
       if (quorumAvailable) offset
       else offset.max(settings.minerSettings.noQuorumMiningDelay)
     }) match {
       case Right(offset) =>
+        val waitBlockId    = baseBlockchain.flatMap(_.lastBlockId)
+        val waitBlockIdStr = waitBlockId.fold("")(id => s" with waiting $id")
         log.debug(
-          f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds (${LocalTime.now().plusNanos(offset.toNanos)})"
+          f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds (${LocalTime.now().plusNanos(offset.toNanos)})$waitBlockIdStr"
         )
 
-        val waitBlockAppendedTask = maybeBlockchain match {
-          case Some(value) =>
+        val waitBlockAppendedTask = waitBlockId match {
+          case Some(blockId) =>
             def waitUntilBlockAppended(block: BlockId): Task[Unit] =
               if (blockchainUpdater.contains(block)) Task.unit
               else Task.defer(waitUntilBlockAppended(block)).delayExecution(1 seconds)
 
-            waitUntilBlockAppended(value.lastBlockId.get)
+            waitUntilBlockAppended(blockId)
 
           case None => Task.unit
         }
@@ -390,9 +394,9 @@ object Miner {
   val MaxTransactionsPerMicroblock: Int = 500
 
   val StrictDisabledMiner: Miner & MinerDebugInfo = new Miner with MinerDebugInfo {
-    override def scheduleMining(blockchain: Option[Blockchain], cancelMicroBlockMining: Boolean): Unit = {}
-    override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration]        = Left("Disabled")
-    override val state: MinerDebugInfo.State                                                           = MinerDebugInfo.Disabled
+    override def scheduleMining(baseBlockchain: Option[Blockchain], cancelMicroBlockMining: Boolean): Unit = {}
+    override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration]            = Left("Disabled")
+    override val state: MinerDebugInfo.State                                                               = MinerDebugInfo.Disabled
   }
 
   def forwardTo(underlying: => Miner): Miner = { (blockchain: Option[Blockchain], cancelMicroBlockMining: Boolean) =>

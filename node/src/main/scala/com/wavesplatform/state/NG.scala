@@ -3,23 +3,22 @@ package com.wavesplatform.state
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Transaction
 
 trait NG {
-  def microBlock(id: ByteStr): Option[MicroBlock]
+  def microBlock(totalBlockId: BlockId): Option[MicroBlock]
 
   def bestLastBlockInfo(maxMicroblockTimestampMs: Long): Option[BlockMinerInfo]
 
   def microblockIds: Seq[BlockId]
 
-  def liquidBlock(id: ByteStr): Option[Block]
+  def liquidBlock(totalBlockId: BlockId): Option[Block]
 
-  def liquidBlockSnapshot(id: ByteStr): Option[StateSnapshot]
+  def liquidBlockSnapshot(totalBlockId: BlockId): Option[StateSnapshot]
 
-  def microBlockSnapshot(totalBlockId: ByteStr): Option[StateSnapshot]
+  def microBlockSnapshot(totalBlockId: BlockId): Option[StateSnapshot]
 
-  def liquidTransactions(id: ByteStr): Option[Seq[(TxMeta, Transaction)]]
+  def liquidTransactions(totalBlockId: BlockId): Option[Seq[(TxMeta, Transaction)]]
 
   def liquidBlockMeta: Option[BlockMeta]
 

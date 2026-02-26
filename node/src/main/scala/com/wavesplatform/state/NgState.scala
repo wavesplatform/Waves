@@ -142,8 +142,8 @@ case class NgState(
   def contains(blockId: BlockId): Boolean =
     base.id() == blockId || microBlocks.exists(_.idEquals(blockId))
 
-  def microBlock(id: BlockId): Option[MicroBlock] =
-    microBlocks.find(_.idEquals(id)).map(_.microBlock)
+  def microBlock(totalBlockId: BlockId): Option[MicroBlock] =
+    microBlocks.find(_.idEquals(totalBlockId)).map(_.microBlock)
 
   def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
     val blockId = microBlocks
