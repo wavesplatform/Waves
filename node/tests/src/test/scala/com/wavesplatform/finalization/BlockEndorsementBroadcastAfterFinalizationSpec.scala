@@ -1,9 +1,7 @@
 package com.wavesplatform.finalization
 
-import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
@@ -72,7 +70,7 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
           appenderScheduler
         )(channel2, _, None)
 
-        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
+        val block = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = sender, strictTime = true)
 
         testTime.setTime(block.header.timestamp)
         appender(block).runSyncUnsafe()
@@ -101,19 +99,19 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
           appenderScheduler
         )(channel2, _, None)
 
-        val block2 = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
+        val block2 = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
         testTime.setTime(block2.header.timestamp)
         appender(block2).runSyncUnsafe()
         if (d.lastBlockId != block2.id()) fail(s"Can't apply endorsedBlock $block2, see logs")
         channel1.sentEndorsements.length shouldBe 0
 
-        val block3 = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator2, strictTime = true)
+        val block3 = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true)
         testTime.setTime(block3.header.timestamp)
         appender(block3).runSyncUnsafe()
         if (d.lastBlockId != block3.id()) fail(s"Can't apply block3 $block3, see logs")
         channel1.sentEndorsements.length shouldBe 0
 
-        val block4 = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
+        val block4 = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
         testTime.setTime(block4.header.timestamp)
         appender(block4).runSyncUnsafe()
         if (d.lastBlockId != block4.id()) fail(s"Can't apply block4 $block4, see logs")
@@ -124,20 +122,7 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
 
   "should broadcast a block endorsement if validator" in withManager { manager =>
     val otherGenerator = Wallet.generateNewAccount(Domain.DefaultWalletSeed :+ 1.toByte, nonce = 0)
-
-    def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-      private val xs = Vector(generator1, otherGenerator).map { g =>
-        g.toAddress -> BlsKeyPair(g.privateKey).publicKey
-      }
-
-      override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = xs
-    }
-
-    withDomain(
-      defaultSettings,
-      AddrWithBalance.enoughBalances(generator1, otherGenerator),
-      wrapBU = wrapBU
-    ) { d =>
+    withDomain(defaultSettings, AddrWithBalance.enoughBalances(generator1, otherGenerator)) { d =>
       d.wallet.generateNewAccounts(1)
 
       val channels = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
@@ -158,13 +143,23 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
         appenderScheduler
       )(channel2, _, None)
 
-      val endorsedBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator1, strictTime = true)
+      d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+      d.appendBlock(
+        d.createBlock(
+          Block.ProtoBlockVersion,
+          txs = Seq(generator1, otherGenerator).map(TxHelpers.commitToGeneration(Height(4), _)),
+          generator = generator1,
+          strictTime = true
+        )
+      )
+
+      val endorsedBlock = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
       testTime.setTime(endorsedBlock.header.timestamp)
       appender(endorsedBlock).runSyncUnsafe()
       if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply endorsedBlock $endorsedBlock, see logs")
       channel1.sentEndorsements.length shouldBe 0
 
-      val nextBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = otherGenerator, strictTime = true)
+      val nextBlock = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = otherGenerator, strictTime = true)
       testTime.setTime(nextBlock.header.timestamp)
       appender(nextBlock).runSyncUnsafe()
       if (d.lastBlockId != nextBlock.id()) fail(s"Can't apply nextBlock $nextBlock, see logs")
@@ -174,19 +169,9 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
 
   "voting height increased if surpass maxRollback blocks" in withManager { manager =>
     val otherGenerator = Wallet.generateNewAccount(Domain.DefaultWalletSeed :+ 1.toByte, nonce = 0)
-
-    def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-      private val xs = Vector(generator1, otherGenerator).map { g =>
-        g.toAddress -> BlsKeyPair(g.privateKey).publicKey
-      }
-
-      override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = xs
-    }
-
     withDomain(
       defaultSettings.copy(synchronizationSettings = defaultSettings.synchronizationSettings.copy(maxRollback = 2)),
-      AddrWithBalance.enoughBalances(generator1, otherGenerator),
-      wrapBU = wrapBU
+      AddrWithBalance.enoughBalances(generator1, otherGenerator)
     ) { d =>
       d.wallet.generateNewAccounts(1)
 
@@ -207,6 +192,15 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
         appenderScheduler
       )(channel2, _, None)
 
+      d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+      val block3 = d.createBlock(
+        Block.ProtoBlockVersion,
+        txs = Seq(generator1, otherGenerator).map(TxHelpers.commitToGeneration(Height(4), _)),
+        generator = generator1,
+        strictTime = true
+      )
+      d.appendBlock(block3)
+
       def appendBlock(n: Int): Block = {
         val r = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = otherGenerator, strictTime = true)
         testTime.setTime(r.header.timestamp)
@@ -215,8 +209,6 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
         r
       }
 
-      appendBlock(2)
-      val block3 = appendBlock(3)
       val block4 = appendBlock(4)
       channel1.outboundMessages().clear()
 
@@ -236,19 +228,9 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
 
   "no prior finalization" in withManager { manager =>
     val otherGenerator = Wallet.generateNewAccount(Domain.DefaultWalletSeed :+ 1.toByte, nonce = 0)
-
-    def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-      private val xs = Vector(generator1, otherGenerator).map { g =>
-        g.toAddress -> BlsKeyPair(g.privateKey).publicKey
-      }
-
-      override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = xs
-    }
-
     withDomain(
       defaultSettings.copy(synchronizationSettings = defaultSettings.synchronizationSettings),
-      AddrWithBalance.enoughBalances(generator1, otherGenerator),
-      wrapBU = wrapBU
+      AddrWithBalance.enoughBalances(generator1, otherGenerator)
     ) { d =>
       d.wallet.generateNewAccounts(1)
       val genesisBlockId = d.lastBlockId
@@ -270,6 +252,16 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
         appenderScheduler
       )(channel2, _, None)
 
+      d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+      d.appendBlock(
+        d.createBlock(
+          Block.ProtoBlockVersion,
+          txs = Seq(generator1, otherGenerator).map(TxHelpers.commitToGeneration(Height(4), _)),
+          generator = generator1,
+          strictTime = true
+        )
+      )
+
       def appendBlock(n: Int): Block = {
         val r = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = otherGenerator, strictTime = true)
         testTime.setTime(r.header.timestamp)
@@ -278,8 +270,6 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
         r
       }
 
-      appendBlock(2)
-      appendBlock(3)
       val block4 = appendBlock(4)
       channel1.outboundMessages().clear()
 
@@ -299,19 +289,11 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
 
   "finalized before" in withManager { manager =>
     val otherGenerator = Wallet.generateNewAccount(Domain.DefaultWalletSeed :+ 1.toByte, nonce = 0)
-
-    def wrapBU(bu: CompleteBlockchainUpdater): CompleteBlockchainUpdater = new ForwardingBlockchainUpdaterImpl(bu) {
-      private val xs = Vector(generator1, otherGenerator).map { g =>
-        g.toAddress -> BlsKeyPair(g.privateKey).publicKey
-      }
-
-      override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = xs
-    }
-
     withDomain(
-      defaultSettings.copy(synchronizationSettings = defaultSettings.synchronizationSettings),
-      AddrWithBalance.enoughBalances(generator1, otherGenerator),
-      wrapBU = wrapBU
+      defaultSettings
+        .copy(synchronizationSettings = defaultSettings.synchronizationSettings)
+        .configure(_.copy(generationPeriodLength = 3)),
+      AddrWithBalance.enoughBalances(generator1, otherGenerator)
     ) { d =>
       d.wallet.generateNewAccounts(1)
       val genesisBlockId = d.lastBlockId
@@ -333,6 +315,15 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
         appenderScheduler
       )(channel2, _, None)
 
+      d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+      val block3 = d.createBlock(
+        Block.ProtoBlockVersion,
+        txs = Seq(generator1, otherGenerator).map(TxHelpers.commitToGeneration(Height(4), _)),
+        generator = generator1,
+        strictTime = true
+      )
+      d.appendBlock(block3)
+
       def appendBlock(n: Int, finalizationVoting: Option[FinalizationVoting] = None): Block = {
         val r =
           d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = otherGenerator, strictTime = true, finalizationVoting = finalizationVoting)
@@ -342,25 +333,24 @@ class BlockEndorsementBroadcastAfterFinalizationSpec extends BaseFinalizationSpe
         r
       }
 
-      val block2 = appendBlock(2)
       appendBlock(
-        n = 3,
+        n = 4,
         Some(
           mkFinalizationVoting(valid = Seq(0).map(GeneratorIndex(_)))
-            .signed(endorsedId = block2.id(), finalizedId = genesisBlockId, validEndorsers = generator1)
+            .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = generator1)
         )
       )
-      val block4 = appendBlock(4)
+      val block5 = appendBlock(5)
       channel1.outboundMessages().clear()
 
-      appendBlock(5)
-      d.blockchain.finalizedHeight.value shouldBe Height(2)
+      appendBlock(6)
+      d.blockchain.finalizedHeight.value shouldBe Height(3)
 
       val endorsement = channel1.sentEndorsements.head.copy(endorserIndex = -1, signature = ByteStr.empty)
       endorsement shouldBe EndorseBlock(
-        finalizedId = block2.id(),
-        finalizedHeight = Height(2),
-        endorsedId = block4.id(),
+        finalizedId = block3.id(),
+        finalizedHeight = Height(3),
+        endorsedId = block5.id(),
         endorserIndex = -1,
         signature = ByteStr.empty
       )
