@@ -141,6 +141,37 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         d.appender.appendBlock(block)
       }
     }.run()
+
+    "if sent conflicting endorsement in the last microblock, that removed" in {
+      val committedGenerators = Seq(committedGenerator1, committedGenerator2)
+
+      withDomain(
+        defaultSettings.configure(_.copy(generationPeriodLength = 3)),
+        AddrWithBalance.enoughBalances(committedGenerators*)
+      ) { d =>
+        log.debug(s"Append block 2 with commitments")
+        val txs = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x))
+        d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = committedGenerator1, strictTime = true))
+
+        log.debug(s"Append block 3")
+        d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+
+        log.debug(s"Append block 4 of new epoch with conflicting endorsement in the last microblock")
+        val block4 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true)
+        d.appender.appendBlock(block4)
+        d.appendMicroBlock(
+          d.createMicroBlock(
+            signer = Some(committedGenerator1),
+            finalizationVoting = Some(mkFinalizationVoting().withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlockId))
+          )(TxHelpers.transfer(committedGenerator1))
+        )
+
+        log.debug(s"Append block 5 of conflicting generator")
+        d.appender.appendBlock(
+          d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(block4.id()), generator = committedGenerator2, strictTime = true)
+        )
+      }
+    }
   }
 
   "should reject a block" - {
@@ -173,10 +204,10 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         )
 
         log.debug(s"Append block 3 of not committed generator")
-        val newBlock1 =
+        val newBlock =
           d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(block2.id()), generator = notCommittedGenerator, strictTime = true)
-        d.appender.appendBlock(newBlock1, requireAppended = false)
-        d.blockchain.isLastBlockId(newBlock1.id()) shouldBe false
+        d.appender.appendBlock(newBlock, requireAppended = false)
+        d.blockchain.isLastBlockId(newBlock.id()) shouldBe false
       }
     }
 
