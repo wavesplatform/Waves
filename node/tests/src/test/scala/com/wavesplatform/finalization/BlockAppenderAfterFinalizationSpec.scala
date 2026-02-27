@@ -172,6 +172,62 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         )
       }
     }
+
+    "if sent LeaseCancel in the last microblock, that removed" in {
+      val committedGenerators = Seq(committedGenerator1, committedGenerator2)
+      withDomain(
+        defaultSettings.configure(
+          _.copy(
+            generationPeriodLength = 51,
+            generationBalanceDepthFrom50To1000AfterHeight = 1000
+          )
+        ),
+        AddrWithBalance.enoughBalances(committedGenerator1) :+ AddrWithBalance(
+          committedGenerator2Addr,
+          CommitToGenerationTransaction.DepositInWavelets + 1.waves
+        )
+      ) { d =>
+        log.debug(s"Append block 2 with leasing")
+        val leasingTxn = TxHelpers.lease(committedGenerator1, committedGenerator2Addr, amount = 20_000.waves)
+        d.appender.appendBlock(
+          d.createBlock(
+            version = Block.ProtoBlockVersion,
+            txs = Seq(leasingTxn),
+            generator = committedGenerator1,
+            strictTime = true
+          )
+        )
+
+        log.debug("Appending [3; 51] blocks")
+        (3 to 50).foreach { _ =>
+          d.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+        }
+        d.appender.appendBlock(
+          d.createBlock(
+            version = Block.ProtoBlockVersion,
+            txs = Nil,
+            generator = committedGenerator1,
+            strictTime = true
+          )
+        )
+
+        log.debug("Commit to generation")
+        d.appendMicroBlock(
+          d.createMicroBlock(signer = Some(committedGenerator1))(
+            committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(52), x))*
+          )
+        )
+        val block51Id = d.lastBlockId
+
+        log.debug("Cancel leasing for committedGenerator2 in microblock")
+        d.appendMicroBlock(d.createMicroBlock(signer = Some(committedGenerator1))(TxHelpers.leaseCancel(leasingTxn.id(), committedGenerator1)))
+
+        log.debug(s"Append block 52 referencing keyblock")
+        d.appender.appendBlock(
+          d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, ref = Some(block51Id), generator = committedGenerator2, strictTime = true)
+        )
+      }
+    }
   }
 
   "should reject a block" - {
