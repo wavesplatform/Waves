@@ -194,11 +194,11 @@ class BlockchainUpdaterImpl(
         .orElse(lastBlockReward)
   }
 
-  /** Referenced blockchain for mining.
+  /** Referenced blockchain for mining or appending new block that references the latest block in blockchain or a microblock
     * @return
     *   SnapshotBlockchain with a reward for a next height
     * @note
-    *   Do not use for other purposes
+    *   Do not use this for other purposes
     */
   def referencedBlockchain(reference: ByteStr): Blockchain =
     ngState

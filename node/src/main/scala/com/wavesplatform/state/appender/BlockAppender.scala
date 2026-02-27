@@ -26,6 +26,9 @@ import java.time.Instant
 import scala.util.chaining.*
 
 object BlockAppender extends ScorexLogging {
+
+  /** @note Expects that newBlock references the latest block of blockchainUpdater or some microblock
+    */
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
       time: Time,
@@ -45,7 +48,7 @@ object BlockAppender extends ScorexLogging {
           appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
         } else {
           appendKeyBlock(
-            blockchain = blockchainUpdater.referencedBlockchain(newBlock.header.reference),
+            blockchain = blockchainUpdater.referencedBlockchain(newBlock.header.reference), // WARN: Safe to use, see note above
             blockchainUpdater,
             utxStorage,
             pos,
