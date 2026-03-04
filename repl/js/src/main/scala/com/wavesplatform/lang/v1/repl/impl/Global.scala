@@ -1,11 +1,9 @@
 package com.wavesplatform.lang.v1.repl.impl
 
 import scala.scalajs.js
-import scala.scalajs.js.annotation.JSGlobalScope
-import scala.scalajs.js.{Object, Promise, native}
+import scala.scalajs.js.Promise
 
-@native
-@JSGlobalScope
-object Global extends Object {
-  def httpGet(params: js.Dynamic): Promise[js.Dynamic] = native
+object Global {
+  def httpGet(params: js.Dynamic): Promise[js.Dynamic] =
+    com.wavesplatform.lang.impl.Global.httpGet(params)
 }

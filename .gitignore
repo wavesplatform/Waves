@@ -41,5 +41,4 @@ package
 !ride-runner/src/package
 native
 
-lang/js/dist
-repl/js/dist
+ride-js-bundle/dist

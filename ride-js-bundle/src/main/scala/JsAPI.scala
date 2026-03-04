@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.repl.node.http.WebEnvironment.executionContext
 
 object JsAPI {
-  @JSExportTopLevel("repl")
+  @JSExportTopLevel("repl", moduleID = "repl")
   def repl(
       settings: UndefOr[NodeConnectionSettings],
       libraries: js.Array[String] = js.Array()

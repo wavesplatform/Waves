@@ -15,14 +15,14 @@ import scala.scalajs.js.{Any, Dictionary}
 
 object JsAPI {
 
-  @JSExportTopLevel("getTypes")
+  @JSExportTopLevel("getTypes", moduleID = "lang")
   def getTypes(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object & js.Dynamic] =
     API
       .allTypes(ver, isTokenContext, isContract)
       .map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v)))
       .toJSArray
 
-  @JSExportTopLevel("getVarsDoc")
+  @JSExportTopLevel("getVarsDoc", moduleID = "lang")
   def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object & js.Dynamic] =
     API
       .allVars(ver, isTokenContext, isContract)
@@ -35,7 +35,7 @@ object JsAPI {
       }
       .toJSArray
 
-  @JSExportTopLevel("getFunctionsDoc")
+  @JSExportTopLevel("getFunctionsDoc", moduleID = "lang")
   def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object & js.Dynamic] =
     API
       .allFunctions(ver, isTokenContext, isContract)
@@ -53,7 +53,7 @@ object JsAPI {
       }
       .toJSArray
 
-  @JSExportTopLevel("contractLimits")
+  @JSExportTopLevel("contractLimits", moduleID = "lang")
   def contractLimits(): js.Dynamic = {
     import ContractLimits.*
     js.Dynamic.literal(
@@ -71,7 +71,7 @@ object JsAPI {
     )
   }
 
-  @JSExportTopLevel("scriptInfo")
+  @JSExportTopLevel("scriptInfo", moduleID = "lang")
   def scriptInfo(input: String): js.Dynamic = {
     val info = DirectiveParser(input)
       .flatMap(v => extractDirectives(v))
@@ -89,7 +89,7 @@ object JsAPI {
     )
   }
 
-  @JSExportTopLevel("parseAndCompile")
+  @JSExportTopLevel("parseAndCompile", moduleID = "lang")
   def parseAndCompile(
       input: String,
       estimatorVersion: Int,
@@ -126,7 +126,7 @@ object JsAPI {
         }
       )
 
-  @JSExportTopLevel("compile")
+  @JSExportTopLevel("compile", moduleID = "lang")
   def compile(
       input: String,
       estimatorVersion: Int,
@@ -193,7 +193,7 @@ object JsAPI {
         }
       )
 
-  @JSExportTopLevel("decompile")
+  @JSExportTopLevel("decompile", moduleID = "lang")
   def decompile(input: String): js.Dynamic =
     Global
       .decompile(input)
@@ -202,6 +202,6 @@ object JsAPI {
         scriptText => jObj("result" -> scriptText)
       )
 
-  @JSExportTopLevel("nodeVersion")
+  @JSExportTopLevel("nodeVersion", moduleID = "lang")
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 }

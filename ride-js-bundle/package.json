@@ -1,10 +1,12 @@
 {
-  "name": "@waves/ride-repl",
-  "version": "0.1.0-snapshot",
-  "description": "RIDE REPL",
-  "main": "dist/repl.js",
-  "module": "dist/repl.js",
-  "browser": "dist/repl.js",
+  "name": "@waves/ride-lang",
+  "version": "0.1.0",
+  "description": "RIDE Compiler and REPL",
+  "type": "module",
+  "exports": {
+    "./lang": "./dist/lang.js",
+    "./repl": "./dist/repl.js"
+  },
   "files": ["dist/"],
   "license": "MIT",
   "repository": {
