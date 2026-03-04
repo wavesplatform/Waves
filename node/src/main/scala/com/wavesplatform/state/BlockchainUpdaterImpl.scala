@@ -427,6 +427,11 @@ class BlockchainUpdaterImpl(
                 }
 
                 restTotalConstraint = updatedTotalConstraint
+                if (
+                  (block.header.timestamp > time.getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis)
+                  || (newHeight.toInt % 100 == 0)
+                ) log.info(s"New height: $newHeight")
+
                 ngState = Some(
                   new NgState(
                     block,
@@ -451,13 +456,6 @@ class BlockchainUpdaterImpl(
                     )
                   )
                 )
-
-                if (
-                  (block.header.timestamp > time
-                    .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight.toInt % 100 == 0)
-                ) {
-                  log.info(s"New height: $newHeight")
-                }
 
                 publishLastBlockInfo()
 
