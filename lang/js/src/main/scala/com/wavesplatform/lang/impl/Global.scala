@@ -11,12 +11,12 @@ import scala.scalajs.js.{Promise, UndefOr}
 @js.native
 @JSImport("@waves/ts-lib-crypto", JSImport.Namespace)
 private object TsLibCrypto extends js.Object {
-  def verifySignature(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array): Boolean                      = js.native
-  def rsaVerify(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array, digest: UndefOr[String]): Boolean   = js.native
-  def keccak(bytes: Uint8Array): Uint8Array                                                                             = js.native
-  def blake2b(bytes: Uint8Array): Uint8Array                                                                           = js.native
-  def sha256(bytes: Uint8Array): String                                                                                 = js.native
-  def merkleVerify(rootHash: Uint8Array, merkleProof: Uint8Array, leafData: Uint8Array): Boolean                       = js.native
+  def verifySignature(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array): Boolean                    = js.native
+  def rsaVerify(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array, digest: UndefOr[String]): Boolean = js.native
+  def keccak(bytes: Uint8Array): Uint8Array                                                                          = js.native
+  def blake2b(bytes: Uint8Array): Uint8Array                                                                         = js.native
+  def sha256(bytes: Uint8Array): String                                                                              = js.native
+  def merkleVerify(rootHash: Uint8Array, merkleProof: Uint8Array, leafData: Uint8Array): Boolean                     = js.native
 }
 
 @js.native
@@ -34,7 +34,7 @@ object Global {
     val result = new Uint8Array(len)
     var i      = 0
     while (i < len) {
-      result(i) = (Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16) & 0xFF).toByte
+      result(i) = (Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16) & 0xff).toByte
       i += 1
     }
     result.buffer

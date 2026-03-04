@@ -10,11 +10,18 @@ import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.repl.node.http.WebEnvironment.executionContext
 
 object JsAPI {
-  @JSExportTopLevel("repl", moduleID = "repl")
+  @JSExportTopLevel("repl", moduleID = "ride")
   def repl(
-      settings: UndefOr[NodeConnectionSettings],
+      settings: js.UndefOr[js.Dynamic] = js.undefined,
       libraries: js.Array[String] = js.Array()
-  ): js.Dynamic = asJs(Repl(settings.toOption, None, libraries.toList))
+  ): js.Dynamic = asJs(Repl(settings.toOption.map(makeSettings), None, libraries.toList))
+
+  private def makeSettings(opts: js.Dynamic): NodeConnectionSettings =
+    NodeConnectionSettings(
+      opts.nodeUrl.asInstanceOf[String],
+      opts.chainId.asInstanceOf[String].charAt(0).toInt,
+      opts.address.asInstanceOf[String]
+    )
 
   private def asJs(repl: Repl): js.Dynamic =
     jObj(
@@ -22,7 +29,7 @@ object JsAPI {
       "info"        -> repl.info,
       "totalInfo"   -> (() => repl.totalInfo),
       "clear"       -> (() => repl.clear()),
-      "reconfigure" -> (repl.reconfigure andThen asJs)
+      "reconfigure" -> ((opts: js.Dynamic) => asJs(repl.reconfigure(makeSettings(opts))))
     )
 
   private def mapResult(eval: Future[Either[String, String]]): Promise[js.Object & js.Dynamic] =
