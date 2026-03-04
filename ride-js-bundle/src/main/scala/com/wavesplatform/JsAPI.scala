@@ -227,7 +227,7 @@ object JsAPI {
     if (!js.isUndefined(compiled.error))
       js.Dynamic.literal("error" -> compiled.error)
     else {
-      val flat = js.Object.assign(js.Dynamic.literal(), compiled.result).asInstanceOf[js.Dynamic]
+      val flat = js.Object.assign(js.Dynamic.literal(), compiled.result.asInstanceOf[js.Object]).asInstanceOf[js.Dynamic]
       flat.error = js.undefined
       flat
     }

@@ -1,6 +1,6 @@
 import scala.concurrent.Future
 import scala.scalajs.js
-import scala.scalajs.js.{Promise, UndefOr}
+import scala.scalajs.js.Promise
 import scala.scalajs.js.Dynamic.literal as jObj
 import scala.scalajs.js.JSConverters.*
 import scala.scalajs.js.annotation.JSExportTopLevel
@@ -19,7 +19,7 @@ object JsAPI {
   private def makeSettings(opts: js.Dynamic): NodeConnectionSettings =
     NodeConnectionSettings(
       opts.nodeUrl.asInstanceOf[String],
-      opts.chainId.asInstanceOf[String].charAt(0).toInt,
+      opts.chainId.asInstanceOf[String].charAt(0).toByte,
       opts.address.asInstanceOf[String]
     )
 

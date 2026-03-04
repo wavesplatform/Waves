@@ -8,7 +8,7 @@
   "exports": {
     ".": "./dist/ride.js"
   },
-  "files": ["dist/", "index.d.ts"],
+  "files": ["dist/**/*.js", "index.d.ts"],
   "license": "MIT",
   "repository": {
     "type": "git",
