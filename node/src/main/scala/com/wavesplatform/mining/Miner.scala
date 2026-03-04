@@ -115,16 +115,13 @@ class MinerImpl(
   override def state: MinerDebugInfo.State = debugStateRef
 
   private def checkAge(parentHeight: Int, parentTimestamp: Long): Either[String, Unit] =
-    Either
-      .cond(parentHeight == 1, (), (timeService.correctedTime() - parentTimestamp).millis)
-      .left
-      .flatMap(blockAge =>
-        Either.cond(
-          blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed,
-          (),
-          s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
-        )
-      )
+    if (parentHeight == 1) Either.unit
+    else {
+      val blockAge = (timeService.correctedTime() - parentTimestamp).millis
+      Either.raiseWhen(blockAge > minerSettings.intervalAfterLastBlockThenGenerationIsAllowed) {
+        s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
+      }
+    }
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG).exists(Height(blockchainUpdater.height) > _ + 1)
 

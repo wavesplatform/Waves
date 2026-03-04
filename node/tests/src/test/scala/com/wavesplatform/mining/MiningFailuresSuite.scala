@@ -31,7 +31,7 @@ class MiningFailuresSuite extends FlatSpec, WithNewDBForEachTest {
 
   behavior of "Miner"
 
-  it should "generate valid blocks ignoring time errors " in {
+  it should "generate valid blocks ignoring time errors" in {
     @volatile var minedBlock: Block = null
     val genesis                     = TestBlock.create(System.currentTimeMillis(), Nil).block
     val blockchainUpdater = new EmptyBlockchain with BlockchainUpdater with NG {
@@ -55,7 +55,7 @@ class MiningFailuresSuite extends FlatSpec, WithNewDBForEachTest {
         )
       )
 
-      override def isLastBlockId(id: ByteStr) = true
+      override def isLastBlockId(id: ByteStr) = id == genesis.id() || Option(minedBlock).map(_.id()).contains(id)
 
       private val counter = AtomicInt(0)
 

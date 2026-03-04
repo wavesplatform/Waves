@@ -80,11 +80,7 @@ package object appender {
     r.leftMap(GenericError(_))
   }
 
-  /** @param blockchain The block can reference only one of the latest liquid blocks.
-    *                   We have to validate the new block against a state by this reference
-    */
   private[appender] def appendKeyBlock(
-      blockchain: Blockchain,
       blockchainUpdater: BlockchainUpdater,
       utx: UtxPool,
       pos: PoSSelector, // No need to .copy(blockchain = blockchain), because it doesn't depend on committed/conflict endorsers
@@ -92,7 +88,10 @@ package object appender {
       log: LoggerFacade,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] =
+  )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] = {
+    // The block can reference only one of the latest liquid blocks.
+    // We have to validate the new block against a state by this reference
+    val blockchain = blockchainUpdater.referencedBlockchain(block.header.reference) // Safe to use, see note above in apply
     for {
       data <- findBlockAndGetGenerators(blockchain, block)
       (hitSource, balances) <-
@@ -127,6 +126,7 @@ package object appender {
             case res => res
           }
     } yield applyResult
+  }
 
   private[appender] def appendExtensionBlock(
       blockchainUpdater: BlockchainUpdater & Blockchain,

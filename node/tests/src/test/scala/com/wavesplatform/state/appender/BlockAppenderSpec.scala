@@ -6,6 +6,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.network.{MessageCodec, PBBlockSpec, PeerDatabase, RawBytes}
 import com.wavesplatform.state.BlockEndorser
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Ignored
 import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.TxHelpers
@@ -62,6 +63,17 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
 
       appender(block).runSyncUnsafe()
       channel1.outboundMessages().isEmpty shouldBe true
+    }
+  }
+
+  "BlockAppender" should "ignore a block if it is already appended" in {
+    val miner = TxHelpers.signer(0)
+    withDomain(DomainPresets.ConsensusImprovements, AddrWithBalance.enoughBalances(miner)) { d =>
+      val b        = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, strictTime = true, generator = miner)
+      def append() = d.appender.appendBlockWithoutFallback(b).explicitGet()
+
+      append() shouldBe a[BlockApplyResult.Applied]
+      append() shouldBe BlockApplyResult.Ignored
     }
   }
 
