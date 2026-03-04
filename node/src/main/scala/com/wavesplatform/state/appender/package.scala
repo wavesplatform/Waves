@@ -80,7 +80,8 @@ package object appender {
     r.leftMap(GenericError(_))
   }
 
-  /** @param blockchain The keyblock can reference not only the latest liquid block. We will validate new block against this blockchain.
+  /** @param blockchain The block can reference only one of the latest liquid blocks.
+    *                   We have to validate the new block against a state by this reference
     */
   private[appender] def appendKeyBlock(
       blockchain: Blockchain,

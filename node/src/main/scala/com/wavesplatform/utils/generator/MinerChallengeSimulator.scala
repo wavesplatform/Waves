@@ -158,7 +158,7 @@ object MinerChallengeSimulator {
 
     private def getBlockMiningTimes(miners: List[SeedKeyPair]): Seq[(SeedKeyPair, Long)] =
       miners.flatMap { kp =>
-        val time = miner.nextBlockGenerationTime(blockchain, blockchain.lastBlockHeader.get, kp)
+        val time = miner.nextBlockGenerationTime(blockchain, kp)
         time.toOption.map(kp -> _)
       }
   }

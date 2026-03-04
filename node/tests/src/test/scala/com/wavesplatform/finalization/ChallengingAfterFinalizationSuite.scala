@@ -15,8 +15,8 @@ import com.wavesplatform.wallet.Wallet
 import org.scalatest.time.SpanSugar.convertLongToGrainOfTime
 
 class ChallengingAfterFinalizationSuite extends BaseFinalizationSpec, TestSchedulerOps {
-  private val thisNodeAcc  = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 0)
-  private val otherNodeAcc = TxHelpers.defaultSigner
+  private val thisNodeAcc        = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 0)
+  private val committedGenerator = TxHelpers.defaultSigner
 
   private val baseSettings = DomainPresets.DeterministicFinality.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
   private val defaultSettings = baseSettings
@@ -25,13 +25,13 @@ class ChallengingAfterFinalizationSuite extends BaseFinalizationSpec, TestSchedu
 
   "Anyone can challenge" in withDomain(
     defaultSettings,
-    AddrWithBalance.enoughBalances(otherNodeAcc) // thisNodeAcc has no WAVES
+    AddrWithBalance.enoughBalances(committedGenerator) // thisNodeAcc has no WAVES
   ) { d =>
     d.wallet.generateNewAccounts(1)
 
     log.debug("Append block2")
-    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, strictTime = true, generator = otherNodeAcc))
-    d.appendMicroBlock(TxHelpers.commitToGeneration(Height(3), sender = otherNodeAcc))
+    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, strictTime = true, generator = committedGenerator))
+    d.appendMicroBlock(TxHelpers.commitToGeneration(Height(3), sender = committedGenerator))
 
     log.debug("Append block3 with invalid state hash and challenge")
     val invalidStateHash = ByteStr.fill(DigestLength)(1)
@@ -39,9 +39,9 @@ class ChallengingAfterFinalizationSuite extends BaseFinalizationSpec, TestSchedu
       Block.ProtoBlockVersion,
       txs = Nil,
       strictTime = true,
-      generator = otherNodeAcc,
+      generator = committedGenerator,
       stateHash = Some(Some(invalidStateHash)),
-      timestamp = Some(d.nextBlockTime(otherNodeAcc) + 1L) // HACK: challenger block timestamp will be better
+      timestamp = Some(d.nextBlockTime(committedGenerator) + 1L) // HACK: challenger block timestamp will be better
     )
     d.appender.appendBlock(invalidBlock, requireAppended = false)
 

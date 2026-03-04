@@ -229,7 +229,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
 
     while (!Thread.currentThread().isInterrupted && !quit) synchronized {
       val times = miners.flatMap { kp =>
-        val time = miner.nextBlockGenerationTime(blockchain, blockchain.lastBlockHeader.get, kp)
+        val time = miner.nextBlockGenerationTime(blockchain, kp)
         time.toOption.map(kp -> _)
       }
 
