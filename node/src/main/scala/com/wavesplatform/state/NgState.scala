@@ -229,7 +229,7 @@ case class NgState(
           val (txs, voting, maybeFound) = microBlocksAsc.foldLeft(init) {
             case ((txs, voting, Some((sig, stateHash, discarded))), MicroBlockInfo(mbId, mb)) =>
               val discDiff = microSnapshots(mbId).snapshot
-              (txs, FinalizationVoting.combine(voting, mb.finalizationVoting), Some((sig, stateHash, discarded :+ (mb -> discDiff))))
+              (txs, voting, Some((sig, stateHash, discarded :+ (mb -> discDiff))))
 
             case ((txs, voting, None), mb) if mb.idEquals(blockId) =>
               val found = Some((mb.microBlock.totalResBlockSig, mb.microBlock.stateHash, Seq.empty[(MicroBlock, StateSnapshot)]))
