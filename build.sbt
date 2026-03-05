@@ -150,7 +150,6 @@ lazy val `repl-js` = repl.js
 lazy val `curve25519-test` = project.dependsOn(node)
 
 lazy val `waves-node` = (project in file("."))
-  .configs(Dependencies.DebArm64, Dependencies.DebAmd64)
   .aggregate(
     `lang-js`,
     `lang-jvm`,
@@ -171,7 +170,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "3.7.4",
+    scalaVersion         := "3.8.1",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -206,7 +205,7 @@ inScope(Global)(
      */
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
-    network         := Network.default(),
+    network := Network.default(),
     resolvers ++= Resolver.sonatypeCentralSnapshots +: Seq(Resolver.mavenLocal),
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
@@ -219,12 +218,8 @@ inScope(Global)(
   )
 )
 
-lazy val packageAll = taskKey[Unit]("Package all artifacts")
-packageAll := {
-  (node / assembly).value
-  (`ride-runner` / assembly).value
-  buildDebPackages.value
-  buildTarballsForDocker.value
+commands += Command.command("packageAll"){ state =>
+  "node / assembly" :: "ride-runner / assembly" :: "buildDebPackages" :: "buildTarballsForDocker" :: state
 }
 
 lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server tarballs and copy them to docker/target")
@@ -250,19 +245,9 @@ buildRIDERunnerForDocker := {
 lazy val compilePRRaw = taskKey[Unit]("Compile the project")
 compilePRRaw := Def
   .sequential(
-    clean,
-    Def.task {
-      (`lang-tests` / Test / compile).value
-      (`repl-jvm` / Test / compile).value
-      (`lang-tests-js` / Test / compile).value
-      (`grpc-server` / Test / compile).value
-      (`node-tests` / Test / compile).value
-      (`node-it` / Test / compile).value
-      (benchmark / Test / compile).value
-      (`node-generator` / Compile / compile).value
-      (`ride-runner` / Test / compile).value
-      (`lang-jvm` / Test / compile).value
-    }
+    clean.all(ScopeFilter(inAnyProject)),
+    scalafmtCheck.all(ScopeFilter(inAnyProject, inConfigurations(Compile))),
+    compile.all(ScopeFilter(inAnyProject, inConfigurations(Test)))
   )
   .value
 
@@ -270,19 +255,14 @@ lazy val checkPRRaw = taskKey[Unit]("Compile the project and run unit tests")
 checkPRRaw := Def
   .sequential(
     compilePRRaw,
-    Def.task {
-      (`lang-tests` / Test / test).value
-      (`repl-jvm` / Test / test).value
-      (`lang-js` / Compile / fullOptJS).value
-      (`lang-tests-js` / Test / test).value
-      (`grpc-server` / Test / test).value
-      (`node-tests` / Test / test).value
-      (`repl-js` / Compile / fullOptJS).value
-      (`ride-runner` / Test / test).value
-      (node / assembly).value
-      buildTarballsForDocker.value
-      (`lang-jvm` / assembly).value
-    }
+    Def.sequential(
+      test.all(
+        ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `lang-tests-js`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
+      ),
+      fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
+      assembly.all(ScopeFilter(inProjects(node, `lang-jvm`))),
+      buildTarballsForDocker
+    )
   )
   .value
 
@@ -290,7 +270,7 @@ def commandWithFatalWarnings(commandName: String, task: TaskKey[Unit]): Command 
   Command.command(commandName) { state =>
     val extracted = Project.extract(state)
     val newState = extracted.appendWithoutSession(
-      Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")),
+      Seq(Global / scalacOptions ++= Seq("-Werror")),
       state
     )
 
@@ -298,18 +278,16 @@ def commandWithFatalWarnings(commandName: String, task: TaskKey[Unit]): Command 
     state
   }
 
-def compilePR = commandWithFatalWarnings("compilePR", compilePRRaw)
-def checkPR   = commandWithFatalWarnings("checkPR", checkPRRaw)
+def compilePR: Command = commandWithFatalWarnings("compilePR", compilePRRaw)
+def checkPR: Command   = commandWithFatalWarnings("checkPR", checkPRRaw)
 
-lazy val completeQaseRun = taskKey[Unit]("Complete Qase run")
-completeQaseRun := Def.task {
-  (`lang-testkit` / Test / runMain).toTask(" com.wavesplatform.report.QaseRunCompleter").value
-}.value
-
-lazy val buildDebPackages = taskKey[Unit]("Build DEB packages")
-buildDebPackages := {
-  (`grpc-server` / Debian / packageBin).value
-  (node / Debian / packageBin).value
+commands += Command.command("buildDebPackages") { state =>
+  "set node / Debian / packageArchitecture := \"arm64\"" ::
+    "node/ Debian / packageBin" ::
+    "set node / Debian / packageArchitecture := \"amd64\"" ::
+    "node / Debian / packageBin" ::
+    "grpc-server / Debian / packageBin" ::
+    state
 }
 
 lazy val buildPlatformIndependentArtifacts = taskKey[Unit]("Build fat JARs for node and ride-runner and TGZ for grpc-server")
@@ -319,20 +297,10 @@ buildPlatformIndependentArtifacts := {
   (`grpc-server` / Universal / packageZipTarball).value
 }
 
-lazy val buildReleaseArtifacts: Command = Command("buildReleaseArtifacts")(_ => Network.networkParser) { (state, args) =>
-  args.toSet[Network].foreach { n =>
-    val newState = Project
-      .extract(state)
-      .appendWithoutSession(
-        Seq(Global / network := n),
-        state
-      )
-    Project.extract(newState).runTask(buildDebPackages, newState)
-  }
-
-  Project.extract(state).runTask(buildPlatformIndependentArtifacts, state)
-
-  state
+commands += Command("buildReleaseArtifacts")(_ => Network.networkParser) { (state, args) =>
+  args.toSet[Network].toList.flatMap { n =>
+    s"set Global / network := $n" :: "buildDebPackages" :: Nil
+  } ::: "buildPlatformIndependentArtifacts" :: state
 }
 
 /** Command: generateGenesis <path-to-config>
@@ -367,4 +335,4 @@ def generateGenesisCommand: Command =
     state
   }
 
-commands ++= Seq(compilePR, checkPR, buildReleaseArtifacts, generateGenesisCommand)
+commands ++= Seq(compilePR, checkPR, generateGenesisCommand)

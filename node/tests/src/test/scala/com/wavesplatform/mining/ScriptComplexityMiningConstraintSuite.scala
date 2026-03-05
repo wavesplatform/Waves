@@ -1,21 +1,21 @@
 package com.wavesplatform.mining
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, LeaseBalance}
+import com.wavesplatform.state.{AccountScriptInfo, Height}
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.{Asset, DataTransaction, Transaction, TxVersion}
+import com.wavesplatform.utils.EmptyBlockchain
 import org.scalacheck.Gen
-import org.scalamock.scalatest.PathMockFactory
 
-class ScriptComplexityMiningConstraintSuite extends FlatSpec with PathMockFactory {
-  private val settings = WavesSettings.fromRootConfig(ConfigFactory.load())
+class ScriptComplexityMiningConstraintSuite extends FlatSpec {
+  private val defaultSettings = WavesSettings.fromRootConfig(ConfigFactory.load())
 
   private val complexity = OneDimensionalMiningConstraint(1000, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock")
   private val maxTxs     = OneDimensionalMiningConstraint(3, TxEstimators.one, "MaxTxsInMicroBlock")
@@ -25,21 +25,21 @@ class ScriptComplexityMiningConstraintSuite extends FlatSpec with PathMockFactor
 
   "ScriptComplexityMiningConstraint" should "accept non-scripted txs after limit" in {
     forAll(preconditions) { case (acc1, acc2, tx1, tx2, tx3) =>
-      val blockchain = stub[Blockchain]
-      (() => blockchain.settings).when().returning(settings.blockchainSettings)
-      (() => blockchain.height).when().returning(1)
-      (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.DataTransaction.id -> Height(0)))
+      val blockchain = new EmptyBlockchain {
+        override lazy val settings: BlockchainSettings                          = defaultSettings.blockchainSettings
+        override def height: Int                                                = 1
+        override def activatedFeatures: Map[Short, Height]                      = Map(BlockchainFeatures.DataTransaction.id -> Height(0))
+        override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = Map(acc1.toAddress -> 10000000, acc2.toAddress -> 10000000)
+        override def balance(address: Address, mayBeAssetId: Asset): Long       = 10000000
+        override def accountScript(address: Address): Option[AccountScriptInfo] =
+          if (address == tx1.sender.toAddress) Some(AccountScriptInfo(acc1.publicKey, script, 1000, Map.empty)) else None
+      }
 
       val txDiffer = (tx: Transaction) => {
         val time = System.currentTimeMillis()
         TransactionDiffer(Some(time - 1000), time)(blockchain, tx).resultE
           .explicitGet()
       }
-      (blockchain.balance).when(*, *).returning(10000000)
-      (blockchain.wavesBalances).when(*).returning(Map(acc1.toAddress -> 10000000, acc2.toAddress -> 10000000))
-      (blockchain.leaseBalance).when(*).returning(LeaseBalance(0, 0))
-      (blockchain.accountScript).when(tx1.sender.toAddress).returning(Some(AccountScriptInfo(acc1.publicKey, script, 1000, Map.empty)))
-      (blockchain.accountScript).when(*).returning(None)
 
       val c1          = constraint.put(blockchain, tx1, txDiffer(tx1))
       val cOverfilled = c1.put(blockchain, tx1, txDiffer(tx1))

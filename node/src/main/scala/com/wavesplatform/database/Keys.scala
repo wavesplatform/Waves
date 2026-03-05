@@ -251,21 +251,21 @@ object Keys {
     historyKey(MaliciousMinerBanHeights, addressBytes)
 
   // Writes only after DeterministicFinality activation
-  val finalizedHeight = Key(
+  val finalizedHeight: Key[Option[Height]] = Key(
     FinalizedBlockHeight,
     keySuffix = Array.emptyByteArray,
     readFinalizedHeight,
     _.fold(Array.emptyByteArray)(_.toByteArray)
   )
 
-  def finalizedHeightAt(at: Height) = Key(
+  def finalizedHeightAt(at: Height): Key[Option[Height]] = Key(
     FinalizedBlockHeightAt,
     keySuffix = h(at),
     readFinalizedHeight,
     _.fold(Array.emptyByteArray)(_.toByteArray)
   )
 
-  private def readFinalizedHeight(bytes: Array[Byte]) =
+  private def readFinalizedHeight(bytes: Array[Byte]): Option[Height] =
     Option(bytes).collect { case bs if bs.length == Ints.BYTES => com.wavesplatform.state.Height(Ints.fromByteArray(bytes)) }
 
   /** Key: Int(committedPeriod.start) ++ Int(commitmentHeight)

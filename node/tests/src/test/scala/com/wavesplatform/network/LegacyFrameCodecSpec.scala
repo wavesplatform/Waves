@@ -12,11 +12,10 @@ import io.netty.buffer.Unpooled.wrappedBuffer
 import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.embedded.EmbeddedChannel
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
 
 import scala.concurrent.duration.DurationInt
 
-class LegacyFrameCodecSpec extends FreeSpec with MockFactory {
+class LegacyFrameCodecSpec extends FreeSpec {
 
   "should handle one message" in forAll(issueGen) { origTx =>
     val codec = new LegacyFrameCodecL1(PeerDatabase.NoOp, 3.minutes)

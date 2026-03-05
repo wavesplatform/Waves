@@ -1,6 +1,7 @@
 package com.wavesplatform.utx
 
 import cats.implicits.catsSyntaxSemigroup
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -23,7 +24,7 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
+import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
@@ -477,7 +478,7 @@ case class UtxPoolImpl(
     (packResult.transactions.map(_.reverse), packResult.constraint, packResult.stateHash)
   }
 
-  private val traceLogger = LoggerFacade(LoggerFactory.getLogger(this.getClass.getCanonicalName + ".trace"))
+  private val traceLogger = Logger(LoggerFactory.getLogger(this.getClass.getCanonicalName + ".trace"))
   traceLogger.trace("Validation trace reporting is enabled")
 
   @scala.annotation.tailrec

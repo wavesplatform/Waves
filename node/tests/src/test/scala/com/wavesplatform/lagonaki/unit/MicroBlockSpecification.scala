@@ -17,11 +17,10 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.transfer.*
-import org.scalamock.scalatest.MockFactory
 
 import scala.util.Random
 
-class MicroBlockSpecification extends FunSuite with MockFactory {
+class MicroBlockSpecification extends FunSuite {
 
   private val prevResBlockSig  = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
   private val totalResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))

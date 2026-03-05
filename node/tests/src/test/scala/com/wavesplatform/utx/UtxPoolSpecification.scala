@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import com.wavesplatform
 import com.wavesplatform.*
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.TransactionsOrdering
@@ -37,11 +37,10 @@ import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Transaction, *}
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{EmptyBlockchain, Time}
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import org.scalacheck.Gen.*
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
 
@@ -64,7 +63,7 @@ private object UtxPoolSpecification {
   }
 }
 
-class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransactionsHelpers with WithDomain with EitherValues with Eventually {
+class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDomain, EitherValues, Eventually {
   private val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
   import DomainPresets.*
@@ -1030,33 +1029,46 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee.value < tx1.fee.value))
         } yield (acc, acc1, tx1, txs)
 
-        forAll(gen) { case (acc, acc1, tx1, rest) =>
-          val blockchain = stub[Blockchain]
-          (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
-          (() => blockchain.height).when().returning(1)
-          (() => blockchain.activatedFeatures).when().returning(Map.empty)
+        forAll(gen) { case (acc, _, tx1, rest) =>
 
-          val utx =
-            new UtxPoolImpl(
-              ntpTime,
-              blockchain,
-              WavesSettings.default().utxSettings,
-              WavesSettings.default().maxTxErrorLogSize,
-              isMiningEnabled = true
+          var utx: UtxPool = null // this is needed to resolve circular references between UTX and blockchain stub
+          val blockchain = new EmptyBlockchain {
+            override lazy val settings: BlockchainSettings                    = WavesSettings.default().blockchainSettings
+            override def balance(address: Address, mayBeAssetId: Asset): Long = ENOUGH_AMT
+
+            override def blockHeader(height: Int): Option[SignedBlockHeader] = Some(
+              SignedBlockHeader(
+                BlockHeader(
+                  0,
+                  System.currentTimeMillis(),
+                  ByteStr.empty,
+                  0,
+                  ByteStr.empty,
+                  PublicKey(new Array[Byte](32)),
+                  Vector.empty,
+                  0,
+                  ByteStr.empty,
+                  None,
+                  None,
+                  None
+                ),
+                ByteStr.empty
+              )
             )
-          (blockchain.balance).when(*, *).returning(ENOUGH_AMT).repeat((rest.length + 1) * 2)
 
-          (blockchain.balance).when(*, *).returning(ENOUGH_AMT)
-
-          (blockchain.wavesBalances).when(*).returning(Map(acc.toAddress -> ENOUGH_AMT, acc1.toAddress -> ENOUGH_AMT))
-
-          (blockchain.leaseBalance).when(*).returning(LeaseBalance(0, 0))
-          (blockchain.accountScript).when(*).onCall { (_: Address) =>
-            utx.removeAll(rest)
-            None
+            override def accountScript(address: Address): Option[AccountScriptInfo] = {
+              if (address == acc.toAddress) utx.removeAll(rest)
+              None
+            }
           }
-          val tb = TestBlock.create(Nil).block
-          (blockchain.blockHeader).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
+
+          utx = new UtxPoolImpl(
+            ntpTime,
+            blockchain,
+            WavesSettings.default().utxSettings,
+            WavesSettings.default().maxTxErrorLogSize,
+            isMiningEnabled = true
+          )
 
           utx.putIfNew(tx1).resultE should beRight
           rest.foreach(utx.putIfNew(_).resultE should beRight)

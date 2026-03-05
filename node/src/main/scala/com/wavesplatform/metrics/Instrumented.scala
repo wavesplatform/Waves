@@ -1,6 +1,6 @@
 package com.wavesplatform.metrics
 
-import com.wavesplatform.utils.LoggerFacade
+import com.typesafe.scalalogging.Logger
 import kamon.metric.{MeasurementUnit, Metric}
 
 object Instrumented {
@@ -18,7 +18,7 @@ object Instrumented {
     (result, nanos / NanosInMS)
   }
 
-  def logMeasure[R](log: LoggerFacade, action: String)(f: => R): R = {
+  def logMeasure[R](log: Logger, action: String)(f: => R): R = {
     val (result, time) = Instrumented.withTimeMillis(f)
     log.trace(s"$action took ${time}ms")
     result

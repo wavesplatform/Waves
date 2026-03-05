@@ -1,10 +1,10 @@
-import sbt._
-import complete.DefaultParsers._
-import sbt.complete._
+import sbt.*
+import complete.DefaultParsers.*
+import sbt.complete.*
 
 sealed abstract class Network(val suffix: String) {
   lazy val packageSuffix: String = if (suffix == Mainnet.suffix) "" else "-" + suffix
-  override val toString: String  = suffix
+//  override val toString: String  = suffix
 }
 
 object Network {
@@ -20,7 +20,7 @@ object Network {
   def default(): Network = sys.props.get("network").fold[Network](Mainnet)(apply)
 }
 
-object Mainnet  extends Network("mainnet")
-object Testnet  extends Network("testnet")
-object Devnet   extends Network("devnet")
-object Stagenet extends Network("stagenet")
+case object Mainnet  extends Network("mainnet")
+case object Testnet  extends Network("testnet")
+case object Devnet   extends Network("devnet")
+case object Stagenet extends Network("stagenet")

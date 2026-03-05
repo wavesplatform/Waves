@@ -14,7 +14,7 @@ enablePlugins(
 libraryDependencies ++= Dependencies.node.value
 
 instrumentation := false
-debArchitecture := Amd64
+debArchitecture := Arm64
 
 javaAgents ++= {
   if (instrumentation.value) {
@@ -161,14 +161,14 @@ inConfig(Debian)(
     maintainer               := "com.wavesplatform",
     packageSource            := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
-    debianPackageDependencies += "java11-runtime-headless",
+    debianPackageDependencies += "java17-runtime-headless",
     maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm")),
     linuxPackageMappings := {
       val classifier = if (packageArchitecture.value == "amd64") "linux-x86_64" else "linux-aarch_64"
       val platformSpecificMappings = packageMapping(
         (Optional / update).value
           .select(artifactFilter(classifier = classifier))
-          .map(_ -> (defaultLinuxInstallLocation.value + "/" + (Debian / packageName).value)): _*
+          .map(f => f -> (defaultLinuxInstallLocation.value + "/" + (Debian / packageName).value + "/lib/software.amazon.cryptools." + f.getName)): _*
       )
 
       linuxPackageMappings.value.map(m =>

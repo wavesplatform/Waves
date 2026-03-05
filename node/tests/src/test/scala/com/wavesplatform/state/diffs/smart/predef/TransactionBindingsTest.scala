@@ -23,7 +23,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNam
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Common, Global}
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.ci.*
 import com.wavesplatform.test.*
@@ -36,13 +36,12 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeS
 import com.wavesplatform.transaction.{Asset, CommitToGenerationTransaction, DataTransaction, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
-import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.EitherValues
 import play.api.libs.json.Json
 
 import scala.util.Random
 
-class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues with WithDomain {
+class TransactionBindingsTest extends PropSpec, EitherValues, WithDomain {
   private val T = 'T'.toByte
 
   property("TransferTransaction binding") {
@@ -146,7 +145,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
   }
 
   property("CreateAliasTransaction binding") {
-    val tx = TxHelpers.createAlias("alias")
+    val tx = TxHelpers.createAlias()
     val result = runScript[CONST_BOOLEAN](
       s"""
          |match tx {
@@ -353,10 +352,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | }
          |""".stripMargin
 
-    val blockchain = stub[Blockchain]
-    (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> Height(0)))
-    (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
+    val blockchain = new EmptyBlockchain {
+      override lazy val settings: BlockchainSettings = WavesSettings.default().blockchainSettings
+      override def activatedFeatures: Map[Short, Height] = Map(BlockchainFeatures.BlockV5.id -> Height(0))
+    }
 
     val result = runScriptWithCustomContext[CONST_BOOLEAN](script, tx, V4, blockchain)
     result shouldBe evaluated(true)
@@ -917,8 +916,9 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val expr = Parser.parseExpr(script).get.value
 
     val directives = DirectiveSet(V2, Account, Expression).explicitGet()
-    val blockchain = stub[Blockchain]
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> Height(0)))
+    val blockchain = new EmptyBlockchain {
+      override def activatedFeatures: Map[Short, Height] = Map(BlockchainFeatures.BlockV5.id -> Height(0))
+    }
 
     val ctx =
       PureContext.build(V2, useNewPowPrecision = true).withEnvironment[Environment] |+|

@@ -10,17 +10,18 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.*
-import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.*
 import com.wavesplatform.test.FlatSpec
-import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 import com.wavesplatform.transaction.{BlockchainUpdater, DiscardedBlocks, LastBlockInfo, Transaction}
+import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
+import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 import monix.execution.atomic.AtomicInt
@@ -31,22 +32,22 @@ class MiningFailuresSuite extends FlatSpec, WithNewDBForEachTest {
 
   behavior of "Miner"
 
-  it should "generate valid blocks ignoring time errors" in {
+  it should "generate valid blocks ignoring time errors " in {
     @volatile var minedBlock: Block = null
     val genesis                     = TestBlock.create(System.currentTimeMillis(), Nil).block
     val blockchainUpdater = new EmptyBlockchain with BlockchainUpdater with NG {
-      override def height = 1
+      override def height: Int = 1
 
-      override def heightOf(blockId: ByteStr) = Some(1)
+      override def heightOf(blockId: ByteStr): Option[Int] = Some(1)
 
-      override def hitSource(height: Int) = Some(ByteStr(new Array[Byte](32)))
+      override def hitSource(height: Int): Option[ByteStr] = Some(ByteStr(new Array[Byte](32)))
 
-      override def blockHeader(height: Int) = Some(SignedBlockHeader(genesis.header, genesis.signature))
+      override def blockHeader(height: Int): Option[SignedBlockHeader] = Some(SignedBlockHeader(genesis.header, genesis.signature))
 
       override def balanceSnapshots(address: Address, from: Int, to: Option[ByteStr]): Seq[BalanceSnapshot] =
         Seq(BalanceSnapshot(Height(1), ENOUGH_AMT, 0, 0, 0))
 
-      override def bestLastBlockInfo(maxMicroblockTimestampMs: Long) = Some(
+      override def bestLastBlockInfo(maxMicroblockTimestampMs: Long): Option[BlockMinerInfo] = Some(
         BlockMinerInfo(
           genesis.header.baseTarget,
           genesis.header.generationSignature,
@@ -55,7 +56,7 @@ class MiningFailuresSuite extends FlatSpec, WithNewDBForEachTest {
         )
       )
 
-      override def isLastBlockId(id: ByteStr) = id == genesis.id() || Option(minedBlock).map(_.id()).contains(id)
+      override def isLastBlockId(id: ByteStr): Boolean = true
 
       private val counter = AtomicInt(0)
 
@@ -80,7 +81,7 @@ class MiningFailuresSuite extends FlatSpec, WithNewDBForEachTest {
           verify: Boolean
       ): Either[ValidationError, Block.BlockId] = ???
 
-      override def computeNextReward = Some(0)
+      override def computeNextReward: Option[Long] = Some(0)
 
       override def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks] = Right(Seq.empty)
 
@@ -164,6 +165,6 @@ class MiningFailuresSuite extends FlatSpec, WithNewDBForEachTest {
     appenderScheduler.shutdown()
   }
 
-  private def generateBlockTask(miner: MinerImpl)(account: KeyPair) =
+  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
     miner.generateBlockTask(account, None)
 }

@@ -5,11 +5,12 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{issueAmount, issueFee, minFee}
 import com.wavesplatform.it.{BaseFreeSpec, Node, WaitForHeight2}
 import com.wavesplatform.state.Height
+import com.wavesplatform.utils.ScorexLogging
 
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 
-class NetworkSeparationTestSuite extends BaseFreeSpec with WaitForHeight2 {
+class NetworkSeparationTestSuite extends BaseFreeSpec, WaitForHeight2, ScorexLogging {
   import NetworkSeparationTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs

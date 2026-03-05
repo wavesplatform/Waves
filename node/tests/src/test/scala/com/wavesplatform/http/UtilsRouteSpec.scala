@@ -22,23 +22,22 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.{Global, contract}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.settings.TestSettings
+import com.wavesplatform.settings.{BlockchainSettings, TestSettings}
+import com.wavesplatform.state.Height
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.utils.{Schedulers, Time}
+import com.wavesplatform.utils.{EmptyBlockchain, Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import monix.execution.schedulers.SchedulerService
 import org.apache.pekko.http.scaladsl.testkit.RouteTestTimeout
 import org.scalacheck.Gen
-import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Inside
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
 import play.api.libs.json.*
 
 import scala.concurrent.duration.*
 
-class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory with Inside with WithDomain {
+class UtilsRouteSpec extends RouteSpec("/utils"), RestAPISettingsHelper, PropertyChecks, Inside, WithDomain {
   private val estimator                                              = ScriptEstimatorV2
   protected override implicit val routeTestTimeout: RouteTestTimeout = RouteTestTimeout(20.seconds)
 
@@ -58,7 +57,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Int.MaxValue,
     () => estimator,
     timeBounded,
-    stub[Blockchain]("globalBlockchain")
+    EmptyBlockchain
   )
 
   override def afterAll(): Unit = {
@@ -66,7 +65,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     super.afterAll()
   }
 
-  (() => utilsApi.blockchain.activatedFeatures).when().returning(Map()).anyNumberOfTimes()
   private val route = seal(utilsApi.route)
 
   val script: FUNCTION_CALL = FUNCTION_CALL(
@@ -621,10 +619,11 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath(s"/script/compileCode after SynchronousCalls") in {
-    val blockchain = stub[Blockchain]("blockchain")
-    val route      = seal(utilsApi.copy(blockchain = blockchain).route)
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> Height(0)))
-    (() => blockchain.settings).when().returning(TestSettings.Default.blockchainSettings)
+    val blockchain = new EmptyBlockchain {
+      override lazy val settings: BlockchainSettings     = TestSettings.Default.blockchainSettings
+      override def activatedFeatures: Map[Short, Height] = Map(BlockchainFeatures.SynchronousCalls.id -> Height(0))
+    }
+    val route = seal(utilsApi.copy(blockchain = blockchain).route)
 
     Post(routePath("/script/compileCode"), dAppWithoutVerifier) ~> route ~> check {
       val json = responseAs[JsValue]
@@ -658,15 +657,13 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath(s"/script/compileCode after ContinuationTransaction") in {
-    val blockchain = stub[Blockchain]("blockchain")
-    val route      = seal(utilsApi.copy(blockchain = blockchain).route)
-    (() => blockchain.activatedFeatures)
-      .when()
-      .returning(
+    val blockchain = new EmptyBlockchain {
+      override def activatedFeatures: Map[Short, Height] =
         Seq(BlockchainFeatures.SynchronousCalls, BlockchainFeatures.RideV6, BlockchainFeatures.ContinuationTransaction)
           .map(x => x.id -> Height(0))
           .toMap
-      )
+    }
+    val route = seal(utilsApi.copy(blockchain = blockchain).route)
 
     Post(routePath("/script/compileCode"), freeCall) ~> route ~> check {
       val json = responseAs[JsValue]
@@ -784,11 +781,11 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath(s"/script/estimate after RideV6") in {
-    val blockchain = stub[Blockchain]("blockchain")
-    val route      = seal(utilsApi.copy(blockchain = blockchain).route)
-    (() => blockchain.activatedFeatures)
-      .when()
-      .returning(Map(BlockchainFeatures.SynchronousCalls.id -> Height(0), BlockchainFeatures.RideV6.id -> Height(0)))
+    val blockchain = new EmptyBlockchain {
+      override def activatedFeatures: Map[Short, Height] =
+        Map(BlockchainFeatures.SynchronousCalls.id -> Height(0), BlockchainFeatures.RideV6.id -> Height(0))
+    }
+    val route = seal(utilsApi.copy(blockchain = blockchain).route)
 
     Post(routePath("/script/estimate"), freeCallExpr) ~> route ~> check {
       val json = responseAs[JsValue]

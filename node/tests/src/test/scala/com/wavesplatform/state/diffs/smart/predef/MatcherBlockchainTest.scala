@@ -20,9 +20,8 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
-import org.scalamock.scalatest.MockFactory
 
-class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
+class MatcherBlockchainTest extends PropSpec, WithDomain {
   property("ScriptRunner.applyGeneric() avoids Blockchain calls") {
     val blockchain: Blockchain = new Blockchain {
       override def settings: BlockchainSettings                                                             = ???

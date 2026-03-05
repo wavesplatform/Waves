@@ -2,6 +2,7 @@ package com.wavesplatform.generator
 
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.features.EstimatorProvider.*
@@ -11,7 +12,7 @@ import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.{LoggerFacade, NTP}
+import com.wavesplatform.utils.NTP
 import monix.execution.Scheduler
 import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Dsl.asyncHttpClient
@@ -29,7 +30,7 @@ object TransactionsGeneratorApp extends ScoptImplicits {
 
   def main(args: Array[String]): Unit = {
     implicit val httpClient: AsyncHttpClient = asyncHttpClient()
-    val log                                  = LoggerFacade(LoggerFactory.getLogger("generator"))
+    val log                                  = Logger(LoggerFactory.getLogger("generator"))
 
     val parser = new OptionParser[GeneratorSettings]("generator") {
       head("TransactionsGenerator - Waves load testing transactions generator")

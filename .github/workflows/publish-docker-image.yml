@@ -67,7 +67,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '11'
+          java-version: '17'
           cache: 'sbt'
       - uses: sbt/setup-sbt@v1
       - name: Build tarballs for docker

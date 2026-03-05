@@ -11,7 +11,7 @@ trait CatchLogs { this: ScorexLogging =>
   import ch.qos.logback.classic.Logger
 
   val inMemoryLog = {
-    val logger = log.logger.asInstanceOf[Logger]
+    val logger = log.underlying.asInstanceOf[Logger]
     val r      = new InMemoryAppender()
     r.setContext(logger.getLoggerContext)
     r.start()

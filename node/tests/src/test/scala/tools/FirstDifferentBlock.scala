@@ -2,7 +2,7 @@ package tools
 
 import play.api.libs.json.Json
 
-object FirstDifferentBlock extends App {
+object FirstDifferentBlock {
 
   def get(url: String) = scala.io.Source.fromURL(url).mkString
 
@@ -41,5 +41,5 @@ object FirstDifferentBlock extends App {
     }
   }
 
-  println("first different block height is " + firstDifferent(1, 258, nodeComparator(DEVNET3D, DEVNET3)))
+  @main def run(): Unit = println("first different block height is " + firstDifferent(1, 258, nodeComparator(DEVNET3D, DEVNET3)))
 }

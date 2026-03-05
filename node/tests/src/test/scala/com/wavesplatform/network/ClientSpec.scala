@@ -8,12 +8,11 @@ import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
 import io.netty.util.concurrent.GlobalEventExecutor
-import org.scalamock.scalatest.MockFactory
 
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class ClientSpec extends FreeSpec with MockFactory {
+class ClientSpec extends FreeSpec {
 
   private val clientHandshake = new Handshake(
     applicationName = "wavesI",
