@@ -58,7 +58,7 @@ object NgState {
   private val MaxTotalDiffs = 15
 }
 
-/** @param microSnapshots Contains data related to this microblock
+/** @param microSnapshots Data is related to this microblock, not to a liquid block
   */
 case class NgState(
     base: Block,
@@ -105,7 +105,7 @@ case class NgState(
 
   def lastMicroBlock: Option[MicroBlock] = microSnapshots.lastOption.map(_._2.microBlock)
 
-  def transactions: Seq[Transaction] = base.transactionData.toVector ++ microSnapshots.values.flatMap(_.microBlock.transactionData)
+  def transactions: Seq[Transaction] = base.transactionData.toVector ++ microSnapshots.valuesIterator.flatMap(_.microBlock.transactionData)
 
   def bestLiquidBlock: Block = lastMicroBlock.fold(base) { lastMb =>
     internalCaches.bestBlock match {
@@ -138,7 +138,7 @@ case class NgState(
   def bestLiquidComputedStateHash: ByteStr = snapshotFor(bestLiquidBlockId)._4
 
   def allSnapshots: Seq[(MicroBlock, StateSnapshot)] =
-    microSnapshots.map { case (totalBlockId, mb) => mb.microBlock -> microSnapshots(totalBlockId).data.snapshot }.toVector
+    microSnapshots.map { case (totalBlockId, mb) => mb.microBlock -> mb.data.snapshot }.toVector
 
   def contains(blockId: BlockId): Boolean = base.id() == blockId || microSnapshots.contains(blockId)
 
@@ -181,7 +181,7 @@ case class NgState(
     )
   }
 
-  def carryFee: Long = baseBlockCarry + microSnapshots.values.map(_.data.carryFee).sum
+  def carryFee: Long = baseBlockCarry + microSnapshots.valuesIterator.map(_.data.carryFee).sum
 
   def createTotalBlockId(lastMicroBlock: MicroBlock): BlockId = {
     val newTransactions = this.transactions ++ lastMicroBlock.transactionData
@@ -210,7 +210,7 @@ case class NgState(
         if (base.id() == blockId)
           (
             base,
-            microSnapshots.values.map { mb => (mb.microBlock, mb.data.snapshot) }.toVector
+            microSnapshots.valuesIterator.map { mb => (mb.microBlock, mb.data.snapshot) }.toVector
           ).some
         else if (!microSnapshots.contains(blockId)) None
         else {
