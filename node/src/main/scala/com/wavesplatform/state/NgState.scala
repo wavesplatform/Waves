@@ -138,7 +138,7 @@ case class NgState(
   def bestLiquidComputedStateHash: ByteStr = snapshotFor(bestLiquidBlockId)._4
 
   def allSnapshots: Seq[(MicroBlock, StateSnapshot)] =
-    microSnapshots.map { case (totalBlockId, mb) => mb.microBlock -> mb.data.snapshot }.toVector
+    microSnapshots.valuesIterator.map { mb => mb.microBlock -> mb.data.snapshot }.toVector
 
   def contains(blockId: BlockId): Boolean = base.id() == blockId || microSnapshots.contains(blockId)
 
