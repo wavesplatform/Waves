@@ -1,6 +1,7 @@
 package com.wavesplatform.state
 
 import cats.implicits.catsSyntaxSemigroup
+import cats.syntax.option.*
 import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
@@ -207,12 +208,10 @@ case class NgState(
       blockId,
       { () =>
         if (base.id() == blockId)
-          Some(
-            (
-              base,
-              microSnapshots.values.map { mb => (mb.microBlock, mb.data.snapshot) }.toVector
-            )
-          )
+          (
+            base,
+            microSnapshots.values.map { mb => (mb.microBlock, mb.data.snapshot) }.toVector
+          ).some
         else if (!microSnapshots.contains(blockId)) None
         else {
           val init = (
@@ -223,10 +222,10 @@ case class NgState(
           val (txs, voting, maybeFound) = microSnapshots.foldLeft(init) {
             case ((txs, voting, Some(found)), (_, mb)) => // Already found
               val discDiff = mb.data.snapshot
-              (txs, voting, Some((found.sig, found.stateHash, found.discarded.appended(mb.microBlock -> discDiff))))
+              (txs, voting, (found.sig, found.stateHash, found.discarded.appended(mb.microBlock -> discDiff)).some)
 
             case ((txs, voting, None), (totalBlockId, mb)) if totalBlockId == blockId => // Found now
-              val found = Some((mb.microBlock.totalResBlockSig, mb.microBlock.stateHash, Seq.empty[(MicroBlock, StateSnapshot)]))
+              val found = (mb.microBlock.totalResBlockSig, mb.microBlock.stateHash, Seq.empty[(MicroBlock, StateSnapshot)]).some
               (txs ++ mb.microBlock.transactionData, FinalizationVoting.combine(voting, mb.microBlock.finalizationVoting), found)
 
             case ((txs, voting, None), (_, mb)) => // Not yet found
