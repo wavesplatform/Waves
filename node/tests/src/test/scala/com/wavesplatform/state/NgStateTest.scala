@@ -85,9 +85,9 @@ class NgStateTest extends PropSpec {
     var ng = mkNgState(block)
     microBlocks.foreach(m => ng = ng.append(m, StateSnapshot.empty, 1L, 0L, 0L, ByteStr.empty, None, Seq.empty))
 
-    ng.liquidBlockOf(block.id()).map(_.liquid.carryFee) shouldBe Some(0L)
+    ng.liquidBlockOf(block.id()).map(_.data.carryFee) shouldBe Some(0L)
     microBlocks.zipWithIndex.foreach { case (m, i) =>
-      val u = ng.liquidBlockOf(m.totalResBlockSig).map(_.liquid.carryFee)
+      val u = ng.liquidBlockOf(m.totalResBlockSig).map(_.data.carryFee)
       u shouldBe Some(i + 1)
     }
     ng.carryFee shouldBe microBlocks.size

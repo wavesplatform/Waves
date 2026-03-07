@@ -196,22 +196,22 @@ class LightNodeTest extends PropSpec with WithDomain {
   }
 
   private def getTxSnapshots(d: Domain, block: Block): Seq[(StateSnapshot, TxMeta.Status)] = {
-    val lb = d.liquidState.get.liquidBlockOf(block.header.reference).get
-    val hs = d.posSelector.validateGenerationSignature(block).explicitGet()
+    val liquid = d.liquidState.get.liquidBlockOf(block.header.reference).get
+    val hs     = d.posSelector.validateGenerationSignature(block).explicitGet()
 
     val referencedBlockchain = SnapshotBlockchain(
       d.rocksDBWriter,
-      lb.liquid.snapshot,
-      lb.block,
+      liquid.data.snapshot,
+      liquid.block,
       d.liquidState.get.hitSource,
-      lb.liquid.carryFee,
+      liquid.data.carryFee,
       Some(d.settings.blockchainSettings.rewardsSettings.initial),
-      Some(lb.liquid.liquidStateHash)
+      Some(liquid.data.liquidStateHash)
     )
 
     val snapshot =
       BlockDiffer
-        .fromBlock(referencedBlockchain, Some(lb.block), block, None, MiningConstraint.Unlimited, hs, None)
+        .fromBlock(referencedBlockchain, Some(liquid.block), block, None, MiningConstraint.Unlimited, hs, None)
         .explicitGet()
         .snapshot
 

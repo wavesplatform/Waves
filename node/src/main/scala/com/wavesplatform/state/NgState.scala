@@ -1,27 +1,20 @@
 package com.wavesplatform.state
 
 import cats.implicits.catsSyntaxSemigroup
-import com.google.common.cache.CacheBuilder
+import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, FinalizationVoting, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.NgState.{BlockData, LiquidBlock, MicroBlockInfo, NgStateCaches}
+import com.wavesplatform.state.NgState.{BlockData, LiquidBlock, NgStateCaches}
 import com.wavesplatform.state.StateSnapshot.monoid
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
 import java.util.concurrent.TimeUnit
+import scala.collection.immutable.VectorMap
 
 object NgState {
-  case class MicroBlockInfo(totalBlockId: BlockId, microBlock: MicroBlock) {
-    def idEquals(id: ByteStr): Boolean = totalBlockId == id
-  }
-
-  case class LiquidBlock(
-      block: Block,
-      discarded: DiscardedMicroBlocks,
-      liquid: BlockData
-  )
+  case class LiquidBlock(block: Block, discarded: DiscardedMicroBlocks, data: BlockData)
 
   case class BlockData(
       snapshot: StateSnapshot,
@@ -42,17 +35,8 @@ object NgState {
   }
 
   class NgStateCaches {
-    val liquidBlocks = CacheBuilder
-      .newBuilder()
-      .maximumSize(NgState.MaxTotalDiffs)
-      .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build[BlockId, BlockData]()
-
-    val forgedBlocks = CacheBuilder
-      .newBuilder()
-      .maximumSize(NgState.MaxTotalDiffs)
-      .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build[BlockId, Option[(Block, DiscardedMicroBlocks)]]()
+    val liquidBlocks = mkCacheByBlockId[BlockData]
+    val forgedBlocks = mkCacheByBlockId[Option[(Block, DiscardedMicroBlocks)]]
 
     @volatile
     var bestBlock = Option.empty[Block]
@@ -62,6 +46,12 @@ object NgState {
       liquidBlocks.invalidate(newBlockId)
       bestBlock = None
     }
+
+    private def mkCacheByBlockId[DataT <: Any]: Cache[BlockId, DataT] = CacheBuilder
+      .newBuilder()
+      .maximumSize(NgState.MaxTotalDiffs)
+      .expireAfterWrite(10, TimeUnit.MINUTES)
+      .build[BlockId, DataT]()
   }
 
   private val MaxTotalDiffs = 15
@@ -80,8 +70,7 @@ case class NgState(
     hitSource: ByteStr,
     leasesToCancel: Map[ByteStr, StateSnapshot],
     finalizationState: FinalizationState,
-    microSnapshots: Map[BlockId, (mb: BlockData, receivedTimestampMs: Long)] = Map.empty,
-    microBlocks: List[MicroBlockInfo] = List.empty, // Recent in the head
+    microSnapshots: VectorMap[BlockId, (microBlock: MicroBlock, data: BlockData, receivedTimestampMs: Long)] = VectorMap.empty,
     internalCaches: NgStateCaches = new NgStateCaches
 ) {
   def cancelExpiredLeases(snapshot: StateSnapshot): StateSnapshot =
@@ -90,7 +79,7 @@ case class NgState(
       .toList
       .foldLeft(snapshot)(_ |+| _)
 
-  def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId)
+  def microBlockIds: Seq[BlockId] = microSnapshots.keys.reverseIterator.toSeq
 
   def snapshotFor(totalResBlockRef: BlockId): BlockData =
     if (totalResBlockRef == base.id())
@@ -106,28 +95,26 @@ case class NgState(
       internalCaches.liquidBlocks.get(
         totalResBlockRef,
         { () =>
-          microBlocks.find(_.idEquals(totalResBlockRef)) match {
-            case Some(MicroBlockInfo(blockId, current)) => this.snapshotFor(current.reference).mergeToLiquid(microSnapshots(blockId).mb)
-            case None                                   => throw new RuntimeException(s"Can't find liquid block $totalResBlockRef")
-          }
+          val mb = microSnapshots.getOrElse(totalResBlockRef, throw new RuntimeException(s"Can't find liquid block $totalResBlockRef"))
+          this.snapshotFor(mb.microBlock.reference).mergeToLiquid(mb.data)
         }
       )
 
-  def bestLiquidBlockId: BlockId = microBlocks.headOption.fold(base.id())(_.totalBlockId)
+  def bestLiquidBlockId: BlockId = microSnapshots.lastOption.fold(base.id())(_._1)
 
-  def lastMicroBlock: Option[MicroBlock] = microBlocks.headOption.map(_.microBlock)
+  def lastMicroBlock: Option[MicroBlock] = microSnapshots.lastOption.map(_._2.microBlock)
 
-  def transactions: Seq[Transaction] = base.transactionData.toVector ++ microBlocks.view.map(_.microBlock.transactionData).reverse.flatten
+  def transactions: Seq[Transaction] = base.transactionData.toVector ++ microSnapshots.values.flatMap(_.microBlock.transactionData)
 
-  def bestLiquidBlock: Block = microBlocks.headOption.fold(base) { last =>
+  def bestLiquidBlock: Block = lastMicroBlock.fold(base) { lastMb =>
     internalCaches.bestBlock match {
       case Some(cachedBlock) => cachedBlock
       case None =>
         val block = Block.create(
           base,
           transactions,
-          last.microBlock.totalResBlockSig,
-          last.microBlock.stateHash,
+          lastMb.totalResBlockSig,
+          lastMb.stateHash,
           finalizationState.accFinalizationVoting
         )
         internalCaches.bestBlock = Some(block)
@@ -141,25 +128,25 @@ case class NgState(
     }
 
   def bestLiquidSnapshotAndFees: (StateSnapshot, Long, Long) = {
-    val s = snapshotFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
+    val s = snapshotFor(bestLiquidBlockId)
     (s.snapshot, s.carryFee, s.totalFee)
   }
 
   def bestLiquidSnapshot: StateSnapshot = bestLiquidSnapshotAndFees._1
 
-  def bestLiquidComputedStateHash: ByteStr = snapshotFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))._4
+  def bestLiquidComputedStateHash: ByteStr = snapshotFor(bestLiquidBlockId)._4
 
   def allSnapshots: Seq[(MicroBlock, StateSnapshot)] =
-    microBlocks.toVector.map(mb => mb.microBlock -> microSnapshots(mb.totalBlockId).mb.snapshot).reverse
+    microSnapshots.map { case (totalBlockId, mb) => mb.microBlock -> microSnapshots(totalBlockId).data.snapshot }.toVector
 
-  def contains(blockId: BlockId): Boolean = base.id() == blockId || microBlocks.exists(_.idEquals(blockId))
+  def contains(blockId: BlockId): Boolean = base.id() == blockId || microSnapshots.contains(blockId)
 
-  def microBlock(totalBlockId: BlockId): Option[MicroBlock] = microBlocks.find(_.idEquals(totalBlockId)).map(_.microBlock)
+  def microBlock(totalBlockId: BlockId): Option[MicroBlock] = microSnapshots.get(totalBlockId).map(_.microBlock)
 
   def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
-    val blockId = microBlocks
-      .find(mi => microSnapshots(mi.totalBlockId).receivedTimestampMs <= maxTimeStamp)
-      .fold(base.id())(_.totalBlockId)
+    val blockId = microSnapshots.keys.reverseIterator
+      .collectFirst { case bestBlockId if microSnapshots(bestBlockId).receivedTimestampMs <= maxTimeStamp => bestBlockId }
+      .getOrElse(base.id())
 
     BlockMinerInfo(base.header.baseTarget, base.header.generationSignature, base.header.timestamp, blockId)
   }
@@ -180,21 +167,20 @@ case class NgState(
     val microSnapshots = this.microSnapshots.updated(
       fixedTotalBlockId,
       (
+        microBlock,
         BlockData(snapshot, microblockCarry, microblockTotalFee, liquidStateHash, finalization.height, finalization.accVoting),
         timestamp
       )
     )
-    val microBlocks = MicroBlockInfo(fixedTotalBlockId, microBlock) :: this.microBlocks
 
     internalCaches.invalidate(fixedTotalBlockId)
     this.copy(
       microSnapshots = microSnapshots,
-      microBlocks = microBlocks,
       finalizationState = finalization.updatedState
     )
   }
 
-  def carryFee: Long = baseBlockCarry + microSnapshots.values.map(_.mb.carryFee).sum
+  def carryFee: Long = baseBlockCarry + microSnapshots.values.map(_.data.carryFee).sum
 
   def createTotalBlockId(lastMicroBlock: MicroBlock): BlockId = {
     val newTransactions = this.transactions ++ lastMicroBlock.transactionData
@@ -220,36 +206,31 @@ case class NgState(
     internalCaches.forgedBlocks.get(
       blockId,
       { () =>
-        val microBlocksAsc = microBlocks.reverse
-
         if (base.id() == blockId)
           Some(
             (
               base,
-              microBlocksAsc.toVector.map { mb =>
-                val diff = microSnapshots(mb.totalBlockId).mb.snapshot
-                (mb.microBlock, diff)
-              }
+              microSnapshots.values.map { mb => (mb.microBlock, mb.data.snapshot) }.toVector
             )
           )
-        else if (!microBlocksAsc.exists(_.idEquals(blockId))) None
+        else if (!microSnapshots.contains(blockId)) None
         else {
           val init = (
             base.transactionData,
             base.header.finalizationVoting,
             Option.empty[(sig: ByteStr, stateHash: Option[ByteStr], discarded: DiscardedMicroBlocks)]
           )
-          val (txs, voting, maybeFound) = microBlocksAsc.foldLeft(init) {
-            case ((txs, voting, Some(found)), MicroBlockInfo(mbId, mb)) =>
-              val discDiff = microSnapshots(mbId).mb.snapshot
-              (txs, voting, Some((found.sig, found.stateHash, found.discarded :+ (mb -> discDiff))))
+          val (txs, voting, maybeFound) = microSnapshots.foldLeft(init) {
+            case ((txs, voting, Some(found)), (_, mb)) => // Already found
+              val discDiff = mb.data.snapshot
+              (txs, voting, Some((found.sig, found.stateHash, found.discarded.appended(mb.microBlock -> discDiff))))
 
-            case ((txs, voting, None), mb) if mb.idEquals(blockId) =>
+            case ((txs, voting, None), (totalBlockId, mb)) if totalBlockId == blockId => // Found now
               val found = Some((mb.microBlock.totalResBlockSig, mb.microBlock.stateHash, Seq.empty[(MicroBlock, StateSnapshot)]))
               (txs ++ mb.microBlock.transactionData, FinalizationVoting.combine(voting, mb.microBlock.finalizationVoting), found)
 
-            case ((txs, voting, None), MicroBlockInfo(_, mb)) =>
-              (txs ++ mb.transactionData, FinalizationVoting.combine(voting, mb.finalizationVoting), None)
+            case ((txs, voting, None), (_, mb)) => // Not yet found
+              (txs ++ mb.microBlock.transactionData, FinalizationVoting.combine(voting, mb.data.finalizationVoting), None)
           }
 
           maybeFound.map { found =>

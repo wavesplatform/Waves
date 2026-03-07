@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import cats.syntax.either.*
 import cats.syntax.option.*
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockSnapshot, FinalizationVoting, MicroBlock, MicroBlockSnapshot, SignedBlockHeader}
@@ -80,11 +80,11 @@ class BlockchainUpdaterImpl(
   override def liquidBlock(totalBlockId: BlockId): Option[Block] = readLock(ngState.flatMap(_.liquidBlockOf(totalBlockId).map(_.block)))
 
   override def liquidBlockSnapshot(totalBlockId: BlockId): Option[StateSnapshot] = readLock {
-    ngState.flatMap(_.liquidBlockOf(totalBlockId).map(_.liquid.snapshot))
+    ngState.flatMap(_.liquidBlockOf(totalBlockId).map(_.data.snapshot))
   }
 
   override def microBlockSnapshot(totalBlockId: BlockId): Option[StateSnapshot] = readLock(
-    ngState.flatMap(_.microSnapshots.get(totalBlockId).map(_.mb.snapshot))
+    ngState.flatMap(_.microSnapshots.get(totalBlockId).map(_.data.snapshot))
   )
 
   override def liquidTransactions(totalBlockId: BlockId): Option[Seq[(TxMeta, Transaction)]] =
@@ -208,15 +208,15 @@ class BlockchainUpdaterImpl(
         if (ng.base.header.reference == reference)
           Some(SnapshotBlockchain(rocksdb, ng.reward)) // Same reward for a competitor's block, because same height
         else
-          ng.liquidBlockOf(reference).map { r =>
+          ng.liquidBlockOf(reference).map { liquid =>
             SnapshotBlockchain(
               rocksdb,
-              r.liquid.snapshot,
-              r.block,
+              liquid.data.snapshot,
+              liquid.block,
               ng.hitSource,
-              r.liquid.carryFee,
+              liquid.data.carryFee,
               computeNextReward,
-              Some(r.liquid.liquidStateHash)
+              Some(liquid.data.liquidStateHash)
             )
           }
       }
@@ -325,11 +325,11 @@ class BlockchainUpdaterImpl(
                   )
               } else
                 metrics.forgeBlockTimeStats.measureOptional(ng.liquidBlockOf(block.header.reference)) match {
-                  case None     => Left(BlockAppendError(s"References incorrect or non-existing block", block))
-                  case Some(lb) =>
+                  case None         => Left(BlockAppendError(s"References incorrect or non-existing block", block))
+                  case Some(liquid) =>
                     // Block on a new height
-                    if (!verify || lb.block.signatureValid()) {
-                      val referencedForgedBlockParentHeight = Height(rocksdb.heightOf(lb.block.header.reference).getOrElse(0))
+                    if (!verify || liquid.block.signatureValid()) {
+                      val referencedForgedBlockParentHeight = Height(rocksdb.heightOf(liquid.block.header.reference).getOrElse(0))
 
                       val constraint = MiningConstraints(rocksdb, referencedForgedBlockParentHeight.toInt).total
 
@@ -337,22 +337,22 @@ class BlockchainUpdaterImpl(
                       val reward     = computeNextReward
 
                       val prevHitSource                     = ng.hitSource
-                      val liquidSnapshotWithCancelledLeases = ng.cancelExpiredLeases(lb.liquid.snapshot)
+                      val liquidSnapshotWithCancelledLeases = ng.cancelExpiredLeases(liquid.data.snapshot)
                       val referencedBlockchain = SnapshotBlockchain(
                         rocksdb,
                         liquidSnapshotWithCancelledLeases,
-                        lb.block,
+                        liquid.block,
                         ng.hitSource,
-                        lb.liquid.carryFee,
+                        liquid.data.carryFee,
                         reward,
-                        Some(lb.liquid.liquidStateHash)
+                        Some(liquid.data.liquidStateHash)
                         // TODO: generatorBalances? With this we can't remove a hacky fallback calculation
                       )
 
                       for {
                         differResult <- BlockDiffer.fromBlock(
                           referencedBlockchain,
-                          Some(lb.block),
+                          Some(liquid.block),
                           block,
                           snapshot,
                           constraint,
@@ -375,31 +375,31 @@ class BlockchainUpdaterImpl(
                         miner.scheduleMining(Some(extendedBlockchain))
 
                         log.trace(
-                          s"Persisting block ${lb.block.id()}, discarded microblock refs: ${lb.discarded.map(_._1.reference).mkString("[", ",", "]")}"
+                          s"Persisting block ${liquid.block.id()}, discarded microblock refs: ${liquid.discarded.map(_._1.reference).mkString("[", ",", "]")}"
                         )
 
-                        if (lb.discarded.nonEmpty) {
+                        if (liquid.discarded.nonEmpty) {
                           blockchainUpdateTriggers.onMicroBlockRollback(this, block.header.reference)
                           metrics.microBlockForkStats.increment()
-                          metrics.microBlockForkHeightStats.record(lb.discarded.size)
+                          metrics.microBlockForkHeightStats.record(liquid.discarded.size)
                         }
 
                         // Careful! This affects referencedBlockchain and extendedBlockchain, e.g. height
                         rocksdb.append(
                           liquidSnapshotWithCancelledLeases,
-                          lb.liquid.carryFee,
-                          lb.liquid.totalFee,
+                          liquid.data.carryFee,
+                          liquid.data.totalFee,
                           prevReward,
                           prevHitSource,
-                          lb.liquid.liquidStateHash,
-                          lb.block, // It writes the referencedForgedBlock, not a block!
-                          lb.liquid.finalizedHeight,
+                          liquid.data.liquidStateHash,
+                          liquid.block, // It writes the referencedForgedBlock, not a block!
+                          liquid.data.finalizedHeight,
                           ng.finalizationState.generatorSet
                         )
-                        BlockStats.appended(lb.block, lb.liquid.snapshot.scriptsComplexity)
+                        BlockStats.appended(liquid.block, liquid.data.snapshot.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
                         blockchainUpdateTriggers.onProcessBlock(block, differResult.keyBlockSnapshot, reward, hitSource, rocksdb)
-                        val (discardedMbs, discardedSnapshots) = lb.discarded.unzip
+                        val (discardedMbs, discardedSnapshots) = liquid.discarded.unzip
                         if (discardedMbs.nonEmpty) {
                           log.trace(s"Discarded microblocks: $discardedMbs")
                         }
@@ -575,14 +575,14 @@ class BlockchainUpdaterImpl(
               (totalBlock, referencedComputedStateHash) <- ng
                 .liquidBlockOf(microBlock.reference)
                 .toRight(GenericError(s"No referenced block exists: $microBlock"))
-                .map { r =>
+                .map { liquid =>
                   Block.create(
-                    r.block,
-                    r.block.transactionData ++ microBlock.transactionData,
+                    liquid.block,
+                    liquid.block.transactionData ++ microBlock.transactionData,
                     microBlock.totalResBlockSig,
                     microBlock.stateHash,
-                    FinalizationVoting.combine(r.block.header.finalizationVoting, microBlock.finalizationVoting)
-                  ) -> r.liquid.liquidStateHash
+                    FinalizationVoting.combine(liquid.block.header.finalizationVoting, microBlock.finalizationVoting)
+                  ) -> liquid.data.liquidStateHash
                 }
               _ <- Either.raiseUnless(totalBlock.signatureValid()) {
                 MicroBlockAppendError("Invalid total block signature", microBlock)
@@ -785,8 +785,8 @@ class BlockchainUpdaterImpl(
     }
 
     ngLiquidBlockOfTo
-      .fold[Blockchain](rocksdb) { r =>
-        SnapshotBlockchain(rocksdb, r.liquid.snapshot, r.block, ByteStr.empty, 0L, None, None)
+      .fold[Blockchain](rocksdb) { liquid =>
+        SnapshotBlockchain(rocksdb, liquid.data.snapshot, liquid.block, ByteStr.empty, 0L, None, None)
       }
       .balanceSnapshots(address, from, to)
   }
