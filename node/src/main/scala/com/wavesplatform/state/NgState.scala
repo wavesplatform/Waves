@@ -123,8 +123,8 @@ case class NgState(
   }
 
   def liquidBlockOf(id: BlockId): Option[LiquidBlock] =
-    forgeBlock(id).map { case (block, discarded) =>
-      LiquidBlock(block, discarded, this.snapshotFor(id))
+    forgeBlock(id).map { r =>
+      LiquidBlock(r.forged, r.discarded, this.snapshotFor(id))
     }
 
   def bestLiquidSnapshotAndFees: (StateSnapshot, Long, Long) = {
@@ -202,7 +202,7 @@ case class NgState(
     block.mkTransactionsRoot(base.header.version, newTransactions)
   }
 
-  private def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
+  private def forgeBlock(blockId: BlockId): Option[(forged: Block, discarded: DiscardedMicroBlocks)] =
     internalCaches.forgedBlocks.get(
       blockId,
       { () =>
