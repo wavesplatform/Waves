@@ -1,14 +1,14 @@
 package com.wavesplatform.state
 
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.history.*
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
 import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
 
 class NgStateTest extends PropSpec {
-
-  def preconditionsAndPayments(amt: Int): (GenesisTransaction, Seq[TransferTransaction]) = {
+  private def preconditionsAndPayments(amt: Int): (GenesisTransaction, Seq[TransferTransaction]) = {
     val master    = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
 
@@ -18,40 +18,52 @@ class NgStateTest extends PropSpec {
     (genesis, payments)
   }
 
+  private def mkNgState(block: Block): NgState = NgState(
+    block,
+    StateSnapshot.empty,
+    baseBlockCarry = 0L,
+    baseBlockTotalFee = 0L,
+    baseBlockComputedStateHash = ByteStr.empty,
+    approvedFeatures = Set.empty,
+    reward = None,
+    hitSource = block.header.generationSignature,
+    leasesToCancel = Map.empty,
+    FinalizationState.notActivated(block)
+  )
+
   property("can forge correctly signed blocks") {
     val (genesis, payments)  = preconditionsAndPayments(10)
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-    var ng = NgState(block, StateSnapshot.empty, 0L, 0L, ByteStr.empty, Set.empty, None, block.header.generationSignature, Map.empty)
+    var ng = mkNgState(block)
     microBlocks.foreach(m => ng = ng.append(m, StateSnapshot.empty, 0L, 0L, 0L, ByteStr.empty, None, Seq.empty))
 
-    ng.snapshotOf(microBlocks.last.totalResBlockSig)
+    ng.liquidBlockOf(microBlocks.last.totalResBlockSig)
     microBlocks.foreach { m =>
-      val (forged, _, _, _, _, _) = ng.snapshotOf(m.totalResBlockSig).get
-      forged.signatureValid() shouldBe true
+      val r = ng.liquidBlockOf(m.totalResBlockSig).get
+      r.block.signatureValid() shouldBe true
     }
-    Seq(microBlocks(4)).map(x => ng.snapshotOf(x.totalResBlockSig))
+    Seq(microBlocks(4)).foreach { x =>
+      ng.liquidBlockOf(x.totalResBlockSig) shouldBe defined
+    }
   }
 
   property("can resolve best liquid block") {
     val (genesis, payments)  = preconditionsAndPayments(5)
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-    var ng = NgState(block, StateSnapshot.empty, 0L, 0L, ByteStr.empty, Set.empty, None, block.header.generationSignature, Map.empty)
+    var ng = mkNgState(block)
     microBlocks.foreach(m => ng = ng.append(m, StateSnapshot.empty, 0L, 0L, 0L, ByteStr.empty, None, Seq.empty))
 
     ng.bestLiquidBlock.id() shouldBe microBlocks.last.totalResBlockSig
-
-    new NgState(block, StateSnapshot.empty, 0L, 0L, ByteStr.empty, Set.empty, Some(0), block.header.generationSignature, Map.empty).bestLiquidBlock
-      .id() shouldBe block
-      .id()
+    mkNgState(block).bestLiquidBlock.id() shouldBe block.id()
   }
 
   property("can resolve best last block") {
     val (genesis, payments)  = preconditionsAndPayments(5)
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-    var ng = NgState(block, StateSnapshot.empty, 0L, 0L, ByteStr.empty, Set.empty, None, block.header.generationSignature, Map.empty)
+    var ng = mkNgState(block)
 
     microBlocks.foldLeft(1000) { case (thisTime, m) =>
       ng = ng.append(m, StateSnapshot.empty, 0L, 0L, thisTime, ByteStr.empty, None, Seq.empty)
@@ -63,21 +75,19 @@ class NgStateTest extends PropSpec {
     ng.bestLastBlockInfo(1051).blockId shouldBe microBlocks.tail.head.totalResBlockSig
     ng.bestLastBlockInfo(2000).blockId shouldBe microBlocks.last.totalResBlockSig
 
-    new NgState(block, StateSnapshot.empty, 0L, 0L, ByteStr.empty, Set.empty, Some(0), block.header.generationSignature, Map.empty).bestLiquidBlock
-      .id() shouldBe block
-      .id()
+    mkNgState(block).bestLiquidBlock.id() shouldBe block.id()
   }
 
   property("calculates carry fee correctly") {
     val (genesis, payments)  = preconditionsAndPayments(5)
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-    var ng = NgState(block, StateSnapshot.empty, 0L, 0L, ByteStr.empty, Set.empty, None, block.header.generationSignature, Map.empty)
+    var ng = mkNgState(block)
     microBlocks.foreach(m => ng = ng.append(m, StateSnapshot.empty, 1L, 0L, 0L, ByteStr.empty, None, Seq.empty))
 
-    ng.snapshotOf(block.id()).map(_._3) shouldBe Some(0L)
+    ng.liquidBlockOf(block.id()).map(_.liquid.carryFee) shouldBe Some(0L)
     microBlocks.zipWithIndex.foreach { case (m, i) =>
-      val u = ng.snapshotOf(m.totalResBlockSig).map(_._3)
+      val u = ng.liquidBlockOf(m.totalResBlockSig).map(_.liquid.carryFee)
       u shouldBe Some(i + 1)
     }
     ng.carryFee shouldBe microBlocks.size

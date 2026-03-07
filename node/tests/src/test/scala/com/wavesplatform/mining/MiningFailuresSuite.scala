@@ -56,7 +56,7 @@ class MiningFailuresSuite extends FlatSpec, WithNewDBForEachTest {
         )
       )
 
-      override def isLastBlockId(id: ByteStr): Boolean = true
+      override def isLastBlockId(id: ByteStr) = id == genesis.id() || Option(minedBlock).map(_.id()).contains(id)
 
       private val counter = AtomicInt(0)
 

@@ -143,7 +143,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     }.run()
 
     "if sent conflicting endorsement in the last microblock, that removed" - {
-      "referencing keyblock" in {
+      "can append a keyblock referencing keyblock" in {
         val committedGenerators = Seq(committedGenerator1, committedGenerator2)
 
         withDomain(
@@ -174,7 +174,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         }
       }
 
-      "referencing microblock" in {
+      "can append a keyblock referencing microblock" in {
         val committedGenerators = Seq(committedGenerator1, committedGenerator2)
 
         withDomain(
@@ -202,6 +202,42 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
           d.appender.appendBlock(
             d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(parentBlockId), generator = committedGenerator2, strictTime = true)
           )
+        }
+      }
+
+      "referencing microblock and forging by another" in {
+        val committedGenerators = Seq(committedGenerator1, committedGenerator2)
+
+        withDomain(
+          defaultSettings.configure(_.copy(generationPeriodLength = 3)),
+          AddrWithBalance.enoughBalances(committedGenerators*)
+        ) { d =>
+          log.debug(s"Append block 2 with commitments")
+          val txs = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x))
+          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = committedGenerator1, strictTime = true))
+
+          log.debug(s"Append block 3")
+          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+
+          log.debug(s"Append block 4 of new epoch with conflicting endorsement in the last microblock")
+          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+          val parentBlockId = d.appendMicroBlock(d.createMicroBlock(signer = Some(committedGenerator1))(TxHelpers.transfer(committedGenerator1)))
+          d.appendMicroBlock(
+            d.createMicroBlock( // Finalization reached
+              signer = Some(committedGenerator1),
+              finalizationVoting = Some(mkFinalizationVoting().withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlockId))
+            )(TxHelpers.transfer(committedGenerator1))
+          )
+
+          log.debug(s"Append block 5 of valid generator")
+          d.appender.appendBlock( // Finalization reset
+            d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(parentBlockId), generator = committedGenerator1, strictTime = true)
+          )
+
+          withClue("Not finalized: ") {
+            d.finalizedHeightAtPrevIs(1)
+            d.finalizedHeightIs(1) // Because we need committedGenerator2 balance for finalization
+          }
         }
       }
     }

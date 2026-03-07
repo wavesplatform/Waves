@@ -25,6 +25,7 @@ import com.wavesplatform.state.{
   Blockchain,
   BlockchainUpdaterImpl,
   CompleteBlockchainUpdater,
+  FinalizationState,
   GenesisBlockHeight,
   Height,
   NgState,
@@ -274,7 +275,8 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         fs.preActivatedFeatures.keySet,
         reward = None,
         checkedBlock.header.generationSignature,
-        leasesToCancel = Map()
+        leasesToCancel = Map(),
+        finalizationState = FinalizationState.notActivated(checkedBlock)
       )
       assertion(diffResult.snapshot, SnapshotBlockchain(state, ngState))
       state.append(

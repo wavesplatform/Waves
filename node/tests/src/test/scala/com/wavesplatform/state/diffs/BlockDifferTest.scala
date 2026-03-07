@@ -223,25 +223,25 @@ class BlockDifferTest extends FreeSpec with WithDomain {
       val sender = TxHelpers.signer(1)
       withDomain(DomainPresets.TransactionStateSnapshot, AddrWithBalance.enoughBalances(sender)) { d =>
         (1 to 5).map { idx =>
-          val (refBlock, refSnapshot, carry, _, refStateHash, _) = d.liquidState.get.snapshotOf(d.lastBlock.id()).get
+          val lb = d.liquidState.get.liquidBlockOf(d.lastBlock.id()).get
           val refBlockchain = SnapshotBlockchain(
             d.rocksDBWriter,
-            refSnapshot,
-            refBlock,
+            lb.liquid.snapshot,
+            lb.block,
             d.liquidState.get.hitSource,
-            carry,
+            lb.liquid.carryFee,
             d.blockchain.computeNextReward,
-            Some(refStateHash)
+            Some(lb.liquid.liquidStateHash)
           )
 
           val block = d.createBlock(Block.ProtoBlockVersion, Seq(TxHelpers.transfer(sender, amount = idx.waves, fee = TestValues.fee * idx)))
           val hs    = d.posSelector.validateGenerationSignature(block).explicitGet()
-          val txValidationResult = BlockDiffer.fromBlock(refBlockchain, Some(refBlock), block, None, MiningConstraint.Unlimited, hs)
+          val txValidationResult = BlockDiffer.fromBlock(refBlockchain, Some(lb.block), block, None, MiningConstraint.Unlimited, hs)
 
           val txInfo        = txValidationResult.explicitGet().snapshot.transactions.head._2
           val blockSnapshot = BlockSnapshot(block.id(), Seq(txInfo.snapshot -> txInfo.status))
 
-          val snapshotApplyResult = BlockDiffer.fromBlock(refBlockchain, Some(refBlock), block, Some(blockSnapshot), MiningConstraint.Unlimited, hs)
+          val snapshotApplyResult = BlockDiffer.fromBlock(refBlockchain, Some(lb.block), block, Some(blockSnapshot), MiningConstraint.Unlimited, hs)
 
           // TODO: remove after NODE-2610 fix
           def clearAffected(r: Result): Result = {

@@ -158,7 +158,8 @@ class LightNodeTest extends PropSpec with WithDomain {
         appender(extensionBlocks).runSyncUnsafe() should beRight
         d.lastBlock.header.stateHash shouldBe expectedStateHash
         d.blockchain.height shouldBe chainSize + 1
-        d.blocksApi.blocksRange(Height(2), Height(d.blockchain.height)).toListL.runSyncUnsafe().map(_._1.header) shouldBe betterBlocks.map(_._1.header)
+        d.blocksApi.blocksRange(Height(2), Height(d.blockchain.height)).toListL.runSyncUnsafe().map(_._1.header) shouldBe
+          betterBlocks.map(_._1.header)
       }
     }
   }
@@ -195,23 +196,22 @@ class LightNodeTest extends PropSpec with WithDomain {
   }
 
   private def getTxSnapshots(d: Domain, block: Block): Seq[(StateSnapshot, TxMeta.Status)] = {
-    val (refBlock, refSnapshot, carry, _, prevStateHash, _) = d.liquidState.get.snapshotOf(block.header.reference).get
-
+    val lb = d.liquidState.get.liquidBlockOf(block.header.reference).get
     val hs = d.posSelector.validateGenerationSignature(block).explicitGet()
 
     val referencedBlockchain = SnapshotBlockchain(
       d.rocksDBWriter,
-      refSnapshot,
-      refBlock,
+      lb.liquid.snapshot,
+      lb.block,
       d.liquidState.get.hitSource,
-      carry,
+      lb.liquid.carryFee,
       Some(d.settings.blockchainSettings.rewardsSettings.initial),
-      Some(prevStateHash)
+      Some(lb.liquid.liquidStateHash)
     )
 
     val snapshot =
       BlockDiffer
-        .fromBlock(referencedBlockchain, Some(refBlock), block, None, MiningConstraint.Unlimited, hs, None)
+        .fromBlock(referencedBlockchain, Some(lb.block), block, None, MiningConstraint.Unlimited, hs, None)
         .explicitGet()
         .snapshot
 
