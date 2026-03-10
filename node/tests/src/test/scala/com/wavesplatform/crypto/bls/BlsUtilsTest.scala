@@ -28,6 +28,38 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
   private val sig3 = signBasic(privateKey3, message)
 
   "aggregation in verifyAgg" - {
+    "signed with one" - {
+      "verify with same" in {
+        BlsUtils.verifyAgg(sig1, message, Seq(publicKey1)).value shouldBe true
+      }
+
+      "verify with other" in {
+        BlsUtils.verifyAgg(sig1, message, Seq(publicKey2)).value shouldBe false
+      }
+    }
+
+    "signed with multiple" - {
+      "verify with one known" in {
+        val aggSig = Seq(sig1, sig2).reduceLeft(BlsUtils.aggSign)
+        BlsUtils.verifyAgg(aggSig, message, Seq(publicKey2)).value shouldBe false
+      }
+
+      "verify with one unknown" in {
+        val aggSig = Seq(sig1, sig2).reduceLeft(BlsUtils.aggSign)
+        BlsUtils.verifyAgg(aggSig, message, Seq(publicKey3)).value shouldBe false
+      }
+
+      "verify with all" in {
+        val aggSig = Seq(sig1, sig2).reduceLeft(BlsUtils.aggSign)
+        BlsUtils.verifyAgg(aggSig, message, Seq(publicKey1, publicKey2)).value shouldBe true
+      }
+
+      "verify with all and unknown" in {
+        val aggSig = Seq(sig1, sig2).reduceLeft(BlsUtils.aggSign)
+        BlsUtils.verifyAgg(aggSig, message, Seq(publicKey1, publicKey2, publicKey3)).value shouldBe false
+      }
+    }
+
     "aggregation of two same signatures" in {
       val aggSig = BlsUtils.aggSign(BlsUtils.aggSign(sig1, sig2), sig1)
 
@@ -37,14 +69,22 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
 
     "different order of signatures and keys" in {
       val aggSig = BlsUtils.aggSign(sig1, sig2)
-
       BlsUtils.verifyAgg(aggSig, message, Seq(publicKey2, publicKey1)).value shouldBe true
     }
 
     "associativity" in {
       val aggSig = Seq(sig1, sig2, sig3).reduceLeft(BlsUtils.aggSign)
-
       BlsUtils.verifyAgg(aggSig, message, Seq(publicKey2, publicKey1, publicKey3)).value shouldBe true
+    }
+  }
+
+  "verifyBasic" - {
+    "same pk" in {
+      BlsUtils.verifyBasic(sig1, message, publicKey1) shouldBe true
+    }
+
+    "other pk" in {
+      BlsUtils.verifyBasic(sig1, message, publicKey2) shouldBe false
     }
   }
 

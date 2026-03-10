@@ -4,7 +4,7 @@ import cats.instances.seq.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.typesafe.scalalogging.Logger
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, BlockEndorsement, BlockSnapshot, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
@@ -14,7 +14,6 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.BlockSnapshotResponse
 import com.wavesplatform.protobuf.PBSnapshots
-import com.wavesplatform.state
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.transaction.*
@@ -345,7 +344,7 @@ package object appender {
 
   def validateFinalizationVoting(block: Block, blockchain: Blockchain, generatorSet: GeneratorSet): Either[ValidationError, GeneratorSet] =
     block.header.finalizationVoting
-      .fold(Right(generatorSet)) { fv =>
+      .fold(generatorSet.asRight[String]) { fv =>
         for {
           _ <- Either.raiseUnless(blockchain.supportsFinalizationVoting(blockchain.height + 1))(
             "Finalization voting is not allowed before Deterministic Finality feature activation"
@@ -377,19 +376,18 @@ package object appender {
           _ <- Either.raiseWhen(validEndorserAddresses.contains(block.header.generator.toAddress))("Miner can't endorse its own block")
 
           knownConflictGenerators = blockchain.conflictGenerators(blockGenerationPeriod).upTo(blockHeight)
-          _ <- fv.conflict
-            .traverse(
-              validateConflictingEndorsement(
-                blockchain,
-                fv,
-                allCommittedGenerators,
-                knownConflictGenerators,
-                validEndorserAddresses,
-                block.header.generator.toAddress,
-                generatorsWithEnoughBalance,
-                fv.finalizedHeight
-              )
+          _ <- fv.conflict.traverse(
+            validateConflictingEndorsement(
+              blockchain,
+              fv,
+              allCommittedGenerators,
+              knownConflictGenerators,
+              validEndorserAddresses,
+              block.header.generator.toAddress,
+              generatorsWithEnoughBalance,
+              fv.finalizedHeight
             )
+          )
           conflictingEndorsers     = fv.conflict.map(_.endorserIndex).toSet
           nonConflictingGenerators = generatorSet.filterNot(x => conflictingEndorsers.contains(x.index))
           _ <- fv.aggregatedEndorsement match {
@@ -399,14 +397,12 @@ package object appender {
               else
                 for {
                   finalizedBlockId <- blockchain.blockId(fv.finalizedHeight.toInt).toRight(s"Unable to get block ID at height ${fv.finalizedHeight}")
-                  _ <-
-                    if (validEndorsers.isEmpty) Either.unit
-                    else
-                      BlsUtils.verifyAgg(
-                        aggregatedEndorsement.arr,
-                        BlockEndorsement.mkMessage(finalizedBlockId, fv.finalizedHeight, block.header.reference),
-                        validEndorsers.view.map(_._2.arr)
-                      )
+                  isValid <- BlsUtils.verifyAgg(
+                    aggregatedEndorsement.arr,
+                    BlockEndorsement.mkMessage(finalizedBlockId, fv.finalizedHeight, block.header.reference),
+                    validEndorsers.view.map(_._2.arr)
+                  )
+                  _ <- Either.raiseUnless(isValid)("Wrong BLS signature")
                 } yield ()
           }
         } yield nonConflictingGenerators

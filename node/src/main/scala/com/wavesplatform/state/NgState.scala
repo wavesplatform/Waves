@@ -216,7 +216,7 @@ case class NgState(
         else {
           val init = (
             base.transactionData,
-            base.header.finalizationVoting,
+            Option.empty[FinalizationVoting],
             Option.empty[(sig: ByteStr, stateHash: Option[ByteStr], discarded: DiscardedMicroBlocks)]
           )
           val (txs, voting, maybeFound) = microSnapshots.foldLeft(init) {
@@ -224,12 +224,12 @@ case class NgState(
               val discDiff = mb.data.snapshot
               (txs, voting, (found.sig, found.stateHash, found.discarded.appended(mb.microBlock -> discDiff)).some)
 
-            case ((txs, voting, None), (totalBlockId, mb)) if totalBlockId == blockId => // Found now
+            case ((txs, _, None), (totalBlockId, mb)) if totalBlockId == blockId => // Found now
               val found = (mb.microBlock.totalResBlockSig, mb.microBlock.stateHash, Seq.empty[(MicroBlock, StateSnapshot)]).some
-              (txs ++ mb.microBlock.transactionData, FinalizationVoting.combine(voting, mb.microBlock.finalizationVoting), found)
+              (txs ++ mb.microBlock.transactionData, mb.data.finalizationVoting, found) // finalizationVoting already combined
 
-            case ((txs, voting, None), (_, mb)) => // Not yet found
-              (txs ++ mb.microBlock.transactionData, FinalizationVoting.combine(voting, mb.data.finalizationVoting), None)
+            case ((txs, _, None), (_, mb)) => // Not yet found
+              (txs ++ mb.microBlock.transactionData, None, None)
           }
 
           maybeFound.map { found =>

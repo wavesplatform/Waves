@@ -53,6 +53,6 @@ object BlsUtils {
       Right(ctx.finalverify())
     }
   } catch {
-    case NonFatal(e) => Left("Error verifying aggregated BLS signature: " + e.getMessage)
+    case NonFatal(e) => Left(s"Error verifying aggregated BLS signature: ${e.getMessage}")
   }
 }

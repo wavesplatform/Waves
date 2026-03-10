@@ -3,13 +3,10 @@ package com.wavesplatform.finalization
 import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.finalization.BaseFinalizationSpec
-import com.wavesplatform.history.Domain
 import com.wavesplatform.state.{GeneratorIndex, GenesisBlockHeight, Height}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{NumericExt, produce}
 import com.wavesplatform.transaction.TxHelpers
-import org.scalactic.source.Position
 
 class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
   private val generator1     = TxHelpers.signer(0)
@@ -33,16 +30,16 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
 
   "second microblock appended if first is invalid" - {
     "invalid endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
-      log.debug(s"Append block 2 with commitments")
+      log.debug("Append block 2 with commitments")
       val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
       val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
 
       val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
-      log.debug(s"Append block 3")
+      log.debug("Append block 3")
       d.appender.appendBlock(block3)
 
-      log.debug(s"Append microblock with conflicting endorsement")
+      log.debug("Append microblock with conflicting endorsement")
       val microBlockWithTxn1 = d.createMicroBlock(
         signer = Some(generator1),
         finalizationVoting = Some(
@@ -55,7 +52,7 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
       )(TxHelpers.transfer(generator2, generator1Addr))
       d.appendMicroBlockE(microBlockWithTxn1) should produce("Miner can't endorse its own block")
 
-      log.debug(s"Append microblock without endorsements")
+      log.debug("Append microblock without endorsements")
       d.appendMicroBlockE(TxHelpers.transfer(generator2, generator1Addr)) should beRight
     }
 
@@ -64,16 +61,16 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
       val generator3Idx = GeneratorIndex(2)
       val generators    = Seq(generator1, generator2, generator3)
       withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
-        log.debug(s"Append block 2 with commitments")
+        log.debug("Append block 2 with commitments")
         val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
         val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
         d.appender.appendBlock(block2WithCommitments)
 
         val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
-        log.debug(s"Append block 3")
+        log.debug("Append block 3")
         d.appender.appendBlock(block3)
 
-        log.debug(s"Append microblock with conflicting endorsement")
+        log.debug("Append microblock with conflicting endorsement")
         val microBlockWithTxn1 = d.createMicroBlock(
           signer = Some(generator1),
           finalizationVoting = Some(
@@ -87,36 +84,36 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
         )(TxHelpers.transfer(generator2, generator1Addr))
         d.appendMicroBlockE(microBlockWithTxn1) should produce("Too many valid endorsements")
 
-        log.debug(s"Append microblock without endorsements")
+        log.debug("Append microblock without endorsements")
         d.appendMicroBlockE(TxHelpers.transfer(generator2, generator1Addr)) should beRight
       }
     }
 
     "duplicate conflicting endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
-      log.debug(s"Append block 2 with commitments")
+      log.debug("Append block 2 with commitments")
       val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
       val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
 
       val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
-      log.debug(s"Append block 3")
+      log.debug("Append block 3")
       d.appender.appendBlock(block3)
 
-      log.debug(s"Append microblock with conflicting endorsement")
+      log.debug("Append microblock with conflicting endorsement")
       val microBlockWithTxn1 = d.createMicroBlock(
         signer = Some(generator1),
         finalizationVoting = Some(mkFinalizationVoting().withConflict(generator2, generator2Idx, block2WithCommitments.id()))
       )(TxHelpers.transfer(generator2, generator1Addr))
       d.appendMicroBlock(microBlockWithTxn1)
 
-      log.debug(s"Can't append microblock with same conflicting endorsement")
+      log.debug("Can't append microblock with same conflicting endorsement")
       val microBlockWithTxn2 = d.createMicroBlock(
         signer = Some(generator1),
         finalizationVoting = Some(mkFinalizationVoting().withConflict(generator2, generator2Idx, block2WithCommitments.id()))
       )(TxHelpers.transfer(generator2, generator1Addr))
       d.appendMicroBlockE(microBlockWithTxn2) should produce("Duplicate conflicting endorser indexes")
 
-      log.debug(s"Append microblock without endorsements")
+      log.debug("Append microblock without endorsements")
       d.appendMicroBlockE(TxHelpers.transfer(generator2, generator1Addr)) should beRight
     }
   }
@@ -135,37 +132,38 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
     withDomain(defaultSettings, initBalances) { d =>
       val genesisBlockId = d.blockchain.lastBlockId.value
 
-      log.debug(s"Append block 2 with commitments")
+      log.debug("Append block 2 with commitments")
       val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
       val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator2, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
 
-      log.debug(s"Append block 3")
+      log.debug("Append block 3")
       val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true)
       d.appender.appendBlock(block3)
 
-      log.debug(s"Append microblock with valid endorsements, reaching finalization")
+      log.debug("Append microblock with valid endorsements, reaching finalization")
       val microBlockWithTxn1 = d.createMicroBlock(
         signer = Some(generator2),
         finalizationVoting = Some(
           mkFinalizationVoting(valid = Seq(generator1Idx))
-            .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = generator1)
+            .signed(endorsedId = block2WithCommitments.id(), finalizedId = genesisBlockId, validEndorsers = generator1)
         )
       )(TxHelpers.transfer(generator1, generator2Addr))
       d.appendMicroBlockE(microBlockWithTxn1) should beRight
 
-      log.debug(s"Append microblock with conflicting endorsement, losing finalization")
+      log.debug("Append microblock with conflicting endorsement, losing finalization")
       val microBlockWithTxn2 = d.createMicroBlock(
         signer = Some(generator2),
-        finalizationVoting = Some(mkFinalizationVoting().withConflict(generator1, generator1Idx, genesisBlockId))
+        finalizationVoting = Some(mkFinalizationVoting().withConflict(generator1, generator1Idx, block2WithCommitments.id()))
       )(TxHelpers.transfer(generator1, generator2Addr))
       d.appendMicroBlockE(microBlockWithTxn2) should beRight
 
-      log.debug(s"Append microblock with valid endorsement, reaching finalization again")
+      log.debug("Append microblock with valid endorsement, reaching finalization again")
       val microBlockWithTxn3 = d.createMicroBlock(
         signer = Some(generator2),
         finalizationVoting = Some(
-          mkFinalizationVoting(valid = Seq(generator3Idx)).signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = generator3)
+          mkFinalizationVoting(valid = Seq(generator3Idx))
+            .signed(endorsedId = block2WithCommitments.id(), finalizedId = genesisBlockId, validEndorsers = generator3)
         )
       )(TxHelpers.transfer(generator1, generator2Addr))
       d.appendMicroBlockE(microBlockWithTxn3) should beRight
@@ -173,6 +171,38 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
       log.debug("Append block 4")
       d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true))
       d.allFinalizedHeightIs(2)
+    }
+  }
+
+  "checks BLS signature in microblock" in {
+    val generators = Seq(generator1, generator2)
+    val initBalances = Seq(
+      AddrWithBalance(generator1.toAddress, 5000.waves),
+      AddrWithBalance(generator2.toAddress, 2000.waves)
+    )
+
+    withDomain(defaultSettings, initBalances) { d =>
+      val genesisBlockId = d.blockchain.lastBlockId.value
+
+      log.debug("Append block 2 with commitments")
+      val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator2, strictTime = true)
+      d.appender.appendBlock(block2WithCommitments)
+
+      log.debug("Append block 3")
+      val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true)
+      d.appender.appendBlock(block3)
+
+      log.debug("Append microblock with wrong BLS signature")
+      val unknownGenerator = TxHelpers.signer(1000)
+      val microBlock1 = d.createMicroBlock(
+        signer = Some(generator2),
+        finalizationVoting = Some(
+          mkFinalizationVoting(valid = Seq(generator1Idx))
+            .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = unknownGenerator)
+        )
+      )(TxHelpers.transfer(generator1, generator2Addr))
+      d.appendMicroBlockE(microBlock1) should produce("Wrong BLS signature")
     }
   }
 }

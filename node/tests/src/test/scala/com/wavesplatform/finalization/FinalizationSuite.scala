@@ -174,7 +174,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
       strictTime = true,
       timestamp = Some(d.nextBlockTime(node1Acc) + 100),
       finalizationVoting = Some( // voted: node1Acc, node0Acc; not voted: node2Acc
-        mkFinalizationVoting(valid = Seq(GeneratorIndex(2)))
+        mkFinalizationVoting(valid = Seq(GeneratorIndex(0)))
           .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = node0Acc)
       )
     )
