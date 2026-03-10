@@ -37,7 +37,7 @@ import monix.reactive.Observable
 import scopt.OParser
 
 import java.io.*
-import java.net.{MalformedURLException, URI}
+import java.net.URI
 import java.time
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -330,17 +330,16 @@ object Importer extends ScorexLogging {
 
         case _ =>
           System.setProperty("http.agent", s"waves-node/${Version.VersionString}")
-          try {
-            val url        = URI.create(file).toURL
-            val connection = url.openConnection()
+          val uri = new URI(file)
+          if (isRemoteResource(uri)) {
+            val connection = uri.toURL.openConnection()
             if (offset > 0) connection.setRequestProperty("Range", s"bytes=$offset-")
             connection.connect()
             connection.getInputStream
-          } catch {
-            case _: MalformedURLException =>
-              val fs = new FileInputStream(file)
-              if (offset > 0) fs.skip(offset)
-              fs
+          } else {
+            val fs = new FileInputStream(file)
+            if (offset > 0) fs.skip(offset)
+            fs
           }
       }
     }
@@ -442,5 +441,10 @@ object Importer extends ScorexLogging {
       scheduler
     )
     Await.result(Kamon.stopModules(), 10.seconds)
+  }
+
+  private def isRemoteResource(uri: URI): Boolean = {
+    val scheme = uri.getScheme
+    scheme != null && scheme != "file"
   }
 }
