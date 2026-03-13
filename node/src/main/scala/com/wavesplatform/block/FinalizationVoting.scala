@@ -2,6 +2,7 @@ package com.wavesplatform.block
 
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.state.{GeneratorIndex, Height}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 
 /** @param aggregatedEndorsement Empty if there is no valid endorsement (except miner's one)
   */
@@ -11,10 +12,13 @@ case class FinalizationVoting(
     aggregatedEndorsement: Option[BlsSignature],
     conflict: Seq[BlockEndorsement]
 ) {
-  def withValid(endorser: GeneratorIndex, signature: BlsSignature): FinalizationVoting = copy(
-    valid = valid :+ endorser,
-    aggregatedEndorsement = Some(aggregatedEndorsement.fold(signature)(_.append(signature)))
-  )
+  def withValid(endorserIdxs: Iterable[GeneratorIndex], endorserSigs: Iterable[BlsSignature]): Either[GenericError, FinalizationVoting] =
+    BlsSignature.agg(Iterable.concat(aggregatedEndorsement, endorserSigs)).map { agg =>
+      copy(
+        valid = valid ++ endorserIdxs,
+        aggregatedEndorsement = Some(agg)
+      )
+    }
 
   def nonEmpty: Boolean = valid.nonEmpty || conflict.nonEmpty
 

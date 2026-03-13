@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey, BlsSignature, TestBlsKeyPair}
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -19,6 +19,10 @@ import play.api.libs.json.Json
 import scala.util.{Failure, Success}
 
 class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
+  private val wavesSigner = TxHelpers.signer(0)
+  private val blsKp       = BlsKeyPair(wavesSigner.privateKey)
+  private val sig         = CommitToGenerationTransaction.mkPopSignature(blsKp, Height(3000))
+
   private val origTx = CommitToGenerationTransaction(
     version = TxVersion.V1,
     sender = PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
@@ -26,18 +30,14 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
     generationPeriodStart = Height(3000),
     timestamp = 1526287561757L,
     fee = TxPositiveAmount.unsafeFrom(100000000),
-    commitmentSignature = BlsSignature(
-      Base58.decode(
-        "oJUBPLXnqejpwkkifzBbyQp63mPwypYq9GV7eAYqQGAvsE2LxU6csrrwLWgK1HdW28Ygku7vfkcMW1TCDCFymVXoqi7SpCwWGp3P6gegHusSPBsuVQQiQ5BWTYpUpSJjiBL"
-      )
-    ).explicitGet(),
+    commitmentSignature = sig,
     proofs = Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get),
     chainId = AddressScheme.current.chainId
   )
 
   "JSON parsing" in {
-    val js = Json.parse("""{
-      "id": "55Cy8fzNF8wNQjjtsFhiNCUQkCJL97iaLRYfnEVRpVnr",
+    val js = Json.parse(s"""{
+      "id": "FEjd4wn3HMmEvayqGVoBGHcf7uxn2GhR1zhKxL72935a",
       "type": 19,
       "version": 1,
       "fee": 100000000,
@@ -47,13 +47,12 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
       "generationPeriodStart": 3000,
       "endorserPublicKey": "6CagLT3FjEcaNHPYCaG2dcfEfzDj6ynVeZbxbLHkHdfzvbfBmBMkkatTYcBXD9cHMU",
-      "commitmentSignature": "oJUBPLXnqejpwkkifzBbyQp63mPwypYq9GV7eAYqQGAvsE2LxU6csrrwLWgK1HdW28Ygku7vfkcMW1TCDCFymVXoqi7SpCwWGp3P6gegHusSPBsuVQQiQ5BWTYpUpSJjiBL",
+      "commitmentSignature": "$sig",
       "proofs": [
         "28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ"
       ],
       "chainId": 84
     }""")
-
     origTx.json() shouldEqual js
   }
 
@@ -117,13 +116,6 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
   }
 
   "Can't commit" - {
-    "zero public key" in withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender)) { d =>
-      log.info("First")
-      val zeroBlsKp = TestBlsKeyPair.unsafe(Array.emptyByteArray)
-      val txn       = TxHelpers.commitToGenerationWithEndorserKey(Height(3001), zeroBlsKp, sender)
-      d.appendBlockE(txn) should produce("Invalid commitment signature")
-    }
-
     "twice" in withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender)) { d =>
       log.info("First")
       d.appendBlock(TxHelpers.commitToGeneration(Height(3001), sender))

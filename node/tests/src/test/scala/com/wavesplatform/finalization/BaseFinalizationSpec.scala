@@ -60,7 +60,7 @@ trait BaseFinalizationSpec extends FreeSpec, WithDomain, WithResourceManager, Ei
         }
         .foldLeft(Option.empty[BlsSignature]) {
           case (None, s)    => Some(s)
-          case (Some(r), s) => Some(r.append(s))
+          case (Some(r), s) => Some(BlsSignature.agg(Seq(r, s)).value)
         }
 
       self.copy(aggregatedEndorsement = aggSig)

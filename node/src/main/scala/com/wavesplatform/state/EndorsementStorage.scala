@@ -9,7 +9,6 @@ import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
 import com.wavesplatform.network.EndorseBlock
 import com.wavesplatform.state.EndorsementFilter.SimulationResult
 import com.wavesplatform.state.EndorsementStorage.InMemory.FinalizationResult
-import com.wavesplatform.state.Height
 
 import scala.collection.{immutable, mutable}
 
@@ -143,14 +142,14 @@ object EndorsementStorage {
 
         origResult = latestResult
         simulation = currentFilter.simulate(valid.keys, conflict.keySet)
-        _ = {
-          latestResult = createVoting(currentFilter, simulation)
-        }
-        changedFinalizationStatus = latestResult.reachedFinalization != origResult.reachedFinalization
+        newResult <- createVoting(currentFilter, simulation)
+        _ = latestResult = newResult
+
+        changedFinalizationStatus = newResult.reachedFinalization != origResult.reachedFinalization
         _ <- Either.raiseUnless(moreConflict || changedFinalizationStatus) {
           s"Status not changed, endorsed=${simulation.endorsedBalance}, total=${simulation.totalBalance}, chosen valid=[${simulation.chosenValid.sorted.mkString(", ")}], valid=[${valid.keysIterator.mkString(", ")}]"
         }
-      } yield latestResult.voting
+      } yield newResult.voting
 
       r.left.foreach { err =>
         if (currentFilter.nonEmpty) logger.debug(s"Not found new significant endorsements for $endorsedId: $err")
@@ -158,7 +157,7 @@ object EndorsementStorage {
       r.toOption
     }
 
-    private def createVoting(currentFilter: EndorsementFilter, simulationResult: SimulationResult): FinalizationResult = {
+    private def createVoting(currentFilter: EndorsementFilter, simulationResult: SimulationResult): Either[String, FinalizationResult] = {
       val votingWithoutValid = FinalizationVoting(
         valid = Seq.empty,
         finalizedHeight = currentFilter.finalizedHeight,
@@ -168,18 +167,21 @@ object EndorsementStorage {
 
       val voting =
         if (simulationResult.reachedFinalization)
-          simulationResult.chosenValid.foldLeft(votingWithoutValid) { case (r, idx) => r.withValid(idx, valid(idx.toInt)) }
-        else votingWithoutValid
-      FinalizationResult(simulationResult.reachedFinalization, voting)
+          votingWithoutValid
+            .withValid(
+              simulationResult.chosenValid,
+              simulationResult.chosenValid.map(idx => valid(idx.toInt))
+            )
+            .leftMap(_.err)
+        else votingWithoutValid.asRight
+
+      voting.map(FinalizationResult(simulationResult.reachedFinalization, _))
     }
 
-    private def verifySig(msg: EndorseBlock, pk: BlsPublicKey): Either[String, BlsSignature] =
-      for {
-        sig <- BlsSignature(msg.signature).leftMap(_.err)
-        _ <- Either.raiseUnless(pk.verify(BlockEndorsement.mkMessage(msg.finalizedId, msg.finalizedHeight, msg.endorsedId), sig)) {
-          "BLS signature is invalid"
-        }
-      } yield sig
+    private def verifySig(msg: EndorseBlock, pk: BlsPublicKey): Either[String, BlsSignature] = for {
+      sig <- BlsSignature(msg.signature).leftMap(_.err)
+      _   <- sig.verifyBasic(BlockEndorsement.mkMessage(msg.finalizedId, msg.finalizedHeight, msg.endorsedId), pk)
+    } yield sig
   }
 
   object InMemory {

@@ -37,6 +37,8 @@ final case class CommitToGenerationTransaction(
         "commitmentSignature"   -> commitmentSignature.base58
       )
     )
+
+  lazy val popMessage: Array[Byte] = CommitToGenerationTransaction.mkPopMessage(endorserPublicKey, generationPeriodStart)
 }
 
 object CommitToGenerationTransaction {
@@ -47,10 +49,11 @@ object CommitToGenerationTransaction {
   implicit def signed(tx: CommitToGenerationTransaction, privateKey: PrivateKey): CommitToGenerationTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  def mkPopSignature(blsKeyPair: BlsKeyPair, generationPeriodStart: Height): BlsSignature = {
-    val blsMessage = blsKeyPair.publicKey.arr ++ generationPeriodStart.toByteArray
-    blsKeyPair.sign(blsMessage)
-  }
+  def mkPopSignature(blsKeyPair: BlsKeyPair, generationPeriodStart: Height): BlsSignature =
+    blsKeyPair.sign(mkPopMessage(blsKeyPair.publicKey, generationPeriodStart))
+
+  def mkPopMessage(blsPublicKey: BlsPublicKey, generationPeriodStart: Height): Array[Byte] =
+    blsPublicKey.arr ++ generationPeriodStart.toByteArray
 
   def create(
       version: TxVersion,

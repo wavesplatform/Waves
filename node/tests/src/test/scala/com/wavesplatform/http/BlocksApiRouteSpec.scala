@@ -8,6 +8,7 @@ import com.wavesplatform.api.http.{BlocksApiRoute, CustomJson, RouteTimeout}
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockEndorsement, BlockHeader, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.crypto.bls.BlsSignature
 import com.wavesplatform.db.WithDomain
@@ -71,6 +72,14 @@ class BlocksApiRouteSpec
     "VRF"          -> testBlock2.id().toString
   )
 
+  private val testBlsSignature1Str =
+    "x99KGXzbggNGNcwzLXLYDKUWsv8b5aU8S7ZqEyN6XNQygZQT1TSvQtxbHFYEg1YAyUpNtrMVnC3ZJpGbaD1exSfArs63KxRa1dZ5WQAHuGKo1HLDKcCwamAtK3QZpRc31u5"
+  private val testBlsSignature1 = BlsSignature(Base58.decode(testBlsSignature1Str)).explicitGet()
+
+  private val testBlsSignature2Str =
+    "zXSA7BYmQeMmA7xyxb7XuctvkAVa5bNytzmSMmvHXYwZwnf1JnFxDLugfeXAn7ywEnXJGk6y87y6XxRBN2yw3xqBSn39EajJNCjDVNBoCWm8DUr6T6TMxwv4Dd5y6MebeAs"
+  private val testBlsSignature2 = BlsSignature(Base58.decode(testBlsSignature2Str)).explicitGet()
+
   private val finalizedBlockHeaderJson =
     BlockHeaderSerializer.toJson(finalizedBlock.header, finalizedBlock.bytes().length, 0, finalizedBlock.signature) ++ Json.obj(
       "height"       -> 3,
@@ -79,15 +88,15 @@ class BlocksApiRouteSpec
       "rewardShares" -> Json.obj(finalizedBlock.header.generator.toAddress.toString -> 5),
       "VRF"          -> finalizedBlock.id().toString,
       "finalizationVoting" -> Json.obj(
-        "endorserIndexes" -> Seq(1, 0),
-        "finalizedHeight" -> 1,
-        "aggregatedEndorsementSignature" -> "M4MkhxYz8oNM4n9E9pcmarkUZ3TS1zvYqdRm8X5jh1ZoPqirwXPp5poiC7u34QrWpqrr7zWGTWDETEiNG4srsh2eEJtuJXU5FKvx4h855vKTMiDNqf2V5bL5HpZmypcXdz",
+        "endorserIndexes"                -> Seq(1, 0),
+        "finalizedHeight"                -> 1,
+        "aggregatedEndorsementSignature" -> testBlsSignature1Str,
         "conflictEndorsements" -> Seq(
           Json.obj(
             "endorserIndex"    -> 0,
             "finalizedBlockId" -> testBlock2.id(),
             "finalizedHeight"  -> 1,
-            "signature" -> "h7iWQv6yGbjh8ZHTJeEYAiVx75us2zr6gFrXG3AUP28bngSit3ndAecRPEo57pi2egihEz1Xv1RTuURjX8kikP4HTcnoc3w9Veru8PF9AqduiRRkgK3yABf9ae8YxeE4Gy"
+            "signature"        -> testBlsSignature2Str
           )
         )
       )
@@ -105,7 +114,7 @@ class BlocksApiRouteSpec
         finalizationVoting = Some(
           FinalizationVoting(
             valid = GeneratorIndex.unsafeSeq(Seq(1, 0)),
-            aggregatedEndorsement = Some(BlsSignature(Array.fill[Byte](BlsSignature.SizeInBytes)(1)).explicitGet()),
+            aggregatedEndorsement = Some(testBlsSignature1),
             finalizedHeight = Height(1),
             conflict = Vector(
               BlockEndorsement(
@@ -113,7 +122,7 @@ class BlocksApiRouteSpec
                 finalizedId = testBlock2.id(),
                 finalizedHeight = Height(1),
                 endorsedId = testBlock1.id(),
-                signature = BlsSignature(Array.fill[Byte](BlsSignature.SizeInBytes)(2)).explicitGet()
+                signature = testBlsSignature2
               )
             )
           )

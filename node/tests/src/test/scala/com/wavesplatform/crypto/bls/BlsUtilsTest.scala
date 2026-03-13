@@ -3,7 +3,7 @@ package com.wavesplatform.crypto.bls
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.crypto.bls.BlsUtils.*
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test.{FreeSpec, produce}
 import org.scalatest.EitherValues
 import supranational.blst
 import supranational.blst.{P1, SecretKey}
@@ -12,100 +12,113 @@ import java.nio.charset.StandardCharsets
 import scala.util.Random
 
 class BlsUtilsTest extends FreeSpec with EitherValues {
-  private val privateKey1 = mkRandomSecretKey()
-  private val publicKey1  = mkBlsPublicKey(privateKey1)
+  private val sk1 = mkRandomSecretKey()
+  private val pk1 = mkPublicKey(sk1)
 
-  private val privateKey2 = mkRandomSecretKey()
-  private val publicKey2  = mkBlsPublicKey(privateKey2)
+  private val sk2 = mkRandomSecretKey()
+  private val pk2 = mkPublicKey(sk2)
 
-  private val privateKey3 = mkRandomSecretKey()
-  private val publicKey3  = mkBlsPublicKey(privateKey3)
+  private val sk3 = mkRandomSecretKey()
+  private val pk3 = mkPublicKey(sk3)
 
   private val message = "assertion".getBytes()
 
-  private val sig1 = signBasic(privateKey1, message)
-  private val sig2 = signBasic(privateKey2, message)
-  private val sig3 = signBasic(privateKey3, message)
+  private val sig1 = signBasic(sk1, message)
+  private val sig2 = signBasic(sk2, message)
+  private val sig3 = signBasic(sk3, message)
 
   "aggregation in verifyAgg" - {
     "signed with one" - {
       "verify with same" in {
-        BlsUtils.verifyAgg(sig1, message, Seq(publicKey1)).value shouldBe true
+        BlsUtils.verifyAgg(sig1, message, Seq(pk1)) should beRight
       }
 
       "verify with other" in {
-        BlsUtils.verifyAgg(sig1, message, Seq(publicKey2)).value shouldBe false
+        BlsUtils.verifyAgg(sig1, message, Seq(pk2)) should produce("Wrong BLS signature")
       }
     }
 
     "signed with multiple" - {
       "verify with one known" in {
-        val aggSig = Seq(sig1, sig2).reduceLeft(BlsUtils.aggSign)
-        BlsUtils.verifyAgg(aggSig, message, Seq(publicKey2)).value shouldBe false
+        val aggSig = Seq(sig1, sig2).reduceLeft(aggSig2)
+        BlsUtils.verifyAgg(aggSig, message, Seq(pk2)) should produce("Wrong BLS signature")
       }
 
       "verify with one unknown" in {
-        val aggSig = Seq(sig1, sig2).reduceLeft(BlsUtils.aggSign)
-        BlsUtils.verifyAgg(aggSig, message, Seq(publicKey3)).value shouldBe false
+        val aggSig = Seq(sig1, sig2).reduceLeft(aggSig2)
+        BlsUtils.verifyAgg(aggSig, message, Seq(pk3)) should produce("Wrong BLS signature")
       }
 
       "verify with all" in {
-        val aggSig = Seq(sig1, sig2).reduceLeft(BlsUtils.aggSign)
-        BlsUtils.verifyAgg(aggSig, message, Seq(publicKey1, publicKey2)).value shouldBe true
+        val aggSig = Seq(sig1, sig2).reduceLeft(aggSig2)
+        BlsUtils.verifyAgg(aggSig, message, Seq(pk1, pk2)) should beRight
       }
 
       "verify with all and unknown" in {
-        val aggSig = Seq(sig1, sig2).reduceLeft(BlsUtils.aggSign)
-        BlsUtils.verifyAgg(aggSig, message, Seq(publicKey1, publicKey2, publicKey3)).value shouldBe false
+        val aggSig = Seq(sig1, sig2).reduceLeft(aggSig2)
+        BlsUtils.verifyAgg(aggSig, message, Seq(pk1, pk2, pk3)) should produce("Wrong BLS signature")
+      }
+
+      "verify with less" in {
+        val aggSig = Seq(sig1, sig2, sig3).reduceLeft(aggSig2)
+        BlsUtils.verifyAgg(aggSig, message, Seq(pk1, pk2)) should produce("Wrong BLS signature")
       }
     }
 
     "aggregation of two same signatures" in {
-      val aggSig = BlsUtils.aggSign(BlsUtils.aggSign(sig1, sig2), sig1)
+      val aggSig = aggSig2(aggSig2(sig1, sig2), sig1)
 
-      BlsUtils.verifyAgg(aggSig, message, Seq(publicKey1, publicKey2, publicKey1)).value shouldBe true
-      BlsUtils.verifyAgg(aggSig, message, Seq(publicKey1, publicKey2)).value shouldBe false
+      BlsUtils.verifyAgg(aggSig, message, Seq(pk1, pk2, pk1)) should beRight
+      BlsUtils.verifyAgg(aggSig, message, Seq(pk1, pk2)) should produce("Wrong BLS signature")
     }
 
     "different order of signatures and keys" in {
-      val aggSig = BlsUtils.aggSign(sig1, sig2)
-      BlsUtils.verifyAgg(aggSig, message, Seq(publicKey2, publicKey1)).value shouldBe true
+      val aggSig = aggSig2(sig1, sig2)
+      BlsUtils.verifyAgg(aggSig, message, Seq(pk2, pk1)) should beRight
     }
 
     "associativity" in {
-      val aggSig = Seq(sig1, sig2, sig3).reduceLeft(BlsUtils.aggSign)
-      BlsUtils.verifyAgg(aggSig, message, Seq(publicKey2, publicKey1, publicKey3)).value shouldBe true
+      val aggSig = Seq(sig1, sig2, sig3).reduceLeft(aggSig2)
+      BlsUtils.verifyAgg(aggSig, message, Seq(pk2, pk1, pk3)) should beRight
+    }
+  }
+
+  "signBasic" - {
+    "zero message" in {
+      val message = Array.emptyByteArray
+      val sig     = BlsUtils.signBasic(sk1, message)
+      BlsUtils.verifyBasic(sig, message, pk1) should beRight
     }
   }
 
   "verifyBasic" - {
     "same pk" in {
-      BlsUtils.verifyBasic(sig1, message, publicKey1) shouldBe true
+      BlsUtils.verifyBasic(sig1, message, pk1) should beRight
     }
 
     "other pk" in {
-      BlsUtils.verifyBasic(sig1, message, publicKey2) shouldBe false
+      BlsUtils.verifyBasic(sig1, message, pk2) should produce("Wrong BLS signature")
     }
   }
 
   "zero secret/public keys and signatures" - {
     val message = "test".getBytes()
 
-    val zeroSk = BlsUtils.mkBlsSecretKey(Array.fill[Byte](31)(1))
+    val zeroSk = BlsUtils.mkSecretKey(Array.fill[Byte](31)(1)) // Still zero if even less bytes
     val zeroPk = new blst.P1(zeroSk)
     val zeroSig = new blst.P2()
       .hash_to(message, BlsDomainSeparationTag)
       .sign_with(zeroSk)
 
-    val okSk = BlsUtils.mkBlsSecretKey(Array.fill[Byte](32)(0))
+    val okSk = BlsUtils.mkSecretKey(Array.fill[Byte](32)(0))
     val okPk = new blst.P1(okSk)
     val okSig = new blst.P2()
       .hash_to(message, BlsDomainSeparationTag)
       .sign_with(okSk)
 
     "can't create pk from zero bytes" in {
-      val bytes = Array.fill[Byte](zeroPk.serialize().length)(0)
-      intercept[RuntimeException] { new blst.P1(bytes) }.getMessage should include("point is not on curve")
+      val bytes = Array.fill[Byte](zeroPk.compress().length)(0)
+      intercept[RuntimeException] { new blst.P1(bytes) }.getMessage should include("bad point encoding")
     }
 
     "zeroSk" in {
@@ -117,23 +130,23 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
       zeroPk.in_group() shouldBe true
     }
 
-    "zeroSk in group" in {
+    "zeroSig in group" in {
       zeroSig.is_inf() shouldBe true
       zeroSig.in_group() shouldBe true
     }
 
     "zeroSig not verified" - {
       "by zeroPk" in {
-        BlsUtils.verifyBasic(zeroSig.serialize(), message, zeroPk.serialize()) shouldBe false
+        BlsUtils.verifyBasic(zeroSig.compress(), message, zeroPk.compress()) should produce("BLST_PK_IS_INFINITY")
       }
 
       "by okPk" in {
-        BlsUtils.verifyBasic(zeroSig.serialize(), message, okPk.serialize()) shouldBe false
+        BlsUtils.verifyBasic(zeroSig.compress(), message, okPk.compress()) should produce("Wrong BLS signature")
       }
     }
 
     "okSig not verified by zeroPk" in {
-      BlsUtils.verifyBasic(okSig.serialize(), message, zeroPk.serialize()) shouldBe false
+      BlsUtils.verifyBasic(okSig.compress(), message, zeroPk.compress()) should produce("BLST_PK_IS_INFINITY")
     }
 
     "aggregated pk" - {
@@ -158,7 +171,7 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
 
     "aggSig verification with zeroSk" in {
       val aggSig = okSig.dup().add(zeroSig)
-      BlsUtils.verifyAgg(aggSig.serialize(), message, Seq(okPk.serialize(), zeroPk.serialize())).value shouldBe true
+      BlsUtils.verifyAgg(aggSig.compress(), message, Seq(okPk.compress(), zeroPk.compress())) should beRight
     }
   }
 
@@ -177,27 +190,29 @@ class BlsUtilsTest extends FreeSpec with EitherValues {
       )
     )
   ) { (seed, expectedSkInBase64, expectedPkInBase64) =>
-    val sk = BlsUtils.mkBlsSecretKey(seed.getBytes(StandardCharsets.UTF_8))
+    val sk = BlsUtils.mkSecretKey(seed.getBytes(StandardCharsets.UTF_8))
     Base64.encode(sk.to_bendian()) shouldBe expectedSkInBase64
 
-    val pk = BlsUtils.mkBlsPublicKey(sk)
+    val pk = BlsUtils.mkPublicKey(sk)
     Base64.encode(pk) shouldBe expectedPkInBase64
   }
 
   "pk restore" in {
-    val sk = BlsUtils.mkBlsSecretKey("-EXACTLY-32-BYTES-LENGTH-STRING-".getBytes(StandardCharsets.UTF_8))
-    val pk = BlsUtils.mkBlsPublicKey(sk)
+    val sk = BlsUtils.mkSecretKey("-EXACTLY-32-BYTES-LENGTH-STRING-".getBytes(StandardCharsets.UTF_8))
+    val pk = BlsUtils.mkPublicKey(sk)
 
-    val pkRestored1 = new P1(pk).compress()
-    pkRestored1 shouldBe pk
+    val pkRestored = new P1(pk).compress()
+    pkRestored shouldBe pk
 
     val skRestored = new SecretKey()
     skRestored.from_bendian(sk.to_bendian())
 
-    val pkRestored2 = BlsUtils.mkBlsPublicKey(skRestored)
-    pkRestored2 shouldBe pk
+    val pkFromRestoredSk = BlsUtils.mkPublicKey(skRestored)
+    pkFromRestoredSk shouldBe pk
   }
 
-  private def mkRandomSecretKey(): SecretKey  = mkBlsSecretKey(mkRandomWavesKeyPair().privateKey.arr)
+  private def aggSig2(sig1: Array[Byte], sig2: Array[Byte]): Array[Byte] = BlsUtils.aggSig(Seq(sig1, sig2)).value
+
+  private def mkRandomSecretKey(): SecretKey  = mkSecretKey(mkRandomWavesKeyPair().privateKey.arr)
   private def mkRandomWavesKeyPair(): KeyPair = KeyPair(Array.fill(32)(Random.nextInt().toByte))
 }

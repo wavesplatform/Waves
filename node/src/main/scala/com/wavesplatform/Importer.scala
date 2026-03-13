@@ -358,35 +358,33 @@ object Importer extends ScorexLogging {
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb)
     checkGenesis(settings, blockchainUpdater, Miner.StrictDisabledMiner)
 
-    val blocksFileOffset =
-      importOptions.format match {
-        case Formats.Binary =>
-          var blocksOffset = 0L
-          rdb.db.iterateOver(KeyTag.BlockInfoAtHeight) { e =>
-            e.getKey match {
-              case Array(_, _, 0, 0, 0, 1) => // Skip genesis
-              case _ =>
-                val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
-                blocksOffset += meta.size + 4
-            }
+    val blocksFileOffset = importOptions.format match {
+      case Formats.Binary =>
+        var blocksOffset = 0L
+        rdb.db.iterateOver(KeyTag.BlockInfoAtHeight) { e =>
+          e.getKey match {
+            case Array(_, _, 0, 0, 0, 1) => // Skip genesis
+            case _ =>
+              val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
+              blocksOffset += meta.size + 4
           }
-          blocksOffset
-        case _ =>
-          0
-      }
-    val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)
-    val snapshotsInputStream =
-      importOptions.snapshotsFile
-        .map { file =>
-          val inputStream = new BufferedInputStream(initFileStream(file, 0), 20 * 1024 * 1024)
-          val sizeBytes   = new Array[Byte](Ints.BYTES)
-          (2 to blockchainUpdater.height).foreach { _ =>
-            ByteStreams.read(inputStream, sizeBytes, 0, 4)
-            val snapshotsSize = Ints.fromByteArray(sizeBytes)
-            ByteStreams.skipFully(inputStream, snapshotsSize)
-          }
-          inputStream
         }
+        blocksOffset
+
+      case _ => 0
+    }
+
+    val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)
+    val snapshotsInputStream = importOptions.snapshotsFile.map { file =>
+      val inputStream = new BufferedInputStream(initFileStream(file, 0), 20 * 1024 * 1024)
+      val sizeBytes   = new Array[Byte](Ints.BYTES)
+      (2 to blockchainUpdater.height).foreach { _ =>
+        ByteStreams.read(inputStream, sizeBytes, 0, 4)
+        val snapshotsSize = Ints.fromByteArray(sizeBytes)
+        ByteStreams.skipFully(inputStream, snapshotsSize)
+      }
+      inputStream
+    }
 
     sys.addShutdownHook {
       quit = true

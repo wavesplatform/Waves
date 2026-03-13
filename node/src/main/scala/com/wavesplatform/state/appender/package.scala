@@ -8,7 +8,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, BlockEndorsement, BlockSnapshot, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsUtils}
+import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
@@ -339,7 +339,7 @@ package object appender {
     _ <- Either.raiseWhen(conflictingEndorsement.finalizedId == finalizedBlock.id()) {
       s"Contains expected finalized block: ${conflictingEndorsement.finalizedId}"
     }
-    _ <- Either.raiseUnless(conflictingEndorsement.signatureValid(blsPublicKey))(s"Invalid conflicting endorsement signature from $address")
+    _ <- conflictingEndorsement.signatureValid(blsPublicKey).leftMap(err => s"Invalid conflicting endorsement signature from $address: $err")
   } yield ()
 
   def validateFinalizationVoting(block: Block, blockchain: Blockchain, generatorSet: GeneratorSet): Either[ValidationError, GeneratorSet] =
@@ -397,12 +397,10 @@ package object appender {
               else
                 for {
                   finalizedBlockId <- blockchain.blockId(fv.finalizedHeight.toInt).toRight(s"Unable to get block ID at height ${fv.finalizedHeight}")
-                  isValid <- BlsUtils.verifyAgg(
-                    aggregatedEndorsement.arr,
+                  _ <- aggregatedEndorsement.verifyAgg(
                     BlockEndorsement.mkMessage(finalizedBlockId, fv.finalizedHeight, block.header.reference),
-                    validEndorsers.view.map(_._2.arr)
+                    validEndorsers.view.map(_._2)
                   )
-                  _ <- Either.raiseUnless(isValid)("Wrong BLS signature")
                 } yield ()
           }
         } yield nonConflictingGenerators

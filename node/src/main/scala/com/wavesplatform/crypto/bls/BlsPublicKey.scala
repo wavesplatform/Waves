@@ -6,23 +6,23 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 opaque type BlsPublicKey = ByteStr
 
 object BlsPublicKey {
-  val SizeInBytes = 48
+  val SizeInBytes = BlsUtils.PublicKeySizeInBytes
 
   extension (self: BlsPublicKey) {
     def byteStr: ByteStr = self
     def arr: Array[Byte] = byteStr.arr
+    def base58: String   = byteStr.toString
 
-    def verify(message: Array[Byte], signature: BlsSignature): Boolean = BlsUtils.verifyBasic(signature.arr, message, arr)
-
-    def base58: String = byteStr.toString
+    /** We need this once when adding a new endorser
+      */
+    def validated: Either[String, Unit] = BlsUtils.validatePublicKey(arr)
   }
 
-  private[bls] def unsafe(byteStr: ByteStr): BlsPublicKey = byteStr
+  private[bls] def unchecked(byteStr: ByteStr): BlsPublicKey = byteStr
 
   def apply(arr: Array[Byte]): Either[GenericError, BlsPublicKey] = apply(ByteStr(arr))
-  def apply(byteStr: ByteStr): Either[GenericError, BlsPublicKey] = Either.cond(
-    byteStr.arr.length == SizeInBytes,
-    byteStr,
-    GenericError(s"Unexpected BLS public key length: ${byteStr.arr.length}, expected: $SizeInBytes")
-  )
+  def apply(byteStr: ByteStr): Either[GenericError, BlsPublicKey] = BlsUtils.sanityCheckPublicKey(byteStr.arr) match {
+    case Right(_)  => Right(byteStr)
+    case Left(err) => Left(GenericError(err))
+  }
 }

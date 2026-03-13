@@ -299,7 +299,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     }
   }
 
-  "should reject a block" - {
+  "should reject a block of generator" - {
     "if not committed" in new BaseTest {
       override def continue(d: Domain): Unit = {
         log.debug(s"Append block 3 of not committed generator")

@@ -5,9 +5,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
+import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.network.EndorseBlock
-import com.wavesplatform.state.{EndorsementFilter, EndorsementStorage, GeneratorIndex, Height}
 import com.wavesplatform.test.{FreeSpec, NumericExt, produce}
 import com.wavesplatform.transaction.TxHelpers
 import org.scalactic.source.Position
@@ -74,7 +73,7 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
 
         "a wrong signature" in test(
           EndorseBlock(activeGeneratorIndex.toInt, expectedFinalizedId, expectedFinalizedHeight, expectedEndorsedId, ByteStr.empty),
-          "Unexpected BLS signature length: 0, expected: 96"
+          "Unexpected BLS signature length: 0, expected 96"
         )
 
         "an unexpected finalized height" in test(
@@ -335,12 +334,10 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
               case Some(aggEnd) =>
                 if (valid.isEmpty) fail(s"Signature must be empty if endorsers empty: $aggEnd, [${valid.mkString(", ")}]")
                 else
-                  aggEnd
-                    .verifyAgg(
-                      BlockEndorsement.mkMessage(expectedFinalizedId, expectedFinalizedHeight, endorsedId),
-                      valid.map(generators(_).blsKp.publicKey)
-                    )
-                    .value shouldBe true
+                  aggEnd.verifyAgg(
+                    BlockEndorsement.mkMessage(expectedFinalizedId, expectedFinalizedHeight, endorsedId),
+                    valid.map(generators(_).blsKp.publicKey)
+                  ) should beRight
             }
           }
         case _ =>

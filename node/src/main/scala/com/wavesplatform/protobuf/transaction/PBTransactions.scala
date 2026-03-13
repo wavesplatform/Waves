@@ -328,11 +328,12 @@ object PBTransactions {
 
       case Data.CommitToGeneration(CommitToGenerationTransactionData(generationPeriodStart, endorserPublicKey, commitmentSignature, `empty`)) =>
         for {
-          sig <- BlsSignature(commitmentSignature.toByteArray)
+          sig   <- BlsSignature(commitmentSignature.toByteArray)
+          blsPk <- BlsPublicKey(endorserPublicKey.toByteStr)
           tx <- CommitToGenerationTransaction.create(
             version.toByte,
             sender.toPublicKey,
-            BlsPublicKey(endorserPublicKey.toByteStr).explicitGet(),
+            blsPk,
             Height(generationPeriodStart),
             timestamp,
             feeAmount,
