@@ -7,7 +7,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.{FreeSpec, NumericExt, produce}
+import com.wavesplatform.test.{NumericExt, produce}
 import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 
@@ -171,6 +171,11 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
           d.appender.appendBlock(
             d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(block4.id()), generator = committedGenerator2, strictTime = true)
           )
+
+          withClue("Not finalized: ") {
+            d.finalizedHeightAtPrevIs(1)
+            d.finalizedHeightIs(1)
+          }
         }
       }
 
@@ -190,7 +195,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
           log.debug(s"Append block 4 of new epoch with conflicting endorsement in the last microblock")
           d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
-          val parentBlockId = d.appendMicroBlock(d.createMicroBlock(signer = Some(committedGenerator1))(TxHelpers.transfer(committedGenerator1)))
+          val block4 = d.appendMicroBlock(d.createMicroBlock(signer = Some(committedGenerator1))(TxHelpers.transfer(committedGenerator1)))
           d.appendMicroBlock(
             d.createMicroBlock(
               signer = Some(committedGenerator1),
@@ -200,8 +205,13 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
           log.debug(s"Append block 5 of conflicting generator")
           d.appender.appendBlock(
-            d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(parentBlockId), generator = committedGenerator2, strictTime = true)
+            d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(block4), generator = committedGenerator2, strictTime = true)
           )
+
+          withClue("Not finalized: ") {
+            d.finalizedHeightAtPrevIs(1)
+            d.finalizedHeightIs(1)
+          }
         }
       }
 
