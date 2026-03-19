@@ -2012,7 +2012,7 @@ class BlockChallengeTest
 
       val appender = createBlockAppender(d)
 
-      val genBalanceError = "generator's effective balance 0 is less that required for generation"
+      val genBalanceError = "generator's effective balance 0 is less than required for generation"
 
       d.appendBlockE(challengingBlock) should beRight
       d.accountsApi.balanceDetails(challengedMiner.toAddress).explicitGet().generating shouldBe 0L

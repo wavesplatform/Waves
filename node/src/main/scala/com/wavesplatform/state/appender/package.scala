@@ -268,7 +268,7 @@ package object appender {
     val balance           = ownBalance + challengedBalance
 
     if (blockchain.isGeneratingBalanceValid(parentHeight, block.header, balance)) Either.right(balance)
-    else if (minerAddress == block.sender.toAddress) Either.left(s"generator's effective balance $balance is less that required for generation")
+    else if (minerAddress == block.sender.toAddress) Either.left(s"generator's effective balance $balance is less than required for generation")
     else Either.right(0L) // Ignore for a regular generator, not a miner
   }
 
