@@ -10,21 +10,21 @@ import play.api.libs.json.*
 
 case class LeaseCancelRequest(
     version: Option[Byte],
-    sender: Option[String],
-    senderPublicKey: Option[String],
+    senderPublicKey: String,
     leaseId: String,
     fee: Long,
     timestamp: Option[Long],
     signature: Option[ByteStr],
     proofs: Option[Proofs]
 ) extends TxBroadcastRequest[LeaseCancelTransaction] {
-  def toTxFrom(sender: PublicKey): Either[ValidationError, LeaseCancelTransaction] =
+  def toTx: Either[ValidationError, LeaseCancelTransaction] =
     for {
       validProofs  <- toProofs(signature, proofs)
       validLeaseId <- parseBase58(leaseId, "invalid.leaseTx", DigestStringLength)
+      validSender  <- PublicKey.fromBase58String(senderPublicKey)
       tx <- LeaseCancelTransaction.create(
         version.getOrElse(1.toByte),
-        sender,
+        validSender,
         validLeaseId,
         fee,
         timestamp.getOrElse(0L),
@@ -37,8 +37,7 @@ object LeaseCancelRequest {
   import com.wavesplatform.utils.byteStrFormat
   implicit val jsonFormat: Format[LeaseCancelRequest] = Format(
     ((JsPath \ "version").readNullable[Byte] and
-      (JsPath \ "sender").readNullable[String] and
-      (JsPath \ "senderPublicKey").readNullable[String] and
+      (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "leaseId").read[String].orElse((JsPath \ "txId").read[String]) and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").readNullable[Long] and

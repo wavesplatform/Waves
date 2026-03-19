@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.assets
 
 import com.wavesplatform.account.*
-import com.wavesplatform.crypto
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.*
@@ -29,6 +29,8 @@ case class SetAssetScriptTransaction(
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V2 {
+  override type T = SetAssetScriptTransaction
+  override def addProof(proof: ByteStr): SetAssetScriptTransaction = copy(proofs = this.proofs.add(proof))
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(SetAssetScriptTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(SetAssetScriptTxSerializer.toBytes(this))
@@ -40,9 +42,6 @@ object SetAssetScriptTransaction extends TransactionParser {
   override val typeId: TxType = 15: Byte
 
   implicit val validator: TxValidator[SetAssetScriptTransaction] = SetAssetScriptTxValidator
-
-  implicit def sign(tx: SetAssetScriptTransaction, privateKey: PrivateKey): SetAssetScriptTransaction =
-    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   val serializer = SetAssetScriptTxSerializer
 
@@ -63,27 +62,4 @@ object SetAssetScriptTransaction extends TransactionParser {
       fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       tx  <- SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      asset: IssuedAsset,
-      script: Option[Script],
-      fee: Long,
-      timestamp: TxTimestamp,
-      signer: PrivateKey,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, SetAssetScriptTransaction] =
-    create(version, sender, asset, script, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      asset: IssuedAsset,
-      script: Option[Script],
-      fee: Long,
-      timestamp: TxTimestamp,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, SetAssetScriptTransaction] =
-    signed(version, sender.publicKey, asset, script, fee, timestamp, sender.privateKey, chainId)
 }

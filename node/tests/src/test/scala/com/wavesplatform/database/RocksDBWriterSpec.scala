@@ -20,7 +20,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.{TxHelpers, TxPositiveAmount}
+import com.wavesplatform.transaction.{Proofs, TxHelpers, TxPositiveAmount}
 import org.rocksdb.{ReadOptions, RocksIterator}
 
 import scala.util.{Random, Using}
@@ -92,7 +92,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     d.blockchain.hasAccountScript(scriptOwner.toAddress) shouldBe true
 
     // removing account script
-    d.appendBlock(SetScriptTransaction.selfSigned(1.toByte, scriptOwner, None, 0.014.waves, ntpNow).explicitGet())
+    d.appendBlock(SetScriptTransaction.create(1.toByte, scriptOwner.publicKey, None, 0.014.waves, ntpNow, Proofs.empty).map(_.signWith(scriptOwner.privateKey)).explicitGet())
     d.blockchain.hasAccountScript(scriptOwner.toAddress) shouldBe false
 
     d.appendBlock()

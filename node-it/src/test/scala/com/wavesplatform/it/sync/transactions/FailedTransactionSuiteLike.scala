@@ -14,7 +14,7 @@ import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.state.Height
-import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.transaction.{Asset, TxVersion, TxHelpers}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.ScorexLogging
@@ -306,20 +306,18 @@ object FailedTransactionSuiteLike {
       sellMatcherFee,
       Asset.fromString(Some(sellMatcherFeeAsset))
     ).explicitGet()
-    ExchangeTransaction
-      .signed(
-        TxVersion.V3,
-        matcher.privateKey,
+    TxHelpers.exchange(
         buy,
         sell,
+        matcher,
         buy.amount.value,
         buy.price.value,
         buy.matcherFee.value,
         sell.matcherFee.value,
         fee,
-        timestamp
+        timestamp,
+        TxVersion.V3
       )
-      .explicitGet()
   }
 
   val configForMinMicroblockAge: Config = ConfigFactory.parseString(s"""

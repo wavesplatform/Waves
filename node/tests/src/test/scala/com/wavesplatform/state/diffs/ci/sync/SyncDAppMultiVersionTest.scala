@@ -9,10 +9,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 
 class SyncDAppMultiVersionTest extends PropSpec with WithDomain {
   import DomainPresets.*
@@ -48,21 +45,20 @@ class SyncDAppMultiVersionTest extends PropSpec with WithDomain {
       gTx1     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       gTx2     = GenesisTransaction.create(dApp1.toAddress, ENOUGH_AMT, ts).explicitGet()
       gTx3     = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
-      ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(version1, dApp2.toAddress)), fee, ts).explicitGet()
-      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script(version2)), fee, ts).explicitGet()
-      invokeTx = Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
+      ssTx1    = TxHelpers.setScript(dApp1, dApp1Script(version1, dApp2.toAddress), fee, 1.toByte)
+      ssTx2    = TxHelpers.setScript(dApp2, dApp2Script(version2), fee, 1.toByte)
+      invokeTx = TxHelpers.invoke(dApp1.toAddress, invoker = invoker, fee = fee, version = TxVersion.V3, timestamp = ts)
     } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx2), invokeTx)
 
   property("sync call can be performed between V5 and V6 dApps") {
     Seq((V5, V6), (V6, V5))
-      .foreach {
-        case (version1, version2) =>
-          val (preparingTxs, invoke) = scenario(version1, version2).sample.get
-          withDomain(RideV6) { d =>
-            d.appendBlock(preparingTxs*)
-            d.appendBlock(invoke)
-            d.blockchain.transactionSucceeded(invoke.txId) shouldBe true
-          }
+      .foreach { case (version1, version2) =>
+        val (preparingTxs, invoke) = scenario(version1, version2).sample.get
+        withDomain(RideV6) { d =>
+          d.appendBlock(preparingTxs*)
+          d.appendBlock(invoke)
+          d.blockchain.transactionSucceeded(invoke.txId) shouldBe true
+        }
       }
   }
 }

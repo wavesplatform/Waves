@@ -80,9 +80,8 @@ package object sync {
   def createIssueRequest(tx: IssueTransaction): IssueRequest = {
     import tx.*
     IssueRequest(
-      Some(tx.version),
-      None,
-      Some(tx.sender.toString),
+      tx.version,
+      tx.sender.toString,
       tx.name.toStringUtf8,
       tx.description.toStringUtf8,
       quantity.value,

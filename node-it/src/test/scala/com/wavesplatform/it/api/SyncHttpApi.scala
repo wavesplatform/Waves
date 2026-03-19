@@ -2,7 +2,7 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.account.{AddressOrAlias, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
-import com.wavesplatform.api.http.requests.{CommitToGenerationRequest, IssueRequest}
+import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{ApiError, DebugMessage}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -14,11 +14,9 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, GenerationPeriod, Height}
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TransactionType, TxExchangeAmount, TxExchangePrice, TxVersion}
+import com.wavesplatform.transaction.{Asset, TransactionType, TxExchangeAmount, TxExchangePrice, TxHelpers, TxVersion}
 import io.grpc.Status.Code
 import org.apache.pekko.http.scaladsl.model.StatusCodes.BadRequest
 import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
@@ -388,19 +386,17 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
         version: Byte = TxVersion.V2,
         waitForTx: Boolean = false
     ): Transaction = {
-      val tx = TransferTransaction
-        .selfSigned(
-          version = version,
-          sender = source,
-          recipient = AddressOrAlias.fromString(recipient).explicitGet(),
-          asset = Asset.fromString(assetId),
-          amount = amount,
-          feeAsset = Asset.fromString(feeAssetId),
-          fee = fee,
-          attachment = attachment,
-          timestamp = System.currentTimeMillis()
-        )
-        .explicitGet()
+      val tx = TxHelpers.transfer(
+        source,
+        AddressOrAlias.fromString(recipient).explicitGet(),
+        amount,
+        Asset.fromString(assetId),
+        fee,
+        Asset.fromString(feeAssetId),
+        attachment,
+        version = version,
+        timestamp = System.currentTimeMillis()
+      )
 
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
@@ -479,16 +475,15 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
         leasingFee: Long = minFee,
         waitForTx: Boolean = false
     ): Transaction = {
-      val tx = LeaseTransaction
-        .selfSigned(
-          2.toByte,
-          sender = source,
-          recipient = AddressOrAlias.fromString(recipient).explicitGet(),
-          amount = leasingAmount,
-          fee = leasingFee,
-          timestamp = System.currentTimeMillis()
+      val tx = TxHelpers
+        .lease(
+          source,
+          AddressOrAlias.fromString(recipient).explicitGet(),
+          leasingAmount,
+          leasingFee,
+          System.currentTimeMillis(),
+          2.toByte
         )
-        .explicitGet()
 
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
@@ -548,8 +543,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def getMerkleProofPost(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProofPost(ids*))
 
-    def sign(req: CommitToGenerationRequest): Transaction =
-      sign(Json.obj("type" -> TransactionType.CommitToGeneration.id) ++ Json.toJsObject(req)).tap { r =>
+    def signCommitToGenerationRequest(sender: String): Transaction =
+      sign(Json.obj("type" -> TransactionType.CommitToGeneration.id, "sender" -> sender)).tap { r =>
         require(r._type == TransactionType.CommitToGeneration.id)
       }
 
@@ -563,15 +558,14 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       sync(async(n).activeLeases(sourceAddress))
 
     def broadcastCancelLease(source: KeyPair, leaseId: String, fee: Long = minFee, waitForTx: Boolean = false): Transaction = {
-      val tx = LeaseCancelTransaction
-        .selfSigned(
-          TxVersion.V2,
-          source,
+      val tx = TxHelpers
+        .leaseCancel(
           ByteStr.decodeBase58(leaseId).get,
+          source,
           fee,
-          System.currentTimeMillis()
+          System.currentTimeMillis(),
+          TxVersion.V2
         )
-        .explicitGet()
 
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }

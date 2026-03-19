@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Transaction, TxNonNegativeAmount}
+import com.wavesplatform.transaction.{Proofs, Transaction, TxNonNegativeAmount}
 
 import java.util.concurrent.ThreadLocalRandom
 
@@ -121,7 +121,9 @@ object Gen {
       .zip(feeGen)
       .zipWithIndex
       .map { case (((src, dst), fee), i) =>
-        TransferTransaction.selfSigned(2.toByte, src, dst, Waves, fee, Waves, fee, ByteStr.empty, now + i)
+        TransferTransaction
+          .create(2.toByte, src.publicKey, dst, Waves, fee, Waves, fee, ByteStr.empty, now + i, Proofs.empty)
+          .map(_.signWith(src.privateKey))
       }
       .collect { case Right(x) => x }
   }
@@ -135,7 +137,9 @@ object Gen {
       .map { case ((sender, count), i) =>
         val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), TxNonNegativeAmount.unsafeFrom(amountGen.next())))
         val fee       = 100000 + count * 50000
-        MassTransferTransaction.selfSigned(1.toByte, sender, Waves, transfers, fee, now + i, ByteStr.empty)
+        MassTransferTransaction
+          .create(1.toByte, sender.publicKey, Waves, transfers, fee, now + i, ByteStr.empty, Proofs.empty)
+          .map(_.signWith(sender.privateKey))
       }
       .collect { case Right(tx) => tx }
   }

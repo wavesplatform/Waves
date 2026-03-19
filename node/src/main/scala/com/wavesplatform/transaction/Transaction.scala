@@ -13,7 +13,7 @@ trait TransactionBase {
   def chainId: Byte
   def id: Coeval[ByteStr]
   def checkedAssets: Seq[IssuedAsset]
-  val tpe: TransactionType.TransactionType
+  val tpe: TransactionType
 }
 
 object TransactionBase {
@@ -24,7 +24,7 @@ object TransactionBase {
   }
 }
 
-abstract class Transaction(val tpe: TransactionType.TransactionType, val checkedAssets: Seq[IssuedAsset] = Nil) extends TransactionBase {
+abstract class Transaction(val tpe: TransactionType, val checkedAssets: Seq[IssuedAsset] = Nil) extends TransactionBase {
   def bytesSize: Int              = bytes().length
   lazy val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
   val bodyBytes: Coeval[Array[Byte]]
@@ -42,7 +42,7 @@ abstract class Transaction(val tpe: TransactionType.TransactionType, val checked
 }
 
 object Transaction {
-  type Type = TransactionType.TransactionType
+  type Type = TransactionType
 
   val V1: TxVersion = TxVersion.V1
   val V2: TxVersion = TxVersion.V2

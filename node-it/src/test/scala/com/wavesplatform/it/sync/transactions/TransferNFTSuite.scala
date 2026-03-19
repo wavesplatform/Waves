@@ -6,16 +6,16 @@ import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.Transaction
-import com.wavesplatform.it.sync.{calcMassTransferFee, setScriptFee, *}
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.{Asset, TxHelpers}
 
 class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
   val assetName        = "NFTAsset"
@@ -179,20 +179,18 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
       )
       .explicitGet()
 
-    val tx = ExchangeTransaction
-      .signed(
-        2.toByte,
-        matcher = matcher.privateKey,
+    val tx = TxHelpers
+      .exchange(
+        version = 2.toByte,
+        matcher = matcher,
         order1 = buy,
         order2 = sell,
-        amount = 1,
         price = 1.waves,
         buyMatcherFee = matcherFee,
         sellMatcherFee = matcherFee,
         fee = matcherFee,
         timestamp = ts
       )
-      .explicitGet()
       .json()
 
     sender.signedBroadcast(tx, waitForTx = true)

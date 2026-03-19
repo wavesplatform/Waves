@@ -7,12 +7,11 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.test.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{Proofs, TxHelpers}
 import org.scalatest.CancelAfterFailure
 
 class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -44,10 +43,8 @@ class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
         }
         """.stripMargin
 
-    val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(1.toByte, acc0, Some(script), setScriptFee, System.currentTimeMillis())
-      .explicitGet()
+    val script               = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
+    val setScriptTransaction = TxHelpers.setScript(acc0, script, setScriptFee)
 
     val setScriptId = sender
       .signedBroadcast(setScriptTransaction.json())

@@ -23,6 +23,8 @@ case class PaymentTransaction(
 ) extends Transaction(TransactionType.Payment)
     with ProvenTransaction
     with TxWithFee.InWaves {
+  override type T = PaymentTransaction
+  override def addProof(proof: ByteStr): PaymentTransaction = copy(signature = proof)
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PaymentTxSerializer.bodyBytes(this))
 

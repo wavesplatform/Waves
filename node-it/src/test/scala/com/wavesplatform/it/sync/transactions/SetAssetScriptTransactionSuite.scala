@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.transactions
 
-import org.apache.pekko.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{Mistiming, StateCheckFailed, WrongJson}
 import com.wavesplatform.common.state.ByteStr
@@ -15,9 +14,9 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{Proofs, TxPositiveAmount}
+import com.wavesplatform.transaction.{Proofs, TxHelpers, TxPositiveAmount}
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 import play.api.libs.json.*
 
 import scala.concurrent.duration.*
@@ -238,9 +237,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
           timestamp: Long = System.currentTimeMillis,
           assetId: IssuedAsset = IssuedAsset(ByteStr.decodeBase58(assetWScript).get)
       ): SetAssetScriptTransaction =
-        SetAssetScriptTransaction
-          .signed(version = v, sender.keyPair.publicKey, assetId, Some(script), fee, timestamp, sender.keyPair.privateKey)
-          .explicitGet()
+        TxHelpers.setAssetScript(sender.keyPair, assetId, script, fee, timestamp, v)
 
       val (balance, eff) = miner.accountBalances(firstAddress)
 
@@ -276,16 +273,14 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   test("transaction requires a valid proof") {
     for (v <- setAssetScrTxSupportedVersions) {
       val request: JsObject =
-        SetAssetScriptTransaction
-          .selfSigned(
-            v,
-            firstKeyPair,
-            IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
-            Some(script),
-            setAssetScriptFee,
-            System.currentTimeMillis()
+        TxHelpers
+          .setAssetScript(
+            acc = firstKeyPair,
+            asset = IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
+            script = script,
+            fee = setAssetScriptFee,
+            version = v
           )
-          .explicitGet()
           .json()
 
       def id(obj: JsObject) = obj.value("id").as[String]
@@ -355,28 +350,23 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     for (v <- setAssetScrTxSupportedVersions) {
       val assetWithScript = if (v < 2) assetWScript else assetWScript2
-      val setScriptTransaction = SetScriptTransaction
-        .selfSigned(
-          version = v,
-          accountA,
-          Some(
-            ScriptCompiler
-              .compile(
-                s"""|let pkB = base58'${accountB.publicKey}'
-                    |match tx {
-                    |  case s: SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
-                    |  case _ => true
-                    |}
-                """.stripMargin,
-                estimator
-              )
-              .explicitGet()
-              ._1
-          ),
-          setScriptFee + smartFee,
-          System.currentTimeMillis()
-        )
-        .explicitGet()
+      val setScriptTransaction = TxHelpers.setScript(
+        acc = accountA,
+        script = ScriptCompiler
+          .compile(
+            s"""|let pkB = base58'${accountB.publicKey}'
+                |match tx {
+                |  case s: SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
+                |  case _ => true
+                |}
+            """.stripMargin,
+            estimator
+          )
+          .explicitGet()
+          ._1,
+        fee = setScriptFee + smartFee,
+        version = v
+      )
 
       val setScriptId = sender
         .signedBroadcast(setScriptTransaction.json())

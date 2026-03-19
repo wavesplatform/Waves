@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class HttpScriptAssetActionLimitsSuite extends ScriptAssetActionLimitsSuite {
@@ -30,9 +30,8 @@ class HttpScriptAssetActionLimitsSuite extends ScriptAssetActionLimitsSuite {
     nodes.waitForHeightAriseAndTxPresent(
       miner
         .signedBroadcast(
-          SetScriptTransaction
-            .selfSigned(1.toByte, address, Some(compiledScript), 1.waves, System.currentTimeMillis())
-            .explicitGet()
+          TxHelpers
+            .setScript(address, compiledScript, 1.waves, timestamp = System.currentTimeMillis())
             .json()
         )
         .id

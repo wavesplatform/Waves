@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.*
-import com.wavesplatform.crypto
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.*
@@ -27,6 +27,8 @@ case class SetScriptTransaction(
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V2 {
+  override type T = SetScriptTransaction
+  override def addProof(proof: ByteStr): SetScriptTransaction = copy(proofs = this.proofs.add(proof))
 
   val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(SetScriptTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(SetScriptTxSerializer.toBytes(this))
@@ -39,9 +41,6 @@ object SetScriptTransaction extends TransactionParser {
   override val typeId: TxType = 13: Byte
 
   implicit val validator: TxValidator[SetScriptTransaction] = SetScriptTxValidator
-
-  implicit def sign(tx: SetScriptTransaction, privateKey: PrivateKey): SetScriptTransaction =
-    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   override def parseBytes(bytes: Array[TxVersion]): Try[SetScriptTransaction] =
     SetScriptTxSerializer.parseBytes(bytes)
@@ -59,25 +58,4 @@ object SetScriptTransaction extends TransactionParser {
       fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       tx  <- SetScriptTransaction(version, sender, script, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      script: Option[Script],
-      fee: Long,
-      timestamp: TxTimestamp,
-      signer: PrivateKey,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, SetScriptTransaction] =
-    create(version, sender, script, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      script: Option[Script],
-      fee: Long,
-      timestamp: TxTimestamp,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, SetScriptTransaction] =
-    signed(version, sender.publicKey, script, fee, timestamp, sender.privateKey, chainId)
 }

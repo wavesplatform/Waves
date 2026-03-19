@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.lease
 
-import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
-import com.wavesplatform.crypto
+import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.serialization.impl.LeaseTxSerializer
@@ -21,15 +21,20 @@ final case class LeaseTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.Lease)
-    with SigProofsSwitch
-    with Versioned.ToV3
-    with TxWithFee.InWaves
-    with FastHashId
-    with PBSince.V3 {
+) extends Transaction(TransactionType.Lease),
+      ProvenTransaction,
+      HasSignature,
+      Versioned.ToV3,
+      TxWithFee.InWaves,
+      FastHashId,
+      PBSince.V3 {
+  type T = LeaseTransaction
+
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseTxSerializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseTxSerializer.toJson(this))
+
+  override def addProof(proof: ByteStr): LeaseTransaction = copy(proofs = this.proofs.add(proof))
 }
 
 object LeaseTransaction extends TransactionParser {
@@ -38,9 +43,6 @@ object LeaseTransaction extends TransactionParser {
   val typeId: TxType = 8: Byte
 
   implicit val validator: TxValidator[LeaseTransaction] = LeaseTxValidator
-
-  implicit def sign(tx: LeaseTransaction, privateKey: PrivateKey): LeaseTransaction =
-    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   override def parseBytes(bytes: Array[TxVersion]): Try[LeaseTransaction] =
     LeaseTxSerializer.parseBytes(bytes)
@@ -61,25 +63,4 @@ object LeaseTransaction extends TransactionParser {
     } yield tx
 
   }
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      recipient: AddressOrAlias,
-      amount: Long,
-      fee: Long,
-      timestamp: TxTimestamp,
-      signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
-    create(version, sender, recipient, amount, fee, timestamp, Nil).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      recipient: AddressOrAlias,
-      amount: Long,
-      fee: Long,
-      timestamp: TxTimestamp
-  ): Either[ValidationError, TransactionT] =
-    signed(version, sender.publicKey, recipient, amount, fee, timestamp, sender.privateKey)
 }

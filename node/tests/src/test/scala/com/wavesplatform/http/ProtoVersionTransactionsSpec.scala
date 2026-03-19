@@ -49,7 +49,7 @@ class ProtoVersionTransactionsSpec
   private val script           = TxHelpers.script("true")
 
   private val route: Route =
-    TransactionsApiRoute(
+    Route.seal(TransactionsApiRoute(
       restAPISettings,
       domain.transactionsApi,
       domain.wallet,
@@ -59,7 +59,7 @@ class ProtoVersionTransactionsSpec
       DummyTransactionPublisher.accepting,
       domain.testTime,
       new RouteTimeout(60.seconds)(using sharedScheduler)
-    ).route
+    ).route)
 
   "Proto transactions should be able to broadcast " - {
     "CreateAliasTransaction" in {
@@ -191,9 +191,7 @@ class ProtoVersionTransactionsSpec
           .explicitGet()
 
       val exchangeTx =
-        ExchangeTransaction
-          .signed(TxVersion.V3, account.privateKey, buyOrder, sellOrder, 100, 100, MinFee * 3, MinFee * 3, MinFee * 3, now)
-          .explicitGet()
+        TxHelpers.exchange(buyOrder, sellOrder, account, 100, 100, MinFee * 3, MinFee * 3, MinFee * 3, now, TxVersion.V3)
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(exchangeTx)))
 
       Post(routePath("/broadcast"), exchangeTx.json()) ~> ApiKeyHeader ~> route ~> check {
@@ -404,7 +402,7 @@ class ProtoVersionTransactionsSpec
         .create(
           TxVersion.V1,
           account.publicKey,
-          asset.id,
+          asset,
           "Test",
           "Test",
           ntpNow,

@@ -102,7 +102,7 @@ lazy val `node-tests` = project
   .settings(libraryDependencies ++= Dependencies.logDeps)
 
 lazy val `grpc-server` =
-  project.dependsOn(node % "compile;runtime->provided", `node-testkit`)
+  project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test")
 
 lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-testkit`)
 lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `node-testkit`)

@@ -1358,20 +1358,18 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           )
           .explicitGet()
 
-      ExchangeTransaction
-        .signed(
-          TxVersion.V3,
-          matcher.privateKey,
-          buyOrder,
-          sellOrder,
-          1L,
-          1L,
-          TestValues.fee,
-          TestValues.fee,
-          TestValues.fee,
-          ntpTime.correctedTime()
-        )
-        .explicitGet()
+      TxHelpers.exchange(
+        buyOrder,
+        sellOrder,
+        matcher,
+        1L,
+        1L,
+        TestValues.fee,
+        TestValues.fee,
+        TestValues.fee,
+        ntpTime.correctedTime(),
+        TxVersion.V3
+      )
     }
 
     def generateAndAppendTx(orderVersion: TxVersion, mode: OrderPriceMode, settings: WavesSettings = DomainPresets.RideV5): Unit = {
@@ -1590,14 +1588,16 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             buyMatcherFee = fee,
             sellMatcherFee = fee,
             fee = TxPositiveAmount.unsafeFrom(fee),
-            order1 = tx.order1.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(buyer.privateKey),
-            order2 = tx.order2.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(seller.privateKey)
+            order1 = { val o = tx.order1.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)); o.withProofs(Proofs(crypto.sign(buyer.privateKey, o.bodyBytes()))) },
+            order2 = { val o = tx.order2.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)); o.withProofs(Proofs(crypto.sign(seller.privateKey, o.bodyBytes()))) },
+            proofs = Proofs.empty
           )
           .signWith(matcher.privateKey)
         val reversed = fixed
           .copy(
             order1 = fixed.order2,
-            order2 = fixed.order1
+            order2 = fixed.order1,
+            proofs = Proofs.empty
           )
           .signWith(matcher.privateKey)
 
@@ -1664,10 +1664,11 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         val exchange = tx
           .copy(
             amount = TxExchangeAmount.unsafeFrom(amount),
-            order1 = tx.buyOrder.copy(amount = TxExchangeAmount.unsafeFrom(sellAmount)).signWith(buyer.privateKey),
-            order2 = tx.sellOrder.copy(amount = TxExchangeAmount.unsafeFrom(buyAmount)).signWith(seller.privateKey),
+            order1 = { val o = tx.buyOrder.copy(amount = TxExchangeAmount.unsafeFrom(sellAmount)); o.withProofs(Proofs(crypto.sign(buyer.privateKey, o.bodyBytes()))) },
+            order2 = { val o = tx.sellOrder.copy(amount = TxExchangeAmount.unsafeFrom(buyAmount)); o.withProofs(Proofs(crypto.sign(seller.privateKey, o.bodyBytes()))) },
             buyMatcherFee = (BigInt(tx.fee.value) * amount / buyAmount).toLong,
-            sellMatcherFee = (BigInt(tx.fee.value) * amount / sellAmount).toLong
+            sellMatcherFee = (BigInt(tx.fee.value) * amount / sellAmount).toLong,
+            proofs = Proofs.empty
           )
           .signWith(matcher.privateKey)
 
@@ -1857,42 +1858,39 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     val sellMatcherFee      = Long.MinValue - buyMatcherFee + exchangeFee
 
     val sender      = testWallet.generateNewAccount().get
-    def mkIssueTx   = IssueTransaction.selfSigned(2.toByte, sender, "IA_01", "", 100, 2, true, None, issueFee, ntpTime.getTimestamp()).explicitGet()
+    def mkIssueTx   = TxHelpers.issue(issuer = sender, amount = 100, decimals = 2, name = "IA_01", description = "", fee = issueFee, script = None, reissuable = true, timestamp = ntpTime.getTimestamp(), version = 2.toByte)
     val priceAsset  = mkIssueTx
     val amountAsset = mkIssueTx
     val assetPair   = AssetPair(priceAsset.asset, amountAsset.asset)
 
     def mkOrder(orderType: OrderType): Order =
-      Order
-        .selfSigned(
-          3.toByte,
-          sender,
-          sender.publicKey,
-          assetPair,
-          orderType,
-          1,
-          1,
-          ntpTime.getTimestamp(),
-          ntpTime.getTimestamp() + 100000,
-          100
-        )
-        .explicitGet()
+      TxHelpers.order(
+        orderType = orderType,
+        amountAsset = assetPair.amountAsset,
+        priceAsset = assetPair.priceAsset,
+        amount = 1,
+        price = 1,
+        fee = 100,
+        sender = sender,
+        matcher = sender,
+        timestamp = ntpTime.getTimestamp(),
+        expiration = ntpTime.getTimestamp() + 100000,
+        version = 3.toByte
+      )
 
     def mkExchangeTx: ExchangeTransaction =
-      ExchangeTransaction
-        .signed(
-          2.toByte,
-          sender.privateKey,
-          mkOrder(OrderType.BUY),
-          mkOrder(OrderType.SELL),
-          1,
-          1,
-          buyMatcherFee,
-          sellMatcherFee,
-          exchangeFee,
-          ntpTime.getTimestamp()
-        )
-        .explicitGet()
+      TxHelpers.exchange(
+        mkOrder(OrderType.BUY),
+        mkOrder(OrderType.SELL),
+        sender,
+        1,
+        1,
+        buyMatcherFee,
+        sellMatcherFee,
+        exchangeFee,
+        ntpTime.getTimestamp(),
+        2.toByte
+      )
 
     withDomain(DomainPresets.RideV5) { d =>
       d.appendBlock(

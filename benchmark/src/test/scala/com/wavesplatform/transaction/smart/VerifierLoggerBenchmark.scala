@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.smart
 import java.io.BufferedWriter
 import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.TimeUnit
-
 import cats.Id
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
@@ -14,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.state.BinaryDataEntry
-import com.wavesplatform.transaction.DataTransaction
+import com.wavesplatform.transaction.{DataTransaction, TxHelpers}
 import com.wavesplatform.transaction.smart.VerifierLoggerBenchmark.BigLog
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
@@ -42,9 +41,8 @@ object VerifierLoggerBenchmark {
     val resultFile: Path       = Paths.get("log.txt")
     val writer: BufferedWriter = Files.newBufferedWriter(resultFile)
 
-    private val dataTx: DataTransaction = DataTransaction
-      .selfSigned(1.toByte, KeyPair(Array[Byte]()), (1 to 4).map(i => BinaryDataEntry(s"data$i", ByteStr(Array.fill(1024 * 30)(1)))).toList, 100000000, 0)
-      .explicitGet()
+    private val dataTx: DataTransaction =
+      TxHelpers.data(KeyPair(Array[Byte]()), (1 to 4).map(i => BinaryDataEntry(s"data$i", ByteStr(Array.fill(1024 * 30)(1)))).toList, 100000000, 0)
 
     private val dataTxObj: Terms.CaseObj = Bindings.transactionObject(
       RealTransactionWrapper(dataTx, ???, ???, ???).explicitGet(),

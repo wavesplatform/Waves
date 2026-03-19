@@ -9,9 +9,10 @@ import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
-import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion, TransactionSignOps}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
 
@@ -20,9 +21,7 @@ import scala.concurrent.duration.*
 
 class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
   test("transfer with empty string assetId") {
-    val tx = TransferTransaction
-      .selfSigned(2.toByte, sender.keyPair, sender.keyPair.toAddress, Waves, 100L, Waves, minFee, ByteStr.empty, System.currentTimeMillis())
-      .explicitGet()
+    val tx = TxHelpers.transfer(from = sender.keyPair, to = sender.keyPair.toAddress, amount = 100L, asset = Waves, fee = minFee, feeAsset = Waves, attachment = ByteStr.empty, version = 2.toByte)
     val json = tx.json() ++ Json.obj("assetId" -> "", "feeAssetId" -> "")
     sender.signedBroadcast(json, waitForTx = true)
   }

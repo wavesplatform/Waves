@@ -16,8 +16,7 @@ import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry, Height}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import org.scalatest.Assertion
 import org.scalatest.EitherValues.*
 
@@ -201,19 +200,17 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
       .foreach { version =>
         val transferTxId = transferTxIds(version)
         val responseTx   = sender.transactionInfo[TransferTransactionInfo](transferTxId)
-        val bodyBytes = TransferTransaction
-          .selfSigned(
-            version = version,
-            sender = alice,
-            recipient = Alias.createWithChainId(alias, chainId.toByte).explicitGet(),
+        val bodyBytes = TxHelpers.transfer(
+            from = alice,
+            to = Alias.createWithChainId(alias, chainId.toByte).explicitGet(),
             asset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
             amount = transferAmount,
             feeAsset = Waves,
             fee = responseTx.fee,
             attachment = ByteStr(attachment.getBytes(StandardCharsets.UTF_8)),
-            timestamp = responseTx.timestamp
+            timestamp = responseTx.timestamp,
+            version = version
           )
-          .explicitGet()
           .bodyBytes
           .value()
 

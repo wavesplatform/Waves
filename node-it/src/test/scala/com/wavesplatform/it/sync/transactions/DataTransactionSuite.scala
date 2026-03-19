@@ -17,7 +17,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{DataTransaction, Proofs, TxVersion}
+import com.wavesplatform.transaction.{DataTransaction, Proofs, TxHelpers, TxVersion}
 import org.scalatest.{Assertion, Assertions, EitherValues}
 import play.api.libs.json.*
 
@@ -69,7 +69,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       waitForTx = true
     )
     val dataTx =
-      DataTransaction.selfSigned(TxVersion.V1, keyPair, Seq(StringDataEntry("1", "test")), 700000L, System.currentTimeMillis()).explicitGet()
+      TxHelpers.data(account = keyPair, entries = Seq(StringDataEntry("1", "test")), fee = 700000L, version = TxVersion.V1)
 
     val brokenProofs = dataTx.copy(proofs = Proofs(dataTx.proofs.proofs :+ ByteStr(new Array[Byte](65))))
     assertBadRequestAndResponse(sender.signedBroadcast(brokenProofs.json(), waitForTx = true), "Too large proof")
@@ -356,15 +356,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   test("transaction requires a valid proof") {
     for (v <- dataTxSupportedVersions) {
       def request: JsObject =
-        DataTransaction
-          .selfSigned(
-            v,
-            firstKeyPair,
-            List(IntegerDataEntry("int", 333)),
-            minFee,
-            System.currentTimeMillis()
-          )
-          .explicitGet()
+        TxHelpers.data(account = firstKeyPair, entries = List(IntegerDataEntry("int", 333)), fee = minFee, version = v)
           .json()
 
       def id(obj: JsObject): String = obj.value("id").as[String]
@@ -478,5 +470,5 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       timestamp: Long = System.currentTimeMillis,
       version: TxVersion
   ): DataTransaction =
-    DataTransaction.selfSigned(version, sender.keyPair, entries, fee, timestamp).explicitGet()
+    TxHelpers.data(sender.keyPair, entries, fee, version, timestamp)
 }

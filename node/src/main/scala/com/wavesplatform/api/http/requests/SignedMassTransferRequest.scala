@@ -3,9 +3,9 @@ package com.wavesplatform.api.http.requests
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.{Asset, Proofs}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.{Asset, Proofs}
 import play.api.libs.functional.syntax.*
 import play.api.libs.json.*
 
@@ -32,9 +32,9 @@ case class SignedMassTransferRequest(
     transfers: List[Transfer],
     fee: Long,
     timestamp: Long,
-    attachment: ByteStr,
-    proofs: Proofs
-) {
+    attachment: ByteStr = ByteStr.empty,
+    proofs: Proofs = Proofs.empty
+) extends TxBroadcastRequest[MassTransferTransaction] {
   def toTx: Either[ValidationError, MassTransferTransaction] =
     for {
       _sender    <- PublicKey.fromBase58String(senderPublicKey)

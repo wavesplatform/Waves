@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
-import com.wavesplatform.crypto
+import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.serialization.impl.BurnTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.BurnTxValidator
@@ -25,14 +25,18 @@ final case class BurnTransaction(
 ) extends Transaction(TransactionType.Burn, Seq(asset))
     with ProvenTransaction
     with Versioned.ToV3
-    with SigProofsSwitch
+    with HasSignature
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V3 {
 
+  type T = BurnTransaction
+
   override val bodyBytes: Coeval[Array[Byte]] = BurnTxSerializer.bodyBytes(this)
   override val bytes: Coeval[Array[Byte]]     = BurnTxSerializer.toBytes(this)
   override val json: Coeval[JsObject]         = BurnTxSerializer.toJson(this)
+
+  override def addProof(proof: ByteStr): BurnTransaction = copy(proofs = this.proofs.add(proof))
 }
 
 object BurnTransaction extends TransactionParser {
@@ -40,9 +44,6 @@ object BurnTransaction extends TransactionParser {
   override val typeId: TxType = 6: Byte
 
   implicit val validator: TxValidator[BurnTransaction] = BurnTxValidator
-
-  implicit def sign(tx: BurnTransaction, privateKey: PrivateKey): BurnTransaction =
-    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   val serializer = BurnTxSerializer
 
@@ -56,7 +57,7 @@ object BurnTransaction extends TransactionParser {
       quantity: Long,
       fee: Long,
       timestamp: Long,
-      proofs: Proofs,
+      proofs: Proofs = Proofs.empty,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, BurnTransaction] =
     for {
@@ -64,28 +65,4 @@ object BurnTransaction extends TransactionParser {
       fee      <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       tx       <- BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      asset: IssuedAsset,
-      quantity: Long,
-      fee: Long,
-      timestamp: Long,
-      signer: PrivateKey,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, BurnTransaction] =
-    create(version, sender, asset, quantity, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      asset: IssuedAsset,
-      quantity: Long,
-      fee: Long,
-      timestamp: Long,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, BurnTransaction] = {
-    signed(version, sender.publicKey, asset, quantity, fee, timestamp, sender.privateKey, chainId)
-  }
 }

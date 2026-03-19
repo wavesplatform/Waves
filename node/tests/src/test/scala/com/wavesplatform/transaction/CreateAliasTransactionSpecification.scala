@@ -60,8 +60,8 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
 
   property("The same aliases from different senders have the same id") {
     forAll(accountGen, accountGen, aliasGen, timestampGen) { case (a1: KeyPair, a2: KeyPair, a: Alias, t: Long) =>
-      val tx1 = CreateAliasTransaction.selfSigned(1.toByte, a1, a.name, MinIssueFee, t).explicitGet()
-      val tx2 = CreateAliasTransaction.selfSigned(1.toByte, a2, a.name, MinIssueFee, t).explicitGet()
+      val tx1 = TxHelpers.createAlias(a.name, a1, MinIssueFee, timestamp = t)
+      val tx2 = TxHelpers.createAlias(a.name, a2, MinIssueFee, timestamp = t)
       tx1.id() shouldBe tx2.id()
     }
   }

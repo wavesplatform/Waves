@@ -216,12 +216,9 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   }
 
   private def createAliasFromJson(target: KeyPair, alias: String, fee: Long, version: Byte) = {
-    import com.wavesplatform.common.utils.EitherExt2.*
     val transactionJson = Try(
-      CreateAliasTransaction
-        .selfSigned(version, target, alias, fee, System.currentTimeMillis())
-        .foldToTry
-    ).flatten
+      TxHelpers.createAlias(name = alias, sender = target, fee = fee, version = version)
+    )
       .map(_.json())
       .getOrElse(
         Json.obj(

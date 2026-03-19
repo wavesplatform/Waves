@@ -452,8 +452,8 @@ class TransactionBindingsTest extends PropSpec, EitherValues, WithDomain {
     val fee     = ciFee(freeCall = true).sample.get
     val account = accountGen.sample.get
     val asset   = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
-    val tx1     = InvokeExpressionTransaction.selfSigned(TxVersion.V1, account, expression, fee, Waves, Random.nextLong()).explicitGet()
-    val tx2     = InvokeExpressionTransaction.selfSigned(TxVersion.V1, account, expression, fee, asset, Random.nextLong()).explicitGet()
+    val tx1     = TxHelpers.invokeExpression(expression, account, fee, Waves)
+    val tx2     = TxHelpers.invokeExpression(expression, account, fee, asset)
 
     runScriptWithCustomContext[CONST_BOOLEAN](script(tx1), tx1, V6) shouldBe evaluated(true)
     runScriptWithCustomContext[CONST_BOOLEAN](script(tx2), tx2, V6) shouldBe evaluated(true)

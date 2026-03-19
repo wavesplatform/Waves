@@ -16,8 +16,7 @@ import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.state.{AssetInfo, AssetStaticInfo, AssetVolumeInfo, BinaryDataEntry, BooleanDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
-import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.JsonMatchers
 import org.scalatest.{Assertion, EitherValues}
@@ -107,9 +106,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
     val freeCall = TestCompiler(V6).compileFreeCall(s"""strict test = invoke(Address(base58'${dAppAccount.toAddress}'), "test", [], [])
                                                        |if (test == 123) then [] else throw("err")""".stripMargin)
 
-    val invoke = InvokeExpressionTransaction
-      .selfSigned(TxVersion.V1, TxHelpers.defaultSigner, freeCall, 1000000L, Waves, System.currentTimeMillis())
-      .explicitGet()
+    val invoke = TxHelpers.invokeExpression(freeCall, TxHelpers.defaultSigner, 1000000L)
     withDomain(ContinuationTransaction) { d =>
       d.helpers.creditWavesToDefaultSigner()
       d.helpers.creditWavesFromDefaultSigner(dAppAccount.toAddress)
@@ -157,7 +154,12 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
       d.blockchain.accountData(invoke.sender.toAddress, "check").get shouldBe BooleanDataEntry("check", true)
       d.blockchain.accountData(invoke.sender.toAddress, "transactionId").get shouldBe BinaryDataEntry("transactionId", invoke.txId)
       d.liquidSnapshot.assetStatics.size shouldBe 1
-      checkAsset(invoke, d.liquidSnapshot.assetStatics.head._2._1, d.liquidSnapshot.assetNamesAndDescriptions.head._2, d.liquidSnapshot.assetVolumes.head._2)
+      checkAsset(
+        invoke,
+        d.liquidSnapshot.assetStatics.head._2._1,
+        d.liquidSnapshot.assetNamesAndDescriptions.head._2,
+        d.liquidSnapshot.assetVolumes.head._2
+      )
     }
   }
 
@@ -378,8 +380,10 @@ private object InvokeExpressionTest {
          | [
          |   BooleanEntry("check", check),
          |   BinaryEntry("transactionId", i.transactionId)
-         |   ${if (issue) s""", Issue("$TestAssetName", "$TestAssetDesc", $TestAssetVolume, $TestAssetDecimals, $TestAssetReissuable, unit, 0) """
-      else ""}
+         |   ${
+          if (issue) s""", Issue("$TestAssetName", "$TestAssetDesc", $TestAssetVolume, $TestAssetDecimals, $TestAssetReissuable, unit, 0) """
+          else ""
+        }
          |   ${if (transfersCount > 0) "," else ""}
          |   ${(1 to transfersCount).map(_ => s"ScriptTransfer(Address(base58'$receiver'), 1, unit)").mkString(",")}
          | ]
@@ -402,16 +406,15 @@ private object InvokeExpressionTest {
     val fee      = ciFee(freeCall = enoughFee, nonNftIssue = if (issue) 1 else 0, sc = if (bigVerifier) 1 else 0).sample.get
 
     val genesis     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, TxHelpers.timestamp).explicitGet()
-    val setVerifier = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, TxHelpers.timestamp).explicitGet()
+    val setVerifier = verifier.fold(TxHelpers.removeScript(invoker, fee, TxVersion.V2)) { s => TxHelpers.setScript(invoker, s, fee, TxVersion.V2) }
 
-    val sponsorIssueTx =
-      IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, 1.waves, TxHelpers.timestamp).explicitGet()
-    val sponsorAsset = IssuedAsset(sponsorIssueTx.id.value())
-    val sponsorTx    = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, sponsorAsset, Some(1000L), fee, TxHelpers.timestamp).explicitGet()
-    val feeAsset     = if (sponsor) sponsorAsset else Waves
+    val sponsorIssueTx = TxHelpers.issue(invoker, 1000, 1, "name", "", 1.waves, None, true, TxVersion.V2)
+    val sponsorAsset   = IssuedAsset(sponsorIssueTx.id.value())
+    val sponsorTx      = TxHelpers.sponsor(sponsorAsset, Some(1000L), invoker, fee, TxVersion.V2)
+    val feeAsset       = if (sponsor) sponsorAsset else Waves
 
     val call   = makeExpression(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount, raiseError)
-    val invoke = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, TxHelpers.timestamp).explicitGet()
+    val invoke = TxHelpers.invokeExpression(call, invoker, fee, feeAsset, version)
 
     (Seq(genesis, sponsorIssueTx, sponsorTx, setVerifier), invoke)
   }

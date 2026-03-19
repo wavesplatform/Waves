@@ -6,6 +6,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
 import com.wavesplatform.transaction.transfer.*
 import play.api.libs.json.Json
@@ -105,7 +106,7 @@ class TransferTransactionV1Specification extends PropSpec {
   property("negative") {
     for {
       (_, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
-    } yield TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, feeAmount, attachment, timestamp) should produce(
+    } yield TransferTransaction.create(1.toByte, sender.publicKey, recipient, Waves, amount, Waves, feeAmount, attachment, timestamp, Proofs.empty).map(_.signWith(sender.privateKey)) should produce(
       "insufficient fee"
     )
   }

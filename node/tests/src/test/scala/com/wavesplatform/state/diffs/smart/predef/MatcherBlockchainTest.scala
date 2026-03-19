@@ -4,7 +4,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.ValidationError
@@ -19,7 +18,7 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxHelpers}
 
 class MatcherBlockchainTest extends PropSpec, WithDomain {
   property("ScriptRunner.applyGeneric() avoids Blockchain calls") {
@@ -68,7 +67,17 @@ class MatcherBlockchainTest extends PropSpec, WithDomain {
       override def conflictGenerators(at: GenerationPeriod): ConflictGenerators                             = ???
     }
 
-    val tx = TransferTransaction.selfSigned(1.toByte, accountGen.sample.get, accountGen.sample.get.toAddress, Waves, 1, Waves, 1, ByteStr.empty, 0)
+    val tx = TxHelpers.transfer(
+      from = accountGen.sample.get,
+      to = accountGen.sample.get.toAddress,
+      amount = 1,
+      asset = Waves,
+      fee = 1,
+      feeAsset = Waves,
+      attachment = ByteStr.empty,
+      timestamp = 0,
+      version = 1.toByte
+    )
     val scripts =
       Seq(
         TestCompiler(V5).compileExpression("true"),
@@ -92,7 +101,7 @@ class MatcherBlockchainTest extends PropSpec, WithDomain {
     scripts.foreach { script =>
       ScriptRunner
         .applyGeneric(
-          tx.explicitGet(),
+          tx,
           blockchain,
           script,
           isAssetScript = false,

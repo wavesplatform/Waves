@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs.smart.eth
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.DirectiveDictionary
@@ -14,10 +13,7 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, ERC20Address, EthTxGenerator, EthereumTransaction, TxHelpers}
+import com.wavesplatform.transaction.{Asset, ERC20Address, EthTxGenerator, EthereumTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.EthHelpers
 
 import scala.math.Ordering.Implicits.infixOrderingOps
@@ -73,7 +69,16 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
   property("access to Ethereum transfer from RIDE script") {
     val recipient = RandomKeyPair()
 
-    val issue = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, reissuable = true, None, 1.waves, ts).explicitGet()
+    val issue = TxHelpers.issue(
+      issuer = recipient,
+      amount = ENOUGH_AMT,
+      decimals = 8,
+      name = "Asset",
+      description = "",
+      script = None,
+      fee = 1.waves,
+      version = TxVersion.V2
+    )
 
     for {
       version <- DirectiveDictionary[StdLibVersion].all
@@ -82,11 +87,21 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
       val ethTransfer = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, recipient.toAddress, transferAmount, asset)
       val ethSender   = ethTransfer.senderAddress()
       val transferIssuedAsset =
-        TransferTransaction.selfSigned(2.toByte, recipient, ethSender, asset, ENOUGH_AMT, Waves, 0.001.waves, ByteStr.empty, ts).explicitGet()
+        TxHelpers.transfer(
+          from = recipient,
+          to = ethSender,
+          amount = ENOUGH_AMT,
+          asset = asset,
+          fee = 0.001.waves,
+          feeAsset = Waves,
+          attachment = ByteStr.empty,
+          timestamp = ts,
+          version = 2.toByte
+        )
 
       val function    = if (version >= V3) "transferTransactionById" else "transactionById"
       val verifier    = Some(accountScript(version, function, ethTransfer, asset, recipient.toAddress))
-      val setVerifier = () => SetScriptTransaction.selfSigned(1.toByte, recipient, verifier, 0.01.waves, ts).explicitGet()
+      val setVerifier = () => TxHelpers.setScript(recipient, verifier.get, 0.01.waves, 1.toByte)
 
       withDomain(settingsForRide(version.max(V6)), Seq(AddrWithBalance(ethSender), AddrWithBalance(recipient.toAddress))) { d =>
         if (asset != Waves) d.appendBlock(issue, transferIssuedAsset)
@@ -131,11 +146,21 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
       .foreach { version =>
         val script = assetScript(version, dummyEthTransfer, recipient.toAddress)
         val issue =
-          IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, reissuable = true, Some(script), 1.waves, ts).explicitGet()
+          TxHelpers.issue(recipient, ENOUGH_AMT, 8, "Asset", "", fee = 1.waves, Some(script), true, ts, TxVersion.V2)
         val asset       = IssuedAsset(issue.id())
         val ethTransfer = dummyEthTransfer.copy(dummyTransfer.copy(Some(ERC20Address(asset.id.take(20)))))
         val preTransfer =
-          TransferTransaction.selfSigned(2.toByte, recipient, ethSender, asset, ENOUGH_AMT, Waves, 0.005.waves, ByteStr.empty, ts).explicitGet()
+          TxHelpers.transfer(
+            from = recipient,
+            to = ethSender,
+            amount = ENOUGH_AMT,
+            asset = asset,
+            fee = 0.005.waves,
+            feeAsset = Waves,
+            attachment = ByteStr.empty,
+            timestamp = ts,
+            version = 2.toByte
+          )
 
         withDomain(settingsForRide(version.max(V6)), Seq(AddrWithBalance(ethSender), AddrWithBalance(recipient.toAddress))) { d =>
           d.appendBlock(issue, preTransfer)

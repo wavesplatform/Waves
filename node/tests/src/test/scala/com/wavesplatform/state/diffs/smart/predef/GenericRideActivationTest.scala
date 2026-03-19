@@ -8,10 +8,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
 import org.scalatest.EitherValues
 
 class GenericRideActivationTest extends PropSpec with WithDomain with EitherValues {
@@ -37,9 +34,9 @@ class GenericRideActivationTest extends PropSpec with WithDomain with EitherValu
       fee     <- ciFee(sc = 1)
       gTx1   = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       gTx2   = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      ssTx   = SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp(version)), 0.01.waves, ts).explicitGet()
-      ssTx2  = SetScriptTransaction.selfSigned(1.toByte, invoker, Some(verifier(version)), 0.01.waves, ts).explicitGet()
-      invoke = Signed.invokeScript(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts)
+      ssTx   = TxHelpers.setScript(master, dApp(version), 0.01.waves, 1.toByte)
+      ssTx2  = TxHelpers.setScript(invoker, verifier(version), 0.01.waves, 1.toByte)
+      invoke = TxHelpers.invoke(master.toAddress, invoker = invoker, fee = fee, version = 1.toByte, timestamp = ts)
     } yield (Seq(gTx1, gTx2), Seq(ssTx, ssTx2), invoke)
 
   property("RIDE versions activation") {

@@ -1,14 +1,10 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 
 class IllegalAddressChainIdTest extends PropSpec with WithDomain {
@@ -33,8 +29,8 @@ class IllegalAddressChainIdTest extends PropSpec with WithDomain {
     val invoker  = RandomKeyPair()
     val gTx1     = TxHelpers.genesis(master.toAddress, ENOUGH_AMT, TxHelpers.timestamp)
     val gTx2     = TxHelpers.genesis(invoker.toAddress, ENOUGH_AMT, TxHelpers.timestamp)
-    val ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, Some(contract(bigComplexity)), 0.01.waves, TxHelpers.timestamp).explicitGet()
-    val invokeTx = Signed.invokeScript(TxVersion.V3, invoker, master.toAddress, None, Nil, 0.005.waves, Waves, TxHelpers.timestamp)
+    val ssTx     = TxHelpers.setScript(master, contract(bigComplexity), 0.01.waves, 1.toByte)
+    val invokeTx = TxHelpers.invoke(master.toAddress, invoker = invoker, fee = 0.005.waves, version = TxVersion.V3, timestamp = TxHelpers.timestamp)
     (Seq(gTx1, gTx2, ssTx), invokeTx)
   }
 

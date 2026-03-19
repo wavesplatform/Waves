@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import monix.execution.atomic.AtomicInt
 
@@ -328,9 +328,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
     nodes.waitForHeightAriseAndTxPresent(
       miner
         .signedBroadcast(
-          SetScriptTransaction
-            .selfSigned(1.toByte, address, Some(compiledScript), setScriptFee, System.currentTimeMillis())
-            .explicitGet()
+          TxHelpers.setScript(acc = address, script = compiledScript, fee = setScriptFee, version = 1.toByte)
             .json()
         )
         .id

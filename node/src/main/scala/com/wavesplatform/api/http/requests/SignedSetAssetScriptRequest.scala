@@ -29,7 +29,7 @@ case class SignedSetAssetScriptRequest(
     fee: Long,
     timestamp: Long,
     proofs: Proofs
-) {
+) extends TxBroadcastRequest[SetAssetScriptTransaction] {
   def toTx: Either[ValidationError, SetAssetScriptTransaction] =
     for {
       _sender <- PublicKey.fromBase58String(senderPublicKey)

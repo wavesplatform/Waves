@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
@@ -18,12 +19,22 @@ case class DataRequest(
     timestamp: Option[Long] = None
 )
 
-case class SignedDataRequest(version: Byte, senderPublicKey: String, data: List[DataEntry[?]], fee: Long, timestamp: Long, proofs: Proofs) {
+case class SignedDataRequest(
+    version: Byte,
+    senderPublicKey: String,
+    data: List[DataEntry[?]],
+    fee: Long,
+    timestamp: Long,
+    proofs: Option[Proofs],
+    signature: Option[ByteStr]
+) extends TxBroadcastRequest[DataTransaction] {
   def toTx: Either[ValidationError, DataTransaction] =
     for {
-      _sender <- PublicKey.fromBase58String(senderPublicKey)
-      t       <- DataTransaction.create(version, _sender, data, fee, timestamp, proofs)
-    } yield t
+      validProofs <- toProofs(signature, proofs)
+      validSender <- PublicKey.fromBase58String(senderPublicKey)
+      tx          <- DataTransaction.create(version, validSender, data, fee, timestamp, validProofs)
+    } yield tx
+
 }
 
 object SignedDataRequest {

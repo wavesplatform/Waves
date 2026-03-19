@@ -379,7 +379,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     assert(signedRequestResponse.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val signedRequestJson = Json.parse(signedRequestResponse.getResponseBody)
     val signedRequest     = signedRequestJson.as[TransferRequest]
-    assert(PublicKey.fromBase58String(signedRequest.senderPublicKey.get).explicitGet().toAddress.toString == firstAddress)
+    assert(PublicKey.fromBase58String(signedRequest.senderPublicKey).explicitGet().toAddress.toString == firstAddress)
     assert(signedRequest.recipient == secondAddress)
     assert(signedRequest.fee == minFee)
     assert(signedRequest.amount == transferAmount)
@@ -442,10 +442,9 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
       val amount = math.min(buy.amount.value, sell.amount.value)
       val tx =
         if (tver == 1) {
-          ExchangeTransaction
-            .signed(
-              1.toByte,
-              matcher = matcher.privateKey,
+          TxHelpers.exchange(
+              version = 1.toByte,
+              matcher = matcher,
               order1 = buy,
               order2 = sell,
               amount = amount,
@@ -455,13 +454,11 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
               fee = mf,
               timestamp = ts
             )
-            .explicitGet()
             .json()
         } else {
-          ExchangeTransaction
-            .signed(
-              2.toByte,
-              matcher = matcher.privateKey,
+          TxHelpers.exchange(
+              version = 2.toByte,
+              matcher = matcher,
               order1 = buy,
               order2 = sell,
               amount = amount,
@@ -471,7 +468,6 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
               fee = mf,
               timestamp = ts
             )
-            .explicitGet()
             .json()
         }
 

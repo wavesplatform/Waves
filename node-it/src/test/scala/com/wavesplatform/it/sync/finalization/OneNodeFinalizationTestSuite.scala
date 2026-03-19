@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.finalization
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.requests.CommitToGenerationRequest
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.SyncHttpApi.*
@@ -34,10 +33,10 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     step("Commit to generation")
     val period1 = node.currentGenerationPeriod.value.next
 
-    val commitTxn1 = node.sign(CommitToGenerationRequest(sender = Some(miner1Addr)))
+    val commitTxn1 = node.signCommitToGenerationRequest(miner1Addr)
     commitTxn1.generationPeriodStart.value shouldBe period1.start.toInt
 
-    val commitTxn2 = node.sign(CommitToGenerationRequest(sender = Some(miner2Addr)))
+    val commitTxn2 = node.signCommitToGenerationRequest(miner2Addr)
     commitTxn2.generationPeriodStart.value shouldBe period1.start.toInt
 
     node.broadcastRequest(commitTxn1)

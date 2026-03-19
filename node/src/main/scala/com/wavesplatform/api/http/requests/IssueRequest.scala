@@ -9,9 +9,8 @@ import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{Format, Json}
 
 case class IssueRequest(
-    version: Option[Byte],
-    sender: Option[String],
-    senderPublicKey: Option[String],
+    version: Byte = TxVersion.V3,
+    senderPublicKey: String,
     name: String,
     description: String,
     quantity: Long,
@@ -23,18 +22,17 @@ case class IssueRequest(
     signature: Option[ByteStr],
     proofs: Option[Proofs]
 ) extends TxBroadcastRequest[IssueTransaction] {
-  def toTxFrom(sender: PublicKey): Either[ValidationError, IssueTransaction] = {
-    val actualVersion = version.getOrElse(TxVersion.V3)
-
+  def toTx: Either[ValidationError, IssueTransaction] = {
     for {
       validProofs <- toProofs(signature, proofs)
+      validSender <- PublicKey.fromBase58String(senderPublicKey)
       validScript <- script match {
         case None         => Right(None)
         case Some(script) => Script.fromBase64String(script).map(Some(_))
       }
       tx <- IssueTransaction.create(
-        actualVersion,
-        sender,
+        version,
+        validSender,
         name,
         description,
         quantity,

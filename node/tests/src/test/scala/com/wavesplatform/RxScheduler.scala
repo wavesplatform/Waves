@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.*
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.transfer.*
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{Ack, Scheduler}
@@ -38,7 +39,7 @@ trait RxScheduler extends BeforeAndAfterAll { suite: Suite =>
   def block(id: Int): Block = TestBlock.create(Seq.empty).block.copy(signature = byteStr(id))
 
   def microBlock(total: Int, prev: Int): MicroBlock = {
-    val tx = TransferTransaction.selfSigned(1.toByte, signer, signer.toAddress, Waves, 1, Waves, 1, ByteStr.empty, 1).explicitGet()
+    val tx = TransferTransaction.create(1.toByte, signer.publicKey, signer.toAddress, Waves, 1, Waves, 1, ByteStr.empty, 1, Proofs.empty).map(_.signWith(signer.privateKey)).explicitGet()
     MicroBlock.buildAndSign(3.toByte, signer, Seq(tx), byteStr(prev), byteStr(total), None, None).explicitGet()
   }
 

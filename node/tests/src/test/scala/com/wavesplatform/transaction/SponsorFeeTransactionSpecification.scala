@@ -14,7 +14,8 @@ import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctio
 import com.wavesplatform.state.diffs.*
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.SponsorFeeTransaction
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.serialization.impl.SponsorFeeTxSerializer
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalacheck.Gen
@@ -151,23 +152,10 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
       for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
-        issue = IssueTransaction
-          .selfSigned(
-            TxVersion.V1,
-            sender,
-            new String(assetName),
-            new String(description),
-            quantity,
-            decimals,
-            reissuable = reissuable,
-            script = None,
-            iFee,
-            timestamp
-          )
-          .explicitGet()
+        issue = TxHelpers.issue(issuer = sender, amount = quantity, decimals = decimals, name = new String(assetName), description = new String(description), fee = iFee, script = None, reissuable = reissuable, timestamp = timestamp, version = TxVersion.V1)
         minFee <- smallFeeGen
         assetId = issue.assetId
-      } yield SponsorFeeTransaction.selfSigned(1.toByte, sender, IssuedAsset(assetId), Some(minFee), fee, timestamp) should produce(
+      } yield SponsorFeeTransaction.create(1.toByte, sender.publicKey, IssuedAsset(assetId), Some(minFee), fee, timestamp, Proofs.empty).map(_.signWith(sender.privateKey)) should produce(
         "insufficient fee"
       )
     }
@@ -178,23 +166,10 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
       for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
-        issue = IssueTransaction
-          .selfSigned(
-            TxVersion.V1,
-            sender,
-            new String(assetName),
-            new String(description),
-            quantity,
-            decimals,
-            reissuable = reissuable,
-            script = None,
-            iFee,
-            timestamp
-          )
-          .explicitGet()
+        issue = TxHelpers.issue(issuer = sender, amount = quantity, decimals = decimals, name = new String(assetName), description = new String(description), fee = iFee, script = None, reissuable = reissuable, timestamp = timestamp, version = TxVersion.V1)
         minFee  = None
         assetId = issue.assetId
-      } yield SponsorFeeTransaction.selfSigned(1.toByte, sender, IssuedAsset(assetId), minFee, fee, timestamp) should produce("insufficient fee")
+      } yield SponsorFeeTransaction.create(1.toByte, sender.publicKey, IssuedAsset(assetId), minFee, fee, timestamp, Proofs.empty).map(_.signWith(sender.privateKey)) should produce("insufficient fee")
     }
   }
 
@@ -202,13 +177,12 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue = IssueTransaction
-        .selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
-        .explicitGet()
+      issue = TxHelpers.issue(issuer = acc, amount = quantity, decimals = decimals, name = new String(name), description = new String(desc), fee = fee, script = None, reissuable = reissuable, timestamp = ts, version = TxVersion.V1)
       minFee <- Gen.choose(1L, issue.quantity.value)
-      sponsor = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
+      sponsor = SponsorFeeTransaction.create(1.toByte, acc.publicKey, IssuedAsset(issue.id()), Some(minFee), One, ts, Proofs.empty).map(_.signWith(acc.privateKey)).explicitGet()
       transfer = TransferTransaction
-        .selfSigned(1.toByte, acc, acc.toAddress, Waves, 1L, feeAsset = IssuedAsset(issue.id()), minFee, ByteStr.empty, ts)
+        .create(1.toByte, acc.publicKey, acc.toAddress, Waves, 1L, feeAsset = IssuedAsset(issue.id()), minFee, ByteStr.empty, ts, Proofs.empty)
+        .map(_.signWith(acc.privateKey))
         .explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer)
 
@@ -229,16 +203,16 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue = IssueTransaction
-        .selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
-        .explicitGet()
+      issue = TxHelpers.issue(issuer = acc, amount = quantity, decimals = decimals, name = new String(name), description = new String(desc), fee = fee, script = None, reissuable = reissuable, timestamp = ts, version = TxVersion.V1)
       minFee <- Gen.choose(1000000L, issue.quantity.value)
-      sponsor = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
+      sponsor = SponsorFeeTransaction.create(1.toByte, acc.publicKey, IssuedAsset(issue.id()), Some(minFee), One, ts, Proofs.empty).map(_.signWith(acc.privateKey)).explicitGet()
       transfer1 = TransferTransaction
-        .selfSigned(1.toByte, acc, acc.toAddress, Waves, 1L, feeAsset = IssuedAsset(issue.id()), minFee + 7, ByteStr.empty, ts)
+        .create(1.toByte, acc.publicKey, acc.toAddress, Waves, 1L, feeAsset = IssuedAsset(issue.id()), minFee + 7, ByteStr.empty, ts, Proofs.empty)
+        .map(_.signWith(acc.privateKey))
         .explicitGet()
       transfer2 = TransferTransaction
-        .selfSigned(1.toByte, acc, acc.toAddress, Waves, 1L, feeAsset = IssuedAsset(issue.id()), minFee + 9, ByteStr.empty, ts)
+        .create(1.toByte, acc.publicKey, acc.toAddress, Waves, 1L, feeAsset = IssuedAsset(issue.id()), minFee + 9, ByteStr.empty, ts, Proofs.empty)
+        .map(_.signWith(acc.privateKey))
         .explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer1, transfer2)
 
@@ -259,18 +233,18 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue = IssueTransaction
-        .selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
-        .explicitGet()
+      issue = TxHelpers.issue(issuer = acc, amount = quantity, decimals = decimals, name = new String(name), description = new String(desc), fee = fee, script = None, reissuable = reissuable, timestamp = ts, version = TxVersion.V1)
       minFee <- Gen.choose(1L, issue.quantity.value / 11)
 
-      sponsor1 = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
+      sponsor1 = SponsorFeeTransaction.create(1.toByte, acc.publicKey, IssuedAsset(issue.id()), Some(minFee), One, ts, Proofs.empty).map(_.signWith(acc.privateKey)).explicitGet()
       transfer1 = TransferTransaction
-        .selfSigned(1.toByte, acc, acc.toAddress, Waves, 1L, IssuedAsset(issue.id()), fee = minFee, ByteStr.empty, ts)
+        .create(1.toByte, acc.publicKey, acc.toAddress, Waves, 1L, IssuedAsset(issue.id()), fee = minFee, ByteStr.empty, ts, Proofs.empty)
+        .map(_.signWith(acc.privateKey))
         .explicitGet()
-      sponsor2 = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee * 10), One, ts).explicitGet()
+      sponsor2 = SponsorFeeTransaction.create(1.toByte, acc.publicKey, IssuedAsset(issue.id()), Some(minFee * 10), One, ts, Proofs.empty).map(_.signWith(acc.privateKey)).explicitGet()
       transfer2 = TransferTransaction
-        .selfSigned(1.toByte, acc, acc.toAddress, Waves, 1L, IssuedAsset(issue.id()), fee = minFee * 10, ByteStr.empty, ts)
+        .create(1.toByte, acc.publicKey, acc.toAddress, Waves, 1L, IssuedAsset(issue.id()), fee = minFee * 10, ByteStr.empty, ts, Proofs.empty)
+        .map(_.signWith(acc.privateKey))
         .explicitGet()
     } yield (acc, genesis, issue, sponsor1, transfer1, sponsor2, transfer2)
 
@@ -291,12 +265,10 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue = IssueTransaction
-        .selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
-        .explicitGet()
+      issue = TxHelpers.issue(issuer = acc, amount = quantity, decimals = decimals, name = new String(name), description = new String(desc), fee = fee, script = None, reissuable = reissuable, timestamp = ts, version = TxVersion.V1)
       minSponsoredAssetFee <- Gen.choose(1L, issue.quantity.value / 11)
       minFee               <- Gen.choose(One / 1000, One - 1)
-      sponsor = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minSponsoredAssetFee), minFee, ts).explicitGet()
+      sponsor = TxHelpers.sponsor(asset = IssuedAsset(issue.id()), minSponsoredAssetFee = Some(minSponsoredAssetFee), sender = acc, fee = minFee, version = 1.toByte)
     } yield (genesis, issue, sponsor, minFee)
 
     forAll(setup) {

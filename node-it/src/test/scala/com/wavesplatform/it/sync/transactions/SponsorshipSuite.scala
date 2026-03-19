@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync.transactions
 import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.*
@@ -12,8 +11,8 @@ import com.wavesplatform.state.Height
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import org.scalatest.Assertion
 
 import scala.concurrent.duration.*
@@ -83,7 +82,6 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         "AssetTxV1",
         "Created by Sponsorship Suite",
         sponsorAssetTotal,
-        decimals = 2,
         reissuable = false,
         fee = issueFee,
         waitForTx = true
@@ -95,7 +93,6 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         "AssetTxV2",
         "Created by Sponsorship Suite",
         sponsorAssetTotal,
-        decimals = 2,
         reissuable = false,
         fee = issueFee,
         waitForTx = true
@@ -138,16 +135,14 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
       "invalid tx timestamp" in {
         for (v <- sponsorshipTxSupportedVersions) {
           def invalidTx(timestamp: Long): SponsorFeeTransaction =
-            SponsorFeeTransaction
-              .selfSigned(
-                version = v,
-                sponsor,
-                IssuedAsset(ByteStr.decodeBase58(firstSponsorAssetId).get),
-                Some(SmallFee),
-                minFee,
-                timestamp + 1.day.toMillis
-              )
-              .explicitGet()
+            TxHelpers.sponsor(
+              asset = IssuedAsset(ByteStr.decodeBase58(firstSponsorAssetId).get),
+              minSponsoredAssetFee = Some(SmallFee),
+              sender = sponsor,
+              fee = minFee,
+              version = v,
+              timestamp = timestamp
+            )
 
           val iTx = invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis)
           assertBadRequestAndResponse(sender.broadcastRequest(iTx.json()), "Transaction timestamp .* is more than .*ms in the future")
@@ -437,7 +432,6 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
             "Another1",
             "Created by Sponsorship Suite",
             sponsorAssetTotal,
-            decimals = 2,
             fee = issueFee,
             waitForTx = true
           )
@@ -449,8 +443,6 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
             "Another2",
             "Created by Sponsorship Suite",
             sponsorAssetTotal,
-            decimals = 2,
-            reissuable = true,
             fee = issueFee,
             waitForTx = true
           )
@@ -516,7 +508,6 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
             "Created by Sponsorship Suite",
             sponsorAssetTotal,
             decimals = 8,
-            reissuable = true,
             fee = issueFee,
             waitForTx = true
           )

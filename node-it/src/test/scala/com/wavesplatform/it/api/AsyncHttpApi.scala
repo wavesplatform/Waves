@@ -30,10 +30,8 @@ import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.{
   Asset,
-  CreateAliasTransaction,
   DataTransaction,
   Proofs,
-  TransactionSignOps,
   TransactionValidationOps,
   TxDecimals,
   TxExchangeAmount,
@@ -783,9 +781,7 @@ object AsyncHttpApi extends Assertions {
 
     def createAlias(target: KeyPair, alias: String, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] =
       signedBroadcast(
-        CreateAliasTransaction
-          .selfSigned(version, target, alias, fee, System.currentTimeMillis())
-          .explicitGet()
+        com.wavesplatform.transaction.TxHelpers.createAlias(alias, target, fee, version)
           .json()
       )
 

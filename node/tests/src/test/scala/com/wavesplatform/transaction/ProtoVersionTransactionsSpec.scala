@@ -14,12 +14,12 @@ import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.utils.Signed
 import org.scalacheck.Gen
 
 class ProtoVersionTransactionsSpec extends FreeSpec {
@@ -39,7 +39,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
     "CreateAliasTransaction" in {
       val alias = aliasGen.sample.get
 
-      val aliasTx  = CreateAliasTransaction.selfSigned(TxVersion.V3, Account, alias.name, MinFee, Now).explicitGet()
+      val aliasTx  = TxHelpers.createAlias(name = alias.name, sender = Account, fee = MinFee, version = TxVersion.V3)
       val base64Tx = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(aliasTx)))
 
       decode(base64Tx) shouldBe aliasTx
@@ -52,28 +52,13 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
       val decimals    = 2.toByte
       val reissuable  = true
 
-      val issueTx = IssueTransaction
-        .selfSigned(
-          TxVersion.V3,
-          Account,
-          name,
-          description,
-          quantity,
-          decimals,
-          reissuable,
-          script = None,
-          MinIssueFee,
-          Now
-        )
-        .explicitGet()
+      val issueTx = TxHelpers.issue(issuer = Account, amount = quantity, decimals = decimals, name = name, description = description, fee = MinIssueFee, script = None, reissuable = reissuable, version = TxVersion.V3)
       val base64IssueStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(issueTx)))
 
-      val reissueTx = ReissueTransaction
-        .selfSigned(TxVersion.V3, Account, issueTx.asset, quantity, reissuable, MinIssueFee, Now)
-        .explicitGet()
+      val reissueTx = TxHelpers.reissue(asset = issueTx.asset, sender = Account, amount = quantity, reissuable = reissuable, fee = MinIssueFee, version = TxVersion.V3)
       val base64reissueStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(reissueTx)))
 
-      val burnTx        = BurnTransaction.selfSigned(TxVersion.V3, Account, issueTx.asset, quantity, MinIssueFee, Now).explicitGet()
+      val burnTx        = TxHelpers.burn(asset = issueTx.asset, amount = quantity, sender = Account, fee = MinIssueFee, version = TxVersion.V3)
       val base64BurnStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(burnTx)))
 
       decode(base64IssueStr) shouldBe issueTx
@@ -84,7 +69,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
     "DataTransaction" in {
       val data = dataEntryGen(10).sample.get
 
-      val dataTx    = DataTransaction.selfSigned(TxVersion.V2, Account, Seq(data), DataTxFee, Now).explicitGet()
+      val dataTx    = TxHelpers.dataV2(account = Account, entries = Seq(data), fee = DataTxFee)
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(dataTx)))
 
       decode(base64Str) shouldBe dataTx
@@ -103,9 +88,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
           .explicitGet()
 
       val exchangeTx =
-        ExchangeTransaction
-          .signed(TxVersion.V3, Account.privateKey, buyOrder, sellOrder, 100, 100, MinFee * 3, MinFee * 3, MinFee * 3, Now)
-          .explicitGet()
+        TxHelpers.exchange(buyOrder, sellOrder, Account, 100, 100, MinFee * 3, MinFee * 3, MinFee * 3, Now, TxVersion.V3)
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(exchangeTx)))
 
       decode(base64Str) shouldBe exchangeTx
@@ -115,16 +98,16 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
       val dapp       = accountOrAliasGen.sample.get
       val feeAssetId = bytes32gen.map(ByteStr(_)).sample.get
 
-      val invokeScriptTx = Signed.invokeScript(
+      val invokeScriptTx = InvokeScriptTransaction.create(
         TxVersion.V2,
-        Account,
+        Account.publicKey,
         dapp,
         Some(FUNCTION_CALL(User("hello"), List(CONST_LONG(42L)))),
         Seq(Payment(100, Asset.Waves)),
         InvokeScriptTxFee,
         IssuedAsset(feeAssetId),
         Now
-      )
+      ).map(_.signWith(Account.privateKey)).explicitGet()
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(invokeScriptTx)))
 
       decode(base64Str) shouldBe invokeScriptTx
@@ -133,11 +116,9 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
     "LeaseTransaction/LeaseCancelTransaction" in {
       val recipient = accountOrAliasGen.sample.get
 
-      val leaseTx = LeaseTransaction.selfSigned(TxVersion.V3, Account, recipient, 100, MinFee, Now).explicitGet()
+      val leaseTx = LeaseTransaction.create(TxVersion.V3, Account.publicKey, recipient, 100, MinFee, Now, Proofs.empty).map(_.signWith(Account.privateKey)).explicitGet()
       val leaseCancelTx =
-        LeaseCancelTransaction
-          .selfSigned(TxVersion.V3, Account, leaseTx.id(), MinFee, Now)
-          .explicitGet()
+        TxHelpers.leaseCancel(leaseId = leaseTx.id(), sender = Account, fee = MinFee, version = TxVersion.V3)
       val base64LeaseStr       = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(leaseTx)))
       val base64CancelLeaseStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(leaseCancelTx)))
 
@@ -152,7 +133,8 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
 
       val transferTx =
         TransferTransaction
-          .selfSigned(TxVersion.V3, Account, recipient, asset, 100, Asset.Waves, MinFee, ByteStr(attachment), Now)
+          .create(TxVersion.V3, Account.publicKey, recipient, asset, 100, Asset.Waves, MinFee, ByteStr(attachment), Now, Proofs.empty)
+          .map(_.signWith(Account.privateKey))
           .explicitGet()
 
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(transferTx)))
@@ -167,7 +149,8 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
 
       val massTransferTx =
         MassTransferTransaction
-          .selfSigned(TxVersion.V2, Account, Asset.Waves, transfers, MassTransferTxFee, Now, ByteStr(attachment))
+          .create(TxVersion.V2, Account.publicKey, Asset.Waves, transfers, MassTransferTxFee, Now, ByteStr(attachment), Proofs.empty)
+          .map(_.signWith(Account.privateKey))
           .explicitGet()
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(massTransferTx)))
 
@@ -177,7 +160,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
     "SetScriptTransaction" in {
       val script = scriptGen.sample.get
 
-      val setScriptTx = SetScriptTransaction.selfSigned(TxVersion.V2, Account, Some(script), SetScriptFee, Now).explicitGet()
+      val setScriptTx = SetScriptTransaction.create(TxVersion.V2, Account.publicKey, Some(script), SetScriptFee, Now, Proofs.empty).map(_.signWith(Account.privateKey)).explicitGet()
       val base64Str   = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(setScriptTx)))
 
       decode(base64Str) shouldBe setScriptTx
@@ -187,7 +170,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
       val asset  = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
       val script = scriptGen.sample.get
 
-      val setAssetScriptTx = SetAssetScriptTransaction.selfSigned(TxVersion.V2, Account, asset, Some(script), SetAssetScriptFee, Now).explicitGet()
+      val setAssetScriptTx = SetAssetScriptTransaction.create(TxVersion.V2, Account.publicKey, asset, Some(script), SetAssetScriptFee, Now, Proofs.empty).map(_.signWith(Account.privateKey)).explicitGet()
       val base64Str        = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(setAssetScriptTx)))
 
       decode(base64Str) shouldBe setAssetScriptTx
@@ -196,7 +179,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
     "SponsorshipTransaction" in {
       val asset = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
 
-      val sponsorshipTx = SponsorFeeTransaction.selfSigned(TxVersion.V2, Account, asset, Some(100), MinFee, Now).explicitGet()
+      val sponsorshipTx = SponsorFeeTransaction.create(TxVersion.V2, Account.publicKey, asset, Some(100), MinFee, Now, Proofs.empty).map(_.signWith(Account.privateKey)).explicitGet()
       val base64Str     = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(sponsorshipTx)))
 
       decode(base64Str) shouldBe sponsorshipTx

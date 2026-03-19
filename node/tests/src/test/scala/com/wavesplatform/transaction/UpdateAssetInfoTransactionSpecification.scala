@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{InvalidName, TooBigArray}
 import com.wavesplatform.transaction.assets.IssueTransaction.{MaxAssetDescriptionLength, MaxAssetNameLength, MinAssetNameLength}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
@@ -49,7 +49,7 @@ class UpdateAssetInfoTransactionSpecification extends PropSpec {
     UpdateAssetInfoTransaction.create(
       version = TxVersion.V1,
       sender = TxHelpers.signer(1).publicKey,
-      assetId = ByteStr.fill(DigestLength)(1),
+      assetId = IssuedAsset(ByteStr.fill(DigestLength)(1)),
       name = name,
       description = description,
       timestamp = System.currentTimeMillis(),

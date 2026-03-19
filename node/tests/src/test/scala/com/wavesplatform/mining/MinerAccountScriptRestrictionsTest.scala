@@ -88,8 +88,6 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
   private def errMsgBeforeRideV6 =
     s"Account(${minerAcc.toAddress}) is scripted and not allowed to forge blocks"
 
-  private def ts: Long = System.currentTimeMillis()
-
   private def withMiner(d: Domain)(f: (MinerImpl, Appender, Scheduler) => Unit): Unit = {
     val defaultSettings = WavesSettings.default()
     val wavesSettings   = defaultSettings.copy(minerSettings = defaultSettings.minerSettings.copy(quorum = 0))
@@ -140,7 +138,7 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
   }
 
   private def setScript(script: Script): SetScriptTransaction =
-    SetScriptTransaction.selfSigned(TxVersion.V2, minerAcc, Some(script), 0.01.waves, ts).explicitGet()
+    TxHelpers.setScript(acc = minerAcc, script = script, fee = 0.01.waves, version = TxVersion.V2)
 
   private def verifierScriptStr: String =
     s"""

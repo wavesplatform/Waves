@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.transactions
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, Alias}
 import com.wavesplatform.api.http.ApiError.WrongJson
-import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTransferRequest}
+import com.wavesplatform.api.http.requests.SignedMassTransferRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
@@ -145,15 +145,16 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
       ): (SignedMassTransferRequest, Option[ByteStr]) = {
         val txEi = for {
           parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
-          tx <- MassTransferTransaction.selfSigned(
+          tx <- MassTransferTransaction.create(
             1.toByte,
-            sender.keyPair,
+            sender.keyPair.publicKey,
             Waves,
             parsedTransfers,
             fee,
             timestamp,
-            ByteStr(attachment)
-          )
+            ByteStr(attachment),
+            Proofs.empty
+          ).map(_.signWith(sender.keyPair.privateKey))
         } yield tx
 
         val (signature, idOpt) = txEi.fold(_ => (Proofs(List(fakeSignature)), None), tx => (tx.proofs, Some(tx.id())))
@@ -318,7 +319,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
       nodes.waitForHeightAriseAndTxPresent(txId)
 
       // /transactions/info/txID should return complete list of transfers
-      val txInfo = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody).as[MassTransferRequest]
+      val txInfo = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody).as[SignedMassTransferRequest]
       assert(txInfo.transfers.size == 3)
 
       // /transactions/address should return complete transfers list for the sender...
@@ -328,10 +329,10 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
         .value
         .map(js => extractTransactionByType(js, 11).head)
         .head
-      assert(txSender.as[MassTransferRequest].transfers.size == 3)
+      assert(txSender.as[SignedMassTransferRequest].transfers.size == 3)
       assert((txSender \ "transferCount").as[Int] == 3)
       assert((txSender \ "totalAmount").as[Long] == 10.waves)
-      val transfersAfterTrans = txSender.as[MassTransferRequest].transfers
+      val transfersAfterTrans = txSender.as[SignedMassTransferRequest].transfers
       assert(transfers.equals(transfersAfterTrans))
 
       // ...and compact list for recipients
@@ -346,10 +347,10 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
         .map(js => extractTransactionByType(js, 11).head)
         .head
 
-      assert(txRecipient.as[MassTransferRequest].transfers.size == 1)
+      assert(txRecipient.as[SignedMassTransferRequest].transfers.size == 1)
       assert((txRecipient \ "transferCount").as[Int] == 3)
       assert((txRecipient \ "totalAmount").as[Long] == 10.waves)
-      val transferToSecond = txRecipient.as[MassTransferRequest].transfers.head
+      val transferToSecond = txRecipient.as[SignedMassTransferRequest].transfers.head
       assert(transfers contains transferToSecond)
     }
   }

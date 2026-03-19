@@ -13,9 +13,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.{DataTransaction, Transaction, TxHelpers, TxVersion}
 import org.scalacheck.Gen
 
 trait BlocksTransactionsHelpers { self: TransactionGen =>
@@ -30,7 +28,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(1.toByte, from, to, Waves, amount, Waves, FeeAmount, ByteStr.empty, timestamp).explicitGet()
+      } yield TxHelpers.transfer(from, to, amount, Waves, FeeAmount, Waves, ByteStr.empty, timestamp, 1.toByte)
 
     def transferV2(
         from: KeyPair,
@@ -40,7 +38,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(2.toByte, from, to, Waves, amount, Waves, FeeAmount, ByteStr.empty, timestamp).explicitGet()
+      } yield TxHelpers.transfer(from, to, amount, Waves, FeeAmount, Waves, ByteStr.empty, timestamp, 2.toByte)
 
     def transferAsset(
         asset: IssuedAsset,
@@ -51,7 +49,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(1.toByte, from, to, asset, amount, Waves, FeeAmount, ByteStr.empty, timestamp).explicitGet()
+      } yield TxHelpers.transfer(from, to, amount, asset, FeeAmount, Waves, ByteStr.empty, timestamp, 1.toByte)
 
     def lease(
         from: KeyPair,
@@ -61,40 +59,39 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[LeaseTransaction] =
       for {
         timestamp <- timestamp
-      } yield LeaseTransaction.selfSigned(1.toByte, from, to, amount, FeeAmount, timestamp).explicitGet()
+      } yield TxHelpers.lease(from, to, amount, FeeAmount, timestamp, 1.toByte)
 
     def leaseCancel(from: KeyPair, leaseId: ByteStr, timestamp: Gen[Long] = timestampGen): Gen[LeaseCancelTransaction] =
       for {
         timestamp <- timestamp
-      } yield LeaseCancelTransaction.selfSigned(1.toByte, from, leaseId, FeeAmount, timestamp).explicitGet()
+      } yield TxHelpers.leaseCancel(leaseId, from, FeeAmount, timestamp, 1.toByte)
 
     def data(from: KeyPair, dataKey: String, timestamp: Gen[Long] = timestampGen): Gen[DataTransaction] =
       for {
         timestamp <- timestamp
-      } yield DataTransaction.selfSigned(1.toByte, from, List(StringDataEntry(dataKey, Gen.numStr.sample.get)), FeeAmount, timestamp).explicitGet()
+      } yield TxHelpers.data(from, List(StringDataEntry(dataKey, Gen.numStr.sample.get)), FeeAmount, timestamp = timestamp)
 
     def nftIssue(from: KeyPair, timestamp: Gen[Long] = timestampGen): Gen[IssueTransaction] =
       for {
         timestamp <- timestamp
-      } yield IssueTransaction
-        .selfSigned(
-          TxVersion.V1,
+      } yield TxHelpers
+        .issue(
           from,
+          1,
+          0.toByte,
           "test",
           "",
-          1,
-          0,
-          reissuable = false,
-          script = None,
           100000000L,
-          timestamp
+          None,
+          false,
+          timestamp,
+          TxVersion.V1
         )
-        .explicitGet()
 
     def setScript(from: KeyPair, script: Script, timestamp: Gen[Long] = timestampGen): Gen[SetScriptTransaction] =
       for {
         timestamp <- timestamp
-      } yield SetScriptTransaction.selfSigned(1.toByte, from, Some(script), FeeAmount, timestamp).explicitGet()
+      } yield TxHelpers.setScript(from, script, FeeAmount, 1.toByte, timestamp = timestamp)
 
     def invokeScript(
         from: KeyPair,
@@ -105,7 +102,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[InvokeScriptTransaction] =
       for {
         timestamp <- timestamp
-      } yield Signed.invokeScript(1.toByte, from, dapp, Some(call), payments, FeeAmount * 2, Waves, timestamp)
+      } yield TxHelpers.invoke(dapp, Some(call.function.funcName), call.args, payments, from, FeeAmount * 2, Waves, 1.toByte, timestamp)
   }
 
   object UnsafeBlocks {

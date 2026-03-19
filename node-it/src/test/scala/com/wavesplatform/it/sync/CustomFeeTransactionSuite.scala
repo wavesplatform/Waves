@@ -8,8 +8,7 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.{Height, Sponsorship}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import org.scalatest.CancelAfterFailure
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -76,20 +75,7 @@ object CustomFeeTransactionSuite {
   private val defaultAssetQuantity     = 999999999999L
   private val featureCheckBlocksPeriod = 13
 
-  private val assetTx = IssueTransaction
-    .selfSigned(
-      TxVersion.V1,
-      sender = senderKeyPair,
-      "asset",
-      "asset description",
-      quantity = defaultAssetQuantity,
-      decimals = 2,
-      reissuable = false,
-      script = None,
-      fee = 1.waves,
-      timestamp = System.currentTimeMillis()
-    )
-    .explicitGet()
+  private val assetTx = TxHelpers.issue(issuer = senderKeyPair, amount = defaultAssetQuantity, decimals = 2, name = "asset", description = "asset description", fee = 1.waves, script = None, reissuable = false, version = TxVersion.V1)
 
   private val assetId = assetTx.id()
 

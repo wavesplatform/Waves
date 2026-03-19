@@ -3,13 +3,13 @@ package com.wavesplatform.it.sync.transactions
 import cats.syntax.option.*
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.BurnTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{issueAmount, issueFee, *}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.BurnTransaction
 import play.api.libs.json.Json
 
@@ -189,9 +189,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
     val issuedAssetId =
       sender.issue(firstKeyPair, "name", "description", issueAmount, decimals, reissuable = false, fee = issueFee, waitForTx = true).id
 
-    val tx = BurnTransaction
-      .selfSigned(TxVersion.V1, firstKeyPair, IssuedAsset(ByteStr.decodeBase58(issuedAssetId).get), 1, minFee, System.currentTimeMillis())
-      .explicitGet()
+    val tx = TxHelpers.burn(asset = IssuedAsset(ByteStr.decodeBase58(issuedAssetId).get), amount = 1, fee = minFee, sender = firstKeyPair, version = TxVersion.V1)
     val json = tx.json() - "amount" ++ Json.obj("quantity" -> 1L)
     sender.signedBroadcast(json, waitForTx = true).id
   }

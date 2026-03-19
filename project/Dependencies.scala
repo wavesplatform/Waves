@@ -155,7 +155,7 @@ object Dependencies {
       "com.esaulpaugh"     % "headlong" % "13.3.1",
       "com.github.jbellis" % "jamm"     % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
-      "com.wavesplatform"         % "blst-java"                    % "0.3.15",
+      "com.wavesplatform"         % "blst-java"                    % "0.3.16-SNAPSHOT",
       amazonCorretto("linux-x86_64") % Optional,
       amazonCorretto("linux-aarch_64") % Optional
     ) ++ console ++ logDeps ++ protobuf.value

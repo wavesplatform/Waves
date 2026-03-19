@@ -2,7 +2,6 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -24,10 +23,11 @@ case class InvokeExpressionTransaction(
     override val timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.InvokeExpression, Nil)
-    with InvokeTransaction
-    with Versioned.ConstV1
-    with PBSince.V1 {
+) extends Transaction(TransactionType.InvokeExpression, Nil),
+      InvokeTransaction,
+      Versioned.ConstV1,
+      PBSince.V1 {
+  override type T = InvokeExpressionTransaction
 
   lazy val expressionBytes: ByteStr = expression.bytes.value()
 
@@ -38,6 +38,9 @@ case class InvokeExpressionTransaction(
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBTransactionSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(PBTransactionSerializer.bytes(this))
+
+  override def addProof(proof: ByteStr): InvokeExpressionTransaction = copy(proofs = this.proofs.add(proof))
+
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
       BaseTxJson.toJson(this) ++ Json.obj(
@@ -51,9 +54,6 @@ object InvokeExpressionTransaction extends TransactionParser {
   type TransactionT = InvokeExpressionTransaction
 
   override val typeId: TxType = 18: Byte
-
-  implicit def sign(tx: InvokeExpressionTransaction, privateKey: PrivateKey): InvokeExpressionTransaction =
-    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   implicit val validator: TxValidator[InvokeExpressionTransaction] = InvokeExpressionTxValidator
 
@@ -88,15 +88,4 @@ object InvokeExpressionTransaction extends TransactionParser {
         chainId
       ).validatedEither
     } yield tx
-
-  def selfSigned(
-      version: Byte,
-      sender: KeyPair,
-      expression: ExprScript,
-      feeAmount: Long,
-      feeAsset: Asset,
-      timestamp: TxTimestamp
-  ): Either[ValidationError, InvokeExpressionTransaction] =
-    create(version, sender.publicKey, expression, feeAmount, feeAsset, timestamp, Proofs.empty)
-      .map(_.signWith(sender.privateKey))
 }

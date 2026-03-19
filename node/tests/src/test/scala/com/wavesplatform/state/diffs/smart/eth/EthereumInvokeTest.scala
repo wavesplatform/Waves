@@ -18,10 +18,7 @@ import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, EthABIConverter, EthereumTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, EthABIConverter, EthereumTransaction, GenesisTransaction, TxHelpers}
 import com.wavesplatform.utils.EthHelpers
 import org.scalatest.Inside
 
@@ -119,20 +116,20 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with I
     val emptyScript = Some(ExprScript(V4, Terms.TRUE).explicitGet())
     val issues =
       (1 to paymentCount).map(_ =>
-        IssueTransaction.selfSigned(2.toByte, dApp, "Asset", "", ENOUGH_AMT, 8, true, emptyScript, 1.waves, ts).explicitGet()
+        TxHelpers.issue(issuer = dApp, amount = ENOUGH_AMT, decimals = 8, name = "Asset", description = "", fee = 1.waves, script = emptyScript, reissuable = true, timestamp = ts, version = 2.toByte)
       )
     val assets = issues.map(i => IssuedAsset(i.id()))
     val setAssetScripts = assets.map { asset =>
       val resultScript = assetScript(dummyEthInvoke, dApp.toAddress, assets, asset, assetScriptVersion)
-      SetAssetScriptTransaction.selfSigned(1.toByte, dApp, asset, Some(resultScript), 1.waves, ts).explicitGet()
+      TxHelpers.setAssetScript(acc = dApp, asset = asset, script = resultScript, fee = 1.waves, timestamp = ts, version = 1.toByte)
     }
     val assetTransfers =
-      assets.map(a => TransferTransaction.selfSigned(2.toByte, dApp, invoker, a, ENOUGH_AMT, Waves, fee, ByteStr.empty, ts).explicitGet())
+      assets.map(a => TxHelpers.transfer(from = dApp, to = invoker, amount = ENOUGH_AMT, asset = a, fee = fee, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts, version = 2.toByte))
 
     val dAppScript  = makeDAppScript(assets, dApp2.toAddress, dAppVersion, syncCall)
     val dAppScript2 = makeDAppScript2(if (dAppVersion >= V5) dAppVersion else V5, dApp2, dApp, invoker, invokerPk)
-    val setDApp     = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(dAppScript), fee, ts).explicitGet()
-    val setDApp2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dAppScript2), fee, ts).explicitGet()
+    val setDApp     = TxHelpers.setScript(acc = dApp, script = dAppScript, fee = fee, version = 1.toByte, timestamp = ts)
+    val setDApp2    = TxHelpers.setScript(acc = dApp2, script = dAppScript2, fee = fee, version = 1.toByte, timestamp = ts)
 
     val invoke    = EthereumTransaction.Invocation(dApp.toAddress, hexData(dAppScript, assets))
     val ethInvoke = dummyEthInvoke.copy(invoke)

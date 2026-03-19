@@ -4,9 +4,6 @@ import cats.syntax.either.*
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidBlockId, InvalidPublicKey, InvalidSignature, InvalidTransactionId, WrongJson}
-import com.wavesplatform.api.http.requests.*
-import com.wavesplatform.api.http.requests.DataRequest.*
-import com.wavesplatform.api.http.requests.SponsorFeeRequest.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -15,6 +12,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import monix.eval.Coeval
 import monix.execution.Scheduler
+import org.apache.pekko
 import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.server.*
@@ -59,8 +57,6 @@ package object http {
   def createTransaction(senderPk: String, jsv: JsObject)(
       txToResponse: Transaction => ToResponseMarshallable
   ): ToResponseMarshallable = {
-    val typeId = (jsv \ "type").as[Byte]
-
     (jsv \ "version").validateOpt[Byte](using versionReads) match {
       case JsError(errors) => WrongJson(None, errors)
       case JsSuccess(value, _) =>
@@ -70,25 +66,7 @@ package object http {
         PublicKey
           .fromBase58String(senderPk)
           .flatMap { senderPk =>
-            TransactionType(typeId) match {
-              case TransactionType.Transfer         => txJson.as[TransferRequest].toTxFrom(senderPk)
-              case TransactionType.CreateAlias      => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
-              case TransactionType.Lease            => txJson.as[LeaseRequest].toTxFrom(senderPk)
-              case TransactionType.LeaseCancel      => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
-              case TransactionType.Exchange         => txJson.as[ExchangeRequest].toTxFrom(senderPk)
-              case TransactionType.Issue            => txJson.as[IssueRequest].toTxFrom(senderPk)
-              case TransactionType.Reissue          => txJson.as[ReissueRequest].toTxFrom(senderPk)
-              case TransactionType.Burn             => txJson.as[BurnRequest].toTxFrom(senderPk)
-              case TransactionType.MassTransfer     => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderPk)
-              case TransactionType.Data             => TransactionFactory.data(txJson.as[DataRequest], senderPk)
-              case TransactionType.InvokeScript     => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], senderPk)
-              case TransactionType.SetScript        => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
-              case TransactionType.SetAssetScript   => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
-              case TransactionType.SponsorFee       => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
-              case TransactionType.UpdateAssetInfo  => txJson.as[UpdateAssetInfoRequest].toTxFrom(senderPk)
-              case TransactionType.InvokeExpression => TransactionFactory.invokeExpression(txJson.as[InvokeExpressionRequest], senderPk)
-              case other                            => throw new IllegalArgumentException(s"Unsupported transaction type: $other")
-            }
+            TransactionFactory.parseRequest(txJson ++ Json.obj("senderPublicKey" -> senderPk.toString))
           }
           .fold(ApiError.fromValidationError, txToResponse)
     }
@@ -97,7 +75,7 @@ package object http {
   def parseOrCreateTransaction(jsv: JsObject)(
       txToResponse: Transaction => ToResponseMarshallable
   ): ToResponseMarshallable = {
-    val result = TransactionFactory.fromSignedRequest(jsv)
+    val result = TransactionFactory.parseRequest(jsv)
     if (result.isRight) {
       result.fold(ApiError.fromValidationError, txToResponse)
     } else {

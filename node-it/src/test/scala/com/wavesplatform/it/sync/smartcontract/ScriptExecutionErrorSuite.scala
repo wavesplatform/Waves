@@ -10,7 +10,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction}
+import com.wavesplatform.transaction.{Proofs, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -34,12 +34,12 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     val compiled = ScriptCompiler.compile(scriptSrc, ScriptEstimatorV2).explicitGet()._1
 
-    val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(1.toByte, thirdKeyPair, Some(compiled), setScriptFee, ts).explicitGet().json())
+    val tx = sender.signedBroadcast(SetScriptTransaction.create(1.toByte, thirdKeyPair.publicKey, Some(compiled), setScriptFee, ts, Proofs.empty).map(_.signWith(thirdKeyPair.privateKey)).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
     val alias = Alias.fromString(s"alias:${AddressScheme.current.chainId.toChar}:asdasdasdv").explicitGet()
     assertBadRequestAndResponse(
-      sender.signedBroadcast(CreateAliasTransaction.selfSigned(Transaction.V2, thirdKeyPair, alias.name, minFee + smartFee, ts).explicitGet().json()),
+      sender.signedBroadcast(TxHelpers.createAlias(name = alias.name, sender = thirdKeyPair, fee = minFee + smartFee, version = Transaction.V2).json()),
       "Your transaction has incorrect type."
     )
   }
@@ -54,7 +54,8 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     val tx = sender.signedBroadcast(
       SetScriptTransaction
-        .selfSigned(1.toByte, firstKeyPair, Some(script), setScriptFee, ts)
+        .create(1.toByte, firstKeyPair.publicKey, Some(script), setScriptFee, ts, Proofs.empty)
+        .map(_.signWith(firstKeyPair.privateKey))
         .explicitGet()
         .json()
     )
@@ -63,7 +64,8 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
     assertBadRequestAndResponse(
       sender.signedBroadcast(
         TransferTransaction
-          .selfSigned(2.toByte, firstKeyPair, secondKeyPair.toAddress, Waves, 1000, Waves, minFee + smartFee, ByteStr.empty, ts)
+          .create(2.toByte, firstKeyPair.publicKey, secondKeyPair.toAddress, Waves, 1000, Waves, minFee + smartFee, ByteStr.empty, ts, Proofs.empty)
+          .map(_.signWith(firstKeyPair.privateKey))
           .explicitGet()
           .json()
       ),

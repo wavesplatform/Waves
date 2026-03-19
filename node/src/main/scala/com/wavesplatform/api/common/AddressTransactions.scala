@@ -154,7 +154,7 @@ object AddressTransactions {
           txs
             .dropWhile { case (_, txNum, _) => txNum >= maxTxNum }
             .foreach { case (tp, txNum, size) =>
-              if (types.isEmpty || types(TransactionType(tp))) {
+              if (types.isEmpty || types(TransactionType.fromId(tp))) {
                 keysBuffer.addOne(Keys.transactionAt(height, txNum, txHandle))
                 numsBuffer.addOne(txNum)
                 sizesBuffer.addOne(size)
@@ -162,7 +162,7 @@ object AddressTransactions {
             }
         } else {
           txs.foreach { case (tp, txNum, size) =>
-            if (types.isEmpty || types(TransactionType(tp))) {
+            if (types.isEmpty || types(TransactionType.fromId(tp))) {
               keysBuffer.addOne(Keys.transactionAt(height, txNum, txHandle))
               numsBuffer.addOne(txNum)
               sizesBuffer.addOne(size)

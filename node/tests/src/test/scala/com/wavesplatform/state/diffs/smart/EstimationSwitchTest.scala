@@ -11,11 +11,8 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers.{defaultAddress, defaultSigner, setScript}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.TxHelpers.{defaultAddress, defaultSigner}
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 
 class EstimationSwitchTest extends PropSpec with WithDomain with TransactionGenBase {
   private val time = new TestTime
@@ -40,8 +37,8 @@ class EstimationSwitchTest extends PropSpec with WithDomain with TransactionGenB
     val fee       = ciFee().sample.get
     val genesis1  = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
     val genesis2  = GenesisTransaction.create(dApp.toAddress, ENOUGH_AMT, ts).explicitGet()
-    val setScript = () => SetScriptTransaction.selfSigned(1.toByte, dApp, Some(dAppScript), fee, ts).explicitGet()
-    val invoke    = () => Signed.invokeScript(TxVersion.V3, invoker, dApp.toAddress, None, Nil, fee, Waves, ts)
+    val setScript = () => TxHelpers.setScript(dApp, dAppScript, fee, 1.toByte)
+    val invoke    = () => TxHelpers.invoke(dApp.toAddress, invoker = invoker, fee = fee, version = TxVersion.V3, timestamp = ts)
 
     withDomain(domainSettingsWithFS(settings)) { d =>
       d.appendBlock(genesis1, genesis2)
@@ -80,11 +77,11 @@ class EstimationSwitchTest extends PropSpec with WithDomain with TransactionGenB
         """.stripMargin
       )
 
-      d.appendBlock(setScript(defaultSigner, dApp))
+      d.appendBlock(TxHelpers.setScript(defaultSigner, dApp))
       d.blockchain.accountScript(defaultAddress).get.complexitiesByEstimator(3) shouldBe
         Map("overlapCase" -> 2701, "redundantOverheadCase" -> 181)
 
-      d.appendBlock(setScript(defaultSigner, dApp))
+      d.appendBlock(TxHelpers.setScript(defaultSigner, dApp))
       d.blockchain.accountScript(defaultAddress).get.complexitiesByEstimator(3) shouldBe
         Map("overlapCase" -> 1, "redundantOverheadCase" -> 180)
     }

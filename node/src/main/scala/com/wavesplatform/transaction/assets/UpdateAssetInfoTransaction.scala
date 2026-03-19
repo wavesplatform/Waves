@@ -1,8 +1,7 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -30,6 +29,8 @@ case class UpdateAssetInfoTransaction(
     with FastHashId
     with ProvenTransaction
     with PBSince.V1 { self =>
+  override type T = UpdateAssetInfoTransaction
+  override def addProof(proof: ByteStr): UpdateAssetInfoTransaction = copy(proofs = this.proofs.add(proof))
 
   override def assetFee: (Asset, Long) = (feeAsset, feeAmount.value)
 
@@ -51,15 +52,12 @@ object UpdateAssetInfoTransaction extends TransactionParser {
   type TransactionT = UpdateAssetInfoTransaction
   override val typeId: TxType = 17: Byte
 
-  implicit def sign(tx: UpdateAssetInfoTransaction, privateKey: PrivateKey): UpdateAssetInfoTransaction =
-    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
-
   implicit val validator: TxValidator[UpdateAssetInfoTransaction] = UpdateAssetInfoTxValidator
 
   def create(
       version: Byte,
       sender: PublicKey,
-      assetId: ByteStr,
+      assetId: IssuedAsset,
       name: String,
       description: String,
       timestamp: TxTimestamp,
@@ -73,7 +71,7 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       tx <- UpdateAssetInfoTransaction(
         version,
         sender,
-        IssuedAsset(assetId),
+        assetId,
         name,
         description,
         timestamp,
@@ -83,20 +81,6 @@ object UpdateAssetInfoTransaction extends TransactionParser {
         chainId
       ).validatedEither
     } yield tx
-
-  def selfSigned(
-      version: Byte,
-      sender: KeyPair,
-      assetId: ByteStr,
-      name: String,
-      description: String,
-      timestamp: TxTimestamp,
-      feeAmount: Long,
-      feeAsset: Asset,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, UpdateAssetInfoTransaction] =
-    create(version, sender.publicKey, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty, chainId)
-      .map(_.signWith(sender.privateKey))
 
   override def parseBytes(bytes: Array[Byte]): Try[UpdateAssetInfoTransaction] =
     PBTransactionSerializer
