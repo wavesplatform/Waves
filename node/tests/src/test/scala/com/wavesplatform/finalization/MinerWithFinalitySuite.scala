@@ -2,7 +2,6 @@ package com.wavesplatform.finalization
 
 import com.wavesplatform.TestValues
 import com.wavesplatform.block.{Block, BlockEndorsement}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider.MinimalEffectiveBalanceForGenerator2
 import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -12,7 +11,7 @@ import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.EndorseBlock
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.{CatchLogs, FreeSpec, NumericExt, TestSchedulerOps, TestTime}
+import com.wavesplatform.test.{CatchLogs, NumericExt, TestSchedulerOps, TestTime}
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
@@ -584,8 +583,15 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
       minerScheduler.tickNext("miner-4")
       appenderScheduler.tickNext("appender-5")
       val microBlock3TotalId = d.lastBlockId
+      microBlock3TotalId shouldNot be(microBlock2TotalId) // Appended
 
-      microBlock2TotalId shouldNot be(microBlock3TotalId) // Appended
+      log.debug(s"Trigger forging micro block 4 of block 3 without finalization changes")
+      d.utxPool.putIfNew(TxHelpers.transfer(generator1, generator2Addr))
+      time.advance(defaultSettings.minerSettings.microBlockInterval + 1.millis)
+      minerScheduler.tickNext("miner-5")
+      appenderScheduler.tickNext("appender-6")
+      val microBlock4TotalId = d.lastBlockId
+      microBlock4TotalId shouldNot be(microBlock3TotalId) // Appended
     }
   }
 }
