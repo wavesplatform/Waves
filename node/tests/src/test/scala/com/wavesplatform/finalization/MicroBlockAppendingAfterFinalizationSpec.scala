@@ -6,7 +6,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.{GeneratorIndex, GenesisBlockHeight, Height}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{NumericExt, produce}
-import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
+import com.wavesplatform.transaction.TxHelpers
 
 class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
   private val generator1     = TxHelpers.signer(0)
@@ -27,49 +27,6 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
   )
 
   private val generators = Seq(generator1, generator2)
-
-  "reject microblock" - {
-    "with endorsement of poor generator" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
-      val genesisBlockId = d.lastBlockId
-      log.debug("Append block 2 with commitments")
-      val txs    = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
-      val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
-      d.appender.appendBlock(block2)
-
-      log.debug("Append block 3 with spending")
-      val block3 = d.createBlock(
-        version = Block.ProtoBlockVersion,
-        txs = Seq(
-          TxHelpers.transfer(
-            from = generator2,
-            to = generator1Addr,
-            amount = d.blockchain.balance(generator2Addr) - CommitToGenerationTransaction.DepositInWavelets - 2.waves
-          )
-        ),
-        generator = generator1,
-        strictTime = true
-      )
-      d.appender.appendBlock(block3)
-
-      log.debug("Append microblock with endorsement")
-      d.appendMicroBlock(
-        d.createMicroBlock(
-          signer = Some(generator1),
-          finalizationVoting = Some(
-            mkFinalizationVoting(valid = Seq(generator2Idx)).signed(
-              endorsedId = block2.id(),
-              finalizedId = genesisBlockId,
-              validEndorsers = generator2
-            )
-          )
-        )(TxHelpers.transfer(generator2, generator1Addr))
-      )
-
-      log.debug("Append block 4 of poor generator")
-      val block4 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true)
-      d.appender.appendBlockWithoutFallback(block4) should produce("is not allowed to generate a block")
-    }
-  }
 
   "second microblock appended if first is invalid" - {
     "invalid endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>

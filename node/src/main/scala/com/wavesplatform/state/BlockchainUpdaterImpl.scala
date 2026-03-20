@@ -392,7 +392,7 @@ class BlockchainUpdaterImpl(
                           prevReward,
                           prevHitSource,
                           liquid.data.liquidStateHash,
-                          liquid.block, // It writes the referencedForgedBlock, not a block!
+                          liquid.block,
                           liquid.data.finalizedHeight,
                           ng.finalizationState.generatorSet
                         )
@@ -423,15 +423,17 @@ class BlockchainUpdaterImpl(
                   ) =>
                 val newHeight              = Height(rocksdb.height + 1)
                 val currentFinalizedHeight = rocksdb.finalizedHeightAt(Height(rocksdb.height))
-                currentFinalizedHeight.foreach { h =>
-                  log.debug(s"Finalized height at ${rocksdb.height}: $h")
-                }
 
                 restTotalConstraint = updatedTotalConstraint
                 if (
                   (block.header.timestamp > time.getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis)
                   || (newHeight.toInt % 100 == 0)
-                ) log.info(s"New height: $newHeight")
+                ) {
+                  currentFinalizedHeight.foreach { h =>
+                    log.debug(s"Finalized height at ${rocksdb.height}: $h")
+                  }
+                  log.info(s"New height: $newHeight")
+                }
 
                 val blockchain = SnapshotBlockchain(rocksdb, newBlockSnapshot, block, hitSource, carry, reward, Some(computedStateHash))
                 ngState = Some(

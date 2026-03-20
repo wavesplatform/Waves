@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import monix.eval.Coeval
 import monix.execution.Scheduler
-import org.apache.pekko
 import org.apache.pekko.http.scaladsl.marshalling.ToResponseMarshallable
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.server.*
@@ -114,6 +113,8 @@ package object http {
   }
 
   private def idOrHash(error: String => ApiError): PathMatcher1[Coeval[ByteStr]] = Segment.map { str =>
+    // Throwing exceptions during a route parsing can prevent the default fallback to 404, see BlocksApiRoute
+    // Here we parse a Base58 segment only when the value is needed
     Coeval.evalOnce {
       ByteStr.decodeBase58(str) match {
         case Success(value) =>

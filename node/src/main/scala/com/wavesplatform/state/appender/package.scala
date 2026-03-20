@@ -91,7 +91,7 @@ package object appender {
   )(block: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] = {
     // The block can reference only one of the latest liquid blocks.
     // We have to validate the new block against a state by this reference
-    val blockchain = blockchainUpdater.referencedBlockchain(block.header.reference) // Safe to use, see note above in apply
+    val blockchain = blockchainUpdater.referencedBlockchain(block.header.reference) // Safe to use, see BlockAppender.apply
     for {
       data <- findBlockAndGetGenerators(blockchain, block)
       (hitSource, balances) <-
@@ -329,7 +329,7 @@ package object appender {
       s"Conflicting endorsement sender $address has insufficient balance"
     }
     _ <- Either.raiseWhen(address == minerAddress)("Conflicting endorsement from miner is not allowed")
-    _ <- Either.raiseWhen(validEndorsements.contains(address))(s"Block contains both conflicting and valid endorsement from $address")
+    _ <- Either.raiseWhen(validEndorsements.contains(address))(s"Block contains both conflicting and valid endorsements from $address")
     _ <- Either.raiseWhen(conflictingEndorsement.finalizedHeight > validFinalizedHeight) {
       s"Finalized height ${conflictingEndorsement.finalizedHeight} is higher than expected $validFinalizedHeight"
     }
@@ -370,7 +370,7 @@ package object appender {
             allCommittedGenerators.lift(gi.toInt).toRight(s"Invalid endorser index: $gi, expected < ${allCommittedGenerators.length}")
           }
           _ <- fv.valid.traverse { idx =>
-            Either.raiseUnless(generatorsWithEnoughBalance.contains(idx))(s"Valid endorsement sender $idx has insufficient balance")
+            Either.raiseUnless(generatorsWithEnoughBalance.contains(idx))(s"Valid endorser $idx has insufficient balance or conflicting")
           }
           validEndorserAddresses = validEndorsers.view.map(_._1).toSet
           _ <- Either.raiseWhen(validEndorserAddresses.contains(block.header.generator.toAddress))("Miner can't endorse its own block")

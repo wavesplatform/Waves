@@ -590,8 +590,9 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
       time.advance(defaultSettings.minerSettings.microBlockInterval + 1.millis)
       minerScheduler.tickNext("miner-5")
       appenderScheduler.tickNext("appender-6")
-      val microBlock4TotalId = d.lastBlockId
-      microBlock4TotalId shouldNot be(microBlock3TotalId) // Appended
+      withClue("appended: ") {
+        d.lastBlockId shouldNot be (microBlock3TotalId)
+      }
     }
   }
 }

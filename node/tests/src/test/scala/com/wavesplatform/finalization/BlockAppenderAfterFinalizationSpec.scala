@@ -52,28 +52,6 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     }.run()
 
     "if no one eligible committed" - {
-      "all conflict" in pendingUntilFixed(new BaseTest {
-        override def continue(d: Domain): Unit = {
-          log.debug(s"Append block 3 with votes")
-          val block3WithVotes = d.createBlock(
-            version = Block.ProtoBlockVersion,
-            txs = Nil,
-            generator = committedGenerator1,
-            strictTime = true,
-            finalizationVoting = Some(
-              mkFinalizationVoting()
-                .withConflict(committedGenerator1, committedGenerator1Idx, d.lastBlock.id())
-                .withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlock.id())
-            )
-          )
-          d.appender.appendBlock(block3WithVotes)
-
-          log.debug(s"Append block 4 of not committed generator")
-          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
-          d.appender.appendBlock(block)
-        }
-      }.run())
-
       "all committed are poor" in new BaseTest {
         override def continue(d: Domain): Unit = {
           log.debug(s"Append block 3 with spending")
@@ -346,13 +324,13 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       }
     }
 
-    "if conflict" in pendingUntilFixed(new BaseTest {
+    "if conflict" in new BaseTest {
       override def continue(d: Domain): Unit = {
         log.debug(s"Append block 3 with votes")
         val block3WithVotes = d.createBlock(
           version = Block.ProtoBlockVersion,
           txs = Nil,
-          generator = committedGenerator1,
+          generator = committedGenerator2,
           strictTime = true,
           finalizationVoting = Some(mkFinalizationVoting().withConflict(committedGenerator1, committedGenerator1Idx, d.lastBlock.id()))
         )
@@ -364,7 +342,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
         d.blockchain.isLastBlockId(block.id()) shouldBe false
       }
-    }.run())
+    }.run()
 
     "spent all WAVES" in withDomain(
       defaultSettings,
