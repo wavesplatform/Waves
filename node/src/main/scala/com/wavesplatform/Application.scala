@@ -177,7 +177,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
             settings,
             time,
             pos,
-            appendBlock = BlockAppender(blockchainUpdater, time, utxStorage, pos, blockEndorser, appenderScheduler)(_, None)
+            // BlockEndorser is disabled, because the challenging block doesn't contain finalization voting header
+            appendBlock = BlockAppender(blockchainUpdater, time, utxStorage, pos, BlockEndorser.Disabled, appenderScheduler)(_, None)
           )
         )
       } else None
