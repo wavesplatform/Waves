@@ -4,7 +4,6 @@ import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.block.BlockEndorsement
 import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.network.{ChannelGroupExt, EndorseBlock}
-import com.wavesplatform.state.EndorsementFilter
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 
@@ -40,8 +39,9 @@ object BlockEndorser {
         votingBlockHeader   <- blockchain.blockHeader(votingHeight.toInt).toSeq
         endorsedBlockHeader <- blockchain.blockHeader(endorsedHeight.toInt).toSeq
 
-        finalizedHeightAtEndorsed = blockchain.finalizedHeightAt(endorsedHeight)
-        finalizedHeight           = Blockchain.finalizedHeightOrFallback(votingHeight, finalizedHeightAtEndorsed, maxSyncRollbackLength)
+        finalizedHeight = blockchain.finalizedHeightOrFallback(maxSyncRollbackLength)
+        if endorsedHeight > finalizedHeight
+
         finalizedId <- blockchain
           .blockId(finalizedHeight.toInt)
           .toSeq
