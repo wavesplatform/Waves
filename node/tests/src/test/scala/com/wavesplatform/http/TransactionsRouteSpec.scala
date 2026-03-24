@@ -426,18 +426,27 @@ class TransactionsRouteSpec
     }
 
     "large-significand-format" in {
-      val tx = TxHelpers.transfer(richAccount, TxHelpers.address(930), 10.waves)
-      domain.appendBlock(tx)
-      Get(routePath(s"/address/$richAddress/limit/1")) ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
-        val result = responseAs[JsArray] \ 0 \ 0
-        (result \ "amount").as[String] shouldBe tx.amount.value.toString
-        (result \ "fee").as[String] shouldBe tx.fee.value.toString
+      val transferTxn           = TxHelpers.transfer(richAccount, TxHelpers.address(930), 10.waves)
+      val commitToGenerationTxn = TxHelpers.commitToGeneration(Height(3001), richAccount)
+      domain.appendBlock(transferTxn, commitToGenerationTxn)
+
+      Get(routePath(s"/info/${transferTxn.id()}")) ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+        val result = responseAs[JsObject]
+        (result \ "amount").as[String] shouldBe transferTxn.amount.value.toString
+        (result \ "fee").as[String] shouldBe transferTxn.fee.value.toString
 
         (result \ "height").as[Int] shouldBe domain.blockchain.height
         (result \ "spentComplexity").as[Int] shouldBe 0
-        (result \ "version").as[Int] shouldBe tx.version
-        (result \ "type").as[Int] shouldBe tx.tpe.id
-        (result \ "timestamp").as[Long] shouldBe tx.timestamp
+        (result \ "version").as[Int] shouldBe transferTxn.version
+        (result \ "type").as[Int] shouldBe transferTxn.tpe.id
+        (result \ "timestamp").as[Long] shouldBe transferTxn.timestamp
+      }
+
+      Get(routePath(s"/info/${commitToGenerationTxn.id()}")) ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+        val result = responseAs[JsObject]
+        (result \ "fee").as[String] shouldBe commitToGenerationTxn.fee.value.toString
+
+        (result \ "timestamp").as[Long] shouldBe commitToGenerationTxn.timestamp
       }
     }
 

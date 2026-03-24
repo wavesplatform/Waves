@@ -34,13 +34,12 @@ class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLo
 
     step("Commit to generation")
     val commitTxn1 = node1.sign(CommitToGenerationRequest(sender = Some(miner1Addr)))
+    node1.broadcastRequest(commitTxn1)
+
     val commitTxn2 = node2.sign(CommitToGenerationRequest(sender = Some(miner2Addr)))
-    Seq(node1, node2).foreach { node =>
-      node.broadcastRequest(commitTxn1)
-      node.broadcastRequest(commitTxn2)
-    }
+    node2.broadcastRequest(commitTxn2)
+
     node1.waitForGenerationPeriod(period1)
-    node2.waitForGenerationPeriod(period1)
 
     step("Generators")
     isolated {
