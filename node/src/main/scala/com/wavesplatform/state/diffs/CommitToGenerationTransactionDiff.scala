@@ -15,7 +15,7 @@ object CommitToGenerationTransactionDiff {
       current <- blockchain.currentGenerationPeriod.toRight(ActivationError("DeterministicFinality is not yet activated"))
       next = current.next
       _ <- Either.raiseUnless(tx.generationPeriodStart == next.start) {
-        GenericError(s"Expected the next period start height (${next.start}), got ${tx.generationPeriodStart}")
+        GenericError(s"Expected the next period start height ${next.start}, got ${tx.generationPeriodStart}")
       }
       _ <- tx.endorserPublicKey.validated.leftMap(e => GenericError(s"Invalid endorser public key: $e"))
       _ <- tx.commitmentSignature

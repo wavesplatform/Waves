@@ -8,7 +8,6 @@ import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
-import com.wavesplatform.test.DomainPresets.{DeterministicFinality, WavesSettingsOps}
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import play.api.libs.json.Json
 
@@ -61,10 +60,6 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
       case Failure(exception) => fail(exception)
     }
   }
-
-  private val sender                 = TxHelpers.defaultSigner
-  private val generationPeriodLength = 8
-  private val defaultSettings        = DeterministicFinality.configure(_.copy(generationPeriodLength = generationPeriodLength))
 
   "Expected BLS key and PoP" in {
     val wavesPk = PrivateKey(ByteStr.decodeBase58("7UR2CZi6Gv6v1yqmgcPDD98ZtosvtHnNZRxvrHA2Tuyn").get)
