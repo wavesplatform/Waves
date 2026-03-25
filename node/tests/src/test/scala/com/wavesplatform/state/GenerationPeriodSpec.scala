@@ -3,7 +3,6 @@ package com.wavesplatform.state
 import cats.syntax.option.*
 import com.wavesplatform.test.*
 
-// TODO: additional tests with activation=0
 class GenerationPeriodSpec extends FreeSpec {
   private val defaultActivation             = 7
   private val defaultGenerationPeriodLength = 3
