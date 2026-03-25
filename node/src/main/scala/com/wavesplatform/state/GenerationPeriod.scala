@@ -54,8 +54,6 @@ object GenerationPeriod {
       ).some
     }
 
-  def zeroPeriod(activation: Height, generationPeriodLength: Int): GenerationPeriod = GenerationPeriod(activation, activation, generationPeriodLength)
-
   def enclosedPeriods(
       activation: Height,
       generationPeriodLength: Int,
@@ -71,4 +69,7 @@ object GenerationPeriod {
         (fromGenerationPeriod, endPeriod.next.max(fromGenerationPeriod.next))
       }
   }
+
+  private def zeroPeriod(activation: Height, generationPeriodLength: Int): GenerationPeriod =
+    GenerationPeriod(activation, activation, generationPeriodLength)
 }

@@ -338,6 +338,11 @@ class BlockChallengeTest
         TxHelpers.commitToGeneration(Height(701), challengingMiner)
       )
 
+      d.accountsApi
+        .balanceDetails(challengingMiner.toAddress)
+        .explicitGet()
+        .generating shouldBe ENOUGH_AMT - CommitToGenerationTransaction.DepositInWavelets - TestValues.commitToGenerationFee
+
       (1 to 999).foreach(_ => d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = challengedMiner)))
 
       val finalizedHeight = d.blockchain.finalizedHeight.value
