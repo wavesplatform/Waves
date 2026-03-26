@@ -152,7 +152,7 @@ class BlockChallengeTest
           .collectFirst {
             case x if x.address == challengingMinerAddr => x.balance
           }
-          .value shouldBe challengingEffBalanceBefore
+          .value shouldBe Some(challengingEffBalanceBefore)
       }
     }
   }
@@ -569,7 +569,7 @@ class BlockChallengeTest
           .collectFirst {
             case x if x.address == challengedMinerAddr => x.balance
           }
-          .value shouldBe effBalanceBefore
+          .value shouldBe Some(effBalanceBefore)
       }
 
       val newBlock = d.createBlock(
@@ -592,7 +592,7 @@ class BlockChallengeTest
           .collectFirst {
             case x if x.address == challengedMinerAddr => x.balance
           }
-          .value shouldBe 0 // expectedEffectiveBalance // TODO: ?`
+          .value shouldBe Some(0L)
       }
     }
   }

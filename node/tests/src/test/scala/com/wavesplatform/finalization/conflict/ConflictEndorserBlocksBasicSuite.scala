@@ -7,9 +7,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
 import com.wavesplatform.history.Domain
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BalanceSnapshot, Blockchain, GeneratorIndex, Height, Portfolio}
+import com.wavesplatform.state.{BalanceSnapshot, GeneratorIndex, Height, Portfolio}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.{FreeSpec, NumericExt}
+import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
 import com.wavesplatform.transaction.TxHelpers
 import org.scalactic.source.Position
@@ -87,17 +87,17 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
     override def after5WithNewPeriodCheck                = _ shouldBe (4, after2 - DepositInWavelets)
   }.run()
 
-  "generator balance from API" in new Scenario[Long] { // Collected before applying block
+  "generator balance from API" in new Scenario[Option[Long]] { // Collected before applying block
     override def getData = d =>
       d.generatorsApi
         .generators(Height(d.blockchain.height))
         .collectFirst { case x if x.address == conflictGeneratorAddr => x.balance }
-        .getOrElse(0L)
+        .flatten
 
-    override def after2WithCommitmentsCheck              = _ shouldBe 0
-    override def after3WithNewPeriodAndEndorsementsCheck = _ shouldBe 0
-    override def after4WithPunishmentCheck               = _ shouldBe 0
-    override def after5WithNewPeriodCheck                = _ shouldBe 0 // Not committed
+    override def after2WithCommitmentsCheck              = _ shouldBe None
+    override def after3WithNewPeriodAndEndorsementsCheck = _ shouldBe Some(0)
+    override def after4WithPunishmentCheck               = _ shouldBe Some(0)
+    override def after5WithNewPeriodCheck                = _ shouldBe None // Not committed
   }.run()
 
   "generating balance" in new Scenario[Long] { // Collected after applying block

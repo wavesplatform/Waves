@@ -6,13 +6,10 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{Blockchain, GeneratorIndex, Height, Portfolio}
+import com.wavesplatform.state.{GeneratorIndex, Height, Portfolio}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.CommitToGenerationTransaction.DepositInWavelets
 import com.wavesplatform.transaction.TxHelpers
-import org.scalactic.source.Position
-import org.scalatest.Assertion
 
 class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
   private val validGenerator = TxHelpers.signer(0)
@@ -75,7 +72,7 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
       d.generatorsApi
         .generators(Height(d.blockchain.height))
         .collectFirst { case x if x.address == conflictGeneratorAddr => x.balance }
-        .getOrElse(0L) shouldBe balanceAfter4 - DepositInWavelets
+        .value shouldBe Some(balanceAfter4 - DepositInWavelets)
     }
 
     d.blockchain.balanceSnapshots(conflictGeneratorAddr, from = 2, to = None) should contain theSameElementsInOrderAs Seq(

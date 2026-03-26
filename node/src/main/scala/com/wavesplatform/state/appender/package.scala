@@ -316,6 +316,7 @@ package object appender {
   )(
       conflictingEndorsement: BlockEndorsement
   ): Either[String, Unit] = for {
+    _ <- Either.raiseWhen(commitedGenerators.isEmpty)("No one committed")
     (address, blsPublicKey) <- commitedGenerators
       .lift(conflictingEndorsement.endorserIndex.toInt)
       .toRight(s"Invalid conflicting endorser index ${conflictingEndorsement.endorserIndex}")
