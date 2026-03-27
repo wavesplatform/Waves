@@ -5,16 +5,17 @@ import scalapb.compiler.Version.scalapbVersion
 
 //noinspection TypeAnnotation
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.7.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.10.Final"
 
   val gProtoVersion = "4.33.1"
-  val gProto = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
+  val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
   val overrides = Def.setting(
     Seq(
       "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
       "com.google.code.gson"      % "gson"           % "2.13.2",
       "com.squareup.okio"         % "okio-jvm"       % "3.16.0",
       "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
+      "org.msgpack"               % "msgpack-core"   % "0.9.11",
       nettyModule("codec-http2"),
       nettyModule("codec-http"),
       nettyModule("handler-proxy"),
@@ -39,7 +40,7 @@ object Dependencies {
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.7"
 
-  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.20.1"
+  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.21.1"
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.9.8" // 4.10+ requires Java 17 https://github.com/web3j/web3j/issues/1907
 
@@ -51,7 +52,7 @@ object Dependencies {
   val googleGuava     = "com.google.guava"    % "guava"             % "33.5.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.21"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.25"
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.4"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
@@ -151,9 +152,9 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       scalaLogging,
-      "eu.timepit"                 %% "refined"       % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "13.3.1",
-      "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
+      "eu.timepit"        %% "refined"  % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "com.esaulpaugh"     % "headlong" % "13.3.1",
+      "com.github.jbellis" % "jamm"     % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
     ) ++ console ++ logDeps ++ protobuf.value
   )
