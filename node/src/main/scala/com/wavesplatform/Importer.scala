@@ -305,7 +305,7 @@ object Importer extends ScorexLogging {
           if (blockchain.lastBlockId.contains(block.header.reference)) {
             Await.result(appendBlock(block, snapshot).runAsyncLogErr(using appender), Duration.Inf) match {
               case Left(ve) =>
-                log.error(s"Error appending block: $ve")
+                log.error(s"Error appending block ${blockchain.height + 1}: $ve")
                 queue.clear()
                 quit = true
               case _ =>

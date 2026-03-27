@@ -8,8 +8,8 @@ import com.wavesplatform.database.{KeyTag, RDB, createBlock, readBlockMeta, read
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.metrics.Metrics
-import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.*
@@ -239,20 +239,17 @@ object Exporter extends ScorexLogging {
     def createOutputStream(filename: String): Try[FileOutputStream] =
       Try(new FileOutputStream(filename))
 
-    def exportBlock(stream: OutputStream, maybeBlock: Option[Block], legacy: Boolean): Int = {
-      val maybeBlockBytes = maybeBlock.map(_.bytes())
-      maybeBlockBytes
-        .map { oldBytes =>
-          val bytes       = if (legacy) oldBytes else PBBlocks.clearChainId(PBBlocks.protobuf(Block.parseBytes(oldBytes).get)).toByteArray
-          val bytesLength = bytes.length
+    def exportBlock(stream: OutputStream, maybeBlock: Option[Block], legacy: Boolean): Int = maybeBlock
+      .map { block =>
+        val bytes       = if (legacy) block.bytes() else PBBlocks.clearChainId(PBBlocks.protobuf(block)).toByteArray
+        val bytesLength = bytes.length
 
-          stream.write(Ints.toByteArray(bytesLength))
-          stream.write(bytes)
+        stream.write(Ints.toByteArray(bytesLength))
+        stream.write(bytes)
 
-          Ints.BYTES + bytesLength
-        }
-        .getOrElse(0)
-    }
+        Ints.BYTES + bytesLength
+      }
+      .getOrElse(0)
 
     def exportBlockTxSnapshots(stream: OutputStream, snapshots: Seq[Array[Byte]]): Int = {
       val snapshotBytesWithSizes = snapshots.map { snapshot =>
