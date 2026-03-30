@@ -425,7 +425,7 @@ object PBTransactions {
           alias,
           TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
-          Proofs(signature),
+          proofs,
           chainId
         )
 

@@ -30,9 +30,9 @@ final case class CreateAliasTransaction(
 
   lazy val alias: Alias = Alias.createWithChainId(aliasName, chainId, Some(chainId)).explicitGet()
 
-  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(CreateAliasTxSerializer.bodyBytes(this))
-  override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(CreateAliasTxSerializer.toBytes(this))
-  override val json: Coeval[JsObject]              = Coeval.evalOnce(CreateAliasTxSerializer.toJson(this))
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(CreateAliasTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(CreateAliasTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]         = Coeval.evalOnce(CreateAliasTxSerializer.toJson(this))
 
   override val id: Coeval[ByteStr] = Coeval.evalOnce {
     ByteStr(crypto.fastHash(version match {
