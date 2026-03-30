@@ -39,7 +39,6 @@ import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.ExecutionModel.SynchronousExecution
-import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers.*
@@ -77,7 +76,6 @@ case class Domain(
       .explicitGet()
   }
 
-  // TODO: testTime?
   val transactionDiffer: Transaction => TracedResult[ValidationError, StateSnapshot] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
@@ -87,7 +85,6 @@ case class Domain(
   def createDiffE(tx: Transaction): Either[ValidationError, StateSnapshot] = transactionDiffer(tx).resultE
   def createDiff(tx: Transaction): StateSnapshot                           = createDiffE(tx).explicitGet()
 
-  // TODO: testTime?
   lazy val utxPool: UtxPoolImpl =
     new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
 
@@ -98,7 +95,7 @@ case class Domain(
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None, seed = Some(ByteStr(DefaultWalletSeed))))
 
   lazy val blockAppender: Block => Task[Either[ValidationError, BlockApplyResult]] =
-    BlockAppender(blockchain, testTime, utxPool, posSelector, BlockEndorser.Disabled, Scheduler.singleThread("appender"))(_, None) // TODO:
+    BlockAppender(blockchain, testTime, utxPool, posSelector, BlockEndorser.Disabled, scheduler)(_, None)
   lazy val blockChallenger: Option[BlockChallenger] =
     if (!settings.enableLightMode)
       Some(

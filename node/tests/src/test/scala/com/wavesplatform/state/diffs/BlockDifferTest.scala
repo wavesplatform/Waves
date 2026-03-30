@@ -265,19 +265,17 @@ class BlockDifferTest extends FreeSpec with WithDomain {
       val sender   = TxHelpers.signer(1)
       val minerAcc = TxHelpers.signer(2)
       val settings = DomainPresets.TransactionStateSnapshot
-      val time     = TestTime() // TODO: migrate to d.testTime
       withDomain(
         settings.copy(minerSettings = settings.minerSettings.copy(quorum = 0)),
         AddrWithBalance.enoughBalances(sender, minerAcc),
-        time = time
       ) { d =>
         d.appendBlock()
-        time.setTime(d.lastBlock.header.timestamp)
+        d.testTime.setTime(d.lastBlock.header.timestamp)
 
-        time.advance(d.settings.minerSettings.minMicroBlockAge)
+        d.testTime.advance(d.settings.minerSettings.minMicroBlockAge)
         val refId = d.appendMicroBlock(TxHelpers.transfer(sender, amount = 1))
 
-        time.advance(d.settings.minerSettings.minMicroBlockAge)
+        d.testTime.advance(d.settings.minerSettings.minMicroBlockAge)
         d.appendMicroBlock(TxHelpers.transfer(sender, amount = 2))
 
         d.appender.appendBlock(
