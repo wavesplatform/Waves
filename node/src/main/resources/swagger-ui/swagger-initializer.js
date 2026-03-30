@@ -1,3 +1,27 @@
+// Changes the document title
+const TitlePlugin = function(system) {
+  return {
+    statePlugins: {
+      spec: {
+        wrapSelectors: {
+          specJson: (oriSelector) => (...args) => {
+            const result = oriSelector(...args);
+
+            try {
+              const js = result?.toJS?.();
+              const title = js?.info?.title;
+
+              if (title) document.title = title;
+            } catch (e) { }
+
+            return result;
+          }
+        }
+      }
+    }
+  };
+};
+
 window.onload = function() {
   //<editor-fold desc="Changeable Configuration Block">
 
@@ -11,7 +35,8 @@ window.onload = function() {
       SwaggerUIBundle.presets.apis
     ],
     plugins: [
-      SwaggerUIBundle.plugins.DownloadUrl
+      SwaggerUIBundle.plugins.DownloadUrl,
+      TitlePlugin
     ],
     // Hide "Explore" button and input field. StandaloneLayout shows them
     // See https://github.com/swagger-api/swagger-ui/blob/master/src/standalone/presets/standalone/index.js
