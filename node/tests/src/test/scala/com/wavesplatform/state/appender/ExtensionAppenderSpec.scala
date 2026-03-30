@@ -19,7 +19,7 @@ class ExtensionAppenderSpec extends FlatSpec with WithDomain {
       val extensionAppender = ExtensionAppender(d.blockchain, utx, d.posSelector, time, InvalidBlockStorage.NoOp, PeerDatabase.NoOp, global)(null, _)
 
       val tx     = TxHelpers.transfer()
-      val block1 = d.createBlock(Block.PlainBlockVersion, Seq(tx), strictTime = true)
+      val block1 = d.createBlock(Seq(tx), strictTime = true, version = Block.PlainBlockVersion)
       utx.putIfNew(tx).resultE.explicitGet()
       d.appendBlock(tx)
       utx.all shouldBe Seq(tx)

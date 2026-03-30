@@ -1,6 +1,5 @@
 package com.wavesplatform.finalization
 
-import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -8,7 +7,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.{FreeSpec, TestSchedulerOps}
+import com.wavesplatform.test.TestSchedulerOps
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.wallet.Wallet
 import org.scalatest.time.SpanSugar.convertLongToGrainOfTime
@@ -29,14 +28,12 @@ class ChallengingAfterFinalizationSuite extends BaseFinalizationSpec, TestSchedu
     d.wallet.generateNewAccounts(1)
 
     log.debug("Append block2")
-    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, strictTime = true, generator = committedGenerator))
+    d.appender.appendBlock(d.createBlock(strictTime = true, generator = committedGenerator))
     d.appendMicroBlock(TxHelpers.commitToGeneration(Height(3), sender = committedGenerator))
 
     log.debug("Append block3 with invalid state hash and challenge")
     val invalidStateHash = ByteStr.fill(DigestLength)(1)
     val invalidBlock = d.createBlock(
-      Block.ProtoBlockVersion,
-      txs = Nil,
       strictTime = true,
       generator = committedGenerator,
       stateHash = Some(Some(invalidStateHash)),

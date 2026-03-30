@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
@@ -10,8 +11,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.*
@@ -73,54 +74,56 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
   )
 
   property("blockchain functions are available for order branch when verifying exchange transaction") {
-    forAll(sharedParamGen) {
-      case (sender, matcher, genesisTxs, assetPair) =>
-        withDomain(
-          domainSettingsWithPreactivatedFeatures(
-            BlockchainFeatures.SmartAccountTrading,
-            BlockchainFeatures.SmartAssets,
-            BlockchainFeatures.OrderV3,
-            BlockchainFeatures.Ride4DApps
-          )
-        ) { d =>
-          d.appendBlock(genesisTxs*)
-          d.appendBlock(
-            SetScriptTransaction
-              .selfSigned(
-                1.toByte,
-                sender,
-                Some(
-                  ScriptCompiler.compile(
+    forAll(sharedParamGen) { case (sender, matcher, genesisTxs, assetPair) =>
+      withDomain(
+        domainSettingsWithPreactivatedFeatures(
+          BlockchainFeatures.SmartAccountTrading,
+          BlockchainFeatures.SmartAssets,
+          BlockchainFeatures.OrderV3,
+          BlockchainFeatures.Ride4DApps
+        )
+      ) { d =>
+        d.appendBlock(genesisTxs*)
+        d.appendBlock(
+          SetScriptTransaction
+            .selfSigned(
+              1.toByte,
+              sender,
+              Some(
+                ScriptCompiler
+                  .compile(
                     """match tx {
-                    |  case _: Order => height >= 0
-                    |  case _ => true
-                    |}""".stripMargin,
+                      |  case _: Order => height >= 0
+                      |  case _ => true
+                      |}""".stripMargin,
                     ScriptEstimatorV2
-                  ).explicitGet()._1
-                ),
-                0.001.waves,
-                ntpTime.getTimestamp()
-              )
-              .explicitGet()
-          )
+                  )
+                  .explicitGet()
+                  ._1
+              ),
+              0.001.waves,
+              ntpTime.getTimestamp()
+            )
+            .explicitGet()
+        )
 
-          d.appendBlock(
-            ExchangeTransaction
-              .signed(
-                2.toByte,
-                matcher.privateKey,
-                mkOrder(sender, OrderType.BUY, matcher.publicKey, assetPair),
-                mkOrder(sender, OrderType.SELL, matcher.publicKey, assetPair),
-                100,
-                5.waves,
-                0.003.waves,
-                0.003.waves,
-                0.003.waves,
-                ntpTime.getTimestamp()
-              )
-              .explicitGet()
-          )
-        }
+        d.appendBlock(
+          ExchangeTransaction
+            .signed(
+              2.toByte,
+              matcher.privateKey,
+              mkOrder(sender, OrderType.BUY, matcher.publicKey, assetPair),
+              mkOrder(sender, OrderType.SELL, matcher.publicKey, assetPair),
+              100,
+              5.waves,
+              0.003.waves,
+              0.003.waves,
+              0.003.waves,
+              ntpTime.getTimestamp()
+            )
+            .explicitGet()
+        )
+      }
     }
   }
 
@@ -152,32 +155,34 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
   )
 
   property("matcher fee asset script is executed during exchange transaction validation") {
-    forAll(sharedParamGen2) {
-      case (sender, genesisTxs, exchangeTx, buyFeeAsset, sellFeeAsset) =>
-        def setAssetScript(assetId: IssuedAsset, script: Option[Script]): SetAssetScriptTransaction =
-          SetAssetScriptTransaction.selfSigned(1.toByte, sender, assetId, script, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
+    forAll(sharedParamGen2) { case (sender, genesisTxs, exchangeTx, buyFeeAsset, sellFeeAsset) =>
+      def setAssetScript(assetId: IssuedAsset, script: Option[Script]): SetAssetScriptTransaction =
+        SetAssetScriptTransaction.selfSigned(1.toByte, sender, assetId, script, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
 
-        withDomain(
-          domainSettingsWithPreactivatedFeatures(
-            BlockchainFeatures.SmartAccountTrading,
-            BlockchainFeatures.OrderV3,
-            BlockchainFeatures.SmartAssets,
-            BlockchainFeatures.Ride4DApps
+      withDomain(
+        domainSettingsWithPreactivatedFeatures(
+          BlockchainFeatures.SmartAccountTrading,
+          BlockchainFeatures.OrderV3,
+          BlockchainFeatures.SmartAssets,
+          BlockchainFeatures.Ride4DApps
+        )
+      ) { d =>
+        d.appendBlock(genesisTxs*)
+
+        d.blockchainUpdater.processBlock(
+          d.createBlock(Seq(setAssetScript(buyFeeAsset, Some(ExprScript(Terms.FALSE).explicitGet())), exchangeTx), version = Block.PlainBlockVersion)
+        ) should produce("TransactionNotAllowedByScript")
+
+        d.blockchainUpdater.processBlock(
+          d.createBlock(
+            Seq(
+              setAssetScript(sellFeeAsset, Some(ScriptCompiler.compile("(5 / 0) == 2", ScriptEstimatorV2).explicitGet()._1)),
+              exchangeTx
+            ),
+            version = Block.PlainBlockVersion
           )
-        ) { d =>
-          d.appendBlock(genesisTxs*)
-
-          d.blockchainUpdater.processBlock(
-            d.createBlock(2.toByte, Seq(setAssetScript(buyFeeAsset, Some(ExprScript(Terms.FALSE).explicitGet())), exchangeTx))
-          ) should produce("TransactionNotAllowedByScript")
-
-          d.blockchainUpdater.processBlock(
-            d.createBlock(
-              2.toByte,
-              Seq(setAssetScript(sellFeeAsset, Some(ScriptCompiler.compile("(5 / 0) == 2", ScriptEstimatorV2).explicitGet()._1)), exchangeTx)
-            )
-          ) should produce("ScriptExecutionError(error = / by zero")
-        }
+        ) should produce("ScriptExecutionError(error = / by zero")
+      }
     }
   }
 }

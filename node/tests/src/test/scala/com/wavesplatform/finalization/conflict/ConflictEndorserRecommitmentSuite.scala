@@ -1,7 +1,6 @@
 package com.wavesplatform.finalization.conflict
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
@@ -31,7 +30,7 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
   "punished and committed to next" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(validGenerator, conflictGenerator)) { d =>
     log.debug(s"Append block 2 with commitments")
     val block2Txs             = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
-    val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = block2Txs, generator = validGenerator, strictTime = true)
+    val block2WithCommitments = d.createBlock(block2Txs, generator = validGenerator, strictTime = true)
     d.appender.appendBlock(block2WithCommitments)
 
     val balanceAfter1 = ENOUGH_AMT
@@ -39,8 +38,6 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
 
     log.debug(s"Append block 3 with votes")
     val block3WithVotes = d.createBlock(
-      version = Block.ProtoBlockVersion,
-      txs = Nil,
       generator = validGenerator,
       strictTime = true,
       finalizationVoting = Some(mkFinalizationVoting().withConflict(conflictGenerator, GeneratorIndex(1), block2WithCommitments.id()))
@@ -49,13 +46,13 @@ class ConflictEndorserRecommitmentSuite extends BaseFinalizationSpec {
 
     log.debug(s"Append block 3 with punishment and commitment")
     val block4Txs             = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(5), x))
-    val block4WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = block4Txs, generator = validGenerator, strictTime = true)
+    val block4WithCommitments = d.createBlock(block4Txs, generator = validGenerator, strictTime = true)
     d.appender.appendBlock(block4WithCommitments)
 
     val balanceAfter4 = ENOUGH_AMT - 2 * TestValues.commitToGenerationFee - DepositInWavelets
 
     log.debug("Append block 5 of new period")
-    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = validGenerator, strictTime = true))
+    d.appender.appendBlock(d.createBlock(generator = validGenerator, strictTime = true))
 
     withClue(s"checkCommitted: ") {
       d.blockchain.committedGenerators(d.blockchain.currentGenerationPeriod.value).map(_._1) should contain theSameElementsInOrderAs generatorAddrs

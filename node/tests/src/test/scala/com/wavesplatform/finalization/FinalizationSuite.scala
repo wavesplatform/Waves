@@ -1,15 +1,13 @@
 package com.wavesplatform.finalization
 
-import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{Blockchain, GeneratorIndex, GenesisBlockHeight, Height}
+import com.wavesplatform.state.{GeneratorIndex, GenesisBlockHeight, Height}
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.{FreeSpec, NumericExt}
+import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
-import org.scalactic.source.Position
 
 class FinalizationSuite extends BaseFinalizationSpec {
   private val node0Acc = TxHelpers.signer(0)
@@ -34,7 +32,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
       log.debug(s"Append block 3 with commitments")
       val endorsers = Seq(node0Acc, node1Acc)
       val block3 = d.createBlock(
-        version = Block.ProtoBlockVersion,
         txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
         generator = node1Acc
       )
@@ -43,8 +40,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
 
       log.debug(s"Append block 4 with votes")
       val votingBlock = d.createBlock(
-        version = Block.ProtoBlockVersion,
-        txs = Nil,
         generator = node1Acc,
         strictTime = true,
         finalizationVoting = Some(
@@ -56,7 +51,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
       d.allFinalizedHeightIs(1)
 
       log.debug("Append block 5")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node1Acc, strictTime = true))
+      d.appender.appendBlock(d.createBlock(generator = node1Acc, strictTime = true))
       d.allFinalizedHeightIs(3)
     }
 
@@ -70,7 +65,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
       log.debug(s"Append block 3 with commitments")
       val endorsers = Seq(node0Acc, node1Acc)
       val block3 = d.createBlock(
-        version = Block.ProtoBlockVersion,
         txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
         generator = node1Acc
       )
@@ -78,12 +72,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
 
       log.debug(s"Append block 4")
       d.appender.appendBlock(
-        d.createBlock(
-          version = Block.ProtoBlockVersion,
-          txs = Nil,
-          generator = node1Acc,
-          strictTime = true
-        )
+        d.createBlock(generator = node1Acc, strictTime = true)
       )
 
       log.debug(s"Append microblock with votes")
@@ -98,7 +87,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
       d.allFinalizedHeightIs(1)
 
       log.debug("Append block 5")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node1Acc, strictTime = true))
+      d.appender.appendBlock(d.createBlock(generator = node1Acc, strictTime = true))
       d.allFinalizedHeightIs(3)
     }
   }
@@ -113,7 +102,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
     log.debug(s"Append block 3 with commitments")
     val endorsers = Seq(node0Acc, node1Acc, node2Acc)
     val block3 = d.createBlock(
-      version = Block.ProtoBlockVersion,
       txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
       generator = node0Acc
     )
@@ -121,8 +109,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
 
     log.debug(s"Append worse key block 4")
     val betterBlock4 = d.createBlock(
-      version = Block.ProtoBlockVersion,
-      txs = Nil,
       generator = node1Acc,
       strictTime = true,
       finalizationVoting = Some( // voted: node1Acc, node0Acc; not voted: node2Acc
@@ -130,13 +116,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
           .signed(endorsedId = block3.id(), finalizedId = genesisBlockId, validEndorsers = node0Acc)
       )
     )
-    val worseBlock4 = d.createBlock(
-      version = Block.ProtoBlockVersion,
-      txs = Nil,
-      generator = node2Acc,
-      strictTime = true,
-      timestamp = Some(d.nextBlockTime(node2Acc) + 100)
-    )
+    val worseBlock4 = d.createBlock(generator = node2Acc, strictTime = true, timestamp = Some(d.nextBlockTime(node2Acc) + 100))
     d.appender.appendBlock(worseBlock4)
     d.allFinalizedHeightIs(1)
 
@@ -145,7 +125,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
     d.allFinalizedHeightIs(1)
 
     log.debug("Append block 5")
-    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node1Acc, strictTime = true))
+    d.appender.appendBlock(d.createBlock(generator = node1Acc, strictTime = true))
     d.allFinalizedHeightIs(3)
   }
 
@@ -159,17 +139,14 @@ class FinalizationSuite extends BaseFinalizationSpec {
     log.debug(s"Append block 3 with commitments")
     val endorsers = Seq(node0Acc, node1Acc, node2Acc)
     val block3 = d.createBlock(
-      version = Block.ProtoBlockVersion,
       txs = endorsers.map(x => TxHelpers.commitToGeneration(Height(4), x)),
       generator = node1Acc
     )
     d.appendBlock(block3)
 
     log.debug(s"Append worse key (from worse fork) block 4")
-    val betterBlock4 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node2Acc, strictTime = true)
+    val betterBlock4 = d.createBlock(generator = node2Acc, strictTime = true)
     val worseBlock4 = d.createBlock(
-      version = Block.ProtoBlockVersion,
-      txs = Nil,
       generator = node1Acc,
       strictTime = true,
       timestamp = Some(d.nextBlockTime(node1Acc) + 100),
@@ -186,7 +163,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
     d.allFinalizedHeightIs(1)
 
     log.debug("Append block 5")
-    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node1Acc, strictTime = true))
+    d.appender.appendBlock(d.createBlock(generator = node1Acc, strictTime = true))
     d.allFinalizedHeightIs(1)
   }
 
@@ -199,7 +176,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
     log.debug(s"Append block 3 with commitments")
     val endorsers = Seq(node0Acc, node1Acc)
     val block3 = d.createBlock(
-      version = Block.ProtoBlockVersion,
       txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
       generator = node1Acc
     )
@@ -207,17 +183,11 @@ class FinalizationSuite extends BaseFinalizationSpec {
 
     log.debug(s"Append block 4 without votes (only miner)")
     d.appender.appendBlock(
-      d.createBlock(
-        version = Block.ProtoBlockVersion,
-        txs = Nil,
-        generator = node1Acc,
-        strictTime = true,
-        finalizationVoting = None
-      )
+      d.createBlock(generator = node1Acc, strictTime = true, finalizationVoting = None)
     )
 
     log.debug("Append block 5")
-    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node1Acc, strictTime = true))
+    d.appender.appendBlock(d.createBlock(generator = node1Acc, strictTime = true))
     d.allFinalizedHeightIs(1)
   }
 
@@ -230,7 +200,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
     log.debug(s"Append block 3 with commitments")
     val endorsers = Seq(node1Acc, node0Acc)
     val block3 = d.createBlock(
-      version = Block.ProtoBlockVersion,
       txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
       generator = node1Acc
     )
@@ -238,17 +207,11 @@ class FinalizationSuite extends BaseFinalizationSpec {
 
     log.debug(s"Append block 4 without votes (only miner committed)")
     d.appender.appendBlock(
-      d.createBlock(
-        version = Block.ProtoBlockVersion,
-        txs = Nil,
-        generator = node1Acc,
-        strictTime = true,
-        finalizationVoting = None
-      )
+      d.createBlock(generator = node1Acc, strictTime = true, finalizationVoting = None)
     )
 
     log.debug("Append block 5")
-    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node1Acc, strictTime = true))
+    d.appender.appendBlock(d.createBlock(generator = node1Acc, strictTime = true))
     d.allFinalizedHeightIs(2) // 4 - maxRollback = 2, 4 because we calculate finalization based on votes in a previous block
   }
 
@@ -262,7 +225,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
       log.debug(s"Append block 3 with commitments")
       val endorsers = Seq(node0Acc, node1Acc)
       val block3 = d.createBlock(
-        version = Block.ProtoBlockVersion,
         txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
         generator = node1Acc
       )
@@ -271,7 +233,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
       log.debug(s"Append block 4 without votes (only miner committed)")
       d.appender.appendBlock(
         d.createBlock(
-          version = Block.ProtoBlockVersion,
           txs = Seq(
             TxHelpers.transfer(
               node1Acc,
@@ -289,14 +250,14 @@ class FinalizationSuite extends BaseFinalizationSpec {
       )
 
       log.debug("Append block 5")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node2Acc, strictTime = true))
+      d.appender.appendBlock(d.createBlock(generator = node2Acc, strictTime = true))
       d.allFinalizedHeightIs(3) // Generating balance of node1Acc is enough
 
       log.debug("Append block 6")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node2Acc, strictTime = true))
+      d.appender.appendBlock(d.createBlock(generator = node2Acc, strictTime = true))
 
       log.debug("Append block 7")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node2Acc, strictTime = true))
+      d.appender.appendBlock(d.createBlock(generator = node2Acc, strictTime = true))
       continue(d)
     }
 
@@ -317,7 +278,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
     log.debug(s"Append block 3 with commitments")
     val endorsers = Seq(node0Acc, node1Acc, node2Acc, node3Acc)
     val block3 = d.createBlock(
-      version = Block.ProtoBlockVersion,
       txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
       generator = node3Acc
     )
@@ -328,8 +288,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
     log.debug(s"Append block 4 with conflict vote")
     d.appender.appendBlock(
       d.createBlock(
-        version = Block.ProtoBlockVersion,
-        txs = Nil,
         generator = node3Acc,
         strictTime = true,
         finalizationVoting = Some(
@@ -346,7 +304,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
     d.allFinalizedHeightIs(1)
 
     log.debug("Append block 5")
-    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node3Acc, strictTime = true))
+    d.appender.appendBlock(d.createBlock(generator = node3Acc, strictTime = true))
     d.allFinalizedHeightIs(3)
   }
 
@@ -360,7 +318,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
     log.debug(s"Append block 3 with commitments")
     val endorsers = Seq(node0Acc, node1Acc, node2Acc)
     val block3 = d.createBlock(
-      version = Block.ProtoBlockVersion,
       txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x)),
       generator = node1Acc
     )
@@ -369,7 +326,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
     log.debug(s"Append block 4 with votes and spending")
     d.appender.appendBlock(
       d.createBlock(
-        version = Block.ProtoBlockVersion,
         txs = Seq(
           TxHelpers.transfer(
             node0Acc,                                                                            // Endorser
@@ -388,7 +344,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
     )
 
     log.debug("Append block 5")
-    d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node1Acc, strictTime = true))
+    d.appender.appendBlock(d.createBlock(generator = node1Acc, strictTime = true))
     d.allFinalizedHeightIs(3)
   }
 
@@ -417,17 +373,16 @@ class FinalizationSuite extends BaseFinalizationSpec {
         val endorsers = Seq(node0Acc, node1Acc, node2Acc)
         d.appendBlock(
           d.createBlock(
-            version = Block.ProtoBlockVersion,
             txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(52), x)),
             generator = node1Acc
           )
         ) // 51
 
         log.debug(s"Append block without votes, but increased miner's generating balance")
-        d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node1Acc, strictTime = true)) // 52
+        d.appender.appendBlock(d.createBlock(generator = node1Acc, strictTime = true)) // 52
 
         log.debug("Append block to calculate finalization height")
-        d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node1Acc, strictTime = true)) // 53
+        d.appender.appendBlock(d.createBlock(generator = node1Acc, strictTime = true)) // 53
         d.allFinalizedHeightIs(51)
       }
 
@@ -458,7 +413,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
           val endorsers = Seq(node0Acc, node1Acc, node2Acc)
           d.appendBlock(
             d.createBlock(
-              version = Block.ProtoBlockVersion,
               txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(52), x)),
               generator = node1Acc
             )
@@ -467,8 +421,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
           log.debug(s"Append block with vote")
           d.appender.appendBlock(
             d.createBlock(
-              version = Block.ProtoBlockVersion,
-              txs = Nil,
               generator = node1Acc,
               strictTime = true,
               finalizationVoting = Some(
@@ -479,7 +431,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
           ) // 52
 
           log.debug("Append block to calculate finalization height")
-          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node1Acc, strictTime = true)) // 53
+          d.appender.appendBlock(d.createBlock(generator = node1Acc, strictTime = true)) // 53
           d.allFinalizedHeightIs(51)
         }
       }
@@ -510,7 +462,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
       val endorsers = Seq(node0Acc, node1Acc, node2Acc)
       d.appendBlock(
         d.createBlock(
-          version = Block.ProtoBlockVersion,
           txs = endorsers.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(52), x)),
           generator = node1Acc
         )
@@ -519,8 +470,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
       log.debug(s"Append block with vote, balance of non-voting endorser increased")
       d.appender.appendBlock(
         d.createBlock(
-          version = Block.ProtoBlockVersion,
-          txs = Nil,
           generator = node1Acc,
           strictTime = true,
           finalizationVoting = Some(
@@ -531,7 +480,7 @@ class FinalizationSuite extends BaseFinalizationSpec {
       ) // 52
 
       log.debug("Append block to calculate finalization height")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = node1Acc, strictTime = true)) // 53
+      d.appender.appendBlock(d.createBlock(generator = node1Acc, strictTime = true)) // 53
       d.allFinalizedHeightIs(1)
     }
   }

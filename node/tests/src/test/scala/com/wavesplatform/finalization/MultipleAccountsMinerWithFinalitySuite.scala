@@ -1,13 +1,12 @@
 package com.wavesplatform.finalization
 
-import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.{CatchLogs, FreeSpec, NumericExt, TestSchedulerOps, TestTime}
+import com.wavesplatform.test.{CatchLogs, NumericExt, TestSchedulerOps, TestTime}
 import com.wavesplatform.transaction.{CommitToGenerationTransaction, TxHelpers}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
@@ -66,7 +65,6 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
 
       log.debug("Append block2")
       val block2 = d.createBlock(
-        version = Block.ProtoBlockVersion,
         txs = Seq(TxHelpers.commitToGeneration(Height(3), sender = minerAcc)),
         generator = otherNodeNotCommittedAcc1,
         strictTime = true
@@ -152,7 +150,6 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
 
         log.debug("Append block2")
         val block2 = d.createBlock(
-          version = Block.ProtoBlockVersion,
           txs = Seq(minerAcc, otherNodeCommittedAcc1).map(x => TxHelpers.commitToGeneration(Height(3), sender = x)),
           generator = otherNodeCommittedAcc1,
           strictTime = true
@@ -253,7 +250,6 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
 
         log.debug("Append block2")
         val block2 = d.createBlock(
-          version = Block.ProtoBlockVersion,
           txs = Seq(minerAcc, otherNodeCommittedAcc1).map(x => TxHelpers.commitToGeneration(Height(3), sender = x)),
           generator = otherNodeCommittedAcc1,
           strictTime = true

@@ -1,7 +1,6 @@
 package com.wavesplatform.mining
 
 import com.wavesplatform.account.SeedKeyPair
-import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
@@ -68,7 +67,7 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
         microBlockMiner.generateOneMicroBlockTask(defaultSigner, d.lastBlock, Unlimited, 0).runSyncUnsafe()
       }
       def challengeBlock() = {
-        val invalidBlock = d.createBlock(ProtoBlockVersion, Seq(), strictTime = true, stateHash = invalidStateHash)
+        val invalidBlock = d.createBlock(strictTime = true, stateHash = invalidStateHash)
         challenger.challengeBlock(invalidBlock, null).runSyncUnsafe()
       }
 
@@ -177,11 +176,11 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
     ) { case (d, _, append) =>
       (1 to 9).foreach(_ => d.appendBlock())
       d.blockchain.height shouldBe 10
-      val challengedBlock  = d.createBlock(ProtoBlockVersion, Nil, strictTime = true, stateHash = invalidStateHash)
+      val challengedBlock  = d.createBlock(strictTime = true, stateHash = invalidStateHash)
       val challengingBlock = d.createChallengingBlock(secondSigner, challengedBlock, strictTime = true)
       val blockWithOnlyChallengingHeader = {
         val challengedHeader = challengingBlock.header.challengedHeader.map(_.copy(stateHash = None))
-        val block            = d.createBlock(ProtoBlockVersion, Nil, strictTime = true, challengedHeader = challengedHeader)
+        val block            = d.createBlock(strictTime = true, challengedHeader = challengedHeader)
         block.copy(header = block.header.copy(stateHash = None))
       }
       d.testTime.setTime(challengingBlock.header.timestamp)
@@ -191,13 +190,13 @@ class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
 
       d.appendBlock()
       d.blockchain.height shouldBe 11
-      val correctBlockWithStateHash = d.createBlock(ProtoBlockVersion, Nil, strictTime = true)
+      val correctBlockWithStateHash = d.createBlock(strictTime = true)
       correctBlockWithStateHash.header.stateHash shouldBe defined
       d.testTime.setTime(correctBlockWithStateHash.header.timestamp)
       append(correctBlockWithStateHash) shouldBe a[Right[?, ?]]
 
       d.rollbackTo(11)
-      val invalidBlock      = d.createBlock(ProtoBlockVersion, Nil, stateHash = invalidStateHash, strictTime = true)
+      val invalidBlock      = d.createBlock(stateHash = invalidStateHash, strictTime = true)
       val challengingBlock2 = d.createChallengingBlock(secondSigner, invalidBlock, strictTime = true)
       d.testTime.setTime(challengingBlock2.header.timestamp)
       append(challengingBlock2) shouldBe a[Right[?, ?]]

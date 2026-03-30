@@ -3,7 +3,6 @@ package com.wavesplatform.state
 import com.wavesplatform.account.{Address, Alias, KeyPair, PublicKey}
 import com.wavesplatform.api.common.LeaseInfo
 import com.wavesplatform.api.common.LeaseInfo.Status.Active
-import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
@@ -22,7 +21,6 @@ import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.traits.domain.Lease
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.test.*
-import com.wavesplatform.state.{Height, TransactionId}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
@@ -188,7 +186,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.blockchainUpdater.height shouldBe 2
         val blockWithLeaseId = d.lastBlockId
         d.blockchainUpdater.leaseDetails(lt.id()) should contain(
-          LeaseDetails(LeaseStaticInfo(sender.publicKey, recipient.toAddress, lt.amount, TransactionId(lt.id()), Height(2)), LeaseDetails.Status.Active)
+          LeaseDetails(
+            LeaseStaticInfo(sender.publicKey, recipient.toAddress, lt.amount, TransactionId(lt.id()), Height(2)),
+            LeaseDetails.Status.Active
+          )
         )
         d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
         d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
@@ -214,7 +215,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         d.rollbackTo(blockWithLeaseId)
         d.blockchainUpdater.leaseDetails(lt.id()) should contain(
-          LeaseDetails(LeaseStaticInfo(sender.publicKey, recipient.toAddress, lt.amount, TransactionId(lt.id()), Height(2)), LeaseDetails.Status.Active)
+          LeaseDetails(
+            LeaseStaticInfo(sender.publicKey, recipient.toAddress, lt.amount, TransactionId(lt.id()), Height(2)),
+            LeaseDetails.Status.Active
+          )
         )
         d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
         d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
@@ -701,7 +705,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
             def leaseDetails(invokeId: ByteStr) =
               Some(
                 LeaseDetails(
-                  LeaseStaticInfo(checkPk, leaseRecipientAddress.toAddress, TxPositiveAmount.unsafeFrom(leaseAmount), TransactionId(invokeId), Height(3)),
+                  LeaseStaticInfo(
+                    checkPk,
+                    leaseRecipientAddress.toAddress,
+                    TxPositiveAmount.unsafeFrom(leaseAmount),
+                    TransactionId(invokeId),
+                    Height(3)
+                  ),
                   LeaseDetails.Status.Active
                 )
               )
@@ -1114,8 +1124,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
         def leases(address: Address) = d.accountsApi.activeLeases(address).toListL.runSyncUnsafe()
 
         val leaseTxs = Seq.fill(5)(lease(defaultSigner, secondAddress)) ++ Seq.fill(5)(lease(secondSigner, defaultAddress))
-        val info =
-          leaseTxs.map(tx => LeaseInfo(tx.id(), TransactionId(tx.id()), tx.sender.toAddress, tx.recipient.asInstanceOf[Address], tx.amount.value, Height(2), Active))
+        val info = leaseTxs.map { tx =>
+          LeaseInfo(tx.id(), TransactionId(tx.id()), tx.sender.toAddress, tx.recipient.asInstanceOf[Address], tx.amount.value, Height(2), Active)
+        }
 
         val b1 = d.appendBlock(leaseTxs*)
         leases(defaultAddress) should contain theSameElementsAs info
@@ -1129,7 +1140,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
         leases(defaultAddress) should contain theSameElementsAs info.slice(1, 9)
         leases(secondAddress) should contain theSameElementsAs info.slice(1, 9)
 
-        d.appendBlock(d.createBlock(ProtoBlockVersion, Nil, Some(b2.id())))
+        d.appendBlock(d.createBlock(ref = Some(b2.id())))
         leases(defaultAddress) should contain theSameElementsAs info.tail
         leases(secondAddress) should contain theSameElementsAs info.tail
 

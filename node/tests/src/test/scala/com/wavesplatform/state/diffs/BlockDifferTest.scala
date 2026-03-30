@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.{Block, BlockSnapshot}
+import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
@@ -152,8 +152,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             .resultE
             .explicitGet()
 
-          val correctBlock =
-            TestBlock.create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(blockStateHash))
+          val correctBlock = TestBlock.create(blockTs, genesis.id(), txs, signer, stateHash = Some(blockStateHash))
           BlockDiffer
             .fromBlock(
               blockchain,
@@ -164,10 +163,9 @@ class BlockDifferTest extends FreeSpec with WithDomain {
               correctBlock.block.header.generationSignature
             ) should beRight
 
-          val incorrectBlock =
-            TestBlock
-              .create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(ByteStr.fill(DigestLength)(1)))
-              .block
+          val incorrectBlock = TestBlock
+            .create(blockTs, genesis.id(), txs, signer, stateHash = Some(ByteStr.fill(DigestLength)(1)))
+            .block
           BlockDiffer.fromBlock(
             blockchain,
             Some(genesis),
@@ -234,8 +232,8 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             Some(liquid.data.liquidStateHash)
           )
 
-          val block = d.createBlock(Block.ProtoBlockVersion, Seq(TxHelpers.transfer(sender, amount = idx.waves, fee = TestValues.fee * idx)))
-          val hs    = d.posSelector.validateGenerationSignature(block).explicitGet()
+          val block              = d.createBlock(Seq(TxHelpers.transfer(sender, amount = idx.waves, fee = TestValues.fee * idx)))
+          val hs                 = d.posSelector.validateGenerationSignature(block).explicitGet()
           val txValidationResult = BlockDiffer.fromBlock(refBlockchain, Some(liquid.block), block, None, MiningConstraint.Unlimited, hs)
 
           val txInfo        = txValidationResult.explicitGet().snapshot.transactions.head._2
@@ -283,7 +281,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
         d.appendMicroBlock(TxHelpers.transfer(sender, amount = 2))
 
         d.appender.appendBlock(
-          d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, ref = Some(refId), strictTime = true, generator = minerAcc)
+          d.createBlock(ref = Some(refId), strictTime = true, generator = minerAcc)
         )
       }
     }

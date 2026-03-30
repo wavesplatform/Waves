@@ -280,7 +280,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
         val invoke =
           Signed.invokeScript(3.toByte, sender, dapp.toAddress, None, Seq.empty, 50_0000L, Waves, ntpTime.getTimestamp())
 
-        d.appendBlock(d.createBlock(5.toByte, Seq(invoke)))
+        d.appendBlock(d.createBlock(Seq(invoke)))
       }
     }
   }
@@ -292,12 +292,9 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
     withDomain(ConsensusImprovements, AddrWithBalance.enoughBalances(currentBlockSender, anotherBlockSender)) { d =>
       val parent = d.appendBlock()
 
-      val betterBlock =
-        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = anotherBlockSender, ref = Some(parent.id()))
-      val currentBlock =
-        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = currentBlockSender, ref = Some(parent.id()))
-      val worseBlock =
-        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = anotherBlockSender, ref = Some(parent.id()))
+      val betterBlock  = d.createBlock(generator = anotherBlockSender, ref = Some(parent.id()))
+      val currentBlock = d.createBlock(generator = currentBlockSender, ref = Some(parent.id()))
+      val worseBlock   = d.createBlock(generator = anotherBlockSender, ref = Some(parent.id()))
 
       betterBlock.header.timestamp < currentBlock.header.timestamp shouldBe true
       currentBlock.header.timestamp < worseBlock.header.timestamp shouldBe true

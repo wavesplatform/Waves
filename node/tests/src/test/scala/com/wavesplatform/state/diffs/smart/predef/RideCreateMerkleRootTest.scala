@@ -27,10 +27,10 @@ class RideCreateMerkleRootTest extends PropSpec with WithDomain {
               |   [ BinaryEntry("root", createMerkleRoot(proof, id, index)) ]
             """.stripMargin
           )
-          d.appendBlock(d.createBlock(blockVersion, Seq(setScript(secondSigner, dApp))))
+          d.appendBlock(d.createBlock(Seq(setScript(secondSigner, dApp)), version = blockVersion))
 
           val transfers = (1 to 5).map(_ => transfer(version = V3))
-          d.appendBlock(d.createBlock(blockVersion, transfers))
+          d.appendBlock(d.createBlock(transfers, version = blockVersion))
           val root = d.lastBlock.header.transactionsRoot
 
           d.transactionsApi
@@ -40,7 +40,7 @@ class RideCreateMerkleRootTest extends PropSpec with WithDomain {
               val id       = CONST_BYTESTR(ByteStr(Merkle.hash(transfers.find(_.id() == proof.id).get.bytes()))).explicitGet()
               val index    = CONST_LONG(proof.transactionIndex)
               val invokeTx = invoke(func = Some("merkle"), args = Seq(digests, id, index))
-              d.appendBlock(d.createBlock(blockVersion, Seq(invokeTx)))
+              d.appendBlock(d.createBlock(Seq(invokeTx), version = blockVersion))
 
               d.liquidSnapshot.scriptResults.head._2.error shouldBe None
               d.blockchain.accountData(secondAddress, "root").get.value shouldBe root

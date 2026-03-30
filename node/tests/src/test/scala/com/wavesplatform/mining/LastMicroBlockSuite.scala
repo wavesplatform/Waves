@@ -1,12 +1,9 @@
 package com.wavesplatform.mining
 
 import cats.syntax.option.*
-import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
-import com.wavesplatform.state
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{CatchLogs, FreeSpec, NumericExt, TestSchedulerOps, TestTime, WithResourceManager}
@@ -67,7 +64,7 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       )
 
       log.debug("Append block2")
-      val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = Seq.empty, generator = thisNodeAcc1, strictTime = true)
+      val block2 = d.createBlock(generator = thisNodeAcc1, strictTime = true)
       d.appender.appendBlock(block2)
       time.setTime(block2.header.timestamp)
       appenderScheduler.tickNext("this-appender-1", failIfNoTasks = false)
@@ -126,7 +123,7 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       )
 
       log.debug("Append block2")
-      val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = Seq.empty, generator = otherNodeAcc, strictTime = true)
+      val block2 = d.createBlock(generator = otherNodeAcc, strictTime = true)
       d.appender.appendBlock(block2)
       time.setTime(block2.header.timestamp)
       appenderScheduler.tickNext("this-appender-1", failIfNoTasks = false)
@@ -186,7 +183,7 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       ) with CatchLogs
       miner = minerImpl
 
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, strictTime = true, generator = otherNodeAcc))
+      d.appender.appendBlock(d.createBlock(strictTime = true, generator = otherNodeAcc))
 
       log.debug("Trigger forging of block 3")
       val blockTs3 = Seq(thisNodeAcc1, thisNodeAcc2).map(d.nextBlockTime).min

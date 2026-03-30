@@ -4,14 +4,21 @@ import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.InterferableDB
 import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate, ScriptUpdate}
+import com.wavesplatform.events.StateUpdate.{
+  AssetInfo,
+  AssetStateUpdate,
+  BalanceUpdate,
+  DataEntryUpdate,
+  LeaseUpdate,
+  LeasingBalanceUpdate,
+  ScriptUpdate
+}
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateRequest, GetBlockUpdatesRangeRequest, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
@@ -56,7 +63,7 @@ import scala.util.Random
 
 class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures {
   private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
-  
+
   val currentSettings: WavesSettings = RideV5
 
   val transfer: TransferTransaction       = TxHelpers.transfer()
@@ -828,7 +835,6 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
           TxHelpers.transfer(sender, recipient.toAddress, 2.waves, timestamp = txTimestamp + 1)
         )
         val originalBlock = d.createBlock(
-          Block.ProtoBlockVersion,
           txs,
           generator = challengedMiner,
           stateHash = Some(Some(invalidStateHash))
@@ -1100,13 +1106,11 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
     "should return correct updated_waves_amount when reward boost is active" in {
       val settings = ConsensusImprovements
         .setFeaturesHeight(
-          BlockchainFeatures.BlockReward -> 0,
+          BlockchainFeatures.BlockReward             -> 0,
           BlockchainFeatures.BlockRewardDistribution -> 0,
           BlockchainFeatures.BoostBlockReward        -> 5
         )
-        .configure(fs =>
-          fs.copy(blockRewardBoostPeriod = 10)
-        )
+        .configure(fs => fs.copy(blockRewardBoostPeriod = 10))
 
       withDomainAndRepo(settings) { case (d, repo) =>
         d.appendBlock()
@@ -1114,12 +1118,10 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
         (1 to 15).foreach(_ => d.appendBlock())
 
-
         subscription
           .fetchAllEvents(d.blockchain)
-        .map(_.getUpdate.getAppend.getBlock.updatedWavesAmount) shouldBe
+          .map(_.getUpdate.getAppend.getBlock.updatedWavesAmount) shouldBe
           (2 to 16).scanLeft(100_000_000.waves) { (total, height) => total + 6.waves * d.blockchain.blockRewardBoost(Height(height)) }
-
 
       }
     }

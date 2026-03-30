@@ -1,6 +1,5 @@
 package com.wavesplatform.finalization
 
-import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.{GeneratorIndex, GenesisBlockHeight, Height}
@@ -32,10 +31,10 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
     "invalid endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
       log.debug("Append block 2 with commitments")
       val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
-      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
+      val block2WithCommitments = d.createBlock(txs, generator = generator1, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
 
-      val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
+      val block3 = d.createBlock(generator = generator1, strictTime = true)
       log.debug("Append block 3")
       d.appender.appendBlock(block3)
 
@@ -63,10 +62,10 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
       withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
         log.debug("Append block 2 with commitments")
         val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
-        val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
+        val block2WithCommitments = d.createBlock(txs, generator = generator1, strictTime = true)
         d.appender.appendBlock(block2WithCommitments)
 
-        val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
+        val block3 = d.createBlock(generator = generator1, strictTime = true)
         log.debug("Append block 3")
         d.appender.appendBlock(block3)
 
@@ -92,10 +91,10 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
     "duplicate conflicting endorsement" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(generators*)) { d =>
       log.debug("Append block 2 with commitments")
       val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
-      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
+      val block2WithCommitments = d.createBlock(txs, generator = generator1, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
 
-      val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
+      val block3 = d.createBlock(generator = generator1, strictTime = true)
       log.debug("Append block 3")
       d.appender.appendBlock(block3)
 
@@ -134,11 +133,11 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
 
       log.debug("Append block 2 with commitments")
       val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
-      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator2, strictTime = true)
+      val block2WithCommitments = d.createBlock(txs, generator = generator2, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
 
       log.debug("Append block 3")
-      val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true)
+      val block3 = d.createBlock(generator = generator2, strictTime = true)
       d.appender.appendBlock(block3)
 
       log.debug("Append microblock with valid endorsements, reaching finalization")
@@ -169,7 +168,7 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
       d.appendMicroBlockE(microBlockWithTxn3) should beRight
 
       log.debug("Append block 4")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true))
+      d.appender.appendBlock(d.createBlock(generator = generator2, strictTime = true))
       d.allFinalizedHeightIs(2)
     }
   }
@@ -186,11 +185,11 @@ class MicroBlockAppendingAfterFinalizationSpec extends BaseFinalizationSpec {
 
       log.debug("Append block 2 with commitments")
       val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
-      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator2, strictTime = true)
+      val block2WithCommitments = d.createBlock(txs, generator = generator2, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
 
       log.debug("Append block 3")
-      val block3 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true)
+      val block3 = d.createBlock(generator = generator2, strictTime = true)
       d.appender.appendBlock(block3)
 
       log.debug("Append microblock with wrong BLS signature")

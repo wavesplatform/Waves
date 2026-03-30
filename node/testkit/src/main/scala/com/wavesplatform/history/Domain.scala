@@ -248,7 +248,7 @@ case class Domain(
   def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, rdb.db, blockchainUpdater)
 
   def appendAndAssertSucceed(txs: Transaction*): Block = {
-    val block = createBlock(Block.PlainBlockVersion, txs)
+    val block = createBlock(txs, version = Block.PlainBlockVersion)
     appendBlock(block)
     txs.foreach { tx =>
       if (!blockchain.transactionSucceeded(tx.id())) {
@@ -260,7 +260,7 @@ case class Domain(
   }
 
   def appendAndCatchError(txs: Transaction*): ValidationError = {
-    val block  = createBlock(Block.PlainBlockVersion, txs)
+    val block  = createBlock(txs, version = Block.PlainBlockVersion)
     val result = appendBlockE(block)
     txs.foreach { tx =>
       assert(blockchain.transactionInfo(tx.id()).isEmpty, s"should not pass: $tx")
@@ -269,7 +269,7 @@ case class Domain(
   }
 
   def appendAndAssertFailed(txs: Transaction*): Block = {
-    val block = createBlock(Block.PlainBlockVersion, txs)
+    val block = createBlock(txs, version = Block.PlainBlockVersion)
     appendBlockE(block) match {
       case Left(err) =>
         throw new RuntimeException(s"Should be success: $err")
@@ -291,7 +291,7 @@ case class Domain(
     createBlockE(Block.PlainBlockVersion, txs).flatMap(appendBlockE(_))
 
   def appendBlock(version: Byte, txs: Transaction*): Block = {
-    val block = createBlock(version, txs)
+    val block = createBlock(txs, version = version)
     appendBlock(block)
     lastBlock
   }
@@ -301,10 +301,9 @@ case class Domain(
 
   def appendKeyBlock(signer: KeyPair = defaultSigner, ref: Option[ByteStr] = None): Block = {
     val block = createBlock(
-      Block.NgBlockVersion,
-      Nil,
-      ref.orElse(Some(lastBlockId)),
-      generator = signer
+      ref = ref.orElse(Some(lastBlockId)),
+      generator = signer,
+      version = Block.NgBlockVersion
     )
     appendBlock(block) match {
       case Applied(discardedDiffs = discardedSnapshots) =>
@@ -403,8 +402,7 @@ case class Domain(
   }
 
   def createBlock(
-      version: Byte, // TODO: it's almost always ProtoBlockVersion
-      txs: Seq[Transaction],
+      txs: Seq[Transaction] = Nil,
       ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
       strictTime: Boolean = false,
       generator: KeyPair = defaultSigner,
@@ -412,7 +410,8 @@ case class Domain(
       challengedHeader: Option[ChallengedHeader] = None,
       rewardVote: Long = -1L,
       timestamp: Option[Long] = None,
-      finalizationVoting: Option[FinalizationVoting] = None
+      finalizationVoting: Option[FinalizationVoting] = None,
+      version: Byte = Block.ProtoBlockVersion
   ): Block =
     createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote, timestamp, finalizationVoting).explicitGet()
 
@@ -542,7 +541,6 @@ case class Domain(
       timestamp: Option[Long] = None
   ): Block = {
     createBlock(
-      Block.ProtoBlockVersion,
       txs.getOrElse(challengedBlock.transactionData),
       ref.orElse(blockchain.lastBlockId),
       strictTime = strictTime,
@@ -563,7 +561,8 @@ case class Domain(
           )
         )
       ),
-      timestamp = timestamp
+      timestamp = timestamp,
+      version = Block.ProtoBlockVersion
     )
   }
 

@@ -4,7 +4,6 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.grpc.*
-import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
@@ -12,15 +11,15 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{DataEntry, Recipient}
-import com.wavesplatform.state.{Height, BlockRewardCalculator, EmptyDataEntry, IntegerDataEntry}
+import com.wavesplatform.state.{BlockRewardCalculator, EmptyDataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.{DiffMatchers, Schedulers}
-import org.scalatest.{Assertion, BeforeAndAfterAll}
-import com.wavesplatform.test.DomainPresets.*
 import monix.execution.ExecutionModel.SynchronousExecution
 import monix.execution.Scheduler
+import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import scala.concurrent.Await
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -189,7 +188,10 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
 
     val sender          = TxHelpers.signer(1)
     val challengedMiner = TxHelpers.signer(2)
-    withDomain(TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)), balances = AddrWithBalance.enoughBalances(sender)) { d =>
+    withDomain(
+      TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)),
+      balances = AddrWithBalance.enoughBalances(sender)
+    ) { d =>
       val grpcApi = getGrpcApi(d)
 
       val challengingMiner = d.wallet.generateNewAccount().get
@@ -206,8 +208,6 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
 
       val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        Seq.empty,
         strictTime = true,
         generator = challengedMiner,
         stateHash = Some(Some(invalidStateHash))

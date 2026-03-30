@@ -691,7 +691,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         val prevMinerBalance      = d.balance(miner)
         val prevDaoBalance        = d.balance(daoAddress)
         val prevXtnBuybackBalance = d.balance(xtnBuybackAddress)
-        d.appendBlock(d.createBlock(Block.ProtoBlockVersion, Seq.empty, rewardVote = initReward - 1))
+        d.appendBlock(d.createBlock(rewardVote = initReward - 1))
 
         d.balance(miner) shouldBe prevMinerBalance + initReward - 2 * initialConfigAddrReward
         d.balance(daoAddress) shouldBe prevDaoBalance + initialConfigAddrReward
@@ -815,14 +815,14 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         (1 until cappedRewardActivationHeight - 1).foreach { _ =>
           val prevMinerBalance = d.balance(miner)
 
-          d.appendBlock(d.createBlock(Block.ProtoBlockVersion, Seq.empty, rewardVote = initReward - 1))
+          d.appendBlock(d.createBlock(rewardVote = initReward - 1))
 
           d.balance(miner) shouldBe prevMinerBalance + initReward
         }
 
         // activation height, if it == last voting interval height then reward for next block will be changed
         d.appendBlock(
-          d.createBlock(Block.ProtoBlockVersion, Seq.empty, rewardVote = initReward - 1)
+          d.createBlock(rewardVote = initReward - 1)
         )
 
         val prevMinerBalance = d.balance(miner)
@@ -1390,7 +1390,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     d.appendKeyBlock(blockMiner)
     // height 7: start voting
     (1 to 3).foreach(_ =>
-      d.appendBlock(d.createBlock(Block.RewardBlockVersion, Seq.empty, generator = blockMiner, rewardVote = 6.waves + rewardDelta))
+      d.appendBlock(d.createBlock(version = Block.RewardBlockVersion, generator = blockMiner, rewardVote = 6.waves + rewardDelta))
     )
     d.blockchain.height shouldBe 9
     val rewardBeforeIncrease = rewardAtActivationHeight + 4 * 2.waves * 10
@@ -1402,7 +1402,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     )
 
     // height 10: new base reward value = 65 waves
-    d.appendBlock(d.createBlock(Block.RewardBlockVersion, Seq.empty, generator = blockMiner, rewardVote = 7.waves))
+    d.appendBlock(d.createBlock(version = Block.RewardBlockVersion, generator = blockMiner, rewardVote = 7.waves))
     d.blockchain.height shouldBe 10
     val rewardAfterIncrease = rewardBeforeIncrease + addressShareAfterChange * 10
     assertBalances(

@@ -270,7 +270,7 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
     val (balances, lt) = scenario
 
     withDomain(RideV4.setFeaturesHeight(BlockchainFeatures.SynchronousCalls -> 1), balances) { d =>
-      d.blockchainUpdater.processBlock(d.createBlock(Block.PlainBlockVersion, Seq(lt))) should produce("Cannot lease more than own")
+      d.blockchainUpdater.processBlock(d.createBlock(Seq(lt), version = Block.PlainBlockVersion)) should produce("Cannot lease more than own")
     }
   }
 }

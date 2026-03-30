@@ -68,7 +68,7 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
           appenderScheduler
         )(channel2, _, None)
 
-        val block = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = sender, strictTime = true)
+        val block = d.createBlock(generator = sender, strictTime = true)
 
         testTime.setTime(block.header.timestamp)
         appender(block).runSyncUnsafe()
@@ -97,19 +97,19 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
           appenderScheduler
         )(channel2, _, None)
 
-        val block2 = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
+        val block2 = d.createBlock(generator = generator1, strictTime = true)
         testTime.setTime(block2.header.timestamp)
         appender(block2).runSyncUnsafe()
         if (d.lastBlockId != block2.id()) fail(s"Can't apply endorsedBlock $block2, see logs")
         channel1.sentEndorsements.length shouldBe 0
 
-        val block3 = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator2, strictTime = true)
+        val block3 = d.createBlock(generator = generator2, strictTime = true)
         testTime.setTime(block3.header.timestamp)
         appender(block3).runSyncUnsafe()
         if (d.lastBlockId != block3.id()) fail(s"Can't apply block3 $block3, see logs")
         channel1.sentEndorsements.length shouldBe 0
 
-        val block4 = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
+        val block4 = d.createBlock(generator = generator1, strictTime = true)
         testTime.setTime(block4.header.timestamp)
         appender(block4).runSyncUnsafe()
         if (d.lastBlockId != block4.id()) fail(s"Can't apply block4 $block4, see logs")
@@ -145,9 +145,8 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
           appenderScheduler
         )(channel2, _, None)
 
-        d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+        d.appendBlock(d.createBlock(generator = generator1, strictTime = true))
         val block3 = d.createBlock(
-          Block.ProtoBlockVersion,
           txs = Seq(generator1, otherGenerator).map(TxHelpers.commitToGeneration(Height(4), _)),
           generator = generator1,
           strictTime = true
@@ -155,8 +154,7 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
         d.appendBlock(block3)
 
         def appendBlock(n: Int, finalizationVoting: Option[FinalizationVoting] = None): Block = {
-          val r =
-            d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = otherGenerator, strictTime = true, finalizationVoting = finalizationVoting)
+          val r = d.createBlock(generator = otherGenerator, strictTime = true, finalizationVoting = finalizationVoting)
           testTime.setTime(r.header.timestamp)
           appender(r).runSyncUnsafe()
           if (d.lastBlockId != r.id()) fail(s"Can't apply block$n $r, see logs")
@@ -209,23 +207,22 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
         appenderScheduler
       )(channel2, _, None)
 
-      d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+      d.appendBlock(d.createBlock(generator = generator1, strictTime = true))
       d.appendBlock(
         d.createBlock(
-          Block.ProtoBlockVersion,
           txs = Seq(generator1, otherGenerator).map(TxHelpers.commitToGeneration(Height(4), _)),
           generator = generator1,
           strictTime = true
         )
       )
 
-      val endorsedBlock = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true)
+      val endorsedBlock = d.createBlock(generator = generator1, strictTime = true)
       testTime.setTime(endorsedBlock.header.timestamp)
       appender(endorsedBlock).runSyncUnsafe()
       if (d.lastBlockId != endorsedBlock.id()) fail(s"Can't apply endorsedBlock $endorsedBlock, see logs")
       channel1.sentEndorsements.length shouldBe 0
 
-      val nextBlock = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = otherGenerator, strictTime = true)
+      val nextBlock = d.createBlock(generator = otherGenerator, strictTime = true)
       testTime.setTime(nextBlock.header.timestamp)
       appender(nextBlock).runSyncUnsafe()
       if (d.lastBlockId != nextBlock.id()) fail(s"Can't apply nextBlock $nextBlock, see logs")
@@ -259,9 +256,8 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
           appenderScheduler
         )(channel2, _, None)
 
-        d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+        d.appendBlock(d.createBlock(generator = generator1, strictTime = true))
         val block3 = d.createBlock(
-          Block.ProtoBlockVersion,
           txs = Seq(generator1, otherGenerator).map(TxHelpers.commitToGeneration(Height(4), _)),
           generator = generator1,
           strictTime = true
@@ -269,7 +265,7 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
         d.appendBlock(block3)
 
         def appendBlock(n: Int): Block = {
-          val r = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = otherGenerator, strictTime = true)
+          val r = d.createBlock(generator = otherGenerator, strictTime = true)
           testTime.setTime(r.header.timestamp)
           appender(r).runSyncUnsafe()
           if (d.lastBlockId != r.id()) fail(s"Can't apply block$n $r, see logs")
@@ -319,10 +315,9 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
           appenderScheduler
         )(channel2, _, None)
 
-        d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+        d.appendBlock(d.createBlock(generator = generator1, strictTime = true))
         d.appendBlock(
           d.createBlock(
-            Block.ProtoBlockVersion,
             txs = Seq(generator1, otherGenerator).map(TxHelpers.commitToGeneration(Height(4), _)),
             generator = generator1,
             strictTime = true
@@ -330,7 +325,7 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
         )
 
         def appendBlock(n: Int): Block = {
-          val r = d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = otherGenerator, strictTime = true)
+          val r = d.createBlock(generator = otherGenerator, strictTime = true)
           testTime.setTime(r.header.timestamp)
           appender(r).runSyncUnsafe()
           if (d.lastBlockId != r.id()) fail(s"Can't apply block$n $r, see logs")
@@ -382,9 +377,8 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
           appenderScheduler
         )(channel2, _, None)
 
-        d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+        d.appendBlock(d.createBlock(generator = generator1, strictTime = true))
         val block3 = d.createBlock(
-          Block.ProtoBlockVersion,
           txs = Seq(generator1, otherGenerator).map(TxHelpers.commitToGeneration(Height(4), _)),
           generator = generator1,
           strictTime = true
@@ -392,8 +386,7 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
         d.appendBlock(block3)
 
         def appendBlock(n: Int, finalizationVoting: Option[FinalizationVoting] = None): Block = {
-          val r =
-            d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = otherGenerator, strictTime = true, finalizationVoting = finalizationVoting)
+          val r = d.createBlock(generator = otherGenerator, strictTime = true, finalizationVoting = finalizationVoting)
           testTime.setTime(r.header.timestamp)
           appender(r).runSyncUnsafe()
           if (d.lastBlockId != r.id()) fail(s"Can't apply block$n $r, see logs")
@@ -431,10 +424,10 @@ class BlockEndorsementBroadcastSpec extends BaseFinalizationSpec, EmbeddedChanne
       d.wallet.generateNewAccounts(3)
 
       val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x))
-      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = generator1, strictTime = true)
+      val block2WithCommitments = d.createBlock(txs, generator = generator1, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
       (3 to 5).foreach { _ =>
-        d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = generator1, strictTime = true))
+        d.appender.appendBlock(d.createBlock(generator = generator1, strictTime = true))
       }
 
       f(d)

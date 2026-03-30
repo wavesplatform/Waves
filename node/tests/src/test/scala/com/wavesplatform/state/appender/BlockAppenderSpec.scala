@@ -1,6 +1,5 @@
 package com.wavesplatform.state.appender
 
-import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -42,7 +41,7 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
         appenderScheduler
       )(channel2, _, None)
 
-      val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = sender, strictTime = true)
+      val block = d.createBlock(generator = sender, strictTime = true)
 
       testTime.setTime(block.header.timestamp)
       appender(block).runSyncUnsafe()
@@ -69,7 +68,7 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
   "BlockAppender" should "ignore a block if it is already appended" in {
     val miner = TxHelpers.signer(0)
     withDomain(DomainPresets.ConsensusImprovements, AddrWithBalance.enoughBalances(miner)) { d =>
-      val b        = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, strictTime = true, generator = miner)
+      val b        = d.createBlock(strictTime = true, generator = miner)
       def append() = d.appender.appendBlockWithoutFallback(b).explicitGet()
 
       append() shouldBe a[BlockApplyResult.Applied]

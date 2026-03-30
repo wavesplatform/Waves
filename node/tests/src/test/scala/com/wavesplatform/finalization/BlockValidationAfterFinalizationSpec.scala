@@ -74,7 +74,6 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
       override def continue(d: Domain): Unit = {
         d.appender.appendBlock(
           d.createBlock(
-            version = Block.ProtoBlockVersion,
             txs = Seq(
               TxHelpers.transfer(
                 from = committedGenerator2,
@@ -89,8 +88,6 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
 
         log.debug("Append block 4 with poor generator endorsement")
         val block4 = d.createBlock(
-          version = Block.ProtoBlockVersion,
-          txs = Nil,
           generator = committedGenerator1,
           strictTime = true,
           finalizationVoting = Some(
@@ -273,7 +270,7 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
     def run(): Unit = withDomain(settings, AddrWithBalance.enoughBalances(allGenerators*)) { d =>
       log.debug(s"Append block 2 with commitments")
       val txs                   = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
-      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = notCommittedGenerator, strictTime = true)
+      val block2WithCommitments = d.createBlock(txs, generator = notCommittedGenerator, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
 
       log.debug(s"Append block 3")
@@ -283,13 +280,8 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
     extension (d: Domain) {
       def genesisBlockId: BlockId = d.blockchain.blockHeader(GenesisBlockHeight.toInt).value.id()
 
-      def createBlock(finalizationVoting: FinalizationVoting): Block = d.createBlock(
-        version = Block.ProtoBlockVersion,
-        txs = Nil,
-        generator = committedGenerator1,
-        strictTime = true,
-        finalizationVoting = Some(finalizationVoting)
-      )
+      def createBlock(finalizationVoting: FinalizationVoting): Block =
+        d.createBlock(generator = committedGenerator1, strictTime = true, finalizationVoting = Some(finalizationVoting))
     }
   }
 }

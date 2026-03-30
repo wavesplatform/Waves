@@ -678,7 +678,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
       def checkHeight(height: Int, minerShare: Long, daoShare: Long, xtnShare: Long): Unit = {
         val invocation = TxHelpers.invoke(dapp.toAddress, Some("storeBlockInfo"), Seq(CONST_LONG(height)), invoker = invoker)
 
-        d.appendBlock(d.createBlock(Block.RewardBlockVersion, Seq(invocation), generator = miner))
+        d.appendBlock(d.createBlock(Seq(invocation), generator = miner, version = Block.RewardBlockVersion))
 
         d.blockchain.accountData(dapp.toAddress, invocation.id().toString + "_miner").value.value shouldBe minerShare
         d.blockchain.accountData(dapp.toAddress, invocation.id().toString + "_dao").value.value shouldBe daoShare

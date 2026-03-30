@@ -4,7 +4,7 @@ import cats.syntax.option.*
 import com.wavesplatform.TestValues.commitToGenerationFee
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.{GeneratorsApiRoute, RouteTimeout}
-import com.wavesplatform.block.{Block, BlockEndorsement, FinalizationVoting}
+import com.wavesplatform.block.{BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -114,7 +114,7 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with WithDomain {
       val minerGeneratingBalance2 = d.effBalance(miner.toAddress)
 
       (3 to 7).foreach { _ =>
-        d.appender.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, strictTime = true, generator = miner))
+        d.appender.appendBlock(d.createBlock(strictTime = true, generator = miner))
       }
       val minerGeneratingBalance6 = d.effBalance(miner.toAddress)
 
@@ -168,7 +168,7 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with WithDomain {
       val minerGeneratingBalance2 = d.effBalance(miner.toAddress)
 
       (3 to 7).foreach { _ =>
-        d.appender.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, strictTime = true, generator = miner))
+        d.appender.appendBlock(d.createBlock(strictTime = true, generator = miner))
       }
       val minerGeneratingBalance6 = d.effBalance(miner.toAddress)
       d.appendConflicting()
@@ -223,7 +223,7 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with WithDomain {
       val txIds1 = d.commit(generators*)
 
       (3 to 7).foreach { _ =>
-        d.appender.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, strictTime = true, generator = miner))
+        d.appender.appendBlock(d.createBlock(strictTime = true, generator = miner))
       }
       val minerGeneratingBalance = d.effBalance(miner.toAddress)
       d.appendConflicting()
@@ -272,13 +272,13 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with WithDomain {
       val minerGeneratingBalance2 = d.effBalance(miner.toAddress)
 
       (3 to 7).foreach { _ =>
-        d.appender.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, strictTime = true, generator = miner))
+        d.appender.appendBlock(d.createBlock(strictTime = true, generator = miner))
       }
       d.appendConflicting()
       val txIds2 = d.commit(validGenerator, miner)
 
       (8 to 9).foreach { _ =>
-        d.appender.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, strictTime = true, generator = miner))
+        d.appender.appendBlock(d.createBlock(strictTime = true, generator = miner))
       }
       val minerGeneratingBalance = d.effBalance(miner.toAddress)
 

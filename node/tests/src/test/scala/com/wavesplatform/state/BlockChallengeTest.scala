@@ -87,8 +87,8 @@ class BlockChallengeTest
     val challengingMiner = TxHelpers.signer(3)
     withDomain(settings, balances = AddrWithBalance.enoughBalances(sender)) { d =>
       d.appendBlock()
-      val txs                    = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
-      val invalidChallengedBlock = d.createBlock(Block.ProtoBlockVersion, txs, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+      val txs                         = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
+      val invalidChallengedBlock      = d.createBlock(txs, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
       val invalidHashChallengingBlock = d.createChallengingBlock(challengingMiner, invalidChallengedBlock, stateHash = Some(Some(invalidStateHash)))
       val missedHashChallengingBlock  = d.createChallengingBlock(challengingMiner, invalidChallengedBlock, stateHash = Some(None))
       val validChallengingBlock       = d.createChallengingBlock(challengingMiner, invalidChallengedBlock)
@@ -113,17 +113,16 @@ class BlockChallengeTest
         TxHelpers.transfer(TxHelpers.defaultSigner, challengingMinerAddr, 1000.waves + extraForDeposit),
         TxHelpers.transfer(TxHelpers.defaultSigner, challengedMiner.toAddress, 2000.waves + extraForDeposit)
       )
-      (1 to 998).foreach(_ => d.appendBlock(d.createBlock(Block.PlainBlockVersion, txs = Nil, strictTime = true)))
+      (1 to 998).foreach(_ => d.appendBlock(d.createBlock(strictTime = true)))
 
       val commitTxs               = Seq(challengedMiner, challengingMiner).map(acc => TxHelpers.commitToGeneration(Height(1002), acc))
       val commitTxsTotalFee       = commitTxs.map(_.fee.value).sum
       val commitTxsFeeToNextMiner = commitTxsTotalFee - CurrentBlockFeePart.apply(commitTxsTotalFee)
-      val blockWithTxs            = d.createBlock(Block.PlainBlockVersion, commitTxs, strictTime = true)
+      val blockWithTxs            = d.createBlock(commitTxs, strictTime = true)
       d.appendBlock(blockWithTxs)
       d.blockchain.height shouldBe 1001
 
-      val originalBlock =
-        d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+      val originalBlock = d.createBlock(strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
 
       val challengingGenBalanceBefore = d.blockchain.generatingBalance(challengingMinerAddr, Some(originalBlock.header.reference))
       val challengingEffBalanceBefore = d.blockchain.effectiveBalance(challengingMinerAddr, 0)
@@ -163,13 +162,7 @@ class BlockChallengeTest
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
       appendAndCheck(
-        d.createBlock(
-          Block.ProtoBlockVersion,
-          txs = Seq.empty,
-          strictTime = true,
-          stateHash = Some(Some(invalidStateHash)),
-          timestamp = Some(Long.MaxValue)
-        ),
+        d.createBlock(strictTime = true, stateHash = Some(Some(invalidStateHash)), timestamp = Some(Long.MaxValue)),
         d
       ) { block =>
         block.header.challengedHeader shouldBe defined
@@ -202,14 +195,7 @@ class BlockChallengeTest
       }
 
       appendAndCheck(
-        d.createBlock(
-          Block.ProtoBlockVersion,
-          Seq.empty,
-          strictTime = true,
-          generator = challengedMiner,
-          stateHash = Some(Some(invalidStateHash)),
-          timestamp = Some(Long.MaxValue)
-        ),
+        d.createBlock(strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)), timestamp = Some(Long.MaxValue)),
         d
       )(check)
 
@@ -217,14 +203,7 @@ class BlockChallengeTest
       (1 to 999).foreach(_ => d.appendBlock())
 
       appendAndCheck(
-        d.createBlock(
-          Block.ProtoBlockVersion,
-          Seq.empty,
-          strictTime = true,
-          generator = challengedMiner,
-          stateHash = Some(Some(invalidStateHash)),
-          timestamp = Some(Long.MaxValue)
-        ),
+        d.createBlock(strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)), timestamp = Some(Long.MaxValue)),
         d
       )(check)
     }
@@ -268,7 +247,7 @@ class BlockChallengeTest
         TxHelpers.commitToGeneration(Height(701), challengingMiner)
       )
 
-      (1 to 999).foreach(_ => d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = challengedMiner)))
+      (1 to 999).foreach(_ => d.appendBlock(d.createBlock(generator = challengedMiner)))
 
       val finalizedHeight = d.blockchain.finalizedHeight.value
       val finalizedId     = d.blockchain.blockId(finalizedHeight.toInt).value
@@ -281,8 +260,6 @@ class BlockChallengeTest
       )
 
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        txs = Nil,
         strictTime = true,
         generator = challengedMiner,
         stateHash = Some(Some(invalidStateHash)),
@@ -343,7 +320,7 @@ class BlockChallengeTest
         .explicitGet()
         .generating shouldBe ENOUGH_AMT - CommitToGenerationTransaction.DepositInWavelets - TestValues.commitToGenerationFee
 
-      (1 to 999).foreach(_ => d.appendBlock(d.createBlock(Block.ProtoBlockVersion, txs = Nil, generator = challengedMiner)))
+      (1 to 999).foreach(_ => d.appendBlock(d.createBlock(generator = challengedMiner)))
 
       val finalizedHeight = d.blockchain.finalizedHeight.value
       val finalizedId     = d.blockchain.blockId(finalizedHeight.toInt).value
@@ -355,14 +332,8 @@ class BlockChallengeTest
         endorsedId = d.lastBlockId
       )
 
-      val ts = d.nextBlockTime(challengedMiner)
-      val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        txs = Nil,
-        strictTime = true,
-        generator = challengedMiner,
-        timestamp = Some(ts)
-      )
+      val ts            = d.nextBlockTime(challengedMiner)
+      val originalBlock = d.createBlock(strictTime = true, generator = challengedMiner, timestamp = Some(ts))
 
       testTime.setTime(ts)
       d.appendBlock(originalBlock)
@@ -396,11 +367,9 @@ class BlockChallengeTest
     val challengingMiner = TxHelpers.signer(3)
     withDomain(DomainPresets.BlockRewardDistribution, balances = AddrWithBalance.enoughBalances(sender, challengedMiner, challengingMiner)) { d =>
       d.appendBlock()
-      val txs = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
-      val challengedBlock =
-        d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner)
-      val blockWithChallenge =
-        d.createChallengingBlock(challengingMiner, challengedBlock, strictTime = true)
+      val txs                = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
+      val challengedBlock    = d.createBlock(txs, strictTime = true, generator = challengedMiner)
+      val blockWithChallenge = d.createChallengingBlock(challengingMiner, challengedBlock, strictTime = true)
 
       testTime.setTime(blockWithChallenge.header.timestamp.max(challengedBlock.header.timestamp))
       createBlockAppender(d)(blockWithChallenge).runSyncUnsafe() shouldBe Left(
@@ -415,8 +384,6 @@ class BlockChallengeTest
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        Seq.empty,
         strictTime = true,
         stateHash = Some(Some(invalidStateHash)),
         timestamp = Some(Long.MaxValue)
@@ -432,7 +399,7 @@ class BlockChallengeTest
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val originalBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+      val originalBlock = d.createBlock(strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val invalidChallengingBlock = d.createChallengingBlock(
         challengingMiner,
         originalBlock,
@@ -457,13 +424,7 @@ class BlockChallengeTest
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        Seq.empty,
-        strictTime = true,
-        stateHash = Some(Some(invalidStateHash)),
-        timestamp = Some(Long.MaxValue)
-      )
+      val originalBlock = d.createBlock(strictTime = true, stateHash = Some(Some(invalidStateHash)), timestamp = Some(Long.MaxValue))
       appendAndCheck(originalBlock, d) { block =>
         block.header.reference shouldBe originalBlock.header.reference
       }
@@ -475,9 +436,8 @@ class BlockChallengeTest
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val grandParent = d.blockchain.blockHeader(d.blockchain.height - 2).map(_.id())
-      val originalBlock =
-        d.createBlock(Block.ProtoBlockVersion, Seq.empty, ref = grandParent, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+      val grandParent      = d.blockchain.blockHeader(d.blockchain.height - 2).map(_.id())
+      val originalBlock    = d.createBlock(ref = grandParent, strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock, stateHash = None, ref = grandParent)
 
       d.appendBlockE(challengingBlock) shouldBe Left(BlockAppendError("References incorrect or non-existing block", challengingBlock))
@@ -548,7 +508,6 @@ class BlockChallengeTest
       d.blockchain.height shouldBe 1001
 
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(TxHelpers.transfer(challengedMiner, TxHelpers.defaultAddress, amount = 1.waves)),
         strictTime = true,
         generator = challengedMiner,
@@ -572,13 +531,7 @@ class BlockChallengeTest
           .value shouldBe Some(effBalanceBefore)
       }
 
-      val newBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        Seq.empty,
-        strictTime = true,
-        generator = challengingMiner,
-        timestamp = Some(d.nextBlockTime(challengingMiner))
-      )
+      val newBlock = d.createBlock(strictTime = true, generator = challengingMiner, timestamp = Some(d.nextBlockTime(challengingMiner)))
       d.testTime.setTime(newBlock.header.timestamp + GetTimeStampAdjustment)
       d.blockAppender(newBlock).runSyncUnsafe() should beRight
       d.blockchain.height shouldBe 1003 // Same generation period as 1002
@@ -609,8 +562,8 @@ class BlockChallengeTest
 
       d.appendBlock(prevBlockTx)
 
-      val challengedBlockTxs = Seq(TxHelpers.transfer(sender), TxHelpers.transfer(sender))
-      val originalBlock      = d.createBlock(Block.ProtoBlockVersion, challengedBlockTxs, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+      val challengedBlockTxs      = Seq(TxHelpers.transfer(sender), TxHelpers.transfer(sender))
+      val originalBlock           = d.createBlock(challengedBlockTxs, strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val originalMinerBalance    = d.balance(originalBlock.header.generator.toAddress)
       val challengingMinerBalance = d.balance(challengingMiner.toAddress)
       val challengingBlock        = d.createChallengingBlock(challengingMiner, originalBlock)
@@ -683,13 +636,11 @@ class BlockChallengeTest
         EthTxGenerator.generateEthInvoke(recipientEth, dApp.toAddress, "foo", Seq.empty, Seq.empty)
       )
       val validOriginalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         challengedBlockTx +: recipientTxs,
         strictTime = true,
         generator = challengedMiner
       )
       val invalidOriginalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         challengedBlockTx +: recipientTxs,
         strictTime = true,
         generator = challengedMiner,
@@ -792,13 +743,11 @@ class BlockChallengeTest
       )
       val txs = exchangeTx +: invokeTxs
       val validOriginalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         txs,
         strictTime = true,
         generator = challengedMiner
       )
       val invalidOriginalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         txs,
         strictTime = true,
         generator = challengedMiner,
@@ -853,7 +802,6 @@ class BlockChallengeTest
 
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
         strictTime = true,
         generator = challengedMiner,
@@ -885,7 +833,6 @@ class BlockChallengeTest
 
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 10001.waves)
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
         strictTime = true,
         generator = challengedMiner,
@@ -918,7 +865,6 @@ class BlockChallengeTest
 
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
         strictTime = true,
         generator = challengedMiner,
@@ -990,7 +936,6 @@ class BlockChallengeTest
 
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
         strictTime = true,
         generator = challengedMiner,
@@ -1080,7 +1025,6 @@ class BlockChallengeTest
 
       val challengedBlockTx = invoke()
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
         strictTime = true,
         generator = challengedMiner,
@@ -1157,12 +1101,7 @@ class BlockChallengeTest
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        Seq.empty,
-        strictTime = true,
-        stateHash = Some(Some(invalidStateHash))
-      )
+      val originalBlock    = d.createBlock(strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
 
       d.appendBlockE(challengingBlock) should beRight
@@ -1205,13 +1144,7 @@ class BlockChallengeTest
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        Seq.empty,
-        strictTime = true,
-        stateHash = Some(Some(invalidStateHash)),
-        timestamp = Some(Long.MaxValue)
-      )
+      val originalBlock = d.createBlock(strictTime = true, stateHash = Some(Some(invalidStateHash)), timestamp = Some(Long.MaxValue))
 
       appendAndCheck(originalBlock, d) { block =>
         block.header.challengedHeader shouldBe defined
@@ -1244,13 +1177,7 @@ class BlockChallengeTest
 
       d.blockchain.isFeatureActivated(BlockchainFeatures.LightNode) shouldBe false
 
-      val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        Seq.empty,
-        strictTime = true,
-        stateHash = Some(Some(invalidStateHash)),
-        timestamp = Some(Long.MaxValue)
-      )
+      val originalBlock = d.createBlock(strictTime = true, stateHash = Some(Some(invalidStateHash)), timestamp = Some(Long.MaxValue))
 
       appendAndCheck(originalBlock, d) { block =>
         block.header.challengedHeader shouldBe defined
@@ -1340,12 +1267,7 @@ class BlockChallengeTest
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        Seq.empty,
-        strictTime = true,
-        stateHash = Some(Some(invalidStateHash))
-      )
+      val originalBlock    = d.createBlock(strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock, strictTime = true)
 
       val extensionAppender =
@@ -1384,7 +1306,6 @@ class BlockChallengeTest
       (1 to 999).foreach(_ => d.appendBlock())
 
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(TxHelpers.transfer(sender, challengingMiner.toAddress, 1.waves)),
         strictTime = true
       )
@@ -1408,12 +1329,7 @@ class BlockChallengeTest
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        Seq.empty,
-        strictTime = true,
-        stateHash = Some(Some(invalidStateHash))
-      )
+      val originalBlock    = d.createBlock(strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
       val blockHeight      = 1002
 
@@ -1476,7 +1392,6 @@ class BlockChallengeTest
 
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
         strictTime = true,
         generator = challengedMiner,
@@ -1524,7 +1439,6 @@ class BlockChallengeTest
 
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
         strictTime = true,
         generator = challengedMiner,
@@ -1611,7 +1525,6 @@ class BlockChallengeTest
 
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
         strictTime = true,
         generator = challengedMiner,
@@ -1698,13 +1611,7 @@ class BlockChallengeTest
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
-        Seq.empty,
-        strictTime = true,
-        generator = challengedMiner,
-        stateHash = Some(Some(invalidStateHash))
-      )
+      val originalBlock    = d.createBlock(strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
 
       val route = new AddressApiRoute(
@@ -1787,7 +1694,6 @@ class BlockChallengeTest
       val txs = Seq(TxHelpers.transfer(amount = 1.waves), TxHelpers.transfer(amount = 2.waves))
       val invalidBlock =
         d.createBlock(
-          Block.ProtoBlockVersion,
           txs,
           strictTime = true,
           generator = challengedMiner,
@@ -1865,7 +1771,7 @@ class BlockChallengeTest
 
     withDomain(settings, balances = AddrWithBalance.enoughBalances(defaultSigner)) { d =>
       val challengingMiner      = d.wallet.generateNewAccount().get
-      val originalBlock         = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+      val originalBlock         = d.createBlock(strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val validChallengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
 
       validChallengingBlock.signatureValid() shouldBe true
@@ -1903,10 +1809,9 @@ class BlockChallengeTest
       (1 to 999).foreach(_ => d.appendBlock())
 
       val txs       = Seq(TxHelpers.transfer(sender, TxHelpers.defaultAddress, amount = 1.waves))
-      val bestBlock = d.createBlock(Block.ProtoBlockVersion, txs, generator = bestBlockSender)
+      val bestBlock = d.createBlock(txs, generator = bestBlockSender)
       val originalBlock =
         d.createBlock(
-          Block.ProtoBlockVersion,
           txs,
           generator = challengedMiner,
           stateHash = Some(Some(invalidStateHash))
@@ -1914,7 +1819,7 @@ class BlockChallengeTest
 
       val betterChallengingBlock = d.createChallengingBlock(betterChallengingMiner, originalBlock)
       val worseChallengingBlock  = d.createChallengingBlock(challengingMiner, originalBlock)
-      val currentBlock           = d.createBlock(Block.ProtoBlockVersion, txs, generator = currentBlockSender)
+      val currentBlock           = d.createBlock(txs, generator = currentBlockSender)
 
       bestBlock.header.timestamp < betterChallengingBlock.header.timestamp shouldBe true
       betterChallengingBlock.header.timestamp < worseChallengingBlock.header.timestamp shouldBe true
@@ -1971,7 +1876,6 @@ class BlockChallengeTest
       val txs = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
       val originalBlock =
         d.createBlock(
-          Block.ProtoBlockVersion,
           txs,
           strictTime = true,
           generator = challengedMiner,
@@ -1994,7 +1898,7 @@ class BlockChallengeTest
         generator: KeyPair,
         appender: Block => Task[Either[ValidationError, BlockApplyResult]]
     ): Either[ValidationError, BlockApplyResult] = {
-      val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = generator)
+      val block = d.createBlock(strictTime = true, generator = generator)
       testTime.setTime(block.header.timestamp)
       appender(block).runSyncUnsafe()
     }
@@ -2009,10 +1913,9 @@ class BlockChallengeTest
         TxHelpers.transfer(sender, challengedMiner.toAddress, challengedMinerBalance)
       )
       (1 to 999).foreach(_ => d.appendBlock())
-      val transferAmount = 1.waves
-      val txs            = Seq(TxHelpers.transfer(sender, challengedMiner.toAddress, transferAmount))
-      val originalBlock =
-        d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+      val transferAmount   = 1.waves
+      val txs              = Seq(TxHelpers.transfer(sender, challengedMiner.toAddress, transferAmount))
+      val originalBlock    = d.createBlock(txs, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
 
       val appender = createBlockAppender(d)
@@ -2050,15 +1953,13 @@ class BlockChallengeTest
         TxHelpers.transfer(sender, TxHelpers.defaultAddress, amount = 1.waves),
         TxHelpers.transfer(sender, TxHelpers.defaultAddress, amount = 2.waves)
       )
-      val betterBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = betterBlockSender)
-      val originalBlock =
-        d.createBlock(
-          Block.ProtoBlockVersion,
-          txs,
-          strictTime = true,
-          generator = challengedMiner,
-          stateHash = Some(Some(invalidStateHash))
-        )
+      val betterBlock = d.createBlock(strictTime = true, generator = betterBlockSender)
+      val originalBlock = d.createBlock(
+        txs,
+        strictTime = true,
+        generator = challengedMiner,
+        stateHash = Some(Some(invalidStateHash))
+      )
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock, strictTime = true, timestamp = Some(Long.MaxValue))
 
       d.appendBlockE(challengingBlock) should beRight
@@ -2151,7 +2052,6 @@ class BlockChallengeTest
     (1 to 5).foreach(_ => d.appendBlock())
 
     val originalBlock = d.createBlock(
-      Block.ProtoBlockVersion,
       txs,
       strictTime = true,
       generator = challengedMiner,
@@ -2168,7 +2068,6 @@ class BlockChallengeTest
     (1 to 5).foreach(_ => d.appendBlock())
 
     val originalBlock = d.createBlock(
-      Block.ProtoBlockVersion,
       txs,
       strictTime = true,
       generator = challengedMiner,
@@ -2187,7 +2086,6 @@ class BlockChallengeTest
     d.blockchain.isFeatureActivated(BlockchainFeatures.LightNode) shouldBe false
 
     val originalBlock = d.createBlock(
-      Block.ProtoBlockVersion,
       txs,
       strictTime = true,
       generator = challengedMiner,

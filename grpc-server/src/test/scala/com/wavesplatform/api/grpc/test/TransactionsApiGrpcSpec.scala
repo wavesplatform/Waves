@@ -2,8 +2,14 @@ package com.wavesplatform.api.grpc.test
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionResponse, TransactionSnapshotResponse, TransactionSnapshotsRequest, TransactionsApiGrpcImpl, TransactionsRequest}
-import com.wavesplatform.block.Block
+import com.wavesplatform.api.grpc.{
+  ApplicationStatus,
+  TransactionResponse,
+  TransactionSnapshotResponse,
+  TransactionSnapshotsRequest,
+  TransactionsApiGrpcImpl,
+  TransactionsRequest
+}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.DigestLength
@@ -13,7 +19,7 @@ import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import com.wavesplatform.protobuf.{PBSnapshots, toByteString}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{StateSnapshot, TxMeta, Height}
+import com.wavesplatform.state.{Height, StateSnapshot, TxMeta}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
@@ -229,7 +235,6 @@ class TransactionsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffM
       val resenderTxs = Seq(TxHelpers.transfer(resender, recipient.toAddress, 1.waves), TxHelpers.transfer(resender, recipient.toAddress, 2.waves))
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, resender.toAddress, 1001.waves)
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         challengedBlockTx +: resenderTxs,
         strictTime = true,
         generator = challengedMiner,

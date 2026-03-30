@@ -269,7 +269,6 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
 
       val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(TxHelpers.transfer(sender)),
         strictTime = true,
         stateHash = Some(Some(invalidStateHash))
@@ -323,7 +322,6 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
 
       val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock = d.createBlock(
-        Block.ProtoBlockVersion,
         Seq(TxHelpers.transfer(sender)),
         strictTime = true,
         stateHash = Some(Some(invalidStateHash))

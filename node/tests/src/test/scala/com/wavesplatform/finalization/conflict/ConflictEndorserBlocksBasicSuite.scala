@@ -1,7 +1,6 @@
 package com.wavesplatform.finalization.conflict
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.finalization.BaseFinalizationSpec
@@ -161,14 +160,12 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
 
       log.debug(s"Append block 2 with commitments")
       val txs                   = generators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
-      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = validGenerator, strictTime = true)
+      val block2WithCommitments = d.createBlock(txs, generator = validGenerator, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
       after2WithCommitmentsCheck(data)
 
       log.debug(s"Append block 3 with votes")
       val block3WithVotes = d.createBlock(
-        version = Block.ProtoBlockVersion,
-        txs = Nil,
         generator = validGenerator,
         strictTime = true,
         finalizationVoting = Some(mkFinalizationVoting().withConflict(conflictGenerator, GeneratorIndex(1), block2WithCommitments.id()))
@@ -177,12 +174,12 @@ class ConflictEndorserBlocksBasicSuite extends BaseFinalizationSpec {
       after3WithNewPeriodAndEndorsementsCheck(data)
 
       log.debug("Append block 4")
-      val block4 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = validGenerator, strictTime = true)
+      val block4 = d.createBlock(generator = validGenerator, strictTime = true)
       d.appender.appendBlock(block4)
       after4WithPunishmentCheck(data)
 
       log.debug("Append block 5 of new period, apply punishment")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = validGenerator, strictTime = true))
+      d.appender.appendBlock(d.createBlock(generator = validGenerator, strictTime = true))
       after5WithNewPeriodCheck(data)
 
       log.debug("Rollback to 4")

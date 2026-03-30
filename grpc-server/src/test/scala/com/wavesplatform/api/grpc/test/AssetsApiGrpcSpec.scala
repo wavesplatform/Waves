@@ -3,7 +3,6 @@ package com.wavesplatform.api.grpc.test
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.{AssetInfoResponse, AssetsApiGrpcImpl, NFTRequest, NFTResponse}
-import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -18,7 +17,7 @@ import org.scalatest.BeforeAndAfterAll
 
 class AssetsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatchers with WithDomain with GrpcApiHelpers {
   private given scheduler: Scheduler = Schedulers.singleThread("grpc", executionModel = SynchronousExecution)
-  val sender: KeyPair = TxHelpers.signer(1)
+  val sender: KeyPair                = TxHelpers.signer(1)
 
   "GetNFTList should work" in withDomain(RideV6.addFeatures(BlockchainFeatures.ReduceNFTFee), AddrWithBalance.enoughBalances(sender)) { d =>
     val grpcApi = getGrpcApi(d)
@@ -75,7 +74,7 @@ class AssetsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
     check()
 
     // liquid afterId
-    d.appendBlock(d.createBlock(ProtoBlockVersion, nftIssues.drop(afterId + 1), Some(mb1)))
+    d.appendBlock(d.createBlock(nftIssues.drop(afterId + 1), Some(mb1)))
     d.rocksDBWriter.containsTransaction(nftIssues(afterId)) shouldBe true
     d.rocksDBWriter.containsTransaction(nftIssues(afterId + 1)) shouldBe false
     check()

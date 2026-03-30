@@ -218,7 +218,7 @@ inScope(Global)(
   )
 )
 
-commands += Command.command("packageAll"){ state =>
+commands += Command.command("packageAll") { state =>
   "node / assembly" :: "ride-runner / assembly" :: "buildDebPackages" :: "buildTarballsForDocker" :: state
 }
 

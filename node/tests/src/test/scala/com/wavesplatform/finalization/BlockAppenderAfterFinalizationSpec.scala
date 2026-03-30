@@ -1,7 +1,6 @@
 package com.wavesplatform.finalization
 
 import com.wavesplatform.TestValues
-import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
@@ -38,7 +37,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       withDomain(defaultSettings, AddrWithBalance.enoughBalances(generator)) { d =>
         d.wallet.generateNewAccounts(1)
 
-        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = generator, strictTime = true)
+        val block = d.createBlock(generator = generator, strictTime = true)
         d.appender.appendBlock(block)
       }
     }
@@ -46,7 +45,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     "if committed" in new BaseTest {
       override def continue(d: Domain): Unit = {
         log.debug(s"Append block 3 of committed generator")
-        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator1, strictTime = true)
+        val block = d.createBlock(generator = committedGenerator1, strictTime = true)
         d.appender.appendBlock(block)
       }
     }.run()
@@ -56,7 +55,6 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         override def continue(d: Domain): Unit = {
           log.debug(s"Append block 3 with spending")
           val block3WithSpending = d.createBlock(
-            version = Block.ProtoBlockVersion,
             txs = Seq(committedGenerator1, committedGenerator2).map { kp =>
               TxHelpers.transfer(kp, notCommittedGeneratorAddr, amount = d.balance(kp.toAddress) - TestValues.fee - DepositInWavelets)
             },
@@ -66,7 +64,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
           d.appender.appendBlock(block3WithSpending)
 
           log.debug(s"Append block 4 of not committed generator")
-          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
+          val block = d.createBlock(generator = notCommittedGenerator, strictTime = true)
           d.appender.appendBlock(block)
         }
       }.run()
@@ -75,7 +73,6 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         override def continue(d: Domain): Unit = {
           log.debug(s"Append block 3 with vote and spending")
           val block3 = d.createBlock(
-            version = Block.ProtoBlockVersion,
             txs = Seq(
               TxHelpers.transfer(
                 committedGenerator1,
@@ -90,7 +87,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
           d.appender.appendBlock(block3)
 
           log.debug(s"Append block 4 of not committed generator")
-          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
+          val block = d.createBlock(generator = notCommittedGenerator, strictTime = true)
           d.appender.appendBlock(block)
         }
       }.run()
@@ -100,8 +97,6 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       override def continue(d: Domain): Unit = {
         log.debug(s"Append block 3 with votes")
         val block3WithVotes = d.createBlock(
-          version = Block.ProtoBlockVersion,
-          txs = Nil,
           generator = committedGenerator2,
           strictTime = true,
           finalizationVoting = Some(mkFinalizationVoting().withConflict(committedGenerator1, committedGenerator1Idx, d.lastBlock.id()))
@@ -110,12 +105,12 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
         log.debug(s"Append empty blocks")
         (4 to 5).foreach { _ =>
-          val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator2, strictTime = true)
+          val block = d.createBlock(generator = committedGenerator2, strictTime = true)
           d.appender.appendBlock(block)
         }
 
         log.debug(s"Append new period block")
-        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator1, strictTime = true)
+        val block = d.createBlock(generator = committedGenerator1, strictTime = true)
         d.appender.appendBlock(block)
       }
     }.run()
@@ -130,13 +125,13 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         ) { d =>
           log.debug(s"Append block 2 with commitments")
           val txs = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x))
-          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = committedGenerator1, strictTime = true))
+          d.appender.appendBlock(d.createBlock(txs, generator = committedGenerator1, strictTime = true))
 
           log.debug(s"Append block 3")
-          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+          d.appender.appendBlock(d.createBlock(generator = committedGenerator1, strictTime = true))
 
           log.debug(s"Append block 4 of new epoch with conflicting endorsement in the last microblock")
-          val block4 = d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true)
+          val block4 = d.createBlock(generator = committedGenerator1, strictTime = true)
           d.appender.appendBlock(block4)
           d.appendMicroBlock(
             d.createMicroBlock(
@@ -147,7 +142,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
           log.debug(s"Append block 5 of conflicting generator")
           d.appender.appendBlock(
-            d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(block4.id()), generator = committedGenerator2, strictTime = true)
+            d.createBlock(ref = Some(block4.id()), generator = committedGenerator2, strictTime = true)
           )
 
           withClue("Not finalized: ") {
@@ -166,13 +161,13 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         ) { d =>
           log.debug(s"Append block 2 with commitments")
           val txs = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x))
-          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = committedGenerator1, strictTime = true))
+          d.appender.appendBlock(d.createBlock(txs, generator = committedGenerator1, strictTime = true))
 
           log.debug(s"Append block 3")
-          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+          d.appender.appendBlock(d.createBlock(generator = committedGenerator1, strictTime = true))
 
           log.debug(s"Append block 4 of new epoch with conflicting endorsement in the last microblock")
-          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+          d.appender.appendBlock(d.createBlock(generator = committedGenerator1, strictTime = true))
           val block4 = d.appendMicroBlock(d.createMicroBlock(signer = Some(committedGenerator1))(TxHelpers.transfer(committedGenerator1)))
           d.appendMicroBlock(
             d.createMicroBlock(
@@ -183,7 +178,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
           log.debug(s"Append block 5 of conflicting generator")
           d.appender.appendBlock(
-            d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(block4), generator = committedGenerator2, strictTime = true)
+            d.createBlock(ref = Some(block4), generator = committedGenerator2, strictTime = true)
           )
 
           withClue("Not finalized: ") {
@@ -202,13 +197,13 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         ) { d =>
           log.debug(s"Append block 2 with commitments")
           val txs = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(4), x))
-          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = committedGenerator1, strictTime = true))
+          d.appender.appendBlock(d.createBlock(txs, generator = committedGenerator1, strictTime = true))
 
           log.debug(s"Append block 3")
-          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+          d.appender.appendBlock(d.createBlock(generator = committedGenerator1, strictTime = true))
 
           log.debug(s"Append block 4 of new epoch with conflicting endorsement in the last microblock")
-          d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+          d.appender.appendBlock(d.createBlock(generator = committedGenerator1, strictTime = true))
           val parentBlockId = d.appendMicroBlock(d.createMicroBlock(signer = Some(committedGenerator1))(TxHelpers.transfer(committedGenerator1)))
           d.appendMicroBlock(
             d.createMicroBlock( // Finalization reached
@@ -219,7 +214,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
           log.debug(s"Append block 5 of valid generator")
           d.appender.appendBlock( // Finalization reset
-            d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(parentBlockId), generator = committedGenerator1, strictTime = true)
+            d.createBlock(ref = Some(parentBlockId), generator = committedGenerator1, strictTime = true)
           )
 
           withClue("Not finalized: ") {
@@ -248,7 +243,6 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         val leasingTxn = TxHelpers.lease(committedGenerator1, committedGenerator2Addr, amount = 20_000.waves)
         d.appender.appendBlock(
           d.createBlock(
-            version = Block.ProtoBlockVersion,
             txs = Seq(leasingTxn),
             generator = committedGenerator1,
             strictTime = true
@@ -257,15 +251,10 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
         log.debug("Appending [3; 51] blocks")
         (3 to 50).foreach { _ =>
-          d.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+          d.appendBlock(d.createBlock(generator = committedGenerator1, strictTime = true))
         }
         d.appender.appendBlock(
-          d.createBlock(
-            version = Block.ProtoBlockVersion,
-            txs = Nil,
-            generator = committedGenerator1,
-            strictTime = true
-          )
+          d.createBlock(generator = committedGenerator1, strictTime = true)
         )
 
         log.debug("Commit to generation")
@@ -281,7 +270,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
         log.debug(s"Append block 52 referencing keyblock")
         d.appender.appendBlock(
-          d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, ref = Some(block51Id), generator = committedGenerator2, strictTime = true)
+          d.createBlock(ref = Some(block51Id), generator = committedGenerator2, strictTime = true)
         )
       }
     }
@@ -291,7 +280,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     "if not committed" in new BaseTest {
       override def continue(d: Domain): Unit = {
         log.debug(s"Append block 3 of not committed generator")
-        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = notCommittedGenerator, strictTime = true)
+        val block = d.createBlock(generator = notCommittedGenerator, strictTime = true)
         d.appender.appendBlock(block, requireAppended = false)
 
         d.blockchain.isLastBlockId(block.id()) shouldBe false
@@ -308,7 +297,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       ) { d =>
         log.debug(s"Append block 2 with commitments")
         val txs    = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
-        val block2 = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = notCommittedGenerator, strictTime = true)
+        val block2 = d.createBlock(txs, generator = notCommittedGenerator, strictTime = true)
         d.appender.appendBlock(block2)
         d.appendMicroBlock(
           d.createMicroBlock(
@@ -318,7 +307,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
         log.debug(s"Append block 3 of not committed generator")
         val newBlock =
-          d.createBlock(Block.ProtoBlockVersion, txs = Nil, ref = Some(block2.id()), generator = notCommittedGenerator, strictTime = true)
+          d.createBlock(ref = Some(block2.id()), generator = notCommittedGenerator, strictTime = true)
         d.appender.appendBlock(newBlock, requireAppended = false)
         d.blockchain.isLastBlockId(newBlock.id()) shouldBe false
       }
@@ -328,8 +317,6 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
       override def continue(d: Domain): Unit = {
         log.debug(s"Append block 3 with votes")
         val block3WithVotes = d.createBlock(
-          version = Block.ProtoBlockVersion,
-          txs = Nil,
           generator = committedGenerator2,
           strictTime = true,
           finalizationVoting = Some(mkFinalizationVoting().withConflict(committedGenerator1, committedGenerator1Idx, d.lastBlock.id()))
@@ -337,7 +324,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
         d.appender.appendBlock(block3WithVotes)
 
         log.debug(s"Append block 4")
-        val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = committedGenerator1, strictTime = true)
+        val block = d.createBlock(generator = committedGenerator1, strictTime = true)
         d.appender.appendBlock(block, requireAppended = false)
 
         d.blockchain.isLastBlockId(block.id()) shouldBe false
@@ -350,14 +337,13 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     ) { d =>
       log.debug(s"Append block 2 with commitments")
       val block2 = d.createBlock(
-        version = Block.ProtoBlockVersion,
-        txs = Seq(TxHelpers.commitToGeneration(Height(3), committedGenerator1)),
+        Seq(TxHelpers.commitToGeneration(Height(3), committedGenerator1)),
         generator = committedGenerator1
       )
       d.appendBlock(block2)
 
       log.debug(s"Append key block 3")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+      d.appender.appendBlock(d.createBlock(generator = committedGenerator1, strictTime = true))
 
       log.debug(s"Append micro block with spending")
       d.appendMicroBlock(
@@ -373,7 +359,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
       log.debug("Append block 4")
       d.appender.appendBlockWithoutFallback(
-        d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true)
+        d.createBlock(generator = committedGenerator1, strictTime = true)
       ) should produce("less than required for generation")
     }
 
@@ -383,14 +369,13 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     ) { d =>
       log.debug(s"Append block 2 with commitments")
       val block2 = d.createBlock(
-        version = Block.ProtoBlockVersion,
-        txs = Seq(TxHelpers.commitToGeneration(Height(3), committedGenerator1)),
+        Seq(TxHelpers.commitToGeneration(Height(3), committedGenerator1)),
         generator = committedGenerator1
       )
       d.appendBlock(block2)
 
       log.debug(s"Append key block 3")
-      d.appender.appendBlock(d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, generator = committedGenerator1, strictTime = true))
+      d.appender.appendBlock(d.createBlock(generator = committedGenerator1, strictTime = true))
       val keyBlockId = d.lastBlockId
 
       log.debug(s"Append micro block with spending")
@@ -407,7 +392,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
       log.debug("Append block 4")
       d.appender.appendBlockWithoutFallback(
-        d.createBlock(version = Block.ProtoBlockVersion, txs = Nil, ref = Some(keyBlockId), generator = notCommittedGenerator, strictTime = true)
+        d.createBlock(ref = Some(keyBlockId), generator = notCommittedGenerator, strictTime = true)
       ) should produce("is not allowed to generate a block")
     }
   }
@@ -421,7 +406,7 @@ class BlockAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     def run(): Unit = withDomain(defaultSettings, AddrWithBalance.enoughBalances(allGenerators*)) { d =>
       log.debug(s"Append block 2 with commitments")
       val txs                   = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
-      val block2WithCommitments = d.createBlock(version = Block.ProtoBlockVersion, txs = txs, generator = notCommittedGenerator, strictTime = true)
+      val block2WithCommitments = d.createBlock(txs, generator = notCommittedGenerator, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
 
       continue(d)

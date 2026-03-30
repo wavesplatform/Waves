@@ -56,7 +56,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
   }
 
   it should "generate valid empty block of version 4 after block of version 3" in {
-    withEnv(Seq((ts, reference, _) => TestBlock.create(time = ts, ref = reference, txs = Seq.empty, version = Block.NgBlockVersion).block)) {
+    withEnv(Seq((ts, reference, _) => TestBlock.create(time = ts, ref = reference, txs = Nil, version = Block.NgBlockVersion).block)) {
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
         val oldBalance    = blockchain.balance(account.toAddress)
