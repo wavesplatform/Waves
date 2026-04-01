@@ -63,7 +63,7 @@ class MatcherBlockchainTest extends PropSpec, WithDomain {
       override def wavesBalances(addresses: Seq[Address]): Map[Address, Long]                               = ???
       override def effectiveBalanceBanHeights(address: Address): Seq[Int]                                   = ???
       override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset]                    = ???
-      override def lastStateHash(refId: Option[ByteStr]): BlockId                                           = ???
+      override def lastStateHash(liquidBlockId: Option[ByteStr]): BlockId                                   = ???
       override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)]           = ???
       override def conflictGenerators(at: GenerationPeriod): ConflictGenerators                             = ???
     }

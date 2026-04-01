@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import cats.syntax.option.*
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.{Asset, CommitToGenerationTransaction, ERC2
 case class SnapshotBlockchain(
     inner: Blockchain,
     maybeSnapshot: Option[StateSnapshot] = None,
-    blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
+    blockMeta: Option[(signedHeader: SignedBlockHeader, hitSource: ByteStr)] = None,
     carry: Long = 0,
     reward: Option[Long] = None,
     stateHash: Option[ByteStr] = None,
@@ -55,7 +55,7 @@ case class SnapshotBlockchain(
   }
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = {
-    val maybeLastBlockBan = blockMeta.flatMap(_._1.header.challengedHeader).map(_.generator.toAddress) match {
+    val maybeLastBlockBan = blockMeta.flatMap(_.signedHeader.header.challengedHeader).map(_.generator.toAddress) match {
       case Some(generator) if address == generator => Seq(height)
       case _                                       => Seq.empty
     }
@@ -201,7 +201,7 @@ case class SnapshotBlockchain(
 
   override def carryFee(refId: Option[ByteStr]): Long = carry
 
-  override def score: BigInt = blockMeta.fold(BigInt(0))(_._1.header.score()) + inner.score
+  override def score: BigInt = blockMeta.fold(BigInt(0))(_.signedHeader.header.score()) + inner.score
 
   override def blockHeader(height: Int): Option[SignedBlockHeader] =
     blockMeta match {
@@ -209,7 +209,8 @@ case class SnapshotBlockchain(
       case _                                          => inner.blockHeader(height)
     }
 
-  override def heightOf(blockId: ByteStr): Option[Int] = blockMeta.filter(_._1.id() == blockId).map(_ => height) orElse inner.heightOf(blockId)
+  override def heightOf(blockId: ByteStr): Option[Int] =
+    blockMeta.filter(_.signedHeader.id() == blockId).map(_ => height) orElse inner.heightOf(blockId)
 
   /** Features related */
   override def approvedFeatures: Map[Short, Height] = inner.approvedFeatures
@@ -241,7 +242,7 @@ case class SnapshotBlockchain(
 
   override def hitSource(height: Int): Option[ByteStr] =
     blockMeta
-      .collect { case (_, hitSource) if this.height == height => hitSource }
+      .collect { case x if this.height == height => x.hitSource }
       .orElse(inner.hitSource(height))
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
@@ -249,8 +250,8 @@ case class SnapshotBlockchain(
       .resolveERC20Address(address)
       .orElse(snapshot.erc20Addresses.get(address))
 
-  override def lastStateHash(refId: Option[ByteStr]): BlockId =
-    stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
+  override def lastStateHash(liquidBlockId: Option[ByteStr]): BlockId =
+    stateHash.orElse(blockMeta.flatMap(_.signedHeader.header.stateHash)).getOrElse(inner.lastStateHash(liquidBlockId))
 
   override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = {
     val base   = inner.committedGenerators(at)
@@ -265,9 +266,9 @@ case class SnapshotBlockchain(
       else if (at > currPeriod) ConflictGenerators.empty
       else {
         val extraConflictIndexes = for {
-          (blockMeta, _) <- blockMeta.toSeq
-          v              <- blockMeta.header.finalizationVoting.toSeq
-          c              <- v.conflict
+          blockMeta <- blockMeta.toSeq
+          v         <- blockMeta.signedHeader.header.finalizationVoting.toSeq
+          c         <- v.conflict
         } yield c.endorserIndex
 
         base.appendAll(Height(height), extraConflictIndexes*)

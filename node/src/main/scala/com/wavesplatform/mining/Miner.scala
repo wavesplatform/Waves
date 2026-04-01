@@ -320,7 +320,7 @@ class MinerImpl(
         val waitBlockAppendedTask = waitBlockId match {
           case Some(blockId) =>
             def waitUntilBlockAppended(block: BlockId): Task[Unit] =
-              if (blockchainUpdater.contains(block)) Task.unit
+              if (blockchainUpdater.lastBlockId.contains(block)) Task.unit
               else Task.defer(waitUntilBlockAppended(block)).delayExecution(1 seconds)
 
             waitUntilBlockAppended(blockId)
@@ -328,7 +328,7 @@ class MinerImpl(
           case None => Task.unit
         }
 
-        def appendTask(block: Block, totalConstraint: MiningConstraint) = // TODO: accept blockAppender instead all these dependencies?
+        def appendTask(block: Block, totalConstraint: MiningConstraint) =
           BlockAppender(blockchainUpdater, timeService, utx, pos, blockEndorser, appenderScheduler)(block, None).flatMap {
             case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
               generateBlockTask(account, None)

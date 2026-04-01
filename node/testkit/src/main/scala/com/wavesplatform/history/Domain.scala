@@ -462,9 +462,8 @@ case class Domain(
             )
         else Right(NxtLikeConsensusBlockData(60, generationSignature))
       resultBt =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight)) {
-          consensus.baseTarget
-        } else if (parentHeight % 2 != 0) parent.baseTarget
+        if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight)) consensus.baseTarget
+        else if (parentHeight % 2 != 0) parent.baseTarget
         else consensus.baseTarget.max(PoSCalculator.MinBaseTarget)
       blockWithoutStateHash <- Block
         .buildAndSign(

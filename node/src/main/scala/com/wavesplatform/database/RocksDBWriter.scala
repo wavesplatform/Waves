@@ -7,7 +7,7 @@ import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
 import com.google.common.util.concurrent.MoreExecutors
 import com.typesafe.scalalogging.Logger
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockSnapshot
@@ -1143,7 +1143,7 @@ class RocksDBWriter(
 
           rw.delete(Keys.generatorBalances(currentHeight, rdb.apiHandle))
           currentPeriod.foreach { currentPeriod =>
-            rw.delete(Keys.conflictGenerators(currentPeriod, currentHeight)) // TODO: test
+            rw.delete(Keys.conflictGenerators(currentPeriod, currentHeight))
 
             val nextPeriod = currentPeriod.next
             rw.delete(Keys.committedGenerators(nextPeriod, currentHeight))
@@ -1643,7 +1643,7 @@ class RocksDBWriter(
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))
 
-  override def lastStateHash(refId: Option[ByteStr]): ByteStr =
+  override def lastStateHash(liquidBlockId: Option[ByteStr]): ByteStr =
     snapshotStateHash(height)
 
   def snapshotStateHash(height: Int): ByteStr =
