@@ -8,20 +8,10 @@ import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import play.api.libs.json.{Format, Json}
 
 object SponsorFeeRequest {
-  implicit val unsignedSponsorRequestFormat: Format[SponsorFeeRequest]     = Json.format
-  implicit val signedSponsorRequestFormat: Format[SignedSponsorFeeRequest] = Json.format
+  given Format[SponsorFeeRequest] = Json.format
 }
 
 case class SponsorFeeRequest(
-    version: Option[Byte],
-    sender: String,
-    assetId: String,
-    minSponsoredAssetFee: Option[Long],
-    fee: Long,
-    timestamp: Option[Long] = None
-)
-
-case class SignedSponsorFeeRequest(
     version: Byte = 1.toByte,
     senderPublicKey: String,
     assetId: IssuedAsset,

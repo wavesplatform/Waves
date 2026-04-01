@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.transactions
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, Alias}
 import com.wavesplatform.api.http.ApiError.WrongJson
-import com.wavesplatform.api.http.requests.SignedMassTransferRequest
+import com.wavesplatform.api.http.requests.MassTransferRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
@@ -142,7 +142,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
           fee: Long = calcMassTransferFee(1),
           timestamp: Long = System.currentTimeMillis,
           attachment: Array[Byte] = Array.emptyByteArray
-      ): (SignedMassTransferRequest, Option[ByteStr]) = {
+      ): (MassTransferRequest, Option[ByteStr]) = {
         val txEi = for {
           parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
           tx <- MassTransferTransaction.create(
@@ -159,7 +159,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
 
         val (signature, idOpt) = txEi.fold(_ => (Proofs(List(fakeSignature)), None), tx => (tx.proofs, Some(tx.id())))
 
-        val req = SignedMassTransferRequest(
+        val req = MassTransferRequest(
           Some(TxVersion.V1),
           sender.publicKey.toString,
           None,
@@ -173,7 +173,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
         (req, idOpt)
       }
 
-      def negativeTransferAmountRequest: (SignedMassTransferRequest, Option[ByteStr]) = {
+      def negativeTransferAmountRequest: (MassTransferRequest, Option[ByteStr]) = {
         val recipient = secondKeyPair
 
         val transfers  = List(Transfer(recipient.toAddress.toString, -1))
@@ -192,7 +192,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
           TxHelpers.massTransferBodyBytes(sender.keyPair, None, mttdTransfers, ByteString.copyFrom(attachment.arr), fee, timestamp, version)
 
         (
-          SignedMassTransferRequest(
+          MassTransferRequest(
             Some(version),
             sender.publicKey.toString,
             None,
@@ -319,7 +319,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
       nodes.waitForHeightAriseAndTxPresent(txId)
 
       // /transactions/info/txID should return complete list of transfers
-      val txInfo = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody).as[SignedMassTransferRequest]
+      val txInfo = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody).as[MassTransferRequest]
       assert(txInfo.transfers.size == 3)
 
       // /transactions/address should return complete transfers list for the sender...
@@ -329,10 +329,10 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
         .value
         .map(js => extractTransactionByType(js, 11).head)
         .head
-      assert(txSender.as[SignedMassTransferRequest].transfers.size == 3)
+      assert(txSender.as[MassTransferRequest].transfers.size == 3)
       assert((txSender \ "transferCount").as[Int] == 3)
       assert((txSender \ "totalAmount").as[Long] == 10.waves)
-      val transfersAfterTrans = txSender.as[SignedMassTransferRequest].transfers
+      val transfersAfterTrans = txSender.as[MassTransferRequest].transfers
       assert(transfers.equals(transfersAfterTrans))
 
       // ...and compact list for recipients
@@ -347,10 +347,10 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
         .map(js => extractTransactionByType(js, 11).head)
         .head
 
-      assert(txRecipient.as[SignedMassTransferRequest].transfers.size == 1)
+      assert(txRecipient.as[MassTransferRequest].transfers.size == 1)
       assert((txRecipient \ "transferCount").as[Int] == 3)
       assert((txRecipient \ "totalAmount").as[Long] == 10.waves)
-      val transferToSecond = txRecipient.as[SignedMassTransferRequest].transfers.head
+      val transferToSecond = txRecipient.as[MassTransferRequest].transfers.head
       assert(transfers contains transferToSecond)
     }
   }

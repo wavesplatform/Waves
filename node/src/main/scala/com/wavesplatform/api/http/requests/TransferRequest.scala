@@ -41,5 +41,5 @@ case class TransferRequest(
 }
 
 object TransferRequest {
-  implicit val jsonFormat: Format[TransferRequest] = Json.format
+  given Format[TransferRequest] = Json.format
 }

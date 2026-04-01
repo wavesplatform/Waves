@@ -7,19 +7,7 @@ import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import play.api.libs.json.{Format, Json}
 
-object DataRequest {
-  implicit val unsignedDataRequestReads: Format[DataRequest] = Json.format
-}
-
 case class DataRequest(
-    version: Byte,
-    sender: String,
-    data: List[DataEntry[?]],
-    fee: Long,
-    timestamp: Option[Long] = None
-)
-
-case class SignedDataRequest(
     version: Byte,
     senderPublicKey: String,
     data: List[DataEntry[?]],
@@ -37,6 +25,6 @@ case class SignedDataRequest(
 
 }
 
-object SignedDataRequest {
-  implicit val signedDataRequestReads: Format[SignedDataRequest] = Json.format
+object DataRequest {
+  given Format[DataRequest] = Json.format
 }

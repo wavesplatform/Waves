@@ -37,5 +37,5 @@ case class ReissueRequest(
 }
 
 object ReissueRequest {
-  implicit val jsonFormat: Format[ReissueRequest] = Json.format
+  given Format[ReissueRequest] = Json.format
 }

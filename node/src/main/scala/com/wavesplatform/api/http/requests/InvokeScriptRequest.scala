@@ -70,26 +70,13 @@ object InvokeScriptRequest {
     } yield FunctionCallPart(funcName, args)
   }
 
-  implicit val unsignedInvokeScriptRequestReads: Reads[InvokeScriptRequest]     = Json.reads[InvokeScriptRequest]
-  implicit val signedInvokeScriptRequestReads: Reads[SignedInvokeScriptRequest] = Json.reads[SignedInvokeScriptRequest]
+  implicit val unsignedInvokeScriptRequestReads: Reads[InvokeScriptRequest] = Json.reads[InvokeScriptRequest]
 
   def buildFunctionCall(fc: FunctionCallPart): FUNCTION_CALL =
     FUNCTION_CALL(FunctionHeader.User(fc.function), fc.args)
 }
 
 case class InvokeScriptRequest(
-    chainId: Option[Byte],
-    version: Option[Byte],
-    sender: String,
-    fee: Long,
-    feeAssetId: Option[String],
-    call: Option[InvokeScriptRequest.FunctionCallPart],
-    payment: Seq[InvokeScriptTransaction.Payment],
-    dApp: String,
-    timestamp: Option[Long] = None
-)
-
-case class SignedInvokeScriptRequest(
     chainId: Option[Byte],
     version: Byte = 2.toByte,
     senderPublicKey: String,
@@ -118,8 +105,4 @@ case class SignedInvokeScriptRequest(
         chainId.getOrElse(_dappAddress.chainId)
       )
     } yield t
-}
-
-object SignedInvokeScriptRequest {
-  given Reads[SignedInvokeScriptRequest] = Json.reads
 }

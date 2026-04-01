@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
 import play.api.libs.json.*
 
-case class SignedInvokeExpressionRequest(
+case class InvokeExpressionRequest(
     version: Option[Byte],
     senderPublicKey: String,
     fee: Long,
@@ -39,5 +39,5 @@ case class SignedInvokeExpressionRequest(
 }
 
 object InvokeExpressionRequest {
-  implicit val signedInvokeExpressionRequestReads: Reads[SignedInvokeExpressionRequest] = Json.reads[SignedInvokeExpressionRequest]
+  given Reads[InvokeExpressionRequest] = Json.reads
 }

@@ -9,8 +9,8 @@ import com.wavesplatform.transaction.{Asset, Proofs}
 import play.api.libs.functional.syntax.*
 import play.api.libs.json.*
 
-object SignedMassTransferRequest {
-  implicit val jsonFormat: Format[SignedMassTransferRequest] = Format(
+object MassTransferRequest {
+  given Format[MassTransferRequest] = Format(
     (
       (JsPath \ "version").readNullable[Byte] and
         (JsPath \ "senderPublicKey").read[String] and
@@ -20,12 +20,12 @@ object SignedMassTransferRequest {
         (JsPath \ "timestamp").read[Long] and
         (JsPath \ "attachment").readWithDefault(ByteStr.empty) and
         (JsPath \ "proofs").read[Proofs]
-    )(SignedMassTransferRequest.apply),
-    Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
+    )(MassTransferRequest.apply),
+    Json.writes[MassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
   )
 }
 
-case class SignedMassTransferRequest(
+case class MassTransferRequest(
     version: Option[Byte],
     senderPublicKey: String,
     assetId: Option[Asset],

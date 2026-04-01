@@ -37,7 +37,7 @@ case class BurnRequest(
 
 object BurnRequest {
   import com.wavesplatform.utils.byteStrFormat
-  implicit val jsonFormat: Format[BurnRequest] = Format(
+  given Format[BurnRequest] = Format(
     ((JsPath \ "version").readNullable[Byte] and
       (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").read[IssuedAsset] and

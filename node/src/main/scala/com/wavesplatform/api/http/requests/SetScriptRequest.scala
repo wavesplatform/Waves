@@ -8,21 +8,21 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import play.api.libs.functional.syntax.*
 import play.api.libs.json.*
 
-object SignedSetScriptRequest {
-  implicit val signedSetScriptRequestReads: Reads[SignedSetScriptRequest] = (
+object SetScriptRequest {
+  given Reads[SetScriptRequest] = (
     (JsPath \ "version").readNullable[Byte] and
       (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "script").readNullable[String] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "proofs").read[Proofs]
-  )(SignedSetScriptRequest.apply)
+  )(SetScriptRequest.apply)
 
-  implicit val signedSetScriptRequestWrites: OWrites[SignedSetScriptRequest] =
-    Json.writes[SignedSetScriptRequest].transform((request: JsObject) => request + ("version" -> JsNumber(1)))
+  implicit val signedSetScriptRequestWrites: OWrites[SetScriptRequest] =
+    Json.writes[SetScriptRequest].transform((request: JsObject) => request + ("version" -> JsNumber(1)))
 }
 
-case class SignedSetScriptRequest(
+case class SetScriptRequest(
     version: Option[Byte],
     senderPublicKey: String,
     script: Option[String],

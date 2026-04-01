@@ -39,5 +39,5 @@ case class ExchangeRequest(
 }
 
 object ExchangeRequest {
-  implicit val jsonFormat: Format[ExchangeRequest] = Json.format
+  given Format[ExchangeRequest] = Json.format
 }

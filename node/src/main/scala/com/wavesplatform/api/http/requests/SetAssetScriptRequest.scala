@@ -9,8 +9,8 @@ import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import play.api.libs.functional.syntax.*
 import play.api.libs.json.{JsPath, Reads}
 
-object SignedSetAssetScriptRequest {
-  implicit val signedSetAssetScriptRequestReads: Reads[SignedSetAssetScriptRequest] = (
+object SetAssetScriptRequest {
+  given Reads[SetAssetScriptRequest] = (
     (JsPath \ "version").readNullable[Byte] and
       (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").read[IssuedAsset] and
@@ -18,10 +18,10 @@ object SignedSetAssetScriptRequest {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "proofs").read[Proofs]
-  )(SignedSetAssetScriptRequest.apply)
+  )(SetAssetScriptRequest.apply)
 }
 
-case class SignedSetAssetScriptRequest(
+case class SetAssetScriptRequest(
     version: Option[Byte],
     senderPublicKey: String,
     assetId: IssuedAsset,

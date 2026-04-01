@@ -35,7 +35,7 @@ case class LeaseCancelRequest(
 
 object LeaseCancelRequest {
   import com.wavesplatform.utils.byteStrFormat
-  implicit val jsonFormat: Format[LeaseCancelRequest] = Format(
+  given Format[LeaseCancelRequest] = Format(
     ((JsPath \ "version").readNullable[Byte] and
       (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "leaseId").read[String].orElse((JsPath \ "txId").read[String]) and

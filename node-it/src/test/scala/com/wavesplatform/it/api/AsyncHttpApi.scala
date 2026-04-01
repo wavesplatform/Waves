@@ -775,7 +775,6 @@ object AsyncHttpApi extends Assertions {
       signedBroadcast(issue.toTx.explicitGet().json())
 
     def batchSignedTransfer(transfers: Seq[TransferRequest]): Future[Seq[Transaction]] = {
-      import TransferRequest.jsonFormat
       Future.sequence(transfers.map(v => signedBroadcast(toJson(v).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))))
     }
 

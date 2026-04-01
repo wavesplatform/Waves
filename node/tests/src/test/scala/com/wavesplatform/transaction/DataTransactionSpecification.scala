@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.google.common.primitives.Shorts
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.api.http.requests.SignedDataRequest
+import com.wavesplatform.api.http.requests.DataRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -107,7 +107,7 @@ class DataTransactionSpecification extends PropSpec {
       val json = tx.json()
       json.toString shouldEqual tx.toString
 
-      val req = json.as[SignedDataRequest]
+      val req = json.as[DataRequest]
       req.senderPublicKey shouldEqual Base58.encode(tx.sender.arr)
       req.fee shouldEqual tx.fee.value
       req.timestamp shouldEqual tx.timestamp

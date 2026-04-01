@@ -33,5 +33,5 @@ case class UpdateAssetInfoRequest(
 }
 
 object UpdateAssetInfoRequest {
-  implicit val jsonFormat: OFormat[UpdateAssetInfoRequest] = Json.format[UpdateAssetInfoRequest]
+  given OFormat[UpdateAssetInfoRequest] = Json.format[UpdateAssetInfoRequest]
 }

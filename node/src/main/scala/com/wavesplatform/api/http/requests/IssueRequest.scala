@@ -48,5 +48,5 @@ case class IssueRequest(
 }
 
 object IssueRequest {
-  implicit val jsonFormat: Format[IssueRequest] = Json.format
+  given Format[IssueRequest] = Json.format
 }

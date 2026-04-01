@@ -8,7 +8,7 @@ import play.api.libs.json.{Format, Json}
 
 case class CreateAliasRequest(
     alias: String,
-    version: Option[TxVersion],
+    version: TxVersion = 1.toByte,
     senderPublicKey: String,
     fee: Option[Long] = None,
     timestamp: Option[TxTimestamp] = None,
@@ -19,10 +19,10 @@ case class CreateAliasRequest(
     for {
       validProofs <- toProofs(signature, proofs)
       validSender <- PublicKey.fromBase58String(senderPublicKey)
-      tx <- CreateAliasTransaction.create(version.getOrElse(1.toByte), validSender, alias, fee.getOrElse(0L), timestamp.getOrElse(0L), validProofs)
+      tx          <- CreateAliasTransaction.create(version, validSender, alias, fee.getOrElse(0L), timestamp.getOrElse(0L), validProofs)
     } yield tx
 }
 
 object CreateAliasRequest {
-  implicit val jsonFormat: Format[CreateAliasRequest] = Json.format
+  given Format[CreateAliasRequest] = Json.format
 }

@@ -2,9 +2,6 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.*
 import com.wavesplatform.api.http.requests.*
-import com.wavesplatform.api.http.requests.CommitToGenerationRequest.given
-import com.wavesplatform.api.http.requests.InvokeExpressionRequest.*
-import com.wavesplatform.api.http.requests.SponsorFeeRequest.*
 import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Height
@@ -79,16 +76,16 @@ object TransactionFactory {
         case Issue              => jsv.as[IssueRequest].asRight
         case Reissue            => jsv.as[ReissueRequest].asRight
         case Burn               => jsv.as[BurnRequest].asRight
-        case MassTransfer       => jsv.as[SignedMassTransferRequest].asRight
-        case Data               => jsv.as[SignedDataRequest].asRight
-        case InvokeScript       => jsv.as[SignedInvokeScriptRequest].asRight
-        case SetScript          => jsv.as[SignedSetScriptRequest].asRight
-        case SetAssetScript     => jsv.as[SignedSetAssetScriptRequest].asRight
-        case SponsorFee         => jsv.as[SignedSponsorFeeRequest].asRight
+        case MassTransfer       => jsv.as[MassTransferRequest].asRight
+        case Data               => jsv.as[DataRequest].asRight
+        case InvokeScript       => jsv.as[InvokeScriptRequest].asRight
+        case SetScript          => jsv.as[SetScriptRequest].asRight
+        case SetAssetScript     => jsv.as[SetAssetScriptRequest].asRight
+        case SponsorFee         => jsv.as[SponsorFeeRequest].asRight
         case UpdateAssetInfo    => jsv.as[UpdateAssetInfoRequest].asRight
         case CommitToGeneration => jsv.as[CommitToGenerationRequest].asRight
         case Exchange           => jsv.as[ExchangeRequest].asRight
-        case InvokeExpression   => jsv.as[SignedInvokeExpressionRequest].asRight
+        case InvokeExpression   => jsv.as[InvokeExpressionRequest].asRight
         case Genesis | Payment | Ethereum | InvokeExpression =>
           UnsupportedTransactionType.asLeft[TxBroadcastRequest[Transaction & ProvenTransaction]]
       }

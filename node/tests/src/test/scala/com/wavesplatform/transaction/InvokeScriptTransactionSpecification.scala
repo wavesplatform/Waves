@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.*
-import com.wavesplatform.api.http.requests.{InvokeScriptRequest, SignedInvokeScriptRequest}
+import com.wavesplatform.api.http.requests.InvokeScriptRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -208,7 +208,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
   }
 
   property("Signed InvokeScriptTransactionRequest parser") {
-    val req = SignedInvokeScriptRequest(
+    val req = InvokeScriptRequest(
       None,
       1.toByte,
       senderPublicKey = publicKey,
@@ -319,7 +319,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
   }
 
   property("can't have zero amount") {
-    val req = SignedInvokeScriptRequest(
+    val req = InvokeScriptRequest(
       None,
       1.toByte,
       senderPublicKey = publicKey,
@@ -341,7 +341,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
   }
 
   property("can't have negative amount") {
-    val req = SignedInvokeScriptRequest(
+    val req = InvokeScriptRequest(
       None,
       1.toByte,
       senderPublicKey = publicKey,

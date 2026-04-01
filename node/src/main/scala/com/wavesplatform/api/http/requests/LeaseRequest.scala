@@ -35,5 +35,5 @@ case class LeaseRequest(
 }
 
 object LeaseRequest {
-  implicit val jsonFormat: Format[LeaseRequest] = Json.format
+  given Format[LeaseRequest] = Json.format
 }

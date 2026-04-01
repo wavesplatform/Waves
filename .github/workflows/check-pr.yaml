@@ -13,15 +13,15 @@ jobs:
     outputs:
       lang-changed: ${{ steps.filter.outputs.lang == 'true' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'sbt'
           gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-      - uses: sbt/setup-sbt@v1
+      - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
       - name: Check PR
         run: sbt -J-Xlog:gc*=debug:file=./gc.log --batch checkPR
       #- if: always()
@@ -61,7 +61,7 @@ jobs:
           report_paths: '**/target/test-reports/*.xml'
           create_check: false
           check_name: 'Check PR'
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: filter
         with:
           filters: |
@@ -69,17 +69,17 @@ jobs:
               - 'lang/**'
               - 'build.sbt'
               - 'project/*'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: waves-fat-jar
           path: node/target/waves-all-*.jar
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: steps.filter.outputs.lang == 'true'
         with:
           name: file-compiler
           path: lang/jvm/target/file-compiler.jar
       - name: Save debug data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           if-no-files-found: ignore
@@ -97,11 +97,11 @@ jobs:
       matrix:
         os: [macos-15-intel, macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2022]
     steps:
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: 'temurin'
           java-version: '17'
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: waves-fat-jar
       - run: java -cp '*' com.wavesplatform.utils.UtilApp smoke
@@ -119,14 +119,14 @@ jobs:
           - waves-ducks-core/wavesducks-public
           - swopfi/swopfi-smart-contracts
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: ${{ matrix.repo }}
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: 'temurin'
           java-version: '17'
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: file-compiler
       - run: find -name "*.ride" -type f -exec java -jar file-compiler.jar {} +;
@@ -136,13 +136,13 @@ jobs:
     needs: check-pr
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'sbt'
-      - uses: sbt/setup-sbt@v1
+      - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
       - name: Run Integration Tests
         run: sbt --batch "node-it/docker;node-it/test"
         env:
@@ -154,7 +154,7 @@ jobs:
           create_check: false
           check_name: 'Run integration tests'
       - name: Upload Logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           if-no-files-found: ignore
@@ -170,15 +170,15 @@ jobs:
     env:
       PR_NUMBER: ${{ github.event.number }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'sbt'
           gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-      - uses: sbt/setup-sbt@v1
+      - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
       - run: sbt -Dproject.version=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-$PR_NUMBER-SNAPSHOT --batch publish
         env:
           SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}

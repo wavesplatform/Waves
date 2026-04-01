@@ -24,7 +24,16 @@ case class FinalityApiRoute(blockchain: Blockchain, maxRollback: Int, generators
       "currentGenerationPeriod" -> currentPeriod,
       "currentGenerators"       -> generatorsApi.generators(Height(currentHeight)),
       "nextGenerationPeriod"    -> currentPeriod.map(_.next),
-      "nextGenerators"          -> currentPeriod.fold(Seq.empty)(p => generatorsApi.generators(p.next.start))
+      "nextGenerators" -> currentPeriod.fold(Seq.empty)(p =>
+        generatorsApi
+          .generators(p.next.start)
+          .map(ge =>
+            Json.obj(
+              "address"       -> ge.address,
+              "transactionId" -> ge.commitTxnId
+            )
+          )
+      )
     )
   }
 }
@@ -36,5 +45,11 @@ object FinalityApiRoute {
       "end"   -> gp.end
     )
 
-  given Writes[GeneratorEntry] = Json.writes[GeneratorEntry]
+  given Writes[GeneratorEntry] = (ge: GeneratorEntry) =>
+    Json.obj(
+      "address"        -> ge.address,
+      "transactionId"  -> ge.commitTxnId,
+      "balance"        -> ge.balance,
+      "conflictHeight" -> ge.conflictHeight
+    )
 }
