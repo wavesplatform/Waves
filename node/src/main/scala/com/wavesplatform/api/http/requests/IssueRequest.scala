@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http.requests
 
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -20,7 +20,8 @@ case class IssueRequest(
     fee: Long,
     timestamp: Option[Long],
     signature: Option[ByteStr],
-    proofs: Option[Proofs]
+    proofs: Option[Proofs],
+    chainId: Byte = AddressScheme.current.chainId
 ) extends TxBroadcastRequest[IssueTransaction] {
   def toTx: Either[ValidationError, IssueTransaction] = {
     for {
@@ -41,7 +42,8 @@ case class IssueRequest(
         validScript,
         fee,
         timestamp.getOrElse(defaultTimestamp),
-        validProofs
+        validProofs,
+        chainId
       )
     } yield tx
   }

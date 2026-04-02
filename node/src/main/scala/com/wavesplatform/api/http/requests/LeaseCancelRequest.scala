@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http.requests
 
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
@@ -15,7 +15,8 @@ case class LeaseCancelRequest(
     fee: Long,
     timestamp: Option[Long],
     signature: Option[ByteStr],
-    proofs: Option[Proofs]
+    proofs: Option[Proofs],
+    chainId: Byte
 ) extends TxBroadcastRequest[LeaseCancelTransaction] {
   def toTx: Either[ValidationError, LeaseCancelTransaction] =
     for {
@@ -42,7 +43,8 @@ object LeaseCancelRequest {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").readNullable[Long] and
       (JsPath \ "signature").readNullable[ByteStr] and
-      (JsPath \ "proofs").readNullable[Proofs])(LeaseCancelRequest.apply),
+      (JsPath \ "proofs").readNullable[Proofs] and
+      (JsPath \ "chainId").readWithDefault(AddressScheme.current.chainId))(LeaseCancelRequest.apply),
     Json.writes[LeaseCancelRequest]
   )
 }

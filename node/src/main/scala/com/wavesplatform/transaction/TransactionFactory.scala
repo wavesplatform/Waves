@@ -10,46 +10,45 @@ import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.*
 
 object TransactionFactory {
+  def parseRequestAndSign(request: JsObject, signer: KeyPair, generationPeriodStart: => Option[Int]): Either[ValidationError, Transaction] = {
+    val overrides = Json.newBuilder
+    if (!request.keys.contains("senderPublicKey")) {
+      overrides += "senderPublicKey" -> signer.publicKey
+    }
+
+    val extendedRequest = if ((request \ "type").as[Int] == TransactionType.CommitToGeneration.id) {
+      for {
+        periodStart <- ((request \ "generationPeriodStart").asOpt[Int] orElse generationPeriodStart)
+          .toRight(GenericError("missing generation period start"))
+      } yield {
+        val endorserKP = BlsKeyPair(signer.privateKey)
+        overrides ++= Seq(
+          "commitmentSignature"   -> CommitToGenerationTransaction.mkPopSignature(endorserKP, Height(periodStart)).base58,
+          "generationPeriodStart" -> periodStart,
+          "endorserPublicKey"     -> endorserKP.publicKey.base58
+        )
+        overrides.result()
+      }
+    } else Right(overrides.result())
+
+    for {
+      req <- extendedRequest
+      tx  <- parseRequest(req ++ request)
+    } yield tx.signWith(signer.privateKey)
+  }
+
   def parseRequestAndSign(
       request: JsObject,
       wallet: Wallet,
       signer: Option[String | KeyPair],
       generationPeriodStart: => Option[Int]
-  ): Either[ValidationError, Transaction] = {
-    val signerE = signer
-      .fold((request \ "sender").asOpt[String].toRight(GenericError("invalid.sender")).flatMap(s => wallet.findPrivateKey(s).map(_.privateKey))) {
-        case signerAddress: String => wallet.findPrivateKey(signerAddress).map(_.privateKey)
-        case signerKP: KeyPair     => Right(signerKP.privateKey)
+  ): Either[ValidationError, Transaction] =
+    signer
+      .fold((request \ "sender").asOpt[String].toRight(GenericError("invalid.sender")).flatMap(wallet.findPrivateKey)) {
+        case signerAddress: String => wallet.findPrivateKey(signerAddress)
+        case signerKP: KeyPair     => Right(signerKP)
       }
-
-    val extendedRequest = if ((request \ "type").as[Int] == TransactionType.CommitToGeneration.id) {
-      for {
-        signer <- signerE
-        periodStart <- ((request \ "generationPeriodStart").asOpt[Int] orElse generationPeriodStart)
-          .toRight(GenericError("missing generation period start"))
-      } yield {
-        val endorserKP = BlsKeyPair(signer)
-        Json.obj(
-          "commitmentSignature"   -> CommitToGenerationTransaction.mkPopSignature(endorserKP, Height(periodStart)).base58,
-          "generationPeriodStart" -> periodStart,
-          "endorserPublicKey"     -> endorserKP.publicKey.base58
-        ) ++ request
-      }
-    } else Right(request)
-
-    for {
-      req    <- extendedRequest
-      tx     <- parseRequest(req, wallet)
-      signer <- signerE
-    } yield tx.signWith(signer)
-  }
-
-  def parseRequest(request: JsObject, wallet: Wallet): Either[ValidationError, Transaction & ProvenTransaction] =
-    (if (!request.keys.contains("senderPublicKey")) {
-       (request \ "sender").asOpt[String].fold(Left(GenericError("invalid.sender"))) { senderAddress =>
-         wallet.findPrivateKey(senderAddress).map(pk => request ++ Json.obj("senderPublicKey" -> pk.publicKey.toString))
-       }
-     } else Right(request)).flatMap(parseRequest)
+      .flatMap(signer => parseRequestAndSign(request, signer, generationPeriodStart))
 
   def parseRequest(request: JsObject): Either[ValidationError, Transaction & ProvenTransaction] = {
     val overrides = Json.newBuilder

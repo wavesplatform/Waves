@@ -15,7 +15,7 @@ object SetScriptRequest {
       (JsPath \ "script").readNullable[String] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "proofs").read[Proofs]
+      (JsPath \ "proofs").readWithDefault(Proofs.empty)
   )(SetScriptRequest.apply)
 
   implicit val signedSetScriptRequestWrites: OWrites[SetScriptRequest] =

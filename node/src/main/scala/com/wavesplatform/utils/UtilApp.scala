@@ -291,7 +291,7 @@ object UtilApp {
       import cats.syntax.either.*
 
       TransactionFactory
-        .parseRequestAndSign(Json.parse(data).as[JsObject], ???, Some(signerKeyPair), None)
+        .parseRequestAndSign(Json.parse(data).as[JsObject], signerKeyPair, None)
         .leftMap(_.toString)
         .map(_.json().toString().getBytes())
     }

@@ -57,6 +57,7 @@ object NodeConfigs {
 
       val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = bc.zipWithIndex
         .collect { case (x, i) if NonConflictingNodes.contains(i + 1) => x }
+        .reverse
         .splitAt(defaultEntities)
 
       specialNodes

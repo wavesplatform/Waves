@@ -21,7 +21,7 @@ case class CommitToGenerationRequest(
     timestamp: Option[Long] = None,
     fee: Option[Long] = None,
     commitmentSignature: ByteStr,
-    chainId: Option[Byte] = None,
+    chainId: Byte = AddressScheme.current.chainId,
     proofs: Proofs = Proofs.empty
 ) extends TxBroadcastRequest[CommitToGenerationTransaction] {
   def toTx: Either[ValidationError, CommitToGenerationTransaction] = {
@@ -38,7 +38,7 @@ case class CommitToGenerationRequest(
         fee.getOrElse(FeeConstants(TransactionType.CommitToGeneration) * FeeUnit),
         blsSignature,
         proofs,
-        chainId.getOrElse(AddressScheme.current.chainId)
+        chainId
       )
     } yield tx
   }

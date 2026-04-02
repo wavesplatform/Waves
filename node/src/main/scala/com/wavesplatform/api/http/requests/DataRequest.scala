@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http.requests
 
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.DataEntry
@@ -14,13 +14,14 @@ case class DataRequest(
     fee: Long,
     timestamp: Long,
     proofs: Option[Proofs],
-    signature: Option[ByteStr]
+    signature: Option[ByteStr],
+    chainId: Byte = AddressScheme.current.chainId
 ) extends TxBroadcastRequest[DataTransaction] {
   def toTx: Either[ValidationError, DataTransaction] =
     for {
       validProofs <- toProofs(signature, proofs)
       validSender <- PublicKey.fromBase58String(senderPublicKey)
-      tx          <- DataTransaction.create(version, validSender, data, fee, timestamp, validProofs)
+      tx          <- DataTransaction.create(version, validSender, data, fee, timestamp, validProofs, chainId)
     } yield tx
 
 }

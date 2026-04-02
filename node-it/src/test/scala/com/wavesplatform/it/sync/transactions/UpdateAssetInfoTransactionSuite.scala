@@ -120,7 +120,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
           TxVersion.V1,
           AddressScheme.current.chainId,
           issuer.publicKey.toString,
-          IssuedAsset(ByteStr.empty),
+          IssuedAsset(ByteStr(new Array[Byte](32))),
           "test",
           "test",
           None,

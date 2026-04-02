@@ -19,7 +19,7 @@ object MassTransferRequest {
         (JsPath \ "fee").read[Long] and
         (JsPath \ "timestamp").read[Long] and
         (JsPath \ "attachment").readWithDefault(ByteStr.empty) and
-        (JsPath \ "proofs").read[Proofs]
+        (JsPath \ "proofs").readWithDefault(Proofs.empty)
     )(MassTransferRequest.apply),
     Json.writes[MassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
   )
@@ -33,7 +33,7 @@ case class MassTransferRequest(
     fee: Long,
     timestamp: Long,
     attachment: ByteStr = ByteStr.empty,
-    proofs: Proofs = Proofs.empty
+    proofs: Proofs
 ) extends TxBroadcastRequest[MassTransferTransaction] {
   def toTx: Either[ValidationError, MassTransferTransaction] =
     for {

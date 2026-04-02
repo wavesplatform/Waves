@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http.requests
 
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Proofs
@@ -18,11 +18,12 @@ case class SponsorFeeRequest(
     minSponsoredAssetFee: Option[Long],
     fee: Long,
     timestamp: Long,
-    proofs: Proofs
+    proofs: Proofs = Proofs.empty,
+    chainId: Byte = AddressScheme.current.chainId
 ) extends TxBroadcastRequest[SponsorFeeTransaction] {
   def toTx: Either[ValidationError, SponsorFeeTransaction] =
     for {
       validSender <- PublicKey.fromBase58String(senderPublicKey)
-      t           <- SponsorFeeTransaction.create(version, validSender, assetId, minSponsoredAssetFee.filterNot(_ == 0), fee, timestamp, proofs)
+      t <- SponsorFeeTransaction.create(version, validSender, assetId, minSponsoredAssetFee.filterNot(_ == 0), fee, timestamp, proofs, chainId)
     } yield t
 }

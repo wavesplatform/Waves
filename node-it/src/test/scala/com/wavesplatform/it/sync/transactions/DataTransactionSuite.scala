@@ -3,19 +3,18 @@ package com.wavesplatform.it.sync.transactions
 import com.google.common.primitives.Ints
 import com.typesafe.config.Config
 import com.wavesplatform.account.{AddressScheme, KeyPair}
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation, WrongJson}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{TransactionInfo, UnexpectedStatusCodeException}
-import com.wavesplatform.it.sync.{calcDataFee, minFee, *}
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.state.Height
-import com.wavesplatform.test.*
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, Height, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{DataTransaction, Proofs, TxHelpers, TxVersion}
 import org.scalatest.{Assertion, Assertions, EitherValues}
@@ -356,13 +355,17 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   test("transaction requires a valid proof") {
     for (v <- dataTxSupportedVersions) {
       def request: JsObject =
-        TxHelpers.data(account = firstKeyPair, entries = List(IntegerDataEntry("int", 333)), fee = minFee, version = v)
+        TxHelpers
+          .data(account = firstKeyPair, entries = List(IntegerDataEntry("int", 333)), fee = minFee, version = v)
           .json()
 
       def id(obj: JsObject): String = obj.value("id").as[String]
 
       val noProof = request - "proofs"
-      assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", noProof), s"${WrongJson.WrongJsonDataMessage}.*proofs.*missing")
+      assertBadRequestAndResponse(
+        sender.postJson("/transactions/broadcast", noProof),
+        "Transactions from non-scripted accounts must have exactly 1 proof"
+      )
       nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
 
       val badProof = request ++ Json.obj("proofs" -> Seq(Base58.encode(Array.fill(64)(Random.nextInt().toByte))))
