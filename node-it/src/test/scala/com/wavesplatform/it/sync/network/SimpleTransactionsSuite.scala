@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync.network
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.AsyncNetworkApi.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
@@ -16,11 +15,8 @@ import java.nio.charset.StandardCharsets
 import scala.concurrent.duration.*
 
 class SimpleTransactionsSuite extends BaseTransactionSuite {
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(entitiesNumber = 1)
-      .buildNonConflicting()
+  import com.wavesplatform.it.NodeConfigs.*
+  override val nodeConfigs: Seq[Config] = Seq(BiggestMiner.withQuorum(0))
 
   private def node = nodes.head
 

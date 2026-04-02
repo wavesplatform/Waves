@@ -2,9 +2,9 @@ package com.wavesplatform.it.sync.finalization
 
 import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.utils.ScorexLogging
@@ -14,12 +14,10 @@ import org.scalatest.OptionValues
 import scala.concurrent.duration.DurationInt
 
 class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLogging {
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0))))
-      .withDefault(1)
-      .buildNonConflicting()
+  import com.wavesplatform.it.NodeConfigs.*
+  override val nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner.withQuorum(0).preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0)))
+  )
 
   private def node            = dockerNodes().last
   private lazy val miner1Acc  = node.keyPair

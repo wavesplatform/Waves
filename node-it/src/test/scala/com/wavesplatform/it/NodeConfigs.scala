@@ -15,6 +15,19 @@ object NodeConfigs {
   val NotMiner: Config     = Default.last
   def randomMiner: Config  = Random.shuffle(Miners).head
 
+  val BiggestMiner: Config = Miners.last
+
+  extension (c: Config) {
+    def overrides(s: String): Config = ConfigFactory.parseString(s).withFallback(c)
+    def withQuorum(n: Int): Config   = overrides(s"waves.miner.quorum = $n")
+    def preactivatedFeatures(f: (Int, Height)*): Config = overrides(
+      s"""waves.blockchain.custom.functionality.pre-activated-features {
+        ${f.map { case (id, height) => s"$id = $height" }.mkString("\n")}
+      }"""
+    )
+    def notMiner: Config = overrides("waves.miner.enable = no")
+  }
+
   def newBuilder: Builder = Builder(Default, Default.size, Seq.empty)
 
   case class Builder(baseConfigs: Seq[Config], defaultEntities: Int, specialsConfigs: Seq[Config]) {
@@ -57,7 +70,6 @@ object NodeConfigs {
 
       val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = bc.zipWithIndex
         .collect { case (x, i) if NonConflictingNodes.contains(i + 1) => x }
-        .reverse
         .splitAt(defaultEntities)
 
       specialNodes

@@ -1,14 +1,11 @@
 package com.wavesplatform.it.sync.activation
 
-import scala.concurrent.duration.*
-
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.{NodeConfigs, NTPTime}
-import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.it.sync.*
@@ -18,11 +15,13 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{TxExchangePrice, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{TxExchangePrice, TxVersion}
 import play.api.libs.json.JsObject
+
+import scala.concurrent.duration.*
 
 class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTime with OverflowBlock {
   import AcceptFailedScriptActivationSuite.*
@@ -486,16 +485,17 @@ object AcceptFailedScriptActivationSuite {
 
   private def mkScript(scriptText: String): Option[String] = Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1.bytes().base64)
 
+  import com.wavesplatform.it.NodeConfigs.*
+
   private def configs(activate: Boolean): Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(
-        _.preactivatedFeatures(
-          (BlockchainFeatures.BlockV5.id, Height(if (activate) 0 else 9999))
-        )
-      )
-      .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $UpdateInterval"))
-      .overrideBase(_.raw(s"waves.miner.max-transactions-in-micro-block = $MaxTxsInMicroBlock"))
-      .buildNonConflicting()
+    Seq(
+      BiggestMiner
+        .withQuorum(0)
+        .preactivatedFeatures((BlockchainFeatures.BlockV5.id, Height(if (activate) 0 else 9999)))
+        .overrides(s"""
+          waves {
+            blockchain.custom.functionality.min-asset-info-update-interval = $UpdateInterval
+            miner.max-transactions-in-micro-block = $MaxTxsInMicroBlock
+          }""")
+    )
 }

@@ -21,11 +21,8 @@ import monix.execution.atomic.AtomicInt
 import scala.concurrent.duration.*
 
 class IssueReissueBurnAssetSuite extends BaseFreeSpec {
-  override val nodeConfigs: Seq[Config] =
-    com.wavesplatform.it.NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(1)
-      .buildNonConflicting()
+  import com.wavesplatform.it.NodeConfigs.*
+  override val nodeConfigs: Seq[Config] = Seq(BiggestMiner.withQuorum(0))
   private val initialWavesBalance = 100.waves
   private val setScriptPrice      = 0.01.waves
   private val accountCounter      = AtomicInt(1000)

@@ -1333,6 +1333,22 @@ paths:
               examples:
                 largeSignificandblockchainRewards:
                   $ref: '#/components/examples/largeSignificandblockchainRewards'
+  '/blockchain/finality':
+    get:
+      tags: [blockchain]
+      summary: Finality info
+      description: Get finalized block, current and next generation periods, and miners committed to generating blocks in both current and next generation periods
+      operationId: getFinalityInfo
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinalityInfo'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/FinalityInfoLSF'
   '/transactions/status/{id}':
     get:
       tags:
@@ -3457,6 +3473,10 @@ components:
       example: DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p
     Signature:
       type: string
+    AmountString:
+      type: string
+      pattern: '[0-9]+'
+      example: 1200
     Proof:
       type: string
     AssetId:
@@ -4504,6 +4524,60 @@ components:
           type: string
         xtnBuybackAddress:
           type: string
+    GenerationPeriod:
+      type: object
+      required: [start, end]
+      properties:
+        start:
+          $ref: '#/components/schemas/Height'
+        end:
+          $ref: '#/components/schemas/Height'
+    FinalityInfoBase:
+      type: object
+      required: [ height, finalizedHeight, currentGenerationPeriod, nextGenerationPeriod, nextGenerators ]
+      properties:
+        height:
+          $ref: '#/components/schemas/Height'
+        finalizedHeight:
+          $ref: '#/components/schemas/Height'
+        currentGenerationPeriod:
+          $ref: '#/components/schemas/GenerationPeriod'
+        nextGenerationPeriod:
+          $ref: '#/components/schemas/GenerationPeriod'
+        nextGenerators:
+          type: array
+          items:
+            $ref: '#/components/schemas/NextGeneratorData'
+    FinalityInfo:
+      allOf:
+        - $ref: '#/components/schemas/FinalityInfoBase'
+        - type: object
+          required: [currentGenerators]
+          properties:
+            currentGenerators:
+              type: array
+              items:
+                $ref: '#/components/schemas/GeneratorData'
+    FinalityInfoLSF:
+      allOf:
+        - $ref: '#/components/schemas/FinalityInfoBase'
+        - type: object
+          required: [ currentGenerators ]
+          properties:
+            currentGenerators:
+              type: array
+              items:
+                $ref: '#/components/schemas/GeneratorDataLSF'
+    NextGeneratorData:
+      type: object
+      required:
+        - address
+        - transactionId
+      properties:
+        address:
+          $ref: '#/components/schemas/Address'
+        transactionId:
+          $ref: '#/components/schemas/TransactionId'
     GeneratorData:
       type: object
       required:
@@ -4529,7 +4603,7 @@ components:
         address:
           $ref: '#/components/schemas/Address'
         balance:
-          type: string
+          $ref: '#/components/schemas/AmountString'
         transactionId:
           $ref: '#/components/schemas/TransactionId'
         conflictHeight:
