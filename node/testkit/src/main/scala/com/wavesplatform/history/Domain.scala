@@ -432,13 +432,14 @@ case class Domain(
 
     for {
       resultTimestamp <-
-        if (blockchain.height > 0) {
+        if (blockchain.height <= 0) Right(testTime.getTimestamp() - (1 hour).toMillis)
+        else
           timestamp
             .map(Right(_))
             .getOrElse(
               posSelector
                 .getValidBlockDelay(
-                  blockchain.height,
+                  parentHeight,
                   generator,
                   parent.baseTarget,
                   // HACK: 1e11 some generators in tests have less than minimum
@@ -446,8 +447,6 @@ case class Domain(
                 )
                 .map(_ + parent.timestamp)
             )
-        } else
-          Right(testTime.getTimestamp() - (1 hour).toMillis)
       consensus <-
         if (blockchain.height > 0)
           posSelector

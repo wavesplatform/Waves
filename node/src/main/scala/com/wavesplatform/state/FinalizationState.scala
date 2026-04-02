@@ -89,8 +89,6 @@ object FinalizationState extends ScorexLogging {
     )
   }
 
-  // TODO: add already known as conflict, or better: generator balances without conflict
-  // TODO: easier to create lambda?
   private def isParentFinalized(
       after: BlockId,
       generatorSet: GeneratorSet,

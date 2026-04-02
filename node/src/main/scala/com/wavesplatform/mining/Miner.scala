@@ -317,11 +317,13 @@ class MinerImpl(
           f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds (${LocalTime.now().plusNanos(offset.toNanos)})$waitBlockIdStr"
         )
 
+        // We need to wait, because the mining scheduled for SnapshotBlockchain state in BlockchainUpdater
+        // If we need to forge a block immediately, we can't do this, because the parent block is not in the state yet
         val waitBlockAppendedTask = waitBlockId match {
           case Some(blockId) =>
             def waitUntilBlockAppended(block: BlockId): Task[Unit] =
               if (blockchainUpdater.lastBlockId.contains(block)) Task.unit
-              else Task.defer(waitUntilBlockAppended(block)).delayExecution(1 seconds)
+              else Task.defer(waitUntilBlockAppended(block)).delayExecution(100.millis)
 
             waitUntilBlockAppended(blockId)
 

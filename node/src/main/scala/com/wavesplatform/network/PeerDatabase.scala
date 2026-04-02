@@ -46,6 +46,6 @@ object PeerDatabase {
 
     override val detailedSuspended: Map[InetAddress, Long] = Map.empty
 
-    override def blacklistAndClose(channel: Channel, reason: String): Unit = channel.close()
+    override def blacklistAndClose(channel: Channel, reason: String): Unit = Option(channel).foreach(_.close())
   }
 }

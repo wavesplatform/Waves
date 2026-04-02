@@ -12,7 +12,6 @@ import com.wavesplatform.state.EndorsementStorage.InMemory.FinalizationResult
 
 import scala.collection.{immutable, mutable}
 
-// TODO: .switch: use in appender when changed height
 trait EndorsementStorage {
 
   /** @return true, if it can be shared with neighbors
