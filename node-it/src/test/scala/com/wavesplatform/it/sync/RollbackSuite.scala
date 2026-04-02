@@ -13,13 +13,11 @@ import scala.util.Random
 
 @LoadTest
 class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPropertyChecks {
-  override def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((14, Height(1000000))))
-      .withDefault(1)
-      .withSpecial(1, _.nonMiner)
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner.withQuorum(0).preactivatedFeatures((14, Height(1000000))),
+    NotMiner
+  )
 
   private lazy val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
 

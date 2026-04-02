@@ -20,7 +20,7 @@ case class FinalityApiRoute(blockchain: Blockchain, blocksApi: CommonBlocksApi, 
     val currentPeriod = blockchain.generationPeriodOf(currentHeight)
     Json.obj(
       "height"                  -> currentHeight,
-      "finalizedHeight"         -> blocksApi.finalizedHeightAt(currentHeight),
+      "finalizedHeight"         -> blocksApi.currentFinalizedHeight,
       "currentGenerationPeriod" -> currentPeriod,
       "currentGenerators"       -> generatorsApi.generators(currentHeight),
       "nextGenerationPeriod"    -> currentPeriod.map(_.next),

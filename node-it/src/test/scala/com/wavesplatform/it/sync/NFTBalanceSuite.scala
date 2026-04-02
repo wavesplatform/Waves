@@ -20,13 +20,8 @@ import scala.util.Random
 
 class NFTBalanceSuite extends BaseFreeSpec {
   import NFTBalanceSuite.*
-
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(1)
-      .withSpecial(_.nonMiner)
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(BiggestMiner, NotMiner)
 
   private def node: Node = nodes.head
 
