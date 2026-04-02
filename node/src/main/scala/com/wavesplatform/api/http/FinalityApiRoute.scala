@@ -1,12 +1,12 @@
 package com.wavesplatform.api.http
 
-import com.wavesplatform.api.common.CommonGeneratorsApi
 import com.wavesplatform.api.common.CommonGeneratorsApi.GeneratorEntry
+import com.wavesplatform.api.common.{CommonBlocksApi, CommonGeneratorsApi}
 import com.wavesplatform.state.{Blockchain, GenerationPeriod, Height}
 import org.apache.pekko.http.scaladsl.server.Route
 import play.api.libs.json.*
 
-case class FinalityApiRoute(blockchain: Blockchain, maxRollback: Int, generatorsApi: CommonGeneratorsApi) extends ApiRoute {
+case class FinalityApiRoute(blockchain: Blockchain, blocksApi: CommonBlocksApi, generatorsApi: CommonGeneratorsApi) extends ApiRoute {
   import FinalityApiRoute.given
 
   override def route: Route = pathPrefix("blockchain" / "finality") {
@@ -16,13 +16,13 @@ case class FinalityApiRoute(blockchain: Blockchain, maxRollback: Int, generators
   }
 
   private def finalityInfo: JsObject = {
-    val currentHeight = blockchain.height
-    val currentPeriod = blockchain.generationPeriodOf(Height(currentHeight))
+    val currentHeight = Height(blockchain.height)
+    val currentPeriod = blockchain.generationPeriodOf(currentHeight)
     Json.obj(
       "height"                  -> currentHeight,
-      "finalizedHeight"         -> blockchain.finalizedHeightAtOrFallback(maxRollback, Height(currentHeight)),
+      "finalizedHeight"         -> blocksApi.finalizedHeightAt(currentHeight),
       "currentGenerationPeriod" -> currentPeriod,
-      "currentGenerators"       -> generatorsApi.generators(Height(currentHeight)),
+      "currentGenerators"       -> generatorsApi.generators(currentHeight),
       "nextGenerationPeriod"    -> currentPeriod.map(_.next),
       "nextGenerators" -> currentPeriod.fold(Seq.empty)(p =>
         generatorsApi
