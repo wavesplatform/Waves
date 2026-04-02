@@ -58,7 +58,6 @@ class ExtensionAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     log.debug("Append block 2 - the first common block")
     val altChainBlock1 = d.createBlock(generator = committedGenerator2, strictTime = true)
     appendBlock()
-    val commonBlockHeight = Height(d.blockchain.height)
 
     log.debug("Append block 3 (activation height)")
     val altChainBlock2 = d.createBlock(ref = altChainBlock1.id().some, generator = committedGenerator2, strictTime = true)
@@ -109,8 +108,8 @@ class ExtensionAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
     {
       given Prettifier = {
-        case o: IndexedSeq[Seq[GeneratorEntry]] => o.mkString("\n")
-        case o                                  => o.toString
+        case o: IndexedSeq[?] => o.mkString("\n")
+        case o                => o.toString
       }
 
       mainChainBlockGeneratorsAfterRestore shouldBe mainChainBlockGenerators
