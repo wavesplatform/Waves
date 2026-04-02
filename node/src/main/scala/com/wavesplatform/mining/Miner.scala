@@ -323,7 +323,7 @@ class MinerImpl(
           case Some(blockId) =>
             def waitUntilBlockAppended(block: BlockId): Task[Unit] =
               if (blockchainUpdater.lastBlockId.contains(block)) Task.unit
-              else Task.defer(waitUntilBlockAppended(block)).delayExecution(100.millis)
+              else Task.defer(waitUntilBlockAppended(block)).delayExecution(1.second)
 
             waitUntilBlockAppended(blockId)
 
