@@ -490,7 +490,7 @@ object AcceptFailedScriptActivationSuite {
   private def configs(activate: Boolean): Seq[Config] =
     Seq(
       BiggestMiner
-        .withQuorum(0)
+        .quorum(0)
         .preactivatedFeatures((BlockchainFeatures.BlockV5.id, Height(if (activate) 0 else 9999)))
         .overrides(s"""
           waves {

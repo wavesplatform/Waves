@@ -6,7 +6,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -21,14 +20,11 @@ import org.scalatest.{Assertion, CancelAfterFailure}
 import scala.concurrent.duration.*
 
 class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure {
+  import NodeConfigs.*
   import RideV4ActivationSuite.*
-
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight - 1)))
-      .buildNonConflicting()
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner.quorum(0).preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight - 1))
+  )
 
   private def smartAccV4 = firstKeyPair
   private def callerAcc  = secondKeyPair

@@ -2,13 +2,10 @@ package com.wavesplatform.it.sync.transactions
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
-
-import scala.util.{Random, Try}
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.ApiError.WrongJson
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.*
@@ -21,13 +18,16 @@ import com.wavesplatform.transaction.*
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.*
 
+import scala.util.{Random, Try}
+
 class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
+  import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 2, Seq.empty)
-      .overrideBase(_.preactivatedFeatures((RideV6.id, Height(0))))
-      .overrideBase(_.raw(s"waves.blockchain.custom.functionality.allow-multiple-proofs-in-create-alias-until = 0"))
-      .buildNonConflicting()
+    Seq(BiggestMiner, Miners(3)).map(
+      _.preactivatedFeatures(
+        (RideV6.id, Height(0))
+      ).overrides("waves.blockchain.custom.functionality.allow-multiple-proofs-in-create-alias-until = 0")
+    )
 
   var version: Byte = 1
 

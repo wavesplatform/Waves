@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NodeConfigs
+import com.wavesplatform.it.NodeConfigs.BiggestMiner
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.*
@@ -15,11 +16,8 @@ class SetScriptBodyBytesByteVectorSuite extends BaseTransactionSuite {
   private def compile(scriptText: String) =
     ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
 
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(1)
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
 
   private val expectedBodyBytesSize = 32815
 

@@ -22,7 +22,7 @@ import scala.concurrent.duration.*
 
 class IssueReissueBurnAssetSuite extends BaseFreeSpec {
   import com.wavesplatform.it.NodeConfigs.*
-  override val nodeConfigs: Seq[Config] = Seq(BiggestMiner.withQuorum(0))
+  override val nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
   private val initialWavesBalance = 100.waves
   private val setScriptPrice      = 0.01.waves
   private val accountCounter      = AtomicInt(1000)

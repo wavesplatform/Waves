@@ -8,7 +8,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -32,12 +31,8 @@ import play.api.libs.json.*
 import scala.util.Random
 
 class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with BeforeAndAfterAll {
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = 0"))
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0).minAssetInfoUpdateInterval(0))
 
   test("height should always be reported for transactions") {
     val txId = sender.transfer(firstKeyPair, secondAddress, 1.waves, fee = minFee).id

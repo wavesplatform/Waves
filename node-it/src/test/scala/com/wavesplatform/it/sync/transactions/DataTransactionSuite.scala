@@ -24,15 +24,18 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Random, Try}
 
 class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
-  override def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation = 1"))
-      .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period = 1"))
-      .overrideBase(_.preactivatedFeatures(15 -> Height(0)))
-      .withDefault(1)
-      .withSpecial(1, _.nonMiner)
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner.quorum(0),
+    NotMiner
+  ).map(
+    _.preactivatedFeatures(15 -> Height(0)).overrides(
+      """waves.blockchain.custom.functionality {
+        |  blocks-for-feature-activation = 1
+        |  feature-check-blocks-period = 1
+        |}""".stripMargin
+    )
+  )
 
   private lazy val fourthKeyPair         = sender.createKeyPair()
   private lazy val fourthAddress: String = fourthKeyPair.toAddress.toString

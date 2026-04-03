@@ -18,7 +18,17 @@ import com.wavesplatform.transaction.{TxExchangeAmount, TxExchangePrice, TxHelpe
 import play.api.libs.json.{JsNumber, JsObject, JsString, Json}
 
 class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
-  private lazy val exchAsset: IssueTransaction = TxHelpers.issue(issuer = sender.keyPair, amount = someAssetAmount, decimals = 2, name = "myasset", description = "my asset description", fee = 1.waves, script = None, reissuable = true, version = TxVersion.V1)
+  private lazy val exchAsset: IssueTransaction = TxHelpers.issue(
+    issuer = sender.keyPair,
+    amount = someAssetAmount,
+    decimals = 2,
+    name = "myasset",
+    description = "my asset description",
+    fee = 1.waves,
+    script = None,
+    reissuable = true,
+    version = TxVersion.V1
+  )
 
   private def acc0 = firstKeyPair
   private def acc1 = secondKeyPair
@@ -149,7 +159,17 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     val assetDescription = "my asset description"
 
-    val IssueTx: IssueTransaction = TxHelpers.issue(issuer = buyer, amount = someAssetAmount, decimals = 8, name = "myasset", description = assetDescription, fee = 1.waves, script = None, reissuable = true, version = TxVersion.V1)
+    val IssueTx: IssueTransaction = TxHelpers.issue(
+      issuer = buyer,
+      amount = someAssetAmount,
+      decimals = 8,
+      name = "myasset",
+      description = assetDescription,
+      fee = 1.waves,
+      script = None,
+      reissuable = true,
+      version = TxVersion.V1
+    )
 
     val assetId = IssueTx.id()
 
@@ -195,17 +215,17 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
       val tx =
         TxHelpers.exchange(
-            version = 3.toByte,
-            matcher = matcher,
-            order1 = buy,
-            order2 = sell,
-            amount = amount,
-            price = sellPrice,
-            buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount.value).toLong,
-            sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount.value).toLong,
-            fee = matcherFee,
-            timestamp = ntpTime.correctedTime()
-          )
+          version = 3.toByte,
+          matcher = matcher,
+          order1 = buy,
+          order2 = sell,
+          amount = amount,
+          price = sellPrice,
+          buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount.value).toLong,
+          sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount.value).toLong,
+          fee = matcherFee,
+          timestamp = ntpTime.correctedTime()
+        )
 
       sender.postJson("/transactions/broadcast", tx.json())
 
@@ -337,17 +357,17 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     val tx =
       TxHelpers.exchange(
-          version = 3.toByte,
-          matcher = matcher,
-          order1 = buyNftForWaves,
-          order2 = sellNftForWaves,
-          amount = amount,
-          price = nftWavesPrice,
-          buyMatcherFee = (BigInt(matcherFee) * amount / sellNftForWaves.amount.value).toLong,
-          sellMatcherFee = (BigInt(matcherFee) * amount / sellNftForWaves.amount.value).toLong,
-          fee = matcherFee,
-          timestamp = ntpTime.correctedTime()
-        )
+        version = 3.toByte,
+        matcher = matcher,
+        order1 = buyNftForWaves,
+        order2 = sellNftForWaves,
+        amount = amount,
+        price = nftWavesPrice,
+        buyMatcherFee = (BigInt(matcherFee) * amount / sellNftForWaves.amount.value).toLong,
+        sellMatcherFee = (BigInt(matcherFee) * amount / sellNftForWaves.amount.value).toLong,
+        fee = matcherFee,
+        timestamp = ntpTime.correctedTime()
+      )
 
     sender.signedBroadcast(tx.json(), waitForTx = true)
 
@@ -361,17 +381,17 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     val tx2 =
       TxHelpers.exchange(
-          version = 3.toByte,
-          matcher = matcher,
-          order1 = buyNftForOtherAsset,
-          order2 = sellNftForOtherAsset,
-          amount = amount,
-          price = nftForAssetPrice,
-          buyMatcherFee = (BigInt(matcherFee) * amount / buyNftForOtherAsset.amount.value).toLong,
-          sellMatcherFee = (BigInt(matcherFee) * amount / buyNftForOtherAsset.amount.value).toLong,
-          fee = matcherFee,
-          timestamp = ntpTime.correctedTime()
-        )
+        version = 3.toByte,
+        matcher = matcher,
+        order1 = buyNftForOtherAsset,
+        order2 = sellNftForOtherAsset,
+        amount = amount,
+        price = nftForAssetPrice,
+        buyMatcherFee = (BigInt(matcherFee) * amount / buyNftForOtherAsset.amount.value).toLong,
+        sellMatcherFee = (BigInt(matcherFee) * amount / buyNftForOtherAsset.amount.value).toLong,
+        fee = matcherFee,
+        timestamp = ntpTime.correctedTime()
+      )
 
     sender.signedBroadcast(tx2.json(), waitForTx = true)
 
@@ -384,11 +404,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
   }
 
+  import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id.toInt, Height(0))))
-      .withDefault(1)
-      .withSpecial(_.nonMiner)
-      .buildNonConflicting()
+    Seq(BiggestMiner.quorum(0), NotMiner).map(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id.toInt, Height(0))))
 }

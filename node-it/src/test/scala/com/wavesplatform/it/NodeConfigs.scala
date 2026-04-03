@@ -19,12 +19,15 @@ object NodeConfigs {
 
   extension (c: Config) {
     def overrides(s: String): Config = ConfigFactory.parseString(s).withFallback(c)
-    def withQuorum(n: Int): Config   = overrides(s"waves.miner.quorum = $n")
+    def quorum(n: Int): Config       = overrides(s"waves.miner.quorum = $n")
     def preactivatedFeatures(f: (Int, Height)*): Config = overrides(
       s"""waves.blockchain.custom.functionality.pre-activated-features {
         ${f.map { case (id, height) => s"$id = $height" }.mkString("\n")}
       }"""
     )
+    def minAssetInfoUpdateInterval(blocks: Int): Config =
+      overrides(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $blocks")
+
     def notMiner: Config = overrides("waves.miner.enable = no")
   }
 

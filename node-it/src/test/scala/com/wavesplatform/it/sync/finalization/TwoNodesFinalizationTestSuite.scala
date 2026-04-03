@@ -13,12 +13,12 @@ import org.scalatest.OptionValues
 import scala.concurrent.duration.DurationInt
 
 class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLogging {
+  import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0))))
-      .overrideBase(_.raw("waves.miner.minimal-block-generation-offset = 10s"))
-      .withDefault(2)
-      .buildNonConflicting()
+    Seq(BiggestMiner, Miners(6)).map(
+      _.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0)))
+        .overrides("waves.miner.minimal-block-generation-offset = 10s")
+    )
 
   private def node1 = dockerNodes().head
   private def node2 = dockerNodes().last

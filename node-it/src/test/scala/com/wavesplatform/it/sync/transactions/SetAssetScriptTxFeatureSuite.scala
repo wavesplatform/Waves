@@ -17,20 +17,9 @@ class SetAssetScriptTxFeatureSuite extends BaseTransactionSuite {
 
   private var assetId = ""
 
-  override def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.raw(s"""waves {
-                             |  blockchain.custom.functionality {
-                             |    pre-activated-features = {
-                             |      ${BlockchainFeatures.SmartAssets.id} = $featureActivationHeight
-                             |    }
-                             |    
-                             |  }
-                             |}""".stripMargin))
-      .withDefault(1)
-      .withSpecial(_.nonMiner)
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] =
+    Seq(BiggestMiner.quorum(0), NotMiner).map(_.preactivatedFeatures((BlockchainFeatures.SmartAssets.id, featureActivationHeight)))
 
   override def beforeAll(): Unit = {
     super.beforeAll()

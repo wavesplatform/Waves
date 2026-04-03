@@ -12,7 +12,7 @@ import scala.concurrent.duration.DurationInt
 class PeersApiRouteSuite extends BaseFreeSpec with Eventually {
   import com.wavesplatform.it.NodeConfigs.*
   override val nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.withQuorum(0),
+    BiggestMiner.quorum(0),
     Default.head.notMiner
   )
 

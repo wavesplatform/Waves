@@ -1,13 +1,15 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.it.NodeConfigs.{NotMiner, Miners, quorum}
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.state.{IntegerDataEntry, Height}
+import com.wavesplatform.state.{Height, IntegerDataEntry}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.{CreateAliasTransaction, TxExchangeAmount, TxExchangePrice, TxVersion}
@@ -17,6 +19,10 @@ import org.scalatest.Assertion
 import play.api.libs.json.{JsString, JsValue, Json}
 
 class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    Miners(3).quorum(0), // slow down mining a little
+    NotMiner
+  )
 
   val (headerName, headerValue) = ("Accept", "application/json;large-significand-format=string")
 
@@ -204,6 +210,7 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
     overflowBlock()
 
     def checkMassTransferTx(tx: Transaction): Assertion = {
+      log.info(s"Transaction: $tx")
       tx.transfers.get.head.amount shouldBe transferAmount
       tx.totalAmount shouldBe Some(transferAmount)
     }

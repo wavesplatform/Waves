@@ -18,12 +18,9 @@ import org.scalatest.CancelAfterFailure
 
 class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val estimator = ScriptEstimatorV2
-
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(entitiesNumber = 1)
-      .buildNonConflicting()
+  
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
 
   test("assetBalance() verification") {
     val asset = sender

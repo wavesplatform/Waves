@@ -14,18 +14,15 @@ class UtilsEstimatorToggleSuite extends BaseTransactionSuite with CancelAfterFai
   val estimatorV2ActivationHeight = Height(5)
   val estimatorV3ActivationHeight = Height(8)
 
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(NodeConfigs.Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(
-        _.preactivatedFeatures(
-          (BlockchainFeatures.BlockReward.id, estimatorV2ActivationHeight),
-          (BlockchainFeatures.BlockV5.id, estimatorV3ActivationHeight)
-        )
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner
+      .quorum(0)
+      .preactivatedFeatures(
+        (BlockchainFeatures.BlockReward.id, estimatorV2ActivationHeight),
+        (BlockchainFeatures.BlockV5.id, estimatorV3ActivationHeight)
       )
-      .withDefault(1)
-      .buildNonConflicting()
+  )
 
   val differentlyEstimatedScript: String =
     """

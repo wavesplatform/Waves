@@ -4,7 +4,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.Block
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -16,13 +15,15 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 class RideBlockInfoSuite extends BaseTransactionSuite {
   val activationHeight = Height(4)
 
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((14, Height(2))))
-      .overrideBase(_.preactivatedFeatures((15, activationHeight)))
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner
+      .quorum(0)
+      .preactivatedFeatures(
+        (14, Height(2)),
+        (15, activationHeight)
+      )
+  )
 
   private val dAppScriptV4 =
     """

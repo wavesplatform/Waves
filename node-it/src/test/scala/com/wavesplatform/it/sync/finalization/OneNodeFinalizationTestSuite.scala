@@ -16,7 +16,7 @@ import scala.concurrent.duration.DurationInt
 class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLogging {
   import com.wavesplatform.it.NodeConfigs.*
   override val nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.withQuorum(0).preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0)))
+    BiggestMiner.quorum(0).preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0)))
   )
 
   private def node            = dockerNodes().last
@@ -27,6 +27,8 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     val miner2Acc, miner3Acc = node.createKeyPairServerSide()
     val miner2Addr           = miner2Acc.toAddress.toString
     val miner3Addr           = miner3Acc.toAddress.toString
+
+    log.warn(s"M2=$miner2Addr, M3=$miner3Addr")
 
     step("Commit to generation")
     val period1 = node.currentGenerationPeriod.value.next
@@ -48,12 +50,12 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
       generators shouldBe Seq(
         GeneratorsResponse.Entry(
           address = miner1Addr,
-          balance = 9990598000000L,
+          balance = 99990598000000L,
           transactionId = commitTxn1.id
         ),
         GeneratorsResponse.Entry(
           address = miner2Addr,
-          balance = 9989990000000L,
+          balance = 99989990000000L,
           transactionId = commitTxn2.id
         )
       )

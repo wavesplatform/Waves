@@ -41,5 +41,5 @@ class AssetsApiGrpcSuite extends BaseFreeSpec with ActivationStatusRequest with 
   }
 
   import com.wavesplatform.it.NodeConfigs.*
-  override val nodeConfigs: Seq[Config] = Seq(BiggestMiner.withQuorum(0))
+  override val nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
 }

@@ -23,7 +23,7 @@ trait BaseSuite
 
   import com.wavesplatform.it.NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.withQuorum(0),
+    BiggestMiner.quorum(0),
     Default.head.notMiner
   )
 

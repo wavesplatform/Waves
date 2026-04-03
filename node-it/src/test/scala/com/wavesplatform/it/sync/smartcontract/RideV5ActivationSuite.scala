@@ -4,7 +4,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.smartcontract.RideV4ActivationSuite.*
@@ -17,13 +16,12 @@ import scala.concurrent.duration.DurationInt
 class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val activationHeight = Height(6)
 
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.Ride4DApps.id, Height(0))))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, activationHeight - 1)))
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner
+      .quorum(0)
+      .preactivatedFeatures((BlockchainFeatures.Ride4DApps.id, Height(0)), (BlockchainFeatures.SynchronousCalls.id, activationHeight - 1))
+  )
 
   private def smartAccV5 = firstKeyPair
   private def callerAcc  = secondKeyPair

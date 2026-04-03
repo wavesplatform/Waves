@@ -40,11 +40,9 @@ class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with Tra
     enableProfiling = true
   )
 
-  override protected val nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
-    .overrideBase(_.quorum(3))
-    .withDefault(2)
-    .withSpecial(2, _.nonMiner)
-    .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] =
+    (Seq(BiggestMiner, Miners(6)) ++ Seq(NotMiner, Miners.head).map(_.notMiner)).map(_.quorum(3))
 
   private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
   private val requestsCount = 10000

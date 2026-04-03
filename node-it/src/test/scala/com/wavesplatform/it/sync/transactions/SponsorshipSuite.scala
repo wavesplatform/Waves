@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.*
-import com.wavesplatform.it.{BaseFreeSpec, IntegrationSuiteWithThreeAddresses, NodeConfigs}
+import com.wavesplatform.it.{BaseFreeSpec, IntegrationSuiteWithThreeAddresses}
 import com.wavesplatform.state.Height
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.test.*
@@ -18,16 +18,15 @@ import org.scalatest.Assertion
 import scala.concurrent.duration.*
 
 class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddresses {
-
-  override def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((14, Height(1000000))))
-      .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation=1"))
-      .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period=1"))
-      .withDefault(1)
-      .withSpecial(1, _.nonMiner)
-      .buildNonConflicting()
+  import com.wavesplatform.it.NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] =
+    Seq(BiggestMiner.quorum(0), NotMiner).map(
+      _.preactivatedFeatures((14, Height(1000000)))
+        .overrides(s"""waves.blockchain.custom.functionality {
+                      |  blocks-for-feature-activation = 1
+                      |  feature-check-blocks-period = 1
+                      |}""".stripMargin)
+    )
 
   private def sponsor = firstKeyPair
   private def alice   = secondKeyPair

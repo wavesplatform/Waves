@@ -23,12 +23,9 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
   override protected def waitForHeightArise(): Unit =
     nodes.waitForHeightArise()
 
-  override def nodeConfigs: Seq[Config] =
-    com.wavesplatform.it.NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures(BlockchainFeatures.BlockV5.id.toInt -> Height(0)))
-      .withDefault(1)
-      .buildNonConflicting()
+  import com.wavesplatform.it.NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] =
+    Seq(BiggestMiner.quorum(0).preactivatedFeatures(BlockchainFeatures.BlockV5.id.toInt -> Height(0)))  
 
   def await[A](f: Future[A]): A = Await.result(f, 2 seconds)
 

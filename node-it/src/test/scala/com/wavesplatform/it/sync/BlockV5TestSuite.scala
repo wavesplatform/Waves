@@ -17,7 +17,7 @@ import scala.concurrent.duration.*
 class BlockV5TestSuite extends BaseFreeSpec with ActivationStatusRequest with OptionValues {
   import com.wavesplatform.it.NodeConfigs.*
   override val nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.withQuorum(0),
+    BiggestMiner.quorum(0),
     Default.head.notMiner
   )
 
