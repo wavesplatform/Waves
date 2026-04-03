@@ -123,7 +123,6 @@ class MicroBlockMinerSpec extends FlatSpec with WithDomain {
       )
 
       val utxPool = new UtxPool {
-
         override def packUnconfirmed(
             rest: MultiDimensionalMiningConstraint,
             prevStateHash: Option[ByteStr],
@@ -140,7 +139,7 @@ class MicroBlockMinerSpec extends FlatSpec with WithDomain {
         }
 
         override def putIfNew(tx: Transaction, forceValidate: Boolean)                = inner.putIfNew(tx, forceValidate)
-        override def removeAll(txs: Iterable[Transaction]): Unit                      = inner.removeAll(txs)
+        override def removeIds(txIds: Iterable[ByteStr]): Unit                        = inner.removeIds(txIds)
         override def all                                                              = inner.all
         override def size                                                             = inner.size
         override def transactionById(transactionId: ByteStr)                          = inner.transactionById(transactionId)

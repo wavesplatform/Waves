@@ -16,8 +16,7 @@ import com.wavesplatform.state.TxStateSnapshotHashBuilder.TxStatusInfo
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
-import com.wavesplatform.state.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, Portfolio, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, Portfolio, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted, WithLog}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -166,12 +165,6 @@ case class UtxPoolImpl(
     tracedIsNew
   }
 
-  override def removeAll(txs: Iterable[Transaction]): Unit = {
-    if (txs.isEmpty) return
-    val ids = txs.map(_.id()).toSet
-    removeIds(ids)
-  }
-
   def setPrioritySnapshots(discSnapshots: Seq[StateSnapshot]): Unit =
     priorityPool.setPriorityDiffs(discSnapshots).foreach(addTransaction(_, verify = false))
 
@@ -185,8 +178,8 @@ case class UtxPoolImpl(
     }
   }
 
-  private def removeIds(removed: Set[ByteStr]): Unit =
-    removed.flatMap(id => removeFromOrdPool(id)).foreach(TxStateActions.removeMined(_))
+  def removeIds(txIds: Iterable[ByteStr]): Unit =
+    txIds.flatMap(id => removeFromOrdPool(id)).foreach(TxStateActions.removeMined(_))
 
   private[utx] def addTransaction(
       tx: Transaction,

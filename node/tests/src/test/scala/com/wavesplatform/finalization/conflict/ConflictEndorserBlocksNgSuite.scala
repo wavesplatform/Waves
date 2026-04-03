@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.TxHelpers
 import org.scalactic.source.Position
 import org.scalatest.Assertion
 
-/** Blocks:
+/** Adding blocks:
   * 1. Genesis
   * 2. With commitments from two generators
   * 3. First block at period #1

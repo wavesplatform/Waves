@@ -7,6 +7,10 @@ import com.wavesplatform.utils.Schedulers
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 
+/** Executes signature verification in advance using parallel computation.
+  * The result is cached in a lazy value: if precomputation completes in time,
+  * the cached result is reused; otherwise, it is computed on demand.
+  */
 object ParSignatureChecker {
   implicit val sigverify: SchedulerService = Schedulers.fixedPool(4, "sigverify")
 

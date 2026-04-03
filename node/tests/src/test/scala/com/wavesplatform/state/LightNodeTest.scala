@@ -114,8 +114,9 @@ class LightNodeTest extends PropSpec with WithDomain {
         DomainPresets.TransactionStateSnapshot.copy(enableLightMode = isLightMode),
         AddrWithBalance.enoughBalances(sender, TxHelpers.defaultSigner)
       ) { d =>
-        val chainSize = 3
-        val genesisId = d.lastBlockId
+        val chainSize    = 3
+        val genesisId    = d.lastBlockId
+        val genesisBlock = d.lastBlock
         val betterBlocks = (1 to chainSize).map { idx =>
           val txs =
             Seq(TxHelpers.transfer(sender, recipient, amount = (idx + 10).waves), TxHelpers.transfer(sender, recipient, amount = (idx + 11).waves))
@@ -125,17 +126,21 @@ class LightNodeTest extends PropSpec with WithDomain {
           block -> txSnapshots
         }
         val expectedStateHash = d.lastBlock.header.stateHash
+
+        log.debug("Rolling back")
         d.rollbackTo(genesisId)
 
+        log.debug("Appending new blocks")
         (1 to chainSize).foreach { idx =>
           val txs = Seq(TxHelpers.transfer(sender, recipient, amount = idx.waves), TxHelpers.transfer(sender, recipient, (idx + 1).waves))
           d.appendBlock(txs*)
         }
         val currentScore = d.blockchain.score
 
+        log.debug("Appending extension")
         val extensionBlocks = ExtensionBlocks(
           currentScore + 1,
-          betterBlocks.map(_._1),
+          genesisBlock +: betterBlocks.map(_._1),
           betterBlocks.collect { case (b, Some(snapshots)) =>
             b.id() -> BlockSnapshotResponse(b.id(), snapshots.map { case (s, m) => PBSnapshots.toProtobuf(s, m) })
           }.toMap
