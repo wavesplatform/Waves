@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class SetAssetScriptTxFeatureSuite extends BaseTransactionSuite {
 
-  private val featureActivationHeight = Height(8)
+  private val featureActivationHeight = Height(11)
 
   private var assetId = ""
 

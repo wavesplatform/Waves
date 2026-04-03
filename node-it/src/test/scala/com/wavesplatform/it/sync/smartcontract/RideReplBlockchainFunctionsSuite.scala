@@ -25,7 +25,7 @@ import scala.concurrent.duration.*
 
 class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   import NodeConfigs.*
-  override protected def nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
+  override protected def nodeConfigs: Seq[Config] = Seq(Miners.head.quorum(0))
 
   private def alice = firstKeyPair
   private def bob   = secondKeyPair

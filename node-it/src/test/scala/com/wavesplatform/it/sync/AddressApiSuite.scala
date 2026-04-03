@@ -150,5 +150,6 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
   }
 
   import NodeConfigs.*
-  override protected def nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0), NotMiner)
+  override protected def nodeConfigs: Seq[Config] =
+    Seq(BiggestMiner.quorum(0).overrides("waves.rest-api.transactions-by-address-limit = 20"), NotMiner)
 }

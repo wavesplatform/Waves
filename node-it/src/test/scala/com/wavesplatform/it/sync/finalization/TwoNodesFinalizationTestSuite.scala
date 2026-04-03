@@ -46,12 +46,12 @@ class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLo
       generators should contain theSameElementsAs Seq(
         GeneratorsResponse.Entry(
           address = miner1Addr,
-          balance = 9989990000000L,
+          balance = 99990598000000L,
           transactionId = commitTxn1.id
         ),
         GeneratorsResponse.Entry(
           address = miner2Addr,
-          balance = 24990598000000L,
+          balance = 59989990000000L,
           transactionId = commitTxn2.id
         )
       )

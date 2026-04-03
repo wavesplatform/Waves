@@ -381,7 +381,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
 
 object RideV4ActivationSuite {
   private val estimator = ScriptEstimatorV2
-  val activationHeight  = Height(9)
+  val activationHeight  = Height(11)
 
   def asAssetV3(body: String): String = {
     s"""{-# STDLIB_VERSION 3 #-}

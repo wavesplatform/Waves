@@ -13,7 +13,7 @@ import org.scalatest.CancelAfterFailure
 import scala.concurrent.duration.*
 
 class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val featureHeight = Height(8)
+  private val featureHeight = Height(10)
 
   import NodeConfigs.*
 
