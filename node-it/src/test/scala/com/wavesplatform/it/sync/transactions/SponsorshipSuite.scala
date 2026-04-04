@@ -20,7 +20,7 @@ import scala.concurrent.duration.*
 class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddresses {
   import com.wavesplatform.it.NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    Seq(BiggestMiner.quorum(0), NotMiner).map(
+    Seq(Miners(3).quorum(0), NotMiner).map(
       _.preactivatedFeatures((14, Height(1000000)))
         .overrides(s"""waves.blockchain.custom.functionality {
                       |  blocks-for-feature-activation = 1

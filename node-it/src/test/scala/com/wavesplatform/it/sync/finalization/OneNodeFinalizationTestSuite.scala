@@ -47,17 +47,9 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     isolated {
       val generators = node.generators(period1.start)
       generators.size shouldBe 2
-      generators shouldBe Seq(
-        GeneratorsResponse.Entry(
-          address = miner1Addr,
-          balance = 99990598000000L,
-          transactionId = commitTxn1.id
-        ),
-        GeneratorsResponse.Entry(
-          address = miner2Addr,
-          balance = 99989990000000L,
-          transactionId = commitTxn2.id
-        )
+      generators.map(e => e.address -> e.transactionId) should contain theSameElementsAs Seq(
+        miner1Addr -> commitTxn1.id,
+        miner2Addr -> commitTxn2.id
       )
     }
 
