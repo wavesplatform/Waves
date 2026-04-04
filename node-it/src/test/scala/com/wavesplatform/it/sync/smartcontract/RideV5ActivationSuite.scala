@@ -14,7 +14,7 @@ import org.scalatest.{Assertion, CancelAfterFailure}
 import scala.concurrent.duration.DurationInt
 
 class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val activationHeight = Height(6)
+  private val activationHeight = Height(8)
 
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] = Seq(

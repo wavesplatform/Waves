@@ -66,12 +66,12 @@ class MicroblocksSponsoredFeeTestSuite extends BaseFreeSpec with ScorexLogging {
 
   import NodeConfigs.*
   override def nodeConfigs: Seq[Config] = Seq(
-    Default(0).quorum(0).overrides(
+    BiggestMiner.quorum(0).overrides(
       """waves.blockchain.custom.functionality {
         |  blocks-for-feature-activation = 1
         |  feature-check-blocks-period = 1
         |}""".stripMargin),
     Default(1).notMiner,
     Default(2).notMiner
-  )
+  ).map(_.preactivatedFeatures((14, Height(1000000))))
 }

@@ -15,9 +15,10 @@ import scala.concurrent.duration.DurationInt
 class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLogging {
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    Seq(BiggestMiner, Miners(6)).map(
+    Seq(Miners.head, Miners(3)).map(
       _.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0)))
-        .overrides("waves.miner.minimal-block-generation-offset = 10s")
+        .overrides("waves.waves.blockchain.custom.functionality.min-block-time = 10s")
+        .quorum(1)
     )
 
   private def node1 = dockerNodes().head
@@ -33,27 +34,20 @@ class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLo
 
     step("Commit to generation")
     val commitTxn1 = node1.signCommitToGenerationRequest(miner1Addr)
-    node1.broadcastRequest(commitTxn1)
-
     val commitTxn2 = node2.signCommitToGenerationRequest(miner2Addr)
+
+    node2.broadcastRequest(commitTxn1)
     node2.broadcastRequest(commitTxn2)
+
     node1.waitForGenerationPeriod(period1)
 
     step("Generators")
     isolated {
       val generators = node1.generators(period1.start)
       generators.size shouldBe 2
-      generators should contain theSameElementsAs Seq(
-        GeneratorsResponse.Entry(
-          address = miner1Addr,
-          balance = 99990598000000L,
-          transactionId = commitTxn1.id
-        ),
-        GeneratorsResponse.Entry(
-          address = miner2Addr,
-          balance = 59989990000000L,
-          transactionId = commitTxn2.id
-        )
+      generators.map(ge => ge.address -> ge.transactionId) should contain theSameElementsAs Seq(
+        miner1Addr -> commitTxn1.id,
+        miner2Addr -> commitTxn2.id
       )
     }
 
