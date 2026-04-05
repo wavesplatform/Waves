@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.*
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.it.sync.transactions.{FailedTransactionSuiteLike, OverflowBlock}
+import com.wavesplatform.it.sync.transactions.FailedTransactionSuiteLike
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.repl.Repl
@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 
-class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[String] with OverflowBlock {
+class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[String] {
   override protected def waitForHeightArise(): Unit =
     nodes.waitForHeightArise()
 

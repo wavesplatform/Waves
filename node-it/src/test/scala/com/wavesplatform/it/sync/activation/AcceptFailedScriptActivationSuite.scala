@@ -9,7 +9,6 @@ import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.it.sync.*
-import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.Height
@@ -23,7 +22,7 @@ import play.api.libs.json.JsObject
 
 import scala.concurrent.duration.*
 
-class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTime with OverflowBlock {
+class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTime {
   import AcceptFailedScriptActivationSuite.*
 
   private lazy val (dApp, dAppKP)               = (firstAddress, firstKeyPair)
@@ -69,7 +68,6 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   }
 
   test("reject failed transaction before activation height") {
-    overflowBlock()
     sender.waitForHeight(
       Height(
         sender
@@ -108,7 +106,6 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     val startHeight = sender.height
 
     sender.setAssetScript(asset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
-    overflowBlock()
     sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
     val txs =
       (1 to MaxTxsInMicroBlock * 2).map { _ =>
@@ -181,8 +178,6 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   test("accept invalid by asset script InvokeScriptTransaction to utx and save it as failed after activation height") {
     sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
 
-    overflowBlock()
-
     val txs =
       (1 to MaxTxsInMicroBlock * 2).map { i =>
         sender.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee + i)._1.id
@@ -219,7 +214,6 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
     nodes.waitForHeightArise()
-    overflowBlock()
 
     val txs =
       (1 to invokesCount).map { _ =>
@@ -402,7 +396,6 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     {
       val (buy, sell) = orders
-      overflowBlock()
 
       sender.setAssetScript(tradeAsset, dAppKP, priorityFee, assetScript(false))
       val tx = sender
@@ -432,7 +425,6 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       val (buy, sell) = orders
       sender.setAssetScript(tradeAsset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
 
-      overflowBlock()
       sender.setAssetScript(feeAsset, dAppKP, setAssetScriptFee + smartFee, assetScript(false))
       val tx = sender
         .broadcastExchange(
@@ -495,7 +487,10 @@ object AcceptFailedScriptActivationSuite {
         .overrides(s"""
           waves {
             blockchain.custom.functionality.min-asset-info-update-interval = $UpdateInterval
-            miner.max-transactions-in-micro-block = $MaxTxsInMicroBlock
+            miner {
+              max-transactions-in-micro-block = $MaxTxsInMicroBlock
+              micro-block-interval = 5s
+            }
           }""")
     )
 }
