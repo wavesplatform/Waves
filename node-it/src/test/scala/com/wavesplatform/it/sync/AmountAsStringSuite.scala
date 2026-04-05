@@ -20,7 +20,7 @@ import play.api.libs.json.{JsString, JsValue, Json}
 
 class AmountAsStringSuite extends BaseFunSuite with ScorexLogging {
   override protected def nodeConfigs: Seq[Config] = Seq(
-    Miners(3).quorum(0).overrides("waves.miner.micro-block-interval = 5s"), // when UTX is empty, retry building microblock in 2 seconds
+    Miners(1).quorum(0).overrides("waves.miner.micro-block-interval = 5s"), // when UTX is empty, retry building microblock in 2 seconds
     NotMiner
   )
 

@@ -27,7 +27,7 @@ trait IntegrationSuiteWithThreeAddresses extends BaseSuite {
 
     withClue("beforeAll") {
       nodes.waitForHeightAriseAndTxPresent(
-        sender.massTransfer(sender.keyPair, List(firstAddress, secondAddress, thirdAddress).map(MassTransferTransaction.Transfer(_, 100.waves)), 0).id
+        sender.massTransfer(sender.keyPair, List(firstAddress, secondAddress, thirdAddress).map(MassTransferTransaction.Transfer(_, 100.waves)), 0.003.waves, version = 1.toByte).id
       )
     }
   }

@@ -15,27 +15,25 @@ class NotActivateFeatureTestSuite extends BaseFreeSpec with ActivationStatusRequ
   private val votingFeatureNum: Short    = 1
   private val nonVotingFeatureNum: Short = 2
 
+  import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(
-        _.raw(
-          s"""waves {
-         |  blockchain {
-         |    custom {
-         |      functionality {
-         |        pre-activated-features = {}
-         |        feature-check-blocks-period = $votingInterval
-         |        blocks-for-feature-activation = $blocksForActivation
-         |      }
-         |    }
-         |  }
-         |  features.supported=[$nonVotingFeatureNum]
-         |  miner.quorum = 1
-         |}""".stripMargin
-        )
+    Seq(BiggestMiner, Miners(5)).map(
+      _.overrides(
+        s"""waves {
+           |  blockchain {
+           |    custom {
+           |      functionality {
+           |        pre-activated-features = {}
+           |        feature-check-blocks-period = $votingInterval
+           |        blocks-for-feature-activation = $blocksForActivation
+           |      }
+           |    }
+           |  }
+           |  features.supported=[$nonVotingFeatureNum]
+           |  miner.quorum = 1
+           |}""".stripMargin
       )
-      .withDefault(2)
-      .buildNonConflicting()
+    )
 
   private var activationStatusInfoBefore = Seq.empty[FeatureActivationStatus]
   private var activationStatusInfoAfter  = Seq.empty[FeatureActivationStatus]

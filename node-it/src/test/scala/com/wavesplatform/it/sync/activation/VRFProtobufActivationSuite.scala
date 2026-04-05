@@ -8,7 +8,6 @@ import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.*
@@ -20,15 +19,15 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import scala.concurrent.duration.*
 
 class VRFProtobufActivationSuite extends BaseTransactionSuite {
-  val activationHeight = Height(9)
+  val activationHeight = Height(10)
   val updateInterval   = 3
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight)))
-      .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $updateInterval"))
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner
+      .quorum(0)
+      .preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight))
+      .overrides(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $updateInterval")
+  )
 
   private def senderAcc             = firstKeyPair
   private def recipientAcc          = secondKeyPair
@@ -47,8 +46,9 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("miner generates block v4 before activation") {
-    val blockBeforeActivationHeight       = sender.blockAt(sender.height)
-    val blockHeaderBeforeActivationHeight = sender.blockHeaderAt(sender.height)
+    val height = sender.height
+    val blockBeforeActivationHeight       = sender.blockAt(height)
+    val blockHeaderBeforeActivationHeight = sender.blockHeaderAt(height)
     blockBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
     blockHeaderBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
     Base58.decode(blockBeforeActivationHeight.generationSignature.get).length shouldBe Block.GenerationSignatureLength
@@ -72,10 +72,11 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("only able to get block by signature (that is equal to id) before activation") {
-    sender.blockById(sender.blockAt(sender.height).signature) shouldBe sender.blockAt(sender.height)
-    sender.blockAt(sender.height).signature shouldBe sender.blockAt(sender.height).id
-    Base58.decode(sender.blockAt(sender.height).signature).length shouldBe crypto.SignatureLength
-    Base58.decode(sender.blockAt(sender.height).id).length shouldBe crypto.SignatureLength
+    val height = sender.height
+    sender.blockById(sender.blockAt(height).signature) shouldBe sender.blockAt(height)
+    sender.blockAt(height).signature shouldBe sender.blockAt(height).id
+    Base58.decode(sender.blockAt(height).signature).length shouldBe crypto.SignatureLength
+    Base58.decode(sender.blockAt(height).id).length shouldBe crypto.SignatureLength
   }
 
   test("not able to broadcast ExchangeTransaction with reversed buy/sell orders") {
@@ -108,8 +109,9 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("miner generates block v5 after activation") {
-    val blockAtActivationHeight       = sender.blockAt(sender.height)
-    val blockHeaderAtActivationHeight = sender.blockHeaderAt(sender.height)
+    val height = sender.height
+    val blockAtActivationHeight       = sender.blockAt(height)
+    val blockHeaderAtActivationHeight = sender.blockHeaderAt(height)
     blockAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
     blockHeaderAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
 
@@ -118,10 +120,11 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("only able to get block by id (that is not equal to signature) after activation") {
-    sender.blockById(sender.blockAt(sender.height).id) shouldBe sender.blockAt(sender.height)
-    sender.blockAt(sender.height).signature should not be sender.blockAt(sender.height).id
-    Base58.decode(sender.blockAt(sender.height).signature).length shouldBe crypto.SignatureLength
-    Base58.decode(sender.blockAt(sender.height).id).length shouldBe crypto.DigestLength
+    val height = sender.height
+    sender.blockById(sender.blockAt(height).id) shouldBe sender.blockAt(height)
+    sender.blockAt(height).signature should not be sender.blockAt(height).id
+    Base58.decode(sender.blockAt(height).signature).length shouldBe crypto.SignatureLength
+    Base58.decode(sender.blockAt(height).id).length shouldBe crypto.DigestLength
   }
 
   test("able to broadcast UpdateAssetInfoTransaction if interval's reached before activation") {

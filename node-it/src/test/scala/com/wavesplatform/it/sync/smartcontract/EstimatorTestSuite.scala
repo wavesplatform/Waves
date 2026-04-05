@@ -18,7 +18,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   import NodeConfigs.*
 
   override protected def nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner
+    Miners(5)
       .quorum(0)
       .overrides(
         s"""

@@ -171,7 +171,7 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
 
         val aliceTxs = sender.transactionsByAddress(aliceAddress, 100)
         aliceTxs.size shouldBe 5 // not 4, because there was one more transaction in IntegrationSuiteWithThreeAddresses class
-        aliceTxs.count(tx => tx.sender.contains(aliceAddress) || tx.recipient.contains(aliceAddress)) shouldBe 5
+        aliceTxs.count(tx => tx.sender.contains(aliceAddress) || tx.recipient.contains(aliceAddress)) shouldBe 4
         aliceTxs.map(_.id) should contain allElementsOf Seq(
           firstTransferTxToAlice,
           secondTransferTxToAlice,
@@ -181,13 +181,13 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
 
         val bobTxs = sender.transactionsByAddress(bobAddress, 100)
         bobTxs.size shouldBe 3
-        bobTxs.count(tx => tx.sender.contains(bobAddress) || tx.recipient.contains(bobAddress)) shouldBe 3
+        bobTxs.count(tx => tx.sender.contains(bobAddress) || tx.recipient.contains(bobAddress)) shouldBe 2
         bobTxs.map(_.id) should contain allElementsOf Seq(firstTransferTxCustomFeeAlice, secondTransferTxCustomFeeAlice)
       }
 
       "check transactions by address" in {
         val minerTxs = sender.transactionsByAddress(miner.address, 100)
-        minerTxs.size shouldBe 4
+        minerTxs.size shouldBe 2
 
         val sponsorTxs = sender.transactionsByAddress(sponsorAddress, 100)
         // 1 x transfer in IntegrationSuiteWithThreeAddresses
@@ -196,7 +196,7 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         // 2 x sponsor here: A-5, A-6
         // 2 x transfers with sponsored assets here: A-7, A-8
         sponsorTxs.size shouldBe 9
-        sponsorTxs.count(tx => tx.sender.contains(sponsorAddress) || tx.recipient.contains(sponsorAddress)) shouldBe 7 // Without A-7, A-8
+        sponsorTxs.count(tx => tx.sender.contains(sponsorAddress) || tx.recipient.contains(sponsorAddress)) shouldBe 6 // Without initial transfer, A-7, A-8
         sponsorTxs.map(_.id) should contain allElementsOf Seq(
           firstSponsorAssetId,
           secondSponsorAssetId,
