@@ -6,13 +6,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.{BaseFreeSpec, WaitForHeight2}
+import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
 
-class NodeRestartTestSuite extends BaseFreeSpec with WaitForHeight2 {
+class NodeRestartTestSuite extends BaseFreeSpec {
   import NodeRestartTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs

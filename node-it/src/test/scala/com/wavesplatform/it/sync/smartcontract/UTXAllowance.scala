@@ -4,12 +4,12 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
-import com.wavesplatform.it.{BaseFreeSpec, WaitForHeight2}
+import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
-class UTXAllowance extends BaseFreeSpec with WaitForHeight2 {
+class UTXAllowance extends BaseFreeSpec {
   import UTXAllowance.*
 
   override protected def nodeConfigs: Seq[Config] = Configs

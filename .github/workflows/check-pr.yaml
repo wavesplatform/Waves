@@ -161,6 +161,7 @@ jobs:
           name: test-logs
           path: |
             node-it/target/logs/*/
+            node-it/target/test-reports
 
   publish-snapshots:
     name: Publish snapshot packages

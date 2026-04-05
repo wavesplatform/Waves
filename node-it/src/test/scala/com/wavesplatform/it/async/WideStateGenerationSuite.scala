@@ -12,7 +12,7 @@ import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 
 @LoadTest
-class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with TransferSending {
+class WideStateGenerationSuite extends BaseFreeSpec with TransferSending {
 
   override protected def createDocker: Docker = new Docker(
     suiteConfig = ConfigFactory.parseString(
