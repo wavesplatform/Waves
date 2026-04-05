@@ -20,7 +20,7 @@ import scala.concurrent.duration.*
 class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddresses {
   import com.wavesplatform.it.NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    Seq(Miners(3).quorum(0), NotMiner).map(
+    Seq(Miners(6).quorum(0), NotMiner).map(
       _.preactivatedFeatures((14, Height(1000000)))
         .overrides(s"""waves.blockchain.custom.functionality {
                       |  blocks-for-feature-activation = 1
@@ -155,9 +155,14 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
           sender.transfer(alice, bobAddress, 10 * Token, SmallFee, Some(firstSponsorAssetId), Some(firstSponsorAssetId)).id
         val secondTransferTxCustomFeeAlice = // A-8
           sender.transfer(alice, bobAddress, 10 * Token, SmallFee, Some(secondSponsorAssetId), Some(secondSponsorAssetId)).id
-        nodes.waitForHeightArise()
-        nodes.waitForTransaction(firstTransferTxCustomFeeAlice)
-        nodes.waitForTransaction(secondTransferTxCustomFeeAlice)
+        nodes.waitForHeight(
+          Height(
+            Math.max(
+              nodes.waitForTransaction(firstTransferTxCustomFeeAlice).height,
+              nodes.waitForTransaction(secondTransferTxCustomFeeAlice).height
+            ) + 1
+          )
+        )
 
         sender.assertAssetBalance(aliceAddress, firstSponsorAssetId, sponsorAssetTotal / 2 - SmallFee - 10 * Token)
         sender.assertAssetBalance(aliceAddress, secondSponsorAssetId, sponsorAssetTotal / 2 - SmallFee - 10 * Token)
