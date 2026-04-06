@@ -18,7 +18,7 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
 
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner
+    Miners(5)
       .quorum(0)
       .preactivatedFeatures(BlockchainFeatures.Ride4DApps, (BlockchainFeatures.SynchronousCalls, activationHeight - 1))
   )
