@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.transactions
 import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.*
@@ -21,7 +22,7 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
   import com.wavesplatform.it.NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
     Seq(Miners(6).quorum(0), NotMiner).map(
-      _.preactivatedFeatures((14, Height(1000000)))
+      _.preactivatedFeatures(BlockchainFeatures.BlockReward)
         .overrides(s"""waves.blockchain.custom.functionality {
                       |  blocks-for-feature-activation = 1
                       |  feature-check-blocks-period = 1

@@ -6,7 +6,6 @@ import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.test.*
-import com.wavesplatform.state.Height
 
 trait ScriptAssetActionLimitsSuite extends BaseFreeSpec {
 
@@ -14,7 +13,7 @@ trait ScriptAssetActionLimitsSuite extends BaseFreeSpec {
 
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    Seq(BiggestMiner.quorum(0).preactivatedFeatures((SynchronousCalls.id, Height(0)), (RideV6.id, Height(0))))
+    Seq(BiggestMiner.quorum(0).preactivatedFeatures(SynchronousCalls, RideV6))
 
   protected val initialWavesBalance: Long  = 1000.waves
   protected val minSponsoredAssetFee: Long = 1001

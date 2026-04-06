@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.state.{BooleanDataEntry, Height, IntegerDataEntry}
@@ -15,7 +16,7 @@ import scala.util.Random
 class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPropertyChecks {
   import NodeConfigs.*
   override def nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.quorum(0).preactivatedFeatures((14, Height(1000000))),
+    BiggestMiner.quorum(0).preactivatedFeatures((BlockchainFeatures.BlockReward, Height(1000000))),
     NotMiner
   )
 

@@ -21,7 +21,7 @@ import org.scalatest.{Assertion, CancelAfterFailure}
 class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfterFailure {
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.quorum(0).preactivatedFeatures((ContinuationTransaction.id, Height(1)))
+    BiggestMiner.quorum(0).preactivatedFeatures((ContinuationTransaction, Height(1)))
   )
 
   private val expr: ExprScript =

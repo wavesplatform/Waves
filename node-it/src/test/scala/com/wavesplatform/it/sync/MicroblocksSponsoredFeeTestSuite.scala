@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 import com.wavesplatform.state.{Height, Sponsorship}
@@ -73,5 +74,5 @@ class MicroblocksSponsoredFeeTestSuite extends BaseFreeSpec with ScorexLogging {
         |}""".stripMargin),
     Default(1).notMiner,
     Default(2).notMiner
-  ).map(_.preactivatedFeatures((14, Height(1000000))))
+  ).map(_.preactivatedFeatures((BlockchainFeatures.BlockReward, Height(1000000))))
 }

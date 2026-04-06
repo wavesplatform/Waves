@@ -17,8 +17,8 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
   import com.wavesplatform.it.NodeConfigs.*
   override val nodeConfigs: Seq[Config] = Seq(
     BiggestMiner.quorum(0).preactivatedFeatures(
-      (BlockchainFeatures.FairPoS.id, Height(0)),
-      (BlockchainFeatures.DeterministicFinality.id, Height(0)),
+      BlockchainFeatures.FairPoS,
+      BlockchainFeatures.DeterministicFinality
     )
   )
 

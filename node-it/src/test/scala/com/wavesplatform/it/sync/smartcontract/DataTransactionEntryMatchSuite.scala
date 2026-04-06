@@ -22,7 +22,7 @@ class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
 
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.quorum(0).preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, activationHeight))
+    BiggestMiner.quorum(0).preactivatedFeatures((BlockchainFeatures.SynchronousCalls, activationHeight))
   )
 
   private def script(dApp: Boolean) =

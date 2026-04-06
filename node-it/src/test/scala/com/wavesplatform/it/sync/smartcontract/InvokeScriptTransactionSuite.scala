@@ -32,8 +32,8 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     BiggestMiner
       .quorum(0)
       .preactivatedFeatures(
-        (BlockchainFeatures.Ride4DApps.id, Height(0)),
-        (BlockchainFeatures.BlockV5.id, activationHeight)
+        BlockchainFeatures.Ride4DApps,
+        (BlockchainFeatures.BlockV5, activationHeight)
       )
   )
 

@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 class LeaseActionSuite extends BaseTransactionSuite {
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    Seq(BiggestMiner, Miners(6)).map(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, Height(1))))
+    Seq(BiggestMiner, Miners(6)).map(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls, Height(1))))
 
   private def compile(script: String): String =
     ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64

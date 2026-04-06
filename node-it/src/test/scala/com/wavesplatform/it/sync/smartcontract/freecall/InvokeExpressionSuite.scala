@@ -17,7 +17,7 @@ import org.scalatest.{Assertion, CancelAfterFailure}
 class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure {
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.quorum(0).preactivatedFeatures((ContinuationTransaction.id, Height(0)))
+    BiggestMiner.quorum(0).preactivatedFeatures(ContinuationTransaction)
   )
 
   private val expr: ExprScript =

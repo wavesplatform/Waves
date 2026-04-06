@@ -16,7 +16,7 @@ class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLo
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
     Seq(Miners.head, Miners(3)).map(
-      _.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0)))
+      _.preactivatedFeatures(BlockchainFeatures.DeterministicFinality)
         .overrides("waves.waves.blockchain.custom.functionality.min-block-time = 10s")
         .quorum(1)
     )

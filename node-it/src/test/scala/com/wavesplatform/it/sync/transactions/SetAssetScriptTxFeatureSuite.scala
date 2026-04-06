@@ -18,7 +18,7 @@ class SetAssetScriptTxFeatureSuite extends BaseFunSuite {
 
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    Seq(BiggestMiner.quorum(0).preactivatedFeatures((BlockchainFeatures.SmartAssets.id, featureActivationHeight)))
+    Seq(BiggestMiner.quorum(0).preactivatedFeatures((BlockchainFeatures.SmartAssets, featureActivationHeight)))
 
   override def beforeAll(): Unit = {
     super.beforeAll()

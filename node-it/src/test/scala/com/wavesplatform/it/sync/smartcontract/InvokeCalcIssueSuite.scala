@@ -9,7 +9,7 @@ import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util.*
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.{BinaryDataEntry, Height}
+import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.*
 
@@ -17,7 +17,7 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with CancelAfterFailure 
   import InvokeCalcIssueSuite.*
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.quorum(0).preactivatedFeatures((BlockchainFeatures.BlockV5.id, Height(0)), (BlockchainFeatures.BlockV5.id, Height(0)))
+    BiggestMiner.quorum(0).preactivatedFeatures(BlockchainFeatures.BlockV5)
   )
 
   private def smartAcc  = firstKeyPair

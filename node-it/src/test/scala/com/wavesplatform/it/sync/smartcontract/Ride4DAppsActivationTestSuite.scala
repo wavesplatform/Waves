@@ -184,5 +184,5 @@ object Ride4DAppsActivationTestSuite {
   val activationHeight = Height(15)
 
   import NodeConfigs.*
-  val configWithRide4DAppsFeature = Seq(BiggestMiner, NotMiner).map(_.preactivatedFeatures((BlockchainFeatures.Ride4DApps.id, activationHeight - 1)))
+  val configWithRide4DAppsFeature = Seq(BiggestMiner, NotMiner).map(_.preactivatedFeatures((BlockchainFeatures.Ride4DApps, activationHeight - 1)))
 }

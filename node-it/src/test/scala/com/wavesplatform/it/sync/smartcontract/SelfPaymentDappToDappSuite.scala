@@ -9,7 +9,6 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
@@ -18,9 +17,9 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
     BiggestMiner
       .quorum(0)
       .preactivatedFeatures(
-        (BlockchainFeatures.Ride4DApps.id, Height(0)),
-        (BlockchainFeatures.BlockV5.id, Height(0)),
-        (BlockchainFeatures.SynchronousCalls.id, Height(0))
+        BlockchainFeatures.Ride4DApps,
+        BlockchainFeatures.BlockV5,
+        BlockchainFeatures.SynchronousCalls
       )
   )
 

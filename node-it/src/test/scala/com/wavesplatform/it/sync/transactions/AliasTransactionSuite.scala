@@ -12,7 +12,6 @@ import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.*
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -24,9 +23,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
     Seq(BiggestMiner, Miners(3)).map(
-      _.preactivatedFeatures(
-        (RideV6.id, Height(0))
-      ).overrides("waves.blockchain.custom.functionality.allow-multiple-proofs-in-create-alias-until = 0")
+      _.preactivatedFeatures(RideV6).overrides("waves.blockchain.custom.functionality.allow-multiple-proofs-in-create-alias-until = 0")
     )
 
   var version: Byte = 1

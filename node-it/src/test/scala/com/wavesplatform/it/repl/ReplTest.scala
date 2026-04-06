@@ -25,7 +25,7 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
 
   import com.wavesplatform.it.NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    Seq(BiggestMiner.quorum(0).preactivatedFeatures(BlockchainFeatures.BlockV5.id.toInt -> Height(0)))  
+    Seq(BiggestMiner.quorum(0).preactivatedFeatures(BlockchainFeatures.BlockV5))
 
   def await[A](f: Future[A]): A = Await.result(f, 2 seconds)
 

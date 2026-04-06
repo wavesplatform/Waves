@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.smartcontract
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.Block
 import com.wavesplatform.it.api.SyncHttpApi.*
@@ -20,8 +21,8 @@ class RideBlockInfoSuite extends BaseTransactionSuite {
     BiggestMiner
       .quorum(0)
       .preactivatedFeatures(
-        (14, Height(2)),
-        (15, activationHeight)
+        (BlockchainFeatures.BlockReward, Height(2)),
+        (BlockchainFeatures.BlockV5, activationHeight)
       )
   )
 

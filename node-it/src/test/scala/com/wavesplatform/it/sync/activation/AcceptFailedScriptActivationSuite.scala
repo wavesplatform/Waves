@@ -483,7 +483,7 @@ object AcceptFailedScriptActivationSuite {
     Seq(
       Miners(3)
         .quorum(0)
-        .preactivatedFeatures((BlockchainFeatures.BlockV5.id, Height(if (activate) 0 else 9999)))
+        .preactivatedFeatures((BlockchainFeatures.BlockV5, Height(if (activate) 0 else 9999)))
         .overrides(s"""
           waves {
             blockchain.custom.functionality.min-asset-info-update-interval = $UpdateInterval

@@ -25,7 +25,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] = Seq(
     BiggestMiner
       .quorum(0)
-      .preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight))
+      .preactivatedFeatures((BlockchainFeatures.BlockV5, activationHeight))
       .overrides(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $updateInterval")
   )
 

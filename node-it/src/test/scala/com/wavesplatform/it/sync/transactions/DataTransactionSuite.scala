@@ -7,13 +7,14 @@ import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAl
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{TransactionInfo, UnexpectedStatusCodeException}
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, Height, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{DataTransaction, Proofs, TxHelpers, TxVersion}
@@ -29,7 +30,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     BiggestMiner.quorum(0),
     NotMiner
   ).map(
-    _.preactivatedFeatures(15 -> Height(0)).overrides(
+    _.preactivatedFeatures(BlockchainFeatures.BlockV5).overrides(
       """waves.blockchain.custom.functionality {
         |  blocks-for-feature-activation = 1
         |  feature-check-blocks-period = 1

@@ -20,7 +20,7 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
 
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    Seq(BiggestMiner.quorum(0), NotMiner).map(_.preactivatedFeatures((BlockchainFeatures.ReduceNFTFee.id, Height(10))))
+    Seq(BiggestMiner.quorum(0), NotMiner).map(_.preactivatedFeatures((BlockchainFeatures.ReduceNFTFee, Height(10))))
 
   test("Can't issue NFT before activation") {
     val assetName        = "NFTAsset"
