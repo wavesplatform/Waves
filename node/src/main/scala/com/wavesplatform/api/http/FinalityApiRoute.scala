@@ -2,7 +2,6 @@ package com.wavesplatform.api.http
 
 import com.wavesplatform.api.common.CommonGeneratorsApi.GeneratorEntry
 import com.wavesplatform.api.common.{CommonBlocksApi, CommonGeneratorsApi}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.{Blockchain, GenerationPeriod, Height}
 import org.apache.pekko.http.scaladsl.server.Route
 import play.api.libs.json.*
@@ -22,7 +21,6 @@ case class FinalityApiRoute(blockchain: Blockchain, blocksApi: CommonBlocksApi, 
     Json.obj(
       "height"                  -> currentHeight,
       "finalizedHeight"         -> blocksApi.currentFinalizedHeight,
-      "activationHeight"        -> blockchain.featureActivationHeight(BlockchainFeatures.DeterministicFinality),
       "currentGenerationPeriod" -> currentPeriod,
       "currentGenerators"       -> generatorsApi.generators(currentHeight),
       "nextGenerationPeriod"    -> currentPeriod.map(_.next),

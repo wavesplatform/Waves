@@ -12,24 +12,22 @@ case class FinalityStatus(
 )
 
 object FinalityStatus {
+  def parse(activationHeight: Option[Height]): Reads[FinalityStatus] =
+    Reads { json =>
+      for {
+        height                  <- (json \ "height").validate[Height]
+        finalizedHeight         <- (json \ "finalizedHeight").validate[Height]
+        currentGenerationPeriod <- readGenerationPeriod(activationHeight, json, "currentGenerationPeriod")
+        nextGenerationPeriod    <- readGenerationPeriod(activationHeight, json, "nextGenerationPeriod")
+      } yield FinalityStatus(height, finalizedHeight, currentGenerationPeriod, nextGenerationPeriod)
+
+    }
+
+  private def readGenerationPeriod(activationHeight: Option[Height], json: JsValue, fieldName: String) =
+    activationHeight.fold(JsError())(h => (json \ fieldName).validateOpt[GenerationPeriod](using generationPeriodReads(h)))
+
   private def generationPeriodReads(activationHeight: Height): Reads[GenerationPeriod] =
     (
       (__ \ "start").read[Height] and (__ \ "end").read[Height]
     )((start, end) => GenerationPeriod(activationHeight, start, end - start))
-
-  given Reads[FinalityStatus] =
-    (
-      (__ \ "height").read[Height] and
-        (__ \ "finalizedHeight").read[Height] and
-        (__ \ "activationHeight").read[Height] and
-        (__ \ "currentGenerationPeriod").readNullable[JsObject] and
-        (__ \ "nextGenerationPeriod").readNullable[JsObject]
-    )((h, fh, ah, cgp, ngp) =>
-      FinalityStatus(
-        h,
-        fh,
-        cgp.map(_.as[GenerationPeriod](using generationPeriodReads(ah))),
-        ngp.map(_.as[GenerationPeriod](using generationPeriodReads(ah)))
-      )
-    )
 }

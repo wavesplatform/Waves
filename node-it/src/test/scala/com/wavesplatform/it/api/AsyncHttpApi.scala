@@ -9,6 +9,7 @@ import com.wavesplatform.api.http.{ConnectReq, DebugMessage, RollbackParams, `X-
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.api.{ActivationStatus, FinalityStatus, activationStatusFormat}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.invokeExpressionFee
@@ -28,7 +29,18 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
-import com.wavesplatform.transaction.{Asset, DataTransaction, Proofs, TransactionValidationOps, TxDecimals, TxExchangeAmount, TxExchangePrice, TxNonNegativeAmount, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{
+  Asset,
+  DataTransaction,
+  Proofs,
+  TransactionValidationOps,
+  TxDecimals,
+  TxExchangeAmount,
+  TxExchangePrice,
+  TxNonNegativeAmount,
+  TxPositiveAmount,
+  TxVersion
+}
 import monix.execution.atomic.AtomicInt
 import org.asynchttpclient.*
 import org.asynchttpclient.Dsl.{delete as _delete, get as _get, post as _post, put as _put}
@@ -214,8 +226,13 @@ object AsyncHttpApi extends Assertions {
     def finalizedHeight: Future[Height] = get("/blocks/height/finalized").as[JsValue].map(v => (v \ "height").as[Height])
 
     def finalizedHeightAt(at: Height): Future[Height] = get(s"/blocks/finalized/at/$at").as[JsValue].map(v => (v \ "height").as[Height])
-    
-    def finalityStatus: Future[FinalityStatus] = get("/blockchain/finality").as[FinalityStatus]
+
+    def finalityStatus: Future[FinalityStatus] = for {
+      as  <- activationStatus
+      jsv <- get("/blockchain/finality").as[JsValue]
+    } yield jsv.as[FinalityStatus](using
+      FinalityStatus.parse(as.features.find(_.id == BlockchainFeatures.DeterministicFinality.id).flatMap(_.activationHeight))
+    )
 
     def blockAt(height: Height, amountsAsStrings: Boolean = false): Future[Block] =
       get(s"/blocks/at/$height", amountsAsStrings).as[Block](amountsAsStrings)
@@ -771,7 +788,8 @@ object AsyncHttpApi extends Assertions {
 
     def createAlias(target: KeyPair, alias: String, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] =
       signedBroadcast(
-        com.wavesplatform.transaction.TxHelpers.createAlias(alias, target, fee, version)
+        com.wavesplatform.transaction.TxHelpers
+          .createAlias(alias, target, fee, version)
           .json()
       )
 
