@@ -488,7 +488,7 @@ class BlockchainUpdaterImpl(
                 )
               )
             } else None
-            DiscardedBlock(block, ng.hitSource, snapshot, generatorSet = ng.finalizationState.generatorSet)
+            DiscardedBlock(block, ng.hitSource, snapshot)
           }.toSeq
           blocks ++ liquidBlockData
         }

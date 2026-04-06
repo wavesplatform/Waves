@@ -998,7 +998,6 @@ class RocksDBWriter(
 
     log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-    var currentCommittedGenerators = Option.empty[Seq[(Address, BlsPublicKey)]]
     val discardedBlocks: DiscardedBlocks =
       for (currentHeightInt <- height until targetHeight.toInt by -1; currentHeight = Height(currentHeightInt)) yield {
         val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
@@ -1139,25 +1138,8 @@ class RocksDBWriter(
           }
 
           // Finality
-          var generatorSet = Seq.empty[GeneratorInfo]
           currentPeriod.foreach { currentPeriod =>
-            val exactCurrentCommittedGenerators = currentCommittedGenerators.getOrElse {
-              val r = committedGenerators(currentPeriod) // The value is probably in the cache
-              currentCommittedGenerators = Some(r)
-              r
-            }.lift // Always has a value for indexes in currentGeneratorBalances
-
-            val currentGeneratorBalancesKey = Keys.generatorBalances(currentHeight, rdb.apiHandle)
-            val currentGeneratorBalances    = rw.get(currentGeneratorBalancesKey).getOrElse(Seq.empty) // Always Some here
-            generatorSet = for {
-              (gi, b)       <- currentGeneratorBalances
-              (addr, blsPk) <- exactCurrentCommittedGenerators(gi.toInt)
-            } yield GeneratorInfo(gi, addr, blsPk, b)
-
-            // The next discarded block is on a previous period, thus we need to load committed generators
-            if (currentHeight == currentPeriod.start) currentCommittedGenerators = None
-
-            rw.delete(currentGeneratorBalancesKey)
+            rw.delete(Keys.generatorBalances(currentHeight, rdb.apiHandle))
             rw.delete(Keys.conflictGenerators(currentPeriod, currentHeight))
 
             val nextPeriod = currentPeriod.next
@@ -1207,7 +1189,7 @@ class RocksDBWriter(
             Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb, block.transactionData)))
           } else None
 
-          DiscardedBlock(block, Caches.toHitSource(discardedMeta), snapshot, generatorSet)
+          DiscardedBlock(block, Caches.toHitSource(discardedMeta), snapshot)
         }
 
         balancesToInvalidate.result().foreach(discardBalance)

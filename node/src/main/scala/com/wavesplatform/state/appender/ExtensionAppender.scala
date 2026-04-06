@@ -10,7 +10,8 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, Metrics}
-import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, PeerDatabase, formatBlocks, id}
+import com.wavesplatform.network.{BlockSnapshotResponse, ExtensionBlocks, InvalidBlockStorage, PeerDatabase, formatBlocks, id}
+import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.transaction.*
@@ -142,8 +143,13 @@ object ExtensionAppender extends ScorexLogging {
 
     def restoreDiscardedBlocks(lastCommonBlockId: ByteStr, blocks: DiscardedBlocks): Unit = {
       blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
+      val reAppend = BlockAppender.applySync(blockchainUpdater, time, utxStorage, pos, BlockEndorser.Disabled, txSignParCheck = false)(_, _)
       blocks.foreach { x =>
-        blockchainUpdater.processBlock(x.block, x.hitSource, x.snapshot, x.generatorSet).explicitGet()
+        val blockSnapshotResponse = x.snapshot.map { x =>
+          val txStateSnapshot = x.snapshots.map(PBSnapshots.toProtobuf)
+          BlockSnapshotResponse(x.blockId, txStateSnapshot)
+        }
+        reAppend(x.block, blockSnapshotResponse).explicitGet()
       }
     }
 
