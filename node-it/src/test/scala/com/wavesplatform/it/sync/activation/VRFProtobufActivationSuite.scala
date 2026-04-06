@@ -20,7 +20,7 @@ import scala.concurrent.duration.*
 
 class VRFProtobufActivationSuite extends BaseTransactionSuite {
   val activationHeight = Height(10)
-  val updateInterval   = 3
+  val updateInterval   = 10
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] = Seq(
     BiggestMiner
@@ -40,13 +40,13 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val (defaultName, defaultDescription) = ("asset", "description")
     assetId =
       sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, reissuable = true, script = None, waitForTx = true).id
-    sender.waitForHeight(Height(7), 3.minutes)
+    sender.waitForHeight(Height(6), 3.minutes)
     otherAssetId =
       sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, reissuable = true, script = None, waitForTx = true).id
   }
 
   test("miner generates block v4 before activation") {
-    val height = sender.height
+    val height                            = sender.height
     val blockBeforeActivationHeight       = sender.blockAt(height)
     val blockHeaderBeforeActivationHeight = sender.blockHeaderAt(height)
     blockBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
@@ -109,7 +109,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("miner generates block v5 after activation") {
-    val height = sender.height
+    val height                        = sender.height
     val blockAtActivationHeight       = sender.blockAt(height)
     val blockHeaderAtActivationHeight = sender.blockHeaderAt(height)
     blockAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
@@ -128,6 +128,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("able to broadcast UpdateAssetInfoTransaction if interval's reached before activation") {
+    sender.waitForHeight(Height(sender.waitForTransaction(assetId).height + updateInterval))
     sender.updateAssetInfo(senderAcc, assetId, "updatedName", "updatedDescription", minFee, waitForTx = true)
   }
 

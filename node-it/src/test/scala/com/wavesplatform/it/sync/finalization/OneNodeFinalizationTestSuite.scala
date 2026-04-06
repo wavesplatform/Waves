@@ -16,7 +16,10 @@ import scala.concurrent.duration.DurationInt
 class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLogging {
   import com.wavesplatform.it.NodeConfigs.*
   override val nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.quorum(0).preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0)))
+    BiggestMiner.quorum(0).preactivatedFeatures(
+      (BlockchainFeatures.FairPoS.id, Height(0)),
+      (BlockchainFeatures.DeterministicFinality.id, Height(0)),
+    )
   )
 
   private def node            = dockerNodes().last
@@ -54,8 +57,7 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     }
 
     step("Finalized height checks")
-    val deadline               = 2.minutes.fromNow
-    var finalizedHeight1       = node.finalizedHeight
+    val finalizedHeight1       = node.finalizedHeight
     val waitingFinalizedHeight = finalizedHeight1 + 2
 
     withClue("Finalized height is unknown: ") {
@@ -70,28 +72,19 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
       }
     }
 
-    var done = false
-    while (!done && deadline.hasTimeLeft()) {
-      val currHeight = node.height
-      if (currHeight > waitingFinalizedHeight + 2)
-        fail(
-          s"Finalization height doesn't rise: height=$currHeight, waiting for finalized height=$waitingFinalizedHeight, last finalized height=$finalizedHeight1"
-        )
+    // We need at least one transaction, otherwise there won't be a microblock, thus no voting, no finalization
+    // Finalization happened in a microblock
+    node.waitForHeight(Height(node.waitForTransaction(node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true).id).height + 1))
+    val fs = node.finalityStatus
+    if (fs.height > waitingFinalizedHeight + 2)
+      fail(
+        s"Finalization height doesn't rise: height=${fs.height}, waiting for finalized height=$waitingFinalizedHeight, last finalized height=$finalizedHeight1"
+      )
 
-      // We need at least one transaction, otherwise there won't be a microblock, thus no voting, no finalization
-      node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true)
-
-      val updatedFinalizedHeight = node.finalizedHeight
-      if (updatedFinalizedHeight < finalizedHeight1)
-        fail(s"Finalized height $updatedFinalizedHeight became lower than the previous $finalizedHeight1")
-      else if (updatedFinalizedHeight != finalizedHeight1)
-        log.debug(s"New finalized height: $finalizedHeight1 -> $updatedFinalizedHeight")
-
-      finalizedHeight1 = updatedFinalizedHeight
-      done = finalizedHeight1 >= waitingFinalizedHeight
-    }
-
-    node.waitForHeight(node.height + 1) // Finalization happened in a microblock
+    if (fs.finalizedHeight < finalizedHeight1)
+      fail(s"Finalized height ${fs.finalizedHeight} became lower than the previous $finalizedHeight1")
+    else if (fs.finalizedHeight != finalizedHeight1)
+      log.debug(s"New finalized height: $finalizedHeight1 -> ${fs.finalizedHeight}")
 
     step("Survives restart")
     isolated {
@@ -106,7 +99,7 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     node.finalizedHeightAt(finalizedBlock1.height) should be <= finalizedBlock1.height
 
     step("Finalization voting in a block header")
-    val votingBlockHeader  = node.blockHeaderAt(finalizedHeight1 + 1)
+    val votingBlockHeader  = node.blockHeaderAt(finalizedBlock1.height + 1)
     val finalizationVoting = votingBlockHeader.finalizationVoting.value
 
     val generators: Seq[(data: GeneratorsResponse.Entry, index: Int)] = node.generators(votingBlockHeader.height).zipWithIndex

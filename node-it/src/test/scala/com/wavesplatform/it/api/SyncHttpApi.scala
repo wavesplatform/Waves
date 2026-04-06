@@ -6,8 +6,7 @@ import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{ApiError, DebugMessage}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
+import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus, FinalityStatus}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -604,11 +603,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def waitForHeight(expectedHeight: Height, requestAwaitTime: FiniteDuration = RequestAwaitTime): Height =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 
-    def currentGenerationPeriod: Option[GenerationPeriod] = for {
-      activationStatus <- sync(async(n).activationStatus).features.find(_.id == BlockchainFeatures.DeterministicFinality.id)
-      activation       <- activationStatus.activationHeight
-      r                <- GenerationPeriod.from(sync(async(n).height), activation, n.settings)
-    } yield r
+    def currentGenerationPeriod: Option[GenerationPeriod] = sync(async(n).finalityStatus).currentGenerationPeriod
 
     def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Height =
       waitForHeight(p.start, requestAwaitTime)
@@ -634,6 +629,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def finalizedHeight: Height = sync(async(n).finalizedHeight)
 
     def finalizedHeightAt(at: Height): Height = sync(async(n).finalizedHeightAt(at))
+
+    def finalityStatus: FinalityStatus = sync(async(n).finalityStatus)
 
     def blockAt(height: Height, amountsAsStrings: Boolean = false): Block = sync(async(n).blockAt(height, amountsAsStrings))
 

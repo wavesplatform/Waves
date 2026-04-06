@@ -23,7 +23,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   import NodeConfigs.*
   import RideV4ActivationSuite.*
   override protected def nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.quorum(0).preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight - 1))
+    Miners(7).quorum(0).preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight - 1))
   )
 
   private def smartAccV4 = firstKeyPair
