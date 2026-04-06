@@ -112,34 +112,37 @@ object ExtensionAppender extends ScorexLogging {
         ParSignatureChecker.checkTxSignatures(block.transactionData, rideV6Activated)
       }
 
-    def applyFork(appendData: AppendData): Either[ValidationError, Unit] = appendData.newBlocks.view
-      .map { b =>
-        val s = extension.snapshots.get(b.id())
-        val r = appendExtensionBlock(blockchainUpdater, pos, time, verify = true, txSignParCheck = false)(b, s).map {
-          case (_: Applied, height) => BlockStats.applied(b, BlockStats.Source.Ext, height)
-          case _                    =>
+    def applyFork(appendData: AppendData): Either[ValidationError, Unit] = {
+      val appendBlock = appendExtensionBlock(blockchainUpdater, pos, time, verify = true, txSignParCheck = false)(_, _)
+      appendData.newBlocks.view
+        .map { b =>
+          val s = extension.snapshots.get(b.id())
+          val r = appendBlock(b, s).map {
+            case (_: Applied, height) => BlockStats.applied(b, BlockStats.Source.Ext, height)
+            case _                    =>
+          }
+          b -> r
         }
-        b -> r
-      }
-      .zipWithIndex
-      .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
-      .fold(Either.unit[ValidationError]) { case (i, declinedBlock, e) =>
-        e match {
-          case _: TxValidationError.BlockFromFuture =>
-          case _                                    => invalidBlocks.add(declinedBlock.id(), e)
+        .zipWithIndex
+        .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
+        .fold(Either.unit[ValidationError]) { case (i, declinedBlock, e) =>
+          e match {
+            case _: TxValidationError.BlockFromFuture =>
+            case _                                    => invalidBlocks.add(declinedBlock.id(), e)
+          }
+
+          appendData.newBlocks.view
+            .dropWhile(_ != declinedBlock)
+            .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
+
+          log.warn(
+            if (i == 0) s"Can't process fork starting with ${appendData.lastCommonBlockId}, error appending block $declinedBlock: $e"
+            else s"Processed only ${i + 1} of ${appendData.newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e"
+          )
+
+          Left(e)
         }
-
-        appendData.newBlocks.view
-          .dropWhile(_ != declinedBlock)
-          .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
-
-        log.warn(
-          if (i == 0) s"Can't process fork starting with ${appendData.lastCommonBlockId}, error appending block $declinedBlock: $e"
-          else s"Processed only ${i + 1} of ${appendData.newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e"
-        )
-
-        Left(e)
-      }
+    }
 
     def restoreDiscardedBlocks(lastCommonBlockId: ByteStr, blocks: DiscardedBlocks): Unit = {
       blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
