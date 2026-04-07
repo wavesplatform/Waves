@@ -23,7 +23,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   val updateInterval   = 10
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner
+    Miners(5)
       .quorum(0)
       .preactivatedFeatures((BlockchainFeatures.BlockV5, activationHeight))
       .overrides(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $updateInterval")

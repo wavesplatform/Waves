@@ -369,6 +369,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       )
 
     sender.signedBroadcast(tx.json(), waitForTx = true)
+    nodes.waitForHeightAriseAndTxPresent(tx.id().toString)
 
     sender.nftList(sellerAddress, limit = 1) shouldBe empty
     sender.nftList(buyerAddress, 1).head.assetId shouldBe nftAsset
@@ -393,6 +394,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       )
 
     sender.signedBroadcast(tx2.json(), waitForTx = true)
+    nodes.waitForHeightAriseAndTxPresent(tx2.id().toString)
 
     sender.nftList(buyerAddress, limit = 1) shouldBe empty
     sender.nftList(sellerAddress, 1, None).head.assetId shouldBe nftAsset
