@@ -10,12 +10,13 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
+import com.wavesplatform.state.Height
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produceRejectOrFailedDiff}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
+import com.wavesplatform.transaction.{Asset, CommitToGenerationTransaction, Transaction, TxHelpers}
 
 class SyncDAppPaymentTest extends PropSpec with WithDomain {
 
@@ -241,6 +242,92 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
+  property("can't use deposited funds for sync call payment when master has only deposit") {
+    val miner       = TxHelpers.signer(0)
+    val invoker     = TxHelpers.signer(1)
+    val masterDApp  = TxHelpers.signer(2)
+    val serviceDApp = TxHelpers.signer(3)
+
+    val settings = DeterministicFinality
+      .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
+      .configure(_.copy(generationPeriodLength = 2))
+
+    val initBalance  = 2000.waves
+    val initBalances = Seq(miner, invoker, serviceDApp, masterDApp).map(kp => AddrWithBalance(kp.toAddress, initBalance))
+
+    withDomain(settings, initBalances) { d =>
+      log.debug("Append block 2 with scripts and commitment")
+      val txFeeAmount    = 1.waves
+      val available      = initBalance - (CommitToGenerationTransaction.DepositInWavelets + 2 * txFeeAmount)
+      val transferAmount = available + 1
+
+      val setMasterScript  = TxHelpers.setScript(masterDApp, invokerDAppScript(serviceDApp.toAddress, amount = transferAmount), txFeeAmount)
+      val setServiceScript = TxHelpers.setScript(serviceDApp, simpleDAppScript())
+      val commitments = Seq(miner, masterDApp).map { kp =>
+        TxHelpers.commitToGeneration(generationPeriodStart = Height(3), sender = kp, fee = txFeeAmount)
+      }
+
+      d.appender.appendBlock(
+        d.createBlock(
+          txs = Seq(setMasterScript, setServiceScript) ++ commitments,
+          strictTime = true
+        )
+      )
+
+      log.debug("Check master dApp balances")
+      val balanceDetails = d.accountsApi.balanceDetails(masterDApp.toAddress).explicitGet()
+      balanceDetails.available shouldBe available
+
+      log.debug("Try to spend")
+      val invoke = TxHelpers.invoke(masterDApp.toAddress, invoker = invoker)
+      d.appendBlockE(invoke) should produce(s"${masterDApp.toAddress} -> trying to spend a deposit")
+    }
+  }
+
+  property("can't use deposited funds for sync call payment when master has deposit and leasing") {
+    val miner       = TxHelpers.signer(0)
+    val invoker     = TxHelpers.signer(1)
+    val masterDApp  = TxHelpers.signer(2)
+    val serviceDApp = TxHelpers.signer(3)
+
+    val settings = DeterministicFinality
+      .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
+      .configure(_.copy(generationPeriodLength = 2))
+
+    val initBalance  = 2000.waves
+    val initBalances = Seq(miner, invoker, serviceDApp, masterDApp).map(kp => AddrWithBalance(kp.toAddress, initBalance))
+
+    withDomain(settings, initBalances) { d =>
+      log.debug("Append block 2 with scripts and commitment")
+      val txFeeAmount    = 1.waves
+      val leaseAmount    = 100.waves
+      val available      = initBalance - (leaseAmount + CommitToGenerationTransaction.DepositInWavelets + 3 * txFeeAmount)
+      val transferAmount = available + 1
+
+      val setMasterScript  = TxHelpers.setScript(masterDApp, invokerDAppScript(serviceDApp.toAddress, amount = transferAmount), txFeeAmount)
+      val setServiceScript = TxHelpers.setScript(serviceDApp, simpleDAppScript())
+      val lease            = TxHelpers.lease(masterDApp, invoker.toAddress, leaseAmount, txFeeAmount)
+      val commitments = Seq(miner, masterDApp).map { kp =>
+        TxHelpers.commitToGeneration(generationPeriodStart = Height(3), sender = kp, fee = txFeeAmount)
+      }
+
+      d.appender.appendBlock(
+        d.createBlock(
+          txs = Seq(setMasterScript, setServiceScript, lease) ++ commitments,
+          strictTime = true
+        )
+      )
+
+      log.debug("Check master dApp balances")
+      val balanceDetails = d.accountsApi.balanceDetails(masterDApp.toAddress).explicitGet()
+      balanceDetails.available shouldBe available
+
+      log.debug("Try to spend")
+      val invoke = TxHelpers.invoke(masterDApp.toAddress, invoker = invoker)
+      d.appendBlockE(invoke) should produce(s"${masterDApp.toAddress} -> trying to spend either a deposit or leased money")
+    }
+  }
+
   property("should not allow payments overflow") {
     val invoker     = TxHelpers.signer(1)
     val masterDApp  = TxHelpers.signer(2)
@@ -254,7 +341,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
 
       d.appendBlock(setMasterScript, setServiceScript)
 
-      Long.MaxValue - d.balance(serviceDApp.toAddress) < paymentAmount
+      Long.MaxValue - d.balance(serviceDApp.toAddress) shouldBe <(paymentAmount)
 
       d.appendBlockE(invoke) should produce(s"Waves balance sum overflow")
     }

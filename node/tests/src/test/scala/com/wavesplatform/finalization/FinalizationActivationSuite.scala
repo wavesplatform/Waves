@@ -10,11 +10,10 @@ class FinalizationActivationSuite extends BaseFinalizationSpec {
   private val node0Acc = TxHelpers.signer(0)
   private val node1Acc = TxHelpers.signer(1)
 
-  private val baseSettings = DomainPresets.DeterministicFinality
+  private val defaultSettings = DomainPresets.DeterministicFinality
     .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
     .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 5)
-
-  private val defaultSettings = baseSettings.configure(_.copy(generationPeriodLength = 3))
+    .configure(_.copy(generationPeriodLength = 3))
 
   "activation from 5" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(node0Acc, node1Acc)) { d =>
     val genesisBlockId = d.blockchain.lastBlockId.value
