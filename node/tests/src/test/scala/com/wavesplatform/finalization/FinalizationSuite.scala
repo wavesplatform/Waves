@@ -17,7 +17,6 @@ class FinalizationSuite extends BaseFinalizationSpec {
 
   private val baseSettings = DomainPresets.DeterministicFinality.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
   private val defaultSettings = baseSettings
-    .copy(minerSettings = baseSettings.minerSettings.copy(quorum = 0))
     .configure(_.copy(generationPeriodLength = 3, generationBalanceDepthFrom50To1000AfterHeight = 1000))
 
   "finalized if got next block referenced votes in" - {
