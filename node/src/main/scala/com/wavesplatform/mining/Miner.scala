@@ -204,7 +204,7 @@ class MinerImpl(
         }
       } yield balance
 
-      def retryReasons(balance: Long) = for {
+      def retryReasons(balance: Long): Either[String, ForgeAttemptResult] = for {
         _ <- checkQuorumAvailable()
         validBlockDelay <- pos
           .getValidBlockDelay(height, account, refBaseTarget, balance)
