@@ -21,8 +21,10 @@ import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockF
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import kamon.Kamon
+import org.slf4j.LoggerFactory
 
 package object appender {
+  private val log = Logger(LoggerFactory.getLogger("com.wavesplatform.state.appender"))
 
   val MaxTimeDrift: Long = 100 // millis
 
@@ -246,7 +248,10 @@ package object appender {
 
           minerBalance <- minerBalance(blockchain, miner, parentHeight, block).leftMap(GenericError(_))
           _            <- validateBlockVersion(parentHeight.toInt, block, blockchain)
-          _            <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime, currentTs))
+          _            <- {
+            log.debug(s"blockTime = $blockTime, currentTs = $currentTs, ${blockTime - currentTs} < $MaxTimeDrift?")
+            Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime, currentTs))
+          }
           _            <- pos.validateBaseTarget(parentHeight.toInt, block, parent, grandParent)
           hitSource    <- pos.validateGenerationSignature(block)
           _ <- pos

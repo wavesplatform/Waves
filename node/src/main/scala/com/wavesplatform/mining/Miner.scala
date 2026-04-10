@@ -214,9 +214,12 @@ class MinerImpl(
           refBlockHeader.header.timestamp + validBlockDelay,
           currentTime - 1.minute.toMillis
         )
+        _ = log.debug(
+          s"currentTime = $currentTime, validBlockDelay = $validBlockDelay, blockTime = $blockTime, maxTimeInFuture = ${currentTime + maxTimeDrift}"
+        )
         _ <- Either.cond(
           blockTime <= currentTime + maxTimeDrift,
-          log.debug(s"Forging with $address, balance $balance, prev block $reference at $height with target $refBaseTarget"),
+          log.debug(s"Forging with $address, balance $balance, prev block $reference at $height with target $refBaseTarget and time $blockTime"),
           s"Block time $blockTime is from the future: current time is $currentTime, MaxTimeDrift = $maxTimeDrift"
         )
         consensusData <- consensusData(blockchain, account, blockTime)
@@ -352,7 +355,7 @@ class MinerImpl(
         for {
           elapsed <- waitBlockAppendedTask.timed.map(_._1)
           newOffset = (offset - elapsed).max(Duration.Zero)
-
+          _         = log.debug(s"elapsed = $elapsed, sleeping for $newOffset (until ${LocalTime.now().plusNanos(offset.toNanos)})")
           _      <- Task.sleep(newOffset)
           result <- Task(forgeBlock(account)).executeOn(minerScheduler)
 
