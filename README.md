@@ -55,17 +55,17 @@ A quick introduction of the minimal setup you need to get a running node.
 Linux systems:
 ```bash
 sudo apt-get update
-sudo apt-get install openjdk-11-jre
+sudo apt-get install openjdk-17-jre
 java -jar node/target/waves-all*.jar path/to/config/waves-{network}.conf
 ```
 
 Mac systems (assuming already installed homebrew):
 ```bash
-brew cask install adoptopenjdk/openjdk/adoptopenjdk11
+brew cask install adoptopenjdk/openjdk/adoptopenjdk17
 java -jar node/target/waves-all*.jar path/to/config/waves-{network}.conf
 ```
 
-Windows systems (assuming already installed OpenJDK 11):
+Windows systems (assuming already installed OpenJDK 17):
 ```bash
 java -jar node/target/waves-all*.jar path/to/config/waves-{network}.conf
 ```
@@ -94,9 +94,9 @@ To build and test this project, you will have to follow these steps:
 
 ```bash
 sudo apt-get update
-sudo apt-get install openjdk-11-jre                     # Ubuntu
+sudo apt-get install openjdk-17-jre                     # Ubuntu
 # or
-# brew cask install adoptopenjdk/openjdk/adoptopenjdk11 # Mac
+# brew cask install adoptopenjdk/openjdk/adoptopenjdk17 # Mac
 ```
 
 - Install SBT (Scala Build Tool)
