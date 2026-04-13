@@ -52,7 +52,7 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
       - uses: regclient/actions/regctl-installer@4d6888fcc4842c9630f60ebc91715a45dd9bd7a3
-      - uses: proudust/gh-describe@70f72d4f6304ea053cf5a3d71c36211d5acc0c73
+      - uses: proudust/gh-describe@d2398810d922ababf1ec0efb454e42953dfdc460 # v2.1.2
         id: ghd
         with:
           commit-ish: ${{ inputs.ref || github.sha}}

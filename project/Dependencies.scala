@@ -4,15 +4,15 @@ import sbt.{Def, *}
 import scalapb.compiler.Version.scalapbVersion
 
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.10.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.12.Final"
 
-  val gProtoVersion = "4.33.5"
+  val gProtoVersion = "4.34.1"
   val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
   val overrides = Def.setting(
     Seq(
       "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
       "com.google.code.gson"      % "gson"           % "2.13.2",
-      "com.squareup.okio"         % "okio-jvm"       % "3.16.4",
+      "com.squareup.okio"         % "okio-jvm"       % "3.17.0",
       "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
       "org.slf4j"                 % "slf4j-api"      % "2.0.17",
       "org.msgpack"               % "msgpack-core"   % "0.9.11",
@@ -34,7 +34,7 @@ object Dependencies {
   lazy val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.6.0" classifier "protobuf-src" intransitive ()
 
-  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.4.0"
+  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.5.0"
 
   private def pekkoHttpModule(module: String, version: String = "1.3.0") = "org.apache.pekko" %% module % version
 
@@ -46,20 +46,20 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.79.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.80.0"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.5.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.32"
-  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.7"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.9"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
 
   val playJson = "org.playframework" %% "play-json" % "3.0.6"
 
-  val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
+  val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.20" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.9.5" % Test)
 
   private def sttp3Module(module: String) = "com.softwaremill.sttp.client3" %% module % "3.11.0"
@@ -106,9 +106,9 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
-    "com.github.jnr" % "jnr-unixsocket" % "0.38.24", // To support Apple ARM
+    "com.github.jnr" % "jnr-unixsocket" % "0.38.25", // To support Apple ARM
     "com.spotify"    % "docker-client"  % "8.16.0",
-    jacksonModule("dataformat", "dataformat-properties", "2.21.0"),
+    jacksonModule("dataformat", "dataformat-properties", "2.21.2"),
     asyncHttpClient
   ).map(_ % Test)
 
@@ -132,7 +132,7 @@ object Dependencies {
   lazy val node = Def.setting(
     Seq(
       rocksdb,
-      "commons-net"            % "commons-net"               % "3.12.0",
+      "commons-net"            % "commons-net"               % "3.13.0",
       "commons-io"             % "commons-io"                % "2.21.0",
       "com.github.pureconfig" %% "pureconfig-core"           % "0.17.10",
       "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.10",

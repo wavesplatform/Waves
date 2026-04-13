@@ -170,7 +170,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "3.8.1",
+    scalaVersion         := "3.8.3",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -260,7 +260,7 @@ checkPRRaw := Def
         ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `lang-tests-js`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
       ),
       fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
-      assembly.all(ScopeFilter(inProjects(node, `lang-jvm`))),
+      assembly.all(ScopeFilter(inProjects(node))),
       buildTarballsForDocker
     )
   )
