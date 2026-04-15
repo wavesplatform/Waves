@@ -1,12 +1,12 @@
 package com.wavesplatform.utils
 
-import java.net.{InetAddress, SocketTimeoutException}
 import monix.eval.Task
 import monix.execution.ExecutionModel
 import monix.execution.schedulers.SchedulerService
 import org.apache.commons.net.ntp.NTPUDPClient
 
-import java.time.Duration
+import java.net.{InetAddress, SocketTimeoutException}
+import java.time.{Clock, Duration}
 import scala.concurrent.duration.DurationInt
 
 trait Time {
@@ -29,11 +29,11 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
   @volatile private var ntpTimestamp = System.currentTimeMillis()
   @volatile private var nanoTime     = System.nanoTime()
 
-  def correctedTime(): Long = {
+  def correctedTime(): Long = if (!ntpServer.isBlank) {
     val timestamp = ntpTimestamp
     val offset    = (System.nanoTime() - nanoTime) / 1_000_000
     timestamp + offset
-  }
+  } else Clock.systemUTC().instant().toEpochMilli
 
   @volatile private var txTime: Long = 0
 
