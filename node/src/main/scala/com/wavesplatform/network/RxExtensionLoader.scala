@@ -19,10 +19,10 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.{ConcurrentSubject, Subject}
 import monix.reactive.{Observable, Observer}
 
-import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.*
+import scala.jdk.DurationConverters.*
 
-case class ExtensionBlocks(remoteScore: BigInt, blocks: Seq[Block], snapshots: Map[BlockId, BlockSnapshotResponse]) {
+case class ExtensionBlocks(remoteScore: BigInt, blocks: Seq[Block], snapshots: Map[BlockId, BlockSnapshotResponse], source: Channel) {
   override def toString: String = s"ExtensionBlocks($remoteScore, ${formatSignatures(blocks.map(_.id()))}"
 }
 
@@ -37,6 +37,7 @@ object RxExtensionLoader extends ScorexLogging {
       syncTimeOut: FiniteDuration,
       processedBlocksCacheTimeout: FiniteDuration,
       isLightMode: Boolean,
+      blacklistOnScoreMismatch: Boolean,
       lastBlockIds: Coeval[Seq[ByteStr]],
       peerDatabase: PeerDatabase,
       invalidBlocks: InvalidBlockStorage,
@@ -181,7 +182,7 @@ object RxExtensionLoader extends ScorexLogging {
 
           if (updatedExpectedBlocks.isEmpty && expectedSnapshots.isEmpty) {
             val blockById = (receivedBlocks + block).map(b => b.id() -> b).toMap
-            val ext       = ExtensionBlocks(c.score, requested.map(blockById), receivedSnapshots)
+            val ext       = ExtensionBlocks(c.score, requested.map(blockById), receivedSnapshots, ch)
             log.debug(s"${id(ch)} $ext successfully received")
             extensionLoadingFinished(state.withIdleLoader, ext, ch)
           } else {
@@ -228,7 +229,7 @@ object RxExtensionLoader extends ScorexLogging {
 
             if (updatedExpectedSnapshots.isEmpty && expectedBlocks.isEmpty) {
               val blockById = receivedBlocks.map(b => b.id() -> b).toMap
-              val ext       = ExtensionBlocks(c.score, requested.map(blockById), receivedSnapshots.updated(snapshot.blockId, snapshot))
+              val ext       = ExtensionBlocks(c.score, requested.map(blockById), receivedSnapshots.updated(snapshot.blockId, snapshot), ch)
               log.debug(s"${id(ch)} $ext successfully received")
               extensionLoadingFinished(state.withIdleLoader, ext, ch)
             } else {
@@ -296,7 +297,18 @@ object RxExtensionLoader extends ScorexLogging {
         case ApplierState.Applying(maybeBuffer, applying) =>
           if (applying != extension) log.warn(s"Applied $extension doesn't match expected $applying")
           maybeBuffer match {
-            case None => state.copy(applierState = ApplierState.Idle)
+            case None =>
+              applicationResult match {
+                case Right(Some(newLocalScore)) if newLocalScore != applying.remoteScore =>
+                  val reason = s"New local score $newLocalScore does not match declared remote score ${applying.remoteScore}"
+                  log.warn(reason)
+                  if (blacklistOnScoreMismatch) {
+                    peerDatabase.blacklistAndClose(extension.source, reason)
+                  }
+                case _ => // either extension contains invalid blocks, or score has not changed
+              }
+
+              state.copy(applierState = ApplierState.Idle)
             case Some(Buffer(nextChannel, nextExtension)) =>
               applicationResult match {
                 case Left(_) =>
@@ -358,7 +370,7 @@ object RxExtensionLoader extends ScorexLogging {
   private def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] =
     CacheBuilder
       .newBuilder()
-      .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
+      .expireAfterWrite(timeout.toJava)
       .build[K, V]()
 
   sealed trait LoaderState

@@ -4,9 +4,9 @@ import sbt.{Def, *}
 import scalapb.compiler.Version.scalapbVersion
 
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.12.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.14.Final"
 
-  val gProtoVersion = "4.34.1"
+  val gProtoVersion = "4.35.0"
   val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
   val overrides = Def.setting(
     Seq(
@@ -34,7 +34,7 @@ object Dependencies {
   lazy val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.6.0" classifier "protobuf-src" intransitive ()
 
-  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.5.0"
+  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.6.0"
 
   private def pekkoHttpModule(module: String, version: String = "1.3.0") = "org.apache.pekko" %% module % version
 
@@ -46,14 +46,14 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.80.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.81.0"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
-  val googleGuava     = "com.google.guava"    % "guava"             % "33.5.0-jre"
+  val googleGuava     = "com.google.guava"    % "guava"             % "33.6.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.32"
-  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.9"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.10"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
 
@@ -77,7 +77,7 @@ object Dependencies {
     // macOS aarch64
     amazonCorretto("osx-aarch_64"),
     // fallback Java
-    "org.bouncycastle" % "bcprov-jdk18on" % "1.83"
+    "org.bouncycastle" % "bcprov-jdk18on" % "1.84"
   )
 
   val lang = Def.setting(
@@ -108,7 +108,7 @@ object Dependencies {
     logback,
     "com.github.jnr" % "jnr-unixsocket" % "0.38.25", // To support Apple ARM
     "com.spotify"    % "docker-client"  % "8.16.0",
-    jacksonModule("dataformat", "dataformat-properties", "2.21.2"),
+    jacksonModule("dataformat", "dataformat-properties", "2.21.3"),
     asyncHttpClient
   ).map(_ % Test)
 
@@ -155,7 +155,7 @@ object Dependencies {
       "com.esaulpaugh"     % "headlong" % "13.3.1",
       "com.github.jbellis" % "jamm"     % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
-      "com.wavesplatform"         % "blst-java"                    % "0.3.16-SNAPSHOT",
+      "com.wavesplatform"         % "blst-java"                    % "0.3.15-1",
       amazonCorretto("linux-x86_64") % Optional,
       amazonCorretto("linux-aarch_64") % Optional
     ) ++ console ++ logDeps ++ protobuf.value

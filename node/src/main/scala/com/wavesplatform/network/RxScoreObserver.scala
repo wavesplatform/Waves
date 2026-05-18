@@ -1,6 +1,5 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.TimeUnit
 import cats.*
 import cats.instances.bigInt.*
 import cats.instances.tuple.*
@@ -13,6 +12,7 @@ import monix.reactive.Observable
 
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.*
+import scala.jdk.DurationConverters.*
 
 case class BestChannel(channel: Channel, score: BigInt) {
   override def toString: String = s"BestChannel(${id(channel)},$score)"
@@ -60,7 +60,7 @@ object RxScoreObserver extends ScorexLogging {
     var currentBestChannel: Option[Channel] = None
     val scores = CacheBuilder
       .newBuilder()
-      .expireAfterWrite(scoreTtl.toMillis, TimeUnit.MILLISECONDS)
+      .expireAfterWrite(scoreTtl.toJava)
       .build[Channel, BigInt]()
     val statsReporter = Coeval.eval {
       Stats(localScore, currentBestChannel.toString, scores.size())

@@ -268,7 +268,7 @@ object ExchangeTransactionDiff {
   private[diffs] def getOrderFeePortfolio(order: Order, fee: Long): Portfolio =
     Portfolio.build(order.matcherFeeAssetId, fee)
 
-  private def checkOrderPkRecover(order: Order, blockchain: Blockchain): Either[GenericError, Unit] = {
+  private def checkOrderPkRecover(order: Order, blockchain: Blockchain): Either[GenericError, Unit] =
     order.orderAuthentication match {
       case Eip712Signature(signature) =>
         for {
@@ -286,10 +286,12 @@ object ExchangeTransactionDiff {
             (),
             GenericError("Invalid order signature format")
           )
+          _ <- Either.raiseWhen(
+            signature.size > 65 && blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality)
+          )(GenericError("Invalid order signature format"))
         } yield ()
       case _ => Right(())
     }
-  }
 
   private def checkAttachment(order: Order, blockchain: Blockchain): Either[GenericError, Unit] =
     for {

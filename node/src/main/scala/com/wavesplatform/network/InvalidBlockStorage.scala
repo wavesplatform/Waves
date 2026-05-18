@@ -7,6 +7,7 @@ import com.wavesplatform.network.InvalidBlockStorageImpl.*
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 
 import scala.concurrent.duration.FiniteDuration
+import scala.jdk.DurationConverters.*
 
 trait InvalidBlockStorage {
   def add(blockId: ByteStr, validationError: ValidationError): Unit
@@ -24,7 +25,7 @@ object InvalidBlockStorage {
 class InvalidBlockStorageImpl(settings: InvalidBlockStorageSettings) extends InvalidBlockStorage {
   private val cache = CacheBuilder
     .newBuilder()
-    .expireAfterWrite(settings.timeout.length, settings.timeout.unit)
+    .expireAfterWrite(settings.timeout.toJava)
     .build[ByteStr, ValidationError]()
 
   override def add(blockId: ByteStr, validationError: ValidationError): Unit =

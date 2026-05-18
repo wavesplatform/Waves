@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
+import scala.jdk.DurationConverters.*
 
 class ObservedLoadingCacheSpecification extends FreeSpec {
   import com.wavesplatform.utils.ObservedLoadingCacheSpecification.FakeTicker
@@ -57,7 +58,7 @@ class ObservedLoadingCacheSpecification extends FreeSpec {
 
     val delegate = CacheBuilder
       .newBuilder()
-      .expireAfterWrite(ExpiringTime.toMillis, TimeUnit.MILLISECONDS)
+      .expireAfterWrite(ExpiringTime.toJava)
       .ticker(ticker)
       .build[String, Integer](new CacheLoader[String, Integer] {
         override def load(key: String): Integer = key.length

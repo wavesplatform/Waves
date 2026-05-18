@@ -22,10 +22,11 @@ import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator, Val
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
 import org.web3j.abi.TypeDecoder
-import org.web3j.abi.datatypes.Address as EthAddress
 import org.web3j.abi.datatypes.generated.Uint256
+import org.web3j.abi.datatypes.{Type, Address as EthAddress}
 import org.web3j.crypto.*
 import org.web3j.crypto.Sign.SignatureData
+import org.web3j.crypto.transaction.`type`.*
 import org.web3j.utils.Convert
 import play.api.libs.json.*
 
@@ -52,13 +53,17 @@ final case class EthereumTransaction(
 
   override val timestamp: TxTimestamp = underlying.getNonce.longValueExact()
 
+  val ecdsaSignature: Coeval[ECDSASignature] = Coeval.evalOnce {
+    require(signatureData != null, "empty signature data")
+    new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS))
+  }
+
   val signerKeyBigInt: Coeval[BigInteger] = Coeval.evalOnce {
     require(signatureData != null, "empty signature data")
     val v          = BigInt(1, signatureData.getV)
     val recoveryId = if (v > 28) v - chainId * 2 - 35 else v - 27
-    val sig        = new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS))
 
-    Sign.recoverFromSignature(recoveryId.intValue, sig, Hash.sha3(this.bodyBytes()))
+    Sign.recoverFromSignature(recoveryId.intValue, ecdsaSignature(), Hash.sha3(this.bodyBytes()))
   }
 
   val signerPublicKey: Coeval[PublicKey] = Coeval.evalOnce {
@@ -82,6 +87,14 @@ final case class EthereumTransaction(
   )
 
   override lazy val sender: PublicKey = signerPublicKey()
+
+  val longChainId: Coeval[Option[Long]] = Coeval.evalOnce {
+    underlying.getTransaction match {
+      case x: (Transaction1559 | Transaction4844) =>
+        Some(x.getChainId)
+      case _: LegacyTransaction => None
+    }
+  }
 
   def toTransferLike(a: TxPositiveAmount, r: AddressOrAlias, asset: Asset): TransferTransactionLike = new TransferTransactionLike {
     override val amount: TxPositiveAmount       = a
@@ -194,23 +207,11 @@ object EthereumTransaction {
   val AmountMultiplier = 10000000000L
   val AssetDataLength  = 136
 
-  private val decodeMethod = {
-    val m = classOf[TypeDecoder].getDeclaredMethod("decode", classOf[String], classOf[Int], classOf[Class[?]])
-    m.setAccessible(true)
-    m
-  }
-
-  private def decode[A](source: String, offset: Int)(implicit ct: ClassTag[A]): A =
-    decodeMethod.invoke(null, source, offset, ct.runtimeClass.asInstanceOf[Class[A]]).asInstanceOf[A]
-
-  private val encodeMethod = {
-    val m = classOf[TransactionEncoder].getDeclaredMethod("encode", classOf[RawTransaction], classOf[SignatureData])
-    m.setAccessible(true)
-    m
-  }
+  private def decode[A <: Type[?]](source: String, offset: Int)(implicit ct: ClassTag[A]): A =
+    TypeDecoder.decode(source, offset, ct.runtimeClass.asInstanceOf[Class[A]])
 
   private def encodeTransaction(tx: RawTransaction, signatureData: SignatureData): Array[Byte] =
-    encodeMethod.invoke(null, tx, signatureData).asInstanceOf[Array[Byte]]
+    TransactionEncoder.encode(tx, signatureData)
 
   def apply(bytes: Array[Byte]): Either[ValidationError, EthereumTransaction] =
     apply(TransactionDecoder.decode(EthEncoding.toHexString(bytes)).asInstanceOf[SignedRawTransaction])

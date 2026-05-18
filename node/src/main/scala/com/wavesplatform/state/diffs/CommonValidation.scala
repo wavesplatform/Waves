@@ -13,7 +13,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.*
-import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon
+import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionLike}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.*
@@ -79,6 +79,28 @@ object CommonValidation {
         checkedTx.leftMap(GenericError(_))
       }
 
+      def validateInvokeScript(blockchain: Blockchain, istl: InvokeScriptTransactionLike) = {
+        val foldPayments: Iterable[Payment] => Iterable[Payment] =
+          if (blockchain.useCorrectPaymentCheck)
+            _.groupBy(_.assetId)
+              .map { case (assetId, p) => Payment(p.map(_.amount).sum, assetId) }
+          else
+            identity
+
+        for {
+          address <- blockchain.resolveAlias(istl.dApp)
+          _       <- InvokeDiffsCommon.checkPayments(blockchain, istl.payments)
+          allowFeeOverdraft = blockchain.accountScript(address) match {
+            case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
+            case _                                                                                                                      => false
+          }
+          check <- foldPayments(istl.payments)
+            .map(p => checkTransfer(istl.sender.toAddress, p.assetId, p.amount, istl.feeAssetId, istl.fee, allowFeeOverdraft))
+            .find(_.isLeft)
+            .getOrElse(Right(tx))
+        } yield check
+      }
+
       tx match {
         case ptx: PaymentTransaction if blockchain.balance(ptx.sender.toAddress, Waves) < (ptx.amount.value + ptx.fee.value) =>
           Left(
@@ -91,26 +113,16 @@ object CommonValidation {
         case mtx: MassTransferTransaction =>
           checkTransfer(mtx.sender.toAddress, mtx.assetId, mtx.transfers.map(_.amount.value).sum, Waves, mtx.fee.value)
         case citx: InvokeScriptTransaction =>
-          val foldPayments: Iterable[Payment] => Iterable[Payment] =
-            if (blockchain.useCorrectPaymentCheck)
-              _.groupBy(_.assetId)
-                .map { case (assetId, p) => Payment(p.map(_.amount).sum, assetId) }
-            else
-              identity
-
-          for {
-            address <- blockchain.resolveAlias(citx.dApp)
-            _       <- InvokeDiffsCommon.checkPayments(blockchain, citx.payments)
-            allowFeeOverdraft = blockchain.accountScript(address) match {
-              case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
-              case _                                                                                                                      => false
-            }
-            check <- foldPayments(citx.payments)
-              .map(p => checkTransfer(citx.senderAddress, p.assetId, p.amount, citx.feeAssetId, citx.fee.value, allowFeeOverdraft))
-              .find(_.isLeft)
-              .getOrElse(Right(tx))
-          } yield check
-
+          validateInvokeScript(blockchain, citx)
+        case et: EthereumTransaction if blockchain.height > blockchain.settings.functionalitySettings.enforceEthTxValidationAfter =>
+          et.payload match {
+            case i: EthereumTransaction.Invocation =>
+              i.toInvokeScriptLike(et, blockchain)
+                .flatMap(isl => validateInvokeScript(blockchain, isl))
+            case t: EthereumTransaction.Transfer =>
+              t.toTransferLike(et, blockchain)
+                .flatMap(ttl => checkTransfer(et.senderAddress(), ttl.assetId, ttl.amount.value, ttl.feeAssetId, ttl.fee))
+          }
         case _ => Right(tx)
       }
     } else Right(tx)

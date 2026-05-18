@@ -29,12 +29,15 @@ class EthereumInvokePaymentTest extends PropSpec with WithDomain with EthHelpers
          | }
        """.stripMargin
     )
-    val paymentScript = TestCompiler(V5).compileExpression("throw()")
+    val paymentScript = TestCompiler(V5).compileExpression(s"if (tx.sender == Address(base58'$defaultAddress')) then true else throw()")
     val issueTx       = issue(script = Some(paymentScript))
     val asset         = IssuedAsset(issueTx.id())
     def invoke        = EthTxGenerator.generateEthInvoke(defaultEthSigner, secondAddress, "default", Nil, Seq(Payment(1, asset)))
     withDomain(RideV6, AddrWithBalance.enoughBalances(secondSigner) :+ AddrWithBalance(defaultSigner.toEthWavesAddress)) { d =>
-      d.appendBlock(issueTx)
+      d.appendBlock(
+        issueTx,
+        transfer(defaultSigner, defaultEthSigner.toWavesAddress, 1, issueTx.asset)
+      )
 
       d.appendBlock(setScript(secondSigner, dApp(bigComplexity = false)))
       d.appendBlockE(invoke) should produce("Explicit script termination")

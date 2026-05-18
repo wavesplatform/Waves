@@ -82,7 +82,8 @@ case class FunctionalitySettings(
     paymentsCheckHeight: Int = 0,
     unitsRegistryAddress: Option[String] = None,
     maxValidEndorsers: Int = 5,
-    generationPeriodLength: Int = 1000
+    generationPeriodLength: Int = 1000,
+    enforceEthTxValidationAfter: Int = 0
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -148,7 +149,8 @@ object FunctionalitySettings {
     paymentsCheckHeight = 4303300,
     unitsRegistryAddress = Some("3P8LfPXcveST7WKkV3UACQNdr6J3shPYong"),
     maxValidEndorsers = 128, // BLS has much worse performance from 129
-    generationPeriodLength = 10_000
+    generationPeriodLength = 10_000,
+    enforceEthTxValidationAfter = 5234000
   )
 
   val TESTNET: FunctionalitySettings = apply(

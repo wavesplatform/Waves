@@ -11,6 +11,7 @@ case class SynchronizationSettings(
     processedBlocksCacheTimeout: FiniteDuration,
     scoreTTL: FiniteDuration,
     maxBaseTarget: Option[Long],
+    blacklistOnScoreMismatch: Boolean,
     invalidBlocksStorage: InvalidBlockStorageSettings,
     microBlockSynchronizer: SynchronizationSettings.MicroblockSynchronizerSettings,
     historyReplier: SynchronizationSettings.HistoryReplierSettings,

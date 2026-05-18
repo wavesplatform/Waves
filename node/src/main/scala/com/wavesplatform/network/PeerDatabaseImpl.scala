@@ -9,12 +9,12 @@ import io.netty.channel.Channel
 import io.netty.channel.socket.nio.NioSocketChannel
 
 import java.net.{InetAddress, InetSocketAddress, URI}
-import java.util.concurrent.TimeUnit
 import scala.annotation.tailrec
 import scala.collection.*
 import scala.collection.immutable.Seq
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.*
+import scala.jdk.DurationConverters.*
 import scala.util.Random
 import scala.util.control.NonFatal
 
@@ -23,7 +23,7 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
     CacheBuilder
       .newBuilder()
       .ticker(ticker)
-      .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
+      .expireAfterWrite(timeout.toJava)
       .build[T, java.lang.Long]()
 
   private type PeersPersistenceType = Set[String]

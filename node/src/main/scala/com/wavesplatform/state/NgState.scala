@@ -11,8 +11,9 @@ import com.wavesplatform.state.NgState.{BlockData, LiquidBlock, NgStateCaches}
 import com.wavesplatform.state.StateSnapshot.monoid
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
-import java.util.concurrent.TimeUnit
 import scala.collection.immutable.VectorMap
+import scala.concurrent.duration.*
+import scala.jdk.DurationConverters.*
 
 object NgState {
   case class LiquidBlock(block: Block, discarded: DiscardedMicroBlocks, data: BlockData)
@@ -51,7 +52,7 @@ object NgState {
     private def mkCacheByBlockId[DataT <: Any]: Cache[BlockId, DataT] = CacheBuilder
       .newBuilder()
       .maximumSize(NgState.MaxTotalDiffs)
-      .expireAfterWrite(10, TimeUnit.MINUTES)
+      .expireAfterWrite(10.minutes.toJava)
       .build[BlockId, DataT]()
   }
 

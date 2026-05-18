@@ -334,6 +334,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       settings.synchronizationSettings.synchronizationTimeout,
       settings.synchronizationSettings.processedBlocksCacheTimeout,
       settings.enableLightMode,
+      settings.synchronizationSettings.blacklistOnScoreMismatch,
       Coeval(blockchainUpdater.lastBlockIds(settings.synchronizationSettings.maxRollback)),
       peerDatabase,
       knownInvalidBlocks,

@@ -138,7 +138,8 @@ class LightNodeTest extends PropSpec with WithDomain {
           betterBlocks.map(_._1),
           betterBlocks.collect { case (b, Some(snapshots)) =>
             b.id() -> BlockSnapshotResponse(b.id(), snapshots.map { case (s, m) => PBSnapshots.toProtobuf(s, m) })
-          }.toMap
+          }.toMap,
+          new EmbeddedChannel()
         )
 
         val appender =

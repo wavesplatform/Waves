@@ -53,6 +53,7 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
         timeOut,
         cacheTimeout,
         isLightMode = false,
+        blacklistOnScoreMismatch = false,
         Coeval(lastBlockIds.reverse.take(MaxRollback)),
         op,
         invBlockStorage,

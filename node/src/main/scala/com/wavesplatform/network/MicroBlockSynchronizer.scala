@@ -13,9 +13,9 @@ import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 
-import java.util.concurrent.TimeUnit
 import scala.collection.mutable.Set as MSet
 import scala.concurrent.duration.FiniteDuration
+import scala.jdk.DurationConverters.*
 
 object MicroBlockSynchronizer extends ScorexLogging {
 
@@ -203,7 +203,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
   def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] =
     CacheBuilder
       .newBuilder()
-      .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
+      .expireAfterWrite(timeout.toJava)
       .build[K, V]()
 
   case class CacheSizes(microBlockOwners: Long, nextInvs: Long, awaiting: Long, successfullyReceived: Long)
