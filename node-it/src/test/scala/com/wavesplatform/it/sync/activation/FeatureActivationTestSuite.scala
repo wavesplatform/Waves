@@ -14,20 +14,17 @@ class FeatureActivationTestSuite extends BaseFreeSpec with ActivationStatusReque
   private val featureNum: Short   = BlockchainFeatures.SmallerMinimalGeneratingBalance.id
   private val featureDescr        = BlockchainFeatures.SmallerMinimalGeneratingBalance.description
 
-  override protected def nodeConfigs: Seq[Config] = {
-    NodeConfigs.newBuilder
-      .overrideBase(_.raw(s"""waves {
-                               |  blockchain.custom.functionality {
-                               |    pre-activated-features = {}
-                               |    feature-check-blocks-period = $votingInterval
-                               |    blocks-for-feature-activation = $blocksForActivation
-                               |  }
-                               |  features.supported = [$featureNum]
-                               |  miner.quorum = 1
-                               |}""".stripMargin))
-      .withDefault(2)
-      .buildNonConflicting()
-  }
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] =
+    Seq(BiggestMiner, Miners(5)).map(_.overrides(s"""waves {
+                                                    |  blockchain.custom.functionality {
+                                                    |    pre-activated-features = {}
+                                                    |    feature-check-blocks-period = $votingInterval
+                                                    |    blocks-for-feature-activation = $blocksForActivation
+                                                    |  }
+                                                    |  features.supported = [$featureNum]
+                                                    |  miner.quorum = 1
+                                                    |}""".stripMargin))
 
   "supported blocks increased when voting starts" in {
     nodes.waitForHeight(Height(votingInterval * 2 / 3))

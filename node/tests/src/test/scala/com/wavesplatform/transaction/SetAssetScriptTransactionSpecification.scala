@@ -9,6 +9,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import org.scalacheck.Gen
 import play.api.libs.json.*
@@ -36,7 +37,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
       asset <- bytes32gen
       fee   <- smallFeeGen
       ts    <- timestampGen
-      txEi = SetAssetScriptTransaction.selfSigned(TxVersion.V2, acc, IssuedAsset(ByteStr(asset)), None, fee, ts)
+      txEi = SetAssetScriptTransaction.create(TxVersion.V2, acc.publicKey, IssuedAsset(ByteStr(asset)), None, fee, ts, Proofs.empty)
     } yield txEi
 
     forAll(gen)(_ should produce("Cannot set empty script"))

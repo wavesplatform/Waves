@@ -22,17 +22,22 @@ final case class CreateAliasTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.CreateAlias)
-    with SigProofsSwitch
-    with Versioned.ToV3
-    with TxWithFee.InWaves
-    with PBSince.V3 {
+) extends Transaction(TransactionType.CreateAlias),
+      ProvenTransaction,
+      HasSignature,
+      Versioned.ToV3,
+      TxWithFee.InWaves,
+      PBSince.V3 {
+
+  type T = CreateAliasTransaction
 
   lazy val alias: Alias = Alias.createWithChainId(aliasName, chainId, Some(chainId)).explicitGet()
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(CreateAliasTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(CreateAliasTxSerializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.evalOnce(CreateAliasTxSerializer.toJson(this))
+
+  override def addProof(proof: ByteStr): CreateAliasTransaction = copy(proofs = proofs.add(proof))
 
   override val id: Coeval[ByteStr] = Coeval.evalOnce {
     ByteStr(crypto.fastHash(version match {
@@ -49,9 +54,6 @@ object CreateAliasTransaction extends TransactionParser {
 
   implicit val validator: TxValidator[CreateAliasTransaction] = CreateAliasTxValidator
 
-  implicit def sign(tx: CreateAliasTransaction, privateKey: PrivateKey): CreateAliasTransaction =
-    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
-
   override def parseBytes(bytes: Array[TxVersion]): Try[CreateAliasTransaction] =
     CreateAliasTxSerializer.parseBytes(bytes)
 
@@ -61,7 +63,7 @@ object CreateAliasTransaction extends TransactionParser {
       aliasName: String,
       fee: Long,
       timestamp: TxTimestamp,
-      proofs: Proofs,
+      proofs: Proofs = Proofs.empty,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] = {
     for {
@@ -69,25 +71,4 @@ object CreateAliasTransaction extends TransactionParser {
       tx  <- CreateAliasTransaction(version, sender, aliasName, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
   }
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      alias: String,
-      fee: Long,
-      timestamp: TxTimestamp,
-      signer: PrivateKey,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, TransactionT] =
-    create(version, sender, alias, fee, timestamp, Nil, chainId).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      aliasName: String,
-      fee: Long,
-      timestamp: TxTimestamp,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, TransactionT] =
-    signed(version, sender.publicKey, aliasName, fee, timestamp, sender.privateKey, chainId)
 }

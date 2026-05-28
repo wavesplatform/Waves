@@ -102,7 +102,7 @@ lazy val `node-tests` = project
   .settings(libraryDependencies ++= Dependencies.logDeps)
 
 lazy val `grpc-server` =
-  project.dependsOn(node % "compile;runtime->provided", `node-testkit`)
+  project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test")
 
 lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-testkit`)
 lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `node-testkit`)
@@ -170,7 +170,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "3.8.1",
+    scalaVersion         := "3.8.3",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -260,7 +260,7 @@ checkPRRaw := Def
         ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `lang-tests-js`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
       ),
       fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
-      assembly.all(ScopeFilter(inProjects(node, `lang-jvm`))),
+      assembly.all(ScopeFilter(inProjects(node))),
       buildTarballsForDocker
     )
   )

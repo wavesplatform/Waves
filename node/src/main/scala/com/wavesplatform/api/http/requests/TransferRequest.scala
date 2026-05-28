@@ -8,9 +8,8 @@ import com.wavesplatform.transaction.{Asset, Proofs}
 import play.api.libs.json.*
 
 case class TransferRequest(
-    version: Option[Byte],
-    sender: Option[String],
-    senderPublicKey: Option[String],
+    version: Byte = 1.toByte,
+    senderPublicKey: String,
     recipient: String,
     assetId: Option[Asset],
     amount: Long,
@@ -21,13 +20,14 @@ case class TransferRequest(
     signature: Option[ByteStr] = None,
     proofs: Option[Proofs] = None
 ) extends TxBroadcastRequest[TransferTransaction] {
-  def toTxFrom(sender: PublicKey): Either[ValidationError, TransferTransaction] =
+  def toTx: Either[ValidationError, TransferTransaction] =
     for {
       validRecipient <- AddressOrAlias.fromString(recipient)
       validProofs    <- toProofs(signature, proofs)
+      validSender    <- PublicKey.fromBase58String(senderPublicKey)
       tx <- TransferTransaction.create(
-        version.getOrElse(1.toByte),
-        sender,
+        version,
+        validSender,
         validRecipient,
         assetId.getOrElse(Asset.Waves),
         amount,
@@ -41,5 +41,5 @@ case class TransferRequest(
 }
 
 object TransferRequest {
-  implicit val jsonFormat: Format[TransferRequest] = Json.format
+  given Format[TransferRequest] = Json.format
 }

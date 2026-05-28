@@ -1,5 +1,6 @@
 package com.wavesplatform.it.account.storage
 
+import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
@@ -16,6 +17,9 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 case class WriteEntry(ct: String, t: String, v: Any, k: String = "somekey")
 
 class RemoveEntrySuite extends BaseFreeSpec {
+
+  import com.wavesplatform.it.NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(Miners(5).quorum(0))
 
   private val stringTestData  = WriteEntry("String", "String", "somevalue")
   private val integerTestData = WriteEntry("Integer", "Int", 1)
@@ -56,7 +60,7 @@ class RemoveEntrySuite extends BaseFreeSpec {
 
       invokeScript(keyPair, s"write${data.ct}", data.k, data.v.toString)
 
-      nodes.waitForHeightArise() //TODO: delete this line after NODE-2099 will be done
+      nodes.waitForHeightArise() // TODO: delete this line after NODE-2099 will be done
 
       val address = keyPair.toAddress.toString
       miner.getData(address) should have size 1

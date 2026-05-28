@@ -11,22 +11,13 @@ import play.api.libs.json.*
 
 case class InvokeExpressionRequest(
     version: Option[Byte],
-    sender: String,
-    fee: Long,
-    feeAssetId: Option[String],
-    expression: String,
-    timestamp: Option[Long] = None
-)
-
-case class SignedInvokeExpressionRequest(
-    version: Option[Byte],
     senderPublicKey: String,
     fee: Long,
     feeAssetId: Option[String],
     expression: String,
     timestamp: Long,
     proofs: Proofs
-) {
+) extends TxBroadcastRequest[InvokeExpressionTransaction] {
   def toTx: Either[ValidationError, InvokeExpressionTransaction] =
     for {
       _sender     <- PublicKey.fromBase58String(senderPublicKey)
@@ -48,6 +39,5 @@ case class SignedInvokeExpressionRequest(
 }
 
 object InvokeExpressionRequest {
-  implicit val unsignedInvokeExpressionRequestReads: Reads[InvokeExpressionRequest]     = Json.reads[InvokeExpressionRequest]
-  implicit val signedInvokeExpressionRequestReads: Reads[SignedInvokeExpressionRequest] = Json.reads[SignedInvokeExpressionRequest]
+  given Reads[InvokeExpressionRequest] = Json.reads
 }

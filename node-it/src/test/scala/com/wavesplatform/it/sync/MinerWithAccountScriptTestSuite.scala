@@ -14,12 +14,9 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.Height
 
 class MinerWithAccountScriptTestSuite extends BaseFunSuite {
+  import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.preactivatedFeatures(Seq(BlockchainFeatures.RideV6.id.toInt -> Height(0))*))
-      .withDefault(1)
-      .withSpecial(_.nonMiner)
-      .buildNonConflicting()
+    Seq(BiggestMiner, NotMiner).map(_.preactivatedFeatures(BlockchainFeatures.RideV6))
 
   val allowedRecipient: String = KeyPair("allowedRecipient".getBytes).toAddress('I').toString
   val dataKey                  = "testKey"

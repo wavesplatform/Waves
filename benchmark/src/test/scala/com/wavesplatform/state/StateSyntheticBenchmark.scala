@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.StateSyntheticBenchmark.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{Proofs, Transaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.*
 import org.openjdk.jmh.annotations.*
@@ -43,7 +43,7 @@ object StateSyntheticBenchmark {
       for {
         amount    <- Gen.choose(1L, waves(1))
         recipient <- accountGen
-      } yield TransferTransaction.selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, 100000, ByteStr.empty, ts).explicitGet()
+      } yield TransferTransaction.create(1.toByte, sender.publicKey, recipient.toAddress, Waves, amount, Waves, 100000, ByteStr.empty, ts, Proofs.empty).map(_.signWith(sender.privateKey)).explicitGet()
   }
 
   @State(Scope.Benchmark)
@@ -58,7 +58,8 @@ object StateSyntheticBenchmark {
         recipient: KeyPair <- accountGen
         amount             <- Gen.choose(1L, waves(1))
       } yield TransferTransaction
-        .selfSigned(2.toByte, sender, recipient.toAddress, Waves, amount, Waves, 1000000, ByteStr.empty, ts)
+        .create(2.toByte, sender.publicKey, recipient.toAddress, Waves, amount, Waves, 1000000, ByteStr.empty, ts, Proofs.empty)
+        .map(_.signWith(sender.privateKey))
         .explicitGet()
 
     @Setup
@@ -72,7 +73,8 @@ object StateSyntheticBenchmark {
       val setScriptBlock = nextBlock(
         Seq(
           SetScriptTransaction
-            .selfSigned(1.toByte, richAccount, Some(ExprScript(typedScript).explicitGet()), 1000000, System.currentTimeMillis())
+            .create(1.toByte, richAccount.publicKey, Some(ExprScript(typedScript).explicitGet()), 1000000, System.currentTimeMillis(), Proofs.empty)
+            .map(_.signWith(richAccount.privateKey))
             .explicitGet()
         )
       )

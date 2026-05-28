@@ -8,7 +8,7 @@ import com.wavesplatform.it.sync.{matcherFee, minFee, someAssetAmount}
 import com.wavesplatform.test.*
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.*
@@ -116,20 +116,16 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("cannot exchange non-issued assets") {
-    val exchAsset: IssueTransaction = IssueTransaction
-      .selfSigned(
-        TxVersion.V1,
+    val exchAsset: IssueTransaction = TxHelpers.issue(
         sender.keyPair,
+        someAssetAmount,
+        2,
         "myasset",
         "my asset description",
-        quantity = someAssetAmount,
-        decimals = 2,
-        reissuable = true,
-        script = None,
         fee = 1.waves,
+        script = None,
         timestamp = System.currentTimeMillis()
       )
-      .explicitGet()
     for ((o1ver, o2ver, tver) <- versions) {
 
       val assetId             = exchAsset.id().toString

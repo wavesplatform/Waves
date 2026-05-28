@@ -316,7 +316,7 @@ object PBTransactions {
         UpdateAssetInfoTransaction.create(
           version.toByte,
           sender.toPublicKey,
-          assetId.toByteStr,
+          IssuedAsset(assetId.toByteStr),
           name,
           description,
           timestamp,

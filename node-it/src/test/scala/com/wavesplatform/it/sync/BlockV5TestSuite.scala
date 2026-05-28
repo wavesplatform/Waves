@@ -6,22 +6,20 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.Blake2b256
+import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
-import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 import com.wavesplatform.state.Height
 import org.scalatest.*
 
 import scala.concurrent.duration.*
 
 class BlockV5TestSuite extends BaseFreeSpec with ActivationStatusRequest with OptionValues {
-
-  override def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(1)
-      .withSpecial(1, _.nonMiner)
-      .buildNonConflicting()
+  import com.wavesplatform.it.NodeConfigs.*
+  override val nodeConfigs: Seq[Config] = Seq(
+    Miners(3).quorum(0),
+    Default.head.notMiner
+  )
 
   var currentHeight = Height(0)
 

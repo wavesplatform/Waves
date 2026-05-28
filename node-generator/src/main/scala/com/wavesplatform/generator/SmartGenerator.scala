@@ -9,10 +9,10 @@ import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction, TxVersion}
+import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxHelpers, TxVersion}
 import pureconfig.ConfigReader
 
 import java.util.concurrent.ThreadLocalRandom
@@ -33,14 +33,18 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
 
     val setScripts = Range(0, settings.scripts) flatMap (_ =>
       accounts.map { i =>
-        SetScriptTransaction.selfSigned(1.toByte, i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
+        SetScriptTransaction
+          .create(1.toByte, i.publicKey, Some(script), 1.waves, System.currentTimeMillis(), Proofs.empty)
+          .map(_.signWith(i.privateKey))
+          .explicitGet()
       }
     )
 
     val now = System.currentTimeMillis()
     val txs = Range(0, settings.transfers).map { i =>
       TransferTransaction
-        .selfSigned(2.toByte, bank, bank.toAddress, Waves, 1.waves - 2 * fee, Waves, fee, ByteStr.empty, now + i)
+        .create(2.toByte, bank.publicKey, bank.toAddress, Waves, 1.waves - 2 * fee, Waves, fee, ByteStr.empty, now + i, Proofs.empty)
+        .map(_.signWith(bank.privateKey))
         .explicitGet()
     }
 
@@ -56,9 +60,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
       val sellOrder = Order.sell(TxVersion.V2, seller, matcher.publicKey, pair, 100000000L, 1, ts, ts + 30.days.toMillis, 0.003.waves).explicitGet()
       val buyOrder  = Order.buy(TxVersion.V2, buyer, matcher.publicKey, pair, 100000000L, 1, ts, ts + 1.day.toMillis, 0.003.waves).explicitGet()
 
-      ExchangeTransaction
-        .signed(TxVersion.V2, matcher.privateKey, buyOrder, sellOrder, 100000000, 1, 0.003.waves, 0.003.waves, 0.011.waves, ts)
-        .explicitGet()
+      TxHelpers.exchange(buyOrder, sellOrder, matcher, 100000000, 1, 0.003.waves, 0.003.waves, 0.011.waves, ts)
     }
 
     setScripts ++ txs ++ extxs

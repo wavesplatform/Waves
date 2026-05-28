@@ -5,7 +5,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.LeaseInfo
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
@@ -18,11 +17,9 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class LeaseActionSuite extends BaseTransactionSuite {
+  import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 2, Seq.empty)
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, Height(1))))
-      .buildNonConflicting()
+    Seq(BiggestMiner, Miners(6)).map(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls, Height(1))))
 
   private def compile(script: String): String =
     ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
@@ -37,23 +34,23 @@ class LeaseActionSuite extends BaseTransactionSuite {
   test("set script") {
     val dApp = compile(
       s"""
-       |  {-# STDLIB_VERSION 5 #-}
-       |  {-# CONTENT_TYPE DAPP #-}
-       |  {-# SCRIPT_TYPE ACCOUNT #-}
-       |
-       |  @Callable(i)
-       |  func lease() = {
-       |    [
-       |      Lease(i.caller, $dAppLeaseAmount)
-       |    ]
-       |  }
-       |
-       |  @Callable(i)
-       |  func leaseCancel(leaseId: ByteVector) = {
-       |    [
-       |      LeaseCancel(leaseId)
-       |    ]
-       |  }
+         |  {-# STDLIB_VERSION 5 #-}
+         |  {-# CONTENT_TYPE DAPP #-}
+         |  {-# SCRIPT_TYPE ACCOUNT #-}
+         |
+         |  @Callable(i)
+         |  func lease() = {
+         |    [
+         |      Lease(i.caller, $dAppLeaseAmount)
+         |    ]
+         |  }
+         |
+         |  @Callable(i)
+         |  func leaseCancel(leaseId: ByteVector) = {
+         |    [
+         |      LeaseCancel(leaseId)
+         |    ]
+         |  }
      """.stripMargin
     )
     sender.setScript(dAppAcc, Some(dApp), waitForTx = true)

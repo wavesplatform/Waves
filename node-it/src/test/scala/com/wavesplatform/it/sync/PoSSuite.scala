@@ -12,14 +12,14 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.it.{BaseFunSuite, NodeConfigs, WaitForHeight2}
+import com.wavesplatform.it.{BaseFunSuite, NodeConfigs}
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.state.Height
 import play.api.libs.json.{JsSuccess, Json, Reads}
 
 import scala.util.Random
 
-class PoSSuite extends BaseFunSuite with WaitForHeight2 {
+class PoSSuite extends BaseFunSuite {
 
   private val signerPK = KeyPair.fromSeed(nodeConfigs.last.getString("account-seed")).explicitGet()
 

@@ -40,9 +40,6 @@ class AssetsApiGrpcSuite extends BaseFreeSpec with ActivationStatusRequest with 
     nftHeightsWithSequences.groupMap(_._1)(_._2).values.foreach(nums => nums shouldBe (1 to nums.size))
   }
 
-  override def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(1)
-      .buildNonConflicting()
+  import com.wavesplatform.it.NodeConfigs.*
+  override val nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
 }

@@ -5,7 +5,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.features.BlockchainFeatures.ContinuationTransaction
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.api.{PutDataResponse, StateChangesDetails}
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuite
@@ -20,12 +19,10 @@ import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
 import org.scalatest.{Assertion, CancelAfterFailure}
 
 class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfterFailure {
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((ContinuationTransaction.id, Height(1))))
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner.quorum(0).preactivatedFeatures((ContinuationTransaction, Height(1)))
+  )
 
   private val expr: ExprScript =
     TestCompiler(V6).compileFreeCall(

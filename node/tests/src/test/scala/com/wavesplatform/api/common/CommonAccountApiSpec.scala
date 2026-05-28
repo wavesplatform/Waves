@@ -9,12 +9,12 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.{DataEntry, EmptyDataEntry, StringDataEntry, diffs, Height, TransactionId}
+import com.wavesplatform.state.{DataEntry, EmptyDataEntry, Height, StringDataEntry, TransactionId, diffs}
 import com.wavesplatform.test.DomainPresets.RideV4
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers.data
 import com.wavesplatform.transaction.TxVersion.V2
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxHelpers}
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
 import com.wavesplatform.{BlocksTransactionsHelpers, history}
 import monix.execution.Scheduler.Implicits.global
 
@@ -61,9 +61,9 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
         ts = System.currentTimeMillis()
         fee <- smallFeeGen
         genesis        = GenesisTransaction.create(acc.toAddress, diffs.ENOUGH_AMT, ts).explicitGet()
-        data1          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry1), fee, ts).explicitGet()
-        data2          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry2), fee, ts).explicitGet()
-        data3          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry3), fee, ts).explicitGet()
+        data1          = TxHelpers.data(acc, Seq(entry1), fee)
+        data2          = TxHelpers.data(acc, Seq(entry2), fee)
+        data3          = TxHelpers.data(acc, Seq(entry3), fee)
         (block1, mbs1) = UnsafeBlocks.unsafeChainBaseAndMicro(history.randomSig, Seq(genesis), Seq(Seq(data1)), acc, 3, ts)
         (block2, mbs2) = UnsafeBlocks.unsafeChainBaseAndMicro(mbs1.last.totalResBlockSig, Seq(data2), Seq(Seq(data3)), acc, 3, ts)
       } yield (acc, block1, mbs1.head, block2, mbs2.head)
@@ -82,6 +82,20 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
           dataList() shouldBe Set(entry1, entry3)
         }
       }
+    }
+
+    val fundSource = TxHelpers.signer(1003)
+    val dataSender = TxHelpers.signer(1004)
+    "filters entries created and deleted in liquid block" in withDomain(DomainPresets.RideV4, Seq(fundSource -> 100.waves)) { d =>
+      def dataList() = d.accountsApi.dataStream(dataSender.toAddress, None).toListL.runSyncUnsafe()
+
+      val e1 = StringDataEntry("k1", "v1")
+      val e2 = StringDataEntry("k2", "v2")
+      d.appendKeyBlock()
+      d.appendMicroBlock(TxHelpers.transfer(fundSource, dataSender.toAddress, 1.waves), TxHelpers.data(dataSender, Seq(e1, e2)))
+      dataList() shouldBe Seq(e1, e2)
+      d.appendMicroBlock(TxHelpers.data(dataSender, Seq(EmptyDataEntry("k1"), EmptyDataEntry("k2")), version = 2.toByte))
+      dataList() shouldBe empty
     }
   }
 

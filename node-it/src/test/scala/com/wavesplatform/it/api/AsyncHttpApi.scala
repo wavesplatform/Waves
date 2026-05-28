@@ -9,7 +9,8 @@ import com.wavesplatform.api.http.{ConnectReq, DebugMessage, RollbackParams, `X-
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.common.utils.{Base58, Base64}
-import com.wavesplatform.features.api.{ActivationStatus, activationStatusFormat}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.api.{ActivationStatus, FinalityStatus, activationStatusFormat}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.util.*
@@ -30,10 +31,8 @@ import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.{
   Asset,
-  CreateAliasTransaction,
   DataTransaction,
   Proofs,
-  TransactionSignOps,
   TransactionValidationOps,
   TxDecimals,
   TxExchangeAmount,
@@ -227,6 +226,13 @@ object AsyncHttpApi extends Assertions {
     def finalizedHeight: Future[Height] = get("/blocks/height/finalized").as[JsValue].map(v => (v \ "height").as[Height])
 
     def finalizedHeightAt(at: Height): Future[Height] = get(s"/blocks/finalized/at/$at").as[JsValue].map(v => (v \ "height").as[Height])
+
+    def finalityStatus: Future[FinalityStatus] = for {
+      as  <- activationStatus
+      jsv <- get("/blockchain/finality").as[JsValue]
+    } yield jsv.as[FinalityStatus](using
+      FinalityStatus.parse(as.features.find(_.id == BlockchainFeatures.DeterministicFinality.id).flatMap(_.activationHeight))
+    )
 
     def blockAt(height: Height, amountsAsStrings: Boolean = false): Future[Block] =
       get(s"/blocks/at/$height", amountsAsStrings).as[Block](amountsAsStrings)
@@ -777,15 +783,13 @@ object AsyncHttpApi extends Assertions {
       signedBroadcast(issue.toTx.explicitGet().json())
 
     def batchSignedTransfer(transfers: Seq[TransferRequest]): Future[Seq[Transaction]] = {
-      import TransferRequest.jsonFormat
       Future.sequence(transfers.map(v => signedBroadcast(toJson(v).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))))
     }
 
     def createAlias(target: KeyPair, alias: String, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] =
       signedBroadcast(
-        CreateAliasTransaction
-          .selfSigned(version, target, alias, fee, System.currentTimeMillis())
-          .explicitGet()
+        com.wavesplatform.transaction.TxHelpers
+          .createAlias(alias, target, fee, version)
           .json()
       )
 

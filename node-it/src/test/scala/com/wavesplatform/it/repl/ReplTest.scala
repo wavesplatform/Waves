@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.*
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.it.sync.transactions.{FailedTransactionSuiteLike, OverflowBlock}
+import com.wavesplatform.it.sync.transactions.FailedTransactionSuiteLike
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.repl.Repl
@@ -19,16 +19,13 @@ import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 
-class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[String] with OverflowBlock {
+class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[String] {
   override protected def waitForHeightArise(): Unit =
     nodes.waitForHeightArise()
 
-  override def nodeConfigs: Seq[Config] =
-    com.wavesplatform.it.NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures(BlockchainFeatures.BlockV5.id.toInt -> Height(0)))
-      .withDefault(1)
-      .buildNonConflicting()
+  import com.wavesplatform.it.NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] =
+    Seq(BiggestMiner.quorum(0).preactivatedFeatures(BlockchainFeatures.BlockV5))
 
   def await[A](f: Future[A]): A = Await.result(f, 2 seconds)
 

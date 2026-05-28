@@ -9,7 +9,7 @@ import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.Sponsorship
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class SponsorFeeActionSuite extends BaseFreeSpec {
@@ -468,9 +468,8 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
     nodes.waitForTransaction(
       miner
         .signedBroadcast(
-          SetScriptTransaction
-            .selfSigned(1.toByte, address, Some(compiledScript), setScriptFee, System.currentTimeMillis())
-            .explicitGet()
+          TxHelpers
+            .setScript(address, compiledScript, setScriptFee, timestamp = System.currentTimeMillis())
             .json()
         )
         .id

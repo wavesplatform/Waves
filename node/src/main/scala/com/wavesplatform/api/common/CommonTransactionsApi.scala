@@ -12,7 +12,7 @@ import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.{Blockchain, Height, StateSnapshot, TxMeta}
-import com.wavesplatform.transaction.TransactionType.TransactionType
+import com.wavesplatform.transaction.TransactionType
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool

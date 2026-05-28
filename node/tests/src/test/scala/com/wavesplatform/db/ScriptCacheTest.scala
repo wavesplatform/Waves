@@ -12,9 +12,8 @@ import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loa
 import com.wavesplatform.state.*
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.test.FreeSpec
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, TxHelpers}
 import com.wavesplatform.utils.Time
 import org.scalacheck.Gen
 
@@ -54,9 +53,7 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
         val setScriptTxs =
           (accounts zip scripts)
             .map { case (account, (script, _)) =>
-              SetScriptTransaction
-                .selfSigned(1.toByte, account, Some(script), FEE, ts + accounts.length + accounts.indexOf(account) + 1)
-                .explicitGet()
+              TxHelpers.setScript(account, script, FEE, timestamp = ts + accounts.length + accounts.indexOf(account) + 1)
             }
 
         val genesisBlock = TestBlock.create(genesisTxs).block
@@ -107,9 +104,7 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
 
         val lastBlockHeader = bcu.lastBlockHeader.get
 
-        val newScriptTx = SetScriptTransaction
-          .selfSigned(1.toByte, account, None, FEE, lastBlockHeader.header.timestamp + 1)
-          .explicitGet()
+        val newScriptTx = TxHelpers.removeScript(account, FEE, timestamp = lastBlockHeader.header.timestamp + 1)
 
         val blockWithEmptyScriptTx = TestBlock
           .create(

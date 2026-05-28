@@ -492,7 +492,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           blockchainUpdater,
           routeTimeout
         ),
-        RewardApiRoute(blockchainUpdater)
+        RewardApiRoute(blockchainUpdater),
+        FinalityApiRoute(blockchainUpdater, extensionContext.blocksApi, extensionContext.generatorsApi)
       )
 
       val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)

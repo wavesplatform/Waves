@@ -14,8 +14,8 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{Blockchain, EndorsementStorage, StateSnapshot}
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FlatSpec
-import com.wavesplatform.transaction.TxHelpers.{defaultAddress, defaultSigner, secondAddress, transfer}
-import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.TxHelpers.{createAlias, defaultAddress, defaultSigner, secondAddress, transfer}
+import com.wavesplatform.transaction.{Transaction, TxVersion}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl, UtxPriorityPool}
 import monix.execution.Scheduler
@@ -58,9 +58,7 @@ class MicroBlockMinerSpec extends FlatSpec with WithDomain {
         )
         import Scheduler.Implicits.global
         val startTime = System.nanoTime()
-        val tx = CreateAliasTransaction
-          .selfSigned(TxVersion.V1, acc, "test" + Random.nextInt(), TestValues.fee, TestValues.timestamp)
-          .explicitGet()
+        val tx = createAlias(name = "test" + Random.nextInt(), sender = acc, fee = TestValues.fee, version = TxVersion.V1)
         utxPool.putIfNew(tx).resultE.explicitGet()
         val result = task.runSyncUnsafe()
         result match {

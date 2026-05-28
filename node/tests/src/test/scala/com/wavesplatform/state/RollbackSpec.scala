@@ -20,14 +20,13 @@ import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.traits.domain.Lease
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
+import com.wavesplatform.state.{Height, TransactionId}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
-import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.{InvokeTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{Proofs, Transaction, TxHelpers, TxPositiveAmount, TxVersion}
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{Assertion, Assertions}
 
@@ -260,9 +259,17 @@ class RollbackSpec extends FreeSpec with WithDomain {
               nextTs,
               d.lastBlockId,
               Seq(
-                TransferTransaction
-                  .selfSigned(1.toByte, sender, recipient.toAddress, IssuedAsset(issueTransaction.id()), assetAmount, Waves, 1, ByteStr.empty, nextTs)
-                  .explicitGet()
+                TxHelpers.transfer(
+                  from = sender,
+                  to = recipient.toAddress,
+                  amount = assetAmount,
+                  asset = IssuedAsset(issueTransaction.id()),
+                  fee = 1,
+                  feeAsset = Waves,
+                  attachment = ByteStr.empty,
+                  timestamp = nextTs,
+                  version = 1.toByte
+                )
               )
             )
             .block
@@ -845,9 +852,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
             val leaseAmount = smallFeeGen.sample.get
             val leaseTx =
-              LeaseTransaction
-                .selfSigned(2.toByte, leaseSender, leaseRecipientAddress.toAddress, leaseAmount, setScript.fee.value, nextTs)
-                .explicitGet()
+              TxHelpers.lease(
+                sender = leaseSender,
+                recipient = leaseRecipientAddress.toAddress,
+                amount = leaseAmount,
+                fee = setScript.fee.value,
+                version = 2.toByte
+              )
             val leaseId = leaseTx.id()
 
             d.appendBlock(setScript, leaseTx)
@@ -941,7 +952,12 @@ class RollbackSpec extends FreeSpec with WithDomain {
             .create(
               nextTs,
               blockWithScriptId,
-              Seq(SetScriptTransaction.selfSigned(1.toByte, sender, None, 800000, nextTs).explicitGet())
+              Seq(
+                SetScriptTransaction
+                  .create(1.toByte, sender.publicKey, None, 800000, nextTs, Proofs.empty)
+                  .map(_.signWith(sender.privateKey))
+                  .explicitGet()
+              )
             )
             .block
         )
@@ -1124,9 +1140,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
         def leases(address: Address) = d.accountsApi.activeLeases(address).toListL.runSyncUnsafe()
 
         val leaseTxs = Seq.fill(5)(lease(defaultSigner, secondAddress)) ++ Seq.fill(5)(lease(secondSigner, defaultAddress))
-        val info = leaseTxs.map { tx =>
-          LeaseInfo(tx.id(), TransactionId(tx.id()), tx.sender.toAddress, tx.recipient.asInstanceOf[Address], tx.amount.value, Height(2), Active)
-        }
+        val info = leaseTxs.map {tx =>
+            LeaseInfo(tx.id(), TransactionId(tx.id()), tx.sender.toAddress, tx.recipient.asInstanceOf[Address], tx.amount.value, Height(2), Active)
+          }
 
         val b1 = d.appendBlock(leaseTxs*)
         leases(defaultAddress) should contain theSameElementsAs info

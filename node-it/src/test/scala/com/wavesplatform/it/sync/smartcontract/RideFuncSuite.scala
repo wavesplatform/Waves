@@ -10,6 +10,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -17,12 +18,9 @@ import org.scalatest.CancelAfterFailure
 
 class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val estimator = ScriptEstimatorV2
-
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(entitiesNumber = 1)
-      .buildNonConflicting()
+  
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
 
   test("assetBalance() verification") {
     val asset = sender
@@ -46,14 +44,15 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val tx =
       sender.signedBroadcast(
-        SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiled), setScriptFee, System.currentTimeMillis()).explicitGet().json()
+        SetScriptTransaction.create(1.toByte, pkNewAddress.publicKey, Some(compiled), setScriptFee, System.currentTimeMillis(), Proofs.empty).map(_.signWith(pkNewAddress.privateKey)).explicitGet().json()
       )
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
     assertBadRequestAndResponse(
       sender.signedBroadcast(
         TransferTransaction
-          .selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis())
+          .create(2.toByte, pkNewAddress.publicKey, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis(), Proofs.empty)
+          .map(_.signWith(pkNewAddress.privateKey))
           .explicitGet()
           .json()
       ),
@@ -62,17 +61,19 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     sender.signedBroadcast(
       TransferTransaction
-        .selfSigned(
+        .create(
           2.toByte,
-          firstKeyPair,
+          firstKeyPair.publicKey,
           pkNewAddress.toAddress,
           IssuedAsset(ByteStr.decodeBase58(asset).get),
           100000000,
           Waves,
           smartMinFee,
           ByteStr.empty,
-          System.currentTimeMillis()
+          System.currentTimeMillis(),
+          Proofs.empty
         )
+        .map(_.signWith(firstKeyPair.privateKey))
         .explicitGet()
         .json(),
       waitForTx = true
@@ -80,7 +81,8 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val transfer = sender.signedBroadcast(
       TransferTransaction
-        .selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis())
+        .create(2.toByte, pkNewAddress.publicKey, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis(), Proofs.empty)
+        .map(_.signWith(pkNewAddress.privateKey))
         .explicitGet()
         .json()
     )
@@ -99,7 +101,8 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     val updTx =
       sender.signedBroadcast(
         SetScriptTransaction
-          .selfSigned(1.toByte, pkNewAddress, Some(updated), setScriptFee + smartFee, System.currentTimeMillis())
+          .create(1.toByte, pkNewAddress.publicKey, Some(updated), setScriptFee + smartFee, System.currentTimeMillis(), Proofs.empty)
+          .map(_.signWith(pkNewAddress.privateKey))
           .explicitGet()
           .json()
       )
@@ -108,7 +111,8 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     assertBadRequestAndResponse(
       sender.signedBroadcast(
         TransferTransaction
-          .selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis())
+          .create(2.toByte, pkNewAddress.publicKey, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis(), Proofs.empty)
+          .map(_.signWith(pkNewAddress.privateKey))
           .explicitGet()
           .json()
       ),
@@ -117,17 +121,19 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     sender.signedBroadcast(
       TransferTransaction
-        .selfSigned(
+        .create(
           2.toByte,
-          firstKeyPair,
+          firstKeyPair.publicKey,
           pkNewAddress.toAddress,
           IssuedAsset(ByteStr.decodeBase58(asset).get),
           800000000,
           Waves,
           smartMinFee,
           ByteStr.empty,
-          System.currentTimeMillis()
+          System.currentTimeMillis(),
+          Proofs.empty
         )
+        .map(_.signWith(firstKeyPair.privateKey))
         .explicitGet()
         .json(),
       waitForTx = true
@@ -135,7 +141,8 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val transferAfterUpd = sender.signedBroadcast(
       TransferTransaction
-        .selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis())
+        .create(2.toByte, pkNewAddress.publicKey, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis(), Proofs.empty)
+        .map(_.signWith(pkNewAddress.privateKey))
         .explicitGet()
         .json()
     )
@@ -166,21 +173,22 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     val pkNewAddress = newAddress
     sender.transfer(firstKeyPair, newAddress.toAddress.toString, 10.waves, minFee, waitForTx = true)
 
-    val scriptSet          = SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiledScript), setScriptFee, System.currentTimeMillis())
+    val scriptSet          = SetScriptTransaction.create(1.toByte, pkNewAddress.publicKey, Some(compiledScript), setScriptFee, System.currentTimeMillis(), Proofs.empty).map(_.signWith(pkNewAddress.privateKey))
     val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
 
-    val transfer = TransferTransaction.selfSigned(
+    val transfer = TransferTransaction.create(
       2.toByte,
-      pkNewAddress,
+      pkNewAddress.publicKey,
       pkNewAddress.toAddress,
       Waves,
       1.waves,
       Waves,
       smartMinFee,
       ByteStr.empty,
-      System.currentTimeMillis()
-    )
+      System.currentTimeMillis(),
+      Proofs.empty
+    ).map(_.signWith(pkNewAddress.privateKey))
     val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
   }

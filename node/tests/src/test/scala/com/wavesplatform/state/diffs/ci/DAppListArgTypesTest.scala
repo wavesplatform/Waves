@@ -8,7 +8,6 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.values.{V3, V4}
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, *}
 import com.wavesplatform.lang.v1.compiler.{TestCompiler, Types}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
@@ -18,8 +17,6 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.utils.Signed
 import org.scalatest.Inside
 
 class DAppListArgTypesTest extends PropSpec with WithDomain with Inside {
@@ -32,10 +29,9 @@ class DAppListArgTypesTest extends PropSpec with WithDomain with Inside {
     val invoker = RandomKeyPair()
     val dApp    = RandomKeyPair()
     val fee     = ciFee().sample.get
-    val call    = Some(FUNCTION_CALL(User("f"), args))
     val genesis = Seq(invoker, dApp).map(acc => TxHelpers.genesis(acc.toAddress, ENOUGH_AMT))
-    val setDApp = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(dAppScript), 0.01.waves, ts).explicitGet()
-    val ci      = () => Signed.invokeScript(1.toByte, invoker, dApp.toAddress, call, Nil, fee, Waves, ts)
+    val setDApp = TxHelpers.setScript(dApp, dAppScript, 0.01.waves, 1.toByte)
+    val ci      = () => TxHelpers.invoke(dApp.toAddress, Some("f"), args, Nil, invoker, fee, Waves, 1.toByte, ts)
     (genesis :+ setDApp, ci, dApp.toAddress)
   }
 
@@ -127,7 +123,7 @@ class DAppListArgTypesTest extends PropSpec with WithDomain with Inside {
     assert(forbidAfterActivation = true, rideList(rideList().head))
   }
 
-    property("NODE-799. list of object as callable argument is forbidden by serialization") {
+  property("NODE-799. list of object as callable argument is forbidden by serialization") {
     val (_, invoke, _) = preconditions(dApp, rideList(CaseObj(Types.UNIT, Map())))
     (the[Throwable] thrownBy invoke()).getMessage should include("Serialization of value Unit is unsupported")
   }

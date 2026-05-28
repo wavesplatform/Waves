@@ -2,8 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, Alias}
-import com.wavesplatform.api.http.ApiError.WrongJson
-import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTransferRequest}
+import com.wavesplatform.api.http.requests.MassTransferRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto
@@ -142,23 +141,26 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
           fee: Long = calcMassTransferFee(1),
           timestamp: Long = System.currentTimeMillis,
           attachment: Array[Byte] = Array.emptyByteArray
-      ): (SignedMassTransferRequest, Option[ByteStr]) = {
+      ): (MassTransferRequest, Option[ByteStr]) = {
         val txEi = for {
           parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
-          tx <- MassTransferTransaction.selfSigned(
-            1.toByte,
-            sender.keyPair,
-            Waves,
-            parsedTransfers,
-            fee,
-            timestamp,
-            ByteStr(attachment)
-          )
+          tx <- MassTransferTransaction
+            .create(
+              1.toByte,
+              sender.keyPair.publicKey,
+              Waves,
+              parsedTransfers,
+              fee,
+              timestamp,
+              ByteStr(attachment),
+              Proofs.empty
+            )
+            .map(_.signWith(sender.keyPair.privateKey))
         } yield tx
 
         val (signature, idOpt) = txEi.fold(_ => (Proofs(List(fakeSignature)), None), tx => (tx.proofs, Some(tx.id())))
 
-        val req = SignedMassTransferRequest(
+        val req = MassTransferRequest(
           Some(TxVersion.V1),
           sender.publicKey.toString,
           None,
@@ -172,7 +174,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
         (req, idOpt)
       }
 
-      def negativeTransferAmountRequest: (SignedMassTransferRequest, Option[ByteStr]) = {
+      def negativeTransferAmountRequest: (MassTransferRequest, Option[ByteStr]) = {
         val recipient = secondKeyPair
 
         val transfers  = List(Transfer(recipient.toAddress.toString, -1))
@@ -191,7 +193,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
           TxHelpers.massTransferBodyBytes(sender.keyPair, None, mttdTransfers, ByteString.copyFrom(attachment.arr), fee, timestamp, version)
 
         (
-          SignedMassTransferRequest(
+          MassTransferRequest(
             Some(version),
             sender.publicKey.toString,
             None,
@@ -263,7 +265,10 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
       def id(obj: JsObject) = obj.value("id").as[String]
 
       val noProof = signedMassTransfer - "proofs"
-      assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", noProof), s"${WrongJson.WrongJsonDataMessage}.*proofs.*missing")
+      assertBadRequestAndResponse(
+        sender.postJson("/transactions/broadcast", noProof),
+        s"Reason: Transactions from non-scripted accounts must have exactly 1 proof"
+      )
       nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
 
       val badProof = signedMassTransfer ++ Json.obj("proofs" -> Seq(fakeSignature.toString))

@@ -4,21 +4,16 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.test.*
-import com.wavesplatform.state.Height
 
 trait ScriptAssetActionLimitsSuite extends BaseFreeSpec {
 
   def createDApp(script: String, address: KeyPair = miner.generateKeyPair()): KeyPair
 
+  import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((SynchronousCalls.id, Height(0)), (RideV6.id, Height(0))))
-      .buildNonConflicting()
+    Seq(BiggestMiner.quorum(0).preactivatedFeatures(SynchronousCalls, RideV6))
 
   protected val initialWavesBalance: Long  = 1000.waves
   protected val minSponsoredAssetFee: Long = 1001

@@ -1,13 +1,14 @@
 package com.wavesplatform.transaction
 
-object TransactionType extends Enumeration(1) {
-  type TransactionType = Value
+enum TransactionType {
+  def id: Int                 = ordinal + 1
+  def transactionName: String = s"${this.toString}Transaction"
 
-  // Add new transactions before InvokeExpression
-  val Genesis, Payment, Issue, Transfer, Reissue, Burn, Exchange, Lease, LeaseCancel, CreateAlias, MassTransfer, Data, SetScript, SponsorFee,
-      SetAssetScript, InvokeScript, UpdateAssetInfo, Ethereum, CommitToGeneration, InvokeExpression = Value
+  case Genesis, Payment, Issue, Transfer, Reissue, Burn, Exchange, Lease, LeaseCancel, CreateAlias, MassTransfer, Data, SetScript, SponsorFee,
+    SetAssetScript, InvokeScript, UpdateAssetInfo, Ethereum, CommitToGeneration, InvokeExpression
 
-  implicit class ValueExt(val tpe: TransactionType) extends AnyVal {
-    def transactionName: String = s"${tpe}Transaction"
-  }
+}
+
+object TransactionType {
+  def fromId(id: Byte): TransactionType = TransactionType.fromOrdinal(id - 1)
 }

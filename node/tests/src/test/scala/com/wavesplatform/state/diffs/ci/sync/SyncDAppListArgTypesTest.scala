@@ -13,10 +13,8 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
 
 class SyncDAppListArgTypesTest extends PropSpec with WithDomain with TransactionGenBase {
   private val time = new TestTime
@@ -47,9 +45,9 @@ class SyncDAppListArgTypesTest extends PropSpec with WithDomain with Transaction
     val dApp2    = accountGen.sample.get
     val fee      = ciFee().sample.get
     val gTxs     = Seq(invoker, dApp1, dApp2).map(acc => GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet())
-    val ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress, args)), fee, ts).explicitGet()
-    val ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script), fee, ts).explicitGet()
-    val invokeTx = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
+    val ssTx1    = TxHelpers.setScript(dApp1, dApp1Script(dApp2.toAddress, args), fee, 1.toByte)
+    val ssTx2    = TxHelpers.setScript(dApp2, dApp2Script, fee, 1.toByte)
+    val invokeTx = () => TxHelpers.invoke(dApp1.toAddress, invoker = invoker, fee = fee, version = TxVersion.V3, timestamp = ts)
     (gTxs ++ Seq(ssTx1, ssTx2), invokeTx)
   }
 

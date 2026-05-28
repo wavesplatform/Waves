@@ -1,10 +1,11 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.serialization.impl.ReissueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.ReissueTxValidator
@@ -26,14 +27,17 @@ case class ReissueTransaction(
 ) extends Transaction(TransactionType.Reissue, Seq(asset))
     with Versioned.ToV3
     with ProvenTransaction
-    with SigProofsSwitch
+    with HasSignature
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V3 {
+  override type T = ReissueTransaction
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(ReissueTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(ReissueTxSerializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.evalOnce(ReissueTxSerializer.toJson(this))
+
+  override def addProof(proof: ByteStr): ReissueTransaction = copy(proofs = this.proofs.add(proof))
 }
 
 object ReissueTransaction extends TransactionParser {
@@ -56,7 +60,7 @@ object ReissueTransaction extends TransactionParser {
       reissuable: Boolean,
       fee: Long,
       timestamp: Long,
-      proofs: Proofs,
+      proofs: Proofs = Proofs.empty,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
     for {
@@ -64,29 +68,4 @@ object ReissueTransaction extends TransactionParser {
       quantity <- TxPositiveAmount(quantity)(TxValidationError.NonPositiveAmount(quantity, "assets"))
       tx       <- ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      asset: IssuedAsset,
-      quantity: Long,
-      reissuable: Boolean,
-      fee: Long,
-      timestamp: Long,
-      signer: PrivateKey,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, ReissueTransaction] =
-    create(version, sender, asset, quantity, reissuable, fee, timestamp, Nil, chainId).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      asset: IssuedAsset,
-      quantity: Long,
-      reissuable: Boolean,
-      fee: Long,
-      timestamp: Long,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, ReissueTransaction] =
-    signed(version, sender.publicKey, asset, quantity, reissuable, fee, timestamp, sender.privateKey, chainId)
 }

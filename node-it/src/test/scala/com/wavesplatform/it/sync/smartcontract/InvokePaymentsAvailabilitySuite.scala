@@ -5,75 +5,83 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
+import com.wavesplatform.it.NodeConfigs.BiggestMiner
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
 
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(
-        _.preactivatedFeatures(
-          (BlockchainFeatures.Ride4DApps.id, Height(0)),
-          (BlockchainFeatures.BlockV5.id, Height(0)),
-          (BlockchainFeatures.SynchronousCalls.id, Height(0))
-        )
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner
+      .quorum(0)
+      .preactivatedFeatures(
+        BlockchainFeatures.Ride4DApps,
+        BlockchainFeatures.BlockV5,
+        BlockchainFeatures.SynchronousCalls
       )
-      .withDefault(1)
-      .buildNonConflicting()
+  )
 
   private lazy val (caller, callerAddress)           = (firstKeyPair, firstAddress)
   private lazy val (callingDApp, callingDAppAddress) = (secondKeyPair, secondAddress)
   private lazy val (proxyDApp, proxyDAppAddress)     = (thirdKeyPair, thirdAddress)
 
   private def syncDApp(dApp: String) =
-    ScriptCompiler.compile(
-      s"""
-       |{-# STDLIB_VERSION 5 #-}
-       |{-# CONTENT_TYPE DAPP #-}
-       |{-# SCRIPT_TYPE ACCOUNT #-}
-       |
-       | let dApp2 = Address(base58'$dApp')
-       |
-       | @Callable(inv)
-       | func default() = {
-       |    let pmt = inv.payments[0]
-       |    strict invokeV4 = dApp2.invoke("default", nil, [AttachedPayment(pmt.assetId, pmt.amount)])
-       |    [
-       |       IntegerEntry("balance_self", this.assetBalance(pmt.assetId.value())),
-       |       IntegerEntry("balance_calling_dApp", dApp2.assetBalance(pmt.assetId.value()))
-       |    ]
-       | }
-       |
+    ScriptCompiler
+      .compile(
+        s"""
+           |{-# STDLIB_VERSION 5 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           | let dApp2 = Address(base58'$dApp')
+           |
+           | @Callable(inv)
+           | func default() = {
+           |    let pmt = inv.payments[0]
+           |    strict invokeV4 = dApp2.invoke("default", nil, [AttachedPayment(pmt.assetId, pmt.amount)])
+           |    [
+           |       IntegerEntry("balance_self", this.assetBalance(pmt.assetId.value())),
+           |       IntegerEntry("balance_calling_dApp", dApp2.assetBalance(pmt.assetId.value()))
+           |    ]
+           | }
+           |
          """.stripMargin,
-      ScriptEstimatorV3.latest
-    ).explicitGet()._1.bytes().base64
+        ScriptEstimatorV3.latest
+      )
+      .explicitGet()
+      ._1
+      .bytes()
+      .base64
 
   private val dApp =
-    ScriptCompiler.compile(
-      s"""
-       | {-# STDLIB_VERSION 5       #-}
-       | {-# CONTENT_TYPE   DAPP    #-}
-       | {-# SCRIPT_TYPE    ACCOUNT #-}
-       |
-       | @Callable(inv)
-       | func default() = {
-       |   let pmtAssetId = inv.payments[0].assetId.value()
-       |   [
-       |     IntegerEntry("balance_self", this.assetBalance(pmtAssetId)),
-       |     IntegerEntry("balance_caller", inv.caller.assetBalance(pmtAssetId))
-       |   ]
-       | }
+    ScriptCompiler
+      .compile(
+        s"""
+           | {-# STDLIB_VERSION 5       #-}
+           | {-# CONTENT_TYPE   DAPP    #-}
+           | {-# SCRIPT_TYPE    ACCOUNT #-}
+           |
+           | @Callable(inv)
+           | func default() = {
+           |   let pmtAssetId = inv.payments[0].assetId.value()
+           |   [
+           |     IntegerEntry("balance_self", this.assetBalance(pmtAssetId)),
+           |     IntegerEntry("balance_caller", inv.caller.assetBalance(pmtAssetId))
+           |   ]
+           | }
      """.stripMargin,
-      ScriptEstimatorV3.latest
-    ).explicitGet()._1.bytes().base64
+        ScriptEstimatorV3.latest
+      )
+      .explicitGet()
+      ._1
+      .bytes()
+      .base64
 
   private val paymentAmount = 12345
   private val issueAmount   = 1000 * 1000

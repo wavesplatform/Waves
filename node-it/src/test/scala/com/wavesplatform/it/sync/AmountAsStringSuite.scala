@@ -1,22 +1,31 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.it.BaseFunSuite
+import com.wavesplatform.it.NodeConfigs.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
-import com.wavesplatform.it.sync.transactions.OverflowBlock
-import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.state.{IntegerDataEntry, Height}
+import com.wavesplatform.state.{Height, IntegerDataEntry}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.{CreateAliasTransaction, TxExchangeAmount, TxExchangePrice, TxVersion}
+import com.wavesplatform.utils.ScorexLogging
 import org.asynchttpclient.Response
 import org.scalatest
 import org.scalatest.Assertion
 import play.api.libs.json.{JsString, JsValue, Json}
 
-class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
+class AmountAsStringSuite extends BaseFunSuite with ScorexLogging {
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    Miners(1).quorum(0).overrides("waves.miner.micro-block-interval = 5s"), // when UTX is empty, retry building microblock in 2 seconds
+    NotMiner
+  )
+
+  private def firstKeyPair = notMiner.keyPair
+  private def firstAddress = firstKeyPair.toAddress.toString
 
   val (headerName, headerValue) = ("Accept", "application/json;large-significand-format=string")
 
@@ -201,13 +210,13 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
   }
   test("amount as string in masstransfer transaction") {
     nodes.waitForHeightArise()
-    overflowBlock()
 
     def checkMassTransferTx(tx: Transaction): Assertion = {
+      log.info(s"Transaction: $tx")
       tx.transfers.get.head.amount shouldBe transferAmount
       tx.totalAmount shouldBe Some(transferAmount)
     }
-    val (transfers, massTransferFee) = (List(Transfer(secondAddress, transferAmount)), calcMassTransferFee(1))
+    val (transfers, massTransferFee) = (List(Transfer(miner.address, transferAmount)), calcMassTransferFee(1))
     val massTransferTx               = sender.massTransfer(firstKeyPair, transfers, massTransferFee, amountsAsStrings = true)
     checkMassTransferTx(massTransferTx)
 
@@ -229,7 +238,7 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
     val tx =
       Json.obj(
         "type"            -> CreateAliasTransaction.typeId,
-        "sender"          -> firstKeyPair,
+        "sender"          -> firstKeyPair.publicKey.toString,
         "alias"           -> "alias",
         "fee"             -> 100000,
         "timestamp"       -> System.currentTimeMillis(),

@@ -3,18 +3,18 @@ package com.wavesplatform.it.sync.network
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{KnownPeer, Peer}
-import com.wavesplatform.it.{BaseFreeSpec, Node, NodeConfigs}
+import com.wavesplatform.it.{BaseFreeSpec, Node}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.Span
 
 import scala.concurrent.duration.DurationInt
 
 class PeersApiRouteSuite extends BaseFreeSpec with Eventually {
-  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
-    .overrideBase(_.quorum(0))
-    .withDefault(1)
-    .withSpecial(_.nonMiner)
-    .buildNonConflicting()
+  import com.wavesplatform.it.NodeConfigs.*
+  override val nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner.quorum(0),
+    Default.head.notMiner
+  )
 
   private def ofANode(node: Node): PartialFunction[Any, Unit] = {
     case Peer(_, declaredAddress, name) :: Nil if name == node.name && declaredAddress == node.networkAddress.toString =>

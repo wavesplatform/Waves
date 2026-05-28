@@ -1,13 +1,13 @@
 package com.wavesplatform.transaction.assets
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.IssueTxValidator
@@ -33,13 +33,17 @@ case class IssueTransaction(
     with Versioned.ToV3
     with ProvenTransaction
     with FastHashId
-    with SigProofsSwitch
+    with HasSignature
     with TxWithFee.InWaves
     with PBSince.V3 {
+
+  override type T = IssueTransaction
 
   override val bodyBytes: Coeval[Array[TxType]] = Coeval.evalOnce(IssueTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxType]]     = Coeval.evalOnce(IssueTxSerializer.toBytes(this))
   override val json: Coeval[JsObject]           = Coeval.evalOnce(IssueTxSerializer.toJson(this))
+
+  override def addProof(proof: ByteStr): IssueTransaction = copy(proofs = this.proofs.add(proof))
 }
 
 object IssueTransaction extends TransactionParser {
@@ -67,7 +71,7 @@ object IssueTransaction extends TransactionParser {
       script: Option[Script],
       fee: Long,
       timestamp: Long,
-      proofs: Proofs,
+      proofs: Proofs = Proofs.empty,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, IssueTransaction] =
     for {
@@ -89,37 +93,6 @@ object IssueTransaction extends TransactionParser {
         chainId
       ).validatedEither
     } yield tx
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      name: String,
-      description: String,
-      quantity: Long,
-      decimals: Byte,
-      reissuable: Boolean,
-      script: Option[Script],
-      fee: Long,
-      timestamp: Long,
-      signer: PrivateKey,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, IssueTransaction] =
-    create(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      name: String,
-      description: String,
-      quantity: Long,
-      decimals: Byte,
-      reissuable: Boolean,
-      script: Option[Script],
-      fee: Long,
-      timestamp: Long,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, IssueTransaction] =
-    signed(version, sender.publicKey, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender.privateKey, chainId)
 
   override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = IssueTxSerializer.parseBytes(bytes)
 

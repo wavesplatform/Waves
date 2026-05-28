@@ -10,8 +10,7 @@ import play.api.libs.json.{Format, Json}
 
 case class ReissueRequest(
     version: Option[Byte],
-    sender: Option[String],
-    senderPublicKey: Option[String],
+    senderPublicKey: String,
     assetId: IssuedAsset,
     quantity: Long,
     reissuable: Boolean,
@@ -20,12 +19,13 @@ case class ReissueRequest(
     signature: Option[ByteStr],
     proofs: Option[Proofs]
 ) extends TxBroadcastRequest[ReissueTransaction] {
-  def toTxFrom(sender: PublicKey): Either[ValidationError, ReissueTransaction] =
+  def toTx: Either[ValidationError, ReissueTransaction] =
     for {
       validProofs <- toProofs(signature, proofs)
+      validSender <- PublicKey.fromBase58String(senderPublicKey)
       tx <- ReissueTransaction.create(
         version.getOrElse(defaultVersion),
-        sender,
+        validSender,
         assetId,
         quantity,
         reissuable,
@@ -37,5 +37,5 @@ case class ReissueRequest(
 }
 
 object ReissueRequest {
-  implicit val jsonFormat: Format[ReissueRequest] = Json.format
+  given Format[ReissueRequest] = Json.format
 }

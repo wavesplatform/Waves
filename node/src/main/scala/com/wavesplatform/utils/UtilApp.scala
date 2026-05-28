@@ -1,20 +1,19 @@
 package com.wavesplatform.utils
 
 import com.google.common.io.ByteStreams
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
-import com.wavesplatform.api.http.requests.*
+import com.wavesplatform.account.{KeyPair, PKKeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
+import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.crypto.{P256Curve, Sha256}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider.*
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.settings.{WalletSettings, WavesSettings}
-import com.wavesplatform.state.{GenerationPeriod, Height}
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.state.Height
+import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{Transaction, TransactionFactory, TransactionSignOps, TransactionType}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, Version}
 import play.api.libs.json.{JsObject, Json}
@@ -25,16 +24,14 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 import java.util
 import scala.annotation.nowarn
+import scala.util.Random
 
-//noinspection ScalaStyle
-// TODO: Consider remove implemented methods from REST API
 object UtilApp {
   enum Mode {
-    case CompileScript, DecompileScript, SignBytes, VerifySignature, CreateKeyPair, Hash, SerializeTx, SignTx, SignTxWithSk, SmokeTest
+    case CompileScript, DecompileScript, SignBytes, VerifySignature, CreateKeyPair, Hash, SerializeTx, SignTx, SmokeTest
   }
 
   case class CompileOptions(assetScript: Boolean = false)
-  case class SignOptions(privateKey: PrivateKey = null.asInstanceOf[PrivateKey])
   case class VerifyOptions(publicKey: PublicKey = null.asInstanceOf[PublicKey], signature: ByteStr = ByteStr.empty, checkWeakPk: Boolean = false)
   case class HashOptions(mode: String = "fast")
   case class SignTxOptions(signerAddress: String = "", currentHeight: Height = Height(1), finalityActivationHeight: Option[Height] = None)
@@ -54,12 +51,20 @@ object UtilApp {
       inFormat: String = "plain",
       outFormat: String = "plain",
       compileOptions: CompileOptions = CompileOptions(),
-      signOptions: SignOptions = SignOptions(),
+      signOptions: String | KeyPair = "",
       verifyOptions: VerifyOptions = VerifyOptions(),
       hashOptions: HashOptions = HashOptions(),
-      signTxOptions: SignTxOptions = SignTxOptions(),
       keyPairOptions: KeyPairOptions = KeyPairOptions()
   )
+
+  private def maybeFindKeyPair(cmd: Command): Either[ValidationError, KeyPair] = {
+    // we need to load application config to properly set chain ID
+    val walletSettings = Application.loadApplicationConfig(cmd.configFile.map(new File(_))).walletSettings
+    cmd.signOptions match {
+      case signerAddress: String => Wallet(walletSettings).findPrivateKey(signerAddress)
+      case kp: KeyPair           => Right(kp)
+    }
+  }
 
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, Command()).foreach { cmd =>
@@ -67,13 +72,12 @@ object UtilApp {
       val result = cmd.mode match {
         case Mode.CompileScript   => Actions.doCompile(Application.loadApplicationConfig(cmd.configFile.map(new File(_))))(cmd, inBytes)
         case Mode.DecompileScript => Actions.doDecompile(inBytes)
-        case Mode.SignBytes       => Actions.doSign(cmd, inBytes)
+        case Mode.SignBytes       => maybeFindKeyPair(cmd).flatMap(Actions.doSign(_, inBytes))
         case Mode.VerifySignature => Actions.doVerify(cmd, inBytes)
         case Mode.CreateKeyPair   => Actions.doCreateKeyPair(cmd, inBytes)
         case Mode.Hash            => Actions.doHash(cmd, inBytes)
         case Mode.SerializeTx     => Actions.doSerializeTx(inBytes)
-        case Mode.SignTx          => Actions.doSignTx(new NodeState(cmd))(cmd, inBytes)
-        case Mode.SignTxWithSk    => Actions.doSignTxWithSK(cmd, inBytes)
+        case Mode.SignTx          => maybeFindKeyPair(cmd).flatMap(Actions.doSignTx(_, inBytes))
         case Mode.SmokeTest       => Actions.doSmokeTest()
       }
 
@@ -149,7 +153,7 @@ object UtilApp {
             opt[String]('k', "private-key")
               .text("Private key for signing")
               .required()
-              .action((s, c) => c.copy(signOptions = c.signOptions.copy(privateKey = PrivateKey(Base58.decode(s)))))
+              .action((s, c) => c.copy(signOptions = PKKeyPair(PrivateKey(Base58.decode(s)))))
           )
           .text("Sign bytes with provided private key")
           .action((_, c) => c.copy(mode = Mode.SignBytes)),
@@ -196,24 +200,16 @@ object UtilApp {
             opt[String]("signer-address")
               .abbr("sa")
               .text("Signer address (requires corresponding key in wallet.dat)")
-              .action((a, c) => c.copy(signTxOptions = c.signTxOptions.copy(signerAddress = a))),
-            opt[Int]('h', "current-height")
-              .text("Current height, required for signing CommitToGeneration transaction")
-              .optional()
-              .action((h, c) => c.copy(signTxOptions = c.signTxOptions.copy(currentHeight = Height(h)))),
-            opt[Int]('f', "finality-activation-height")
-              .text("Finality activation height, required for signing CommitToGeneration transaction. From preActivatedFeatures setting by default")
-              .optional()
-              .action((h, c) => c.copy(signTxOptions = c.signTxOptions.copy(finalityActivationHeight = Some(Height(h)))))
+              .action((a, c) => c.copy(signOptions = a))
           ),
         cmd("sign-with-sk")
           .text("Sign JSON transaction with private key")
-          .action((_, c) => c.copy(mode = Mode.SignTxWithSk))
+          .action((_, c) => c.copy(mode = Mode.SignTx))
           .children(
             opt[String]("private-key")
               .abbr("sk")
               .text("Private key")
-              .action((a, c) => c.copy(signOptions = c.signOptions.copy(privateKey = PrivateKey(Base58.decode(a)))))
+              .action((a, c) => c.copy(signOptions = PKKeyPair(PrivateKey(Base58.decode(a)))))
           )
       ),
       cmd("smoke").action((_, c) => c.copy(mode = Mode.SmokeTest, inputData = Input.Str(""))),
@@ -223,13 +219,6 @@ object UtilApp {
         case _    => success
       })
     )
-  }
-
-  // noinspection TypeAnnotation
-  private final class NodeState(c: Command) {
-    lazy val settings = Application.loadApplicationConfig(c.configFile.map(new File(_)))
-    lazy val wallet   = Wallet(settings.walletSettings)
-    lazy val time     = new NTP(settings.ntpServer)
   }
 
   private object Actions {
@@ -251,8 +240,8 @@ object UtilApp {
       }
     }
 
-    def doSign(c: Command, data: Array[Byte]): ActionResult =
-      Right(com.wavesplatform.crypto.sign(c.signOptions.privateKey, data).arr)
+    def doSign(keyPair: KeyPair, data: Array[Byte]): ActionResult =
+      Right(com.wavesplatform.crypto.sign(keyPair.privateKey, data).arr)
 
     def doVerify(c: Command, data: Array[Byte]): ActionResult =
       Either.cond(
@@ -291,66 +280,20 @@ object UtilApp {
       case m        => Left(s"Invalid hashing mode: $m")
     }
 
-    def doSerializeTx(data: Array[Byte]): ActionResult = {
-      val jsv = Json.parse(data)
+    def doSerializeTx(data: Array[Byte]): ActionResult =
       TransactionFactory
-        .fromSignedRequest(jsv)
+        .parseRequest(Json.parse(data).as[JsObject])
         .left
         .map(_.toString)
         .map(_.bytes())
-    }
 
-    def doSignTx(ns: NodeState)(c: Command, data: Array[Byte]): ActionResult = {
-      val unsignedTx = Json.parse(data).as[JsObject]
-
-      val currentPeriod = for {
-        finalityActivationHeight <- c.signTxOptions.finalityActivationHeight
-          .orElse(
-            ns.settings.blockchainSettings.functionalitySettings.preActivatedFeatures
-              .get(BlockchainFeatures.DeterministicFinality.id)
-              .map(Height.apply)
-          )
-        currentPeriod <- GenerationPeriod.from(c.signTxOptions.currentHeight, finalityActivationHeight, ns.settings)
-      } yield currentPeriod
-
-      val signedTx = for {
-        tpe <- (unsignedTx \ "type").validate[Int].asEither.left.map { _ => s"Can't parse as transaction request: $unsignedTx" }
-        currentPeriod <-
-          if (tpe == TransactionType.CommitToGeneration.id)
-            currentPeriod.toRight("Finality activation height is required for signing CommitToGeneration transaction")
-          else Right(GenerationPeriod(Height(1), Height(1), 1))
-        factory = TransactionFactory(ns.wallet, ns.time, Some(currentPeriod))
-        signedTx <- factory.parseRequestAndSign(c.signTxOptions.signerAddress, unsignedTx)
-      } yield signedTx
-
-      signedTx.left.map(_.toString).map(tx => Json.toBytes(tx.json()))
-    }
-
-    def doSignTxWithSK(c: Command, data: Array[Byte]): ActionResult = {
+    def doSignTx(signerKeyPair: KeyPair, data: Array[Byte]): ActionResult = {
       import cats.syntax.either.*
-      import com.wavesplatform.api.http.requests.InvokeScriptRequest.signedInvokeScriptRequestReads
-      import com.wavesplatform.api.http.requests.SponsorFeeRequest.signedSponsorRequestFormat
-      import com.wavesplatform.transaction.TransactionType.*
 
-      val json = Json.parse(data)
-      (TransactionType((json \ "type").as[Int]) match {
-        case Issue           => json.as[IssueRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case Transfer        => json.as[TransferRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case Reissue         => json.as[ReissueRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case Burn            => json.as[BurnRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case Exchange        => json.as[ExchangeRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case Lease           => json.as[LeaseRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case LeaseCancel     => json.as[LeaseCancelRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case CreateAlias     => json.as[CreateAliasRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case MassTransfer    => json.as[SignedMassTransferRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case Data            => json.as[SignedDataRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case SetScript       => json.as[SignedSetScriptRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case SponsorFee      => json.as[SignedSponsorFeeRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case SetAssetScript  => json.as[SignedSetAssetScriptRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case InvokeScript    => json.as[SignedInvokeScriptRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case UpdateAssetInfo => json.as[SignedUpdateAssetInfoRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case other           => GenericError(s"Signing $other is not supported").asLeft[Transaction]
-      }).leftMap(_.toString).map(_.json().toString().getBytes())
+      TransactionFactory
+        .parseRequestAndSign(Json.parse(data).as[JsObject], signerKeyPair, None)
+        .leftMap(_.toString)
+        .map(_.json().toString().getBytes())
     }
 
     def doSmokeTest(): ActionResult = {
@@ -362,6 +305,20 @@ object UtilApp {
       val publicKey = Base64.decode("KdU/1vG5aM0TC1WRHYmV8ByD6oabSRj7vHVvqIWYn0h60Ihc/FT/NvVgBTMG8rnVnEF+AeojruMo22LjhGDo7A==")
       require(util.Arrays.equals(hash, Sha256.hash(message)), "hash mismatch")
       require(P256Curve.verify(message, signature, publicKey).explicitGet(), "invalid signature")
+
+      val blsSK1bs = new Array[Byte](32)
+      Random.nextBytes(blsSK1bs)
+      val blsSK1  = BlsKeyPair(PrivateKey(blsSK1bs))
+      val blsSig1 = blsSK1.sign(message)
+
+      val blsSK2bs = new Array[Byte](32)
+      Random.nextBytes(blsSK2bs)
+      val blsSK2  = BlsKeyPair(PrivateKey(blsSK2bs))
+      val blsSig2 = blsSK2.sign(message)
+
+      val aggSig = BlsSignature.agg(Seq(blsSig1, blsSig2)).explicitGet()
+      aggSig.verifyAgg(message, Seq(blsSK1.publicKey, blsSK2.publicKey)).explicitGet()
+
       Right(Array.emptyByteArray)
     }
   }

@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.assets
 
 import cats.syntax.traverse.*
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
-import com.wavesplatform.crypto
+import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.NegativeMinFee
@@ -30,6 +30,8 @@ case class SponsorFeeTransaction(
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V2 {
+  override type T = SponsorFeeTransaction
+  override def addProof(proof: ByteStr): SponsorFeeTransaction = copy(proofs = this.proofs.add(proof))
 
   val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(SponsorFeeTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(SponsorFeeTxSerializer.toBytes(this))
@@ -41,9 +43,6 @@ object SponsorFeeTransaction extends TransactionParser {
   override val typeId: TxType = 14: Byte
 
   implicit val validator: TxValidator[SponsorFeeTransaction] = SponsorFeeTxValidator
-
-  implicit def sign(tx: SponsorFeeTransaction, privateKey: PrivateKey): SponsorFeeTransaction =
-    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   override def parseBytes(bytes: Array[TxVersion]): Try[SponsorFeeTransaction] =
     SponsorFeeTxSerializer.parseBytes(bytes)
@@ -63,27 +62,4 @@ object SponsorFeeTransaction extends TransactionParser {
       minSponsoredAssetFee <- minSponsoredAssetFee.traverse(fee => TxPositiveAmount(fee)(NegativeMinFee(fee, "asset")))
       tx                   <- SponsorFeeTransaction(version, sender, asset, minSponsoredAssetFee, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      asset: IssuedAsset,
-      minSponsoredAssetFee: Option[Long],
-      fee: Long,
-      timestamp: TxTimestamp,
-      signer: PrivateKey,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, SponsorFeeTransaction] =
-    create(version, sender, asset, minSponsoredAssetFee, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      asset: IssuedAsset,
-      minSponsoredAssetFee: Option[Long],
-      fee: Long,
-      timestamp: TxTimestamp,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, SponsorFeeTransaction] =
-    signed(version, sender.publicKey, asset, minSponsoredAssetFee, fee, timestamp, sender.privateKey, chainId)
 }

@@ -28,7 +28,7 @@ import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySetti
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxHelpers, TxVersion}
 import monix.eval.Coeval
 import org.scalatest.Assertion
 
@@ -390,7 +390,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
   property("free call is prohibited") {
     val freeCall = TestCompiler(V6).compileFreeCall("[]")
     val account  = accountGen.sample.get
-    SetScriptTransaction.selfSigned(1.toByte, account, Some(freeCall), MinIssueFee, System.currentTimeMillis()) shouldBe Left(
+    SetScriptTransaction.create(1.toByte, account.publicKey, Some(freeCall), MinIssueFee, System.currentTimeMillis(), Proofs.empty) shouldBe Left(
       GenericError("Script type for Set Script Transaction should not be CALL")
     )
   }
@@ -542,12 +542,13 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       val compileVersion = if (version == V6) V5 else version
       val script         = ContractScriptImpl(version, TestCompiler(compileVersion).compile(expr).explicitGet())
 
-      val tx = SetScriptTransaction.selfSigned(
+      val tx = SetScriptTransaction.create(
         TxVersion.V1,
-        accountGen.sample.get,
+        accountGen.sample.get.publicKey,
         Some(script),
         100000000,
-        1526287561757L
+        1526287561757L,
+        Proofs.empty
       )
 
       if (version == V6) {
@@ -624,15 +625,15 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       val genesis  = GenesisTransaction.create(dApp.toAddress, ENOUGH_AMT, ts).explicitGet()
 
       val scriptWithInvoke    = TestCompiler(V5).compileContract(dAppVerifier("invoke"))
-      val setScriptWithInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(scriptWithInvoke), fee, ts).explicitGet()
+      val setScriptWithInvoke = TxHelpers.setScript(dApp, scriptWithInvoke, fee, TxVersion.V2)
 
       val scriptWithReentrantInvoke    = TestCompiler(V5).compileContract(dAppVerifier("reentrantInvoke"))
-      val setScriptWithReentrantInvoke = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(scriptWithReentrantInvoke), fee, ts).explicitGet()
+      val setScriptWithReentrantInvoke = TxHelpers.setScript(dApp, scriptWithReentrantInvoke, fee, TxVersion.V2)
 
       val setScriptWithInvokeRec =
-        SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(dAppVerifierRec(FunctionIds.CALLDAPP)), fee, ts).explicitGet()
+        TxHelpers.setScript(dApp, dAppVerifierRec(FunctionIds.CALLDAPP), fee, TxVersion.V2)
       val setScriptWithReentrantInvokeRec =
-        SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(dAppVerifierRec(FunctionIds.CALLDAPPREENTRANT)), fee, ts).explicitGet()
+        TxHelpers.setScript(dApp, dAppVerifierRec(FunctionIds.CALLDAPPREENTRANT), fee, TxVersion.V2)
 
       d.appendBlock(genesis)
       d.appendBlockE(setScriptWithInvoke) should produce("DApp-to-dApp invocations are not allowed from verifier")
@@ -662,9 +663,9 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       val genesis  = GenesisTransaction.create(smartAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
 
       val setScriptWithInvoke =
-        SetScriptTransaction.selfSigned(TxVersion.V2, smartAcc, Some(getScriptWithSyncCall("invoke")), 0.01.waves, ts).explicitGet()
+        TxHelpers.setScript(smartAcc, getScriptWithSyncCall("invoke"), 0.01.waves, TxVersion.V2)
       val setScriptWithReentrantInvoke =
-        SetScriptTransaction.selfSigned(TxVersion.V2, smartAcc, Some(getScriptWithSyncCall("reentrantInvoke")), 0.01.waves, ts).explicitGet()
+        TxHelpers.setScript(smartAcc, getScriptWithSyncCall("reentrantInvoke"), 0.01.waves, TxVersion.V2)
 
       d.appendBlock(genesis)
       d.appendBlockE(setScriptWithInvoke) should produce("function 'Native(1020)' not found")

@@ -187,16 +187,18 @@ case class TransactionsApiRoute(
 
   def sign: Route = (pathPrefix("sign") & withAuth) {
     pathEndOrSingleSlash(jsonPost[JsObject] { jsv =>
-      mkTxFactory.parseRequestAndSign((jsv \ "sender").as[String], jsv)
+      TransactionFactory.parseRequestAndSign(jsv, wallet, None, blockchain.currentGenerationPeriod.map(_.next.start.toInt))
     }) ~ signWithSigner
   }
 
   def signWithSigner: Route = path(AddrSegment) { address =>
-    jsonPost[JsObject](mkTxFactory.parseRequestAndSign(address.toString, _))
+    jsonPost[JsObject](
+      TransactionFactory.parseRequestAndSign(_, wallet, Some(address.toString), blockchain.currentGenerationPeriod.map(_.next.start.toInt))
+    )
   }
 
   def signedBroadcast: Route = path("broadcast") {
-    broadcast[JsValue](TransactionFactory.fromSignedRequest)
+    broadcast[JsObject](jsv => TransactionFactory.parseRequest(jsv))
   }
 
   def merkleProof: Route = path("merkleProof") {
@@ -250,8 +252,6 @@ case class TransactionsApiRoute(
       .take(limitParam)
       .mapEval(txMetaEnriched(address, _))
   }
-
-  private def mkTxFactory = TransactionFactory(wallet, time, blockchain.currentGenerationPeriod)
 }
 
 object TransactionsApiRoute {

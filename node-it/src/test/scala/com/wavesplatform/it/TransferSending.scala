@@ -1,7 +1,6 @@
 package com.wavesplatform.it
 
 import java.util.concurrent.ThreadLocalRandom
-
 import com.google.common.primitives.Ints
 import com.typesafe.config.Config
 import com.wavesplatform.account.*
@@ -12,6 +11,7 @@ import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.api.Transaction
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.ScorexLogging
@@ -46,9 +46,8 @@ trait TransferSending extends ScorexLogging {
       Address.fromPublicKey(PublicKey(destPk)).toString
     }
 
-    val requests = sourceAndDest.foldLeft(List.empty[Req]) {
-      case (rs, dstAddr) =>
-        rs :+ Req(srcSeed, dstAddr, fee, fee)
+    val requests = sourceAndDest.foldLeft(List.empty[Req]) { case (rs, dstAddr) =>
+      rs :+ Req(srcSeed, dstAddr, fee, fee)
     }
 
     requests
@@ -57,10 +56,9 @@ trait TransferSending extends ScorexLogging {
   def generateTransfersBetweenAccounts(n: Int, balances: Map[Config, Long]): Seq[Req] = {
     val fee = 100000
     val srcDest = balances.toSeq
-      .map {
-        case (config, _) =>
-          val accountSeed = config.getString("account-seed")
-          (config, KeyPair(Base58.decode(accountSeed)))
+      .map { case (config, _) =>
+        val accountSeed = config.getString("account-seed")
+        (config, KeyPair(Base58.decode(accountSeed)))
       }
 
     val sourceAndDest = (1 to n).map { _ =>
@@ -68,13 +66,12 @@ trait TransferSending extends ScorexLogging {
       (srcConfig, destPrivateKey.toAddress.toString)
     }
 
-    val requests = sourceAndDest.foldLeft(List.empty[Req]) {
-      case (rs, (srcConfig, destAddr)) =>
-        val a              = Random.nextDouble()
-        val b              = balances(srcConfig)
-        val transferAmount = (1e-8 + a * 1e-9 * b).toLong
-        if (transferAmount < 0) log.warn(s"Negative amount: (1e-8 + $a * 1e-8 * $b) = $transferAmount")
-        rs :+ Req(srcConfig.getString("account-seed"), destAddr, Math.max(transferAmount, 1L), fee)
+    val requests = sourceAndDest.foldLeft(List.empty[Req]) { case (rs, (srcConfig, destAddr)) =>
+      val a              = Random.nextDouble()
+      val b              = balances(srcConfig)
+      val transferAmount = (1e-8 + a * 1e-9 * b).toLong
+      if (transferAmount < 0) log.warn(s"Negative amount: (1e-8 + $a * 1e-8 * $b) = $transferAmount")
+      rs :+ Req(srcConfig.getString("account-seed"), destAddr, Math.max(transferAmount, 1L), fee)
     }
 
     requests
@@ -96,9 +93,8 @@ trait TransferSending extends ScorexLogging {
 
       (srcSeed, destAddr)
     }
-    val requests = sourceAndDest.foldLeft(List.empty[Req]) {
-      case (rs, (srcSeed, dstAddr)) =>
-        rs :+ Req(srcSeed, dstAddr, fee, fee)
+    val requests = sourceAndDest.foldLeft(List.empty[Req]) { case (rs, (srcSeed, dstAddr)) =>
+      rs :+ Req(srcSeed, dstAddr, fee, fee)
     }
 
     requests
@@ -109,26 +105,21 @@ trait TransferSending extends ScorexLogging {
   def processRequests(requests: Seq[Req], includeAttachment: Boolean = false): Future[Seq[Transaction]] = {
     val start = System.currentTimeMillis() - requests.size
     val signedTransfers = requests.zipWithIndex
-      .map {
-        case (x, i) =>
-          createSignedTransferRequest(
-            TransferTransaction
-              .selfSigned(
-                version = 2.toByte,
-                sender = KeyPair(Base58.decode(x.senderSeed)),
-                recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
-                asset = Waves,
-                amount = x.amount,
-                feeAsset = Waves,
-                fee = x.fee,
-                attachment =
-                  if (includeAttachment)
-                    ByteStr(Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte))
-                  else ByteStr.empty,
-                timestamp = start + i
-              )
-              .explicitGet()
+      .map { case (x, i) =>
+        createSignedTransferRequest(
+          TxHelpers.transfer(
+            KeyPair(Base58.decode(x.senderSeed)),
+            AddressOrAlias.fromString(x.targetAddress).explicitGet(),
+            x.amount,
+            Waves,
+            x.fee,
+            Waves,
+            if (includeAttachment)
+              ByteStr(Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte))
+            else ByteStr.empty,
+            timestamp = start + i
           )
+        )
       }
 
     signedTransfers.zip(Iterator.continually(nodes).flatten).foldLeft(Future.successful(Seq.empty[Transaction])) {
@@ -143,9 +134,8 @@ trait TransferSending extends ScorexLogging {
   protected def createSignedTransferRequest(tx: TransferTransaction): TransferRequest = {
     import tx.*
     TransferRequest(
-      Some(2.toByte),
-      None,
-      Some(tx.sender.toString),
+      2.toByte,
+      tx.sender.toString,
       recipient.toString,
       Some(assetId),
       amount.value,

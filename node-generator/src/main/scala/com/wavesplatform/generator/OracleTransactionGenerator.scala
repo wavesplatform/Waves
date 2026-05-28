@@ -3,7 +3,6 @@ package com.wavesplatform.generator
 import cats.Show
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.generator.OracleTransactionGenerator.Settings
 import com.wavesplatform.generator.config.ConfigReaders
 import com.wavesplatform.generator.utils.Gen
@@ -11,9 +10,7 @@ import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, Transaction}
+import com.wavesplatform.transaction.{Transaction, TxHelpers}
 import pureconfig.ConfigReader
 
 class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair], estimator: ScriptEstimator) extends TransactionGenerator {
@@ -29,19 +26,13 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
     val enoughFee = 0.005.waves
 
     val setScript: Transaction =
-      SetScriptTransaction
-        .selfSigned(1.toByte, scriptedAccount, Some(script), enoughFee, timestamp = System.currentTimeMillis())
-        .explicitGet()
+      TxHelpers.setScript(scriptedAccount, script, enoughFee)
 
-    val setDataTx: Transaction = DataTransaction
-      .selfSigned(1.toByte, oracle, settings.requiredData.toList, enoughFee, System.currentTimeMillis())
-      .explicitGet()
+    val setDataTx: Transaction = TxHelpers.data(oracle, settings.requiredData.toSeq, enoughFee)
 
     val now = System.currentTimeMillis()
     val transactions: List[Transaction] = (1 to settings.transactions).map { i =>
-      TransferTransaction
-        .selfSigned(2.toByte, scriptedAccount, oracle.toAddress, Waves, 1.waves, Waves, enoughFee, ByteStr.empty, now + i)
-        .explicitGet()
+      TxHelpers.transfer(scriptedAccount, oracle.toAddress, 1.waves, Waves, enoughFee, Waves, ByteStr.empty, now + i, 2.toByte)
     }.toList
 
     setScript +: setDataTx +: transactions

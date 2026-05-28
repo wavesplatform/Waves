@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import cats.data.ValidatedNel
-import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -95,10 +94,6 @@ package object transaction {
   implicit class TransactionValidationOps[T <: Transaction](val tx: T) extends AnyVal {
     def validatedNel(implicit validator: TxValidator[T]): ValidatedNel[ValidationError, T] = validator.validate(tx)
     def validatedEither(implicit validator: TxValidator[T]): Either[ValidationError, T]    = this.validatedNel.toEither.left.map(_.head)
-  }
-
-  implicit class TransactionSignOps[T](val tx: T) extends AnyVal {
-    def signWith(privateKey: PrivateKey)(implicit sign: (T, PrivateKey) => T): T = sign(tx, privateKey)
   }
 
   object ERC20Address {

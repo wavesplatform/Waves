@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.serialization.impl
 
-import com.wavesplatform.transaction.{EthereumTransaction, PBSince, ProvenTransaction, SigProofsSwitch, Transaction, Versioned}
+import com.wavesplatform.transaction.{EthereumTransaction, PBSince, ProvenTransaction, HasSignature, Transaction, Versioned}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 object BaseTxJson {
@@ -27,8 +27,8 @@ object BaseTxJson {
           "proofs"          -> JsArray(p.proofs.proofs.map(p => JsString(p.toString)))
         ) ++ (tx match {
           // Compatibility
-          case s: SigProofsSwitch if s.usesLegacySignature => Json.obj("signature" -> s.signature.toString)
-          case _                                           => Json.obj()
+          case s: HasSignature if s.usesLegacySignature => Json.obj("signature" -> s.signature.toString)
+          case _                                        => Json.obj()
         })
       case _ => JsObject.empty
     })

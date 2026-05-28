@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync.smartcontract
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -14,24 +13,23 @@ import org.scalatest.CancelAfterFailure
 import scala.concurrent.duration.*
 
 class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val featureHeight = Height(8)
+  private val featureHeight = Height(10)
 
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(
-        _.raw(
-          s"""
-             | waves.blockchain.custom.functionality {
-             |   estimator-pre-check-height =  $featureHeight
-             |   estimator-sum-overflow-fix-height = 999999
-             |   pre-activated-features = {14 = 0, 15 = 999999}
-             | }
+  import NodeConfigs.*
+
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    Miners(5)
+      .quorum(0)
+      .overrides(
+        s"""
+           | waves.blockchain.custom.functionality {
+           |   estimator-pre-check-height =  $featureHeight
+           |   estimator-sum-overflow-fix-height = 999999
+           |   pre-activated-features = {14 = 0, 15 = 999999}
+           | }
            """.stripMargin
-        )
       )
-      .buildNonConflicting()
+  )
 
   private def smartAcc  = firstKeyPair
   private def callerAcc = secondKeyPair

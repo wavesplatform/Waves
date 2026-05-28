@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.state.{BooleanDataEntry, Height, IntegerDataEntry}
@@ -13,13 +14,11 @@ import scala.util.Random
 
 @LoadTest
 class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPropertyChecks {
-  override def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((14, Height(1000000))))
-      .withDefault(1)
-      .withSpecial(1, _.nonMiner)
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner.quorum(0).preactivatedFeatures((BlockchainFeatures.BlockReward, Height(1000000))),
+    NotMiner
+  )
 
   private lazy val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
 

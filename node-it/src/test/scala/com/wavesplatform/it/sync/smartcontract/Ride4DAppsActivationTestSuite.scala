@@ -1,18 +1,19 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{Asset, AssetIdLength}
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
 import com.wavesplatform.state.Height
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{Asset, AssetIdLength}
+import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.duration.*
 
@@ -182,18 +183,6 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
 object Ride4DAppsActivationTestSuite {
   val activationHeight = Height(15)
 
-  val configWithRide4DAppsFeature = NodeConfigs.newBuilder
-    .withDefault(1)
-    .withSpecial(1, _.nonMiner)
-    .buildNonConflicting()
-    .map(
-      ConfigFactory
-        .parseString(
-          s"""waves.blockchain.custom.functionality {
-             |  pre-activated-features.11 = ${activationHeight - 1}
-             |}""".stripMargin
-        )
-        .withFallback(_)
-    )
-
+  import NodeConfigs.*
+  val configWithRide4DAppsFeature = Seq(BiggestMiner, NotMiner).map(_.preactivatedFeatures((BlockchainFeatures.Ride4DApps, activationHeight - 1)))
 }

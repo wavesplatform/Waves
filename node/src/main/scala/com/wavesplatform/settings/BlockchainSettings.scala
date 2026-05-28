@@ -82,7 +82,7 @@ case class FunctionalitySettings(
     paymentsCheckHeight: Int = 0,
     unitsRegistryAddress: Option[String] = None,
     maxValidEndorsers: Int = 5,
-    generationPeriodLength: Int = 1001
+    generationPeriodLength: Int = 1000
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter

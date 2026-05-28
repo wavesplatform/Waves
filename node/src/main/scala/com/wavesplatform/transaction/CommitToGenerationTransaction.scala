@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.account.*
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsPublicKey, BlsSignature}
 import com.wavesplatform.lang.ValidationError
@@ -27,6 +28,11 @@ final case class CommitToGenerationTransaction(
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V1 {
+
+  override type T = CommitToGenerationTransaction
+
+  override def addProof(proof: ByteStr): CommitToGenerationTransaction = copy(proofs = proofs.add(proof))
+
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBTransactionSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(PBTransactionSerializer.bytes(this))
   override val json: Coeval[JsObject] =

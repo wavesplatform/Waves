@@ -3,17 +3,14 @@ package com.wavesplatform.it
 import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.test.NumericExt
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.test.NumericExt
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.state.Height
-import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.*
-import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
-trait IntegrationSuiteWithThreeAddresses extends BaseSuite with ScalaFutures with IntegrationPatience with RecoverMethods with ScorexLogging {
+trait IntegrationSuiteWithThreeAddresses extends BaseSuite {
   this: TestSuite & Nodes =>
 
   protected lazy val firstKeyPair: SeedKeyPair = SeedKeyPair("firstKeyPair".getBytes())
@@ -28,22 +25,10 @@ trait IntegrationSuiteWithThreeAddresses extends BaseSuite with ScalaFutures wit
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    val defaultBalance: Long = 100.waves
-
-    def makeTransfers(accounts: Seq[KeyPair]): Seq[String] = accounts.map { acc =>
-      sender.transfer(sender.keyPair, acc.toAddress.toString, defaultBalance, sender.fee(TransferTransaction.typeId)).id
-    }
-
-    def correctStartBalancesFuture(): Unit = {
-      val accounts = Seq(firstKeyPair, secondKeyPair, thirdKeyPair)
-
-      withClue("waitForTxsToReachAllNodes") {
-        nodes.waitForHeight(Height(makeTransfers(accounts).map(ts => nodes.waitForTransaction(ts).height).max + 1))
-      }
-    }
-
     withClue("beforeAll") {
-      correctStartBalancesFuture()
+      nodes.waitForHeightAriseAndTxPresent(
+        sender.massTransfer(sender.keyPair, List(firstAddress, secondAddress, thirdAddress).map(MassTransferTransaction.Transfer(_, 100.waves)), 0.003.waves, version = 1.toByte).id
+      )
     }
   }
 
@@ -52,9 +37,10 @@ trait IntegrationSuiteWithThreeAddresses extends BaseSuite with ScalaFutures wit
       val scriptText = x.stripMargin
       ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
     }
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(1.toByte, acc, script, 0.014.waves, System.currentTimeMillis())
-      .explicitGet()
+    val setScriptTransaction = script.fold(TxHelpers.removeScript(acc, 0.014.waves)) { s =>
+      TxHelpers.setScript(acc, s, 0.014.waves)
+    }
+
     sender
       .signedBroadcast(setScriptTransaction.json(), waitForTx = true)
       .id

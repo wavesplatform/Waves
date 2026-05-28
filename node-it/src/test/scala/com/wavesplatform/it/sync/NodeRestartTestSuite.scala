@@ -6,13 +6,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.{BaseFreeSpec, WaitForHeight2}
+import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.TxHelpers
 
-class NodeRestartTestSuite extends BaseFreeSpec with WaitForHeight2 {
+class NodeRestartTestSuite extends BaseFreeSpec {
   import NodeRestartTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
@@ -34,19 +34,7 @@ class NodeRestartTestSuite extends BaseFreeSpec with WaitForHeight2 {
   }
 
   "after restarting all the nodes, the duplicate transaction cannot be put into the blockchain" in {
-    val txJson = TransferTransaction
-      .selfSigned(
-        1.toByte,
-        nodeB.keyPair,
-        AddressOrAlias.fromString(nodeA.address).explicitGet(),
-        Waves,
-        1.waves,
-        Waves,
-        minFee,
-        ByteStr.empty,
-        System.currentTimeMillis()
-      )
-      .explicitGet()
+    val txJson = TxHelpers.transfer(from = nodeB.keyPair, to = AddressOrAlias.fromString(nodeA.address).explicitGet(), amount = 1.waves, asset = Waves, fee = minFee, feeAsset = Waves, attachment = ByteStr.empty, timestamp = System.currentTimeMillis(), version = 1.toByte)
       .json()
 
     val tx = nodeB.signedBroadcast(txJson, waitForTx = true)

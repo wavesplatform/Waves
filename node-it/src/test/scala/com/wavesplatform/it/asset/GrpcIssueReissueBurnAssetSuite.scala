@@ -14,8 +14,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, C
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.freespec.AnyFreeSpec
 
@@ -260,9 +259,7 @@ class GrpcIssueReissueBurnAssetSuite extends AnyFreeSpec with GrpcBaseTransactio
       miner
         .signedBroadcast(
           PBTransactions.protobuf(
-            SetScriptTransaction
-              .selfSigned(1.toByte, address, Some(compiledScript), setScriptFee, System.currentTimeMillis())
-              .explicitGet()
+            TxHelpers.setScript(address, compiledScript, setScriptFee)
           )
         )
         .id

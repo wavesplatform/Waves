@@ -26,18 +26,16 @@ import scala.concurrent.duration.*
 class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   val activationHeight = Height(8)
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(NodeConfigs.Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(
-        _.preactivatedFeatures(
-          (BlockchainFeatures.Ride4DApps.id, Height(0)),
-          (BlockchainFeatures.BlockV5.id, activationHeight)
-        )
+
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner
+      .quorum(0)
+      .preactivatedFeatures(
+        BlockchainFeatures.Ride4DApps,
+        (BlockchainFeatures.BlockV5, activationHeight)
       )
-      .withDefault(1)
-      .buildNonConflicting()
+  )
 
   private def firstContract      = firstKeyPair
   private def secondContract     = secondKeyPair

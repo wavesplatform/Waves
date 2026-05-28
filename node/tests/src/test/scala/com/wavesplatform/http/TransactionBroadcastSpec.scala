@@ -23,7 +23,6 @@ import com.wavesplatform.transaction.{
   AssetIdLength,
   Proofs,
   Transaction,
-  TransactionSignOps,
   TxExchangeAmount,
   TxHelpers,
   TxMatcherFee,

@@ -2,23 +2,20 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.account.{AddressOrAlias, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
-import com.wavesplatform.api.http.requests.{CommitToGenerationRequest, IssueRequest}
+import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{ApiError, DebugMessage}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
+import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus, FinalityStatus}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, GenerationPeriod, Height}
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TransactionType, TxExchangeAmount, TxExchangePrice, TxVersion}
+import com.wavesplatform.transaction.{Asset, TransactionType, TxExchangeAmount, TxExchangePrice, TxHelpers, TxVersion}
 import io.grpc.Status.Code
 import org.apache.pekko.http.scaladsl.model.StatusCodes.BadRequest
 import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
@@ -388,19 +385,17 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
         version: Byte = TxVersion.V2,
         waitForTx: Boolean = false
     ): Transaction = {
-      val tx = TransferTransaction
-        .selfSigned(
-          version = version,
-          sender = source,
-          recipient = AddressOrAlias.fromString(recipient).explicitGet(),
-          asset = Asset.fromString(assetId),
-          amount = amount,
-          feeAsset = Asset.fromString(feeAssetId),
-          fee = fee,
-          attachment = attachment,
-          timestamp = System.currentTimeMillis()
-        )
-        .explicitGet()
+      val tx = TxHelpers.transfer(
+        source,
+        AddressOrAlias.fromString(recipient).explicitGet(),
+        amount,
+        Asset.fromString(assetId),
+        fee,
+        Asset.fromString(feeAssetId),
+        attachment,
+        version = version,
+        timestamp = System.currentTimeMillis()
+      )
 
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
@@ -479,16 +474,15 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
         leasingFee: Long = minFee,
         waitForTx: Boolean = false
     ): Transaction = {
-      val tx = LeaseTransaction
-        .selfSigned(
-          2.toByte,
-          sender = source,
-          recipient = AddressOrAlias.fromString(recipient).explicitGet(),
-          amount = leasingAmount,
-          fee = leasingFee,
-          timestamp = System.currentTimeMillis()
+      val tx = TxHelpers
+        .lease(
+          source,
+          AddressOrAlias.fromString(recipient).explicitGet(),
+          leasingAmount,
+          leasingFee,
+          System.currentTimeMillis(),
+          2.toByte
         )
-        .explicitGet()
 
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
@@ -548,8 +542,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def getMerkleProofPost(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProofPost(ids*))
 
-    def sign(req: CommitToGenerationRequest): Transaction =
-      sign(Json.obj("type" -> TransactionType.CommitToGeneration.id) ++ Json.toJsObject(req)).tap { r =>
+    def signCommitToGenerationRequest(sender: String): Transaction =
+      sign(Json.obj("type" -> TransactionType.CommitToGeneration.id, "sender" -> sender)).tap { r =>
         require(r._type == TransactionType.CommitToGeneration.id)
       }
 
@@ -563,15 +557,14 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       sync(async(n).activeLeases(sourceAddress))
 
     def broadcastCancelLease(source: KeyPair, leaseId: String, fee: Long = minFee, waitForTx: Boolean = false): Transaction = {
-      val tx = LeaseCancelTransaction
-        .selfSigned(
-          TxVersion.V2,
-          source,
+      val tx = TxHelpers
+        .leaseCancel(
           ByteStr.decodeBase58(leaseId).get,
+          source,
           fee,
-          System.currentTimeMillis()
+          System.currentTimeMillis(),
+          TxVersion.V2
         )
-        .explicitGet()
 
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
@@ -610,11 +603,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def waitForHeight(expectedHeight: Height, requestAwaitTime: FiniteDuration = RequestAwaitTime): Height =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 
-    def currentGenerationPeriod: Option[GenerationPeriod] = for {
-      activationStatus <- sync(async(n).activationStatus).features.find(_.id == BlockchainFeatures.DeterministicFinality.id)
-      activation       <- activationStatus.activationHeight
-      r                <- GenerationPeriod.from(sync(async(n).height), activation, n.settings)
-    } yield r
+    def currentGenerationPeriod: Option[GenerationPeriod] = sync(async(n).finalityStatus).currentGenerationPeriod
 
     def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Height =
       waitForHeight(p.start, requestAwaitTime)
@@ -640,6 +629,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def finalizedHeight: Height = sync(async(n).finalizedHeight)
 
     def finalizedHeightAt(at: Height): Height = sync(async(n).finalizedHeightAt(at))
+
+    def finalityStatus: FinalityStatus = sync(async(n).finalityStatus)
 
     def blockAt(height: Height, amountsAsStrings: Boolean = false): Block = sync(async(n).blockAt(height, amountsAsStrings))
 

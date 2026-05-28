@@ -13,14 +13,16 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.diffs
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.{NumericExt, PropSpec}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalacheck.Gen
 import org.scalatest.*
+import scala.concurrent.duration.*
+import monix.execution.Scheduler.Implicits.global
 
 class BlockchainUpdaterNFTTest extends PropSpec with DomainScenarioDrivenPropertyCheck with BlocksTransactionsHelpers {
 
@@ -99,6 +101,28 @@ class BlockchainUpdaterNFTTest extends PropSpec with DomainScenarioDrivenPropert
 
       val settings = settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee)
       withDomain(settings)(assert)
+    }
+  }
+
+  property("liquid block test") {
+    val sender    = TxHelpers.signer(1004)
+    val issuer    = TxHelpers.signer(1005)
+    val recipient = TxHelpers.signer(1006)
+    val r2        = TxHelpers.address(1007)
+    import DomainPresets.*
+    withDomain(RideV4.addFeatures(BlockchainFeatures.ReduceNFTFee), Seq(sender -> 10.waves)) { d =>
+      val issueNFT = TxHelpers.issue(issuer, 1, 0, "AAAA", "", 0.001.waves, reissuable = false)
+      d.appendBlock(
+        TxHelpers.transfer(sender, issuer.toAddress, 1.waves),
+        TxHelpers.transfer(sender, recipient.toAddress, 1.waves),
+        issueNFT,
+        TxHelpers.transfer(issuer, recipient.toAddress, 1, issueNFT.asset, 0.001.waves),
+        TxHelpers.transfer(recipient, r2, 1, issueNFT.asset, 0.001.waves)
+      )
+
+      d.accountsApi.nftList(issuer.toAddress, None).headL.runSyncUnsafe(5.seconds) shouldBe empty
+      d.accountsApi.nftList(recipient.toAddress, None).headL.runSyncUnsafe(5.seconds) shouldBe empty
+      d.accountsApi.nftList(r2, None).headL.runSyncUnsafe(5.seconds).map(_._1) shouldBe Seq(issueNFT.asset)
     }
   }
 

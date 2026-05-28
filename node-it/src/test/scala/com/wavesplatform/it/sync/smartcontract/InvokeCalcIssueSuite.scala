@@ -4,25 +4,21 @@ import com.typesafe.config.Config
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util.*
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.{BinaryDataEntry, Height}
+import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.*
 
 class InvokeCalcIssueSuite extends BaseTransactionSuite with CancelAfterFailure with OptionValues {
   import InvokeCalcIssueSuite.*
-
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 1, Seq.empty)
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, Height(0)), (BlockchainFeatures.BlockV5.id, Height(0))))
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner.quorum(0).preactivatedFeatures(BlockchainFeatures.BlockV5)
+  )
 
   private def smartAcc  = firstKeyPair
   private def callerAcc = secondKeyPair
@@ -81,15 +77,15 @@ object InvokeCalcIssueSuite {
 
   private val dAppV4: String =
     s"""{-# STDLIB_VERSION 4 #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |
-      |@Callable(i)
-      |func i() = {
-      |let issue = Issue("$assetName", "$assetDescr", $amount, $decimals, $reissuable, unit, 0)
-      |let id = calculateAssetId(issue)
-      |[issue,
-      | BinaryEntry("id", id)]
-      |}
-      |
-      |""".stripMargin
+       |{-# CONTENT_TYPE DAPP #-}
+       |
+       |@Callable(i)
+       |func i() = {
+       |let issue = Issue("$assetName", "$assetDescr", $amount, $decimals, $reissuable, unit, 0)
+       |let id = calculateAssetId(issue)
+       |[issue,
+       | BinaryEntry("id", id)]
+       |}
+       |
+       |""".stripMargin
 }

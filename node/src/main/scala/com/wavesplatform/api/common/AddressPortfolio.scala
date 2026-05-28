@@ -10,16 +10,13 @@ import com.wavesplatform.database.{AddressId, CurrentBalance, DBResource, Key, K
 import com.wavesplatform.state.{AssetDescription, StateSnapshot}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.utils.ScorexLogging
 
 import java.nio.ByteBuffer
 import scala.collection.immutable.VectorMap
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
-class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resource: DBResource)
-    extends AbstractIterator[Seq[(IssuedAsset, Long)]]
-    with ScorexLogging {
+class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resource: DBResource) extends AbstractIterator[Seq[(IssuedAsset, Long)]] {
   private val prefixBytes: Array[Byte] = KeyTag.NftPossession.prefixBytes ++ addressId.toByteArray
 
   resource.withSafePrefixIterator { dbIterator =>

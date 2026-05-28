@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, ScriptExtraFee}
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
-import com.wavesplatform.transaction.TransactionType.{InvokeScript, TransactionType}
+import com.wavesplatform.transaction.TransactionType.InvokeScript
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{Asset, TransactionType}

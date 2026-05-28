@@ -235,7 +235,6 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
         .explicitGet()
 
       def create(
-          matcher: KeyPair = sender1,
           buyOrder: Order = buy,
           sellOrder: Order = sell,
           amount: Long = buyAmount,
@@ -246,10 +245,8 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
           timestamp: Long = expirationTimestamp - Order.MaxLiveTime,
           version: Byte = exchangeV
       ): Either[ValidationError, ExchangeTransaction] = {
-        if (version == 1) {
-          ExchangeTransaction.signed(
-            1.toByte,
-            matcher = matcher.privateKey,
+        ExchangeTransaction
+          .create(
             order1 = buyOrder,
             order2 = sellOrder,
             amount = amount,
@@ -257,22 +254,9 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
             buyMatcherFee = buyMatcherFee,
             sellMatcherFee = sellMatcherFee,
             fee = fee,
-            timestamp = timestamp
+            timestamp = timestamp,
+            version = version
           )
-        } else {
-          ExchangeTransaction.signed(
-            version,
-            matcher = matcher.privateKey,
-            order1 = buyOrder,
-            order2 = sellOrder,
-            amount = amount,
-            price = price,
-            buyMatcherFee = buyMatcherFee,
-            sellMatcherFee = sellMatcherFee,
-            fee = fee,
-            timestamp = timestamp
-          )
-        }
       }
 
       buy.version shouldBe buyV
@@ -314,37 +298,21 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
     }
   }
 
-  def createExTx(buy: Order, sell: Order, price: Long, matcher: KeyPair, version: TxVersion): Either[ValidationError, ExchangeTransaction] = {
+  def createExTx(buy: Order, sell: Order, price: Long, version: TxVersion): Either[ValidationError, ExchangeTransaction] = {
     val matcherFee = 300000L
     val amount     = math.min(buy.amount.value, sell.amount.value)
 
-    if (version == 1) {
-      ExchangeTransaction.signed(
-        1.toByte,
-        matcher = matcher.privateKey,
-        order1 = buy,
-        order2 = sell,
-        amount = amount,
-        price = price,
-        buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount.value).toLong,
-        sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount.value).toLong,
-        fee = matcherFee,
-        timestamp = ntpTime.correctedTime()
-      )
-    } else {
-      ExchangeTransaction.signed(
-        2.toByte,
-        matcher = matcher.privateKey,
-        order1 = buy,
-        order2 = sell,
-        amount = amount,
-        price = price,
-        buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount.value).toLong,
-        sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount.value).toLong,
-        fee = matcherFee,
-        timestamp = ntpTime.correctedTime()
-      )
-    }
+    ExchangeTransaction.create(
+      order1 = buy,
+      order2 = sell,
+      amount = amount,
+      price = price,
+      buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount.value).toLong,
+      sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount.value).toLong,
+      fee = matcherFee,
+      timestamp = ntpTime.correctedTime(),
+      version = version
+    )
   }
 
   property("Test transaction with small amount and expired order") {
@@ -388,14 +356,14 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
           )
           .explicitGet()
 
-      createExTx(buy, sell, sellPrice, matcher, exchangeV) shouldBe an[Right[?, ?]]
+      createExTx(buy, sell, sellPrice, exchangeV) shouldBe an[Right[?, ?]]
 
       val sell1 =
         if (sellV == 3) {
           Order.sell(sellV, sender2, matcher.publicKey, pair, 1, buyPrice, time, time - 1, matcherFee, sellerMatcherFeeAssetId).explicitGet()
         } else Order.sell(sellV, sender2, matcher.publicKey, pair, 1, buyPrice, time, time - 1, matcherFee).explicitGet()
 
-      createExTx(buy, sell1, buyPrice, matcher, exchangeV) shouldBe Left(OrderValidationError(sell1, "expiration should be > currentTime"))
+      createExTx(buy, sell1, buyPrice, exchangeV) shouldBe Left(OrderValidationError(sell1, "expiration should be > currentTime"))
     }
   }
 

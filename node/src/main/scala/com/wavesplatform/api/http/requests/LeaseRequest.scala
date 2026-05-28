@@ -9,8 +9,7 @@ import play.api.libs.json.{Format, Json}
 
 case class LeaseRequest(
     version: Option[Byte],
-    sender: Option[String],
-    senderPublicKey: Option[String],
+    senderPublicKey: String,
     recipient: String,
     amount: Long,
     fee: Long,
@@ -18,13 +17,14 @@ case class LeaseRequest(
     signature: Option[ByteStr],
     proofs: Option[Proofs]
 ) extends TxBroadcastRequest[LeaseTransaction] {
-  def toTxFrom(sender: PublicKey): Either[ValidationError, LeaseTransaction] =
+  def toTx: Either[ValidationError, LeaseTransaction] =
     for {
       validRecipient <- AddressOrAlias.fromString(recipient)
       validProofs    <- toProofs(signature, proofs)
+      validSender    <- PublicKey.fromBase58String(senderPublicKey)
       tx <- LeaseTransaction.create(
         version.getOrElse(1.toByte),
-        sender,
+        validSender,
         validRecipient,
         amount,
         fee,
@@ -35,5 +35,5 @@ case class LeaseRequest(
 }
 
 object LeaseRequest {
-  implicit val jsonFormat: Format[LeaseRequest] = Json.format
+  given Format[LeaseRequest] = Json.format
 }

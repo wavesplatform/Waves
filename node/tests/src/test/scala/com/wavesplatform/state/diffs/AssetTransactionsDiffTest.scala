@@ -460,9 +460,9 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val genesis = GenesisTransaction.create(sender.toAddress, ENOUGH_AMT, t).explicitGet()
 
     def issue(script: Script) =
-      IssueTransaction.selfSigned(2.toByte, sender, "name", "", ENOUGH_AMT, 0, true, Some(script), 100000000, t).explicitGet()
+      TxHelpers.issue(issuer = sender, amount = ENOUGH_AMT, decimals = 0, name = "name", description = "", reissuable = true, script = Some(script), fee = 100000000, version = 2.toByte)
     def setAssetScript(asset: IssuedAsset) =
-      SetAssetScriptTransaction.selfSigned(2.toByte, sender, asset, Some(testScript), 100000000, t).explicitGet()
+      TxHelpers.setAssetScript(sender, asset, testScript, fee = 100000000, version = TxVersion.V2)
 
     def settings(checkNegative: Boolean = false, checkSumOverflow: Boolean = false): FunctionalitySettings = {
       TestFunctionalitySettings
@@ -499,20 +499,17 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val ts: Long = System.currentTimeMillis()
 
     def issue(script: Option[Script]): IssueTransaction =
-      IssueTransaction
-        .selfSigned(
-          version = TxVersion.V2,
-          sender = issuer,
-          name = "test",
-          description = "desc",
-          quantity = 1,
-          decimals = 0,
-          reissuable = true,
-          script = script,
-          fee = 1.waves,
-          timestamp = ts
-        )
-        .explicitGet()
+      TxHelpers.issue(
+        issuer = issuer,
+        amount = 1,
+        decimals = 0,
+        name = "test",
+        description = "desc",
+        reissuable = true,
+        script = script,
+        fee = 1.waves,
+        version = TxVersion.V2
+      )
 
     withDomain(DomainPresets.RideV5) { d =>
       val genesis = GenesisTransaction.create(issuer.toAddress, ENOUGH_AMT, ts).explicitGet()

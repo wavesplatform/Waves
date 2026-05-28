@@ -19,11 +19,8 @@ class DataTransactionBodyBytesByteVectorSuite extends BaseTransactionSuite {
   private def compile(scriptText: String) =
     ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
 
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(1)
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
 
   private val maxDataTxV1bodyBytesSize = 153530
   // actually lower than Terms.DataTxMaxBytes

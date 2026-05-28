@@ -2,15 +2,13 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.api.http.ApiError.InvalidIds
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{TransactionInfo, TransactionStatus}
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
+import com.wavesplatform.transaction.{ProvenTransaction, Transaction, TxHelpers}
 import play.api.libs.json.*
 
 import scala.util.Random
@@ -77,19 +75,17 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
   private def mkTransactions: List[Transaction & ProvenTransaction] =
     (1001 to 1020).map { amount =>
-      TransferTransaction
-        .selfSigned(
-          2.toByte,
-          miner.keyPair,
-          secondKeyPair.toAddress,
-          Waves,
-          amount,
-          Waves,
-          minFee,
-          ByteStr.empty,
-          ntpTime.correctedTime()
-        )
-        .explicitGet()
+      TxHelpers.transfer(
+        from = miner.keyPair,
+        to = secondKeyPair.toAddress,
+        amount = amount,
+        asset = Waves,
+        fee = minFee,
+        feeAsset = Waves,
+        attachment = ByteStr.empty,
+        timestamp = ntpTime.correctedTime(),
+        version = 2.toByte
+      )
     }.toList
 
   private def waitForTransactions(txs: List[Transaction]): List[TransactionInfo] =

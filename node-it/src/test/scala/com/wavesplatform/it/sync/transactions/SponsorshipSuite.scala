@@ -3,32 +3,31 @@ package com.wavesplatform.it.sync.transactions
 import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.*
-import com.wavesplatform.it.{BaseFreeSpec, IntegrationSuiteWithThreeAddresses, NodeConfigs}
+import com.wavesplatform.it.{BaseFreeSpec, IntegrationSuiteWithThreeAddresses}
 import com.wavesplatform.state.Height
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import org.scalatest.Assertion
 
 import scala.concurrent.duration.*
 
 class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddresses {
-
-  override def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((14, Height(1000000))))
-      .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation=1"))
-      .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period=1"))
-      .withDefault(1)
-      .withSpecial(1, _.nonMiner)
-      .buildNonConflicting()
+  import com.wavesplatform.it.NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] =
+    Seq(Miners.head.quorum(0), NotMiner).map(
+      _.preactivatedFeatures(BlockchainFeatures.BlockReward -> Height(10000))
+        .overrides(s"""waves.blockchain.custom.functionality {
+                      |  blocks-for-feature-activation = 1
+                      |  feature-check-blocks-period = 1
+                      |}""".stripMargin)
+    )
 
   private def sponsor = firstKeyPair
   private def alice   = secondKeyPair
@@ -83,7 +82,6 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         "AssetTxV1",
         "Created by Sponsorship Suite",
         sponsorAssetTotal,
-        decimals = 2,
         reissuable = false,
         fee = issueFee,
         waitForTx = true
@@ -95,7 +93,6 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         "AssetTxV2",
         "Created by Sponsorship Suite",
         sponsorAssetTotal,
-        decimals = 2,
         reissuable = false,
         fee = issueFee,
         waitForTx = true
@@ -138,16 +135,14 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
       "invalid tx timestamp" in {
         for (v <- sponsorshipTxSupportedVersions) {
           def invalidTx(timestamp: Long): SponsorFeeTransaction =
-            SponsorFeeTransaction
-              .selfSigned(
-                version = v,
-                sponsor,
-                IssuedAsset(ByteStr.decodeBase58(firstSponsorAssetId).get),
-                Some(SmallFee),
-                minFee,
-                timestamp + 1.day.toMillis
-              )
-              .explicitGet()
+            TxHelpers.sponsor(
+              asset = IssuedAsset(ByteStr.decodeBase58(firstSponsorAssetId).get),
+              minSponsoredAssetFee = Some(SmallFee),
+              sender = sponsor,
+              fee = minFee,
+              version = v,
+              timestamp = timestamp
+            )
 
           val iTx = invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis)
           assertBadRequestAndResponse(sender.broadcastRequest(iTx.json()), "Transaction timestamp .* is more than .*ms in the future")
@@ -161,9 +156,14 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
           sender.transfer(alice, bobAddress, 10 * Token, SmallFee, Some(firstSponsorAssetId), Some(firstSponsorAssetId)).id
         val secondTransferTxCustomFeeAlice = // A-8
           sender.transfer(alice, bobAddress, 10 * Token, SmallFee, Some(secondSponsorAssetId), Some(secondSponsorAssetId)).id
-        nodes.waitForHeightArise()
-        nodes.waitForTransaction(firstTransferTxCustomFeeAlice)
-        nodes.waitForTransaction(secondTransferTxCustomFeeAlice)
+        nodes.waitForHeight(
+          Height(
+            Math.max(
+              nodes.waitForTransaction(firstTransferTxCustomFeeAlice).height,
+              nodes.waitForTransaction(secondTransferTxCustomFeeAlice).height
+            ) + 1
+          )
+        )
 
         sender.assertAssetBalance(aliceAddress, firstSponsorAssetId, sponsorAssetTotal / 2 - SmallFee - 10 * Token)
         sender.assertAssetBalance(aliceAddress, secondSponsorAssetId, sponsorAssetTotal / 2 - SmallFee - 10 * Token)
@@ -172,7 +172,7 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
 
         val aliceTxs = sender.transactionsByAddress(aliceAddress, 100)
         aliceTxs.size shouldBe 5 // not 4, because there was one more transaction in IntegrationSuiteWithThreeAddresses class
-        aliceTxs.count(tx => tx.sender.contains(aliceAddress) || tx.recipient.contains(aliceAddress)) shouldBe 5
+        aliceTxs.count(tx => tx.sender.contains(aliceAddress) || tx.recipient.contains(aliceAddress)) shouldBe 4
         aliceTxs.map(_.id) should contain allElementsOf Seq(
           firstTransferTxToAlice,
           secondTransferTxToAlice,
@@ -182,13 +182,13 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
 
         val bobTxs = sender.transactionsByAddress(bobAddress, 100)
         bobTxs.size shouldBe 3
-        bobTxs.count(tx => tx.sender.contains(bobAddress) || tx.recipient.contains(bobAddress)) shouldBe 3
+        bobTxs.count(tx => tx.sender.contains(bobAddress) || tx.recipient.contains(bobAddress)) shouldBe 2
         bobTxs.map(_.id) should contain allElementsOf Seq(firstTransferTxCustomFeeAlice, secondTransferTxCustomFeeAlice)
       }
 
       "check transactions by address" in {
         val minerTxs = sender.transactionsByAddress(miner.address, 100)
-        minerTxs.size shouldBe 4
+        minerTxs.size shouldBe 2
 
         val sponsorTxs = sender.transactionsByAddress(sponsorAddress, 100)
         // 1 x transfer in IntegrationSuiteWithThreeAddresses
@@ -197,7 +197,7 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
         // 2 x sponsor here: A-5, A-6
         // 2 x transfers with sponsored assets here: A-7, A-8
         sponsorTxs.size shouldBe 9
-        sponsorTxs.count(tx => tx.sender.contains(sponsorAddress) || tx.recipient.contains(sponsorAddress)) shouldBe 7 // Without A-7, A-8
+        sponsorTxs.count(tx => tx.sender.contains(sponsorAddress) || tx.recipient.contains(sponsorAddress)) shouldBe 6 // Without initial transfer, A-7, A-8
         sponsorTxs.map(_.id) should contain allElementsOf Seq(
           firstSponsorAssetId,
           secondSponsorAssetId,
@@ -437,7 +437,6 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
             "Another1",
             "Created by Sponsorship Suite",
             sponsorAssetTotal,
-            decimals = 2,
             fee = issueFee,
             waitForTx = true
           )
@@ -449,8 +448,6 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
             "Another2",
             "Created by Sponsorship Suite",
             sponsorAssetTotal,
-            decimals = 2,
-            reissuable = true,
             fee = issueFee,
             waitForTx = true
           )
@@ -516,7 +513,6 @@ class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddres
             "Created by Sponsorship Suite",
             sponsorAssetTotal,
             decimals = 8,
-            reissuable = true,
             fee = issueFee,
             waitForTx = true
           )

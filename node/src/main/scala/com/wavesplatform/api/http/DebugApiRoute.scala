@@ -197,7 +197,7 @@ case class DebugApiRoute(
     path("validate")(jsonPost[JsObject] { jsv =>
       val startTime = System.nanoTime()
 
-      val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
+      val parsedTransaction = TransactionFactory.parseRequest(jsv)
 
       val tracedSnapshot = for {
         tx   <- TracedResult(parsedTransaction)

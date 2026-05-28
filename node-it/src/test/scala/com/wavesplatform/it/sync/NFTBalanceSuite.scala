@@ -3,16 +3,14 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.*
 import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import play.api.libs.json.*
 
 import scala.concurrent.Future.traverse
@@ -22,13 +20,8 @@ import scala.util.Random
 
 class NFTBalanceSuite extends BaseFreeSpec {
   import NFTBalanceSuite.*
-
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(1)
-      .withSpecial(_.nonMiner)
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(BiggestMiner, NotMiner)
 
   private def node: Node = nodes.head
 
@@ -83,9 +76,17 @@ class NFTBalanceSuite extends BaseFreeSpec {
     "returns only nft with balance > 0 on /nft/{address}/limit/{limit}" in {
       val other = KeyPair("other".getBytes)
 
-      val transfer = TransferTransaction
-        .selfSigned(1.toByte, issuer, other.toAddress, randomTokenToTransfer, 1, Waves, 0.001.waves, ByteStr.empty, System.currentTimeMillis())
-        .explicitGet()
+      val transfer = TxHelpers.transfer(
+        from = issuer,
+        to = other.toAddress,
+        amount = 1,
+        asset = randomTokenToTransfer,
+        fee = 0.001.waves,
+        feeAsset = Waves,
+        attachment = ByteStr.empty,
+        timestamp = System.currentTimeMillis(),
+        version = 1.toByte
+      )
 
       val assertion = for {
         tx         <- node.signedBroadcast(transfer.json())
@@ -156,37 +157,31 @@ object NFTBalanceSuite {
   def fillPortfolio(issuer: KeyPair, nft: Int, simple: Int): (List[IssueTransaction], List[IssueTransaction]) = {
 
     val simpleAssets = List.fill[IssueTransaction](simple) {
-      IssueTransaction
-        .selfSigned(
-          TxVersion.V1,
-          issuer,
-          "SimpleAsset",
-          s"Simple Test Asset ${Random.nextInt(1000)}",
-          1000,
-          8,
-          reissuable = true,
-          script = None,
-          1.waves,
-          System.currentTimeMillis()
-        )
-        .explicitGet()
+      TxHelpers.issue(
+        issuer = issuer,
+        amount = 1000,
+        decimals = 8,
+        name = "SimpleAsset",
+        description = s"Simple Test Asset ${Random.nextInt(1000)}",
+        fee = 1.waves,
+        script = None,
+        reissuable = true,
+        version = TxVersion.V1
+      )
     }
 
     val nonFungibleAssets = List.fill[IssueTransaction](nft) {
-      IssueTransaction
-        .selfSigned(
-          TxVersion.V1,
-          issuer,
-          "NonFungibleAsset",
-          s"NFT Test Asset ${Random.nextInt(1000)}",
-          1,
-          0,
-          reissuable = false,
-          script = None,
-          1.waves,
-          System.currentTimeMillis()
-        )
-        .explicitGet()
+      TxHelpers.issue(
+        issuer = issuer,
+        amount = 1,
+        decimals = 0,
+        name = "NonFungibleAsset",
+        description = s"NFT Test Asset ${Random.nextInt(1000)}",
+        fee = 1.waves,
+        script = None,
+        reissuable = false,
+        version = TxVersion.V1
+      )
     }
 
     (simpleAssets, nonFungibleAssets)
@@ -242,9 +237,13 @@ object NFTBalanceSuite {
       .get(s"/assets/balance/$address")
       .as[JsObject]
       .map { json =>
-        (json \ "balances").as[List[String]](using Reads.list(using Reads { details =>
-          (details \ "issueTransaction" \ "assetId").validate[String]
-        }))
+        (json \ "balances").as[List[String]](using
+          Reads.list(using
+            Reads { details =>
+              (details \ "issueTransaction" \ "assetId").validate[String]
+            }
+          )
+        )
       }
   }
 }

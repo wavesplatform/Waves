@@ -13,28 +13,25 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.assets.exchange.*
-import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{Asset, TxHelpers}
 
 class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
   private def mkIssue(issuer: KeyPair, name: String, script: Option[Script] = None) =
-    IssueTransaction
-      .selfSigned(
-        2.toByte,
-        issuer,
-        name,
-        "",
-        100000_00,
-        2,
-        reissuable = false,
-        script,
-        1.waves,
-        ntpTime.getTimestamp()
-      )
-      .explicitGet()
+    TxHelpers.issue(
+      issuer,
+      100000_00,
+      2,
+      name,
+      "",
+      1.waves,
+      script,
+      reissuable = false,
+      ntpTime.getTimestamp()
+    )
 
   private def mkOrder(
       sender: KeyPair,
@@ -85,43 +82,35 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
       ) { d =>
         d.appendBlock(genesisTxs*)
         d.appendBlock(
-          SetScriptTransaction
-            .selfSigned(
-              1.toByte,
-              sender,
-              Some(
-                ScriptCompiler
-                  .compile(
-                    """match tx {
-                      |  case _: Order => height >= 0
-                      |  case _ => true
-                      |}""".stripMargin,
-                    ScriptEstimatorV2
-                  )
-                  .explicitGet()
-                  ._1
-              ),
-              0.001.waves,
-              ntpTime.getTimestamp()
-            )
-            .explicitGet()
+          TxHelpers.setScript(
+            sender,
+            ScriptCompiler
+              .compile(
+                """match tx {
+                  |  case _: Order => height >= 0
+                  |  case _ => true
+                  |}""".stripMargin,
+                ScriptEstimatorV2
+              )
+              .explicitGet()
+              ._1,
+            0.001.waves,
+            timestamp = ntpTime.getTimestamp()
+          )
         )
 
         d.appendBlock(
-          ExchangeTransaction
-            .signed(
-              2.toByte,
-              matcher.privateKey,
-              mkOrder(sender, OrderType.BUY, matcher.publicKey, assetPair),
-              mkOrder(sender, OrderType.SELL, matcher.publicKey, assetPair),
-              100,
-              5.waves,
-              0.003.waves,
-              0.003.waves,
-              0.003.waves,
-              ntpTime.getTimestamp()
-            )
-            .explicitGet()
+          TxHelpers.exchange(
+            mkOrder(sender, OrderType.BUY, matcher.publicKey, assetPair),
+            mkOrder(sender, OrderType.SELL, matcher.publicKey, assetPair),
+            matcher,
+            100,
+            5.waves,
+            0.003.waves,
+            0.003.waves,
+            0.003.waves,
+            ntpTime.getTimestamp()
+          )
         )
       }
     }
@@ -136,28 +125,25 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
   } yield (
     sender,
     genesisTxs ++ Seq(buyFeeAssetTx, sellFeeAssetTx),
-    ExchangeTransaction
-      .signed(
-        2.toByte,
-        matcher.privateKey,
-        mkOrder(sender, OrderType.BUY, matcher.publicKey, assetPair, 100, buyFeeAssetId),
-        mkOrder(sender, OrderType.SELL, matcher.publicKey, assetPair, 100, sellFeeAssetId),
-        100,
-        5.waves,
-        100,
-        100,
-        0.003.waves,
-        ntpTime.getTimestamp()
-      )
-      .explicitGet(),
+    TxHelpers.exchange(
+      mkOrder(sender, OrderType.BUY, matcher.publicKey, assetPair, 100, buyFeeAssetId),
+      mkOrder(sender, OrderType.SELL, matcher.publicKey, assetPair, 100, sellFeeAssetId),
+      matcher,
+      100,
+      5.waves,
+      100,
+      100,
+      0.003.waves,
+      timestamp = ntpTime.getTimestamp()
+    ),
     buyFeeAssetId,
     sellFeeAssetId
   )
 
   property("matcher fee asset script is executed during exchange transaction validation") {
     forAll(sharedParamGen2) { case (sender, genesisTxs, exchangeTx, buyFeeAsset, sellFeeAsset) =>
-      def setAssetScript(assetId: IssuedAsset, script: Option[Script]): SetAssetScriptTransaction =
-        SetAssetScriptTransaction.selfSigned(1.toByte, sender, assetId, script, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
+      def setAssetScript(assetId: IssuedAsset, script: Script): SetAssetScriptTransaction =
+        TxHelpers.setAssetScript(sender, assetId, script, 0.001.waves, ntpTime.getTimestamp())
 
       withDomain(
         domainSettingsWithPreactivatedFeatures(
@@ -170,13 +156,13 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
         d.appendBlock(genesisTxs*)
 
         d.blockchainUpdater.processBlock(
-          d.createBlock(Seq(setAssetScript(buyFeeAsset, Some(ExprScript(Terms.FALSE).explicitGet())), exchangeTx), version = Block.PlainBlockVersion)
+          d.createBlock(Seq(setAssetScript(buyFeeAsset, ExprScript(Terms.FALSE).explicitGet()), exchangeTx), version = Block.PlainBlockVersion)
         ) should produce("TransactionNotAllowedByScript")
 
         d.blockchainUpdater.processBlock(
           d.createBlock(
             Seq(
-              setAssetScript(sellFeeAsset, Some(ScriptCompiler.compile("(5 / 0) == 2", ScriptEstimatorV2).explicitGet()._1)),
+            setAssetScript(sellFeeAsset, ScriptCompiler.compile("(5 / 0) == 2", ScriptEstimatorV2).explicitGet()._1),
               exchangeTx
             ),
             version = Block.PlainBlockVersion

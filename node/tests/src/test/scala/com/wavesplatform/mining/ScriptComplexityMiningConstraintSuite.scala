@@ -10,7 +10,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{AccountScriptInfo, Height}
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{Asset, DataTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.{Asset, DataTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.EmptyBlockchain
 import org.scalacheck.Gen
 
@@ -59,8 +59,8 @@ class ScriptComplexityMiningConstraintSuite extends FlatSpec {
     for {
       acc1 <- accountGen
       acc2 <- accountGen
-      tx1 = DataTransaction.selfSigned(TxVersion.V1, acc1, Nil, 1000000, System.currentTimeMillis()).explicitGet()
-      tx2 = DataTransaction.selfSigned(TxVersion.V1, acc2, Nil, 1000000, System.currentTimeMillis()).explicitGet()
-      tx3 = DataTransaction.selfSigned(TxVersion.V1, acc2, Nil, 1000000, System.currentTimeMillis()).explicitGet()
+      tx1 = TxHelpers.data(account = acc1, entries = Nil, fee = 1000000, version = TxVersion.V1)
+      tx2 = TxHelpers.data(account = acc2, entries = Nil, fee = 1000000, version = TxVersion.V1)
+      tx3 = TxHelpers.data(account = acc2, entries = Nil, fee = 1000000, version = TxVersion.V1)
     } yield (acc1, acc2, tx1, tx2, tx3)
 }

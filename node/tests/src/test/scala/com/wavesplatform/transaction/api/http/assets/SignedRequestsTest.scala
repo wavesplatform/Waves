@@ -164,8 +164,6 @@ class SignedRequestsTest extends FunSuite {
   }
 
   test("SponsorFeeRequest json parsing works") {
-    import com.wavesplatform.api.http.requests.SponsorFeeRequest.*
-
     val One = 100000000L
     val js1 = s"""{
   "type": 14,
@@ -223,7 +221,7 @@ class SignedRequestsTest extends FunSuite {
   "minSponsoredAssetFee": null
  }"""
 
-    val req = Json.parse(js1).validate[SignedSponsorFeeRequest].get.toTx.explicitGet()
+    val req = Json.parse(js1).validate[SponsorFeeRequest].get.toTx.explicitGet()
     req.proofs shouldBe Proofs(
       Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get)
     )
@@ -231,7 +229,7 @@ class SignedRequestsTest extends FunSuite {
     req.minSponsoredAssetFee.map(_.value) shouldBe Some(100000)
 
     for (js <- Seq(js2, js3, js4)) {
-      val req = Json.parse(js).validate[SignedSponsorFeeRequest].get.toTx.explicitGet()
+      val req = Json.parse(js).validate[SponsorFeeRequest].get.toTx.explicitGet()
       Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
       req.fee.value shouldBe 100000000L
       req.minSponsoredAssetFee.map(_.value) shouldBe None
@@ -253,7 +251,7 @@ class SignedRequestsTest extends FunSuite {
         |]
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[SignedSetAssetScriptRequest].get
+    val req = Json.parse(json).validate[SetAssetScriptRequest].get
     req.assetId.id.toString shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     req.proofs shouldBe Proofs(
       Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get)

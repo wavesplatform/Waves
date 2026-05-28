@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, Transaction, TxHelpers, TxVersion, TransactionSignOps}
+import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, Transaction, TxHelpers, TxVersion}
 import org.scalatest.{EitherValues, OptionValues}
 
 import java.nio.charset.StandardCharsets
@@ -310,7 +310,7 @@ class RideV6FailRejectTest extends FreeSpec with WithDomain with OptionValues wi
           s"NODE-546 If an invoke writes an empty $entryType key to the state",
           "Data entry key should not be empty",
           mkDAppFunc(entry),
-          invokeTx = aliceInvokeTx.copy(version = TxVersion.V1).signWith(invoker.privateKey)
+          invokeTx = TxHelpers.invoke(dApp = aliceAddr, invoker = invoker, func = Some("foo"), fee = 3.waves, version = TxVersion.V1)
         )
       } ++
         dataEntries.map { case (entryType, entry) =>

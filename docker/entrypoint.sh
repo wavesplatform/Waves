@@ -13,7 +13,9 @@ JAVA_OPTS="-XX:+ExitOnOutOfMemoryError
   -Dwaves.rest-api.bind-address=0.0.0.0
   ${JAVA_OPTS}"
 
-echo "JAVA_OPTS=${JAVA_OPTS}" | tee -a ${WVLOG}/waves.log
+if [ "$WAVES_LOG_JAVA_OPTS" = "true" ] ; then
+  echo "JAVA_OPTS=${JAVA_OPTS}" | tee -a ${WVLOG}/waves.log
+fi
 
 if [ -n "$WAVES_WALLET_SEED" ] ; then
   JAVA_OPTS="-Dwaves.wallet.seed=${WAVES_WALLET_SEED} ${JAVA_OPTS}"

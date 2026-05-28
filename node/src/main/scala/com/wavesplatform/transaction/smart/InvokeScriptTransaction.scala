@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.*
-import com.wavesplatform.crypto
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.state.diffs.invoke.{InvokeScriptLike, InvokeScriptTransactionLike}
@@ -31,6 +31,8 @@ case class InvokeScriptTransaction(
     with Versioned.ToV2
     with PBSince.V2 {
 
+  override type T = InvokeScriptTransaction
+
   override def root: InvokeScriptTransactionLike = this
   override val funcCall: FUNCTION_CALL           = funcCallOpt.getOrElse(InvokeTransaction.DefaultCall)
   def senderAddress: Address                     = sender.toAddress
@@ -38,6 +40,8 @@ case class InvokeScriptTransaction(
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(InvokeScriptTxSerializer.bodyBytes(this))
   val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(InvokeScriptTxSerializer.toBytes(this))
   val json: Coeval[JsObject]         = Coeval.evalOnce(InvokeScriptTxSerializer.toJson(this))
+
+  override def addProof(proof: ByteStr): InvokeScriptTransaction = copy(proofs = this.proofs.add(proof))
 }
 
 object InvokeScriptTransaction extends TransactionParser {
@@ -46,9 +50,6 @@ object InvokeScriptTransaction extends TransactionParser {
   override val typeId: TxType = 16: Byte
 
   implicit val validator: TxValidator[InvokeScriptTransaction] = InvokeScriptTxValidator
-
-  implicit def sign(tx: InvokeScriptTransaction, privateKey: PrivateKey): InvokeScriptTransaction =
-    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   override def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] =
     InvokeScriptTxSerializer.parseBytes(bytes)
@@ -67,8 +68,8 @@ object InvokeScriptTransaction extends TransactionParser {
       fee: Long,
       feeAssetId: Asset,
       timestamp: TxTimestamp,
-      proofs: Proofs,
-      chainId: Byte
+      proofs: Proofs = Proofs.empty,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, InvokeScriptTransaction] =
     for {
       fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)

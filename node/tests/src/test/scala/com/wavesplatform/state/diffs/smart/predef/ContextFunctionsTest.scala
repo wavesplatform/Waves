@@ -28,7 +28,6 @@ import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.utils.*
@@ -373,7 +372,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
           .explicitGet()
           ._1
 
-        val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+        val setScriptTx = setScript(acc = masterAcc, script = script, fee = 1000000L, timestamp = transferTx.timestamp + 5)
 
         append(Seq(setScriptTx)).explicitGet()
         append(Seq(transfer2)).explicitGet()
@@ -865,9 +864,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
           .explicitGet()
           ._1
 
-        val setScriptTx = SetScriptTransaction
-          .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
-          .explicitGet()
+        val setScriptTx = setScript(acc = masterAcc, script = script, fee = 1000000L, timestamp = transferTx.timestamp + 5)
 
         append(Seq(setScriptTx)).explicitGet()
         append(Seq(transfer2)).explicitGet()
@@ -949,9 +946,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
            """.stripMargin
           )
 
-        val setScriptTx = SetScriptTransaction
-          .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
-          .explicitGet()
+        val setScriptTx = setScript(acc = masterAcc, script = script, fee = 1000000L, timestamp = transferTx.timestamp + 5)
 
         append(Seq(setScriptTx)).explicitGet()
         append(Seq(transfer2)).explicitGet()

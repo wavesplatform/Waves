@@ -7,7 +7,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuite
@@ -23,11 +22,9 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class LeaseActionGrpcSuite extends GrpcBaseTransactionSuite {
+  import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs
-      .Builder(Default, 2, Seq.empty)
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, Height(1))))
-      .buildNonConflicting()
+    Seq(BiggestMiner, Miners(3)).map(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls, Height(1))))
 
   private def compile(script: String): Script =
     ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1

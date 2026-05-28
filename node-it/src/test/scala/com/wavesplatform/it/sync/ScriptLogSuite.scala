@@ -7,8 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.BinaryDataEntry
-import com.wavesplatform.transaction.DataTransaction
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
@@ -24,7 +23,7 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
     s"""
        |let self = Address(base58'$firstAddress')
        |
-      |match tx {
+       |match tx {
        |	case dtx: DataTransaction =>
        |		let v00 = extract(getBinary(self, "k0"))
        |		let v01 = extract(getBinary(self, "k1"))
@@ -66,10 +65,8 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     sender.putData(firstKeyPair, data, ENOUGH_FEE, waitForTx = true).id
 
-    val script = ScriptCompiler.compile(scriptSrc, ScriptEstimatorV2).explicitGet()._1
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(1.toByte, firstKeyPair, Some(script), setScriptFee, System.currentTimeMillis())
-      .explicitGet()
+    val script               = ScriptCompiler.compile(scriptSrc, ScriptEstimatorV2).explicitGet()._1
+    val setScriptTransaction = TxHelpers.setScript(firstKeyPair, script, setScriptFee, timestamp = System.currentTimeMillis())
 
     val sstx = sender.signedBroadcast(setScriptTransaction.json()).id
 
@@ -80,18 +77,14 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
     Random.nextBytes(signature)
 
     def mkInvData() =
-      DataTransaction
-        .selfSigned(
-          1.toByte,
-          firstKeyPair,
-          List(
-            BinaryDataEntry("pk", firstKeyPair.publicKey.byteStr),
-            BinaryDataEntry("sig", ByteStr(signature))
-          ),
-          ENOUGH_FEE,
-          System.currentTimeMillis()
-        )
-        .explicitGet()
+      TxHelpers.data(
+        firstKeyPair,
+        List(
+          BinaryDataEntry("pk", firstKeyPair.publicKey.byteStr),
+          BinaryDataEntry("sig", ByteStr(signature))
+        ),
+        ENOUGH_FEE
+      )
 
     assertApiErrorRaised(sender.signedBroadcast(mkInvData().json()))
 

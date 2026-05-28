@@ -70,8 +70,7 @@ object InvokeScriptRequest {
     } yield FunctionCallPart(funcName, args)
   }
 
-  implicit val unsignedInvokeScriptRequestReads: Reads[InvokeScriptRequest]     = Json.reads[InvokeScriptRequest]
-  implicit val signedInvokeScriptRequestReads: Reads[SignedInvokeScriptRequest] = Json.reads[SignedInvokeScriptRequest]
+  implicit val unsignedInvokeScriptRequestReads: Reads[InvokeScriptRequest] = Json.reads[InvokeScriptRequest]
 
   def buildFunctionCall(fc: FunctionCallPart): FUNCTION_CALL =
     FUNCTION_CALL(FunctionHeader.User(fc.function), fc.args)
@@ -79,19 +78,7 @@ object InvokeScriptRequest {
 
 case class InvokeScriptRequest(
     chainId: Option[Byte],
-    version: Option[Byte],
-    sender: String,
-    fee: Long,
-    feeAssetId: Option[String],
-    call: Option[InvokeScriptRequest.FunctionCallPart],
-    payment: Seq[InvokeScriptTransaction.Payment],
-    dApp: String,
-    timestamp: Option[Long] = None
-)
-
-case class SignedInvokeScriptRequest(
-    chainId: Option[Byte],
-    version: Option[Byte],
+    version: Byte = 2.toByte,
     senderPublicKey: String,
     fee: Long,
     feeAssetId: Option[Asset],
@@ -99,14 +86,14 @@ case class SignedInvokeScriptRequest(
     call: Option[InvokeScriptRequest.FunctionCallPart],
     payment: Option[Seq[InvokeScriptTransaction.Payment]],
     timestamp: Long,
-    proofs: Proofs
-) {
+    proofs: Proofs = Proofs.empty
+) extends TxBroadcastRequest[InvokeScriptTransaction] {
   def toTx: Either[ValidationError, InvokeScriptTransaction] =
     for {
-      _sender      <- PublicKey.fromBase58String(senderPublicKey)
       _dappAddress <- AddressOrAlias.fromString(dApp)
+      _sender      <- PublicKey.fromBase58String(senderPublicKey)
       t <- InvokeScriptTransaction.create(
-        version.getOrElse(2.toByte),
+        version,
         _sender,
         _dappAddress,
         call.map(InvokeScriptRequest.buildFunctionCall).filterNot(_ == InvokeTransaction.DefaultCall),

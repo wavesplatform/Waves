@@ -1,21 +1,14 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.*
 import org.scalatest.CancelAfterFailure
-
-import scala.concurrent.duration.*
 
 /*
 Scenario:
@@ -25,7 +18,7 @@ every month a foundation makes payments from two MassTransactions(type == 11):
  */
 
 class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private lazy val fourthAddress: String = notMiner.createKeyPair().toAddress.toString
+  private lazy val fourthAddress = notMiner.createKeyPair().toAddress
 
   test("airdrop emulation via MassTransfer") {
     val scriptText = s"""
@@ -65,61 +58,31 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     notMiner.addressScriptInfo(notMiner.address).scriptText.isEmpty shouldBe false
 
-    //save time
-    val currTime = System.currentTimeMillis()
+    // make transfer to users
+    val signedToUsers = TxHelpers.massTransfer(
+      notMiner.keyPair,
+      Seq(thirdKeyPair.toAddress -> 4 * transferAmount, secondKeyPair.toAddress -> 4 * transferAmount),
+      fee = calcMassTransferFee(2) + smartFee
+    )
+    val toUsersID = ByteStr.decodeBase58(notMiner.signedBroadcast(signedToUsers.json(), waitForTx = true).id).get
 
-    //make transfer to users
-    val transfers =
-      MassTransferTransaction
-        .parseTransfersList(List(Transfer(thirdAddress, 4 * transferAmount), Transfer(secondAddress, 4 * transferAmount)))
-        .explicitGet()
-
-    val unsigned =
-      MassTransferTransaction
-        .create(1.toByte, notMiner.publicKey, Waves, transfers, calcMassTransferFee(2) + smartFee, currTime, ByteStr.empty, Proofs.empty)
-        .explicitGet()
-
-    val accountSig = crypto.sign(notMiner.keyPair.privateKey, unsigned.bodyBytes())
-    val signed     = unsigned.copy(1.toByte, proofs = Proofs(Seq(accountSig)))
-    val toUsersID  = notMiner.signedBroadcast(signed.json(), waitForTx = true).id
-
-    //make transfer with incorrect time
-    val heightBefore = notMiner.height
-
-    val transfersToGov =
-      MassTransferTransaction.parseTransfersList(List(Transfer(firstAddress, transferAmount), Transfer(fourthAddress, transferAmount))).explicitGet()
-
-    val unsignedToGov =
-      MassTransferTransaction
-        .create(1.toByte, notMiner.publicKey, Waves, transfersToGov, calcMassTransferFee(2) + smartFee, currTime, ByteStr.empty, Proofs.empty)
-        .explicitGet()
-    val accountSigToGovFail = crypto.sign(notMiner.keyPair.privateKey, unsignedToGov.bodyBytes())
-    val signedToGovFail     = unsignedToGov.copy(1.toByte, proofs = Proofs(Seq(accountSigToGovFail)))
+    val transfersToGov = Seq(firstKeyPair.toAddress -> transferAmount, fourthAddress -> transferAmount)
+    // make transfer with incorrect time
+    val signedToGovWithIncorrectTs = TxHelpers.massTransfer(
+      notMiner.keyPair,
+      transfersToGov,
+      fee = calcMassTransferFee(2) + smartFee,
+      timestamp = signedToUsers.timestamp
+    )
 
     assertBadRequestAndResponse(
-      notMiner.signedBroadcast(signedToGovFail.json()),
+      notMiner.signedBroadcast(signedToGovWithIncorrectTs.addProof(toUsersID).json()),
       "Transaction is not allowed by account-script"
     )
 
-    //make correct transfer to government after some time
-    notMiner.waitForHeight(heightBefore + 10, 5.minutes)
-
-    val unsignedToGovSecond =
-      MassTransferTransaction
-        .create(
-          1.toByte,
-          notMiner.publicKey,
-          Waves,
-          transfersToGov,
-          calcMassTransferFee(2) + smartFee,
-          System.currentTimeMillis(),
-          ByteStr.empty,
-          Proofs.empty
-        )
-        .explicitGet()
-
-    val accountSigToGov = crypto.sign(notMiner.keyPair.privateKey, unsignedToGovSecond.bodyBytes())
-    val signedToGovGood = unsignedToGovSecond.copy(1.toByte, proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.tryDecodeWithLimit(toUsersID).get))))
-    notMiner.signedBroadcast(signedToGovGood.json(), waitForTx = true).id
+    // make correct transfer to government with correct timestamp
+    val signedToGovGood =
+      TxHelpers.massTransfer(notMiner.keyPair, transfersToGov, fee = calcMassTransferFee(2) + smartFee, timestamp = signedToUsers.timestamp + 30_001)
+    notMiner.signedBroadcast(signedToGovGood.addProof(toUsersID).json(), waitForTx = true).id
   }
 }

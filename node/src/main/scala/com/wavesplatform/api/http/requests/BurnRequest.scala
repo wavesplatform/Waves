@@ -11,8 +11,7 @@ import play.api.libs.json.*
 
 case class BurnRequest(
     version: Option[Byte],
-    sender: Option[String],
-    senderPublicKey: Option[String],
+    senderPublicKey: String,
     asset: IssuedAsset,
     quantity: Long,
     fee: Long,
@@ -20,12 +19,13 @@ case class BurnRequest(
     signature: Option[ByteStr],
     proofs: Option[Proofs]
 ) extends TxBroadcastRequest[BurnTransaction] {
-  def toTxFrom(sender: PublicKey): Either[ValidationError, BurnTransaction] =
+  def toTx: Either[ValidationError, BurnTransaction] =
     for {
       validProofs <- toProofs(signature, proofs)
+      validSender <- PublicKey.fromBase58String(senderPublicKey)
       tx <- BurnTransaction.create(
         version.getOrElse(defaultVersion),
-        sender,
+        validSender,
         asset,
         quantity,
         fee,
@@ -37,10 +37,9 @@ case class BurnRequest(
 
 object BurnRequest {
   import com.wavesplatform.utils.byteStrFormat
-  implicit val jsonFormat: Format[BurnRequest] = Format(
+  given Format[BurnRequest] = Format(
     ((JsPath \ "version").readNullable[Byte] and
-      (JsPath \ "sender").readNullable[String] and
-      (JsPath \ "senderPublicKey").readNullable[String] and
+      (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").read[IssuedAsset] and
       (JsPath \ "amount").read[Long].orElse((JsPath \ "quantity").read[Long]) and
       (JsPath \ "fee").read[Long] and

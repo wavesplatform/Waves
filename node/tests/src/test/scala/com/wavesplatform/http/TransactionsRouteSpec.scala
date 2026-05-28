@@ -29,8 +29,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.AccountVerifierTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, AssetIdLength, EthTxGenerator, TransactionSignOps, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, EthTxGenerator, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.{BlockGen, TestValues, crypto}
 import org.apache.pekko.http.scaladsl.model.*
@@ -896,15 +895,12 @@ class TransactionsRouteSpec
       val seed = new Array[Byte](32)
       Random.nextBytes(seed)
       val sender: KeyPair = KeyPair(seed)
-      val ist = Signed.invokeScript(
-        TxVersion.V1,
-        sender,
-        sender.toAddress,
-        None,
-        Seq.empty,
-        500000L,
-        Asset.Waves,
-        testTime.getTimestamp()
+      val ist = TxHelpers.invoke(
+        dApp = sender.toAddress,
+        invoker = sender,
+        fee = 500000L,
+        version = TxVersion.V1,
+        timestamp = testTime.getTimestamp()
       )
       f(sender, ist)
     }
@@ -986,8 +982,13 @@ class TransactionsRouteSpec
         lease
       )
 
-      val invoke = Signed
-        .invokeScript(2.toByte, sender, sender.toAddress, None, Seq.empty, 0.005.waves, Asset.Waves, ntpTime.getTimestamp())
+      val invoke = TxHelpers.invoke(
+        dApp = sender.toAddress,
+        invoker = sender,
+        fee = 0.005.waves,
+        version = 2.toByte,
+        timestamp = ntpTime.getTimestamp()
+      )
 
       Post(routePath("/broadcast?trace=true"), invoke.json()) ~> route ~> check {
         val dappTrace = (responseAs[JsObject] \ "trace").as[Seq[JsObject]].find(jsObject => (jsObject \ "type").as[String] == "dApp").get

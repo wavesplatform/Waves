@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.finalization
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.requests.CommitToGenerationRequest
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.SyncHttpApi.*
@@ -14,12 +13,13 @@ import org.scalatest.OptionValues
 import scala.concurrent.duration.DurationInt
 
 class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLogging {
+  import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.DeterministicFinality.id, Height(0))))
-      .overrideBase(_.raw("waves.miner.minimal-block-generation-offset = 10s"))
-      .withDefault(2)
-      .buildNonConflicting()
+    Seq(Miners.head, Miners(3)).map(
+      _.preactivatedFeatures(BlockchainFeatures.DeterministicFinality)
+        .overrides("waves.waves.blockchain.custom.functionality.min-block-time = 10s")
+        .quorum(1)
+    )
 
   private def node1 = dockerNodes().head
   private def node2 = dockerNodes().last
@@ -33,10 +33,10 @@ class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLo
     val period1 = node1.currentGenerationPeriod.value.next
 
     step("Commit to generation")
-    val commitTxn1 = node1.sign(CommitToGenerationRequest(sender = Some(miner1Addr)))
-    node1.broadcastRequest(commitTxn1)
+    val commitTxn1 = node1.signCommitToGenerationRequest(miner1Addr)
+    val commitTxn2 = node2.signCommitToGenerationRequest(miner2Addr)
 
-    val commitTxn2 = node2.sign(CommitToGenerationRequest(sender = Some(miner2Addr)))
+    node2.broadcastRequest(commitTxn1)
     node2.broadcastRequest(commitTxn2)
 
     node1.waitForGenerationPeriod(period1)
@@ -45,17 +45,9 @@ class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLo
     isolated {
       val generators = node1.generators(period1.start)
       generators.size shouldBe 2
-      generators should contain theSameElementsAs Seq(
-        GeneratorsResponse.Entry(
-          address = miner1Addr,
-          balance = 9989990000000L,
-          transactionId = commitTxn1.id
-        ),
-        GeneratorsResponse.Entry(
-          address = miner2Addr,
-          balance = 24990598000000L,
-          transactionId = commitTxn2.id
-        )
+      generators.map(ge => ge.address -> ge.transactionId) should contain theSameElementsAs Seq(
+        miner1Addr -> commitTxn1.id,
+        miner2Addr -> commitTxn2.id
       )
     }
 

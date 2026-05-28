@@ -9,25 +9,21 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.smartMinFee
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class InvokePaymentsFeeSuite extends BaseTransactionSuite {
-
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(
-        _.preactivatedFeatures(
-          (BlockchainFeatures.Ride4DApps.id, Height(0)),
-          (BlockchainFeatures.BlockV5.id, Height(0)),
-          (BlockchainFeatures.SynchronousCalls.id, Height(0))
-        )
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner
+      .quorum(0)
+      .preactivatedFeatures(
+        BlockchainFeatures.Ride4DApps,
+        BlockchainFeatures.BlockV5,
+        BlockchainFeatures.SynchronousCalls
       )
-      .withDefault(1)
-      .buildNonConflicting()
+  )
 
   private lazy val (caller, callerAddress) = (firstKeyPair, firstAddress)
   private lazy val (dApp, dAppAddress)     = (secondKeyPair, secondAddress)
@@ -51,17 +47,17 @@ class InvokePaymentsFeeSuite extends BaseTransactionSuite {
     ScriptCompiler
       .compile(
         s"""
-         | {-# STDLIB_VERSION 4       #-}
-         | {-# CONTENT_TYPE   DAPP    #-}
-         | {-# SCRIPT_TYPE    ACCOUNT #-}
-         |
-         | @Callable(i)
-         | func default() =
-         |   [
-         |     ScriptTransfer(i.caller, 1, base58'$assetId'),
-         |     Burn(base58'$assetId', 1),
-         |     Reissue(base58'$assetId', 1, false)
-         |   ]
+           | {-# STDLIB_VERSION 4       #-}
+           | {-# CONTENT_TYPE   DAPP    #-}
+           | {-# SCRIPT_TYPE    ACCOUNT #-}
+           |
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     ScriptTransfer(i.caller, 1, base58'$assetId'),
+           |     Burn(base58'$assetId', 1),
+           |     Reissue(base58'$assetId', 1, false)
+           |   ]
        """.stripMargin,
         ScriptEstimatorV3.latest
       )

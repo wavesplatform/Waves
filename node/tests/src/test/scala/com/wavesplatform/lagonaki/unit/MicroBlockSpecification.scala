@@ -33,10 +33,10 @@ class MicroBlockSpecification extends FunSuite {
 
     val ts = System.currentTimeMillis() - 5000
     val tr: TransferTransaction =
-      TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, Waves, 5, Waves, 2, ByteStr.empty, ts + 1).explicitGet()
+      TxHelpers.transfer(from = sender, to = gen.toAddress, amount = 5, asset = Waves, fee = 2, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts + 1, version = 1.toByte)
     val assetId = IssuedAsset(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
     val tr2: TransferTransaction =
-      TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, assetId, 5, Waves, 2, ByteStr.empty, ts + 2).explicitGet()
+      TxHelpers.transfer(from = sender, to = gen.toAddress, amount = 5, asset = assetId, fee = 2, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts + 2, version = 1.toByte)
 
     val transactions = Seq(tr, tr2)
 
@@ -58,10 +58,10 @@ class MicroBlockSpecification extends FunSuite {
   test("MicroBlock with txs bytes/parse roundtrip, with finalizationVoting") {
     val ts = System.currentTimeMillis() - 5000
     val tr: TransferTransaction =
-      TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, Waves, 5, Waves, 2, ByteStr.empty, ts + 1).explicitGet()
+      TxHelpers.transfer(from = sender, to = gen.toAddress, amount = 5, asset = Waves, fee = 2, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts + 1, version = 1.toByte)
     val assetId = IssuedAsset(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
     val tr2: TransferTransaction =
-      TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, assetId, 5, Waves, 2, ByteStr.empty, ts + 2).explicitGet()
+      TxHelpers.transfer(from = sender, to = gen.toAddress, amount = 5, asset = assetId, fee = 2, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts + 2, version = 1.toByte)
 
     val transactions = Seq(tr, tr2)
 
@@ -198,7 +198,7 @@ class MicroBlockSpecification extends FunSuite {
 
   test("MicroBlock cannot contain more than Miner.MaxTransactionsPerMicroblock") {
     val transaction =
-      TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, Waves, 5, Waves, 1000, ByteStr.empty, System.currentTimeMillis()).explicitGet()
+      TxHelpers.transfer(from = sender, to = gen.toAddress, amount = 5, asset = Waves, fee = 1000, feeAsset = Waves, attachment = ByteStr.empty, timestamp = System.currentTimeMillis(), version = 1.toByte)
     val transactions = Seq.fill(Miner.MaxTransactionsPerMicroblock + 1)(transaction)
 
     val eitherBlockOrError = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig, None, None)

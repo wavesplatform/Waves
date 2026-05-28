@@ -21,12 +21,11 @@ trait BaseSuite
     with BeforeAndAfterEach { this: TestSuite & Nodes =>
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
-  protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(1)
-      .withSpecial(_.nonMiner)
-      .buildNonConflicting()
+  import com.wavesplatform.it.NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    BiggestMiner.quorum(0),
+    Default.head.notMiner
+  )
 
   def miner: Node            = nodes.head
   def notMiner: Node         = nodes.last

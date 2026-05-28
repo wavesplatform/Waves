@@ -85,5 +85,5 @@ package object requests {
   implicit val byteStrFormat: Format[ByteStr] = com.wavesplatform.utils.byteStrFormat
 
   private[requests] def defaultVersion   = TxVersion.V1
-  private[requests] def defaultTimestamp = 0L
+  private[requests] def defaultTimestamp = System.currentTimeMillis()
 }

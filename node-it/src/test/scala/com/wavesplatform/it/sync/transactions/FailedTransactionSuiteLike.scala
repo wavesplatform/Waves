@@ -1,7 +1,5 @@
 package com.wavesplatform.it.sync.transactions
 
-import scala.concurrent.duration.*
-
 import com.google.protobuf.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
@@ -9,17 +7,19 @@ import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, T
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.it.{Node, NodeConfigs}
 import com.wavesplatform.it.api.TransactionStatus
+import com.wavesplatform.it.{Node, NodeConfigs}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.state.Height
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsObject
+
+import scala.concurrent.duration.*
 
 trait FailedTransactionSuiteLike[T] extends ScorexLogging { matchers: Matchers =>
   protected def waitForHeightArise(): Unit
@@ -46,7 +46,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { matchers: Matchers =
   }
 
   object restApi {
-    import com.wavesplatform.it.api.SyncHttpApi.{assertApiError, NodeExtSync}
+    import com.wavesplatform.it.api.SyncHttpApi.{NodeExtSync, assertApiError}
 
     /** Checks that transactions contain failed and returns them.
       */
@@ -64,7 +64,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { matchers: Matchers =
 
       all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
 
-      val failedIdsByHeight = failed.groupBy(_.height.get).map { case (h, txs) => Height(h) -> txs.map(_.id)}
+      val failedIdsByHeight = failed.groupBy(_.height.get).map { case (h, txs) => Height(h) -> txs.map(_.id) }
 
       failedIdsByHeight.foreach { case (h, ids) =>
         sender.blockAt(h).transactions.map(_.id) should contain allElementsOf ids
@@ -282,44 +282,46 @@ object FailedTransactionSuiteLike {
       sellMatcherFee: Long
   ): ExchangeTransaction = {
     val timestamp = System.currentTimeMillis()
-    val buy = Order.buy(
-      Order.V4,
-      buyer,
-      matcher.publicKey,
-      assetPair,
-      100,
-      100,
-      timestamp,
-      timestamp + Order.MaxLiveTime / 2,
-      buyMatcherFee,
-      Asset.fromString(Some(buyMatcherFeeAsset))
-    ).explicitGet()
-    val sell = Order.sell(
-      Order.V4,
-      seller,
-      matcher.publicKey,
-      assetPair,
-      100,
-      100,
-      timestamp,
-      timestamp + Order.MaxLiveTime / 2,
-      sellMatcherFee,
-      Asset.fromString(Some(sellMatcherFeeAsset))
-    ).explicitGet()
-    ExchangeTransaction
-      .signed(
-        TxVersion.V3,
-        matcher.privateKey,
-        buy,
-        sell,
-        buy.amount.value,
-        buy.price.value,
-        buy.matcherFee.value,
-        sell.matcherFee.value,
-        fee,
-        timestamp
+    val buy = Order
+      .buy(
+        Order.V4,
+        buyer,
+        matcher.publicKey,
+        assetPair,
+        100,
+        100,
+        timestamp,
+        timestamp + Order.MaxLiveTime / 2,
+        buyMatcherFee,
+        Asset.fromString(Some(buyMatcherFeeAsset))
       )
       .explicitGet()
+    val sell = Order
+      .sell(
+        Order.V4,
+        seller,
+        matcher.publicKey,
+        assetPair,
+        100,
+        100,
+        timestamp,
+        timestamp + Order.MaxLiveTime / 2,
+        sellMatcherFee,
+        Asset.fromString(Some(sellMatcherFeeAsset))
+      )
+      .explicitGet()
+    TxHelpers.exchange(
+      buy,
+      sell,
+      matcher,
+      buy.amount.value,
+      buy.price.value,
+      buy.matcherFee.value,
+      sell.matcherFee.value,
+      fee,
+      timestamp,
+      TxVersion.V3
+    )
   }
 
   val configForMinMicroblockAge: Config = ConfigFactory.parseString(s"""
@@ -327,11 +329,6 @@ object FailedTransactionSuiteLike {
                                                                        |waves.miner.max-transactions-in-micro-block = 1
                                                                        |""".stripMargin)
 
-  val Configs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.raw(s"waves.miner.max-transactions-in-micro-block = 50"))
-      .withDefault(1)
-      .withSpecial(_.nonMiner)
-      .buildNonConflicting()
+  import NodeConfigs.*
+  val Configs: Seq[Config] = Seq(BiggestMiner.quorum(0).overrides("waves.miner.max-transactions-in-micro-block = 50"), NotMiner)
 }

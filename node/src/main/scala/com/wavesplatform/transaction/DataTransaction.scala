@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
-import com.wavesplatform.crypto
+import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.*
@@ -27,6 +27,8 @@ case class DataTransaction(
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V2 {
+  override type T = DataTransaction
+  override def addProof(proof: ByteStr): DataTransaction = copy(proofs = this.proofs.add(proof))
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(DataTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(DataTxSerializer.toBytes(this))
@@ -47,9 +49,6 @@ object DataTransaction extends TransactionParser {
 
   implicit val validator: TxValidator[DataTransaction] = DataTxValidator
 
-  implicit def sign(tx: DataTransaction, privateKey: PrivateKey): DataTransaction =
-    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
-
   override def parseBytes(bytes: Array[TxVersion]): Try[DataTransaction] =
     DataTxSerializer.parseBytes(bytes)
 
@@ -59,32 +58,11 @@ object DataTransaction extends TransactionParser {
       data: Seq[DataEntry[?]],
       fee: Long,
       timestamp: TxTimestamp,
-      proofs: Proofs,
+      proofs: Proofs = Proofs.empty,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, DataTransaction] =
     for {
       fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       tx  <- DataTransaction(version, sender, data, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      data: Seq[DataEntry[?]],
-      fee: Long,
-      timestamp: TxTimestamp,
-      signer: PrivateKey,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, DataTransaction] =
-    create(version, sender, data, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      data: Seq[DataEntry[?]],
-      fee: Long,
-      timestamp: TxTimestamp,
-      chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, DataTransaction] =
-    signed(version, sender.publicKey, data, fee, timestamp, sender.privateKey, chainId)
 }

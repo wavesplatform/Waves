@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.features.BlockchainFeature
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -14,6 +15,27 @@ object NodeConfigs {
   val Miners: Seq[Config]  = Default.init
   val NotMiner: Config     = Default.last
   def randomMiner: Config  = Random.shuffle(Miners).head
+
+  val BiggestMiner: Config = Miners.last
+
+  case class PreactivatedFeature(feature: BlockchainFeature, activationHeight: Height)
+
+  implicit def preactivateFeature(f: BlockchainFeature): PreactivatedFeature             = preactivateFeatureAt(f -> Height(0))
+  implicit def preactivateFeatureAt(f: (BlockchainFeature, Height)): PreactivatedFeature = PreactivatedFeature(f._1, f._2)
+
+  extension (c: Config) {
+    def overrides(s: String): Config = ConfigFactory.parseString(s).withFallback(c)
+    def quorum(n: Int): Config       = overrides(s"waves.miner.quorum = $n")
+    def preactivatedFeatures(fs: PreactivatedFeature*): Config = overrides(
+      s"""waves.blockchain.custom.functionality.pre-activated-features {
+        ${fs.map(f => s"${f.feature.id} = ${f.activationHeight}").mkString("\n")}
+      }"""
+    )
+    def minAssetInfoUpdateInterval(blocks: Int): Config =
+      overrides(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $blocks")
+
+    def notMiner: Config = overrides("waves.miner.enable = no")
+  }
 
   def newBuilder: Builder = Builder(Default, Default.size, Seq.empty)
 

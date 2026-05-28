@@ -12,10 +12,9 @@ import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Proofs, TxPositiveAmount}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.{Proofs, TxHelpers, TxPositiveAmount}
 import org.scalatest.CancelAfterFailure
 
 /*
@@ -36,11 +35,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
      This breaks the test.
   2. We have RollbackSuite
    */
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(1)
-      .buildNonConflicting()
+  import NodeConfigs.*
+  override protected def nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
 
   private lazy val BobBC1: KeyPair   = sender.createKeyPair()
   private lazy val AliceBC1: KeyPair = sender.createKeyPair()
@@ -59,7 +55,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
   test("step2 - Create and setup smart contract for swapBC1") {
     val beforeHeight = sender.height
-    val scriptText   = s"""
+    val scriptText = s"""
     let Bob = Address(base58'${BobBC1.toAddress}')
     let Alice = Address(base58'${AliceBC1.toAddress}')
 
@@ -74,9 +70,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
     val pkSwapBC1 = swapBC1
     val script    = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
-    val sc1SetTx = SetScriptTransaction
-      .selfSigned(1.toByte, sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())
-      .explicitGet()
+    val sc1SetTx  = TxHelpers.setScript(pkSwapBC1, script, setScriptFee, timestamp = System.currentTimeMillis())
 
     val setScriptId = sender
       .signedBroadcast(sc1SetTx.json())
@@ -92,19 +86,15 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
   test("step3 - Alice makes transfer to swapBC1") {
     val txToSwapBC1 =
-      TransferTransaction
-        .selfSigned(
-          version = 2.toByte,
-          sender = AliceBC1,
-          recipient = swapBC1.toAddress,
-          asset = Waves,
-          amount = transferAmount + setScriptFee + smartFee,
-          feeAsset = Waves,
-          fee = setScriptFee + smartFee,
-          attachment = ByteStr.empty,
-          timestamp = System.currentTimeMillis()
+      TxHelpers
+        .transfer(
+          AliceBC1,
+          swapBC1.toAddress,
+          transferAmount + setScriptFee + smartFee,
+          Waves,
+          setScriptFee + smartFee,
+          Waves
         )
-        .explicitGet()
 
     val transferId = sender
       .signedBroadcast(txToSwapBC1.json())
@@ -114,19 +104,14 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
   test("step4 - Alice cannot make transfer from swapBC1 if height is incorrect") {
     val txToSwapBC1 =
-      TransferTransaction
-        .selfSigned(
-          version = 2.toByte,
-          sender = swapBC1,
-          recipient = AliceBC1.toAddress,
-          asset = Waves,
-          amount = transferAmount,
-          feeAsset = Waves,
-          fee = setScriptFee + smartFee,
-          attachment = ByteStr.empty,
-          timestamp = System.currentTimeMillis()
-        )
-        .explicitGet()
+      TxHelpers.transfer(
+        swapBC1,
+        AliceBC1.toAddress,
+        transferAmount,
+        Waves,
+        setScriptFee + smartFee,
+        Waves
+      )
 
     assertApiErrorRaised(sender.signedBroadcast(txToSwapBC1.json()))
   }
@@ -176,19 +161,14 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     miner.accountBalances(swapBC1.toAddress.toString)
     assertBadRequestAndMessage(miner.transactionInfo[TransactionInfo](versionedTransferId), "transactions does not exist", 404)
 
-    val selfSignedToAlice = TransferTransaction
-      .selfSigned(
-        version = 2.toByte,
-        sender = swapBC1,
-        recipient = AliceBC1.toAddress,
-        asset = Waves,
-        amount = transferAmount,
-        feeAsset = Waves,
-        fee = setScriptFee + smartFee,
-        attachment = ByteStr.empty,
-        timestamp = System.currentTimeMillis()
-      )
-      .explicitGet()
+    val selfSignedToAlice = TxHelpers.transfer(
+      swapBC1,
+      AliceBC1.toAddress,
+      transferAmount,
+      Waves,
+      setScriptFee + smartFee,
+      Waves
+    )
 
     val transferToAlice =
       sender.signedBroadcast(selfSignedToAlice.json()).id

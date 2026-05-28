@@ -16,10 +16,8 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.BlockAppendError
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{Schedulers, SystemTime, Time}
 import com.wavesplatform.{EitherMatchers, NTPTime}
@@ -274,11 +272,11 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           ._1
 
         d.appendBlock(
-          SetScriptTransaction.selfSigned(2.toByte, dapp, Some(script), 500_0000L, ntpTime.getTimestamp()).explicitGet()
+          TxHelpers.setScript(acc = dapp, script = script, fee = 500_0000L, version = 2.toByte, timestamp = ntpTime.getTimestamp())
         )
 
         val invoke =
-          Signed.invokeScript(3.toByte, sender, dapp.toAddress, None, Seq.empty, 50_0000L, Waves, ntpTime.getTimestamp())
+          TxHelpers.invoke(dApp = dapp.toAddress, invoker = sender, fee = 50_0000L, version = 3.toByte, timestamp = ntpTime.getTimestamp())
 
         d.appendBlock(d.createBlock(Seq(invoke)))
       }

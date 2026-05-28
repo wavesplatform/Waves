@@ -1,11 +1,11 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.transaction.DataTransaction
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.{DataTransaction, TxHelpers}
 import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
-import com.wavesplatform.common.utils.EitherExt2.*
 
 package object smartcontract {
   val invokeScrTxSupportedVersions: List[Byte] = List(1, 2)
@@ -114,7 +114,7 @@ package object smartcontract {
      """.stripMargin
 
   def exchangeTx(pair: AssetPair, exTxFee: Long, orderFee: Long, time: Time, ord1Ver: Byte, ord2Ver: Byte, accounts: KeyPair*): JsObject = {
-    val buyer       = accounts.head // first one
+    val buyer       = accounts.head      // first one
     val seller      = accounts.tail.head // second one
     val matcher     = accounts.last
     val sellPrice   = (0.50 * Order.PriceConstant).toLong
@@ -126,27 +126,25 @@ package object smartcontract {
     val buyMatcherFee  = (BigInt(orderFee) * amount / buy.amount.value).toLong
     val sellMatcherFee = (BigInt(orderFee) * amount / sell.amount.value).toLong
 
-    val tx = ExchangeTransaction
-      .signed(
-        2.toByte,
-        matcher = matcher.privateKey,
+    val tx = TxHelpers
+      .exchange(
+        version = 2.toByte,
+        matcher = matcher,
         order1 = buy,
         order2 = sell,
         amount = amount,
         price = sellPrice,
         buyMatcherFee = buyMatcherFee,
         sellMatcherFee = sellMatcherFee,
-        fee = matcherFee,
-        timestamp = time.correctedTime()
+        fee = matcherFee
       )
-      .explicitGet()
       .json()
 
     tx
   }
 
   def orders(pair: AssetPair, ord1Ver: Byte, ord2Ver: Byte, fee: Long, time: Time, accounts: KeyPair*): (Order, Order) = {
-    val buyer               = accounts.head // first one
+    val buyer               = accounts.head      // first one
     val seller              = accounts.tail.head // second one
     val matcher             = accounts.last
     val ts                  = time.correctedTime()

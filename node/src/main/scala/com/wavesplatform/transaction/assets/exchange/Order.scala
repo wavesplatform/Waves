@@ -153,7 +153,7 @@ object Order {
       price      <- TxOrderPrice(price)(GenericError(s"Order validation error: ${TxOrderPrice.errMsg}"))
       matcherFee <- TxMatcherFee(matcherFee)(GenericError(s"Order validation error: ${TxMatcherFee.errMsg}"))
     } yield {
-      Order(
+      val o = Order(
         version,
         OrderAuthentication(sender.publicKey),
         matcher,
@@ -168,7 +168,7 @@ object Order {
         priceMode = priceMode,
         attachment = attachment
       )
-        .signWith(sender.privateKey)
+      o.withProofs(Proofs(crypto.sign(sender.privateKey, o.bodyBytes())))
     }
 
   def buy(

@@ -3,14 +3,13 @@ package com.wavesplatform.it.sync.network
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{issueAmount, issueFee, minFee}
-import com.wavesplatform.it.{BaseFreeSpec, Node, WaitForHeight2}
+import com.wavesplatform.it.{BaseFreeSpec, Node}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 
-import scala.concurrent.Await
 import scala.concurrent.duration.*
 
-class NetworkSeparationTestSuite extends BaseFreeSpec, WaitForHeight2, ScorexLogging {
+class NetworkSeparationTestSuite extends BaseFreeSpec, ScorexLogging {
   import NetworkSeparationTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
@@ -49,7 +48,7 @@ class NetworkSeparationTestSuite extends BaseFreeSpec, WaitForHeight2, ScorexLog
     docker.disconnectFromNetwork(dockerNodes().head)
 
     val burnNoOwnerTxTd = nodeB.burn(nodeB.keyPair, issuedAssetId, issueAmount / 2, minFee).id
-    Await.ready(waitForTxsToReachAllNodes(Seq(nodeB), Seq(burnNoOwnerTxTd)), 2.minute)
+    nodeB.waitForTransaction(burnNoOwnerTxTd, 2.minute)
     val heightAfter = nodeB.height
 
     Thread.sleep(60.seconds.toMillis)
