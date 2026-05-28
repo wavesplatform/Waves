@@ -242,16 +242,16 @@ buildRIDERunnerForDocker := {
   )
 }
 
-lazy val compilePRRaw = taskKey[Unit]("Compile the project")
+lazy val compilePRRaw =
+  taskKey[Unit]("Incremental compilation (Compile + Test) without cleanup. Useful for fixing warnings/errors in a fast feedback loop.")
 compilePRRaw := Def
   .sequential(
-    clean.all(ScopeFilter(inAnyProject)),
     scalafmtCheck.all(ScopeFilter(inAnyProject, inConfigurations(Compile))),
     compile.all(ScopeFilter(inAnyProject, inConfigurations(Test)))
   )
   .value
 
-lazy val checkPRRaw = taskKey[Unit]("Compile the project and run unit tests")
+lazy val checkPRRaw = taskKey[Unit]("Incremental compilation without cleanup and running unit tests. Useful for quick test-fix iterations.")
 checkPRRaw := Def
   .sequential(
     compilePRRaw,
@@ -266,20 +266,28 @@ checkPRRaw := Def
   )
   .value
 
-def commandWithFatalWarnings(commandName: String, task: TaskKey[Unit]): Command =
-  Command.command(commandName) { state =>
+def commandWithCleanupAndFatalWarnings(commandName: String, task: TaskKey[Unit], help: Help): Command =
+  Command.command(commandName, help) { state =>
     val extracted = Project.extract(state)
     val newState = extracted.appendWithoutSession(
       Seq(Global / scalacOptions ++= Seq("-Werror")),
       state
     )
 
-    Project.extract(newState).runTask(task, newState)
+    Command.process("clean", newState, onParseError = _ => ()).unsafeRunTask(task)
     state
   }
 
-def compilePR: Command = commandWithFatalWarnings("compilePR", compilePRRaw)
-def checkPR: Command   = commandWithFatalWarnings("checkPR", checkPRRaw)
+def compilePR: Command = commandWithCleanupAndFatalWarnings(
+  "compilePR",
+  compilePRRaw,
+  Help.briefOnly(Seq("compilePR" -> "Compile with scalafmt."))
+)
+def checkPR: Command = commandWithCleanupAndFatalWarnings(
+  "checkPR",
+  checkPRRaw,
+  Help.briefOnly(Seq("checkPR" -> "Compile with scalafmt, build JavaScript artifacts, run unit tests."))
+)
 
 commands += Command.command("buildDebPackages") { state =>
   "set node / Debian / packageArchitecture := \"arm64\"" ::

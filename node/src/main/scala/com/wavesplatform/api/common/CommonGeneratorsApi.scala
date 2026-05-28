@@ -93,17 +93,22 @@ object CommonGeneratorsApi {
         addresses
           .lazyZip(txIds)
           .lazyZip(Iterator.from(0).take(addresses.size).map(GeneratorIndex(_)).to(Iterable))
-          .collect { case (Some(address), txnId, idx) => // TODO: address=None ?
-            val b = balances.get(idx) match {
-              case None if at.toInt <= blockchain.height => Some(0L)
-              case r                                     => r
-            }
+          .flatMap {
+            case (Some(address), txnId, idx) =>
+              val b = balances.get(idx) match {
+                case None if at.toInt <= blockchain.height => Some(0L)
+                case r                                     => r
+              }
 
-            GeneratorEntry(address, b, txnId, conflict.heightOf(idx))
+              Some(GeneratorEntry(address, b, txnId, conflict.heightOf(idx)))
+
+            case (None, txnId, idx) =>
+              log.warn(s"Can't find address, txnId=$txnId, idx=$idx. Contact with developers")
+              None
           }
           .toSeq
       } else {
-        log.warn(s"Different size: addresses=${addresses.size}, balances=${balances.size}, blsPks=${blsPks.size}")
+        log.warn(s"Different size: addresses=${addresses.size}, balances=${balances.size}, blsPks=${blsPks.size}. Contact with developers")
         Seq.empty
       }
     }

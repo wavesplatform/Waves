@@ -39,25 +39,35 @@ object BlockAppender extends ScorexLogging {
       verify: Boolean = true,
       txSignParCheck: Boolean = true
   )(newBlock: Block, snapshot: Option[BlockSnapshotResponse]): Task[Either[ValidationError, BlockApplyResult]] =
-    Task {
-      if (blockchainUpdater.isLastBlockId(newBlock.id())) Right(Ignored) // Cheap to test
-      else if (
-        blockchainUpdater.isLastBlockId(newBlock.header.reference) ||
-        blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
-      ) {
-        if (newBlock.header.challengedHeader.isDefined) {
-          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
-        } else {
-          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot).tap {
-            case Right(Applied(generatorSet = gs)) => blockEndorser.vote(gs)
-            case _                                 =>
-          }
+    Task(applySync(blockchainUpdater, time, utxStorage, pos, blockEndorser, verify, txSignParCheck)(newBlock, snapshot))
+      .executeOn(scheduler)
+
+  private[appender] def applySync(
+      blockchainUpdater: BlockchainUpdater & Blockchain,
+      time: Time,
+      utxStorage: UtxPool,
+      pos: PoSSelector,
+      blockEndorser: BlockEndorser,
+      verify: Boolean = true,
+      txSignParCheck: Boolean = true
+  )(newBlock: Block, snapshot: Option[BlockSnapshotResponse]): Either[ValidationError, BlockApplyResult] =
+    if (blockchainUpdater.isLastBlockId(newBlock.id())) Right(Ignored) // Cheap to test
+    else if (
+      blockchainUpdater.isLastBlockId(newBlock.header.reference) ||
+      blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
+    ) {
+      if (newBlock.header.challengedHeader.isDefined) {
+        appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
+      } else {
+        appendKeyBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot).tap {
+          case Right(Applied(generatorSet = gs)) => blockEndorser.vote(gs)
+          case _                                 =>
         }
-      } else if (blockchainUpdater.contains(newBlock.id()))
-        Right(Ignored)
-      else
-        Left(BlockAppendError("Block is not a child of the last block or its parent", newBlock))
-    }.executeOn(scheduler)
+      }
+    } else if (blockchainUpdater.contains(newBlock.id()))
+      Right(Ignored)
+    else
+      Left(BlockAppendError("Block is not a child of the last block or its parent", newBlock))
 
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,

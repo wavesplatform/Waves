@@ -432,13 +432,14 @@ case class Domain(
 
     for {
       resultTimestamp <-
-        if (blockchain.height > 0) {
+        if (blockchain.height <= 0) Right(testTime.getTimestamp() - (1 hour).toMillis)
+        else
           timestamp
             .map(Right(_))
             .getOrElse(
               posSelector
                 .getValidBlockDelay(
-                  blockchain.height,
+                  parentHeight,
                   generator,
                   parent.baseTarget,
                   // HACK: 1e11 some generators in tests have less than minimum
@@ -446,8 +447,6 @@ case class Domain(
                 )
                 .map(_ + parent.timestamp)
             )
-        } else
-          Right(testTime.getTimestamp() - (1 hour).toMillis)
       consensus <-
         if (blockchain.height > 0)
           posSelector
@@ -462,9 +461,8 @@ case class Domain(
             )
         else Right(NxtLikeConsensusBlockData(60, generationSignature))
       resultBt =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight)) {
-          consensus.baseTarget
-        } else if (parentHeight % 2 != 0) parent.baseTarget
+        if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight)) consensus.baseTarget
+        else if (parentHeight % 2 != 0) parent.baseTarget
         else consensus.baseTarget.max(PoSCalculator.MinBaseTarget)
       blockWithoutStateHash <- Block
         .buildAndSign(

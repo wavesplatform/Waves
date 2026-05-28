@@ -103,7 +103,7 @@ class LazyBlockchain[TagT] private (
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = ???
 
-  override def lastStateHash(refId: Option[BlockId]): BlockId = ???
+  override def lastStateHash(liquidBlockId: Option[BlockId]): BlockId = ???
 
   // Ride: blockInfoByHeight
   override def blockReward(height: Int): Option[Long] = blockHeaderWithVrf(Height(height)).map(_.blockReward)

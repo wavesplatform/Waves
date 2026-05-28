@@ -95,7 +95,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = None
 
-  override def lastStateHash(refId: Option[ByteStr]): ByteStr = TxStateSnapshotHashBuilder.InitStateHash
+  override def lastStateHash(liquidBlockId: Option[ByteStr]): ByteStr = TxStateSnapshotHashBuilder.InitStateHash
 
   override def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)] = IndexedSeq.empty
 

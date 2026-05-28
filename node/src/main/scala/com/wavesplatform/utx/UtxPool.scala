@@ -16,7 +16,7 @@ trait UtxForAppender {
 
 trait UtxPool extends UtxForAppender with AutoCloseable {
   def putIfNew(tx: Transaction, forceValidate: Boolean = false): TracedResult[ValidationError, Boolean]
-  def removeAll(txs: Iterable[Transaction]): Unit
+  def removeIds(txIds: Iterable[ByteStr]): Unit
   def all: Seq[Transaction]
   def size: Int
   def transactionById(transactionId: ByteStr): Option[Transaction]
@@ -39,5 +39,12 @@ object UtxPool {
     case class Limit(time: FiniteDuration)    extends PackStrategy
     case class Estimate(time: FiniteDuration) extends PackStrategy
     case object Unlimited                     extends PackStrategy
+  }
+
+  extension (self: UtxPool) {
+    def removeAll(txs: Iterable[Transaction]): Unit = if (txs.nonEmpty) {
+      val ids = txs.map(_.id()).toSet
+      self.removeIds(ids)
+    }
   }
 }

@@ -204,7 +204,7 @@ class MinerImpl(
         }
       } yield balance
 
-      def retryReasons(balance: Long) = for {
+      def retryReasons(balance: Long): Either[String, ForgeAttemptResult] = for {
         _ <- checkQuorumAvailable()
         validBlockDelay <- pos
           .getValidBlockDelay(height, account, refBaseTarget, balance)
@@ -317,18 +317,20 @@ class MinerImpl(
           f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds (${LocalTime.now().plusNanos(offset.toNanos)})$waitBlockIdStr"
         )
 
+        // We need to wait, because the mining scheduled for SnapshotBlockchain state in BlockchainUpdater
+        // If we need to forge a block immediately, we can't do this, because the parent block is not in the state yet
         val waitBlockAppendedTask = waitBlockId match {
           case Some(blockId) =>
             def waitUntilBlockAppended(block: BlockId): Task[Unit] =
-              if (blockchainUpdater.contains(block)) Task.unit
-              else Task.defer(waitUntilBlockAppended(block)).delayExecution(1 seconds)
+              if (blockchainUpdater.lastBlockId.contains(block)) Task.unit
+              else Task.defer(waitUntilBlockAppended(block)).delayExecution(1.second)
 
             waitUntilBlockAppended(blockId)
 
           case None => Task.unit
         }
 
-        def appendTask(block: Block, totalConstraint: MiningConstraint) = // TODO: accept blockAppender instead all these dependencies?
+        def appendTask(block: Block, totalConstraint: MiningConstraint) =
           BlockAppender(blockchainUpdater, timeService, utx, pos, blockEndorser, appenderScheduler)(block, None).flatMap {
             case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
               generateBlockTask(account, None)

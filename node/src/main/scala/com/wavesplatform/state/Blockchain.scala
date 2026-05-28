@@ -92,14 +92,15 @@ trait Blockchain {
 
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
-  // TODO: named?
   def committedGenerators(at: GenerationPeriod): IndexedSeq[(Address, BlsPublicKey)]
 
   def conflictGenerators(at: GenerationPeriod): ConflictGenerators
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
-  def lastStateHash(refId: Option[ByteStr]): ByteStr
+  /** @note Works only for key block or one of liquid blocks
+    */
+  def lastStateHash(liquidBlockId: Option[ByteStr]): ByteStr
 }
 
 object Blockchain {
@@ -174,9 +175,6 @@ object Blockchain {
       generationDeposit = blockchain.generationDeposit(address)
     )
 
-    // TODO: lock?
-    // TODO: not efficient? See RocksDBWriter.balanceSnapshots
-    // TODO: optimize
     def generationDeposit(address: Address, at: Height = Height(blockchain.height)): Long = blockchain.generationPeriodOf(at).fold(0L) { period =>
       val committed = blockchain.committedGenerators(period)
       val conflict  = blockchain.conflictGenerators(period)

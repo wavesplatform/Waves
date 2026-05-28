@@ -496,15 +496,16 @@ object BlockDiffer {
 
   private def computeTxFeeInfo(blockchain: Blockchain, tx: Transaction, hasNg: Boolean): TxFeeInfo = {
     val hasSponsorship        = Height(blockchain.height) >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
-    val (feeAsset, feeAmount) = maybeApplySponsorship(blockchain, hasSponsorship, tx.assetFee)
+    val (feeAsset, feeAmount) = maybeApplySponsorship(blockchain, hasSponsorship, tx.assetFee) // In WAVES if hasSponsorship
     val currentBlockFee       = CurrentBlockFeePart(feeAmount)
 
-    // carry is 60% of waves fees the next miner will get. obviously carry fee only makes sense when both
-    // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
-    val carry    = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
+    // Carry is 60% of waves fees the next miner will get.
+    // Carry fee (in WAVES) only makes sense when both NG and sponsorship (fee paid in WAVES instead of asset) is active.
+    // Also, if sponsorship is active, feeAsset can only be Waves
+    val carryFee = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
     val wavesFee = if (feeAsset == Waves) feeAmount else 0L
 
-    TxFeeInfo(feeAsset, feeAmount, carry, wavesFee)
+    TxFeeInfo(feeAsset, feeAmount, carryFee, wavesFee)
   }
 
   private def leasePatchesSnapshot(blockchain: Blockchain): StateSnapshot =

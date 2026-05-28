@@ -7,12 +7,11 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.TestSchedulerOps
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.wallet.Wallet
 import org.scalatest.time.SpanSugar.convertLongToGrainOfTime
 
-class ChallengingAfterFinalizationSuite extends BaseFinalizationSpec, TestSchedulerOps {
+class ChallengingAfterFinalizationSuite extends BaseFinalizationSpec {
   private val thisNodeAcc        = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 0)
   private val committedGenerator = TxHelpers.defaultSigner
 
