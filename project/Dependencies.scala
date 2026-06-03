@@ -4,7 +4,7 @@ import sbt.{Def, *}
 import scalapb.compiler.Version.scalapbVersion
 
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.14.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.15.Final"
 
   val gProtoVersion = "4.35.0"
   val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
@@ -40,7 +40,7 @@ object Dependencies {
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.8.1"
 
-  private def jacksonModule(group: String, module: String, version: String = "2.20.1") = s"com.fasterxml.jackson.$group" % s"jackson-$module" % version
+  private def jacksonModule(group: String, module: String, version: String = "2.21.1") = s"com.fasterxml.jackson.$group" % s"jackson-$module" % version
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.13.0" // 4.14+ requires Java 21 https://github.com/LFDT-web3j/web3j/releases/tag/v4.14.0
 
@@ -52,7 +52,7 @@ object Dependencies {
   val googleGuava     = "com.google.guava"    % "guava"             % "33.6.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.32"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.34"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.10"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
@@ -108,7 +108,7 @@ object Dependencies {
     logback,
     "com.github.jnr" % "jnr-unixsocket" % "0.38.25", // To support Apple ARM
     "com.spotify"    % "docker-client"  % "8.16.0",
-    jacksonModule("dataformat", "dataformat-properties", "2.21.3"),
+    jacksonModule("dataformat", "dataformat-properties", "2.22.0"),
     asyncHttpClient
   ).map(_ % Test)
 

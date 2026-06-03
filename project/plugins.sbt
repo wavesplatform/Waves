@@ -6,7 +6,7 @@ resolvers ++= Seq(
 // Should go before Scala.js
 addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.8")
 
-libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "1.0.0-alpha.4"
+libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "1.0.0-alpha.5"
 
 Seq(
   "com.eed3si9n"       % "sbt-assembly"             % "2.3.1",

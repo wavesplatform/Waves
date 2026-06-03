@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network.RxExtensionLoader.ApplierState.Buffer
-import com.wavesplatform.network.RxExtensionLoader.LoaderState.WithPeer
+import com.wavesplatform.network.RxExtensionLoader.LoaderState.{Idle, WithPeer}
 import com.wavesplatform.network.RxScoreObserver.{ChannelClosedAndSyncWith, SyncWith}
 import com.wavesplatform.state.ParSignatureChecker
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -299,7 +299,7 @@ object RxExtensionLoader extends ScorexLogging {
           maybeBuffer match {
             case None =>
               applicationResult match {
-                case Right(Some(newLocalScore)) if newLocalScore != applying.remoteScore =>
+                case Right(Some(newLocalScore)) if newLocalScore != applying.remoteScore && state.loaderState == Idle =>
                   val reason = s"New local score $newLocalScore does not match declared remote score ${applying.remoteScore}"
                   log.warn(reason)
                   if (blacklistOnScoreMismatch) {
