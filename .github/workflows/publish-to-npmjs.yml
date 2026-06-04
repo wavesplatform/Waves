@@ -37,11 +37,16 @@ jobs:
           java-version: '17'
           cache: 'sbt'
       - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
-      - run: sbt -Dproject.version=${{ steps.ghd.outputs.describe }} --batch ';lang-tests/test;lang-tests-js/test;repl/test;langJS/fullOptJS;replJS/fullOptJS'
+      - run: sbt -Dproject.version=${{ steps.ghd.outputs.describe }} --batch ';lang-tests/test;repl/test;langJS/fullOptJS;replJS/fullOptJS'
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           registry-url: 'https://registry.npmjs.org'
           node-version: '>=24.7.0' # Trusted publishing requires npm CLI version 11.5.1 or later.
+      - name: Test @waves/ride-lang against the built artifact
+        run: |
+          cd lang/js
+          npm ci
+          npm test
       - if: github.event_name == 'workflow_dispatch'
         run:
           echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV

@@ -7,6 +7,15 @@
   "browser": "dist/lang.js",
   "files": ["dist/"],
   "license": "MIT",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/wavesplatform/Waves"
