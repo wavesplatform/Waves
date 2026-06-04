@@ -104,6 +104,22 @@ lazy val `node-tests` = project
 lazy val `grpc-server` =
   project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test")
 
+lazy val `waves-ext` = project
+  .in(file("waves-ext"))
+  .dependsOn(node % "compile;runtime->provided", `grpc-server` % "compile->compile", `node-testkit` % "test")
+  .settings(
+    libraryDependencies ++= Dependencies.grpc ++ Seq(
+      "com.iheart" %% "ficus" % "1.5.2"
+    ),
+    inConfig(Compile)(
+      Seq(
+        PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
+        PB.protoSources += baseDirectory.value / "src" / "main" / "protobuf",
+        PB.deleteTargetDirectory := false
+      )
+    )
+  )
+
 lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-testkit`)
 lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `node-testkit`)
 
@@ -164,6 +180,7 @@ lazy val `waves-node` = (project in file("."))
     `node-tests`,
     `node-generator`,
     `grpc-server`,
+    `waves-ext`,
     benchmark,
     `ride-runner`
   )
