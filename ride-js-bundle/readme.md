@@ -33,13 +33,22 @@ The same `RideJS` global is exposed by the browser bundle (`dist/ride.min.js`).
   task is configured to emit it **directly** here (see `repl/js/build.sbt`), so there is no copy
   step.
 - `dist/` — build output: `index.js` (node `main`), `interop.js`, `ride.min.js` (browser).
+- `pnpm-workspace.yaml` — pnpm settings: the `allowBuilds` install-script policy + dependency
+  `overrides`.
 
 ## Build & test
+
+This package uses **pnpm** (pinned via the `packageManager` field). pnpm does not run dependency
+install scripts: the policy lives in `pnpm-workspace.yaml` under `allowBuilds`, where every
+dependency that ships an install script must be explicitly allowed or denied. Ours are denied
+(`esbuild: false`), so no third-party code executes on install; a *new* dependency with a build
+script fails the install until a deliberate decision is recorded.
 
 ```
 sbt replJS/fullOptJS        # from the Waves repo root: emits ride-js-bundle/scalajs/ride-scalajs.js
 cd ride-js-bundle
-npm ci
-npm run build               # build:ts -> build:browser (consumes the emitted artifact)
-npm test                    # Vitest suite (compiles RIDE through the public API)
+corepack enable             # makes the pinned pnpm available
+pnpm install --frozen-lockfile
+pnpm run build              # build:ts -> build:browser (consumes the emitted artifact)
+pnpm test                   # Vitest suite (compiles RIDE through the public API)
 ```

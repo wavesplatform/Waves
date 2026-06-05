@@ -44,12 +44,15 @@ jobs:
         with:
           registry-url: 'https://registry.npmjs.org'
           node-version: '>=24.7.0' # Trusted publishing requires npm CLI version 11.5.1 or later.
+      - run: corepack enable
       - name: Build & test @waves/ride-js
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
         run: |
           cd ride-js-bundle
-          npm ci
-          npm run build
-          npm test
+          pnpm install --frozen-lockfile
+          pnpm run build
+          pnpm test
       - if: github.event_name == 'workflow_dispatch'
         run:
           echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV

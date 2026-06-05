@@ -115,11 +115,14 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: '>=24.7.0'
+      - run: corepack enable
       - name: Build & test @waves/ride-js
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
         run: |
           cd ride-js-bundle
-          npm ci
-          npm test
+          pnpm install --frozen-lockfile
+          pnpm test
 
   run-integration-tests:
     name: Run integration tests

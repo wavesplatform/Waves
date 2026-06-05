@@ -2,6 +2,7 @@
   "name": "@waves/ride-js",
   "version": "2.3.0",
   "description": "Js compiler for Ride - Waves smart contract language.",
+  "packageManager": "pnpm@11.5.2",
   "main": "dist/index.js",
   "typings": "src/index.d.ts",
   "types": "src/index.d.ts",
@@ -45,12 +46,8 @@
     "node-polyfill-webpack-plugin": "^4.1.0"
   },
   "dependencies": {
-    "@waves/ts-lib-crypto": "^1.5.1",
+    "@waves/ts-lib-crypto": "^1.5.2",
     "axios": "^1.13.6",
     "buffer": "^6.0.3"
-  },
-  "overrides": {
-    "serialize-javascript": "^7.0.3",
-    "glob": "^13.0.6"
   }
 }
