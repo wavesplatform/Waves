@@ -97,8 +97,8 @@ jobs:
           name: waves-all
       - run: find -name "*.ride" -type f -exec java -cp '*' com.wavesplatform.lang.FileCompiler {} +;
 
-  ride-lang-js-tests:
-    name: RIDE lang JS tests
+  ride-js-tests:
+    name: RIDE JS bundle tests
     runs-on: ubuntu-latest
     needs: check-pr
     if: needs.check-pr.outputs.lang-changed == 'true'
@@ -110,14 +110,14 @@ jobs:
           java-version: '17'
           cache: 'sbt'
       - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
-      - name: Build dist/lang.js
-        run: sbt --batch langJS/fullOptJS
+      - name: Build combined ScalaJS artifact into ride-js-bundle/scalajs
+        run: sbt --batch replJS/fullOptJS
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: '>=24.7.0'
-      - name: Run Vitest suite
+      - name: Build & test @waves/ride-js
         run: |
-          cd lang/js
+          cd ride-js-bundle
           npm ci
           npm test
 

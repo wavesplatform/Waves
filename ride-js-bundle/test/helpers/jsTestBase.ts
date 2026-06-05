@@ -56,11 +56,12 @@ export function assertCompileSuccessExpression(code: string, version: number, es
 }
 
 export function expressionComplexity(code: string, version = V6, estimator = 3): number {
-  return compile(expression(code, version), estimator).complexity as number;
+  // The wrapped public `compile` nests a successful result under `.result`.
+  return compile(expression(code, version), estimator).result.complexity as number;
 }
 
 export function dAppComplexities(code: string, version = V6, estimator = 3): DAppComplexitiesResult {
-  const result = compile(dApp(code, version), estimator);
+  const { result } = compile(dApp(code, version), estimator);
   return {
     complexity: result.complexity as number,
     verifierComplexity: result.verifierComplexity as number,
