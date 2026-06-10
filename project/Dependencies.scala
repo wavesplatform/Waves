@@ -126,7 +126,7 @@ object Dependencies {
   )
 
   // Check https://github.com/facebook/rocksdb/issues/13893 before bumping
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "10.2.1"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "10.10.1.1"
 
   val scalaLogging: ModuleID = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6"
   lazy val node = Def.setting(
