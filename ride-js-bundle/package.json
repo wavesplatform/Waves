@@ -1,0 +1,53 @@
+{
+  "name": "@waves/ride-js",
+  "version": "2.3.0",
+  "description": "Js compiler for Ride - Waves smart contract language.",
+  "packageManager": "pnpm@11.5.2",
+  "main": "dist/index.js",
+  "typings": "src/index.d.ts",
+  "types": "src/index.d.ts",
+  "scripts": {
+    "build:ts": "tsc",
+    "build:browser": "webpack --config webpack.config.js",
+    "build": "npm run build:ts && npm run build:browser",
+    "pretest": "npm run build:ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "/dist",
+    "/scalajs/ride-scalajs.js",
+    "/src/index.d.ts"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wavesplatform/Waves.git"
+  },
+  "keywords": [
+    "compiler",
+    "waves",
+    "ride",
+    "smart",
+    "contracts"
+  ],
+  "author": "Waves Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/wavesplatform/Waves/issues"
+  },
+  "homepage": "https://github.com/wavesplatform/Waves#readme",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.0",
+    "webpack": "^5.105.4",
+    "webpack-cli": "^6.0.1",
+    "node-polyfill-webpack-plugin": "^4.1.0"
+  },
+  "dependencies": {
+    "@waves/ts-lib-crypto": "^1.5.2",
+    "axios": "^1.13.6",
+    "buffer": "^6.0.3"
+  }
+}

@@ -37,11 +37,22 @@ jobs:
           java-version: '17'
           cache: 'sbt'
       - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
-      - run: sbt -Dproject.version=${{ steps.ghd.outputs.describe }} --batch ';lang-tests/test;lang-tests-js/test;repl/test;langJS/fullOptJS;replJS/fullOptJS'
+      # Emits the single combined ScalaJS artifact directly into ride-js-bundle/scalajs
+      # (see repl/js/build.sbt). lang-js is compiled transitively as a dependency of repl-js.
+      - run: sbt -Dproject.version=${{ steps.ghd.outputs.describe }} --batch ';lang-tests/test;repl/test;replJS/fullOptJS'
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           registry-url: 'https://registry.npmjs.org'
           node-version: '>=24.7.0' # Trusted publishing requires npm CLI version 11.5.1 or later.
+      - run: corepack enable
+      - name: Build & test @waves/ride-js
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+        run: |
+          cd ride-js-bundle
+          pnpm install --frozen-lockfile
+          pnpm run build
+          pnpm test
       - if: github.event_name == 'workflow_dispatch'
         run:
           echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
@@ -52,10 +63,7 @@ jobs:
           echo "TAG=latest" >> $GITHUB_ENV
       - id: publish
         run: |
-          cd lang/js
-          npm version $VERSION --no-git-tag-version
+          cd ride-js-bundle
+          npm version $VERSION --no-git-tag-version --allow-same-version
           npm publish --provenance --access public --tag $TAG
-          cd ../../repl/js
-          npm version $VERSION --no-git-tag-version
-          npm publish --provenance --access public --tag $TAG
-          echo "url=https://www.npmjs.com/package/@waves/ride-lang/v/$VERSION" >> "$GITHUB_OUTPUT"
+          echo "url=https://www.npmjs.com/package/@waves/ride-js/v/$VERSION" >> "$GITHUB_OUTPUT"

@@ -79,15 +79,6 @@ lazy val `lang-tests` = project
   .in(file("lang/tests"))
   .dependsOn(`lang-testkit`)
 
-lazy val `lang-tests-js` = project
-  .in(file("lang/tests-js"))
-  .enablePlugins(ScalaJSPlugin)
-  .dependsOn(`lang-js`)
-  .settings(
-    libraryDependencies += Dependencies.scalaJsTest.value,
-    testFrameworks += new TestFramework("utest.runner.Framework")
-  )
-
 lazy val node = project.dependsOn(`lang-jvm`)
 
 lazy val `node-testkit` = project
@@ -154,7 +145,6 @@ lazy val `waves-node` = (project in file("."))
     `lang-js`,
     `lang-jvm`,
     `lang-tests`,
-    `lang-tests-js`,
     `lang-testkit`,
     `repl-js`,
     `repl-jvm`,
@@ -257,7 +247,7 @@ checkPRRaw := Def
     compilePRRaw,
     Def.sequential(
       test.all(
-        ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `lang-tests-js`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
+        ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
       ),
       fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
       assembly.all(ScopeFilter(inProjects(node))),
