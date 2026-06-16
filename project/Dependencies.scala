@@ -6,7 +6,7 @@ import scalapb.compiler.Version.scalapbVersion
 object Dependencies {
   private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.15.Final"
 
-  val gProtoVersion = "4.35.0"
+  val gProtoVersion = "4.35.1"
   val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
   val overrides = Def.setting(
     Seq(
@@ -46,14 +46,14 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.81.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.82.0"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.6.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.34"
-  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.10"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.11"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
 
@@ -87,7 +87,7 @@ object Dependencies {
       monixModule("eval").value,
       "org.typelevel" %%% s"cats-core" % "2.13.0",
       "com.lihaoyi"   %%% "fastparse"  % "3.1.1",
-      "org.typelevel" %%% "cats-mtl"   % "1.6.0",
+      "org.typelevel" %%% "cats-mtl"   % "1.7.0",
       "ch.obermuhlner"  % "big-math"   % "2.3.2",
       googleGuava, // BaseEncoding.base16()
       curve25519,
@@ -116,8 +116,7 @@ object Dependencies {
     logback,
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
     "org.scalacheck"    %% "scalacheck"      % "1.19.0",
-    "org.mockito"        % "mockito-all"     % "1.10.19",
-    "org.scalamock"     %% "scalamock"       % "6.2.0"
+    "org.scalamock"     %% "scalamock"       % "7.5.5"
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
@@ -126,14 +125,14 @@ object Dependencies {
   )
 
   // Check https://github.com/facebook/rocksdb/issues/13893 before bumping
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "10.2.1"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "10.10.1.1"
 
   val scalaLogging: ModuleID = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6"
   lazy val node = Def.setting(
     Seq(
       rocksdb,
       "commons-net"            % "commons-net"               % "3.13.0",
-      "commons-io"             % "commons-io"                % "2.21.0",
+      "commons-io"             % "commons-io"                % "2.22.0",
       "com.github.pureconfig" %% "pureconfig-core"           % "0.17.10",
       "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.10",
       "net.logstash.logback"   % "logstash-logback-encoder"  % "9.0" % Runtime,
@@ -187,7 +186,7 @@ object Dependencies {
   lazy val rideRunner = Def.setting(
     Seq(
       rocksdb,
-      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.2.3",
+      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.2.4",
       "net.logstash.logback"          % "logstash-logback-encoder" % "9.0" % Runtime,
       kamonModule("caffeine"),
       kamonModule("prometheus"),
