@@ -11,7 +11,7 @@ object Dependencies {
   val overrides = Def.setting(
     Seq(
       "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
-      "com.google.code.gson"      % "gson"           % "2.13.2",
+      "com.google.code.gson"      % "gson"           % "2.14.0",
       "com.squareup.okio"         % "okio-jvm"       % "3.17.0",
       "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
       "org.slf4j"                 % "slf4j-api"      % "2.0.17",
