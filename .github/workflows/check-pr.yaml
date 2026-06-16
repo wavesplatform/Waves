@@ -6,6 +6,9 @@ concurrency:
   group: check-pr-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  checks: write
+
 jobs:
   check-pr:
     name: Check PR
