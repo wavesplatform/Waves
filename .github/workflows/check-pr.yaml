@@ -43,12 +43,12 @@ jobs:
               - 'lang/**'
               - 'build.sbt'
               - 'project/*'
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: waves-all
           path: node/target/waves-all-*.jar
       - name: Save debug data
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           if-no-files-found: ignore
@@ -123,7 +123,7 @@ jobs:
           create_check: false
           check_name: 'Run integration tests'
       - name: Upload Logs
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           if-no-files-found: ignore
