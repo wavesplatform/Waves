@@ -455,6 +455,10 @@ object BlockDiffer {
             }
           }
 
+          if (sys.props.get("tx.trace").contains(tx.id().toString)) {
+            throw new Exception(s"Terminating after tx ${tx.id()}, validation result: ${res.resultE}")
+          }
+
           res.copy(resultE = res.resultE.recover {
             case _ if hasChallenge =>
               result.copy(

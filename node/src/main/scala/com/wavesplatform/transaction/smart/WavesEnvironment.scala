@@ -481,9 +481,10 @@ class DAppEnvironment(
           wrapDAppEnv
         )(invoke)
       _ <-
-        if (blockchain.isFeatureActivated(LightNode))
+        if (blockchain.isFeatureActivated(LightNode)) {
+          println(s"\n\tRESULT after calling $func on $address: ${snapshotToString(snapshot)}")
           validateIntermediateBalances(blockchain, snapshot, totalComplexityLimit - availableComplexity, Nil)
-        else
+        } else
           traced(Right(()))
       fixedSnapshot = snapshot
         .setScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = snapshot.scriptResults(txId))))))
@@ -507,5 +508,12 @@ class DAppEnvironment(
         case Right((evaluated, complexity, diffLog)) => (Right((evaluated, diffLog)), complexity)
       }
     }
+  }
+
+  private def snapshotToString(snapshot: StateSnapshot): String = {
+    Seq(
+      snapshot.balances.view.map { case ((address, asset), balance) => s"[\"$address\",\"$asset\",$balance]" }.mkString("\"balances\":[", ",", "]"),
+      snapshot.leaseBalances.view.map{case (address, lb) => s"\"$address\":[${lb.in},${lb.out}]"}.mkString("\"leaseBalances\":{", ",", "}")
+    ).mkString("{", ",", "}")
   }
 }
