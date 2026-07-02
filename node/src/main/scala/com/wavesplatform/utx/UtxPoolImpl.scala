@@ -547,7 +547,7 @@ case class UtxPoolImpl(
   private object TxCleanup {
     private val scheduled = AtomicBoolean(false)
 
-    def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
+    def runCleanupAsync(): Unit = if (!transactions.isEmpty && scheduled.compareAndSet(false, true)) {
       cleanupLoop()
     }
 

@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
 import com.google.common.primitives.{Ints, Longs, Shorts}
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.api.common.{AddressPortfolio, CommonAccountsApi}
 import com.wavesplatform.common.state.ByteStr
@@ -14,7 +14,7 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
-import com.wavesplatform.state.{Blockchain, Height, Portfolio, SnapshotBlockchain, StateSnapshot, TransactionId, StateHash}
+import com.wavesplatform.state.{Blockchain, Height, LeaseDetails, Portfolio, SnapshotBlockchain, StateHash, StateSnapshot, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.{ExecutionModel, Scheduler}
@@ -481,6 +481,40 @@ object Explorer extends ScorexLogging {
             prevHeight = heightFromKey
           }
           log.info(s"Checked $addressCount addresses")
+        case "ALC" =>
+          log.info("Counting active leases")
+          val allLeases     = mutable.HashMap.empty[ByteStr, Seq[LeaseDetails.Status]]
+          val allLessors    = mutable.HashSet.empty[PublicKey]
+          val allRecipients = mutable.HashSet.empty[Address]
+          rdb.db.iterateOver(KeyTag.LeaseDetails.prefixBytes, None) { e =>
+            val leaseId      = ByteStr(e.getKey.takeRight(32))
+            val leaseDetails = readLeaseDetails(e.getValue)
+            allLessors += leaseDetails.sender
+            allRecipients += leaseDetails.recipientAddress
+            leaseDetails.status match {
+              case LeaseDetails.Status.Active =>
+                allLeases.updateWith(leaseId) {
+                  case None => Some(Seq(LeaseDetails.Status.Active))
+                  case other =>
+                    log.info(s"ACTIVE for $leaseId, prev=$other")
+                    other
+                }
+              case inactive =>
+                allLeases.updateWith(leaseId) {
+                  case None =>
+                    Some(Seq(inactive))
+                  case Some(other) =>
+                    if (other != Seq(LeaseDetails.Status.Active)) {
+                      log.info(s"UPDATE: $other :+ $inactive")
+                    }
+                    Some(other :+ inactive)
+                }
+            }
+          }
+          log.info(
+            s"Found ${allLeases.size} leases from ${allLessors.size} unique lessors and ${allRecipients.size} unique recipients, of which ${allLeases
+                .count { case (_, details) => details.forall(_ == LeaseDetails.Status.Active) }} are active"
+          )
       }
     } finally {
       reader.close()

@@ -51,8 +51,8 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ inputs.ref }}
-      - uses: regclient/actions/regctl-installer@4d6888fcc4842c9630f60ebc91715a45dd9bd7a3
-      - uses: proudust/gh-describe@d2398810d922ababf1ec0efb454e42953dfdc460 # v2.1.2
+      - uses: regclient/actions/regctl-installer@4b4db1dcc7dad75ad67a788a380f75a20cc8a040 # v0.1.0
+      - uses: proudust/gh-describe@80412be8ce0e77d8afba6b340e34790bc772aa45 # v2.2.0
         id: ghd
         with:
           commit-ish: ${{ inputs.ref || github.sha}}
@@ -64,7 +64,7 @@ jobs:
           echo "base-image-digest=$(regctl manifest digest $BASE_IMAGE)" >> "$GITHUB_OUTPUT"
           echo "node-version=$(echo ${{ steps.ghd.outputs.describe }} | cut -c 2-)" >> "$GITHUB_OUTPUT"
         id: versions
-      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+      - uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -107,12 +107,12 @@ jobs:
             echo EOF
           } >> "$GITHUB_OUTPUT"
         id: annotations
-      - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+      - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+      - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         if: inputs.environment != ''
         with:
           username: ${{ secrets.DOCKERHUB_USER }}
@@ -174,7 +174,7 @@ jobs:
             echo ${{ inputs.docker-tags }} | tr ',' '\n' | sed -e 's/^/type=raw,value=/'
             echo EOF
           } >> "$GITHUB_ENV"
-      - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+      - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

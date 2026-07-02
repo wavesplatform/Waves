@@ -134,8 +134,16 @@ object ExtensionAppender extends ScorexLogging {
         Right(maybeNewScore)
       case Left(ve) =>
         val errorMessage = s"${id(ch)} Error appending extension ${formatBlocks(extensionBlocks.blocks)}: $ve"
-        log.warn(errorMessage)
-        peerDatabase.blacklistAndClose(ch, errorMessage)
+
+        ve match {
+          case _: TxValidationError.BlockFromFuture =>
+            // don't blacklist on block from future
+            log.debug(errorMessage)
+          case _ =>
+            log.warn(errorMessage)
+            peerDatabase.blacklistAndClose(ch, errorMessage)
+        }
+
         Left(ve)
     }
   }

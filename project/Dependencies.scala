@@ -26,6 +26,7 @@ object Dependencies {
       jacksonModule("core", "databind"),
       jacksonModule("datatype", "datatype-jdk8"),
       jacksonModule("datatype", "datatype-jsr310"),
+      "tools.jackson.core" % "jackson-databind" % "3.1.4",
       gProto
     )
   )
@@ -46,13 +47,13 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.82.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.82.1"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.6.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.34"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.37"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.11"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
@@ -106,7 +107,7 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
-    "com.github.jnr" % "jnr-unixsocket" % "0.38.25", // To support Apple ARM
+    "com.github.jnr" % "jnr-unixsocket" % "0.39.1", // To support Apple ARM
     "com.spotify"    % "docker-client"  % "8.16.0",
     jacksonModule("dataformat", "dataformat-properties", "2.22.0"),
     asyncHttpClient
@@ -150,7 +151,7 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       scalaLogging,
-      "eu.timepit"        %% "refined"  % "0.11.3" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "eu.timepit"        %% "refined"  % "0.11.4" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"     % "headlong" % "13.3.1",
       "com.github.jbellis" % "jamm"     % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
@@ -201,7 +202,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.14.15"
+    val circeVersion = "0.14.16"
     Seq(
       "io.circe" %%% "circe-core",
       "io.circe" %%% "circe-generic",
