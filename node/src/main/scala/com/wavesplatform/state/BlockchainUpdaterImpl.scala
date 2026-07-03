@@ -426,7 +426,7 @@ class BlockchainUpdaterImpl(
 
                 restTotalConstraint = updatedTotalConstraint
                 if (
-                  (block.header.timestamp > time.getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis)
+                  (block.header.timestamp > time.correctedTime() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis)
                   || (newHeight.toInt % 100 == 0)
                 ) {
                   currentFinalizedHeight.foreach { h =>

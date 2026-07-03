@@ -345,7 +345,7 @@ object Importer extends ScorexLogging {
     }
 
     val scheduler = Schedulers.singleThread("appender")
-    val time      = new NTP(settings.ntpServer)
+    val time      = Time(settings.ntpServer)
 
     val rdb = RDB.open(settings.dbSettings)
     val (blockchainUpdater, rdbWriter) =

@@ -86,8 +86,7 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
           minerAcc,
           otherNodeAcc2Addr,
           amount = d.blockchain.balance(minerAcc.toAddress) - CommitToGenerationTransaction.DepositInWavelets - 1.waves,
-          fee = 1.waves,
-          timestamp = time.getTimestamp()
+          fee = 1.waves
         )
       )
       utxEvents.onNext(())
@@ -171,8 +170,7 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
             minerAcc,
             otherNodeAcc2Addr,
             amount = d.blockchain.balance(minerAcc.toAddress) - CommitToGenerationTransaction.DepositInWavelets - 1.waves,
-            fee = 1.waves,
-            timestamp = time.getTimestamp()
+            fee = 1.waves
           )
         )
         utxEvents.onNext(())
@@ -194,8 +192,7 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
         d.utxPool.putIfNew(
           TxHelpers.transfer(
             otherNodeCommittedAcc1,
-            otherNodeAcc2Addr,
-            timestamp = time.getTimestamp()
+            otherNodeAcc2Addr
           )
         )
         utxEvents.onNext(())
@@ -271,8 +268,7 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
             minerAcc,
             otherNodeAcc2Addr,
             amount = d.blockchain.balance(minerAcc.toAddress) - CommitToGenerationTransaction.DepositInWavelets - 1.waves,
-            fee = 1.waves,
-            timestamp = time.getTimestamp()
+            fee = 1.waves
           )
         )
         utxEvents.onNext(())
@@ -296,8 +292,7 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
             otherNodeCommittedAcc1,
             otherNodeAcc2Addr,
             amount = d.blockchain.balance(otherNodeCommittedAcc1.toAddress) - CommitToGenerationTransaction.DepositInWavelets - 1.waves,
-            fee = 1.waves,
-            timestamp = time.getTimestamp()
+            fee = 1.waves
           )
         )
         utxEvents.onNext(())

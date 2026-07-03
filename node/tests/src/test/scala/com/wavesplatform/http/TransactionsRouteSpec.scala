@@ -986,8 +986,7 @@ class TransactionsRouteSpec
         dApp = sender.toAddress,
         invoker = sender,
         fee = 0.005.waves,
-        version = 2.toByte,
-        timestamp = ntpTime.getTimestamp()
+        version = 2.toByte
       )
 
       Post(routePath("/broadcast?trace=true"), invoke.json()) ~> route ~> check {

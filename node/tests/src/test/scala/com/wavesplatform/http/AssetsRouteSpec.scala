@@ -87,8 +87,7 @@ class AssetsRouteSpec
                                            |  ]
                                            |}
                                            |""".stripMargin),
-        0.01.waves,
-        timestamp = ntpTime.getTimestamp()
+        0.01.waves
       )
 
   private def issueTransaction(name: Option[String] = None, script: Option[Script] = None, quantity: Option[Long] = None): IssueTransaction =
@@ -303,8 +302,7 @@ class AssetsRouteSpec
         issuer,
         transfers,
         issueTransaction.asset,
-        0.01.waves,
-        timestamp = ntpTime.getTimestamp()
+        0.01.waves
       )
     )
 

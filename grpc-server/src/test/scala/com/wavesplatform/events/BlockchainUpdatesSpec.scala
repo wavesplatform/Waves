@@ -721,12 +721,12 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         2.waves,
         Asset.Waves,
         2.toByte,
-        ntpTime.getTimestamp()
+        ntpTime.correctedTime()
       )
       d.appendBlock(
-        GenesisTransaction.create(issuerAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
-        GenesisTransaction.create(invoker.toAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
-        SetScriptTransaction.create(2.toByte, issuer.publicKey, Some(dAppScript), 0.01.waves, ntpTime.getTimestamp(), Proofs.empty).map(_.signWith(issuer.privateKey)).explicitGet(),
+        GenesisTransaction.create(issuerAddress, 1000.waves, ntpTime.correctedTime()).explicitGet(),
+        GenesisTransaction.create(invoker.toAddress, 1000.waves, ntpTime.correctedTime()).explicitGet(),
+        SetScriptTransaction.create(2.toByte, issuer.publicKey, Some(dAppScript), 0.01.waves, ntpTime.correctedTime(), Proofs.empty).map(_.signWith(issuer.privateKey)).explicitGet(),
         invoke
       )
 

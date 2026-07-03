@@ -43,7 +43,7 @@ object Exporter extends ScorexLogging {
         val settings = Application.loadApplicationConfig(configFile)
 
         Using.resources(
-          new NTP(settings.ntpServer),
+          Time(settings.ntpServer),
           RDB.open(settings.dbSettings)
         ) { (time, rdb) =>
           val (blockchain, rdbWriter) = StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.noop)

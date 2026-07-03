@@ -344,7 +344,6 @@ class BlockV5Test extends FlatSpec with WithMiner with OptionValues with EitherV
       fee = 100000,
       feeAsset = Waves,
       attachment = ByteStr.empty,
-      timestamp = ntpTime.getTimestamp(),
       version = TxVersion.V1
     )
 

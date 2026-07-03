@@ -32,10 +32,7 @@ class UtilsRouteEvaluateSpec extends RouteSpec("/utils"), RestAPISettingsHelper,
   private val timer                         = new HashedWheelTimer()
   private val timeBounded: SchedulerService = Schedulers.timeBoundedFixedPool(timer, 5.seconds, 1, "rest-time-limited")
   private val utilsApi: UtilsApiRoute = UtilsApiRoute(
-    new Time {
-      def correctedTime(): Long = System.currentTimeMillis()
-      def getTimestamp(): Long  = System.currentTimeMillis()
-    },
+    Time.SystemTime,
     restAPISettings,
     Int.MaxValue,
     () => ScriptEstimatorV3.latest,

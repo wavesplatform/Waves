@@ -272,11 +272,11 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           ._1
 
         d.appendBlock(
-          TxHelpers.setScript(acc = dapp, script = script, fee = 500_0000L, version = 2.toByte, timestamp = ntpTime.getTimestamp())
+          TxHelpers.setScript(acc = dapp, script = script, fee = 500_0000L, version = 2.toByte)
         )
 
         val invoke =
-          TxHelpers.invoke(dApp = dapp.toAddress, invoker = sender, fee = 50_0000L, version = 3.toByte, timestamp = ntpTime.getTimestamp())
+          TxHelpers.invoke(dApp = dapp.toAddress, invoker = sender, fee = 50_0000L, version = 3.toByte)
 
         d.appendBlock(d.createBlock(Seq(invoke)))
       }

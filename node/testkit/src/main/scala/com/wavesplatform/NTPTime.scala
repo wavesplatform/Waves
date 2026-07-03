@@ -6,5 +6,5 @@ import org.scalatest.Suite
 trait NTPTime { suite: Suite =>
   protected val ntpTime: Time = SystemTime
 
-  protected def ntpNow: Long = ntpTime.getTimestamp()
+  protected def ntpNow: Long = ntpTime.correctedTime()
 }

@@ -28,7 +28,7 @@ case class TestTime(@volatile private var t: Long = System.currentTimeMillis(), 
 
   override def correctedTime(): Long = t
 
-  override def getTimestamp(): Long = {
+  def getTimestamp(): Long = {
     t += 1
     t
   }

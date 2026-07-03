@@ -1,30 +1,38 @@
 package com.wavesplatform.utils
 
-import java.net.{InetAddress, SocketTimeoutException}
-import monix.eval.Task
-import monix.execution.ExecutionModel
-import monix.execution.schedulers.SchedulerService
 import org.apache.commons.net.ntp.NTPUDPClient
 
+import java.net.{InetAddress, SocketTimeoutException}
 import java.time.Duration
-import scala.concurrent.duration.DurationInt
+import java.util.concurrent.*
 
-trait Time {
+trait Time extends AutoCloseable {
   def correctedTime(): Long
-  def getTimestamp(): Long
   def monotonicMillis(): Long = System.nanoTime() / 1_000_000
+  override def close(): Unit  = {}
 }
 
-class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable {
-  private val ExpirationTimeout = 60.seconds
-  private val RetryDelay        = 10.seconds
-  private val ResponseTimeout   = 10.seconds
+object Time {
+  object SystemTime extends Time {
+    override def correctedTime(): Long = System.currentTimeMillis()
+  }
 
-  private implicit val scheduler: SchedulerService =
-    Schedulers.singleThread(name = "time-impl", reporter = log.error("Error in NTP", _), ExecutionModel.AlwaysAsyncExecution)
+  def apply(ntpServer: String): Time = if (ntpServer.isBlank) SystemTime else new NTP(ntpServer)
+}
+
+class NTP(ntpServer: String) extends Time with ScorexLogging {
+  private val ExpirationTimeout = 60 // seconds
+  private val RetryDelay        = 10 // seconds
+  private val ResponseTimeout   = 10 // seconds
+
+  private val scheduler = {
+    val xc = new ScheduledThreadPoolExecutor(1, Schedulers.threadFactory("time-impl", true, log.error("Error in NTP", _)))
+    xc.setExecuteExistingDelayedTasksAfterShutdownPolicy(false)
+    xc
+  }
 
   private val client = new NTPUDPClient()
-  client.setDefaultTimeout(Duration.ofMillis(ResponseTimeout.toMillis))
+  client.setDefaultTimeout(Duration.ofSeconds(ResponseTimeout))
 
   @volatile private var ntpTimestamp = System.currentTimeMillis()
   @volatile private var nanoTime     = System.nanoTime()
@@ -35,52 +43,33 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
     timestamp + offset
   }
 
-  @volatile private var txTime: Long = 0
+  private def retry(delayInSeconds: Long) = scheduler.schedule((() => updateTimestamp()): Runnable, delayInSeconds, TimeUnit.SECONDS)
 
-  def getTimestamp(): Long = {
-    txTime = Math.max(correctedTime(), txTime + 1)
-    txTime
-  }
-
-  private val updateTask: Task[Unit] = {
-    def newOffsetTask: Task[Option[(InetAddress, Long, Long)]] = Task {
-      try {
-        client.open()
-        val beforeRequest   = System.nanoTime()
-        val info            = client.getTime(InetAddress.getByName(ntpServer))
-        val message         = info.getMessage
-        val ntpTime         = message.getTransmitTimeStamp.getTime
-        val serverSpentTime = message.getTransmitTimeStamp.getTime - message.getReceiveTimeStamp.getTime
-        val roundripTime    = (System.nanoTime() - beforeRequest) / 1_000_000 - serverSpentTime
-        val corrected       = ntpTime + roundripTime / 2
-        Some((info.getAddress, corrected, System.nanoTime()))
-      } catch {
-        case _: SocketTimeoutException =>
-          None
-        case t: Throwable =>
-          log.warn("Problems with NTP: ", t)
-          None
-      } finally {
-        client.close()
-      }
+  private def updateTimestamp(): Unit =
+    try {
+      client.open()
+      val beforeRequest   = System.nanoTime()
+      val info            = client.getTime(InetAddress.getByName(ntpServer))
+      val message         = info.getMessage
+      val ntpTime         = message.getTransmitTimeStamp.getTime
+      val serverSpentTime = message.getTransmitTimeStamp.getTime - message.getReceiveTimeStamp.getTime
+      val roundTripTime   = (System.nanoTime() - beforeRequest) / 1_000_000 - serverSpentTime
+      val corrected       = ntpTime + roundTripTime / 2
+      log.trace(s"Adjusting time with ${ntpTimestamp - System.currentTimeMillis()} milliseconds, source: ${info.getAddress.getHostName}.")
+      ntpTimestamp = corrected
+      nanoTime = System.nanoTime()
+      retry(ExpirationTimeout)
+    } catch {
+      case _: SocketTimeoutException => retry(RetryDelay)
+      case t: Throwable =>
+        log.warn("Problems with NTP", t)
+        retry(RetryDelay)
+    } finally {
+      client.close()
     }
-
-    newOffsetTask.flatMap {
-      case None if !scheduler.isShutdown => updateTask.delayExecution(RetryDelay)
-      case Some((server, ntpTimestamp, nanoTime)) if !scheduler.isShutdown =>
-        log.trace(s"Adjusting time with ${ntpTimestamp - System.currentTimeMillis()} milliseconds, source: ${server.getHostName}.")
-        this.ntpTimestamp = ntpTimestamp
-        this.nanoTime = nanoTime
-        updateTask.delayExecution(ExpirationTimeout)
-      case _ => Task.unit
-    }
-  }
-
-  private val taskHandle = updateTask.runAsyncLogErr
 
   override def close(): Unit = {
     log.trace("Shutting down Time")
-    taskHandle.cancel()
     scheduler.shutdown()
   }
 }

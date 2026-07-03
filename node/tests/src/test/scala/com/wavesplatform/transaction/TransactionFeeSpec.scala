@@ -64,7 +64,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                       |}
                                                       |""".stripMargin)),
               0.01.waves,
-              ntpTime.getTimestamp(),
+              ntpTime.correctedTime(),
               Proofs.empty
             )
             .map(_.signWith(dAppSigner.privateKey))
@@ -101,7 +101,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                         |}
                                                         |""".stripMargin)),
                 0.01.waves,
-                ntpTime.getTimestamp(),
+                ntpTime.correctedTime(),
                 Proofs.empty
               )
               .map(_.signWith(sender.privateKey))
@@ -134,7 +134,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                          |  [ScriptTransfer(i.caller, 100, unit)]
                                                          |}""".stripMargin)),
                 0.01.waves,
-                ntpTime.getTimestamp(),
+                ntpTime.correctedTime(),
                 Proofs.empty
               )
               .map(_.signWith(dappAccount.privateKey))
@@ -186,7 +186,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                         |}
                                                         |""".stripMargin)),
                 0.01.waves,
-                ntpTime.getTimestamp(),
+                ntpTime.correctedTime(),
                 Proofs.empty
               )
               .map(_.signWith(sender.privateKey))
@@ -212,7 +212,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                          |}
                                                          |""".stripMargin)),
                 0.01.waves,
-                ntpTime.getTimestamp(),
+                ntpTime.correctedTime(),
                 Proofs.empty
               )
               .map(_.signWith(dappAccount.privateKey))
@@ -248,7 +248,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
           1L,
           issue.asset,
           version = TxVersion.V2,
-          timestamp = ntpTime.getTimestamp()
+          timestamp = ntpTime.correctedTime()
         )
         d.commonApi.calculateFee(transfer) shouldBe (issue.asset, 1L, 0.001.waves)
       }
@@ -303,7 +303,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                    |""".stripMargin),
               0.01.waves,
               2.toByte,
-              timestamp = ntpTime.getTimestamp()
+              timestamp = ntpTime.correctedTime()
             ),
           TxHelpers.setScript(
             secondSigner,
@@ -322,7 +322,7 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                  |""".stripMargin),
             0.01.waves,
             2.toByte,
-            timestamp = ntpTime.getTimestamp()
+            timestamp = ntpTime.correctedTime()
           )
         )
 

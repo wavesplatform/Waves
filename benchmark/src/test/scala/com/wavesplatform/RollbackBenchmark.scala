@@ -12,7 +12,7 @@ import com.wavesplatform.state.{GenesisBlockHeight, Height, Portfolio, StateSnap
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
-import com.wavesplatform.utils.{NTP, ScorexLogging}
+import com.wavesplatform.utils.{ScorexLogging, Time}
 
 import java.io.File
 import scala.collection.immutable.VectorMap
@@ -21,7 +21,7 @@ object RollbackBenchmark extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val settings      = Application.loadApplicationConfig(Some(new File(args(0))))
     val rdb           = RDB.open(settings.dbSettings)
-    val time          = new NTP(settings.ntpServer)
+    val time          = Time(settings.ntpServer)
     val rocksDBWriter = RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val issuer = KeyPair(new Array[Byte](32))
@@ -45,7 +45,7 @@ object RollbackBenchmark extends ScorexLogging {
         false,
         None,
         TxPositiveAmount.unsafeFrom(1e8.toLong),
-        time.getTimestamp(),
+        time.correctedTime(),
         Proofs(ByteStr(new Array[Byte](64))),
         AddressScheme.current.chainId
       )
@@ -55,11 +55,11 @@ object RollbackBenchmark extends ScorexLogging {
     val genesisBlock = Block
       .buildAndSign(
         1.toByte,
-        time.getTimestamp(),
+        time.correctedTime(),
         Block.GenesisReference,
         baseTarget = 1000,
         Block.GenesisGenerationSignature,
-        GenesisTransaction.create(issuer.publicKey.toAddress, 100000e8.toLong, time.getTimestamp()).explicitGet() +: assets,
+        GenesisTransaction.create(issuer.publicKey.toAddress, 100000e8.toLong, time.correctedTime()).explicitGet() +: assets,
         issuer,
         featureVotes = Seq.empty,
         rewardVote = -1,
@@ -91,7 +91,7 @@ object RollbackBenchmark extends ScorexLogging {
       Block
         .buildAndSign(
           2.toByte,
-          time.getTimestamp(),
+          time.correctedTime(),
           genesisBlock.id(),
           1000,
           Block.GenesisGenerationSignature,

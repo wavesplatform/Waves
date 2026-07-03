@@ -79,10 +79,10 @@ class SpentComplexitySpec
   "Invocation" - {
     "does not count verifier complexity when InvokeScript is sent from smart account" in
       withDomain(settings, Seq(AddrWithBalance(sender.toAddress, 10_000_00000000L))) { d =>
-        val invokeTx = TxHelpers.invoke(sender.toAddress, None, Seq.empty, Seq.empty, sender, 90_0000L, Asset.Waves, 2.toByte, ntpTime.getTimestamp())
+        val invokeTx = TxHelpers.invoke(sender.toAddress, None, Seq.empty, Seq.empty, sender, 90_0000L, Asset.Waves, 2.toByte)
 
         d.appendBlock(
-          TxHelpers.setScript(sender, contract, 100_0000L, 2.toByte, timestamp = ntpTime.getTimestamp()),
+          TxHelpers.setScript(sender, contract, 100_0000L, 2.toByte),
           invokeTx
         )
 
@@ -95,10 +95,10 @@ class SpentComplexitySpec
       val recipient = testWallet.generateNewAccount().get
 
       withDomain(settings, Seq(AddrWithBalance(sender.toAddress, 10_000_00000000L), AddrWithBalance(recipient.toAddress, 10_00000000L))) { d =>
-        val issue = TxHelpers.issue(sender, 1000_00L, 2.toByte, "TEST", "", 1_00000000L, Some(assetScript), false, ntpTime.getTimestamp(), 2.toByte)
+        val issue = TxHelpers.issue(sender, 1000_00L, 2.toByte, "TEST", "", 1_00000000L, Some(assetScript), false, version = 2.toByte)
 
         val transferAsset = TxHelpers
-          .transfer(sender, recipient.toAddress, 50_00L, issue.asset, 90_0000L, Waves, timestamp = ntpTime.getTimestamp(), version = 2.toByte)
+          .transfer(sender, recipient.toAddress, 50_00L, issue.asset, 90_0000L, Waves, version = 2.toByte)
 
         val invokeTx = TxHelpers.invoke(
           sender.toAddress,
@@ -108,14 +108,13 @@ class SpentComplexitySpec
           recipient,
           90_0000L,
           Asset.Waves,
-          2.toByte,
-          ntpTime.getTimestamp()
+          2.toByte
         )
 
         d.appendBlock(
           issue,
           transferAsset,
-          TxHelpers.setScript(sender, contract, 100_0000L, 2.toByte, timestamp = ntpTime.getTimestamp()),
+          TxHelpers.setScript(sender, contract, 100_0000L, 2.toByte),
           invokeTx
         )
 
@@ -130,13 +129,13 @@ class SpentComplexitySpec
     val recipient = testWallet.generateNewAccount().get
 
     withDomain(settings, Seq(AddrWithBalance(sender.toAddress, 10_000_00000000L), AddrWithBalance(recipient.toAddress, 10_00000000L))) { d =>
-      val issue = TxHelpers.issue(sender, 1000_00L, 2.toByte, "TEST", "", 1_00000000L, Some(assetScript), false, ntpTime.getTimestamp(), 2.toByte)
+      val issue = TxHelpers.issue(sender, 1000_00L, 2.toByte, "TEST", "", 1_00000000L, Some(assetScript), false, version = 2.toByte)
 
       val transferAsset =
-        TxHelpers.transfer(sender, recipient.toAddress, 50_00L, issue.asset, 90_0000L, Waves, ByteStr.empty, ntpTime.getTimestamp(), 2.toByte)
+        TxHelpers.transfer(sender, recipient.toAddress, 50_00L, issue.asset, 90_0000L, Waves, ByteStr.empty, version = 2.toByte)
 
       val returnFrom =
-        TxHelpers.transfer(recipient, sender.toAddress, 49_00L, issue.asset, 90_0000L, Waves, ByteStr.empty, ntpTime.getTimestamp(), 2.toByte)
+        TxHelpers.transfer(recipient, sender.toAddress, 49_00L, issue.asset, 90_0000L, Waves, ByteStr.empty, version = 2.toByte)
 
       d.appendBlock(
         issue,

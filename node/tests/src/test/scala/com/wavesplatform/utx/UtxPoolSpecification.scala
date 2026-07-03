@@ -106,20 +106,20 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
     }
   }
 
-  private def transfer(sender: KeyPair, maxAmount: Long, time: Time) =
+  private def transfer(sender: KeyPair, maxAmount: Long) =
     (for {
       amount    <- chooseNum(1L, (maxAmount * 0.9).toLong)
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TxHelpers.transfer(from = sender, to = recipient.toAddress, amount = amount, asset = Waves, fee = fee, feeAsset = Waves, attachment = ByteStr.empty, timestamp = time.getTimestamp(), version = 1.toByte))
+    } yield TxHelpers.transfer(from = sender, to = recipient.toAddress, amount = amount, asset = Waves, fee = fee, feeAsset = Waves, attachment = ByteStr.empty, version = 1.toByte))
       .label("transferTransaction")
 
-  private def invokeScript(sender: KeyPair, dApp: Address, time: Time) =
+  private def invokeScript(sender: KeyPair, dApp: Address) =
     Gen.choose(500000L, 600000L).map { fee =>
-      TxHelpers.invoke(dApp, None, Seq.empty, Seq.empty, sender, fee, Waves, TxVersion.V1, time.getTimestamp())
+      TxHelpers.invoke(dApp, None, Seq.empty, Seq.empty, sender, fee, Waves, TxVersion.V1)
     }
 
-  private def dAppSetScript(sender: KeyPair, time: Time) = {
+  private def dAppSetScript(sender: KeyPair) = {
     val scriptText =
       """
         |{-# STDLIB_VERSION 3 #-}
@@ -129,7 +129,7 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
         |func default() = { WriteSet([DataEntry("0", true)]) }
         |""".stripMargin
     val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV1).explicitGet()._1
-    TxHelpers.setScript(acc = sender, script = script, fee = extraFee, version = TxVersion.V1, timestamp = time.getTimestamp())
+    TxHelpers.setScript(acc = sender, script = script, fee = extraFee, version = TxVersion.V1)
   }
 
   private def withState[A](test: (KeyPair, Long, BlockchainUpdaterImpl) => A): A = {
@@ -143,7 +143,7 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
   private def withStateWithTransfer[A](test: (TestTime, BlockchainUpdaterImpl, TransferTransaction) => A): A = {
     withState { case (sender, _, bcu) =>
       val time = new TestTime
-      test(time, bcu, transfer(sender, time))
+      test(time, bcu, transfer(sender))
     }
   }
 
@@ -193,7 +193,7 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
     withState { case (sender, _, bcu) =>
       val recipient = TxHelpers.signer(2)
       val time      = TestTime()
-      val txs       = (1 to 10).map(_ => transferWithRecipient(sender, recipient.publicKey, time))
+      val txs       = (1 to 10).map(_ => transferWithRecipient(sender, recipient.publicKey))
       val settings =
         UtxSettings(
           10,
@@ -216,8 +216,8 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
       val recipients = (1 to 10).map(idx => TxHelpers.signer(1 + idx).publicKey)
       val time       = TestTime()
       // @TODO: Random transactions
-      val txs = (1 to 10).map(_ => massTransferWithRecipients(sender, recipients, senderBalance / 10, time)) ++
-        (if (!allowRecipients) Seq(massTransferWithRecipients(sender, Seq.empty, senderBalance / 10, time)) else Seq.empty)
+      val txs = (1 to 10).map(_ => massTransferWithRecipients(sender, recipients, senderBalance / 10)) ++
+        (if (!allowRecipients) Seq(massTransferWithRecipients(sender, Seq.empty, senderBalance / 10)) else Seq.empty)
       val whitelist: Set[String] = if (allowRecipients) recipients.map(_.toAddress.toString).toSet else Set.empty
       val settings =
         UtxSettings(
@@ -241,7 +241,7 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
     withState { case (sender, _, bcu) =>
       val recipient = TxHelpers.signer(2)
       val time      = TestTime()
-      val txs       = (1 to 10).map(_ => transferWithRecipient(sender, recipient.publicKey, time))
+      val txs       = (1 to 10).map(_ => transferWithRecipient(sender, recipient.publicKey))
       val settings =
         UtxSettings(
           txs.length,
@@ -263,7 +263,7 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
     withState { case (sender, _, bcu) =>
       val recipient = TxHelpers.signer(2)
       val time      = TestTime()
-      val txs       = (1 to 10).map(_ => transferWithRecipient(sender, recipient.publicKey, time))
+      val txs       = (1 to 10).map(_ => transferWithRecipient(sender, recipient.publicKey))
       val settings =
         UtxSettings(
           txs.length,
@@ -284,10 +284,9 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
 
   private def withDualTxs[A](test: (UtxPool, TestTime, Seq[Transaction], Seq[Transaction]) => A): A =
     withState { case (sender, _, bcu) =>
-      val ts    = System.currentTimeMillis()
       val count = 5
-      val txs1  = (1 to count).map(idx => transfer(sender, TestTime(ts + idx)))
-      val txs2  = (1 to count).map(idx => transfer(sender, TestTime(ts + idx + maxAge.toMillis + 1000)))
+      val txs1  = (1 to count).map(_ => transfer(sender))
+      val txs2  = (1 to count).map(_ => transfer(sender))
       val time  = TestTime()
       val utx = new UtxPoolImpl(
         time,
@@ -337,17 +336,17 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
       test(sender, senderBalance, utx, bcu.lastBlockTimestamp.getOrElse(0L))
     }
 
-  private def transfer(sender: KeyPair, time: Time) =
-    TxHelpers.transfer(from = sender, to = TxHelpers.address(2), amount = 1, asset = Waves, fee = extraFee, feeAsset = Waves, attachment = ByteStr.empty, timestamp = time.getTimestamp(), version = 1.toByte)
+  private def transfer(sender: KeyPair) =
+    TxHelpers.transfer(from = sender, to = TxHelpers.address(2), amount = 1, asset = Waves, fee = extraFee, feeAsset = Waves, attachment = ByteStr.empty, version = 1.toByte)
 
-  private def transferWithRecipient(sender: KeyPair, recipient: PublicKey, time: Time) =
-    TxHelpers.transfer(from = sender, to = recipient.toAddress, amount = 1, asset = Waves, fee = extraFee, feeAsset = Waves, attachment = ByteStr.empty, timestamp = time.getTimestamp(), version = 1.toByte)
+  private def transferWithRecipient(sender: KeyPair, recipient: PublicKey) =
+    TxHelpers.transfer(from = sender, to = recipient.toAddress, amount = 1, asset = Waves, fee = extraFee, feeAsset = Waves, attachment = ByteStr.empty, version = 1.toByte)
 
-  private def massTransferWithRecipients(sender: KeyPair, recipients: Seq[PublicKey], maxAmount: Long, time: Time) = {
+  private def massTransferWithRecipients(sender: KeyPair, recipients: Seq[PublicKey], maxAmount: Long) = {
     val amount    = maxAmount / (recipients.size + 1)
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, TxNonNegativeAmount.unsafeFrom(amount)))
     val minFee    = FeeValidation.FeeConstants(TransactionType.Transfer) + FeeValidation.FeeConstants(TransactionType.MassTransfer) * transfers.size
-    TxHelpers.massTransfer(sender, transfers.map(t => (t.address, t.amount.value)), Waves, minFee, time.getTimestamp(), 1.toByte)
+    TxHelpers.massTransfer(sender, transfers.map(t => (t.address, t.amount.value)), Waves, minFee, version = 1.toByte)
   }
 
   private def transactionV1(sender: KeyPair, ts: Long, feeAmount: Long): TransferTransaction =
@@ -359,7 +358,7 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
   private def utxTest(utxSettings: UtxSettings, txCount: Int = 10)(f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = {
     withState { case (sender, _, bcu) =>
       val time = TestTime()
-      val txs  = (1 to txCount).map(_ => transfer(sender, time))
+      val txs  = (1 to txCount).map(_ => transfer(sender))
 
       val utx = new UtxPoolImpl(time, bcu, utxSettings, Int.MaxValue, isMiningEnabled = true)
       f(txs, utx, time)
@@ -367,7 +366,7 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
   }
 
   private def preconditionBlocks(lastBlockId: ByteStr, master: KeyPair, time: Time): Seq[Block] = {
-    val ts = time.getTimestamp()
+    val ts = time.correctedTime()
     val script = TestCompiler(V3).compileExpression(
       """
         |let x = 1
@@ -421,8 +420,8 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
         val time = TestTime()
 
         val gen = for {
-          headTransaction <- transfer(sender, senderBalance / 2, time)
-          vipTransaction <- transfer(sender, senderBalance / 2, time)
+          headTransaction <- transfer(sender, senderBalance / 2)
+          vipTransaction <- transfer(sender, senderBalance / 2)
             .suchThat(TransactionsOrdering.InUTXPool(Set.empty).compare(_, headTransaction) < 0)
         } yield (headTransaction, vipTransaction)
 
@@ -457,21 +456,21 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
 
         val precondition = TestBlock
           .create(
-            time.getTimestamp(),
+            time.correctedTime(),
             bcu.lastBlockId.get,
-            Seq(dAppSetScript(sender3, time)),
+            Seq(dAppSetScript(sender3)),
             sender1
           )
           .block
         bcu.processBlock(precondition).explicitGet()
 
         val whiteListGen = Gen.oneOf(
-          invokeScript(sender1, sender3.toAddress, time),
-          transfer(sender2, senderBalance2 / 2, time)
+          invokeScript(sender1, sender3.toAddress),
+          transfer(sender2, senderBalance2 / 2)
         )
 
         val gen = for {
-          headTransaction      <- transfer(sender1, senderBalance1 / 2, time)
+          headTransaction      <- transfer(sender1, senderBalance1 / 2)
           whitelistTransaction <- whiteListGen
         } yield (headTransaction, whitelistTransaction)
 
@@ -535,7 +534,7 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
           .create(
             time.getTimestamp(),
             bcu.lastBlockId.get,
-            Seq(dAppSetScript(sender3, time)),
+            Seq(dAppSetScript(sender3)),
             sender1
           )
           .block
@@ -544,12 +543,12 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
         val whiteListGen = Gen.listOfN(
           5,
           Gen.oneOf(
-            invokeScript(sender1, sender3.toAddress, time),
-            transfer(sender2, senderBalance2 / 20, time)
+            invokeScript(sender1, sender3.toAddress),
+            transfer(sender2, senderBalance2 / 20)
           )
         )
 
-        val gen = Gen.listOfN(10, transfer(sender1, senderBalance1 / 20, time))
+        val gen = Gen.listOfN(10, transfer(sender1, senderBalance1 / 20))
 
         forAll(whiteListGen, gen, Arbitrary.arbBool.arbitrary.label("allowSkipChecks")) { case (whitelistedTxs, txs, allowSkipChecks) =>
           val utxSettings =
@@ -578,7 +577,7 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
       txs.foreach(tx => utx.putIfNew(tx).resultE should beRight)
       utx.all.size shouldEqual txs.size
 
-      time.advance(maxAge + 1000.millis)
+      time.setTimeIfGreater(txs.maxBy(_.timestamp).timestamp + maxAge.toMillis + 1000)
 
       val (packed, _, _) = utx.packUnconfirmed(limitByNumber(100), None, PackStrategy.Unlimited)
       packed shouldBe empty
@@ -1009,8 +1008,8 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
         val gen = for {
           acc  <- accountGen
           acc1 <- accountGen
-          tx1  <- transfer(acc, ENOUGH_AMT / 3, ntpTime)
-          txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee.value < tx1.fee.value))
+          tx1  <- transfer(acc, ENOUGH_AMT / 3)
+          txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L).suchThat(_.fee.value < tx1.fee.value))
         } yield (acc, acc1, tx1, txs)
 
         forAll(gen) { case (acc, _, tx1, rest) =>

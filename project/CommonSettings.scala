@@ -27,8 +27,11 @@ object CommonSettings extends AutoPlugin {
       case "scala-collection-compat.properties" | "META-INF/versions/9/OSGI-INF/MANIFEST.MF" =>
         MergeStrategy.discard
 
-      case "logback.xml" | PathList("scala", "util", "control", "compat") | PathList("scala", "collection", "compat") |
-          PathList("swagger-ui", "openapi.yaml") =>
+      case "logback.xml" |
+           PathList("scala", "util", "control", "compat") |
+           PathList("scala", "collection", "compat") |
+           PathList("swagger-ui", "openapi.yaml") |
+           "META-INF/FastDoubleParser-LICENSE" =>
         MergeStrategy.last
       case other => (assembly / assemblyMergeStrategy).value(other)
     }

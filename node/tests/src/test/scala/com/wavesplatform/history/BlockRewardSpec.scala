@@ -74,14 +74,14 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     miner2        <- accountGen
     genesisBlock = TestBlock
       .create(
-        ntpTime.getTimestamp(),
+        ntpTime.correctedTime(),
         Seq(
           GenesisTransaction
-            .create(sourceAddress.toAddress, (Constants.TotalWaves - 60000) * Constants.UnitsInWave, ntpTime.getTimestamp())
+            .create(sourceAddress.toAddress, (Constants.TotalWaves - 60000) * Constants.UnitsInWave, ntpTime.correctedTime())
             .explicitGet(),
-          GenesisTransaction.create(issuer.toAddress, 40000 * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
-          GenesisTransaction.create(miner1.toAddress, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet(),
-          GenesisTransaction.create(miner2.toAddress, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet()
+          GenesisTransaction.create(issuer.toAddress, 40000 * Constants.UnitsInWave, ntpTime.correctedTime()).explicitGet(),
+          GenesisTransaction.create(miner1.toAddress, InitialMinerBalance, ntpTime.correctedTime()).explicitGet(),
+          GenesisTransaction.create(miner2.toAddress, InitialMinerBalance, ntpTime.correctedTime()).explicitGet()
         )
       )
       .block
@@ -239,8 +239,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         OneTotalFee,
         Waves,
         ByteStr.empty,
-        ntpTime.getTimestamp(),
-        1.toByte
+        version = 1.toByte
       )
       tx2 = TxHelpers
         .transfer(
@@ -251,8 +250,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
           OneTotalFee,
           Waves,
           ByteStr.empty,
-          ntpTime.getTimestamp(),
-          1.toByte
+          version = 1.toByte
         )
       b2        = mkEmptyBlock(genesisBlock.id(), miner1)
       b3        = mkEmptyBlock(b2.id(), miner1)
@@ -310,8 +308,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         OneTotalFee,
         Waves,
         ByteStr.empty,
-        ntpTime.getTimestamp(),
-        1.toByte
+        version = 1.toByte
       )
       b2        = mkEmptyBlock(genesisBlock.id(), miner)
       b3        = mkEmptyBlock(b2.id(), miner)

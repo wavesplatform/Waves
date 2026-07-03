@@ -64,7 +64,7 @@ import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
 
-class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
+class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: Time) extends ScorexLogging {
   app =>
 
   import Application.*
@@ -684,7 +684,7 @@ object Application extends ScorexLogging {
       SystemInformationReporter.report(settings.config)
     }
 
-    val time = new NTP(settings.ntpServer)
+    val time = Time(settings.ntpServer)
     Metrics.start(settings.metrics, time)
 
     def dumpMinerConfig(): Unit = {

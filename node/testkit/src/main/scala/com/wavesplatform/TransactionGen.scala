@@ -837,7 +837,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { su
 
   def invokeExpressionTransactionGen(sender: KeyPair, script: ExprScript, feeAmount: Long): Gen[InvokeExpressionTransaction] =
     InvokeExpressionTransaction
-      .create(1, sender.publicKey, script, feeAmount, Waves, ntpTime.getTimestamp(), Proofs.empty)
+      .create(1, sender.publicKey, script, feeAmount, Waves, ntpTime.correctedTime(), Proofs.empty)
       .map(_.signWith(sender.privateKey))
       .explicitGet()
 }

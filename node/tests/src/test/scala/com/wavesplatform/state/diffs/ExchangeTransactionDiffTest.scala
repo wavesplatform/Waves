@@ -1337,7 +1337,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             1L,
             1_0000_0000L,
             ntpTime.correctedTime(),
-            ntpTime.getTimestamp() + 1000,
+            ntpTime.correctedTime() + 1000,
             TestValues.fee,
             priceMode = mode
           )
@@ -1352,7 +1352,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             1L,
             1L,
             ntpTime.correctedTime(),
-            ntpTime.getTimestamp() + 1000,
+            ntpTime.correctedTime() + 1000,
             TestValues.fee,
             priceMode = mode
           )
@@ -1858,7 +1858,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     val sellMatcherFee      = Long.MinValue - buyMatcherFee + exchangeFee
 
     val sender      = testWallet.generateNewAccount().get
-    def mkIssueTx   = TxHelpers.issue(issuer = sender, amount = 100, decimals = 2, name = "IA_01", description = "", fee = issueFee, script = None, reissuable = true, timestamp = ntpTime.getTimestamp(), version = 2.toByte)
+    def mkIssueTx   = TxHelpers.issue(issuer = sender, amount = 100, decimals = 2, name = "IA_01", description = "", fee = issueFee, script = None, version = 2.toByte)
     val priceAsset  = mkIssueTx
     val amountAsset = mkIssueTx
     val assetPair   = AssetPair(priceAsset.asset, amountAsset.asset)
@@ -1873,8 +1873,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         fee = 100,
         sender = sender,
         matcher = sender,
-        timestamp = ntpTime.getTimestamp(),
-        expiration = ntpTime.getTimestamp() + 100000,
+        timestamp = ntpTime.correctedTime(),
+        expiration = ntpTime.correctedTime() + 100000,
         version = 3.toByte
       )
 
@@ -1888,13 +1888,12 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         buyMatcherFee,
         sellMatcherFee,
         exchangeFee,
-        ntpTime.getTimestamp(),
-        2.toByte
+        version = 2.toByte
       )
 
     withDomain(DomainPresets.RideV5) { d =>
       d.appendBlock(
-        GenesisTransaction.create(sender.toAddress, matcherStartBalance, ntpTime.getTimestamp()).explicitGet(),
+        GenesisTransaction.create(sender.toAddress, matcherStartBalance, ntpTime.correctedTime()).explicitGet(),
         priceAsset,
         amountAsset
       )

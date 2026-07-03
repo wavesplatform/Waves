@@ -162,7 +162,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
             val pseudoBlock = Block(
               BlockHeader(
                 blockchain.blockVersionAt(blockchain.height),
-                time.getTimestamp() + settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis,
+                time.correctedTime() + settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis,
                 blockchain.lastBlockId.get,
                 lastHeader.baseTarget,
                 lastHeader.generationSignature,
@@ -186,12 +186,12 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
 
   private def correctTxTimestamp(genTx: GenTx, time: Time): Transaction =
     genTx match {
-      case GenTx(t: BurnTransaction, Right(signer))        => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: CreateAliasTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: DataTransaction, Right(signer))        => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: BurnTransaction, Right(signer))        => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: CreateAliasTransaction, Right(signer)) => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: DataTransaction, Right(signer))        => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
       case GenTx(t: EthereumTransaction, Left(signer)) =>
         val correctedTimeRawTx = RawTransaction.createTransaction(
-          BigInt(time.getTimestamp()).bigInteger,
+          BigInt(time.correctedTime()).bigInteger,
           t.underlying.getGasPrice,
           t.underlying.getGasLimit,
           t.underlying.getTo,
@@ -199,20 +199,20 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
           t.underlying.getData
         )
         EthTxGenerator.signRawTransaction(signer, t.chainId)(correctedTimeRawTx)
-      case GenTx(t: ExchangeTransaction, Right(signer))     => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: InvokeScriptTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: IssueTransaction, Right(signer))        => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: LeaseCancelTransaction, Right(signer))  => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: LeaseTransaction, Right(signer))        => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: MassTransferTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+      case GenTx(t: ExchangeTransaction, Right(signer))     => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: InvokeScriptTransaction, Right(signer)) => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: IssueTransaction, Right(signer))        => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: LeaseCancelTransaction, Right(signer))  => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: LeaseTransaction, Right(signer))        => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: MassTransferTransaction, Right(signer)) => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
       case GenTx(t: PaymentTransaction, Right(signer)) =>
-        t.copy(timestamp = time.getTimestamp(), signature = crypto.sign(signer.privateKey, t.bodyBytes()))
-      case GenTx(t: ReissueTransaction, Right(signer))         => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: SetAssetScriptTransaction, Right(signer))  => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: SetScriptTransaction, Right(signer))       => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: SponsorFeeTransaction, Right(signer))      => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: TransferTransaction, Right(signer))        => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
-      case GenTx(t: UpdateAssetInfoTransaction, Right(signer)) => t.copy(timestamp = time.getTimestamp()).signWith(signer.privateKey)
+        t.copy(timestamp = time.correctedTime(), signature = crypto.sign(signer.privateKey, t.bodyBytes()))
+      case GenTx(t: ReissueTransaction, Right(signer))         => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: SetAssetScriptTransaction, Right(signer))  => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: SetScriptTransaction, Right(signer))       => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: SponsorFeeTransaction, Right(signer))      => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: TransferTransaction, Right(signer))        => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
+      case GenTx(t: UpdateAssetInfoTransaction, Right(signer)) => t.copy(timestamp = time.correctedTime()).signWith(signer.privateKey)
       case GenTx(t, _)                                         => t
     }
 }
