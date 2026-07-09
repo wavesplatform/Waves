@@ -37,6 +37,7 @@ import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, DiffToLogConverter, TransactionBase, TransactionType}
 import monix.eval.Coeval
+import play.api.libs.json.Json
 
 import scala.util.Try
 
@@ -318,6 +319,8 @@ object DAppEnvironment {
     def setResult(result: ScriptResult): Unit =
       this.result = Right(result)
 
+    def getResult: Option[ScriptResult] = result.toOption
+
     def setError(error: ValidationError): Unit =
       this.result = Left(error)
 
@@ -482,7 +485,8 @@ class DAppEnvironment(
         )(invoke)
       _ <-
         if (blockchain.isFeatureActivated(LightNode)) {
-          println(s"\n\tRESULT after calling $func on $address: ${snapshotToString(snapshot)}")
+          println(s"\n\tRESULT after calling $func on $address: ${snapshotToString(snapshot)}, actions=${invocationTracker.getResult
+              .map(r => resultToString(r, tx.id()))}")
           validateIntermediateBalances(blockchain, snapshot, totalComplexityLimit - availableComplexity, Nil)
         } else
           traced(Right(()))
@@ -513,7 +517,37 @@ class DAppEnvironment(
   private def snapshotToString(snapshot: StateSnapshot): String = {
     Seq(
       snapshot.balances.view.map { case ((address, asset), balance) => s"[\"$address\",\"$asset\",$balance]" }.mkString("\"balances\":[", ",", "]"),
-      snapshot.leaseBalances.view.map{case (address, lb) => s"\"$address\":[${lb.in},${lb.out}]"}.mkString("\"leaseBalances\":{", ",", "}")
+      snapshot.leaseBalances.view.map { case (address, lb) => s"\"$address\":[${lb.in},${lb.out}]" }.mkString("\"leaseBalances\":{", ",", "}")
     ).mkString("{", ",", "}")
   }
+
+  private def resultToString(scriptResult: ScriptResult, invokeId: ByteStr): String =
+    scriptResult.actions.view
+      .map {
+        case AssetTransfer(recipientAddressBytes, recipient, amount, assetId) =>
+          Json.obj("to" -> recipientAddressBytes.toString, "amount" -> amount, "assetId" -> assetId.map(_.toString))
+        case Issue(id, compiledScript, decimals, description, isReissuable, name, quantity, nonce) =>
+          Json.obj("issue" -> id.toString, "quantity" -> quantity)
+        case Reissue(assetId, isReissuable, quantity) =>
+          Json.obj("reissue" -> assetId.toString, "quantity" -> quantity)
+        case Burn(assetId, quantity) =>
+          Json.obj("burn" -> assetId.toString, "quantity" -> quantity)
+        case SponsorFee(assetId, minSponsoredAssetFee) =>
+          Json.obj("sponsorFee" -> assetId.toString, "minSponsoredAssetFee" -> minSponsoredAssetFee)
+        case l @ Lease(recipient, amount, nonce) =>
+          Json.obj("leaseId" -> Lease.calculateId(l, invokeId).toString, "amount" -> amount, "to" -> recipient.toString)
+        case LeaseCancel(id) =>
+          Json.obj("cancelLeaseId" -> id.toString)
+        case DataItem.Bin(k, v) =>
+          Json.obj("key" -> k, "binary" -> v.base64Raw)
+        case DataItem.Lng(k, v) =>
+          Json.obj("key" -> k, "int" -> v)
+        case DataItem.Bool(k, v) =>
+          Json.obj("key" -> k, "boolean" -> v)
+        case DataItem.Str(k, v) =>
+          Json.obj("key" -> k, "string" -> v)
+        case DataItem.Delete(k) =>
+          Json.obj("key" -> k)
+      }
+      .mkString("[", ",", "]")
 }
