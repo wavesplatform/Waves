@@ -32,6 +32,14 @@ object RDB extends StrictLogging {
   final class TxSnapshotHandle private[RDB] (val handle: ColumnFamilyHandle)
   final class ApiHandle private[RDB] (val handle: ColumnFamilyHandle)
 
+  val TxMetaCF     = "tx-meta"
+  val TxCF         = "tx"
+  val TxSnapshotCF = "tx-snapshot"
+  val ApiCF        = "api"
+
+  /** Column families that only contain data derived from the blockchain and can be truncated without losing the state */
+  val NonEssentialColumnFamilies: Seq[String] = Seq(TxSnapshotCF, ApiCF)
+
   case class OptionsWithResources[A](options: A, resources: Seq[RocksObject])
 
   def open(settings: DBSettings): RDB = {
@@ -63,26 +71,26 @@ object RDB extends StrictLogging {
             .setCfPaths(Seq(new DbPath(new File(dbDir, "default").toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
-          "tx-meta".utf8Bytes,
+          TxMetaCF.utf8Bytes,
           txMetaCfOptions.options
             .optimizeForPointLookup(16 << 20) // Iterators might not work with this option
             .setDisableAutoCompactions(true)
-            .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-meta").toPath, 0L)).asJava)
+            .setCfPaths(Seq(new DbPath(new File(dbDir, TxMetaCF).toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
-          "tx".utf8Bytes,
+          TxCF.utf8Bytes,
           txCfOptions.options
-            .setCfPaths(Seq(new DbPath(new File(dbDir, "tx").toPath, 0L)).asJava)
+            .setCfPaths(Seq(new DbPath(new File(dbDir, TxCF).toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
-          "tx-snapshot".utf8Bytes,
+          TxSnapshotCF.utf8Bytes,
           txSnapshotCfOptions.options
-            .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-snapshot").toPath, 0L)).asJava)
+            .setCfPaths(Seq(new DbPath(new File(dbDir, TxSnapshotCF).toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
-          "api".utf8Bytes,
+          ApiCF.utf8Bytes,
           apiCfOptions.options
-            .setCfPaths(Seq(new DbPath(new File(dbDir, "api").toPath, 0L)).asJava)
+            .setCfPaths(Seq(new DbPath(new File(dbDir, ApiCF).toPath, 0L)).asJava)
         )
       ).asJava,
       handles
@@ -94,8 +102,25 @@ object RDB extends StrictLogging {
       new TxHandle(handles.get(2)),
       new TxSnapshotHandle(handles.get(3)),
       new ApiHandle(handles.get(4)),
-      dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources ++ txSnapshotCfOptions.resources
+      dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources ++
+        txSnapshotCfOptions.resources ++ apiCfOptions.resources
     )
+  }
+
+  /** Removes all the data from a non-essential column family by dropping it. It is re-created on the next [[open]], because the DB is opened
+    * with `createMissingColumnFamilies`.
+    */
+  def truncateColumnFamily(settings: DBSettings, cfName: String): Unit = {
+    val handleOf: RDB => ColumnFamilyHandle = cfName match {
+      case TxSnapshotCF => _.txSnapshotHandle.handle
+      case ApiCF        => _.apiHandle.handle
+      case _            => throw new IllegalArgumentException(s"$cfName is not one of ${NonEssentialColumnFamilies.mkString(", ")}")
+    }
+
+    Using.resource(open(settings)) { rdb =>
+      logger.info(s"Truncating $cfName")
+      rdb.db.dropColumnFamily(handleOf(rdb))
+    }
   }
 
   private def newColumnFamilyOptions(

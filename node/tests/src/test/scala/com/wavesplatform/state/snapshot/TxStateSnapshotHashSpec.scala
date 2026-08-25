@@ -335,4 +335,5 @@ class TxStateSnapshotHashSpec extends PropSpec {
       }
     }
   }
+
 }
