@@ -101,11 +101,16 @@ object EthereumTransactionDiff {
         !(tx.signerKeyBigInt().toByteArray.length < EthereumKeyLength) || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements)
       )("Invalid public key")
       _ <- Either.raiseWhen(
-        tx.longChainId()
-          .exists(_ != AddressScheme.current.chainId) && blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality)
+        tx.longChainId().exists(_ != AddressScheme.current.chainId) && (
+          blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality) ||
+            blockchain.isFeatureActivated(BlockchainFeatures.AdjustedBlockRewardDistribution)
+        )
       )(s"Transaction chain ID ${tx.longChainId()} does not match current chain ID ${AddressScheme.current.chainId}")
       _ <- Either.raiseWhen(
-        !tx.ecdsaSignature().isCanonical && blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality)
+        !tx.ecdsaSignature().isCanonical && (
+          blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality) ||
+            blockchain.isFeatureActivated(BlockchainFeatures.AdjustedBlockRewardDistribution)
+        )
       )("Non-canonical ECDSA signature")
     } yield ()).leftMap(GenericError.apply)
 }
