@@ -85,6 +85,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     forceStopApplication(FatalDBError)
   }
 
+  private def reportErrorAndBlacklist(errorMessage: String, source: Channel)(maybeThrowable: Option[Throwable]): Task[Unit] = {
+    maybeThrowable.foreach { t =>
+      peerDatabase.blacklistAndClose(source, errorMessage)
+      log.warn(errorMessage, t)
+    }
+    Task.now(())
+  }
+
   private val appenderScheduler = singleThread("appender", stopOnAppendError)
 
   private val extensionLoaderScheduler = singleThread("rx-extension-loader", reporter = log.error("Error in Extension Loader", _))
@@ -344,12 +352,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       syncWithChannelClosed,
       extensionLoaderScheduler,
       timeoutSubject
-    ) { case (c, b) =>
-      processFork(c, b).doOnFinish {
-        case None    => Task.now(())
-        case Some(e) => Task(stopOnAppendError.reportFailure(e))
-      }
-    }
+    ) { case (c, b) => processFork(c, b).doOnFinish(reportErrorAndBlacklist("Exception caught while processing extension", c)) }
 
     TransactionSynchronizer(
       settings.synchronizationSettings.utxSynchronizer,
@@ -360,11 +363,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     Observable(
       microblockDataWithSnapshot
-        .mapEval(processMicroBlock.tupled),
+        .mapEval { case (c, md, sd) => processMicroBlock(c, md, sd).doOnFinish(reportErrorAndBlacklist("Error appending microblock", c)) },
       newBlocksWithSnapshot
-        .mapEval(processBlock.tupled)
+        .mapEval { case (c, b, s) => processBlock(c, b, s).doOnFinish(reportErrorAndBlacklist("Error appending blocks", c)) }
     ).mergeMap(identity)
-      .onErrorHandle(stopOnAppendError.reportFailure)
       .subscribe()
 
     // API start

@@ -335,4 +335,17 @@ class TxStateSnapshotHashSpec extends PropSpec {
       }
     }
   }
+
+  property("max snapshot size") {
+    TSS(
+      leaseBalances = Seq.fill(100)(TSS.LeaseBalance(bs(new Array[Byte](20)), Long.MaxValue, Long.MaxValue)),
+      cancelledLeases = Seq.fill(100)(TSS.CancelledLease(bs(new Array[Byte](32)))),
+      accountData = Seq.fill(100)(
+        TSS.AccountData(
+          bs(new Array[Byte](20)),
+          Seq(DataEntry("a"*400, DataEntry.Value.BinaryValue(bs(new Array[Byte](150)))))
+        )
+      )
+    ).serializedSize shouldBe 10_000
+  }
 }

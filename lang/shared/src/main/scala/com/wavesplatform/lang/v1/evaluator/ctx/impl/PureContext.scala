@@ -23,7 +23,7 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation.*
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader, compiler}
 
 import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.charset.{MalformedInputException, StandardCharsets}
+import java.nio.charset.{CharsetDecoder, MalformedInputException, StandardCharsets}
 import java.nio.{BufferUnderflowException, ByteBuffer}
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -947,7 +947,9 @@ object PureContext {
         notImplemented[Id, EVALUATED]("dropRight(xs: String, number: Int)", xs)
     }
 
-  val UTF8Decoder = UTF_8.newDecoder
+  val UTF8Decoder = new ThreadLocal[CharsetDecoder] {
+    override def initialValue(): CharsetDecoder = UTF_8.newDecoder()
+  }
 
   def toUtf8String(reduceLimit: Boolean): BaseFunction[NoContext] =
     NativeFunction(
@@ -959,7 +961,7 @@ object PureContext {
     ) {
       case CONST_BYTESTR(u) :: Nil =>
         Try(ByteBuffer.wrap(u.arr))
-          .map(UTF8Decoder.decode)
+          .map(UTF8Decoder.get().decode)
           .toEither
           .map(_.toString)
           .flatMap(CONST_STRING(_, reduceLimit))

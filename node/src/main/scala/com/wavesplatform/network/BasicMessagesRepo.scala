@@ -46,7 +46,7 @@ abstract class InetSocketAddressSeqSpec[A <: AnyRef: ClassTag] extends MessageSp
 
   override val messageCode: Message.MessageCode = 2: Byte
 
-  override val maxLength: Int = DataLength + 1000 * (AddressLength + PortLength)
+  override val maxLength: Int = DataLength + InetSocketAddressSeqSpec.MaxAddressCount * (AddressLength + PortLength)
 
   protected def unwrap(v: A): Seq[InetSocketAddress]
   protected def wrap(addresses: Seq[InetSocketAddress]): A
@@ -80,6 +80,10 @@ abstract class InetSocketAddressSeqSpec[A <: AnyRef: ClassTag] extends MessageSp
       Bytes.concat(bs, peerAddress, Ints.toByteArray(peerPort))
     }
   }
+}
+
+object InetSocketAddressSeqSpec {
+  val MaxAddressCount: Int = 1000
 }
 
 object PeersSpec extends InetSocketAddressSeqSpec[KnownPeers] {
