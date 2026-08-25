@@ -51,55 +51,7 @@ object RDB extends StrictLogging {
     val dbDir     = file.getAbsoluteFile
     dbDir.getParentFile.mkdirs()
 
-    val handles       = new util.ArrayList[ColumnFamilyHandle]()
-    val cfDescriptors = newColumnFamilyDescriptors(dbDir, settings)
-    val db = RocksDB.open(
-      dbOptions.options,
-      settings.directory,
-      cfDescriptors.options.asJava,
-      handles
-    )
-
-    new RDB(
-      db,
-      new TxMetaHandle(handles.get(1)),
-      new TxHandle(handles.get(2)),
-      new TxSnapshotHandle(handles.get(3)),
-      new ApiHandle(handles.get(4)),
-      dbOptions.resources ++ cfDescriptors.resources
-    )
-  }
-
-  /** Drops and re-creates a non-essential column family, i.e. removes all the data it contains */
-  def truncateColumnFamily(settings: DBSettings, cfName: String): Unit = {
-    require(NonEssentialColumnFamilies.contains(cfName), s"$cfName is not one of ${NonEssentialColumnFamilies.mkString(", ")}")
-
-    val file = new File(settings.directory)
-    require(file.isDirectory, s"${file.getAbsolutePath} is not a directory")
-    checkDbDir(file.toPath)
-    logger.debug(s"Open DB at ${settings.directory}")
-
-    val dbOptions     = createDbOptions(settings)
-    val cfDescriptors = newColumnFamilyDescriptors(file.getAbsoluteFile, settings)
-    val cfIndex       = cfDescriptors.options.indexWhere(cfd => util.Arrays.equals(cfd.getName, cfName.utf8Bytes))
-    val handles       = new util.ArrayList[ColumnFamilyHandle]()
-
-    val db = RocksDB.open(dbOptions.options, settings.directory, cfDescriptors.options.asJava, handles)
-    try {
-      val handle = handles.get(cfIndex)
-      logger.info(s"Truncating $cfName")
-      db.dropColumnFamily(handle)
-      handle.close()
-      db.createColumnFamily(cfDescriptors.options(cfIndex)).close()
-      logger.info(s"$cfName truncated")
-    } finally {
-      handles.asScala.foreach(_.close())
-      db.close()
-      (dbOptions.resources ++ cfDescriptors.resources).foreach(_.close())
-    }
-  }
-
-  private def newColumnFamilyDescriptors(dbDir: File, settings: DBSettings): OptionsWithResources[Seq[ColumnFamilyDescriptor]] = {
+    val handles = new util.ArrayList[ColumnFamilyHandle]()
     val defaultCfOptions =
       newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
     val txMetaCfOptions =
@@ -108,8 +60,9 @@ object RDB extends StrictLogging {
     val txSnapshotCfOptions =
       newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val apiCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.apiCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-
-    OptionsWithResources(
+    val db = RocksDB.open(
+      dbOptions.options,
+      settings.directory,
       Seq(
         new ColumnFamilyDescriptor(
           RocksDB.DEFAULT_COLUMN_FAMILY,
@@ -139,9 +92,35 @@ object RDB extends StrictLogging {
           apiCfOptions.options
             .setCfPaths(Seq(new DbPath(new File(dbDir, ApiCF).toPath, 0L)).asJava)
         )
-      ),
-      defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources ++ txSnapshotCfOptions.resources ++ apiCfOptions.resources
+      ).asJava,
+      handles
     )
+
+    new RDB(
+      db,
+      new TxMetaHandle(handles.get(1)),
+      new TxHandle(handles.get(2)),
+      new TxSnapshotHandle(handles.get(3)),
+      new ApiHandle(handles.get(4)),
+      dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources ++
+        txSnapshotCfOptions.resources ++ apiCfOptions.resources
+    )
+  }
+
+  /** Removes all the data from a non-essential column family by dropping it. It is re-created on the next [[open]], because the DB is opened
+    * with `createMissingColumnFamilies`.
+    */
+  def truncateColumnFamily(settings: DBSettings, cfName: String): Unit = {
+    val handleOf: RDB => ColumnFamilyHandle = cfName match {
+      case TxSnapshotCF => _.txSnapshotHandle.handle
+      case ApiCF        => _.apiHandle.handle
+      case _            => throw new IllegalArgumentException(s"$cfName is not one of ${NonEssentialColumnFamilies.mkString(", ")}")
+    }
+
+    Using.resource(open(settings)) { rdb =>
+      logger.info(s"Truncating $cfName")
+      rdb.db.dropColumnFamily(handleOf(rdb))
+    }
   }
 
   private def newColumnFamilyOptions(
