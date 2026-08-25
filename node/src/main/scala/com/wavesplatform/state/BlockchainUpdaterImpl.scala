@@ -677,7 +677,7 @@ class BlockchainUpdaterImpl(
       case Some(ng) if this.height == height =>
         val parentConflictEndorsements = rocksdb.lastBlockHeader.flatMap(_.header.finalizationVoting).fold(0)(_.conflict.size)
         rocksdb.wavesAmount(height - 1) +
-          BigInt(ng.reward.getOrElse(0L)) * this.blockRewardBoost(Height(height)) -
+          BigInt(BlockRewardCalculator.getTotalBlockReward(Height(height), ng.reward.getOrElse(0L), this)) -
           parentConflictEndorsements * CommitToGenerationTransaction.DepositInWavelets
       case _ =>
         rocksdb.wavesAmount(height)

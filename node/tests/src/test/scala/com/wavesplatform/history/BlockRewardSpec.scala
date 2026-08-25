@@ -14,7 +14,7 @@ import com.wavesplatform.features.BlockchainFeatures.{BlockReward, BlockRewardDi
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{Constants, FunctionalitySettings, RewardsSettings}
+import com.wavesplatform.settings.{Constants, FunctionalitySettings, RewardsSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, GenesisBlockHeight, Height}
 import com.wavesplatform.test.*
@@ -1433,5 +1433,123 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
           5 * (6.waves + rewardDelta) * 10 + // 10..14: boosted reward after change
           6.waves + rewardDelta
       ) // 15: non-boosted after change
+  }
+
+  private val AdjustedDistributionActivationHeight = 8
+
+  private def adjustedDistributionSettings(initialReward: Long, ceaseXtnBuyback: Boolean): WavesSettings = {
+    val featureHeights =
+      Seq(
+        BlockchainFeatures.CappedReward                    -> 0,
+        BlockchainFeatures.BoostBlockReward                -> 5,
+        BlockchainFeatures.AdjustedBlockRewardDistribution -> AdjustedDistributionActivationHeight
+      ) ++ (if (ceaseXtnBuyback) Seq(BlockchainFeatures.CeaseXtnBuyback -> 0) else Nil)
+
+    val ws = DomainPresets.BlockRewardDistribution
+      .setFeaturesHeight(featureHeights*)
+      .configure(fs =>
+        fs.copy(
+          // the boost period covers the whole scenario: the adjusted distribution must supersede it, not outlive it
+          blockRewardBoostPeriod = 1000,
+          xtnBuybackRewardPeriod = 0,
+          daoAddress = Some(daoAddress.toString),
+          xtnBuybackAddress = Some(xtnBuybackAddress.toString)
+        )
+      )
+    ws.copy(blockchainSettings = ws.blockchainSettings.copy(rewardsSettings = RewardsSettings(1000, 1000, initialReward, 0.5.waves, 4)))
+  }
+
+  "Adjusted block reward distribution:" - {
+    "replaces the default 2/2/2 distribution with 10 (DAO) / 8 (miner) / 2 (XTN buyback)" in withDomain(
+      adjustedDistributionSettings(6.waves, ceaseXtnBuyback = false),
+      Seq(AddrWithBalance(blockMiner.toAddress, initialMinerBalance))
+    ) { d =>
+      (1 to 6).foreach(_ => d.appendKeyBlock(blockMiner))
+      // heights 2..4: default distribution, heights 5..7: boosted distribution
+      d.blockchain.height shouldBe 7
+      assertBalances(
+        d.blockchain,
+        blockMiner.toAddress -> (initialMinerBalance + 3 * 2.waves + 3 * 20.waves),
+        daoAddress           -> (3 * 2.waves + 3 * 20.waves),
+        xtnBuybackAddress    -> (3 * 2.waves + 3 * 20.waves)
+      )
+      d.blockchain.wavesAmount(7) shouldBe BigInt(100_000_000.waves + 3 * 6.waves + 3 * 60.waves)
+
+      d.appendKeyBlock(blockMiner)
+      // height 8: activation height, the boost has no effect anymore
+      d.blockchain.height shouldBe AdjustedDistributionActivationHeight
+      assertBalances(
+        d.blockchain,
+        blockMiner.toAddress -> (initialMinerBalance + 3 * 2.waves + 3 * 20.waves + 8.waves),
+        daoAddress           -> (3 * 2.waves + 3 * 20.waves + 10.waves),
+        xtnBuybackAddress    -> (3 * 2.waves + 3 * 20.waves + 2.waves)
+      )
+
+      d.appendKeyBlock(blockMiner)
+      d.blockchain.height shouldBe 9
+      assertBalances(
+        d.blockchain,
+        blockMiner.toAddress -> (initialMinerBalance + 3 * 2.waves + 3 * 20.waves + 2 * 8.waves),
+        daoAddress           -> (3 * 2.waves + 3 * 20.waves + 2 * 10.waves),
+        xtnBuybackAddress    -> (3 * 2.waves + 3 * 20.waves + 2 * 2.waves)
+      )
+
+      // the voted reward is unchanged, but 20 waves are actually issued per block
+      d.blockchain.blockReward(9) shouldBe 6.waves.some
+      d.blockchain.wavesAmount(9) shouldBe BigInt(100_000_000.waves + 3 * 6.waves + 3 * 60.waves + 2 * 20.waves)
+      RewardApiRoute(d.blockchain).getRewards(Height(9)).explicitGet().currentReward shouldBe 20.waves
+    }
+
+    "gives the XTN buyback share to the miner when XTN buyback has ceased" in withDomain(
+      adjustedDistributionSettings(6.waves, ceaseXtnBuyback = true),
+      Seq(AddrWithBalance(blockMiner.toAddress, initialMinerBalance))
+    ) { d =>
+      (1 to 6).foreach(_ => d.appendKeyBlock(blockMiner))
+      // heights 2..4: 4/2/0, heights 5..7: 40/20/0
+      d.blockchain.height shouldBe 7
+      assertBalances(
+        d.blockchain,
+        blockMiner.toAddress -> (initialMinerBalance + 3 * 4.waves + 3 * 40.waves),
+        daoAddress           -> (3 * 2.waves + 3 * 20.waves),
+        xtnBuybackAddress    -> 0L
+      )
+
+      d.appendKeyBlock(blockMiner)
+      // height 8: 10 waves to the miner and 10 waves to the DAO
+      d.blockchain.height shouldBe AdjustedDistributionActivationHeight
+      assertBalances(
+        d.blockchain,
+        blockMiner.toAddress -> (initialMinerBalance + 3 * 4.waves + 3 * 40.waves + 10.waves),
+        daoAddress           -> (3 * 2.waves + 3 * 20.waves + 10.waves),
+        xtnBuybackAddress    -> 0L
+      )
+      d.blockchain.wavesAmount(8) shouldBe BigInt(100_000_000.waves + 3 * 6.waves + 3 * 60.waves + 20.waves)
+    }
+
+    "keeps the distribution unchanged when the block reward is below 6 waves, but still supersedes the boost" in withDomain(
+      adjustedDistributionSettings(3.waves, ceaseXtnBuyback = false),
+      Seq(AddrWithBalance(blockMiner.toAddress, initialMinerBalance))
+    ) { d =>
+      (1 to 6).foreach(_ => d.appendKeyBlock(blockMiner))
+      // heights 2..4: 2/0.5/0.5, heights 5..7: 20/5/5
+      d.blockchain.height shouldBe 7
+      assertBalances(
+        d.blockchain,
+        blockMiner.toAddress -> (initialMinerBalance + 3 * 2.waves + 3 * 20.waves),
+        daoAddress           -> (3 * 0.5.waves + 3 * 5.waves),
+        xtnBuybackAddress    -> (3 * 0.5.waves + 3 * 5.waves)
+      )
+
+      d.appendKeyBlock(blockMiner)
+      // height 8: same proportions, but the boost no longer applies
+      d.blockchain.height shouldBe AdjustedDistributionActivationHeight
+      assertBalances(
+        d.blockchain,
+        blockMiner.toAddress -> (initialMinerBalance + 3 * 2.waves + 3 * 20.waves + 2.waves),
+        daoAddress           -> (3 * 0.5.waves + 3 * 5.waves + 0.5.waves),
+        xtnBuybackAddress    -> (3 * 0.5.waves + 3 * 5.waves + 0.5.waves)
+      )
+      d.blockchain.wavesAmount(8) shouldBe BigInt(100_000_000.waves + 3 * 3.waves + 3 * 30.waves + 3.waves)
+    }
   }
 }

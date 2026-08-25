@@ -651,7 +651,7 @@ object Application extends ScorexLogging {
         val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height.toInt, blockMeta.header.generator.toAddress, blockchainUpdater)
         blockMeta.copy(
           rewardShares = rewardShares,
-          reward = blockMeta.reward.map(_ * blockchainUpdater.blockRewardBoost(height))
+          reward = blockMeta.reward.map(BlockRewardCalculator.getTotalBlockReward(height, _, blockchainUpdater))
         )
       }
 

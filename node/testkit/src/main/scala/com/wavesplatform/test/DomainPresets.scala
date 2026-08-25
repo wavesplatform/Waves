@@ -107,6 +107,9 @@ object DomainPresets {
 
   val DeterministicFinality: WavesSettings = TransactionStateSnapshot.addFeatures(BlockchainFeatures.DeterministicFinality)
 
+  val AdjustedBlockRewardDistribution: WavesSettings =
+    DeterministicFinality.addFeatures(BlockchainFeatures.AdjustedBlockRewardDistribution)
+
   def settingsForRide(version: StdLibVersion): WavesSettings =
     version match {
       case V1 => RideV3

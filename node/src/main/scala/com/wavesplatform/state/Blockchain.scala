@@ -273,13 +273,16 @@ object Blockchain {
         .featureActivationHeight(BlockchainFeatures.LightNode)
         .exists(Height(height) >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
 
+    // AdjustedBlockRewardDistribution supersedes BoostBlockReward: the fixed shares it introduces are not boosted
     def blockRewardBoost(height: Height): Int =
-      blockchain
-        .featureActivationHeight(BlockchainFeatures.BoostBlockReward)
-        .filter { boostHeight =>
-          boostHeight <= height && height < boostHeight + blockchain.settings.functionalitySettings.blockRewardBoostPeriod
-        }
-        .fold(1)(_ => BlockRewardCalculator.RewardBoost)
+      if (isFeatureActivated(BlockchainFeatures.AdjustedBlockRewardDistribution, height.toInt)) 1
+      else
+        blockchain
+          .featureActivationHeight(BlockchainFeatures.BoostBlockReward)
+          .filter { boostHeight =>
+            boostHeight <= height && height < boostHeight + blockchain.settings.functionalitySettings.blockRewardBoostPeriod
+          }
+          .fold(1)(_ => BlockRewardCalculator.RewardBoost)
 
     /** @return None, if DeterministicFinality is not activated for provided height
       */
