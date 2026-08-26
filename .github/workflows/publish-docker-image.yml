@@ -107,12 +107,12 @@ jobs:
             echo EOF
           } >> "$GITHUB_OUTPUT"
         id: annotations
-      - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         if: inputs.environment != ''
         with:
           username: ${{ secrets.DOCKERHUB_USER }}
@@ -174,7 +174,7 @@ jobs:
             echo ${{ inputs.docker-tags }} | tr ',' '\n' | sed -e 's/^/type=raw,value=/'
             echo EOF
           } >> "$GITHUB_ENV"
-      - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
