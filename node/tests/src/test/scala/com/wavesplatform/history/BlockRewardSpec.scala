@@ -1435,15 +1435,21 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       ) // 15: non-boosted after change
   }
 
+
   private val AdjustedDistributionActivationHeight = 8
 
-  private def adjustedDistributionSettings(initialReward: Long, ceaseXtnBuyback: Boolean): WavesSettings = {
+  private def adjustedDistributionSettings(
+      rewardsSettings: RewardsSettings,
+      boostBlockReward: Boolean = false,
+      ceaseXtnBuyback: Boolean = false
+  ): WavesSettings = {
     val featureHeights =
       Seq(
         BlockchainFeatures.CappedReward                    -> 0,
-        BlockchainFeatures.BoostBlockReward                -> 5,
         BlockchainFeatures.AdjustedBlockRewardDistribution -> AdjustedDistributionActivationHeight
-      ) ++ (if (ceaseXtnBuyback) Seq(BlockchainFeatures.CeaseXtnBuyback -> 0) else Nil)
+      ) ++
+        (if (boostBlockReward) Seq(BlockchainFeatures.BoostBlockReward -> 5) else Nil) ++
+        (if (ceaseXtnBuyback) Seq(BlockchainFeatures.CeaseXtnBuyback -> 0) else Nil)
 
     val ws = DomainPresets.BlockRewardDistribution
       .setFeaturesHeight(featureHeights*)
@@ -1456,12 +1462,30 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
           xtnBuybackAddress = Some(xtnBuybackAddress.toString)
         )
       )
-    ws.copy(blockchainSettings = ws.blockchainSettings.copy(rewardsSettings = RewardsSettings(1000, 1000, initialReward, 0.5.waves, 4)))
+    ws.copy(blockchainSettings = ws.blockchainSettings.copy(rewardsSettings = rewardsSettings))
+  }
+
+  /** Appends a block and checks how the reward of that block was split. */
+  private def appendVotingBlock(d: Domain, rewardVote: Long = -1L)(miner: Long, dao: Long, xtn: Long)(implicit pos: Position): Unit = {
+    val minerBalanceBefore = d.balance(blockMiner.toAddress)
+    val daoBalanceBefore   = d.balance(daoAddress)
+    val xtnBalanceBefore   = d.balance(xtnBuybackAddress)
+
+    d.appendBlock(d.createBlock(version = Block.RewardBlockVersion, generator = blockMiner, rewardVote = rewardVote))
+
+    withClue(s"height ${d.blockchain.height}: ") {
+      assertBalances(
+        d.blockchain,
+        blockMiner.toAddress -> (minerBalanceBefore + miner),
+        daoAddress           -> (daoBalanceBefore + dao),
+        xtnBuybackAddress    -> (xtnBalanceBefore + xtn)
+      )
+    }
   }
 
   "Adjusted block reward distribution:" - {
-    "replaces the default 2/2/2 distribution with 10 (DAO) / 8 (miner) / 2 (XTN buyback)" in withDomain(
-      adjustedDistributionSettings(6.waves, ceaseXtnBuyback = false),
+    "replaces the default 2/2/2 distribution with 10 (DAO) / 8 (miner) / 2 (XTN buyback) and supersedes the boost" in withDomain(
+      adjustedDistributionSettings(RewardsSettings(1000, 1000, 6.waves, 0.5.waves, 4), boostBlockReward = true),
       Seq(AddrWithBalance(blockMiner.toAddress, initialMinerBalance))
     ) { d =>
       (1 to 6).foreach(_ => d.appendKeyBlock(blockMiner))
@@ -1476,7 +1500,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       d.blockchain.wavesAmount(7) shouldBe BigInt(100_000_000.waves + 3 * 6.waves + 3 * 60.waves)
 
       d.appendKeyBlock(blockMiner)
-      // height 8: activation height, the boost has no effect anymore
+      // height 8: activation height, the block reward is reset to 20 waves and the boost has no effect anymore
       d.blockchain.height shouldBe AdjustedDistributionActivationHeight
       assertBalances(
         d.blockchain,
@@ -1494,14 +1518,39 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         xtnBuybackAddress    -> (3 * 2.waves + 3 * 20.waves + 2 * 2.waves)
       )
 
-      // the voted reward is unchanged, but 20 waves are actually issued per block
-      d.blockchain.blockReward(9) shouldBe 6.waves.some
+      d.blockchain.blockReward(9) shouldBe 20.waves.some
       d.blockchain.wavesAmount(9) shouldBe BigInt(100_000_000.waves + 3 * 6.waves + 3 * 60.waves + 2 * 20.waves)
       RewardApiRoute(d.blockchain).getRewards(Height(9)).explicitGet().currentReward shouldBe 20.waves
     }
 
+    "resets the block reward to 20 waves regardless of its value before the activation" in withDomain(
+      adjustedDistributionSettings(RewardsSettings(1000, 1000, 3.waves, 0.5.waves, 4)),
+      Seq(AddrWithBalance(blockMiner.toAddress, initialMinerBalance))
+    ) { d =>
+      (1 to 6).foreach(_ => d.appendKeyBlock(blockMiner))
+      // heights 2..7: 2 waves to the miner, the remaining 1 wave is split between the DAO and the XTN buyback addresses
+      d.blockchain.height shouldBe 7
+      assertBalances(
+        d.blockchain,
+        blockMiner.toAddress -> (initialMinerBalance + 6 * 2.waves),
+        daoAddress           -> (6 * 0.5.waves),
+        xtnBuybackAddress    -> (6 * 0.5.waves)
+      )
+
+      d.appendKeyBlock(blockMiner)
+      d.blockchain.height shouldBe AdjustedDistributionActivationHeight
+      d.blockchain.blockReward(AdjustedDistributionActivationHeight) shouldBe 20.waves.some
+      assertBalances(
+        d.blockchain,
+        blockMiner.toAddress -> (initialMinerBalance + 6 * 2.waves + 8.waves),
+        daoAddress           -> (6 * 0.5.waves + 10.waves),
+        xtnBuybackAddress    -> (6 * 0.5.waves + 2.waves)
+      )
+      d.blockchain.wavesAmount(8) shouldBe BigInt(100_000_000.waves + 6 * 3.waves + 20.waves)
+    }
+
     "gives the XTN buyback share to the miner when XTN buyback has ceased" in withDomain(
-      adjustedDistributionSettings(6.waves, ceaseXtnBuyback = true),
+      adjustedDistributionSettings(RewardsSettings(1000, 1000, 6.waves, 0.5.waves, 4), boostBlockReward = true, ceaseXtnBuyback = true),
       Seq(AddrWithBalance(blockMiner.toAddress, initialMinerBalance))
     ) { d =>
       (1 to 6).foreach(_ => d.appendKeyBlock(blockMiner))
@@ -1526,30 +1575,56 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       d.blockchain.wavesAmount(8) shouldBe BigInt(100_000_000.waves + 3 * 6.waves + 3 * 60.waves + 20.waves)
     }
 
-    "keeps the distribution unchanged when the block reward is below 6 waves, but still supersedes the boost" in withDomain(
-      adjustedDistributionSettings(3.waves, ceaseXtnBuyback = false),
+    "keeps the total block reward votable, 20 waves being only the value the voting restarts from" in withDomain(
+      // a 6 waves increment makes the whole range of the distribution reachable within a few terms
+      adjustedDistributionSettings(RewardsSettings(5, 5, 6.waves, 6.waves, 4)),
       Seq(AddrWithBalance(blockMiner.toAddress, initialMinerBalance))
     ) { d =>
-      (1 to 6).foreach(_ => d.appendKeyBlock(blockMiner))
-      // heights 2..4: 2/0.5/0.5, heights 5..7: 20/5/5
-      d.blockchain.height shouldBe 7
+      // heights 2..5: 6 waves, the default 2/2/2 distribution, nobody votes
+      (1 to 4).foreach(_ => d.appendKeyBlock(blockMiner))
+      d.blockchain.height shouldBe 5
+      d.blockchain.blockReward(5) shouldBe 6.waves.some
       assertBalances(
         d.blockchain,
-        blockMiner.toAddress -> (initialMinerBalance + 3 * 2.waves + 3 * 20.waves),
-        daoAddress           -> (3 * 0.5.waves + 3 * 5.waves),
-        xtnBuybackAddress    -> (3 * 0.5.waves + 3 * 5.waves)
+        blockMiner.toAddress -> (initialMinerBalance + 4 * 2.waves),
+        daoAddress           -> (4 * 2.waves),
+        xtnBuybackAddress    -> (4 * 2.waves)
       )
 
-      d.appendKeyBlock(blockMiner)
-      // height 8: same proportions, but the boost no longer applies
-      d.blockchain.height shouldBe AdjustedDistributionActivationHeight
-      assertBalances(
-        d.blockchain,
-        blockMiner.toAddress -> (initialMinerBalance + 3 * 2.waves + 3 * 20.waves + 2.waves),
-        daoAddress           -> (3 * 0.5.waves + 3 * 5.waves + 0.5.waves),
-        xtnBuybackAddress    -> (3 * 0.5.waves + 3 * 5.waves + 0.5.waves)
-      )
-      d.blockchain.wavesAmount(8) shouldBe BigInt(100_000_000.waves + 3 * 3.waves + 3 * 30.waves + 3.waves)
+      // heights 6..9 vote for 26 waves, heights 8..9 are already using the adjusted distribution
+      appendVotingBlock(d, 26.waves)(2.waves, 2.waves, 2.waves)
+      appendVotingBlock(d, 26.waves)(2.waves, 2.waves, 2.waves)
+      appendVotingBlock(d, 26.waves)(8.waves, 10.waves, 2.waves)
+      appendVotingBlock(d, 26.waves)(8.waves, 10.waves, 2.waves)
+      d.blockchain.height shouldBe 9
+      d.blockchain.blockReward(9) shouldBe 20.waves.some
+
+      // height 10: the votes are counted, the total reward grows to 26 waves and the miner takes everything above 20
+      appendVotingBlock(d)(14.waves, 10.waves, 2.waves)
+      d.blockchain.blockReward(10) shouldBe 26.waves.some
+      d.blockchain.wavesAmount(10) shouldBe BigInt(100_000_000.waves + 4 * 6.waves + 2 * 6.waves + 2 * 20.waves + 26.waves)
+
+      // heights 11..14 vote the reward back down
+      (1 to 4).foreach(_ => appendVotingBlock(d, 0)(14.waves, 10.waves, 2.waves))
+      // height 15: back to 20 waves
+      appendVotingBlock(d)(8.waves, 10.waves, 2.waves)
+      d.blockchain.blockReward(15) shouldBe 20.waves.some
+
+      (1 to 4).foreach(_ => appendVotingBlock(d, 0)(8.waves, 10.waves, 2.waves))
+      // height 20: 14 waves, the miner keeps its guaranteed 8 waves and the rest is split 5 to 1
+      appendVotingBlock(d)(8.waves, 5.waves, 1.waves)
+      d.blockchain.blockReward(20) shouldBe 14.waves.some
+
+      (1 to 4).foreach(_ => appendVotingBlock(d, 0)(8.waves, 5.waves, 1.waves))
+      // height 25: 8 waves, only the guaranteed miner reward is left
+      appendVotingBlock(d)(8.waves, 0, 0)
+      d.blockchain.blockReward(25) shouldBe 8.waves.some
+
+      (1 to 4).foreach(_ => appendVotingBlock(d, 0)(8.waves, 0, 0))
+      // height 30: 2 waves, below the guaranteed miner reward
+      appendVotingBlock(d)(2.waves, 0, 0)
+      d.blockchain.blockReward(30) shouldBe 2.waves.some
+      RewardApiRoute(d.blockchain).getRewards(Height(30)).explicitGet().currentReward shouldBe 2.waves
     }
   }
 }

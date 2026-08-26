@@ -194,6 +194,12 @@ class BlockchainUpdaterImpl(
             Some(currentReward)
         }
         .orElse(lastBlockReward)
+        .map { reward =>
+          // AdjustedBlockRewardDistribution resets the block reward to its own initial value at the activation height, the voting continues from there
+          if (this.featureActivationHeight(BlockchainFeatures.AdjustedBlockRewardDistribution).contains(nextHeight))
+            BlockRewardCalculator.AdjustedFullReward
+          else reward
+        }
   }
 
   /** Referenced blockchain for mining or appending new block that references the latest block in blockchain or a microblock
@@ -677,7 +683,7 @@ class BlockchainUpdaterImpl(
       case Some(ng) if this.height == height =>
         val parentConflictEndorsements = rocksdb.lastBlockHeader.flatMap(_.header.finalizationVoting).fold(0)(_.conflict.size)
         rocksdb.wavesAmount(height - 1) +
-          BigInt(BlockRewardCalculator.getTotalBlockReward(Height(height), ng.reward.getOrElse(0L), this)) -
+          BigInt(ng.reward.getOrElse(0L)) * this.blockRewardBoost(Height(height)) -
           parentConflictEndorsements * CommitToGenerationTransaction.DepositInWavelets
       case _ =>
         rocksdb.wavesAmount(height)

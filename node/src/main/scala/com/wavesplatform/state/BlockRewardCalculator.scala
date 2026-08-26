@@ -24,12 +24,58 @@ object BlockRewardCalculator {
   val GuaranteedMinerReward: Long = 2 * Constants.UnitsInWave
   val RewardBoost                 = 10
 
-  /** Fixed shares used after the activation of [[BlockchainFeatures.AdjustedBlockRewardDistribution]]. They replace the default 2/2/2 distribution
-    * (or its boosted 20/20/20 form) and are not affected by the reward boost.
+  /** How the block reward is split between the miner, the DAO address and the XTN buyback address once
+    * [[BlockchainFeatures.CappedReward]] is activated.
+    *
+    * @param fullReward
+    *   the block reward at which both the DAO and the XTN buyback addresses receive their maximum shares
+    * @param guaranteedMinerReward
+    *   the part of the block reward the miner receives regardless of the votes
+    * @param maxDaoAddressReward
+    *   the maximum share of the DAO address
+    * @param maxXtnBuybackAddressReward
+    *   the maximum share of the XTN buyback address
+    * @param daoAddressRemainderPart
+    *   the part of a below-[[fullReward]] block reward left after the guaranteed miner reward that goes to the DAO address
+    * @param xtnBuybackAddressRemainderPart
+    *   the same for the XTN buyback address
+    */
+  case class RewardDistribution(
+      fullReward: Long,
+      guaranteedMinerReward: Long,
+      maxDaoAddressReward: Long,
+      maxXtnBuybackAddressReward: Long,
+      daoAddressRemainderPart: Fraction,
+      xtnBuybackAddressRemainderPart: Fraction
+  )
+
+  /** 2 (DAO) / 2 (miner) / 2 (XTN buyback) at the initial block reward of 6 waves. */
+  val DefaultDistribution: RewardDistribution = RewardDistribution(
+    FullRewardInit,
+    GuaranteedMinerReward,
+    MaxAddressReward,
+    MaxAddressReward,
+    RemaindRewardAddressPart,
+    RemaindRewardAddressPart
+  )
+
+  /** 10 (DAO) / 8 (miner) / 2 (XTN buyback) at the block reward of 20 waves, used after the activation of
+    * [[BlockchainFeatures.AdjustedBlockRewardDistribution]]. 20 waves is the amount the block reward is reset to at the activation height, it stays
+    * votable afterwards.
     */
   val AdjustedFullReward: Long              = 20 * Constants.UnitsInWave
   val AdjustedDaoAddressReward: Long        = 10 * Constants.UnitsInWave
   val AdjustedXtnBuybackAddressReward: Long = 2 * Constants.UnitsInWave
+  val AdjustedGuaranteedMinerReward: Long   = AdjustedFullReward - AdjustedDaoAddressReward - AdjustedXtnBuybackAddressReward
+
+  val AdjustedDistribution: RewardDistribution = RewardDistribution(
+    AdjustedFullReward,
+    AdjustedGuaranteedMinerReward,
+    AdjustedDaoAddressReward,
+    AdjustedXtnBuybackAddressReward,
+    Fraction(5, 6),
+    Fraction(1, 6)
+  )
 
   def getBlockRewardShares(
       height: Height,
@@ -50,40 +96,29 @@ object BlockRewardCalculator {
         height < blockRewardDistributionHeight + blockchain.settings.functionalitySettings.xtnBuybackRewardPeriod
       }
       if (height >= cappedRewardHeight) {
-        if (fullBlockReward < GuaranteedMinerReward) {
+        val distribution = if (height >= adjustedRewardDistributionHeight) AdjustedDistribution else DefaultDistribution
+
+        if (fullBlockReward < distribution.guaranteedMinerReward) {
           BlockRewardShares(fullBlockReward, 0, 0)
-        } else if (fullBlockReward < FullRewardInit) {
+        } else if (fullBlockReward < distribution.fullReward) {
+          val remainder = fullBlockReward - distribution.guaranteedMinerReward
           calculateRewards(
             fullBlockReward,
-            RemaindRewardAddressPart.apply(fullBlockReward - GuaranteedMinerReward),
-            daoAddress,
-            modifiedXtnBuybackAddress
-          )
-        } else if (height >= adjustedRewardDistributionHeight) {
-          calculateRewards(
-            AdjustedFullReward,
-            daoAddress.fold(0L)(_ => AdjustedDaoAddressReward),
-            modifiedXtnBuybackAddress.fold(0L)(_ => AdjustedXtnBuybackAddressReward)
+            daoAddress.fold(0L)(_ => distribution.daoAddressRemainderPart(remainder)),
+            modifiedXtnBuybackAddress.fold(0L)(_ => distribution.xtnBuybackAddressRemainderPart(remainder))
           )
         } else {
-          calculateRewards(fullBlockReward, MaxAddressReward, daoAddress, modifiedXtnBuybackAddress)
+          calculateRewards(
+            fullBlockReward,
+            daoAddress.fold(0L)(_ => distribution.maxDaoAddressReward),
+            modifiedXtnBuybackAddress.fold(0L)(_ => distribution.maxXtnBuybackAddressReward)
+          )
         }
       } else {
         calculateRewards(fullBlockReward, CurrentBlockRewardPart.apply(fullBlockReward), daoAddress, modifiedXtnBuybackAddress)
       }
     } else BlockRewardShares(fullBlockReward, 0, 0)
   }.multiply(blockchain.blockRewardBoost(height))
-
-  /** Total amount of WAVES issued by the block at the given height. Equals to the boosted block reward before the activation of
-    * [[BlockchainFeatures.AdjustedBlockRewardDistribution]] and to the sum of the fixed shares after it.
-    */
-  def getTotalBlockReward(height: Height, fullBlockReward: Long, blockchain: Blockchain): Long = {
-    val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
-    val xtnBuybackAddress = blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
-
-    val shares = getBlockRewardShares(height, fullBlockReward, daoAddress, xtnBuybackAddress, blockchain)
-    shares.miner + shares.daoAddress + shares.xtnBuybackAddress
-  }
 
   def getSortedBlockRewardShares(height: Int, fullBlockReward: Long, generator: Address, blockchain: Blockchain): Seq[(Address, Long)] = {
     val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten

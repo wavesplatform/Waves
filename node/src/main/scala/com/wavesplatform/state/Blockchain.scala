@@ -273,7 +273,7 @@ object Blockchain {
         .featureActivationHeight(BlockchainFeatures.LightNode)
         .exists(Height(height) >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
 
-    // AdjustedBlockRewardDistribution supersedes BoostBlockReward: the fixed shares it introduces are not boosted
+    // AdjustedBlockRewardDistribution supersedes BoostBlockReward: the block reward it votes on is already the full amount issued per block
     def blockRewardBoost(height: Height): Int =
       if (isFeatureActivated(BlockchainFeatures.AdjustedBlockRewardDistribution, height.toInt)) 1
       else
