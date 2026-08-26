@@ -287,7 +287,10 @@ object ExchangeTransactionDiff {
             GenericError("Invalid order signature format")
           )
           _ <- Either.raiseWhen(
-            signature.size > 65 && blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality)
+            signature.size > 65 && (
+              blockchain.isFeatureActivated(BlockchainFeatures.DeterministicFinality) ||
+                blockchain.isFeatureActivated(BlockchainFeatures.AdjustedBlockRewardDistribution)
+            )
           )(GenericError("Invalid order signature format"))
         } yield ()
       case _ => Right(())
