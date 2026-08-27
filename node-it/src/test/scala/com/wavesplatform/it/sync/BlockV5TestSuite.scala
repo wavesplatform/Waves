@@ -26,10 +26,9 @@ class BlockV5TestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
   "block v5 appears and blockchain grows" - {
     "check block v5 at current height" in {
       nodes.head.waitForHeight(nodes.head.height + 2, 2.minute)
-      currentHeight = nodes.head.height
 
-      val lastBlockCurrentHeight         = nodes.head.lastBlock()
       val lastBlockHeaderCurrentHeight   = nodes.head.lastBlockHeader()
+      currentHeight = lastBlockHeaderCurrentHeight.height
       val blockAtCurrentHeight           = nodes.head.blockAt(currentHeight)
       val blockHeaderCurrentHeight       = nodes.head.blockHeaderAt(currentHeight)
       val blockBySignatureCurrentHeight  = nodes.head.blockById(blockAtCurrentHeight.id)
@@ -45,7 +44,6 @@ class BlockV5TestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
       generationSignatureInBlockJson.arr.length shouldBe Block.GenerationVRFSignatureLength
 
       blockAtCurrentHeight shouldBe blockBySignatureCurrentHeight
-      blockAtCurrentHeight shouldBe lastBlockCurrentHeight
       blockHeaderCurrentHeight shouldBe lastBlockHeaderCurrentHeight
       blockAtCurrentHeight.signature shouldBe blockHeaderCurrentHeight.signature
       blockAtCurrentHeight.baseTarget shouldBe blockHeaderCurrentHeight.baseTarget

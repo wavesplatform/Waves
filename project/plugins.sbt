@@ -9,10 +9,10 @@ addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.8")
 libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "1.0.0-alpha.6"
 
 Seq(
-  "com.eed3si9n"       % "sbt-assembly"             % "2.4.1",
+  "com.eed3si9n"       % "sbt-assembly"             % "2.4.2",
   "com.github.sbt"     % "sbt-git"                  % "2.1.0",
   "com.github.sbt"     % "sbt-native-packager"      % "1.11.7",
-  "com.github.sbt"     % "sbt-pgp"                  % "2.3.1",
+  "com.github.sbt"     % "sbt-pgp"                  % "2.3.2",
   "com.lightbend.sbt"  % "sbt-javaagent"            % "0.1.6",
   "org.portable-scala" % "sbt-scalajs-crossproject" % "1.4.0",
   "org.scala-js"       % "sbt-scalajs"              % "1.22.0",
