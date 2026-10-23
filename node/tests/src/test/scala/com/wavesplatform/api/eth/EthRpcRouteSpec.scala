@@ -8,7 +8,7 @@ import com.wavesplatform.history.{DefaultWavesSettings, Domain, settingsWithFeat
 import com.wavesplatform.http.RouteSpec
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.BinaryDataEntry
+import com.wavesplatform.state.{BinaryDataEntry, IntegerDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.node.{randomAddress, randomKeyPair}
 import com.wavesplatform.transaction.TxHelpers.issue
@@ -332,6 +332,136 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     Post(routePath(""), Json.obj())
       .~>(new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route)
       .~>(check { responseAs[JsObject] shouldBe Json.obj() })
+  }
+
+  "batch requests" in withDomain() { d =>
+    Post(
+      routePath(""),
+      Json.arr(
+        Json.obj("method" -> "eth_blockNumber", "id" -> 1),
+        Json.obj("method" -> "eth_chainId", "id" -> 2),
+        Json.obj("method" -> "eth_syncing", "id" -> 3)
+      )
+    ).~>(new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route) ~> check {
+      val arr = responseAs[JsArray]
+      arr.value.length shouldBe 3
+      (arr.value(0) \ "id").as[Int] shouldBe 1
+      (arr.value(1) \ "id").as[Int] shouldBe 2
+      (arr.value(2) \ "result").as[Boolean] shouldBe false
+    }
+  }
+
+  "EIP-1559 fee methods" in withDomain() { d =>
+    routeTest(d, "eth_maxPriorityFeePerGas")(result shouldBe "0x3b9aca00")
+    routeTest(d, "eth_feeHistory", "0x4", "latest", Json.arr()) {
+      (resultJson \ "baseFeePerGas").as[JsArray].value.nonEmpty shouldBe true
+      (resultJson \ "gasUsedRatio").as[JsArray].value.nonEmpty shouldBe true
+    }
+  }
+
+  "standard Web3 methods" in withDomain() { d =>
+    routeTest(d, "eth_syncing")((responseAs[JsObject] \ "result").as[Boolean] shouldBe false)
+    routeTest(d, "eth_accounts")((responseAs[JsObject] \ "result").as[JsArray] shouldBe Json.arr())
+    routeTest(d, "web3_clientVersion")(result should startWith("Waves/v"))
+    routeTest(d, "net_listening")((responseAs[JsObject] \ "result").as[Boolean] shouldBe true)
+    routeTest(d, "net_peerCount")(result shouldBe "0x1")
+  }
+
+  "additional Web3.js compatibility methods" in withDomain() { d =>
+    routeTest(d, "net_version")(result shouldBe d.blockchain.settings.addressSchemeCharacter.toLong.toString)
+    routeTest(d, "eth_protocolVersion")(result shouldBe "0x41")
+    routeTest(d, "eth_getStorageAt", "0x0000000000000000000000000000000000000000", "0x0", "latest")(result should startWith("0x000"))
+    routeTest(d, "personal_listAccounts")((responseAs[JsObject] \ "result").as[JsArray] shouldBe Json.arr())
+    routeTest(d, "web3_sha3", "0x68656c6c6f")(result should startWith("0x"))
+    routeTest(d, "eth_getUncleCountByBlockHash", "0x00")(result shouldBe "0x0")
+    routeTest(d, "eth_getUncleCountByBlockNumber", "latest")(result shouldBe "0x0")
+    routeTest(d, "eth_getUncleByBlockHashAndIndex", "0x00", "0x0")((responseAs[JsObject] \ "result").get shouldBe JsNull)
+    routeTest(d, "eth_getUncleByBlockNumberAndIndex", "latest", "0x0")((responseAs[JsObject] \ "result").get shouldBe JsNull)
+    d.appendBlock()
+    routeTest(d, "eth_getBlockTransactionCountByNumber", "latest")(result shouldBe "0x0")
+    routeTest(d, "eth_getBlockTransactionCountByHash", toHexString(d.lastBlockId.arr))(result shouldBe "0x0")
+    routeTest(d, "eth_getTransactionByBlockNumberAndIndex", "latest", "0x0")((responseAs[JsObject] \ "result").get shouldBe JsNull)
+    routeTest(d, "eth_getTransactionByBlockHashAndIndex", toHexString(d.lastBlockId.arr), "0x0")((responseAs[JsObject] \ "result").get shouldBe JsNull)
+    routeTest(d, "eth_getLogs", Json.obj("fromBlock" -> "latest", "toBlock" -> "latest")) {
+      (responseAs[JsObject] \ "result").as[JsArray] shouldBe Json.arr()
+    }
+  }
+
+  "full block details" in withDomain() { d =>
+    d.appendBlock()
+    routeTest(d, "eth_getBlockByNumber", "latest") {
+      (resultJson \ "number").as[String] shouldBe "0x1"
+      (resultJson \ "hash").as[String] should startWith("0x")
+      (resultJson \ "parentHash").as[String] should startWith("0x")
+      (resultJson \ "gasLimit").as[String] shouldBe "0x1c9c380"
+      (resultJson \ "baseFeePerGas").as[String] shouldBe "0x0"
+      (resultJson \ "transactions").as[JsArray] shouldBe Json.arr()
+    }
+  }
+
+  "ERC-20 full token metadata" in withDomain() { d =>
+    val randomKP = randomKeyPair()
+    val issueTx  = TxHelpers.issue(randomKP, 100000000, 8, "MYTOKEN", "test token", 1.waves, version = TxVersion.V2)
+    d.appendBlock(
+      GenesisTransaction.create(randomKP.toAddress, 5.waves, ntpTime.correctedTime()).explicitGet(),
+      issueTx
+    )
+    val tokenAddr = EthEncoding.toHexString(issueTx.id().arr.take(20))
+    // name() = 0x06fdde03
+    routeTest(d, "eth_call", Json.obj("to" -> tokenAddr, "data" -> "0x06fdde03")) {
+      result should endWith("4d59544f4b454e" + "00" * 25)
+    }
+    // totalSupply() = 0x18160ddd
+    routeTest(d, "eth_call", Json.obj("to" -> tokenAddr, "data" -> "0x18160ddd")) {
+      resultInt shouldBe 100000000
+    }
+    // allowance() = 0xdd62ed3e
+    routeTest(d, "eth_call", Json.obj("to" -> tokenAddr, "data" -> "0xdd62ed3e")) {
+      result should startWith("0x")
+    }
+  }
+
+  "ERC-721 NFT detection & metadata" in withDomain(
+    settingsWithFeatures(BlockchainFeatures.ReduceNFTFee, BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.RideV6)
+  ) { d =>
+    val randomKP = randomKeyPair()
+    val nftIssueTx = TxHelpers.issue(randomKP, 1, 0, "MYNFT", "https://example.com/metadata/1.json", 1.waves, reissuable = false, version = TxVersion.V2)
+    d.appendBlock(
+      GenesisTransaction.create(randomKP.toAddress, 5.waves, ntpTime.correctedTime()).explicitGet(),
+      nftIssueTx
+    )
+    val nftAddr = EthEncoding.toHexString(nftIssueTx.id().arr.take(20))
+    // supportsInterface(0x80ac58cd) = true (ERC-721)
+    routeTest(d, "eth_call", Json.obj("to" -> nftAddr, "data" -> "0x01ffc9a780ac58cd00000000000000000000000000000000000000000000000000000000")) {
+      result should endWith("1")
+    }
+    // tokenURI(1) = 0xc87b56dd
+    routeTest(d, "eth_call", Json.obj("to" -> nftAddr, "data" -> "0xc87b56dd0000000000000000000000000000000000000000000000000000000000000001")) {
+      result should include("68747470733a2f2f6578616d706c652e636f6d")
+    }
+    // ownerOf(1) = 0x6352211e
+    routeTest(d, "eth_call", Json.obj("to" -> nftAddr, "data" -> "0x6352211e0000000000000000000000000000000000000000000000000000000000000001")) {
+      result should startWith("0x")
+    }
+    // totalSupply() = 1
+    routeTest(d, "eth_call", Json.obj("to" -> nftAddr, "data" -> "0x18160ddd")) {
+      resultInt shouldBe 1
+    }
+  }
+
+  "eth_getStorageAt with account data" in withDomain(
+    settingsWithFeatures(BlockchainFeatures.DataTransaction, BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.RideV6)
+  ) { d =>
+    val randomKP = randomKeyPair()
+    val dataTx = TxHelpers.data(randomKP, Seq(IntegerDataEntry("balance", 123456L)), 0.005.waves, version = TxVersion.V2)
+    d.appendBlock(
+      GenesisTransaction.create(randomKP.toAddress, 5.waves, ntpTime.correctedTime()).explicitGet(),
+      dataTx
+    )
+    val ethAddr = randomKP.toAddress.toEthAddress
+    routeTest(d, "eth_getStorageAt", ethAddr, "0x62616c616e6365", "latest") {
+      result should endWith("1e240")
+    }
   }
 
   def resultJson: JsObject = (responseAs[JsObject] \ "result").as[JsObject]
