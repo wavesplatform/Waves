@@ -188,6 +188,9 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                 resp(id, encodeResponse(assetDescription(contractAddress).fold("")(_.name.toStringUtf8)))
               case "313ce567" => // decimals()
                 resp(id, encodeResponse(new Uint8(assetDescription(contractAddress).fold(0)(_.decimals))))
+              case "18160ddd" => // totalSupply()
+                val supply = assetDescription(contractAddress).fold(BigInteger.ZERO)(_.totalVolume.bigInteger)
+                resp(id, encodeResponse(new Uint256(supply)))
               case "70a08231" => // balanceOf(address)
                 resp(
                   id,
