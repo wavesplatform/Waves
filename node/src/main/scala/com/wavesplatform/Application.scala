@@ -406,7 +406,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       val routeTimeout         = new RouteTimeout(serverRequestTimeout)(using heavyRequestScheduler)
 
       val apiRoutes = Seq(
-        new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi, time),
+        new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi, time)(using actorSystem),
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time, routeTimeout),
         TransactionsApiRoute(
