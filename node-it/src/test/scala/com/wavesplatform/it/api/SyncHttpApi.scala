@@ -792,7 +792,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def waitForSameBlockHeadersAt(
         height: Height,
-        retryInterval: FiniteDuration = 5.seconds,
+        retryInterval: FiniteDuration = 1.second,
         conditionAwaitTime: FiniteDuration = ConditionAwaitTime
     ): Boolean =
       sync(async(nodes).waitForSameBlockHeadersAt(height, retryInterval), conditionAwaitTime)

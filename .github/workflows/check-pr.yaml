@@ -85,7 +85,6 @@ jobs:
         repo:
           - waves-exchange/neutrino-contract
           - waves-exchange/contracts
-          - waves-ducks-core/wavesducks-public
           - swopfi/swopfi-smart-contracts
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -113,7 +112,7 @@ jobs:
           cache: 'sbt'
       - uses: sbt/setup-sbt@3afe9cf056c5d139bfc46579af1192d77a2f0821 # v1.4.0
       - name: Run Integration Tests
-        run: sbt --batch "node-it/docker;node-it/test"
+        run: sbt -Dwaves.it.max-parallel-suites=4 --batch "node-it/docker;node-it/integrationTests"
         env:
           RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}
       - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3
@@ -128,6 +127,41 @@ jobs:
         with:
           if-no-files-found: ignore
           name: test-logs
+          path: |
+            node-it/target/logs/*/
+            node-it/target/test-reports
+
+  # The @LoadTest suites measure whether a node keeps up with thousands of transactions, so they get a runner of their
+  # own, one suite at a time: sharing it with other suites turns them into a measurement of the runner. Two explicit
+  # jobs rather than a matrix keep the required-check names stable; keep the action pins in lockstep with the job above.
+  run-load-tests:
+    name: Run load tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'sbt'
+      - uses: sbt/setup-sbt@3afe9cf056c5d139bfc46579af1192d77a2f0821 # v1.4.0
+      - name: Run Load Tests
+        run: sbt -Dwaves.it.max-parallel-suites=1 --batch "node-it/docker;node-it/loadTests"
+        env:
+          RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}-load
+      - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3
+        if: always()
+        with:
+          report_paths: '**/target/test-reports/*.xml'
+          create_check: false
+          check_name: 'Run load tests'
+      - name: Upload Logs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          if-no-files-found: ignore
+          name: load-test-logs
           path: |
             node-it/target/logs/*/
             node-it/target/test-reports

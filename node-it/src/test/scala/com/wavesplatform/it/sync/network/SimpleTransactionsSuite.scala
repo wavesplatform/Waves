@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.network
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.it.Docker
 import com.wavesplatform.it.api.AsyncNetworkApi.*
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
@@ -15,6 +16,9 @@ import java.nio.charset.StandardCharsets
 import scala.concurrent.duration.*
 
 class SimpleTransactionsSuite extends BaseTransactionSuite {
+  // Speaks the binary protocol from the test JVM, so it needs the node-to-node port published (see Docker.publishNetworkPort).
+  override protected def createDocker: Docker = new Docker(tag = getClass.getSimpleName, publishNetworkPort = true)
+
   import com.wavesplatform.it.NodeConfigs.*
   override val nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
 

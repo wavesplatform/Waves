@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import com.google.protobuf.ByteString
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.api.SyncGrpcApi.*
@@ -13,6 +14,10 @@ import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
 trait GrpcIntegrationSuiteWithThreeAddress extends BaseSuite with ScalaFutures with IntegrationPatience with RecoverMethods with ScorexLogging {
   this: TestSuite & Nodes =>
+
+  // template.conf runs no extensions, so that suites which never call gRPC don't start a server or publish its port.
+  override protected def createDocker: Docker =
+    new Docker(suiteConfig = ConfigFactory.parseString(s"waves.extensions = [${Docker.GrpcExtension}]"), tag = getClass.getSimpleName)
 
   protected lazy val firstAcc: KeyPair  = KeyPair("first_acc".getBytes("UTF-8"))
   protected lazy val secondAcc: KeyPair = KeyPair("second_acc".getBytes("UTF-8"))

@@ -9,6 +9,8 @@ import java.lang.annotation.Target;
 
 @TagAnnotation
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+// TYPE only: IntegrationTestsPlugin.loadTestNames selects suites by class-level annotation, so a method-level tag
+// would be excluded from integrationTests and never selected by loadTests.
+@Target(ElementType.TYPE)
 public @interface LoadTest {
 }

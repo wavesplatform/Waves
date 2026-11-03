@@ -208,7 +208,13 @@ inScope(Global)(
     network := Network.default(),
     resolvers ++= Resolver.sonatypeCentralSnapshots +: Seq(Resolver.mavenLocal),
     Compile / packageDoc / publishArtifact := false,
-    concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
+    // Both limits in one assignment: a Global key is last-writer-wins, and .sbt files load after AutoPlugins, so a
+    // second assignment in IntegrationTestsPlugin used to be silently shadowed by this one, making
+    // -Dwaves.it.max-parallel-suites a no-op. checkTestLimits guards against that happening again.
+    concurrentRestrictions := Seq(
+      Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8)),
+      Tags.limit(Tags.ForkedTestGroup, maxParallelSuites.value)
+    ),
     excludeLintKeys ++= Set(
       node / Universal / configuration,
       node / Linux / configuration,
@@ -242,12 +248,25 @@ buildRIDERunnerForDocker := {
   )
 }
 
+// The ForkedTestGroup limit is what makes -Dwaves.it.max-parallel-suites mean anything, and it was missing because a
+// second Global assignment of concurrentRestrictions shadowed it. Assert it rather than trust a comment.
+lazy val checkTestLimits = taskKey[Unit]("Fails if Global/concurrentRestrictions no longer caps forked test groups")
+checkTestLimits := {
+  val limit     = (Global / maxParallelSuites).value
+  val overLimit = Map[ConcurrentRestrictions.Tag, Int](Tags.ForkedTestGroup -> (limit + 1))
+  if ((Global / concurrentRestrictions).value.forall(_(overLimit)))
+    sys.error(
+      s"Global/concurrentRestrictions no longer caps ${Tags.ForkedTestGroup} at $limit - another assignment of that Global key has shadowed it"
+    )
+}
+
 lazy val compilePRRaw = taskKey[Unit]("Compile the project")
 compilePRRaw := Def
   .sequential(
     clean.all(ScopeFilter(inAnyProject)),
     scalafmtCheck.all(ScopeFilter(inAnyProject, inConfigurations(Compile))),
-    compile.all(ScopeFilter(inAnyProject, inConfigurations(Test)))
+    compile.all(ScopeFilter(inAnyProject, inConfigurations(Test))),
+    checkTestLimits
   )
   .value
 
