@@ -21,6 +21,14 @@ trait BlockchainUpdater {
   def processMicroBlock(microBlock: MicroBlock, snapshot: Option[MicroBlockSnapshot], verify: Boolean = true): Either[ValidationError, BlockId]
   def computeNextReward: Option[Long]
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks]
+
+  /** The lowest height block sync may fork from: the finalized height, or `max-rollback` below the tip while finality lags behind that. Sync
+    * advertises ids down to it and rejects forks below it; removeAfter is not bound by it.
+    */
+  def syncBoundary: Height
+
+  /** Ids from the tip down to [[syncBoundary]], the anchors a block id request offers. */
+  def lastBlockIds: Seq[ByteStr]
   def lastBlockInfo: Observable[LastBlockInfo]
   def isLastBlockId(id: ByteStr): Boolean
   def referencedBlockchain(reference: ByteStr): Blockchain

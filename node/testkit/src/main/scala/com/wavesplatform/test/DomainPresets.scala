@@ -106,6 +106,7 @@ object DomainPresets {
   val TransactionStateSnapshot: WavesSettings = BlockRewardDistribution.addFeatures(BlockchainFeatures.LightNode)
 
   val DeterministicFinality: WavesSettings = TransactionStateSnapshot.addFeatures(BlockchainFeatures.DeterministicFinality)
+  val FinalityImprovements: WavesSettings  = DeterministicFinality.addFeatures(BlockchainFeatures.FinalityImprovements)
 
   val AdjustedBlockRewardDistribution: WavesSettings =
     DeterministicFinality.addFeatures(BlockchainFeatures.AdjustedBlockRewardDistribution)

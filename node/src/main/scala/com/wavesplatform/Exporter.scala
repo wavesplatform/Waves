@@ -154,7 +154,6 @@ object Exporter extends ScorexLogging {
       } else acc.reverse
     }
 
-    @tailrec
     override final def computeNext(): (Int, Block, Seq[Array[Byte]]) = {
       if (blockMetaIterator.hasNext) {
         val (h, meta) = blockMetaIterator.next()
@@ -175,11 +174,7 @@ object Exporter extends ScorexLogging {
               case _       => loadTxData[Array[Byte]](Seq.empty, h, snapshotIterator, (h, sn) => nextSnapshotEntry = Some(h -> sn))
             }
           } else Seq.empty
-          createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, txs).toOption
-            .map(block => (h, block, snapshots)) match {
-            case Some(r) => r
-            case None    => computeNext()
-          }
+          (h, createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, txs), snapshots)
         } else {
           closeResources()
           endOfData()

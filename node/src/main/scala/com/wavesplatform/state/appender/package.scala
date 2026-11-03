@@ -5,10 +5,12 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.Address
-import com.wavesplatform.block.{Block, BlockEndorsement, BlockSnapshot, FinalizationVoting}
+import com.wavesplatform.block.{Block, BlockEndorsement, BlockSnapshot}
+import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.crypto.bls.BlsPublicKey
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
@@ -228,7 +230,7 @@ package object appender {
       r <- blockConsensusValidation(blockchain, pos, time.correctedTime())(block, parentHeight)
       _ <- validateStateHash(block, blockchain)
       _ <- validateChallengedHeader(block, blockchain)
-      b <- validateFinalizationVoting(block, blockchain, generatorSet)
+      b <- validateFinalizationVoting(block, blockchain, generatorSet, acceptedConflicts = Set.empty)
     } yield (r, b)
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long)(
@@ -246,6 +248,7 @@ package object appender {
 
           minerBalance <- minerBalance(blockchain, miner, parentHeight, block).leftMap(GenericError(_))
           _            <- validateBlockVersion(parentHeight.toInt, block, blockchain)
+          _            <- validateBlockHeader(parentHeight.next, block, blockchain)
           _            <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime, currentTs))
           _            <- pos.validateBaseTarget(parentHeight.toInt, block, parent, grandParent)
           hitSource    <- pos.validateGenerationSignature(block)
@@ -283,6 +286,11 @@ package object appender {
     )
   }
 
+  // Proto blocks are decoded without Validators.validateBlock, unlike legacy ones (see Block.parseBytes)
+  private def validateBlockHeader(height: Height, block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
+    if (blockchain.isFeatureActivated(BlockchainFeatures.FinalityImprovements, height.toInt)) Validators.validateBlock(block).map(_ => ())
+    else Either.unit
+
   private def validateChallengedHeader(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
     for {
       _ <- Either.cond(
@@ -306,7 +314,7 @@ package object appender {
 
   private def validateConflictingEndorsement(
       blockchain: Blockchain,
-      finalizationVoting: FinalizationVoting,
+      balanceExempt: GeneratorIndex => Boolean,
       commitedGenerators: IndexedSeq[(Address, BlsPublicKey)],
       conflictingGenerators: Set[GeneratorIndex],
       validEndorsements: Set[Address],
@@ -324,8 +332,7 @@ package object appender {
       "Second conflicting endorsement from one generator"
     }
     _ <- Either.raiseUnless(
-      generatorsWithEnoughBalance.contains(conflictingEndorsement.endorserIndex) ||
-        finalizationVoting.conflict.exists(_.endorserIndex == conflictingEndorsement.endorserIndex) // Allow in NG
+      generatorsWithEnoughBalance.contains(conflictingEndorsement.endorserIndex) || balanceExempt(conflictingEndorsement.endorserIndex)
     ) {
       s"Conflicting endorsement sender $address has insufficient balance"
     }
@@ -343,7 +350,16 @@ package object appender {
     _ <- conflictingEndorsement.signatureValid(blsPublicKey).leftMap(err => s"Invalid conflicting endorsement signature from $address: $err")
   } yield ()
 
-  def validateFinalizationVoting(block: Block, blockchain: Blockchain, generatorSet: GeneratorSet): Either[ValidationError, GeneratorSet] =
+  /** @param acceptedConflicts
+    *   conflicts the liquid block already carries, which NG's generator set has dropped. Only these are exempt from the balance check since
+    *   [[BlockchainFeatures.FinalityImprovements]]; before it, the exemption tested the voting being validated, so it covered every conflict.
+    */
+  def validateFinalizationVoting(
+      block: Block,
+      blockchain: Blockchain,
+      generatorSet: GeneratorSet,
+      acceptedConflicts: Set[GeneratorIndex]
+  ): Either[ValidationError, GeneratorSet] =
     block.header.finalizationVoting
       .fold(generatorSet.asRight[String]) { fv =>
         for {
@@ -377,10 +393,13 @@ package object appender {
           _ <- Either.raiseWhen(validEndorserAddresses.contains(block.header.generator.toAddress))("Miner can't endorse its own block")
 
           knownConflictGenerators = blockchain.conflictGenerators(blockGenerationPeriod).upTo(blockHeight)
+          balanceExempt: (GeneratorIndex => Boolean) =
+            if (blockchain.isFeatureActivated(BlockchainFeatures.FinalityImprovements, blockHeight.toInt)) acceptedConflicts.contains
+            else fv.conflictingEndorsers.contains
           _ <- fv.conflict.traverse(
             validateConflictingEndorsement(
               blockchain,
-              fv,
+              balanceExempt,
               allCommittedGenerators,
               knownConflictGenerators,
               validEndorserAddresses,
@@ -389,7 +408,7 @@ package object appender {
               fv.finalizedHeight
             )
           )
-          conflictingEndorsers     = fv.conflict.map(_.endorserIndex).toSet
+          conflictingEndorsers     = fv.conflictingEndorsers
           nonConflictingGenerators = generatorSet.filterNot(x => conflictingEndorsers.contains(x.index))
           _ <- fv.aggregatedEndorsement match {
             case None => Either.raiseWhen(validEndorsers.nonEmpty)("No endorsements are included, but aggregated endorsement signature is non-empty")

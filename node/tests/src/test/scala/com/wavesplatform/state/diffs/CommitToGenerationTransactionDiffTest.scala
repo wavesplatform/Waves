@@ -62,6 +62,47 @@ class CommitToGenerationTransactionDiffTest extends FreeSpec with WithDomain {
     d.blockchain.wavesPortfolio(sender.toAddress).generationDeposit shouldBe CommitToGenerationTransaction.DepositInWavelets
   }
 
+  "Proof of possession" - {
+    val otherSender = TxHelpers.secondSigner
+    val periodStart = Height(3001)
+
+    // Another account resubmits a pending commitment's BLS key and proof as its own
+    def copied(original: CommitToGenerationTransaction): CommitToGenerationTransaction = {
+      val tx = TxHelpers
+        .commitToGeneration(periodStart, otherSender)
+        .copy(endorserPublicKey = original.endorserPublicKey, commitmentSignature = original.commitmentSignature)
+      tx.copy(proofs = Proofs(crypto.sign(otherSender.privateKey, tx.bodyBytes())))
+    }
+
+    "is not bound to the sender before Finality Improvements" in
+      withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender, otherSender)) { d =>
+        d.appendBlockE(TxHelpers.commitToGeneration(periodStart, sender, senderBound = true)) should produce("Invalid commitment signature")
+        d.appendBlock(copied(TxHelpers.commitToGeneration(periodStart, sender)))
+      }
+
+    "is bound to the sender since Finality Improvements" in
+      withDomain(DomainPresets.FinalityImprovements, AddrWithBalance.enoughBalances(sender, otherSender)) { d =>
+        d.appendBlockE(TxHelpers.commitToGeneration(periodStart, sender)) should produce("Invalid commitment signature")
+
+        val original = TxHelpers.commitToGeneration(periodStart, sender, senderBound = true)
+        d.appendBlockE(copied(original)) should produce("Invalid commitment signature")
+        d.appendBlock(original)
+      }
+
+    "switches to the bound form at the activation height" in {
+      val activationHeight = 4
+      withDomain(
+        DeterministicFinality.setFeaturesHeight(BlockchainFeatures.FinalityImprovements -> activationHeight),
+        AddrWithBalance.enoughBalances(sender, otherSender)
+      ) { d =>
+        while (d.blockchain.height < activationHeight - 2) d.appendBlock()
+        d.appendBlock(TxHelpers.commitToGeneration(periodStart, sender)) // At activationHeight - 1
+        d.appendBlockE(TxHelpers.commitToGeneration(periodStart, otherSender)) should produce("Invalid commitment signature")
+        d.appendBlock(TxHelpers.commitToGeneration(periodStart, otherSender, senderBound = true))
+      }
+    }
+  }
+
   "Can't commit" - {
     "with wrong next period start height" in withDomain(DeterministicFinality, AddrWithBalance.enoughBalances(sender)) { d =>
       d.appendBlockE(TxHelpers.commitToGeneration(Height(1), sender)) should produce("Expected the next period start height")
@@ -90,7 +131,7 @@ class CommitToGenerationTransactionDiffTest extends FreeSpec with WithDomain {
         val periodStart = Height(3001)
         val unsignedTx = TxHelpers
           .commitToGeneration(periodStart, newGenerator)
-          .copy(commitmentSignature = CommitToGenerationTransaction.mkPopSignature(otherGeneratorKp, periodStart))
+          .copy(commitmentSignature = CommitToGenerationTransaction.mkPopSignature(otherGeneratorKp, periodStart, None))
         val signedTx = unsignedTx.copy(proofs = Proofs(crypto.sign(newGenerator.privateKey, unsignedTx.bodyBytes())))
 
         d.appendBlockE(unsignedTx) should produce("Proof doesn't validate as signature")
@@ -111,7 +152,7 @@ class CommitToGenerationTransactionDiffTest extends FreeSpec with WithDomain {
         val baseTx = TxHelpers.commitToGeneration(Height(3001), sender)
         val withPop = baseTx.copy(
           endorserPublicKey = blsKp.publicKey,
-          commitmentSignature = CommitToGenerationTransaction.mkPopSignature(blsKp, baseTx.generationPeriodStart)
+          commitmentSignature = CommitToGenerationTransaction.mkPopSignature(blsKp, baseTx.generationPeriodStart, None)
         )
 
         withPop.copy(proofs = Proofs(crypto.sign(sender.privateKey, withPop.bodyBytes())))

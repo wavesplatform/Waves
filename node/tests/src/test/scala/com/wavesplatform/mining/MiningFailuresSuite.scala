@@ -85,6 +85,10 @@ class MiningFailuresSuite extends FlatSpec, WithNewDBForEachTest {
 
       override def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks] = Right(Seq.empty)
 
+      override def syncBoundary: Height = Height(1)
+
+      override def lastBlockIds: Seq[ByteStr] = Seq.empty
+
       override def lastBlockInfo: Observable[LastBlockInfo] = Observable.empty
 
       override def referencedBlockchain(reference: ByteStr): Blockchain = this

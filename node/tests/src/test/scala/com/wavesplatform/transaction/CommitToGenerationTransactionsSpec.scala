@@ -16,7 +16,7 @@ import scala.util.{Failure, Success}
 class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
   private val wavesSigner = TxHelpers.signer(0)
   private val blsKp       = BlsKeyPair(wavesSigner.privateKey)
-  private val sig         = CommitToGenerationTransaction.mkPopSignature(blsKp, Height(3000))
+  private val sig         = CommitToGenerationTransaction.mkPopSignature(blsKp, Height(3000), None)
 
   private val origTx = CommitToGenerationTransaction(
     version = TxVersion.V1,
@@ -67,7 +67,7 @@ class CommitToGenerationTransactionsSpec extends FreeSpec with WithDomain {
     val blsKp = BlsKeyPair(wavesPk)
     blsKp.publicKey.byteStr.base64Raw shouldBe "jrugi0W0es2WxuHoptQtchqwactZsldOGucYObZrEIOpxbWmhL8dodvpnzA+2qUf"
 
-    CommitToGenerationTransaction.mkPopSignature(blsKp, Height(1001)).byteStr.base64Raw shouldBe
+    CommitToGenerationTransaction.mkPopSignature(blsKp, Height(1001), None).byteStr.base64Raw shouldBe
       "sOlLZL2RZZ3c98PmUvKSN960aj+VJwyVGEUygI78mGDwGJflJWLHCwuqiYk1fRG7FOCJKOtKbKOG7tBykQ5iTcRu+7eLWhiodJw47YEfDOZHNwkl8dQwgxAam8+3BEvX"
   }
 }

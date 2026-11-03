@@ -13,7 +13,6 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
-import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.bls.BlsPublicKey
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
@@ -1002,6 +1001,9 @@ class RocksDBWriter(
 
     log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
+    // Committed generators of a period are written at heights of the previous period, so they are intact while we roll back heights of this period
+    val committedGeneratorsOf = mutable.Map.empty[GenerationPeriod, IndexedSeq[(Address, BlsPublicKey)]]
+
     val discardedBlocks: DiscardedBlocks =
       for (currentHeightInt <- height until targetHeight.toInt by -1; currentHeight = Height(currentHeightInt)) yield {
         val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
@@ -1141,6 +1143,13 @@ class RocksDBWriter(
             rw.delete(Keys.transactionStateSnapshotAt(currentHeight, num, rdb.txSnapshotHandle))
           }
 
+          val generatorSet: GeneratorSet = (for {
+            period   <- currentPeriod.toSeq
+            balances <- rw.get(Keys.generatorBalances(currentHeight, rdb.apiHandle)).toSeq
+            committed = committedGeneratorsOf.getOrElseUpdate(period, loadCommittedGenerators(period))
+            (idx, balance)          <- balances
+            (address, blsPublicKey) <- committed.lift(idx.toInt)
+          } yield GeneratorInfo(idx, address, blsPublicKey, balance))
           rw.delete(Keys.generatorBalances(currentHeight, rdb.apiHandle))
           currentPeriod.foreach { currentPeriod =>
             rw.delete(Keys.conflictGenerators(currentPeriod, currentHeight)) // TODO: test
@@ -1186,13 +1195,13 @@ class RocksDBWriter(
             ),
             ByteStr(discardedMeta.signature.toByteArray),
             blockTxs.map(_._2)
-          ).explicitGet()
+          )
 
           val snapshot = if (isLightMode) {
             Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb, block.transactionData)))
           } else None
 
-          DiscardedBlock(block, Caches.toHitSource(discardedMeta), snapshot, Seq.empty) // TODO: generatorBalances
+          DiscardedBlock(block, Caches.toHitSource(discardedMeta), snapshot, generatorSet)
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
