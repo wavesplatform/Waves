@@ -1,3 +1,7 @@
+import java.nio.file.Files
+
+import scala.jdk.CollectionConverters.*
+
 /* IDEA notes
  * May require to delete .idea and re-import with all checkboxes
  * Worksheets may not work: https://youtrack.jetbrains.com/issue/SCL-6726
@@ -99,7 +103,26 @@ lazy val `node-testkit` = project
 lazy val `node-tests` = project
   .in(file("node/tests"))
   .dependsOn(`node-testkit`)
-  .settings(libraryDependencies ++= Dependencies.logDeps)
+  .settings(
+    libraryDependencies ++= Dependencies.logDeps,
+    // In-process, a leaking or hung suite exhausts the heap of sbt itself, which then thrashes in GC until CI cancels
+    // it, leaving nothing to diagnose. A fork confines that to its own JVM and dumps its heap on OOM.
+    Test / fork               := true,
+    Test / testForkedParallel := true,
+    Test / javaOptions ++= {
+      val root = (ThisBuild / baseDirectory).value
+      Seq(
+        "-Xmx4g",
+        "-XX:+HeapDumpOnOutOfMemoryError",
+        s"-XX:HeapDumpPath=$root",
+        "-XX:+ExitOnOutOfMemoryError",
+        s"-XX:ErrorFile=$root/hs_err_pid%p.log",
+        "-Dfile.encoding=UTF-8",
+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+        "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED"
+      )
+    }
+  )
 
 lazy val `grpc-server` =
   project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test")
@@ -226,19 +249,67 @@ inScope(Global)(
 )
 
 commands += Command.command("packageAll") { state =>
-  "node / assembly" :: "ride-runner / assembly" :: "buildDebPackages" :: "buildTarballsForDocker" :: state
+  "node / assembly" :: "ride-runner / assembly" :: "buildDebPackages" :: "stageForDocker" :: state
 }
 
-lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server tarballs and copy them to docker/target")
-buildTarballsForDocker := {
-  IO.copyFile(
-    (node / Universal / packageZipTarball).value,
-    baseDirectory.value / "docker" / "target" / "waves.tgz"
-  )
-  IO.copyFile(
-    (`grpc-server` / Universal / packageZipTarball).value,
-    baseDirectory.value / "docker" / "target" / "waves-grpc-server.tgz"
-  )
+// The image runs on Linux only, so the cross-platform jars the universal package carries are ~90MB it would transfer
+// and throw away: conscrypt is the crypto provider for the platforms the image is not, and the Linux-only rocksdb and
+// Corretto builds are staged in their place (see stageForDocker below).
+lazy val dockerExcludedJars = Seq("AmazonCorrettoCryptoProvider", "conscrypt", "rocksdbjni")
+
+// Corretto ships one jar per platform and the image needs the one matching its own, so they are staged under the
+// name docker gives that platform in TARGETARCH and the Dockerfile copies just that directory.
+lazy val dockerCorrettoArchs = Map("linux-x86_64" -> "amd64", "linux-aarch_64" -> "arm64")
+
+// A configuration of its own, because a dependency reachable from node - Optional included - is packaged into the
+// release tarball and the deb, which ship the cross-platform rocksdb jar on purpose.
+lazy val DockerNative = config("docker-native")
+ivyConfigurations += DockerNative
+libraryDependencies += Dependencies.rocksdbForLinux % DockerNative
+
+lazy val stageForDocker = taskKey[Unit]("Stage node and grpc-server files into docker/target, the image build context")
+stageForDocker := {
+  val dest = baseDirectory.value / "docker" / "target"
+
+  // Third-party jars change only when a dependency does, so they are staged apart from Waves' own jars and scripts:
+  // the image copies each directory as its own layer, and the big one stays cached across code-only builds.
+  val universal = (node / Universal / mappings).value ++ (`grpc-server` / Universal / mappings).value
+
+  val corretto = universal.flatMap { case (file, path) =>
+    dockerCorrettoArchs.collectFirst {
+      case (classifier, arch) if path.contains("AmazonCorrettoCryptoProvider") && path.contains(s"-$classifier.") =>
+        file -> dest / "native" / arch / path.stripPrefix("lib/")
+    }
+  }
+
+  val rocksdb = update.value
+    .select(configurationFilter(DockerNative.name))
+    .map(file => file -> dest / "lib" / s"org.rocksdb.${file.getName}")
+
+  val staged = universal
+    .filterNot { case (_, path) => dockerExcludedJars.exists(path.contains) }
+    .map { case (file, path) =>
+      val target =
+        if (path.startsWith("lib/") && !path.startsWith("lib/com.wavesplatform.")) dest / "lib" / path.stripPrefix("lib/")
+        else dest / "app" / path
+      file -> target
+    } ++ corretto ++ rocksdb
+
+  val wanted = staged.map(_._2).toSet
+  if (dest.isDirectory) {
+    val walk = Files.walk(dest.toPath)
+    val stale =
+      try walk.iterator().asScala.map(_.toFile).filter(f => f.isFile && !wanted.contains(f)).toList
+      finally walk.close()
+    stale.foreach(IO.delete)
+  }
+
+  staged.foreach { case (source, target) =>
+    // Copying only what changed keeps BuildKit's context transfer incremental: it detects an unchanged file by
+    // size and modification time, and re-sends nothing for one it has already seen.
+    if (!target.exists() || target.length() != source.length() || target.lastModified() != source.lastModified())
+      IO.copyFile(source, target, preserveLastModified = true)
+  }
 }
 
 lazy val buildRIDERunnerForDocker = taskKey[Unit]("Package RIDE Runner tarball and copy it to docker/target")
@@ -281,7 +352,7 @@ checkPRRaw := Def
       ),
       fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
       assembly.all(ScopeFilter(inProjects(node))),
-      buildTarballsForDocker
+      stageForDocker
     )
   )
   .value

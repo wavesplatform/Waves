@@ -17,6 +17,8 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 ## Building Docker image
 `./build-with-docker.sh && docker build -t wavesplatform/wavesnode docker` (from the repository root) - builds an image with the current local repository
 
+`sbt stageForDocker && docker build -t wavesplatform/wavesnode docker` (from the repository root) - the same with a local sbt, staging only what the image needs into `docker/target`
+
 **You can specify following arguments when building the image:**
 
 
@@ -28,6 +30,14 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 
 ## Running Docker image
 
+### The node runs as an unprivileged user
+
+The node process runs as `waves` (uid 999, gid 999), never as root. The container still starts as root so that `entrypoint.sh` can take ownership of `/var/lib/waves` and `/var/log/waves` - a bind-mounted host directory arrives with the host's ownership, unlike a named volume - and then drops to `waves` before starting the JVM. That chown is recursive on the first start after mounting a directory the node does not own yet, and skipped on every start after it, so nothing needs to be prepared by hand.
+
+Two things follow from it:
+
+- A config directory mounted at `/etc/waves` is left alone, so its files must be readable by uid 999. It is never chowned: it belongs to whoever runs the image.
+- `docker run --user ...` is honoured as given. The entrypoint drops privileges only when it starts as root, so an explicit `--user` runs the node as that user and takes responsibility for the mounted directories' ownership.
 
 
 ### Configuration options

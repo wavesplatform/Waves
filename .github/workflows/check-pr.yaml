@@ -47,6 +47,17 @@ jobs:
         with:
           name: waves-all
           path: node/target/waves-all-*.jar
+      # A hang or a GC death spiral never throws OutOfMemoryError (G1 has no GC overhead limit), so the JVMs are still
+      # alive after a cancel or a timeout: dump them here, before the runner kills them.
+      - name: Dump live JVMs
+        if: failure() || cancelled()
+        run: |
+          for pid in $(jps -q); do
+            jcmd $pid Thread.print > threads-$pid.txt 2>&1 || true
+          done
+          for pid in $(jps -l | awk '/ForkMain/ {print $1}'); do
+            jcmd $pid GC.heap_dump $PWD/java_pid$pid.hprof || true
+          done
       - name: Save debug data
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
@@ -57,6 +68,8 @@ jobs:
             gc.log*
             hs*.log
             core*
+            threads-*.txt
+            *.hprof
 
   run-smoke-tests:
     needs: check-pr

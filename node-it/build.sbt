@@ -27,8 +27,8 @@ docker := {
   if (exit != 0) sys.error(s"Docker build failed with exit code $exit")
 }
 
-val buildTarballsForDocker = taskKey[Unit]("build all packages")
+val stageForDocker = taskKey[Unit]("stage node files into the docker build context")
 
 // To solve "Error response from daemon: No such image: " see:
 // https://github.com/marcus-drake/sbt-docker/issues/133#issuecomment-2718354260
-docker := docker.dependsOn(LocalProject("waves-node") / buildTarballsForDocker).value
+docker := docker.dependsOn(LocalProject("waves-node") / stageForDocker).value
