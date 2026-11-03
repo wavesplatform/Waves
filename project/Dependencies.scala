@@ -12,7 +12,7 @@ object Dependencies {
     Seq(
       "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
       "com.google.code.gson"      % "gson"           % "2.14.0",
-      "com.squareup.okio"         % "okio-jvm"       % "3.17.0",
+      "com.squareup.okio"         % "okio-jvm"       % "3.18.2",
       "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
       "org.slf4j"                 % "slf4j-api"      % "2.0.18",
       "org.msgpack"               % "msgpack-core"   % "0.9.12",
@@ -26,7 +26,11 @@ object Dependencies {
       jacksonModule("core", "databind"),
       jacksonModule("datatype", "datatype-jdk8"),
       jacksonModule("datatype", "datatype-jsr310"),
-      "tools.jackson.core" % "jackson-databind" % "3.1.4",
+      "tools.jackson.core" % "jackson-core"     % "3.2.4",
+      "tools.jackson.core" % "jackson-databind" % "3.2.4",
+      // Scala 3 compiler and scaladoc toolchains, no Scala release ships the patched versions yet
+      "org.jline"          % "jline-reader"     % "3.30.15",
+      "org.jsoup"          % "jsoup"            % "1.23.2",
       gProto
     )
   )
@@ -41,7 +45,7 @@ object Dependencies {
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.8.1"
 
-  private def jacksonModule(group: String, module: String, version: String = "2.21.4") = s"com.fasterxml.jackson.$group" % s"jackson-$module" % version
+  private def jacksonModule(group: String, module: String, version: String = "2.21.7") = s"com.fasterxml.jackson.$group" % s"jackson-$module" % version
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.13.0" // 4.14+ requires Java 21 https://github.com/LFDT-web3j/web3j/releases/tag/v4.14.0
 
@@ -54,7 +58,7 @@ object Dependencies {
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback         = "ch.qos.logback"      % "logback-classic"   % "1.6.3"
-  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.13"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.14"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
 
@@ -116,7 +120,7 @@ object Dependencies {
   lazy val test = scalaTest +: Seq(
     logback,
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
-    "org.scalacheck"    %% "scalacheck"      % "1.19.0",
+    "org.scalacheck"    %% "scalacheck"      % "1.20.0",
     "org.scalamock"     %% "scalamock"       % "7.5.5"
   ).map(_ % Test)
 
