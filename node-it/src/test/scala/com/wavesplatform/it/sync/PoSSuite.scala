@@ -34,7 +34,7 @@ class PoSSuite extends BaseFunSuite {
 
     val height = nodes.last.height
 
-    for (h <- height to (height + 10)) {
+    for (h <- height to (height + BlocksPerTimestampCheck - 1)) {
 
       val block = forgeBlock(Height(h), signerPK)()
 
@@ -140,7 +140,7 @@ class PoSSuite extends BaseFunSuite {
     nodes.waitForHeight(vrfActivationHeight)
     val height = nodes.last.height
 
-    for (h <- height to (height + 10)) {
+    for (h <- height to (height + BlocksPerTimestampCheck - 1)) {
 
       val block = forgeBlock(Height(h), signerPK)()
 
@@ -279,7 +279,9 @@ class PoSSuite extends BaseFunSuite {
       .get
   }
 
-  private val vrfActivationHeight = Height(20)
+  // Past the BlockV4 tests: the timestamp loop plus one block per remaining V4 test, with a few blocks of margin.
+  private val BlocksPerTimestampCheck = 5
+  private val vrfActivationHeight     = Height(15)
 
   // Speaks the binary protocol from the test JVM, so it needs the node-to-node port published (see Docker.publishNetworkPort).
   override protected def createDocker: Docker = new Docker(tag = getClass.getSimpleName, publishNetworkPort = true)

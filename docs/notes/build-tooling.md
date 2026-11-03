@@ -14,6 +14,10 @@ purpose: Implementation notes for the sbt build (Global settings, test concurren
 
 Two things to know when checking this by hand. `print Global/concurrentRestrictions` is the authoritative check; `inspect` will happily show a defining assignment that lost. And `sbt --client -D...` sets the property on the thin client, not on the long-lived server that evaluates the setting, so the flag appears to be ignored; verify a `-D`-driven setting with a plain `sbt -D... --batch` (what CI runs).
 
+## Forked suites also carry Tags.Test, so that limit caps node-it too
+
+Fixing the shadowing above still left `-Dwaves.it.max-parallel-suites` unable to go above 4 on a GitHub runner. sbt's `ForkTests` tags every forked group with `(ForkedTestGroup, 1)` *plus* the tags of `Test / testOnly` (or `Test / test`), which default to `(Tags.Test, 1)`, so each node-it suite counted against `Tags.limit(Tags.Test, min(SystemProcessors, 8))` as well, and the smaller of the two limits won. `IntegrationTestsPlugin` clears both `tags` settings for node-it, which leaves `ForkedTestGroup` as the only cap on suite concurrency. Other modules keep the `Tags.Test` limit. `checkTestLimits` also fails if `Tags.Test` reappears on node-it's test tasks. To check by hand: `show node-it/Test/testOnly/tags` must print an empty list.
+
 ## Docker image build: staged directories, not a tarball
 
 `sbt stageForDocker` copies the node and grpc-server universal mappings straight into `docker/target`, the image build context, and `docker/Dockerfile` `COPY`s them in. It used to package both as `.tgz` (`buildTarballsForDocker`) and unpack them in a `RUN`, which cost a recompression plus an unpack per iteration:

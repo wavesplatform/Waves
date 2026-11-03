@@ -125,7 +125,12 @@ jobs:
           cache: 'sbt'
       - uses: sbt/setup-sbt@3afe9cf056c5d139bfc46579af1192d77a2f0821 # v1.4.0
       - name: Run Integration Tests
-        run: sbt -Dwaves.it.max-parallel-suites=4 --batch "node-it/docker;node-it/integrationTests"
+        # Samples CPU pressure and vmstat into the uploaded logs, to tell whether the runner has room for more parallel suites.
+        run: |
+          mkdir -p node-it/target/logs/$RUN_ID
+          (while sleep 5; do echo "$(date +%T) $(head -1 /proc/pressure/cpu 2>/dev/null || echo no-psi) load=$(cut -d' ' -f1 /proc/loadavg)"; done) > node-it/target/logs/$RUN_ID/cpu.log &
+          vmstat -t 5 > node-it/target/logs/$RUN_ID/vmstat.log &
+          sbt -Dwaves.it.max-parallel-suites=5 --batch "node-it/docker;node-it/integrationTests"
         env:
           RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}
       - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3
@@ -160,7 +165,12 @@ jobs:
           cache: 'sbt'
       - uses: sbt/setup-sbt@3afe9cf056c5d139bfc46579af1192d77a2f0821 # v1.4.0
       - name: Run Load Tests
-        run: sbt -Dwaves.it.max-parallel-suites=1 --batch "node-it/docker;node-it/loadTests"
+        # Samples CPU pressure and vmstat into the uploaded logs, to tell whether the runner has room for more parallel suites.
+        run: |
+          mkdir -p node-it/target/logs/$RUN_ID
+          (while sleep 5; do echo "$(date +%T) $(head -1 /proc/pressure/cpu 2>/dev/null || echo no-psi) load=$(cut -d' ' -f1 /proc/loadavg)"; done) > node-it/target/logs/$RUN_ID/cpu.log &
+          vmstat -t 5 > node-it/target/logs/$RUN_ID/vmstat.log &
+          sbt -Dwaves.it.max-parallel-suites=1 --batch "node-it/docker;node-it/loadTests"
         env:
           RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}-load
       - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3

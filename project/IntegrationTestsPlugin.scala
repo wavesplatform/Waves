@@ -67,6 +67,11 @@ object IntegrationTestsPlugin extends AutoPlugin {
         loadTests         := runSuites(_._1, s"no suite carries @$LoadTestTag", tagged = true).value,
         integrationTests  := runSuites(_._2, "no untagged suites found", tagged = false).value,
         parallelExecution := true,
+        // sbt tags every forked group with these too, so the default (Tags.Test, 1) puts suites under build.sbt's
+        // per-processor Tags.Test cap (4 on a GitHub runner) and the flag could only lower concurrency, never raise it.
+        // Cleared, the ForkedTestGroup limit (-Dwaves.it.max-parallel-suites) is the only one that applies.
+        testOnly / tags := Seq.empty,
+        test / tags     := Seq.empty,
         testGrouping := {
           // ffs, sbt!
           // https://github.com/sbt/sbt/issues/3266

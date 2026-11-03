@@ -330,6 +330,10 @@ checkTestLimits := {
     sys.error(
       s"Global/concurrentRestrictions no longer caps ${Tags.ForkedTestGroup} at $limit - another assignment of that Global key has shadowed it"
     )
+  // Forked groups inherit these tags; a Tags.Test entry would cap node-it at the per-processor Tags.Test limit instead.
+  val itTags = (`node-it` / Test / testOnly / tags).value ++ (`node-it` / Test / test / tags).value
+  if (itTags.exists(_._1 == Tags.Test))
+    sys.error(s"node-it test tasks carry ${Tags.Test} again, so its forked suites are capped by that limit, not by maxParallelSuites")
 }
 
 lazy val compilePRRaw = taskKey[Unit]("Compile the project")

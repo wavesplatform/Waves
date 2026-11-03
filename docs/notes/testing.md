@@ -32,6 +32,10 @@ Selecting by name rather than by ScalaTest `-n`/`-l` tag arguments is deliberate
 
 `loadTests` and `integrationTests` both go through `testOnly`, both refuse to run an empty selection, and `loadTests` additionally refuses to start when `SCALATEST_EXCLUDE_TAGS` would filter out the very tag it selects on.
 
+## node-it: is the runner saturated?
+
+Both node-it CI jobs sample the runner into the uploaded logs while sbt runs: `cpu.log` (the first line of `/proc/pressure/cpu`, plus the 1-minute load average, every 5s) and `vmstat.log` (`vmstat -t 5`), both in `node-it/target/logs/<run-id>/`. Read them against a timeline of the suites, built from the first and last timestamps of each suite's `test.log`. Do not use the JUnit XML `timestamp`/`time`, which leave out container startup and are misleading. Rough reading: CPU pressure `some avg10` well under 20% with `vmstat` `id` above 0 means there is room for more parallel suites; a sustained `avg10` above about 40%, or a run queue (`r`) above the vCPU count, means the runner is saturated, which leads to the starvation described under Load tests. Also check `wa` and `free`: every node container gets `-Xmx2g`, so memory can run out before CPU does.
+
 ## node-tests: finding why a block was rejected
 
 Tests log at `OFF` by default (`node/tests/src/test/resources/logback-test.xml`), so an append rejected inside the appender surfaces only as `Can't apply block ..., see logs` from `Domain.appendBlock`. Re-run with `-Dlogback.test.level=TRACE` and grep for the real reason.
