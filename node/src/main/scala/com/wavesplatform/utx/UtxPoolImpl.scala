@@ -7,6 +7,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.events.UtxEvent
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
@@ -258,12 +259,27 @@ case class UtxPoolImpl(
       strategy: PackStrategy,
       cancelled: () => Boolean
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint, Option[ByteStr]) =
-    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true))(
+    val (prevBlockTs, blockTs) = packTimeBounds()
+    pack(TransactionDiffer(prevBlockTs, blockTs, enableExecutionLog = true))(
       initialConstraint,
       strategy,
       prevStateHash,
       cancelled
     )
+
+  /** Time bounds of the block the packed transactions go into. After NG they go into a microblock of the key block on top of the chain, and
+    * BlockDiffer.fromMicroBlock bounds them by that key block's timestamp and its parent's, not by the node's clock. A transaction from beyond
+    * the key block's forward offset would otherwise be packed, fail the miner's own microblock and be packed again on the next attempt.
+    */
+  private def packTimeBounds(): (Option[Long], Long) =
+    if (blockchain.isFeatureActivated(BlockchainFeatures.NG))
+      blockchain.lastBlockTimestamp match {
+        case Some(keyBlockTs) =>
+          val parentTs = Option.when(blockchain.height > 1)(blockchain.blockHeader(blockchain.height - 1)).flatten.map(_.header.timestamp)
+          (parentTs, keyBlockTs)
+        case None => (None, time.correctedTime())
+      }
+    else (blockchain.lastBlockTimestamp, time.correctedTime()) // Packed into a new key block, see Miner.packTransactionsForKeyBlock
 
   def cleanUnconfirmed(): Unit = {
     log.trace(s"Starting UTX cleanup at height ${blockchain.height}")

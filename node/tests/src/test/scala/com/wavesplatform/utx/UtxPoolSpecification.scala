@@ -111,7 +111,16 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
       amount    <- chooseNum(1L, (maxAmount * 0.9).toLong)
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TxHelpers.transfer(from = sender, to = recipient.toAddress, amount = amount, asset = Waves, fee = fee, feeAsset = Waves, attachment = ByteStr.empty, version = 1.toByte))
+    } yield TxHelpers.transfer(
+      from = sender,
+      to = recipient.toAddress,
+      amount = amount,
+      asset = Waves,
+      fee = fee,
+      feeAsset = Waves,
+      attachment = ByteStr.empty,
+      version = 1.toByte
+    ))
       .label("transferTransaction")
 
   private def invokeScript(sender: KeyPair, dApp: Address) =
@@ -337,10 +346,28 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
     }
 
   private def transfer(sender: KeyPair) =
-    TxHelpers.transfer(from = sender, to = TxHelpers.address(2), amount = 1, asset = Waves, fee = extraFee, feeAsset = Waves, attachment = ByteStr.empty, version = 1.toByte)
+    TxHelpers.transfer(
+      from = sender,
+      to = TxHelpers.address(2),
+      amount = 1,
+      asset = Waves,
+      fee = extraFee,
+      feeAsset = Waves,
+      attachment = ByteStr.empty,
+      version = 1.toByte
+    )
 
   private def transferWithRecipient(sender: KeyPair, recipient: PublicKey) =
-    TxHelpers.transfer(from = sender, to = recipient.toAddress, amount = 1, asset = Waves, fee = extraFee, feeAsset = Waves, attachment = ByteStr.empty, version = 1.toByte)
+    TxHelpers.transfer(
+      from = sender,
+      to = recipient.toAddress,
+      amount = 1,
+      asset = Waves,
+      fee = extraFee,
+      feeAsset = Waves,
+      attachment = ByteStr.empty,
+      version = 1.toByte
+    )
 
   private def massTransferWithRecipients(sender: KeyPair, recipients: Seq[PublicKey], maxAmount: Long) = {
     val amount    = maxAmount / (recipients.size + 1)
@@ -350,10 +377,30 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
   }
 
   private def transactionV1(sender: KeyPair, ts: Long, feeAmount: Long): TransferTransaction =
-    TxHelpers.transfer(from = sender, to = TxHelpers.address(2), amount = waves(1), asset = Waves, fee = feeAmount, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts, version = 1.toByte)
+    TxHelpers.transfer(
+      from = sender,
+      to = TxHelpers.address(2),
+      amount = waves(1),
+      asset = Waves,
+      fee = feeAmount,
+      feeAsset = Waves,
+      attachment = ByteStr.empty,
+      timestamp = ts,
+      version = 1.toByte
+    )
 
   private def transactionV2(sender: KeyPair, ts: Long, feeAmount: Long): TransferTransaction =
-    TxHelpers.transfer(from = sender, to = TxHelpers.address(2), amount = waves(1), asset = Waves, fee = feeAmount, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts, version = 2.toByte)
+    TxHelpers.transfer(
+      from = sender,
+      to = TxHelpers.address(2),
+      amount = waves(1),
+      asset = Waves,
+      fee = feeAmount,
+      feeAsset = Waves,
+      attachment = ByteStr.empty,
+      timestamp = ts,
+      version = 2.toByte
+    )
 
   private def utxTest(utxSettings: UtxSettings, txCount: Int = 10)(f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = {
     withState { case (sender, _, bcu) =>
@@ -608,10 +655,10 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
                 GenesisTransaction.create(richAccount.toAddress, ENOUGH_AMT, ntpNow).explicitGet(),
                 GenesisTransaction.create(randomAccount.toAddress, ENOUGH_AMT, ntpNow).explicitGet(),
                 TxHelpers.setScript(
-                    richAccount,
-                    Script.fromBase64String("AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet(),
-                    QuickTX.FeeAmount * 4,
-                  )
+                  richAccount,
+                  Script.fromBase64String("AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet(),
+                  QuickTX.FeeAmount * 4
+                )
               ),
               signer = TestBlock.defaultSigner,
               version = 3,
@@ -671,6 +718,28 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
         d.utxPool.addTransaction(transfer2, verify = true)
 
         d.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None)._1.get shouldEqual Seq(transfer1, transfer2)
+      }
+    }
+
+    "does not pack a transaction from beyond the key block's forward offset into a microblock" in {
+      val blockMiner = TxHelpers.signer(1200)
+      withDomain(DomainPresets.NG, balances = AddrWithBalance.enoughBalances(blockMiner)) { d =>
+        val keyBlock = d.createBlock(generator = blockMiner, version = Block.NgBlockVersion)
+        d.appendBlock(keyBlock)
+        val forwardOffset = d.settings.blockchainSettings.functionalitySettings.maxTransactionTimeForwardOffset.toMillis
+        val now           = keyBlock.header.timestamp + 5.minutes.toMillis
+        d.testTime.setTime(now)
+
+        val inBounds  = TxHelpers.transfer(blockMiner, timestamp = keyBlock.header.timestamp + forwardOffset, version = TxVersion.V1)
+        val tooRecent = TxHelpers.transfer(blockMiner, timestamp = keyBlock.header.timestamp + forwardOffset + 1, version = TxVersion.V1)
+        val utx       = new UtxPoolImpl(d.testTime, d.blockchain, d.settings.utxSettings, Int.MaxValue, isMiningEnabled = true)
+        Seq(inBounds, tooRecent).foreach(utx.putIfNew(_).resultE.explicitGet() shouldBe true) // Both are valid against the node's clock
+
+        val (packed, _, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None, PackStrategy.Unlimited)
+        packed.value shouldBe Seq(inBounds)
+        d.appendMicroBlockE(d.createMicroBlock(signer = Some(blockMiner))(tooRecent)) should produce("in the future relative to block timestamp")
+        d.appendMicroBlock(d.createMicroBlock(signer = Some(blockMiner))(packed.value*))
+        utx.close()
       }
     }
 
@@ -1084,8 +1153,28 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
           ts = System.currentTimeMillis()
           fee <- smallFeeGen
           genesis = GenesisTransaction.create(richAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
-          validTransfer = TxHelpers.transfer(from = richAcc, to = secondAcc.toAddress, amount = 1L, asset = Waves, fee = fee, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts, version = TxVersion.V1)
-          invalidTransfer = TxHelpers.transfer(from = secondAcc, to = richAcc.toAddress, amount = 2L, asset = Waves, fee = fee, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts, version = TxVersion.V1)
+          validTransfer = TxHelpers.transfer(
+            from = richAcc,
+            to = secondAcc.toAddress,
+            amount = 1L,
+            asset = Waves,
+            fee = fee,
+            feeAsset = Waves,
+            attachment = ByteStr.empty,
+            timestamp = ts,
+            version = TxVersion.V1
+          )
+          invalidTransfer = TxHelpers.transfer(
+            from = secondAcc,
+            to = richAcc.toAddress,
+            amount = 2L,
+            asset = Waves,
+            fee = fee,
+            feeAsset = Waves,
+            attachment = ByteStr.empty,
+            timestamp = ts,
+            version = TxVersion.V1
+          )
         } yield (genesis, validTransfer, invalidTransfer)
 
         forAll(preconditions) { case (genesis, validTransfer, invalidTransfer) =>

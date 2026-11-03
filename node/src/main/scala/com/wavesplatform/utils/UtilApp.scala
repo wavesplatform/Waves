@@ -56,6 +56,7 @@ object UtilApp {
       verifyOptions: VerifyOptions = VerifyOptions(),
       hashOptions: HashOptions = HashOptions(),
       keyPairOptions: KeyPairOptions = KeyPairOptions(),
+      bindPopToSender: Boolean = false,
       columnFamily: String = ""
   )
 
@@ -79,7 +80,7 @@ object UtilApp {
         case Mode.CreateKeyPair   => Actions.doCreateKeyPair(cmd, inBytes)
         case Mode.Hash            => Actions.doHash(cmd, inBytes)
         case Mode.SerializeTx     => Actions.doSerializeTx(inBytes)
-        case Mode.SignTx          => maybeFindKeyPair(cmd).flatMap(Actions.doSignTx(_, inBytes))
+        case Mode.SignTx          => maybeFindKeyPair(cmd).flatMap(Actions.doSignTx(_, inBytes, cmd.bindPopToSender))
         case Mode.SmokeTest       => Actions.doSmokeTest()
         case Mode.TruncateCF      => Actions.doTruncateCF(Application.loadApplicationConfig(cmd.configFile.map(new File(_))), cmd.columnFamily)
       }
@@ -96,6 +97,10 @@ object UtilApp {
 
     val builder = OParser.builder[Command]
     import builder.*
+
+    val bindPopToSenderOpt = opt[Unit]("bind-pop-to-sender")
+      .text("Bind a CommitToGeneration's proof of possession to its sender, required once Finality Improvements (27) is activated")
+      .action((_, c) => c.copy(bindPopToSender = true))
 
     OParser.sequence(
       programName("waves util"),
@@ -203,7 +208,8 @@ object UtilApp {
             opt[String]("signer-address")
               .abbr("sa")
               .text("Signer address (requires corresponding key in wallet.dat)")
-              .action((a, c) => c.copy(signOptions = a))
+              .action((a, c) => c.copy(signOptions = a)),
+            bindPopToSenderOpt
           ),
         cmd("sign-with-sk")
           .text("Sign JSON transaction with private key")
@@ -212,7 +218,8 @@ object UtilApp {
             opt[String]("private-key")
               .abbr("sk")
               .text("Private key")
-              .action((a, c) => c.copy(signOptions = PKKeyPair(PrivateKey(Base58.decode(a)))))
+              .action((a, c) => c.copy(signOptions = PKKeyPair(PrivateKey(Base58.decode(a))))),
+            bindPopToSenderOpt
           )
       ),
       cmd("smoke").action((_, c) => c.copy(mode = Mode.SmokeTest, inputData = Input.Str(""))),
@@ -303,11 +310,11 @@ object UtilApp {
         .map(_.toString)
         .map(_.bytes())
 
-    def doSignTx(signerKeyPair: KeyPair, data: Array[Byte]): ActionResult = {
+    def doSignTx(signerKeyPair: KeyPair, data: Array[Byte], bindPopToSender: Boolean): ActionResult = {
       import cats.syntax.either.*
 
       TransactionFactory
-        .parseRequestAndSign(Json.parse(data).as[JsObject], signerKeyPair, None)
+        .parseRequestAndSign(Json.parse(data).as[JsObject], signerKeyPair, None, bindPopToSender)
         .leftMap(_.toString)
         .map(_.json().toString().getBytes())
     }
