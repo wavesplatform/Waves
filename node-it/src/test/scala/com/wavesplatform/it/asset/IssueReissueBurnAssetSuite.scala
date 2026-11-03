@@ -351,13 +351,12 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
 
   private def idOf(tx: PBSignedTransaction): String = PBTransactions.vanilla(tx, unsafe = false).explicitGet().id().toString
 
-  // Waits for the transaction, not for the next block: there is one node, and both APIs serve the liquid block. Microblocks
-  // come every second, so the default 1s poll would add most of a second to each of the ~165 waits.
+  // The default 1s poll would add most of a second to each of the ~165 waits.
   private def mined(txId: String): TransactionInfo = sync(AsyncHttpApi.NodeAsyncHttpApi(sender).waitForTransaction(txId, 200.millis))
 
-  // For a transaction a later broadcast is validated against. The miner can orphan its own newest microblock (see "Key block forged on a stale
-  // parent" in docs/notes/mining.md), returning its transactions to the UTX pool for a moment, so the transaction has to be under the next key
-  // block, still at the same height, before anything that depends on it is sent.
+  // Every wait goes through this, not through `mined`: the miner can orphan its own newest microblock (see "Key block forged on a stale parent"
+  // in docs/notes/mining.md), and for about 200ms its transactions are gone, which breaks both a broadcast validated against them and a read
+  // of their results. Under the next key block, still at the same height, a transaction stays.
   @tailrec private def settled(txId: String): Unit = {
     val height = mined(txId).height
     sender.waitFor[Int](s"height > $height")(_.height.toInt, _ > height, 200.millis)
@@ -408,7 +407,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
         )
     }
 
-    if (wait) mined(txId)
+    if (wait) settled(txId)
     txId
   }
 
@@ -523,11 +522,9 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
   def issueValidated(account: KeyPair, data: Asset, api: Api = Api.Rest): String =
     validateIssuedAssets(account, issue(api, account, CallableMethod, data), data)
 
-  // Settled: reissues, burns, sponsorships and the rejection checks all validate against the issued asset.
   def issue(api: Api, account: KeyPair, method: String, data: Asset, fee: Long = invocationCost(1)): String = method match {
     case CallableMethod =>
       val txId = invoke(api, account, "issueAsset", fee = fee)
-      settled(txId)
       assertStateChanges(txId) { sd =>
         (sd.issues: @unchecked) match {
           case Seq(issue) => validateIssue(issue, data)
@@ -579,7 +576,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
         case Api.Rest => sender.reissue(account, assetId, quantity, reissuable, version = TxVersion.V2).id
         case Api.Grpc => idOf(grpc.broadcastReissue(account, fee, assetId, quantity, reissuable, version = TxVersion.V2))
       }
-      mined(txId)
+      settled(txId)
       txId
   }
 
@@ -597,7 +594,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
         case Api.Rest => sender.burn(account, assetId, quantity, fee = invokeFee, version = TxVersion.V2).id
         case Api.Grpc => idOf(grpc.broadcastBurn(account, assetId, quantity, fee = invokeFee, version = TxVersion.V2))
       }
-      mined(txId)
+      settled(txId)
       txId
   }
 
@@ -607,7 +604,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       case Api.Grpc =>
         idOf(grpc.broadcastSponsorFee(account, Some(Amount.of(ByteString.copyFrom(Base58.decode(assetId)), minFee)), sponsorFee))
     }
-    mined(txId)
+    settled(txId)
     txId
   }
 
