@@ -32,6 +32,7 @@ import monix.execution.atomic.AtomicInt
 import org.scalatest.Assertion
 
 import java.util.regex.Pattern
+import scala.annotation.tailrec
 import scala.concurrent.duration.*
 
 /** Issue/reissue/burn through plain transactions and dApp actions. One node serves both REST and gRPC: each test broadcasts through one of them, and
@@ -354,19 +355,28 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
   // come every second, so the default 1s poll would add most of a second to each of the ~165 waits.
   private def mined(txId: String): TransactionInfo = sync(AsyncHttpApi.NodeAsyncHttpApi(sender).waitForTransaction(txId, 200.millis))
 
+  // For a transaction a later broadcast is validated against. The miner can orphan its own newest microblock (see "Key block forged on a stale
+  // parent" in docs/notes/mining.md), returning its transactions to the UTX pool for a moment, so the transaction has to be under the next key
+  // block, still at the same height, before anything that depends on it is sent.
+  @tailrec private def settled(txId: String): Unit = {
+    val height = mined(txId).height
+    sender.waitFor[Int](s"height > $height")(_.height.toInt, _ > height, 200.millis)
+    if (mined(txId).height != height) settled(txId)
+  }
+
   def createDapp(api: Api, scriptParts: String*): KeyPair = {
     val acc            = TxHelpers.signer(accountCounter.getAndIncrement())
     val compiledScript = ScriptCompiler.compile(scriptParts.mkString(" "), ScriptEstimatorV2).explicitGet()._1
     val setScript      = TxHelpers.setScript(acc = acc, script = compiledScript, fee = setScriptFee, version = 1.toByte)
 
-    // The set-script fee comes out of the transfer, so the transfer has to be in the chain before the set-script is validated.
+    // The set-script fee comes out of the transfer, and every invocation needs the script.
     api match {
       case Api.Rest =>
-        mined(miner.transfer(sender.keyPair, addressOf(acc), initialWavesBalance, setScriptFee * 2).id)
-        mined(miner.signedBroadcast(setScript.json()).id)
+        settled(miner.transfer(sender.keyPair, addressOf(acc), initialWavesBalance, setScriptFee * 2).id)
+        settled(miner.signedBroadcast(setScript.json()).id)
       case Api.Grpc =>
-        mined(idOf(grpc.broadcastTransfer(sender.keyPair, PBRecipients.create(acc.toAddress), initialWavesBalance, setScriptFee * 2)))
-        mined(idOf(grpc.signedBroadcast(PBTransactions.protobuf(setScript))))
+        settled(idOf(grpc.broadcastTransfer(sender.keyPair, PBRecipients.create(acc.toAddress), initialWavesBalance, setScriptFee * 2)))
+        settled(idOf(grpc.signedBroadcast(PBTransactions.protobuf(setScript))))
     }
 
     acc
@@ -513,9 +523,11 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
   def issueValidated(account: KeyPair, data: Asset, api: Api = Api.Rest): String =
     validateIssuedAssets(account, issue(api, account, CallableMethod, data), data)
 
+  // Settled: reissues, burns, sponsorships and the rejection checks all validate against the issued asset.
   def issue(api: Api, account: KeyPair, method: String, data: Asset, fee: Long = invocationCost(1)): String = method match {
     case CallableMethod =>
       val txId = invoke(api, account, "issueAsset", fee = fee)
+      settled(txId)
       assertStateChanges(txId) { sd =>
         (sd.issues: @unchecked) match {
           case Seq(issue) => validateIssue(issue, data)
@@ -539,7 +551,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
             )
           )
       }
-      mined(txId)
+      settled(txId)
       txId
   }
 

@@ -44,4 +44,5 @@ Hard-won implementation knowledge lives in `docs/notes/`, one file per subsystem
 
 - Writing or fixing tests (node-it suites and fixtures, Docker.scala ports, load tests, node-tests helpers): read `docs/notes/testing.md` first.
 - Touching the BlockchainUpdates extension or events.StateUpdate: read `docs/notes/blockchain-updates.md` first.
+- Touching block or microblock mining (Miner.scala, MicroBlockMinerImpl), or a test that reacts to the liquid block: read `docs/notes/mining.md` first.
 - Touching build.sbt, sbt plugins or tasks (IntegrationTestsPlugin, concurrentRestrictions, checkTestLimits), or the docker image (Dockerfile, entrypoint.sh, stageForDocker): read `docs/notes/build-tooling.md` first.
