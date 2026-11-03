@@ -6,6 +6,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.{GeneratorsApiRoute, RouteTimeout}
 import com.wavesplatform.block.{BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{WithDomain, WithState}
@@ -316,6 +317,46 @@ class GeneratorsApiRouteSpec extends RouteSpec("/generators") with WithDomain {
           )
         )
       }
+    }
+
+    "keeps balances after dropped blocks are re-applied" in withDomain(
+      defaultSettings.copy(dbSettings = defaultSettings.dbSettings.copy(storeStateHashes = true)),
+      balances = defaultInitBalances
+    ) { d =>
+      d.appendBlock()
+      d.commit(generators*)
+
+      (3 to 8).foreach { _ =>
+        d.appender.appendBlock(d.createBlock(strictTime = true, generator = miner))
+      }
+
+      // 7 is persisted, 8 is liquid
+      val heights = Seq(7, 8)
+      def generatorsAt(): Seq[JsArray] = heights.map { h =>
+        var r = JsArray()
+        d.checkAt(h) { r = responseAs[JsArray] }
+        r
+      }
+
+      val generatorsBefore = generatorsAt()
+      generatorsBefore.foreach { xs =>
+        xs.value should not be empty
+        xs.value.map(x => (x \ "balance").as[Long]) should not contain 0L
+      }
+      val stateHash7 = d.rocksDBWriter.loadStateHash(Height(7))
+      stateHash7 should not be empty
+      val blockIds = heights.map(h => d.blockchain.blockId(h).value)
+
+      // Same as ExtensionAppender does when it fails to apply a fork
+      val discarded = d.rollbackTo(d.blockchain.blockId(6).value)
+      discarded.map(_.block.id()) shouldBe blockIds
+      discarded.foreach { x =>
+        d.blockchainUpdater.processBlock(x.block, x.hitSource, x.snapshot, x.generatorSet).explicitGet()
+      }
+
+      d.appender.appendBlock(d.createBlock(strictTime = true, generator = miner)) // Persists 8
+      generatorsAt() shouldBe generatorsBefore
+      d.rocksDBWriter.loadStateHash(Height(7)) shouldBe stateHash7
     }
   }
 

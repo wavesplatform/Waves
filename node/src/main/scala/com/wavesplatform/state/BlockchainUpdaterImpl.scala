@@ -72,7 +72,7 @@ class BlockchainUpdaterImpl(
   private def publishLastBlockInfo(): Unit =
     for (id <- this.lastBlockId; ts <- ngState.map(_.base.header.timestamp).orElse(rocksdb.lastBlockTimestamp)) {
       val blockchainReady = ts + maxBlockReadinessAge > time.correctedTime()
-      internalLastBlockInfo.onNext(LastBlockInfo(id, Height(height), score, this.finalizedHeightOrFallback(maxSyncRollbackLength), blockchainReady))
+      internalLastBlockInfo.onNext(LastBlockInfo(id, Height(height), score, syncBoundary, blockchainReady))
     }
 
   publishLastBlockInfo()
@@ -106,6 +106,10 @@ class BlockchainUpdaterImpl(
   override def bestLiquidSnapshotAndFees: Option[(StateSnapshot, Long, Long)] = readLock(ngState.map(_.bestLiquidSnapshotAndFees))
 
   override val settings: BlockchainSettings = wavesSettings.blockchainSettings
+
+  override def syncBoundary: Height = readLock(this.finalizedHeightOrFallback(maxSyncRollbackLength))
+
+  override def lastBlockIds: Seq[ByteStr] = readLock((height to syncBoundary.toInt by -1).flatMap(this.blockId))
 
   override def isLastBlockId(id: ByteStr): Boolean = readLock {
     ngState.fold(rocksdb.lastBlockId.contains(id))(_.contains(id))
@@ -539,7 +543,7 @@ class BlockchainUpdaterImpl(
                 )
               )
             } else None
-            DiscardedBlock(block, ng.hitSource, snapshot, generatorSet = Seq.empty)
+            DiscardedBlock(block, ng.hitSource, snapshot, ng.finalizationState.generatorSet)
           }.toSeq
           blocks ++ liquidBlockData
         }
@@ -579,23 +583,26 @@ class BlockchainUpdaterImpl(
             Left(MicroBlockAppendError("It doesn't reference last known microBlock(which exists)", microBlock))
           case _ =>
             for {
-              _ <- microBlock.signaturesValid()
-              (totalBlock, referencedComputedStateHash) <- ng
-                .liquidBlockOf(microBlock.reference)
-                .toRight(GenericError(s"No referenced block exists: $microBlock"))
-                .map { liquid =>
-                  Block.create(
-                    liquid.block,
-                    liquid.block.transactionData ++ microBlock.transactionData,
-                    microBlock.totalResBlockSig,
-                    microBlock.stateHash,
-                    FinalizationVoting.combine(liquid.block.header.finalizationVoting, microBlock.finalizationVoting)
-                  ) -> liquid.data.liquidStateHash
-                }
+              _      <- microBlock.signaturesValid()
+              liquid <- ng.liquidBlockOf(microBlock.reference).toRight(GenericError(s"No referenced block exists: $microBlock"))
+              accepted                    = liquid.block.header.finalizationVoting
+              referencedComputedStateHash = liquid.data.liquidStateHash
+              totalBlock = Block.create(
+                liquid.block,
+                liquid.block.transactionData ++ microBlock.transactionData,
+                microBlock.totalResBlockSig,
+                microBlock.stateHash,
+                FinalizationVoting.combine(accepted, microBlock.finalizationVoting)
+              )
               _ <- Either.raiseUnless(totalBlock.signatureValid()) {
                 MicroBlockAppendError("Invalid total block signature", microBlock)
               }
-              b <- appender.validateFinalizationVoting(totalBlock, rocksdb, ng.finalizationState.generatorSet)
+              b <- appender.validateFinalizationVoting(
+                totalBlock,
+                rocksdb,
+                ng.finalizationState.generatorSet,
+                accepted.fold(Set.empty)(_.conflictingEndorsers)
+              )
               blockDifferResult <- BlockDiffer.fromMicroBlock(
                 this,
                 rocksdb.lastBlockTimestamp,
@@ -618,7 +625,7 @@ class BlockchainUpdaterImpl(
 
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${snapshot.hashString}")
               internalLastBlockInfo.onNext(
-                LastBlockInfo(blockId, Height(height), score, this.finalizedHeightOrFallback(maxSyncRollbackLength), ready = true)
+                LastBlockInfo(blockId, Height(height), score, syncBoundary, ready = true)
               )
 
               miner.scheduleMining(baseBlockchain = None, cancelMicroBlockMining = false)

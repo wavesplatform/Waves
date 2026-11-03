@@ -6,7 +6,6 @@ import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Longs}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, PublicKey}
-import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -23,7 +22,7 @@ import com.wavesplatform.protobuf.{PBSnapshots, toByteStr, toByteString, toPubli
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{EthereumTransaction, PBSince, Transaction, TransactionParsers, TxPositiveAmount, TxValidationError, Versioned}
+import com.wavesplatform.transaction.{EthereumTransaction, PBSince, Transaction, TransactionParsers, TxPositiveAmount, Versioned}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -649,8 +648,12 @@ package object database {
     }
   }
 
-  def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
-    Validators.validateBlock(Block(header, signature, txs))
+  /** A block read back from the database. It was validated when appended, and the rules may have tightened since: a header accepted before
+    * [[com.wavesplatform.features.BlockchainFeatures.FinalityImprovements]] (duplicate or unsorted feature votes) fails Validators.validateBlock
+    * now, yet it must still load, roll back, be served to peers and be exported.
+    */
+  def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Block =
+    Block(header, signature, txs)
 
   def writeAssetScript(script: AssetScriptInfo): Array[Byte] =
     Longs.toByteArray(script.complexity) ++ script.script.bytes().arr
@@ -729,9 +732,8 @@ package object database {
 
   def loadBlock(height: Height, rdb: RDB): Option[Block] =
     for {
-      meta  <- rdb.db.get(Keys.blockMetaAt(height))
-      block <- createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, loadTransactions(height, rdb).map(_._2)).toOption
-    } yield block
+      meta <- rdb.db.get(Keys.blockMetaAt(height))
+    } yield createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, loadTransactions(height, rdb).map(_._2))
 
   def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Height]], valueKey: Height => Key[A]): Option[A] =
     for {

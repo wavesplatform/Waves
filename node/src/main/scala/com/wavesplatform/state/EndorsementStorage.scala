@@ -6,11 +6,15 @@ import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.crypto.bls.{BlsPublicKey, BlsSignature}
-import com.wavesplatform.network.EndorseBlock
+import com.wavesplatform.network.{ChannelObservable, EndorseBlock}
 import com.wavesplatform.state.EndorsementFilter.SimulationResult
 import com.wavesplatform.state.EndorsementStorage.InMemory.FinalizationResult
 
+import io.netty.channel.Channel
+import monix.execution.Scheduler
+
 import scala.collection.{immutable, mutable}
+import scala.util.control.NonFatal
 
 // TODO: .switch: use in appender when changed height
 trait EndorsementStorage {
@@ -29,7 +33,24 @@ trait EndorsementStorage {
   def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting]
 }
 
-object EndorsementStorage {
+object EndorsementStorage extends StrictLogging {
+
+  /** Feeds peers' endorsements into `storage`, relaying those worth sharing. An exception is logged rather than let out: Monix would cancel the
+    * subscription, silently stopping endorsement processing until a restart.
+    */
+  def process(storage: EndorsementStorage, endorsements: ChannelObservable[EndorseBlock], relay: (Channel, EndorseBlock) => Unit)(using
+      Scheduler
+  ): Unit =
+    endorsements.foreach { case (ch, x) =>
+      try
+        storage.tryAdd(x) match {
+          case Left(err)   => logger.trace(s"Unexpected $x: $err")
+          case Right(true) => relay(ch, x)
+          case _           =>
+        }
+      catch { case NonFatal(e) => logger.error(s"Failed to process $x from $ch", e) }
+    }
+
   object Disabled extends EndorsementStorage {
     override def tryAdd(msg: EndorseBlock): Either[String, Boolean]                  = true.asRight
     override def startVoting(filter: EndorsementFilter): Boolean                     = false
@@ -60,7 +81,8 @@ object EndorsementStorage {
         _ <- Either.raiseWhen(msg.endorserIndex >= filter.normalizedGeneratorSet.size)(
           s"There are only ${filter.normalizedGeneratorSet.size} endorsers"
         )
-        endorserIndex <- GeneratorIndex.checked(msg.endorserIndex).toRight(s"Invalid endorser index: ${msg.endorserIndex}")
+        // Any int32 off the wire; GeneratorIndex.checked throws below -1
+        endorserIndex <- Either.cond(msg.endorserIndex >= 0, GeneratorIndex(msg.endorserIndex), s"Invalid endorser index: ${msg.endorserIndex}")
         _             <- Either.raiseWhen(msg.endorserIndex == filter.miner.toInt)("Miner can't sent endorsements")
         (endorserAddr, endorserPk, balance) = filter.normalizedGeneratorSet(msg.endorserIndex)
         _   <- Either.raiseWhen(balance == 0)(s"Endorser #$endorserIndex $endorserAddr has no enough balance")

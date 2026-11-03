@@ -170,7 +170,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "3.8.4",
+    scalaVersion         := "3.10.0",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -190,6 +190,7 @@ inScope(Global)(
       "-Wconf:cat=deprecation&origin=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&origin=com.wavesplatform.state.InvokeScriptResult.*:s",
       "-Wconf:cat=deprecation&origin=com\\.wavesplatform\\.(lang\\..*|JsApiUtils)&origin=com\\.wavesplatform\\.lang\\.v1\\.compiler\\.Terms\\.LET_BLOCK:s",
+      "-Wconf:cat=deprecation&msg=ArrowAssoc.* is deprecated since 3\\.10:s", // Deprecated in Scala 3.10, play-json, pureconfig and fastparse macros still expand to it
       "-Wconf:src=src_managed/.*:s"
     ),
     crossPaths        := false,

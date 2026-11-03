@@ -29,7 +29,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.AccountVerifierTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.{Asset, AssetIdLength, EthTxGenerator, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, CommitToGenerationTransaction, EthTxGenerator, TransactionFactory, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.{BlockGen, TestValues, crypto}
 import org.apache.pekko.http.scaladsl.model.*
@@ -886,6 +886,10 @@ class TransactionsRouteSpec
         (jsObject \ "senderPublicKey").as[String] shouldBe sender.publicKey.toString
         (jsObject \ "endorserPublicKey").as[String] shouldBe blsKP.publicKey.base58
         (jsObject \ "commitmentSignature").asOpt[String] shouldBe defined
+
+        // Finality Improvements is not activated here, so the proof does not name the sender
+        val tx = TransactionFactory.parseRequest(jsObject).explicitGet().asInstanceOf[CommitToGenerationTransaction]
+        tx.commitmentSignature.verifyBasic(tx.popMessage(senderBound = false), tx.endorserPublicKey) shouldBe a[Right[?, ?]]
       }
     }
   }

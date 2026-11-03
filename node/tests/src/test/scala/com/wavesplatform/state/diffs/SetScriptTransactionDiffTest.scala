@@ -208,12 +208,14 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     }
 
     withClue("InvokeExpression") {
-      intercept[RuntimeException](TxHelpers.scriptV6(s"""
-                                                        |@Callable(i)
-                                                        |func test() = {
-                                                        |  strict tx = InvokeExpressionTransaction(base58'', unit, base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])
-                                                        |  []
-                                                        |}""".stripMargin)).toString should include("Can't find a function")
+      intercept[RuntimeException](
+        TxHelpers.scriptV6(s"""
+                              |@Callable(i)
+                              |func test() = {
+                              |  strict tx = InvokeExpressionTransaction(base58'', unit, base58'', 1, 1, 1, Address(base58''), base58'', base58'', [])
+                              |  []
+                              |}""".stripMargin)
+      ).toString should include("Can't find a function")
     }
   }
 
@@ -670,6 +672,26 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       d.appendBlock(genesis)
       d.appendBlockE(setScriptWithInvoke) should produce("function 'Native(1020)' not found")
       d.appendBlockE(setScriptWithReentrantInvoke) should produce("function 'Native(1021)' not found")
+    }
+  }
+
+  property("RIDE V9 is activated by either Deterministic Finality or Finality Improvements") {
+    import com.wavesplatform.features.RideVersionProvider.RideVersionBlockchainExt
+    import com.wavesplatform.test.DomainPresets.WavesSettingsOps
+
+    val sender = TxHelpers.defaultSigner
+    val script = TestCompiler(V9).compileExpression("true")
+
+    withDomain(DomainPresets.TransactionStateSnapshot, AddrWithBalance.enoughBalances(sender)) { d =>
+      d.blockchain.actualRideVersion shouldBe V8
+      d.appendBlockE(TxHelpers.setScript(sender, script)) should produce(s"${DeterministicFinality.description} feature has not been activated yet")
+    }
+
+    Seq(DomainPresets.DeterministicFinality, DomainPresets.TransactionStateSnapshot.addFeatures(FinalityImprovements)).foreach { settings =>
+      withDomain(settings, AddrWithBalance.enoughBalances(sender)) { d =>
+        d.blockchain.actualRideVersion shouldBe V9
+        d.appendAndAssertSucceed(TxHelpers.setScript(sender, script))
+      }
     }
   }
 }
