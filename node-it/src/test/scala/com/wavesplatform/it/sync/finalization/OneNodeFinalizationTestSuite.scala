@@ -5,7 +5,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.state.Height
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.utils.ScorexLogging
 import org.apache.pekko.http.scaladsl.model.StatusCodes
@@ -72,19 +71,11 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
       }
     }
 
-    // We need at least one transaction, otherwise there won't be a microblock, thus no voting, no finalization
-    // Finalization happened in a microblock
-    node.waitForHeight(Height(node.waitForTransaction(node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true).id).height + 1))
-    val fs = node.finalityStatus
-    if (fs.height > waitingFinalizedHeight + 2)
-      fail(
-        s"Finalization height doesn't rise: height=${fs.height}, waiting for finalized height=$waitingFinalizedHeight, last finalized height=$finalizedHeight1"
-      )
-
-    if (fs.finalizedHeight < finalizedHeight1)
-      fail(s"Finalized height ${fs.finalizedHeight} became lower than the previous $finalizedHeight1")
-    else if (fs.finalizedHeight != finalizedHeight1)
-      log.debug(s"New finalized height: $finalizedHeight1 -> ${fs.finalizedHeight}")
+    // We need at least one transaction, otherwise there won't be a microblock, thus no voting, no finalization.
+    // Wait for the finalized height itself: a bound on the chain height breaks whenever the test JVM stalls.
+    node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true)
+    val fs = node.waitFor(s"finalized height >= $waitingFinalizedHeight")(_.finalityStatus, _.finalizedHeight >= waitingFinalizedHeight, 500.millis)
+    log.debug(s"New finalized height: $finalizedHeight1 -> ${fs.finalizedHeight} at ${fs.height}")
 
     step("Survives restart")
     isolated {

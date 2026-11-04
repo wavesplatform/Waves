@@ -12,7 +12,7 @@ allowed-tools: Read, Bash(git status *), Bash(git diff *), Bash(git log *), Bash
    ```
    Valid `type` prefixes: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `infra`.
 
-2. **Auto-fix before commit.** `sbt scalafmtAll`, then `sbt compilePR` (format check + compile with `-Werror`) for any code change.
+2. **Auto-fix before commit.** `sbt scalafmt` (Compile only, matching CI; not `scalafmtAll`), then `sbt compilePR` (format check + compile with `-Werror`) for any code change.
 
 3. **Commit & push.**
    ```

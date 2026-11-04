@@ -15,7 +15,7 @@ Waves node in Scala 3 (consensus, state, REST/gRPC API, RIDE). sbt 1.x multi-mod
 - `sbt node-it/loadTests` / `sbt node-it/integrationTests`: the `@LoadTest`-annotated suites and their complement, discovered from the annotation. They are separate CI jobs and the load half runs serially. Read "Load tests" in `docs/notes/testing.md` before touching one, or before changing how node-it is invoked in CI.
 - Sandboxed dev environments: the default Docker builder here cannot do nested overlayfs mounts, so `node-it/docker` (or any `docker build` using the default `docker` driver) fails every `RUN` layer with `mount source: "overlay", ... err: operation not permitted`. Switch to a docker-container buildx builder (`docker buildx ls`; `docker buildx create --use` if none exists) and build by hand: `cd docker && docker buildx build --load -t com.wavesplatform/node-it:latest .`. `sbt node-it/docker` always uses the default builder, but its dependency `stageForDocker` still stages the node files into `docker/target`, so letting it fail once before the manual build is a reasonable sequence.
 - node-it suites run with `-Dwaves.it.max-parallel-suites=N` to cap Docker resource usage (each suite starts its own containers). Pass it on the `sbt` command line, not inside the sbt shell, and not through `sbt --client` (the thin client keeps the property to itself; see `docs/notes/build-tooling.md`). Per-suite logs land in `node-it/target/logs/<run-id>/<abbreviated.suite.Name>/`, but the real assertion/exception message is only in the sbt console output; grep it for `*** FAILED ***`/`*** ABORTED ***` and the lines after.
-- `sbt scalafmtAll`: auto-format before committing.
+- `sbt scalafmt`: auto-format before committing. CI checks only `Compile` sources; `scalafmtAll` also rewrites unformatted test files nobody touched.
 - A long-lived sbt server (`sbt --client`) that loads the Amazon Corretto crypto provider after a recompile can abort with `IllegalAccessError: ... ZombieClassLoader` (the provider registers once per JVM, from the old layer). `sbt --client shutdown`, then rerun.
 
 ## Modules
@@ -34,7 +34,7 @@ Waves node in Scala 3 (consensus, state, REST/gRPC API, RIDE). sbt 1.x multi-mod
 ## PR workflow
 
 - Default branch is `version-1.6.x`. Never push to it; feature branch + PR, human merges.
-- Before pushing: `sbt compilePR` locally; fix formatting with `sbt scalafmtAll`, never by hand-matching the checker. Then run `/review` and fix Critical/Major findings in the same branch.
+- Before pushing: `sbt compilePR` locally; fix formatting with `sbt scalafmt`, never by hand-matching the checker. Then run `/review` and fix Critical/Major findings in the same branch.
 - After pushing: watch `gh pr checks` until green; a red check is yours to fix or explicitly hand over.
 - On a mistake repeated twice, encode the rule (lint config, test, CI, `docs/notes/` for implementation learnings, or this file for build/conventions/workflow rules only); never just fix the instance.
 

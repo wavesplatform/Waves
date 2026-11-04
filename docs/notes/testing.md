@@ -47,3 +47,7 @@ Most node-it suites are slow because of how they wait, not because of how much t
 ## node-tests: finding why a block was rejected
 
 Tests log at `OFF` by default (`node/tests/src/test/resources/logback-test.xml`), so an append rejected inside the appender surfaces only as `Can't apply block ..., see logs` from `Domain.appendBlock`. Re-run with `-Dlogback.test.level=TRACE` and grep for the real reason.
+
+## node-it: the test JVM counts toward the miner quorum
+
+`MinerImpl` checks `waves.miner.quorum` against `allChannels.size`, which includes any connection the test JVM opens over the binary protocol (`sendByNetwork`), not only peer nodes. A suite that idles its miners with a quorum of exactly `nodes.size` (each node has `nodes.size - 1` peers) gets the quorum reached the moment it connects, and the miner's 5s retry can forge a block that races whatever the suite injects. `BlockChallengeSuite` lost its injected block to that race on a loaded runner. Use an unreachable quorum instead; `BlockChallenger` does not check the quorum, so challenge blocks are still forged. Also, do not bound the chain height in an assertion about something else (`OneNodeFinalizationTestSuite` checked finality by requiring height <= N): the test JVM can stall for 10s under CPU pressure, so wait for the condition itself.

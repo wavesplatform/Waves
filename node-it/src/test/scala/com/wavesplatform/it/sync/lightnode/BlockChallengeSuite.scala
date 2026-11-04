@@ -29,7 +29,9 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
 
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
-      .overrideBase(_.quorum(4))
+      // Unreachable quorum keeps every regular miner idle, so nothing races the injected block (BlockChallenger ignores the quorum).
+      // quorum(4) was not enough: the test JVM's own connection is a 4th channel and let the challenger forge its own block.
+      .overrideBase(_.quorum(100))
       .overrideBase(_.minAssetInfoUpdateInterval(0))
       .overrideBase(
         _.preactivatedFeatures(
