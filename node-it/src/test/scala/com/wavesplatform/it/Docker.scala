@@ -247,7 +247,7 @@ class Docker(
 
       val profilerConfigEnv = if (enableProfiling) {
         // https://www.yourkit.com/docs/java/help/startup_options.jsp
-        s"YOURKIT_OPTS=port=$ProfilerPort,listen=all,sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot,onexit=snapshot"
+        s"YOURKIT_OPTS=port=$ProfilerPort,listen=all,sampling,monitors,sessionname=WavesNode,dir=$ProfilerDir,logdir=$ProfilerDir,onexit=snapshot"
       } else ""
 
       val debuggerPort = if (enableDebugger) Docker.freeDebuggerPort() else 0
@@ -477,7 +477,7 @@ class Docker(
 
   private def saveProfile(node: DockerNode): Unit = if (enableProfiling) {
     try {
-      val profilerDirStream = client.archiveContainer(node.containerId, ContainerRoot.resolve("profiler").toString)
+      val profilerDirStream = client.archiveContainer(node.containerId, ProfilerDir.toString)
 
       try {
         val archiveStream = new ArchiveStreamFactory().createArchiveInputStream(ArchiveStreamFactory.TAR, profilerDirStream)
@@ -593,7 +593,8 @@ object Docker {
   val GrpcExtension              = "com.wavesplatform.api.grpc.GRPCServerExtension"
   val BlockchainUpdatesExtension = "com.wavesplatform.events.BlockchainUpdates"
 
-  private val ContainerRoot = Paths.get("/usr/share/waves")
+  // Under the log directory: the install tree is not writable by the node user
+  private val ProfilerDir = Paths.get("/var/log/waves/profiler")
   private val ProfilerPort  = 10001
 
   private val RunId = Option(System.getenv("RUN_ID")).getOrElse(DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now()))
