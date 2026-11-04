@@ -6,15 +6,15 @@ import scalapb.compiler.Version.scalapbVersion
 object Dependencies {
   private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.17.Final"
 
-  val gProtoVersion = "4.36.2"
+  val gProtoVersion = "4.36.0"
   val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
   val overrides = Def.setting(
     Seq(
       "org.scala-lang"           %% "scala3-library" % scalaVersion.value,
-      "com.google.code.gson"      % "gson"           % "2.15.0",
+      "com.google.code.gson"      % "gson"           % "2.14.0",
       "com.squareup.okio"         % "okio-jvm"       % "3.18.2",
       "org.apache.httpcomponents" % "httpclient"     % "4.5.14",
-      "org.slf4j"                 % "slf4j-api"      % "2.0.20",
+      "org.slf4j"                 % "slf4j-api"      % "2.0.18",
       "org.msgpack"               % "msgpack-core"   % "0.9.12",
       nettyModule("codec-http2"),
       nettyModule("codec-http"),
@@ -54,10 +54,10 @@ object Dependencies {
   private def grpcModule(module: String) = "io.grpc" % module % "1.83.1"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
-  val googleGuava     = "com.google.guava"    % "guava"             % "33.8.0-jre"
+  val googleGuava     = "com.google.guava"    % "guava"             % "33.7.1-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.6.6"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.6.3"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.14"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
@@ -72,18 +72,17 @@ object Dependencies {
   val sttp3      = sttp3Module("core")
   val sttp3Monix = sttp3Module("monix")
 
-  // 4.2.0 is built with Scala 3.9 (TASTy 28.9), which Scala 3.8 cannot read. Bump together with scalaVersion.
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 
   def amazonCorretto(c: String): ModuleID = "software.amazon.cryptools" % "AmazonCorrettoCryptoProvider" % "2.5.0" classifier c
 
   val cryptoProviders = Seq(
     // Windows x86_64, Windows x86, macOS x86_64, linux x86_64
-    "org.conscrypt" % "conscrypt-openjdk-uber" % "2.8.0",
+    "org.conscrypt" % "conscrypt-openjdk-uber" % "2.6.3",
     // macOS aarch64
     amazonCorretto("osx-aarch_64"),
     // fallback Java
-    "org.bouncycastle" % "bcprov-jdk18on" % "1.86"
+    "org.bouncycastle" % "bcprov-jdk18on" % "1.85.2"
   )
 
   val lang = Def.setting(
@@ -112,7 +111,7 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
-    "com.github.jnr" % "jnr-unixsocket" % "0.39.8", // To support Apple ARM
+    "com.github.jnr" % "jnr-unixsocket" % "0.39.3", // To support Apple ARM
     "com.spotify"    % "docker-client"  % "8.16.0",
     jacksonModule("dataformat", "dataformat-properties", "2.22.2"),
     asyncHttpClient
@@ -130,8 +129,9 @@ object Dependencies {
     pekkoModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "11.8.1"
-  // Every Linux native of the above at a third of its size; the docker image ships it instead (see stageForDocker).
+  // Check https://github.com/facebook/rocksdb/issues/13893 before bumping
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "10.10.1.1"
+  // Linux-only natives of the above; the docker image ships this jar instead (see stageForDocker).
   val rocksdbForLinux: ModuleID = rocksdb.classifier("linux64")
 
   val scalaLogging: ModuleID = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6"
@@ -140,8 +140,8 @@ object Dependencies {
       rocksdb,
       "commons-net"            % "commons-net"               % "3.13.0",
       "commons-io"             % "commons-io"                % "2.22.0",
-      "com.github.pureconfig" %% "pureconfig-core"           % "0.17.11",
-      "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.11",
+      "com.github.pureconfig" %% "pureconfig-core"           % "0.17.10",
+      "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.10",
       "net.logstash.logback"   % "logstash-logback-encoder"  % "9.0" % Runtime,
       kamonCore,
       kamonModule("pekko-http"),
@@ -193,13 +193,13 @@ object Dependencies {
   lazy val rideRunner = Def.setting(
     Seq(
       rocksdb,
-      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.3.1",
+      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.2.4",
       "net.logstash.logback"          % "logstash-logback-encoder" % "9.0" % Runtime,
       kamonModule("caffeine"),
       kamonModule("prometheus"),
       sttp3,
       sttp3Monix,
-      "org.scala-lang.modules"             %% "scala-xml"              % "2.5.0", // JUnit reports
+      "org.scala-lang.modules"             %% "scala-xml"              % "2.4.0", // JUnit reports
       pekkoHttpModule("pekko-http-testkit") % Test,
       "com.softwaremill.diffx"             %% "diffx-core"             % "0.9.0" % Test,
       "com.softwaremill.diffx"             %% "diffx-scalatest-should" % "0.9.0" % Test,
