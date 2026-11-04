@@ -5,6 +5,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.state.Height
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.utils.ScorexLogging
 import org.apache.pekko.http.scaladsl.model.StatusCodes
@@ -15,11 +16,16 @@ import scala.concurrent.duration.DurationInt
 class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLogging {
   import com.wavesplatform.it.NodeConfigs.*
   override val nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.quorum(0).preactivatedFeatures(
-      BlockchainFeatures.FairPoS,
-      BlockchainFeatures.DeterministicFinality
-    )
+    BiggestMiner
+      .quorum(0)
+      .preactivatedFeatures(
+        BlockchainFeatures.FairPoS,
+        BlockchainFeatures.DeterministicFinality
+      )
   )
+
+  // A block is finalized by endorsements in the next one's microblocks; the old height bound allowed one more
+  private val MaxFinalizationLag = 2
 
   private def node            = dockerNodes().last
   private lazy val miner1Acc  = node.keyPair
@@ -76,6 +82,14 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true)
     val fs = node.waitFor(s"finalized height >= $waitingFinalizedHeight")(_.finalityStatus, _.finalizedHeight >= waitingFinalizedHeight, 500.millis)
     log.debug(s"New finalized height: $finalizedHeight1 -> ${fs.finalizedHeight} at ${fs.height}")
+
+    // From recorded history, not the current height: finality stops with the last microblock, the chain does not.
+    node.waitForHeight(fs.height.next) // so the block that reached the target is solid and has a record
+    val reachedAt =
+      (waitingFinalizedHeight to fs.height).map(Height(_)).find(h => node.finalizedHeightAt(h) >= waitingFinalizedHeight).value
+    withClue(s"finalized height $waitingFinalizedHeight reached at $reachedAt: ") {
+      (reachedAt - waitingFinalizedHeight) should be <= MaxFinalizationLag
+    }
 
     step("Survives restart")
     isolated {
