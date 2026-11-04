@@ -10,7 +10,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
 import com.wavesplatform.it.api.Block as ApiBlock
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.it.{BaseFunSuite, Docker, Node, NodeConfigs, TransferSending}
+import com.wavesplatform.it.{BaseFunSuite, Node, NodeConfigs, TransferSending}
 import com.wavesplatform.lang.directives.values.V8
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.RawBytes
@@ -24,8 +24,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.*
 
 class BlockChallengeSuite extends BaseFunSuite with TransferSending {
-  // Speaks the binary protocol from the test JVM, so it needs the node-to-node port published (see Docker.publishNetworkPort).
-  override protected def createDocker: Docker = new Docker(tag = getClass.getSimpleName, publishNetworkPort = true)
+  override protected def publishNetworkPort: Boolean = true
 
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder

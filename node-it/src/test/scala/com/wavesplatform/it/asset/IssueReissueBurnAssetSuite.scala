@@ -1,7 +1,7 @@
 package com.wavesplatform.it.asset
 
 import com.google.protobuf.ByteString
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{AssetDoesNotExist, TransactionDoesNotExist}
 import com.wavesplatform.common.state.ByteStr
@@ -44,8 +44,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
 
   override val nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
 
-  override protected def createDocker: Docker =
-    new Docker(suiteConfig = ConfigFactory.parseString(s"waves.extensions = [${Docker.GrpcExtension}]"), tag = getClass.getSimpleName)
+  override protected def nodeExtensions: Seq[String] = super.nodeExtensions :+ Docker.GrpcExtension
 
   private val initialWavesBalance = 100.waves
   private val setScriptPrice      = 0.01.waves

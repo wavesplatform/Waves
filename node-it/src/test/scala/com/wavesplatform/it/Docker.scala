@@ -650,7 +650,14 @@ object Docker {
       ConfigSource.fromConfig(configTemplate).at("waves.blockchain.custom.address-scheme-character").loadOrThrow[String].charAt(0).toByte
   }
 
-  def apply(owner: Class[?]): Docker = new Docker(tag = owner.getSimpleName)
+  def apply(owner: Class[?], suiteConfig: Config = empty, extensions: Seq[String] = Seq.empty, publishNetworkPort: Boolean = false): Docker =
+    new Docker(
+      suiteConfig =
+        if (extensions.isEmpty) suiteConfig
+        else ConfigFactory.parseString(extensions.mkString("waves.extensions = [", ", ", "]")).withFallback(suiteConfig),
+      tag = owner.getSimpleName,
+      publishNetworkPort = publishNetworkPort
+    )
 
   private def asProperties(config: Config): Properties = {
     val jsonConfig = config.resolve().root().render(ConfigRenderOptions.concise())
