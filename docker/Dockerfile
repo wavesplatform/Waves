@@ -17,9 +17,7 @@ ENV WVLOG=/var/log/waves
 ENV WAVES_INSTALL_PATH=/usr/share/waves
 ENV WAVES_CONFIG=/etc/waves/waves.conf
 
-# Setup node. There is deliberately no USER instruction: entrypoint.sh starts as root only to take ownership of a
-# bind-mounted data or log directory, then re-execs itself as waves (uid 999) with setpriv, from util-linux in the
-# base image. Declaring USER instead would leave every bind mount for the operator to chown by hand.
+# Setup node
 RUN groupadd -r waves --gid=999; \
     useradd -r -g waves --uid=999 --home-dir=$WVDATA --shell=/bin/bash waves; \
     # The COPYs below own what they bring in, so only the directories themselves are created here
