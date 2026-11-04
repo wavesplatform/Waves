@@ -16,6 +16,28 @@ object IntegrationTestsPlugin extends AutoPlugin {
 
   private val LoadTestTag = "com.wavesplatform.it.LoadTest"
 
+  /** `-Dwaves.it.shard=i/n` (1-based) for splitting `integrationTests` across CI runners; whole set when absent. */
+  private def itShard: (Int, Int) =
+    sys.props.get("waves.it.shard").fold((1, 1)) { spec =>
+      scala.util.Try(spec.split('/').map(_.trim.toInt)).toOption match {
+        case Some(Array(i, n)) if 1 <= i && i <= n => (i, n)
+        case _                                     => sys.error(s"waves.it.shard must be i/n with 1 <= i <= n, got '$spec'")
+      }
+    }
+
+  // A stable hash of the name rather than the position in a sorted list: Grpc/Http twin suites sort next to each other,
+  // and alternating by position put the slow twins on the same shard.
+  private def shardOfUntagged(split: (Seq[String], Seq[String])): Seq[String] = {
+    val (index, count) = itShard
+    split._2.filter { suite =>
+      val crc = new java.util.zip.CRC32
+      crc.update(suite.getBytes("UTF-8"))
+      crc.getValue % count == index - 1
+    }
+  }
+
+  private def shardSpec: String = { val (i, n) = itShard; s"$i/$n" }
+
   /** Runs exactly the named suites through `testOnly`, failing loudly rather than reporting a green empty run. */
   private def runSuites(select: ((Seq[String], Seq[String])) => Seq[String], emptyWhy: String, tagged: Boolean) =
     Def.taskDyn {
@@ -65,7 +87,7 @@ object IntegrationTestsPlugin extends AutoPlugin {
           definedTests.value.map(_.name).partition(Class.forName(_, false, loader).isAnnotationPresent(loadTest))
         },
         loadTests         := runSuites(_._1, s"no suite carries @$LoadTestTag", tagged = true).value,
-        integrationTests  := runSuites(_._2, "no untagged suites found", tagged = false).value,
+        integrationTests  := runSuites(shardOfUntagged, s"no untagged suites found in shard ${shardSpec}", tagged = false).value,
         parallelExecution := true,
         // sbt tags every forked group with these too, so the default (Tags.Test, 1) puts suites under build.sbt's
         // per-processor Tags.Test cap (4 on a GitHub runner) and the flag could only lower concurrency, never raise it.
