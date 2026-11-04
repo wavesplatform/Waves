@@ -259,10 +259,8 @@ class Docker(
       val extensions = actualConfig.getStringList("waves.extensions").asScala.toSeq
       val publishedPorts = Seq(
         Some(actualConfig.getInt("waves.rest-api.port")),
-        Option.when(extensions.contains(GrpcExtension))(Try(actualConfig.getInt("waves.grpc.port")).getOrElse(6870)),
-        Option.when(extensions.contains(BlockchainUpdatesExtension))(
-          Try(actualConfig.getInt("waves.blockchain-updates.grpc-port")).getOrElse(6881)
-        ),
+        Option.when(extensions.contains(GrpcExtension))(actualConfig.getInt("waves.grpc.port")),
+        Option.when(extensions.contains(BlockchainUpdatesExtension))(actualConfig.getInt("waves.blockchain-updates.grpc-port")),
         Option.when(publishNetworkPort)(networkPort.toInt),
         Option.when(enableDebugger)(internalDebuggerPort)
       ).flatten.distinct
