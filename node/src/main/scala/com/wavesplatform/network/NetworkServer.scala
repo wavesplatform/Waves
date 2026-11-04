@@ -122,6 +122,7 @@ object NetworkServer extends ScorexLogging {
           Seq(
             new BrokenConnectionDetector(networkSettings.breakIdleConnectionsTimeout),
             new HandshakeDecoder(peerDatabase),
+            // No shorter timeout while peerless: an expired handshake suspends the peer, and connecting goes on regardless
             new HandshakeTimeoutHandler(networkSettings.handshakeTimeout),
             clientHandshakeHandler
           ) ++ pipelineTail

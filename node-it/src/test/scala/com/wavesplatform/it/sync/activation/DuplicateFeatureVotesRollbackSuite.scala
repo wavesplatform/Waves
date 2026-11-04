@@ -12,7 +12,7 @@ import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.it.{BaseFreeSpec, Docker, NodeConfigs, ReportingTestName}
+import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs, ReportingTestName}
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.state.Height
 import play.api.libs.json.Json
@@ -42,8 +42,7 @@ class DuplicateFeatureVotesRollbackSuite extends BaseFreeSpec with ActivationSta
   private val signer: KeyPair = KeyPair.fromSeed(NotMiner.getString("account-seed")).explicitGet()
   private val signerBalance   = 6_000_000_000_000_000L // From template.conf, never decreases: blocks have no transactions, only rewards
 
-  // Speaks the binary protocol from the test JVM, so it needs the node-to-node port published (see Docker.publishNetworkPort).
-  override protected def createDocker: Docker = new Docker(tag = getClass.getSimpleName, publishNetworkPort = true)
+  override protected def publishNetworkPort: Boolean = true
 
   override protected def nodeConfigs: Seq[Config] =
     Seq(BiggestMiner.overrides(s"""waves {

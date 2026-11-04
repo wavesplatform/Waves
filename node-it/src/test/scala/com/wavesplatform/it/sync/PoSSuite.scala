@@ -12,7 +12,7 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.it.{BaseFunSuite, Docker, NodeConfigs}
+import com.wavesplatform.it.{BaseFunSuite, NodeConfigs}
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.state.Height
 import play.api.libs.json.{JsSuccess, Json, Reads}
@@ -283,8 +283,7 @@ class PoSSuite extends BaseFunSuite {
   private val BlocksPerTimestampCheck = 5
   private val vrfActivationHeight     = Height(15)
 
-  // Speaks the binary protocol from the test JVM, so it needs the node-to-node port published (see Docker.publishNetworkPort).
-  override protected def createDocker: Docker = new Docker(tag = getClass.getSimpleName, publishNetworkPort = true)
+  override protected def publishNetworkPort: Boolean = true
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder

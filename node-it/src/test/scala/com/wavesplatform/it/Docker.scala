@@ -259,10 +259,8 @@ class Docker(
       val extensions = actualConfig.getStringList("waves.extensions").asScala.toSeq
       val publishedPorts = Seq(
         Some(actualConfig.getInt("waves.rest-api.port")),
-        Option.when(extensions.contains(GrpcExtension))(Try(actualConfig.getInt("waves.grpc.port")).getOrElse(6870)),
-        Option.when(extensions.contains(BlockchainUpdatesExtension))(
-          Try(actualConfig.getInt("waves.blockchain-updates.grpc-port")).getOrElse(6881)
-        ),
+        Option.when(extensions.contains(GrpcExtension))(actualConfig.getInt("waves.grpc.port")),
+        Option.when(extensions.contains(BlockchainUpdatesExtension))(actualConfig.getInt("waves.blockchain-updates.grpc-port")),
         Option.when(publishNetworkPort)(networkPort.toInt),
         Option.when(enableDebugger)(internalDebuggerPort)
       ).flatten.distinct
@@ -651,7 +649,14 @@ object Docker {
       ConfigSource.fromConfig(configTemplate).at("waves.blockchain.custom.address-scheme-character").loadOrThrow[String].charAt(0).toByte
   }
 
-  def apply(owner: Class[?]): Docker = new Docker(tag = owner.getSimpleName)
+  def apply(owner: Class[?], suiteConfig: Config = empty, extensions: Seq[String] = Seq.empty, publishNetworkPort: Boolean = false): Docker =
+    new Docker(
+      suiteConfig =
+        if (extensions.isEmpty) suiteConfig
+        else ConfigFactory.parseString(extensions.mkString("waves.extensions = [", ", ", "]")).withFallback(suiteConfig),
+      tag = owner.getSimpleName,
+      publishNetworkPort = publishNetworkPort
+    )
 
   private def asProperties(config: Config): Properties = {
     val jsonConfig = config.resolve().root().render(ConfigRenderOptions.concise())
