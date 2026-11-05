@@ -10,7 +10,7 @@ libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "1.0.0-alpha
 
 Seq(
   "com.eed3si9n"       % "sbt-assembly"             % "2.4.2",
-  "com.github.sbt"     % "sbt-git"                  % "2.1.0",
+  "com.github.sbt"     % "sbt-git"                  % "3.0.0-RC1",
   "com.github.sbt"     % "sbt-native-packager"      % "1.11.7",
   "com.github.sbt"     % "sbt-pgp"                  % "2.3.2",
   "com.lightbend.sbt"  % "sbt-javaagent"            % "0.1.6",
