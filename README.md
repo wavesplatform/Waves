@@ -56,18 +56,18 @@ Linux systems:
 ```bash
 sudo apt-get update
 sudo apt-get install openjdk-17-jre
-java -jar node/target/waves-all*.jar path/to/config/waves-{network}.conf
+java -jar target/out/jvm/u/node/waves-all*.jar path/to/config/waves-{network}.conf
 ```
 
 Mac systems (assuming already installed homebrew):
 ```bash
 brew cask install adoptopenjdk/openjdk/adoptopenjdk17
-java -jar node/target/waves-all*.jar path/to/config/waves-{network}.conf
+java -jar target/out/jvm/u/node/waves-all*.jar path/to/config/waves-{network}.conf
 ```
 
 Windows systems (assuming already installed OpenJDK 17):
 ```bash
-java -jar node/target/waves-all*.jar path/to/config/waves-{network}.conf
+java -jar target/out/jvm/u/node/waves-all*.jar path/to/config/waves-{network}.conf
 ```
 
 Using docker, follow the [official image documentation](https://hub.docker.com/r/wavesplatform/wavesnode).
@@ -126,7 +126,7 @@ sbt node-it/docker
 - Run all tests. You can increase or decrease number of parallel running tests by changing `waves.it.max-parallel-suites`
 system property:
 ```bash
-sbt -Dwaves.it.max-parallel-suites=1 node-it/test
+sbt --server -Dwaves.it.max-parallel-suites=1 --batch node-it/testFull
 ```
 
 - Run one test:
@@ -140,7 +140,7 @@ sbt node-it/testOnly *.TestClassName
 
 ```bash
 sbt packageAll                   # Mainnet
-sbt -Dnetwork=testnet packageAll # Testnet
+sbt --server -Dnetwork=testnet --batch packageAll # Testnet
 ```
 
 `sbt packageAll` ‌produces only `deb` package along with a fat `jar`. 
@@ -150,7 +150,7 @@ sbt -Dnetwork=testnet packageAll # Testnet
 `deb` package is located in target folder. You can replace '*' with actual package name:
 
 ```bash
-sudo dpkg -i node/target/*.deb
+sudo dpkg -i target/out/jvm/u/node/*.deb
 ```
 
 

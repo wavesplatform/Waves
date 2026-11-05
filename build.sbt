@@ -1,4 +1,5 @@
 import java.nio.file.Files
+import sbt.protocol.testing.TestResult
 
 import scala.jdk.CollectionConverters.*
 
@@ -33,12 +34,12 @@ lazy val lang =
     .withoutSuffixFor(JVMPlatform)
     .crossType(CrossType.Full)
     .settings(
-      assembly / test := {},
+      assembly / test := TestResult.Passed,
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       inConfig(Compile)(
         Seq(
           sourceGenerators += Tasks.docSource,
-          PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
+          PB.targets += PB.Target(scalapb.gen(flatPackage = true), sourceManaged.value),
           PB.protoSources += PB.externalIncludePath.value,
           PB.generate / includeFilter := { (f: File) =>
             (** / "waves" / "lang" / "*.proto").matches(f.toPath)
@@ -143,7 +144,7 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
     ),
     inConfig(Compile)(
       Seq(
-        PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
+        PB.targets += PB.Target(scalapb.gen(flatPackage = true), sourceManaged.value),
         PB.protoSources += PB.externalIncludePath.value,
         PB.generate / includeFilter := { (f: File) =>
           (** / "waves" / "*.proto").matches(f.toPath)
@@ -166,7 +167,7 @@ lazy val `repl-js` = repl.js
   .dependsOn(`lang-js`)
   .settings(
     libraryDependencies ++= Dependencies.scalapbRuntimeJS.value ++ Seq(
-      "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
+      "org.scala-js" %% "scala-js-macrotask-executor" % "1.1.1"
     )
   )
 
@@ -196,8 +197,8 @@ inScope(Global)(
     scalaVersion         := "3.10.0",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
-    organizationHomepage := Some(url("https://wavesplatform.com")),
-    licenses             := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
+    organizationHomepage := Some(uri("https://wavesplatform.com")),
+    licenses             := Seq(("MIT", uri("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     publish / skip       := true,
     scalacOptions ++= Seq(
       "-feature",
@@ -228,7 +229,7 @@ inScope(Global)(
      * u - select the JUnit XML reporter with output directory
      */
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
-    testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
+    testOptions += Tests.Setup(() => sys.props("sbt-testing") = "true"),
     network := Network.default(),
     resolvers ++= Resolver.sonatypeCentralSnapshots +: Seq(Resolver.mavenLocal),
     Compile / packageDoc / publishArtifact := false,
@@ -243,7 +244,20 @@ inScope(Global)(
       node / Universal / configuration,
       node / Linux / configuration,
       node / Debian / configuration,
-      Global / maxParallelSuites
+      Global / maxParallelSuites,
+      // sbt-native-packager scope bridges (Debian/Rpm/Universal) nothing here reads; sbt 2's lint reports them, sbt 1's
+      // did not. sbt matches this set by key label alone, so one entry per key covers every project and scope.
+      daemonGroup,
+      daemonGroupGid,
+      daemonStdoutLogFile,
+      daemonUser,
+      daemonUserUid,
+      debianControlScriptsDirectory,
+      executableScriptName,
+      javaOptions,
+      name,
+      rpmScriptsDirectory,
+      sourceDirectory
     )
   )
 )
@@ -268,12 +282,16 @@ ivyConfigurations += DockerNative
 libraryDependencies += Dependencies.rocksdbForLinux % DockerNative
 
 lazy val stageForDocker = taskKey[Unit]("Stage node and grpc-server files into docker/target, the image build context")
-stageForDocker := {
+// Uncached: docker/target is outside sbt's tracked outputs, so a cache hit would skip the copy and leave it stale or empty.
+stageForDocker := Def.uncached {
   val dest = baseDirectory.value / "docker" / "target"
+  val conv = fileConverter.value
 
   // Third-party jars change only when a dependency does, so they are staged apart from Waves' own jars and scripts:
   // the image copies each directory as its own layer, and the big one stays cached across code-only builds.
-  val universal = (node / Universal / mappings).value ++ (`grpc-server` / Universal / mappings).value
+  val universal = ((node / Universal / mappings).value ++ (`grpc-server` / Universal / mappings).value).map { case (ref, path) =>
+    conv.toPath(ref).toFile -> path
+  }
 
   val corretto = universal.flatMap { case (file, path) =>
     dockerCorrettoArchs.collectFirst {
@@ -313,9 +331,9 @@ stageForDocker := {
 }
 
 lazy val buildRIDERunnerForDocker = taskKey[Unit]("Package RIDE Runner tarball and copy it to docker/target")
-buildRIDERunnerForDocker := {
+buildRIDERunnerForDocker := Def.uncached {
   IO.copyFile(
-    (`ride-runner` / Universal / packageZipTarball).value,
+    fileConverter.value.toPath((`ride-runner` / Universal / packageZipTarball).value).toFile,
     (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
   )
 }
@@ -323,7 +341,7 @@ buildRIDERunnerForDocker := {
 // The ForkedTestGroup limit is what makes -Dwaves.it.max-parallel-suites mean anything, and it was missing because a
 // second Global assignment of concurrentRestrictions shadowed it. Assert it rather than trust a comment.
 lazy val checkTestLimits = taskKey[Unit]("Fails if Global/concurrentRestrictions no longer caps forked test groups")
-checkTestLimits := {
+checkTestLimits := Def.uncached {
   val limit     = (Global / maxParallelSuites).value
   val overLimit = Map[ConcurrentRestrictions.Tag, Int](Tags.ForkedTestGroup -> (limit + 1))
   if ((Global / concurrentRestrictions).value.forall(_(overLimit)))
@@ -337,29 +355,34 @@ checkTestLimits := {
 }
 
 lazy val compilePRRaw = taskKey[Unit]("Compile the project")
-compilePRRaw := Def
-  .sequential(
-    clean.all(ScopeFilter(inAnyProject)),
-    scalafmtCheck.all(ScopeFilter(inAnyProject, inConfigurations(Compile))),
-    compile.all(ScopeFilter(inAnyProject, inConfigurations(Test))),
-    checkTestLimits
-  )
-  .value
+compilePRRaw := Def.uncached(
+  Def
+    .sequential(
+      clean.all(ScopeFilter(inAnyProject)),
+      scalafmtCheck.all(ScopeFilter(inAnyProject, inConfigurations(Compile))),
+      compile.all(ScopeFilter(inAnyProject, inConfigurations(Test))),
+      checkTestLimits
+    )
+    .value
+)
 
 lazy val checkPRRaw = taskKey[Unit]("Compile the project and run unit tests")
-checkPRRaw := Def
-  .sequential(
-    compilePRRaw,
-    Def.sequential(
-      test.all(
-        ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `lang-tests-js`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
-      ),
-      fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
-      assembly.all(ScopeFilter(inProjects(node))),
-      stageForDocker
+checkPRRaw := Def.uncached(
+  Def
+    .sequential(
+      compilePRRaw,
+      Def.sequential(
+        // testFull, not test: sbt 2's test is incremental and reports success having run nothing it ran before.
+        testFull.all(
+          ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `lang-tests-js`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
+        ),
+        fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
+        assembly.all(ScopeFilter(inProjects(node))),
+        stageForDocker
+      )
     )
-  )
-  .value
+    .value
+)
 
 def commandWithFatalWarnings(commandName: String, task: TaskKey[Unit]): Command =
   Command.command(commandName) { state =>
@@ -386,7 +409,7 @@ commands += Command.command("buildDebPackages") { state =>
 }
 
 lazy val buildPlatformIndependentArtifacts = taskKey[Unit]("Build fat JARs for node and ride-runner and TGZ for grpc-server")
-buildPlatformIndependentArtifacts := {
+buildPlatformIndependentArtifacts := Def.uncached {
   (node / assembly).value
   (`ride-runner` / assembly).value
   (`grpc-server` / Universal / packageZipTarball).value

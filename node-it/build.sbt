@@ -9,7 +9,8 @@ description := "NODE integration tests"
 libraryDependencies ++= Dependencies.it
 
 val docker = taskKey[Unit]("Build docker image for integration tests")
-docker := {
+// Uncached: the image lives in the docker daemon, where the action cache cannot see it.
+docker := Def.uncached {
   val log = streams.value.log
 
   val cwd   = baseDirectory.value.getParentFile / "docker"

@@ -1,8 +1,32 @@
 ---
-purpose: Implementation notes for the sbt build (Global settings, test concurrency limits) and the docker image build
+purpose: Implementation notes for the sbt build (sbt 2 migration, Global settings, test concurrency limits) and the docker image build
 ---
 
 # Build tooling
+
+## sbt 2
+
+The build runs on sbt 2 (`project/build.properties`), whose meta-build is Scala 3. Most of the port is mechanical (`url` to `uri`, `Def.Setting[?]`, `args*`, `PB.Target(...)`, method calls instead of infix `classifier`/`exclude`); the rest of this section is what is not.
+
+**`test` is incremental.** It reruns only suites whose inputs changed and reports `[success]` having run none, so it proves nothing about a module. `checkPR`, CI and the docs use `testFull`; `testOnly` is unaffected.
+
+**The action cache skips side effects.** sbt 2 caches every task result by default and, on a hit, replays it without running the body, and `setup-java`'s `cache: 'sbt'` carries that cache across CI runs. A task whose real output is something sbt does not track (`stageForDocker` writing `docker/target`, `node-it/docker` building an image, `buildRIDERunnerForDocker`, the `compilePR`/`checkPR` sequences) would silently no-op on a hit, so each is wrapped in `Def.uncached`. A task whose result type has no `JsonFormat` (anything carrying `java.io.File`, `FileRef` under its sbt2-compat alias, `Classpath`-derived values in `ExtensionPackaging` and `IntegrationTestsPlugin`) fails to compile until it is uncached. New tasks with effects outside their declared outputs need the same treatment.
+
+**Files are `FileRef`s.** `Universal / mappings`, classpaths, `packageBin` and `packageZipTarball` hold `xsbti.VirtualFileRef`, not `File`. Convert with `fileConverter.value` (`toPath`/`toVirtualFile`), or with `sbtcompat.PluginCompat.{toFile, toFileRef}` (the `sbt2-compat` plugin) under an implicit `xsbti.FileConverter`. Classpath metadata is stringly typed now: `moduleIDStr`/`artifactStr` attributes, parsed with `parseModuleIDStrAttribute`/`parseArtifactStrAttribute`.
+
+**`%%%` is gone.** `%%` resolves against the project's `platform`, which `ScalaJSPlugin` sets to `sjs1`, so the shared `lang`/`repl` settings use `%%` and get the right artifact on each side. `sbt-platform-deps` has no sbt 2 build and is not needed.
+
+**`inTask` is gone.** `node` and `ride-runner` scope their assembly settings with its expansion, `inScope(ThisScope.copy(task = Select(assembly.key)))(...)`.
+
+**Outputs moved.** Everything lands under the root `target/out/<platform>/u/<project>/` (`jvm` or `sjs1`; `u` because `crossPaths := false`), including JUnit reports (`.../test-reports/`) and node-it logs (`target/out/jvm/u/node-it/logs/<run-id>/`). The release script finds artifacts with `find .`, so only `check-pr.yaml`'s paths had to change. `lang/js/dist` and `repl/js/dist` keep their explicit `artifactPath`.
+
+**CI runs `sbt --server`.** The default `sbt` is the native thin client: it forks a server and polls `project/target/active.json` for its socket, and on a cold checkout can read that file half-written, start a second server and exit 1 before running anything (seen in node-jvm, the Hearth fork of this build). `--server` runs the server in the foreground and skips the handshake. It is also the only way a `-D` on the command line reaches the build (`-Dwaves.it.max-parallel-suites`, `-Dproject.version`).
+
+**Lint.** sbt 2 reports 40 sbt-native-packager scope bridges (`Debian`/`Rpm`/`Universal` aliases such as `executableScriptName`, `daemonUser`) as unused; sbt 1's lint never saw them. `excludeLintKeys` lists them once each: sbt matches that set by key label alone (`LintUnused` maps it through `scopedKey.key.label`), so the scope written on an entry is decoration and one entry silences the key everywhere.
+
+**Plugins on pre-releases.** `sbt-protoc` 1.1.0-RC2 and `sbt-git` 3.0.0-RC1 are the only sbt 2 builds of either; `sbt-git` 3 also makes the build load from a linked git worktree, which 2.x cannot (`NoWorkTreeException` from its JGit). `sbt-javaagent` moved to `com.github.sbt`.
+
+**Known noise.** `SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder"` at load comes from an SLF4J 1.x API on sbt 2's own classpath; neither a 1.7 nor a 2.0 `slf4j-nop` in `plugins.sbt` silences it. `JVM Options are defined twice` while packaging `node` is an sbt-native-packager 1.11.7 bug: `ApplicationIniGenerator` recognises the duplicate `application.ini` (one from the bash, one from the bat start script) by comparing a `File` against a `FileRef`, which never matches under sbt 2. The duplicate is still dropped, so the package is unaffected.
 
 ## A second assignment of a Global key replaces the first, it does not add to it
 
@@ -12,7 +36,7 @@ purpose: Implementation notes for the sbt build (Global settings, test concurren
 
 `checkTestLimits` (`build.sbt`, sequenced into `compilePR`) asserts the ForkedTestGroup cap is actually in force, so a third assignment of the key fails the build instead of quietly winning. The `:=` deliberately replaces sbt's own default rule set rather than extending it; if you need one of those defaults back, add it to this `Seq` explicitly.
 
-Two things to know when checking this by hand. `print Global/concurrentRestrictions` is the authoritative check; `inspect` will happily show a defining assignment that lost. And `sbt --client -D...` sets the property on the thin client, not on the long-lived server that evaluates the setting, so the flag appears to be ignored; verify a `-D`-driven setting with a plain `sbt -D... --batch` (what CI runs).
+Two things to know when checking this by hand. `print Global/concurrentRestrictions` is the authoritative check; `inspect` will happily show a defining assignment that lost. And `sbt --client -D...` sets the property on the thin client, not on the long-lived server that evaluates the setting, so the flag appears to be ignored; verify a `-D`-driven setting with `sbt --server -D... --batch` (what CI runs). Under sbt 2 a plain `sbt -D...` is the thin client too.
 
 ## Forked suites also carry Tags.Test, so that limit caps node-it too
 
