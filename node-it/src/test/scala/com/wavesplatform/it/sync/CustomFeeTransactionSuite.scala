@@ -73,7 +73,7 @@ object CustomFeeTransactionSuite {
   private val seed                     = Default(2).getString("account-seed")
   private val senderKeyPair            = KeyPair.fromSeed(seed).explicitGet()
   private val defaultAssetQuantity     = 999999999999L
-  private val featureCheckBlocksPeriod = 13
+  private val featureCheckBlocksPeriod = 8
 
   private val assetTx = TxHelpers.issue(issuer = senderKeyPair, amount = defaultAssetQuantity, decimals = 2, name = "asset", description = "asset description", fee = 1.waves, script = None, reissuable = false, version = TxVersion.V1)
 

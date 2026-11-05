@@ -12,6 +12,7 @@ import monix.execution.atomic.AtomicInt
 import monix.reactive.Observable
 
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 
 class TransactionSynchronizerSpec extends PropSpec with WithDomain {
   property("synchronizer should broadcast transactions on new both microblocks and blocks") {
@@ -26,28 +27,34 @@ class TransactionSynchronizerSpec extends PropSpec with WithDomain {
 
       val broadcastCount = AtomicInt(0)
 
-      val scheduler = Schedulers.fixedPool(4, "synchronizer")
-      val synchronizer = TransactionSynchronizer(
-        UtxSynchronizerSettings(1000000, 8, 5000, true),
-        blockIds,
-        txs.map((null, _)),
-        (_, _) => Future.successful { broadcastCount.increment(); TracedResult(Right(true)) }
-      )(using scheduler)
-
-      val appends = 20
-      (1 to appends).foreach { i =>
-        if (i % 2 == 1)
-          d.appendBlock()
-        else
-          d.appendMicroBlock(transfer())
-        while (broadcastCount.get() != i + 1)
-          Thread.sleep(10)
+      // Waits for the count to reach `expected`, then requires it to be exactly that. Waiting for `!= expected` instead
+      // spun forever once the count overshot, hanging the whole unit test run in CI.
+      def awaitBroadcasts(expected: Int): Unit = {
+        val deadline = 10.seconds.fromNow
+        while (broadcastCount.get() < expected && deadline.hasTimeLeft()) Thread.sleep(10)
+        withClue(s"broadcasts after ${expected - 1} appends:") { broadcastCount.get() shouldBe expected }
       }
 
-      broadcastCount.get() shouldBe appends + 1
+      val scheduler = Schedulers.fixedPool(4, "synchronizer")
+      try {
+        val synchronizer = TransactionSynchronizer(
+          UtxSynchronizerSettings(1000000, 8, 5000, true),
+          blockIds,
+          txs.map((null, _)),
+          (_, _) => Future.successful { broadcastCount.increment(); TracedResult(Right(true)) }
+        )(using scheduler)
 
-      synchronizer.cancel()
-      scheduler.shutdown()
+        try {
+          awaitBroadcasts(1)
+          (1 to 20).foreach { i =>
+            if (i % 2 == 1)
+              d.appendBlock()
+            else
+              d.appendMicroBlock(transfer())
+            awaitBroadcasts(i + 1)
+          }
+        } finally synchronizer.cancel()
+      } finally scheduler.shutdown()
     }
   }
 }

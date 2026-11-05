@@ -47,16 +47,31 @@ jobs:
         with:
           name: waves-all
           path: node/target/waves-all-*.jar
+      # A hang or a GC death spiral never throws OutOfMemoryError (G1 has no GC overhead limit), so the JVMs are still
+      # alive after a cancel or a timeout: dump them here, before the runner kills them.
+      - name: Dump live JVMs
+        if: failure() || cancelled()
+        run: |
+          for pid in $(jps -q); do
+            jcmd $pid Thread.print > threads-$pid.txt 2>&1 || true
+          done
+          for pid in $(jps -l | awk '/ForkMain/ {print $1}'); do
+            jcmd $pid GC.heap_dump $PWD/java_pid$pid.hprof || true
+          done
+      # Heap dumps hold the whole JVM environment and the artifact is public: keep secrets out of this job's env.
       - name: Save debug data
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           if-no-files-found: ignore
+          retention-days: 3
           name: debug-data
           path: |
             gc.log*
             hs*.log
             core*
+            threads-*.txt
+            *.hprof
 
   run-smoke-tests:
     needs: check-pr
@@ -85,7 +100,6 @@ jobs:
         repo:
           - waves-exchange/neutrino-contract
           - waves-exchange/contracts
-          - waves-ducks-core/wavesducks-public
           - swopfi/swopfi-smart-contracts
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -100,10 +114,24 @@ jobs:
           name: waves-all
       - run: find -name "*.ride" -type f -exec java -cp '*' com.wavesplatform.lang.FileCompiler {} +;
 
-  run-integration-tests:
-    name: Run integration tests
+  # node-it, one runner per entry. integrationTests is split across runners by a hash of the suite name
+  # (-Dwaves.it.shard), about 25 min each instead of 50 on one. The @LoadTest suites measure whether a node keeps up
+  # with thousands of transactions, so they get a runner of their own, one suite at a time: sharing it with other suites
+  # turns them into a measurement of the runner. Check names come from `name`: changing one (or the shard count) means
+  # updating branch protection.
+  node-it:
+    name: ${{ matrix.name }}
     # needs: check-pr
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      # A failing entry must not cancel the others and throw away their results.
+      fail-fast: false
+      matrix:
+        include:
+          - { name: 'Run integration tests (1/2)', id: '1', sbt: '-Dwaves.it.max-parallel-suites=5 -Dwaves.it.shard=1/2', task: integrationTests }
+          - { name: 'Run integration tests (2/2)', id: '2', sbt: '-Dwaves.it.max-parallel-suites=5 -Dwaves.it.shard=2/2', task: integrationTests }
+          - { name: 'Run load tests', id: 'load', sbt: '-Dwaves.it.max-parallel-suites=1', task: loadTests }
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -112,22 +140,27 @@ jobs:
           java-version: '17'
           cache: 'sbt'
       - uses: sbt/setup-sbt@3afe9cf056c5d139bfc46579af1192d77a2f0821 # v1.4.0
-      - name: Run Integration Tests
-        run: sbt --batch "node-it/docker;node-it/test"
+      - name: Run tests
+        # Samples CPU pressure and vmstat into the uploaded logs, to tell whether the runner has room for more parallel suites.
+        run: |
+          mkdir -p node-it/target/logs/$RUN_ID
+          (while sleep 5; do echo "$(date +%T) $(head -1 /proc/pressure/cpu 2>/dev/null || echo no-psi) load=$(cut -d' ' -f1 /proc/loadavg)"; done) > node-it/target/logs/$RUN_ID/cpu.log &
+          vmstat -t 5 > node-it/target/logs/$RUN_ID/vmstat.log &
+          sbt ${{ matrix.sbt }} --batch "node-it/docker;node-it/${{ matrix.task }}"
         env:
-          RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}
+          RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}-${{ matrix.id }}
       - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3
         if: always()
         with:
           report_paths: '**/target/test-reports/*.xml'
           create_check: false
-          check_name: 'Run integration tests'
+          check_name: ${{ matrix.name }}
       - name: Upload Logs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           if-no-files-found: ignore
-          name: test-logs
+          name: node-it-logs-${{ matrix.id }}
           path: |
             node-it/target/logs/*/
             node-it/target/test-reports

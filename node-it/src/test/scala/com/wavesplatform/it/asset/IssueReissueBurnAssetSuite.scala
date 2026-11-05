@@ -1,28 +1,51 @@
 package com.wavesplatform.it.asset
 
+import com.google.protobuf.ByteString
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{AssetDoesNotExist, TransactionDoesNotExist}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.it.api.{AssetInfo, BurnInfoResponse, IssueInfoResponse, ReissueInfoResponse, StateChangesDetails, Transaction}
+import com.wavesplatform.it.api.{
+  AsyncHttpApi,
+  BurnInfoResponse,
+  IssueInfoResponse,
+  ReissueInfoResponse,
+  StateChangesDetails,
+  SyncGrpcApi,
+  TransactionInfo
+}
 import com.wavesplatform.it.sync.*
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG}
+import com.wavesplatform.it.{BaseFreeSpec, Docker}
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf.transaction.{PBRecipients, PBSignedTransaction, PBTransactions}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import monix.execution.atomic.AtomicInt
+import org.scalatest.Assertion
 
+import java.util.regex.Pattern
+import scala.annotation.tailrec
 import scala.concurrent.duration.*
 
+/** Issue/reissue/burn through plain transactions and dApp actions. One node serves both REST and gRPC: each test broadcasts through one of them, and
+  * every result is checked through both, so the two APIs are covered without running the same chain activity twice.
+  */
 class IssueReissueBurnAssetSuite extends BaseFreeSpec {
+  import IssueReissueBurnAssetSuite.*
   import com.wavesplatform.it.NodeConfigs.*
+
   override val nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
+
+  override protected def nodeExtensions: Seq[String] = super.nodeExtensions :+ Docker.GrpcExtension
+
   private val initialWavesBalance = 100.waves
   private val setScriptPrice      = 0.01.waves
   private val accountCounter      = AtomicInt(1000)
@@ -36,161 +59,151 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
   private val longMinAsset             = Asset("Long min", "name" * 4, "A" * 1000, Long.MaxValue, reissuable = true, 0, Long.MinValue)
   private val nftAsset                 = Asset("NFT", "NFTAsset", "description", 1, reissuable = false, 0, 0)
 
-  for (method <- Seq(CallableMethod, TransactionMethod)) s"Asset Issue/Reissue/Burn via $method" - {
+  // Each method is broadcast through a different API, so between them both APIs send plain transactions and invocations.
+  for ((method, api) <- Seq(CallableMethod -> Api.Rest, TransactionMethod -> Api.Grpc)) s"Asset Issue/Reissue/Burn via $method, sent over $api" - {
     val isCallable = method == CallableMethod
 
     for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset, nftAsset, longMaxAsset, longMinAsset))
       s"${data.assetType} asset could be issued in callable" in {
-        val acc = createDapp(script(data))
+        val acc = createDapp(api, script(data))
 
-        val fee = invocationCost(if (isNft(data)) 0 else 1)
-        val tx  = issue(acc, method, data, fee)
+        val fee  = invocationCost(if (isNft(data)) 0 else 1)
+        val txId = issue(api, acc, method, data, fee)
 
-        validateIssuedAssets(acc, tx, data, method = method)
-        sender.balanceDetails(acc.toAddress.toString).regular shouldBe (initialWavesBalance - setScriptPrice - fee)
+        validateIssuedAssets(acc, txId, data, method = method)
+        assertWavesBalance(acc, initialWavesBalance - setScriptPrice - fee)
       }
 
     for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset)) s"${data.assetType} asset could be partially burned" in {
-      val acc            = createDapp(script(data))
+      val acc            = createDapp(api, script(data))
       val fee            = invocationCost(if (isNft(data)) 0 else 1)
-      val txIssue        = issue(acc, method, data, fee)
+      val txIssue        = issue(api, acc, method, data, fee)
       val assetId        = validateIssuedAssets(acc, txIssue, data, method = method)
       val burnQuantity   = 1000
       val remainQuantity = data.quantity - burnQuantity
 
-      burn(acc, TransactionMethod, assetId, burnQuantity / 2)
-      burn(acc, CallableMethod, assetId, burnQuantity / 2)
-      sender.assetsDetails(assetId).quantity shouldBe remainQuantity
-      sender.assertAssetBalance(acc.toAddress.toString, assetId, remainQuantity)
+      burn(api, acc, TransactionMethod, assetId, burnQuantity / 2)
+      burn(api, acc, CallableMethod, assetId, burnQuantity / 2)
+      assertAsset(assetId)(remainQuantity)
+      assertBalance(acc, assetId, remainQuantity)
     }
 
     for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset, nftAsset, longMaxAsset)) s"${data.assetType} could be fully burned" in {
-      val acc     = createDapp(script(data))
+      val acc     = createDapp(api, script(data))
       val fee     = invocationCost(if (isNft(data)) 0 else 1)
-      val txIssue = issue(acc, method, data, fee)
+      val txIssue = issue(api, acc, method, data, fee)
       val assetId = validateIssuedAssets(acc, txIssue, data, method = method)
 
-      sender.assertAssetBalance(acc.toAddress.toString, assetId, data.quantity)
-      val tx = burn(acc, method, assetId, data.quantity)
+      assertBalance(acc, assetId, data.quantity)
+      val txId = burn(api, acc, method, assetId, data.quantity)
 
-      sender.assetsDetails(assetId).quantity shouldBe 0
-      sender.assertAssetBalance(acc.toAddress.toString, assetId, 0)
+      assertAsset(assetId)(0)
+      assertBalance(acc, assetId, 0)
 
-      if (isCallable) assertStateChanges(tx) { sd =>
+      if (isCallable) assertStateChanges(txId) { sd =>
         sd.burns should matchPattern { case Seq(BurnInfoResponse(`assetId`, data.quantity)) =>
         }
       }
 
       if (data.reissuable) {
-        reissue(acc, method, assetId, data.quantity, reissuable = true)
-        sender.assetsDetails(assetId).quantity shouldBe data.quantity
-        sender.assertAssetBalance(acc.toAddress.toString, assetId, data.quantity)
+        reissue(api, acc, method, assetId, data.quantity, reissuable = true)
+        assertAsset(assetId)(data.quantity)
+        assertBalance(acc, assetId, data.quantity)
       }
     }
 
     "Reissuable asset could be reissued" in {
-      val acc               = createDapp(script(simpleReissuableAsset))
-      val txIssue           = issue(acc, method, simpleReissuableAsset, invocationCost(1))
-      val assetId           = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
-      val initialQuantity   = simpleReissuableAsset.quantity
-      val addedQuantity     = 100500
-      val initialReissuable = simpleReissuableAsset.reissuable
+      val acc             = createDapp(api, script(simpleReissuableAsset))
+      val txIssue         = issue(api, acc, method, simpleReissuableAsset, invocationCost(1))
+      val assetId         = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
+      val initialQuantity = simpleReissuableAsset.quantity
+      val addedQuantity   = 100500
 
-      reissue(acc, TransactionMethod, assetId, addedQuantity / 2, reissuable = true)
-      reissue(acc, CallableMethod, assetId, addedQuantity / 2, reissuable = false)
+      reissue(api, acc, TransactionMethod, assetId, addedQuantity / 2, reissuable = true)
+      reissue(api, acc, CallableMethod, assetId, addedQuantity / 2, reissuable = false)
 
-      sender.assetsDetails(assetId).reissuable shouldBe !initialReissuable
-      sender.assetsDetails(assetId).quantity shouldBe initialQuantity + addedQuantity
-      sender.assertAssetBalance(acc.toAddress.toString, assetId, initialQuantity + addedQuantity)
+      assertAsset(assetId)(initialQuantity + addedQuantity, reissuable = Some(!simpleReissuableAsset.reissuable))
+      assertBalance(acc, assetId, initialQuantity + addedQuantity)
     }
 
     "Non-reissuable asset could not be reissued" in {
-      val acc     = createDapp(script(simpleNonreissuableAsset))
-      val txIssue = issue(acc, method, simpleNonreissuableAsset, invocationCost(1))
+      val acc     = createDapp(api, script(simpleNonreissuableAsset))
+      val txIssue = issue(api, acc, method, simpleNonreissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleNonreissuableAsset, method = method)
-      assertApiError(reissue(acc, method, assetId, 100500, reissuable = false, checkStateChanges = false).id) { e =>
-        e.message should include("Asset is not reissuable")
-      }
+      assertRejected(api, "Asset is not reissuable")(reissue(api, acc, method, assetId, 100500, reissuable = false, checkStateChanges = false))
     }
 
     "Issued asset could be sponsored" in {
-      if (isCallable) {
-        val assetAcc     = createDapp(script(simpleReissuableAsset))
-        val nftAcc       = createDapp(script(nftAsset))
-        val txAssetIssue = issue(assetAcc, method, simpleReissuableAsset, invocationCost(1))
-        val txNftIssue   = issue(nftAcc, method, nftAsset, invocationCost(1))
-        val assetId      = validateIssuedAssets(assetAcc, txAssetIssue, simpleReissuableAsset, method = method)
-        val nftId        = validateIssuedAssets(nftAcc, txNftIssue, nftAsset, method = method)
+      val assetAcc = createDapp(api, script(simpleReissuableAsset))
+      val nftAcc   = createDapp(api, script(nftAsset))
+      val assetId  = validateIssuedAssets(assetAcc, issue(api, assetAcc, method, simpleReissuableAsset), simpleReissuableAsset, method = method)
+      val nftId    = validateIssuedAssets(nftAcc, issue(api, nftAcc, method, nftAsset), nftAsset, method = method)
 
-        sender.sponsorAsset(assetAcc, assetId, simpleReissuableAsset.quantity / 2, sponsorFee, waitForTx = true)
-        sender.sponsorAsset(nftAcc, nftId, 1, sponsorFee, waitForTx = true)
+      sponsor(api, assetAcc, assetId, simpleReissuableAsset.quantity / 2)
+      sponsor(api, nftAcc, nftId, 1)
 
-        sender.assetsDetails(assetId).minSponsoredAssetFee shouldBe Some(simpleReissuableAsset.quantity / 2)
-        sender.assetsDetails(nftId).minSponsoredAssetFee shouldBe Some(1L)
-      }
+      assertSponsorship(assetId, simpleReissuableAsset.quantity / 2)
+      assertSponsorship(nftId, 1)
     }
   }
 
+  // A rejected broadcast leaves no trace on chain, so each of these checks the rejection through both APIs at no cost.
   "Restrictions in " + CallableMethod - {
     val method = CallableMethod
 
     "Issue two identical assets with the same nonce (one invocation) should produce an error" in {
-      val acc = createDapp(script(simpleNonreissuableAsset))
-      assertApiError(invokeScript(acc, "issue2Assets", fee = invocationCost(2)).id) { e =>
-        e.message should include(" is already issued")
-      }
+      val acc = createDapp(Api.Rest, script(simpleNonreissuableAsset))
+      for (api <- Api.values)
+        assertRejected(api, " is already issued")(invoke(api, acc, "issue2Assets", fee = invocationCost(2)))
     }
 
     "Issue two identical assets with the same nonce (different invocations) should not produce an error" in {
-      val acc      = createDapp(script(simpleNonreissuableAsset))
-      val txIssue1 = issue(acc, method, simpleNonreissuableAsset, invocationCost(1))
-      val txIssue2 = issue(acc, method, simpleNonreissuableAsset, invocationCost(1))
+      val acc      = createDapp(Api.Rest, script(simpleNonreissuableAsset))
+      val txIssue1 = issue(Api.Rest, acc, method, simpleNonreissuableAsset, invocationCost(1))
+      val txIssue2 = issue(Api.Grpc, acc, method, simpleNonreissuableAsset, invocationCost(1))
       validateIssuedAssets(acc, txIssue1, simpleNonreissuableAsset, method = method)
       validateIssuedAssets(acc, txIssue2, simpleNonreissuableAsset, method = method)
     }
 
     "Reissuing more than Long.Max should produce an error" in {
-      val acc             = createDapp(script(simpleReissuableAsset))
-      val txIssue         = issue(acc, method, simpleReissuableAsset, invocationCost(1))
-      val assetId         = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
+      val acc             = createDapp(Api.Rest, script(simpleReissuableAsset))
+      val assetId         = validateIssuedAssets(acc, issue(Api.Rest, acc, method, simpleReissuableAsset), simpleReissuableAsset, method = method)
       val initialQuantity = simpleReissuableAsset.quantity
 
-      assertApiError(reissue(acc, method, assetId, Long.MaxValue - initialQuantity + 1, reissuable = true, checkStateChanges = false).id) { e =>
-        e.message should include("Asset total value overflow")
-      }
+      for (api <- Api.values)
+        assertRejected(api, "Asset total value overflow")(
+          reissue(api, acc, method, assetId, Long.MaxValue - initialQuantity + 1, reissuable = true, checkStateChanges = false)
+        )
     }
 
     "Burning more than current asset count should produce an error" in {
-      val acc     = createDapp(script(simpleReissuableAsset))
-      val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
-      val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
+      val acc     = createDapp(Api.Rest, script(simpleReissuableAsset))
+      val assetId = validateIssuedAssets(acc, issue(Api.Rest, acc, method, simpleReissuableAsset), simpleReissuableAsset, method = method)
 
-      assertBadRequestAndMessage(
-        invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.quantity / 2 + 1).toInt, wait = false),
-        "Accounts balance errors"
-      )
+      for (api <- Api.values)
+        assertRejected(api, "Accounts balance errors")(
+          invoke(api, acc, "transferAndBurn", assetId = assetId, count = simpleReissuableAsset.quantity / 2 + 1, wait = false)
+        )
     }
 
     "Reissuing NFT asset should produce an error" in {
-      val acc     = createDapp(script(nftAsset))
-      val txIssue = issue(acc, method, nftAsset, invocationCost(1))
-      val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = method)
+      val acc     = createDapp(Api.Rest, script(nftAsset))
+      val assetId = validateIssuedAssets(acc, issue(Api.Rest, acc, method, nftAsset), nftAsset, method = method)
 
-      assertApiError(reissue(acc, method, assetId, 2, reissuable = true, checkStateChanges = false).id) { e =>
-        e.message should include("Asset is not reissuable")
-      }
+      for (api <- Api.values)
+        assertRejected(api, "Asset is not reissuable")(reissue(api, acc, method, assetId, 2, reissuable = true, checkStateChanges = false))
     }
 
     "Reissuing after setting isReissuiable to falser inside one invocation should produce an error" in {
-      val acc     = createDapp(script(simpleReissuableAsset))
-      val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
-      val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
+      val acc     = createDapp(Api.Rest, script(simpleReissuableAsset))
+      val assetId = validateIssuedAssets(acc, issue(Api.Rest, acc, method, simpleReissuableAsset), simpleReissuableAsset, method = method)
 
-      assertApiError(invokeScript(acc, "reissueAndReissue", assetId = assetId, count = 1000, fee = invocationCost(1)).id) { e =>
-        e.message should include("Asset is not reissuable")
-      }
+      for (api <- Api.values)
+        assertRejected(api, "Asset is not reissuable")(
+          invoke(api, acc, "reissueAndReissue", assetId = assetId, count = 1000, fee = invocationCost(1))
+        )
 
-      sender.assetsDetails(assetId).quantity should be(simpleReissuableAsset.quantity)
+      assertAsset(assetId)(simpleReissuableAsset.quantity)
     }
   }
 
@@ -208,8 +221,8 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
           |  ]
           |}""".stripMargin
 
-      val acc = createDapp(script)
-      assertStateChanges(invokeScript(acc, "nooperation")) { sc =>
+      val acc = createDapp(Api.Rest, script)
+      assertStateChanges(invoke(Api.Rest, acc, "nooperation")) { sc =>
         sc.issues shouldBe empty
         sc.burns shouldBe empty
         sc.reissues shouldBe empty
@@ -218,54 +231,52 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
 
     "Two assets" in {
       val asset = Asset("test", "name", "description", 10, reissuable = true, 8, 1)
-      val acc   = createDapp(script(asset))
+      val acc   = createDapp(Api.Grpc, script(asset))
 
-      val issue1   = issue(acc, CallableMethod, asset)
-      val asset1Id = validateIssuedAssets(acc, issue1, asset)
+      val asset1Id = validateIssuedAssets(acc, issue(Api.Grpc, acc, CallableMethod, asset), asset)
+      reissue(Api.Grpc, acc, CallableMethod, asset1Id, 10, reissuable = true)
+      burn(Api.Grpc, acc, CallableMethod, asset1Id, 5)
+      assertAsset(asset1Id)(15, reissuable = Some(true))
+      assertBalance(acc, asset1Id, 15)
 
-      reissue(acc, CallableMethod, asset1Id, 10, reissuable = true)
-      burn(acc, CallableMethod, asset1Id, 5)
-      assertQuantity(asset1Id)(15)
-      sender.assertAssetBalance(acc.toAddress.toString, asset1Id, 15)
-
-      val issue2   = issue(acc, CallableMethod, asset)
-      val asset2Id = validateIssuedAssets(acc, issue2, asset)
-      burn(acc, CallableMethod, asset2Id, 5)
-      reissue(acc, CallableMethod, asset2Id, 10, reissuable = false)
-      assertQuantity(asset2Id)(15, reissuable = false)
-      sender.assertAssetBalance(acc.toAddress.toString, asset2Id, 15)
+      val asset2Id = validateIssuedAssets(acc, issue(Api.Grpc, acc, CallableMethod, asset), asset)
+      burn(Api.Grpc, acc, CallableMethod, asset2Id, 5)
+      reissue(Api.Grpc, acc, CallableMethod, asset2Id, 10, reissuable = false)
+      assertAsset(asset2Id)(15, reissuable = Some(false))
+      assertBalance(acc, asset2Id, 15)
     }
 
     "NFT burning removes it from list" in {
-      val acc     = createDapp(script(nftAsset))
-      val txIssue = issue(acc, CallableMethod, nftAsset, invocationCost(1))
-      val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = CallableMethod)
-      sender.nftList(acc.toAddress.toString, 2).map(_.assetId) shouldBe Seq(assetId)
-      burn(acc, CallableMethod, assetId, 1)
-      sender.nftList(acc.toAddress.toString, 1) shouldBe empty
+      val acc     = createDapp(Api.Rest, script(nftAsset))
+      val assetId = validateIssuedAssets(acc, issue(Api.Rest, acc, CallableMethod, nftAsset, invocationCost(1)), nftAsset)
+      assertNfts(acc, 2)(_ shouldBe Seq(assetId))
+      burn(Api.Rest, acc, CallableMethod, assetId, 1)
+      assertNfts(acc, 1)(_ shouldBe empty)
     }
 
+    // Distribution is a REST-only endpoint and is served for the last solid block, hence the block waits here.
     "distribution works" in {
-      val acc   = createDapp(script(simpleReissuableAsset))
+      val acc   = createDapp(Api.Rest, script(simpleReissuableAsset))
       val asset = issueValidated(acc, simpleReissuableAsset)
-      invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
+      invoke(Api.Rest, acc, "transferAndBurn", assetId = asset, count = 100)
       nodes.waitForHeightArise()
       sender.assetDistribution(asset).map { case (a, v) => a.toString -> v } shouldBe Map(
-        miner.address          -> 100L,
-        acc.toAddress.toString -> (simpleReissuableAsset.quantity - 200)
+        miner.address  -> 100L,
+        addressOf(acc) -> (simpleReissuableAsset.quantity - 200)
       )
-      reissue(acc, CallableMethod, asset, 400, reissuable = false)
-      invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
+      reissue(Api.Rest, acc, CallableMethod, asset, 400, reissuable = false)
+      invoke(Api.Rest, acc, "transferAndBurn", assetId = asset, count = 100)
       nodes.waitForHeightArise()
       sender.assetDistribution(asset).map { case (a, v) => a.toString -> v } shouldBe Map(
-        miner.address          -> 200L,
-        acc.toAddress.toString -> simpleReissuableAsset.quantity
+        miner.address  -> 200L,
+        addressOf(acc) -> simpleReissuableAsset.quantity
       )
     }
 
+    // Rollback exists only in the REST debug API; what it leaves behind is checked through both.
     "rollback works" in {
-      val acc        = createDapp(script(simpleReissuableAsset))
-      val addressStr = acc.toAddress.toString
+      val acc        = createDapp(Api.Rest, script(simpleReissuableAsset))
+      val addressStr = addressOf(acc)
       val assetA     = issueValidated(acc, simpleReissuableAsset)
 
       sender.transactionsByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
@@ -274,7 +285,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
 
       val height = nodes.waitForHeightArise()
       nodes.waitForHeightArise()
-      val txId = invokeScript(acc, "reissueIssueAndNft", assetId = assetA, fee = invocationCost(1)).id
+      val txId = invoke(Api.Rest, acc, "reissueIssueAndNft", assetId = assetA, fee = invocationCost(1))
 
       val (assetNft, assetB) = sender
         .stateChanges(txId)
@@ -295,100 +306,131 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       }
       assertApiError(sender.stateChanges(txId), TransactionDoesNotExist)
 
-      assertAssetDetails(assetA) { ai =>
-        ai.quantity shouldBe simpleReissuableAsset.quantity
-        ai.reissuable shouldBe true
-      }
+      assertAsset(assetA)(simpleReissuableAsset.quantity, reissuable = Some(true))
       assertApiError(sender.assetsDetails(assetB), AssetDoesNotExist(IssuedAsset(ByteStr.decodeBase58(assetB).get)))
       assertApiError(sender.assetsDetails(assetNft), AssetDoesNotExist(IssuedAsset(ByteStr.decodeBase58(assetNft).get)))
+      SyncGrpcApi.assertGrpcError(grpc.assetInfo(assetB), expectedCode = io.grpc.Status.Code.NOT_FOUND)
+      SyncGrpcApi.assertGrpcError(grpc.assetInfo(assetNft), expectedCode = io.grpc.Status.Code.NOT_FOUND)
 
-      sender.assertAssetBalance(addressStr, assetA, simpleReissuableAsset.quantity)
+      assertBalance(acc, assetA, simpleReissuableAsset.quantity)
+      // assetB no longer exists, which the REST balance assertion reports as an API error rather than a zero balance.
       sender.assetBalance(addressStr, assetB).balance shouldBe 0L
+      grpc.assetsBalance(pbAddress(acc), Seq(assetB)).getOrElse(assetB, 0L) shouldBe 0L
       sender.assetsBalance(addressStr).balances.map(_.assetId).toSet shouldBe Set(assetA)
-      sender.nftList(addressStr, 10) shouldBe empty
+      assertNfts(acc, 10)(_ shouldBe empty)
+    }
+
+    // Reissue 100 and burn 50 make the quantity change observable, so the checks can tell an applied invocation from one that was not.
+    "liquid block works" in {
+      val acc   = createDapp(Api.Grpc, script(simpleReissuableAsset))
+      val asset = issueValidated(acc, simpleReissuableAsset, Api.Grpc)
+      val txId  = invoke(Api.Grpc, acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
+      def checks(): Unit = {
+        assertStateChanges(txId) { sd =>
+          sd.issues should have size 2
+          sd.burns should have size 1
+          sd.reissues should have size 1
+        }
+        assertAsset(asset)(simpleReissuableAsset.quantity + 50)
+        assertBalance(acc, asset, simpleReissuableAsset.quantity + 50)
+        sender.assetsBalance(addressOf(acc)).balances should have size 2
+        assertNfts(acc, 10)(_ should have size 1)
+      }
+      checks()
+      nodes.waitForHeightArise()
+      checks()
     }
   }
 
-  def createDapp(scriptParts: String*): KeyPair = {
-    val script  = scriptParts.mkString(" ")
-    val address = TxHelpers.signer(accountCounter.getAndIncrement())
-    val compiledScript = ScriptCompiler
-      .compile(
-        script,
-        ScriptEstimatorV2
-      )
-      .explicitGet()
-      ._1
+  private def grpc = SyncGrpcApi.NodeExtGrpc(sender)
 
-    miner.transfer(sender.keyPair, address.toAddress.toString, initialWavesBalance, setScriptFee * 2, waitForTx = true)
+  private def addressOf(acc: KeyPair): String = acc.toAddress.toString
 
-    nodes.waitForHeightAriseAndTxPresent(
-      miner
-        .signedBroadcast(
-          TxHelpers.setScript(acc = address, script = compiledScript, fee = setScriptFee, version = 1.toByte)
-            .json()
-        )
-        .id
-    )
+  private def pbAddress(acc: KeyPair): ByteString = SyncGrpcApi.keyPairAsBytes(acc)
 
-    address
+  private def idOf(tx: PBSignedTransaction): String = PBTransactions.vanilla(tx, unsafe = false).explicitGet().id().toString
+
+  // The default 1s poll would add most of a second to each of the ~165 waits.
+  private def mined(txId: String): TransactionInfo = sync(AsyncHttpApi.NodeAsyncHttpApi(sender).waitForTransaction(txId, 200.millis))
+
+  // Every wait goes through this, not through `mined`: the miner can orphan its own newest microblock (see "Key block forged on a stale parent"
+  // in docs/notes/mining.md), and for about 200ms its transactions are gone, which breaks both a broadcast validated against them and a read
+  // of their results. Under the next key block, still at the same height, a transaction stays.
+  @tailrec private def settled(txId: String): Unit = {
+    val height = mined(txId).height
+    sender.waitFor[Int](s"height > $height")(_.height.toInt, _ > height, 200.millis)
+    if (mined(txId).height != height) settled(txId)
   }
 
-  def invokeScript(
-      sender: KeyPair,
+  def createDapp(api: Api, scriptParts: String*): KeyPair = {
+    val acc            = TxHelpers.signer(accountCounter.getAndIncrement())
+    val compiledScript = ScriptCompiler.compile(scriptParts.mkString(" "), ScriptEstimatorV2).explicitGet()._1
+    val setScript      = TxHelpers.setScript(acc = acc, script = compiledScript, fee = setScriptFee, version = 1.toByte)
+
+    // The set-script fee comes out of the transfer, and every invocation needs the script.
+    api match {
+      case Api.Rest =>
+        settled(miner.transfer(sender.keyPair, addressOf(acc), initialWavesBalance, setScriptFee * 2).id)
+        settled(miner.signedBroadcast(setScript.json()).id)
+      case Api.Grpc =>
+        settled(idOf(grpc.broadcastTransfer(sender.keyPair, PBRecipients.create(acc.toAddress), initialWavesBalance, setScriptFee * 2)))
+        settled(idOf(grpc.signedBroadcast(PBTransactions.protobuf(setScript))))
+    }
+
+    acc
+  }
+
+  def invoke(
+      api: Api,
+      dApp: KeyPair,
       function: String,
       wait: Boolean = true,
       assetId: String = "",
       count: Long = 1,
       isReissuable: Boolean = true,
-      fee: Long = invokeFee,
-      payments: Seq[InvokeScriptTransaction.Payment] = Seq.empty
-  ): Transaction = {
-    val args = function match {
-      case "transferAndBurn"    => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
-      case "reissueIssueAndNft" => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
-      case "process11actions"   => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
-      case "burnAsset"          => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
-      case "reissueAsset"      => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_BOOLEAN(isReissuable), CONST_LONG(count))
-      case "reissueAndReissue" => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
-      case _                   => Nil
+      fee: Long = invokeFee
+  ): String = {
+    def asset = CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet()
+    val args: List[EXPR] = function match {
+      case "transferAndBurn" | "burnAsset" | "reissueAndReissue" => List(asset, CONST_LONG(count))
+      case "reissueIssueAndNft" | "process11actions"             => List(asset)
+      case "reissueAsset"                                        => List(asset, CONST_BOOLEAN(isReissuable), CONST_LONG(count))
+      case _                                                     => Nil
     }
 
-    val tx = miner
-      .invokeScript(
-        sender,
-        sender.toAddress.toString,
-        fee = fee,
-        waitForTx = wait,
-        func = Some(function),
-        args = args,
-        payment = payments
-      )
-
-    if (wait) {
-      miner.waitForTransaction(tx._1.id)
-      miner.waitFor("empty utx")(_.utxSize, (_: Int) == 0, 1 second)
-      nodes.waitForHeightArise()
+    val txId = api match {
+      case Api.Rest => miner.invokeScript(dApp, addressOf(dApp), func = Some(function), args = args, fee = fee)._1.id
+      case Api.Grpc =>
+        idOf(
+          grpc.broadcastInvokeScript(dApp, PBRecipients.create(dApp.toAddress), Some(FUNCTION_CALL(FunctionHeader.User(function), args)), fee = fee)
+        )
     }
 
-    tx._1
+    if (wait) settled(txId)
+    txId
   }
 
-  def assertStateChanges(tx: Transaction)(f: StateChangesDetails => Unit): Unit = {
-    f(stateChanges(tx))
-    f(stateChangesStrings(tx))
-
-    val result      = sender.transactionsByAddress(tx.sender.get, 100)
-    val stateChange = result.find(_.id == tx.id)
-    stateChange shouldBe defined
-    f(stateChange.get.stateChanges.get)
+  def assertRejected(api: Api, message: String)(f: => Any): Assertion = api match {
+    case Api.Rest => assertApiError(f)(e => e.message should include(message))
+    case Api.Grpc => SyncGrpcApi.assertGrpcError(f, Pattern.quote(message))
   }
 
-  def stateChanges(tx: Transaction): StateChangesDetails =
-    sender.stateChanges(tx.id).stateChanges.get
-
-  def stateChangesStrings(tx: Transaction): StateChangesDetails =
-    sender.stateChanges(tx.id, amountsAsStrings = true).stateChanges.get
+  // REST serves state changes three ways (plain, amounts as strings, by address) and gRPC a fourth; all must agree.
+  def assertStateChanges(txId: String)(f: StateChangesDetails => Unit): Unit = {
+    withClue("REST: ")(f(sender.stateChanges(txId).stateChanges.get))
+    withClue("REST, amounts as strings: ")(f(sender.stateChanges(txId, amountsAsStrings = true).stateChanges.get))
+    withClue("REST, by address: ") {
+      val senderAddress = sender.transactionInfo[TransactionInfo](txId).sender.get
+      val byAddress     = sender.transactionsByAddress(senderAddress, 100).find(_.id == txId)
+      byAddress shouldBe defined
+      f(byAddress.get.stateChanges.get)
+    }
+    withClue("gRPC: ") {
+      val (transaction, details) = grpc.stateChanges(txId)
+      transaction.chainId shouldBe 'I'.toByte
+      f(details)
+    }
+  }
 
   def validateIssue(issue: IssueInfoResponse, data: Asset): Unit = {
     issue.name shouldBe data.name
@@ -398,39 +440,72 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
     issue.quantity shouldBe data.quantity
   }
 
-  def assertQuantity(assetId: String)(quantity: Long, reissuable: Boolean = true): Unit = {
-    assertAssetDetails(assetId) { ai =>
-      ai.quantity shouldBe quantity
-      ai.reissuable shouldBe reissuable
+  def assertAsset(assetId: String)(quantity: Long, reissuable: Option[Boolean] = None): Unit = {
+    withClue("REST: ") {
+      val info = sender.assetsDetails(assetId)
+      info.quantity shouldBe quantity
+      reissuable.foreach(info.reissuable shouldBe _)
+    }
+    withClue("gRPC: ") {
+      val info = grpc.assetInfo(assetId)
+      info.totalVolume shouldBe quantity
+      reissuable.foreach(info.reissuable shouldBe _)
     }
   }
 
-  def assertAssetDetails(assetId: String)(f: AssetInfo => Unit): Unit = {
-    val assetInfo = sender.assetsDetails(assetId)
-    f(assetInfo)
+  def assertBalance(acc: KeyPair, assetId: String, expected: Long): Unit = {
+    withClue("REST: ")(sender.assertAssetBalance(addressOf(acc), assetId, expected))
+    withClue("gRPC: ")(grpc.assertAssetBalance(pbAddress(acc), assetId, expected))
   }
 
-  def validateIssuedAssets(account: KeyPair, tx: Transaction, data: Asset, nth: Int = -1, method: String = CallableMethod): String = {
+  def assertWavesBalance(acc: KeyPair, expected: Long): Unit = {
+    withClue("REST: ")(sender.balanceDetails(addressOf(acc)).regular shouldBe expected)
+    withClue("gRPC: ")(grpc.wavesBalance(pbAddress(acc)).regular shouldBe expected)
+  }
+
+  def assertNfts(acc: KeyPair, limit: Int)(f: Seq[String] => Unit): Unit = {
+    withClue("REST: ")(f(sender.nftList(addressOf(acc), limit).map(_.assetId)))
+    withClue("gRPC: ")(f(grpc.nftList(pbAddress(acc), limit).map(r => Base58.encode(r.assetId.toByteArray))))
+  }
+
+  def assertSponsorship(assetId: String, minFee: Long): Unit = {
+    withClue("REST: ")(sender.assetsDetails(assetId).minSponsoredAssetFee shouldBe Some(minFee))
+    withClue("gRPC: ")(grpc.assetInfo(assetId).sponsorship shouldBe minFee)
+  }
+
+  def validateIssuedAssets(account: KeyPair, txId: String, data: Asset, nth: Int = -1, method: String = CallableMethod): String = {
     val assetId = method match {
-      case CallableMethod => invokeAssetId(tx, nth)
-      case _              => tx.id
+      case CallableMethod => invokeAssetId(txId, nth)
+      case _              => txId
     }
 
-    val assetInfo = sender.assetsDetails(assetId)
+    val tx = sender.transactionInfo[TransactionInfo](txId)
+    withClue("REST: ") {
+      val assetInfo = sender.assetsDetails(assetId)
+      assetInfo.originTransactionId shouldBe txId
+      assetInfo.issueTimestamp shouldBe tx.timestamp
+      assetInfo.issuer shouldBe tx.sender.get
+      assetInfo.name shouldBe data.name
+      assetInfo.description shouldBe data.description
+      assetInfo.reissuable shouldBe data.reissuable
+      assetInfo.decimals shouldBe data.decimals
+      assetInfo.quantity shouldBe data.quantity
+      assetInfo.scriptDetails shouldBe None
+    }
+    withClue("gRPC: ") {
+      val assetInfo = grpc.assetInfo(assetId)
+      assetInfo.issuer shouldBe ByteString.copyFrom(account.publicKey.arr)
+      assetInfo.name shouldBe data.name
+      assetInfo.description shouldBe data.description
+      assetInfo.reissuable shouldBe data.reissuable
+      assetInfo.decimals shouldBe data.decimals
+      assetInfo.totalVolume shouldBe data.quantity
+      assetInfo.script shouldBe None
+    }
 
-    assetInfo.originTransactionId shouldBe tx.id
-    assetInfo.issueTimestamp shouldBe tx.timestamp
-    assetInfo.issuer shouldBe tx.sender.get
-    assetInfo.name shouldBe data.name
-    assetInfo.description shouldBe data.description
-    assetInfo.reissuable shouldBe data.reissuable
-    assetInfo.decimals shouldBe data.decimals
-    assetInfo.quantity shouldBe data.quantity
-    assetInfo.scriptDetails shouldBe None
+    assertBalance(account, assetId, data.quantity)
 
-    sender.assertAssetBalance(account.toAddress.toString, assetId, data.quantity)
-
-    if (method == CallableMethod) assertStateChanges(tx) { sd =>
+    if (method == CallableMethod) assertStateChanges(txId) { sd =>
       val issue = if (nth == -1) sd.issues.head else sd.issues(nth)
       validateIssue(issue, data)
     }
@@ -438,43 +513,46 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
     assetId
   }
 
-  def invokeAssetId(tx: Transaction, nth: Int = -1): String = {
-    (if (nth == -1) stateChanges(tx).issues.head
-     else stateChanges(tx).issues(nth)).assetId
+  def invokeAssetId(txId: String, nth: Int = -1): String = {
+    val issues = sender.stateChanges(txId).stateChanges.get.issues
+    (if (nth == -1) issues.head else issues(nth)).assetId
   }
 
-  def issueValidated(account: KeyPair, data: Asset): String = {
-    val tx = issue(account, CallableMethod, data)
-    validateIssuedAssets(account, tx, data)
-  }
+  def issueValidated(account: KeyPair, data: Asset, api: Api = Api.Rest): String =
+    validateIssuedAssets(account, issue(api, account, CallableMethod, data), data)
 
-  def issue(account: KeyPair, method: String, data: Asset, fee: Long = invocationCost(1)): Transaction = {
-    method match {
-      case CallableMethod =>
-        val tx = invokeScript(account, "issueAsset", fee = fee)
-        assertStateChanges(tx) { sd =>
-          (sd.issues: @unchecked) match {
-            case Seq(issue) => validateIssue(issue, data)
-          }
+  def issue(api: Api, account: KeyPair, method: String, data: Asset, fee: Long = invocationCost(1)): String = method match {
+    case CallableMethod =>
+      val txId = invoke(api, account, "issueAsset", fee = fee)
+      assertStateChanges(txId) { sd =>
+        (sd.issues: @unchecked) match {
+          case Seq(issue) => validateIssue(issue, data)
         }
-        tx
+      }
+      txId
 
-      case _ =>
-        val tx = sender.issue(
-          account,
-          data.name,
-          data.description,
-          data.quantity,
-          data.decimals,
-          reissuable = data.reissuable,
-          fee = fee
-        )
-        nodes.waitForHeightAriseAndTxPresent(tx.id)
-        tx
-    }
+    case _ =>
+      val txId = api match {
+        case Api.Rest => sender.issue(account, data.name, data.description, data.quantity, data.decimals, reissuable = data.reissuable, fee = fee).id
+        case Api.Grpc =>
+          idOf(
+            grpc.broadcastIssue(
+              account,
+              data.name,
+              data.quantity,
+              data.decimals,
+              reissuable = data.reissuable,
+              fee = fee,
+              description = data.description
+            )
+          )
+      }
+      settled(txId)
+      txId
   }
 
   def reissue(
+      api: Api,
       account: KeyPair,
       method: String,
       assetId: String,
@@ -482,32 +560,51 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       reissuable: Boolean,
       fee: Long = invokeFee,
       checkStateChanges: Boolean = true
-  ): Transaction = {
-    method match {
-      case CallableMethod =>
-        val tx = invokeScript(account, "reissueAsset", assetId = assetId, count = quantity, isReissuable = reissuable, fee = fee)
-        if (checkStateChanges)
-          assertStateChanges(tx) { sd =>
-            sd.reissues should matchPattern { case Seq(ReissueInfoResponse(`assetId`, `reissuable`, `quantity`)) =>
-            }
-          }
-        tx
-
-      case _ => sender.reissue(account, assetId, quantity, reissuable, version = TxVersion.V2, waitForTx = true)
-    }
-  }
-
-  def burn(account: KeyPair, method: String, assetId: String, quantity: Long, fee: Long = invokeFee): Transaction = {
-    method match {
-      case CallableMethod =>
-        val tx = invokeScript(account, "burnAsset", assetId = assetId, count = quantity, fee = fee)
-        assertStateChanges(tx) { sd =>
-          sd.burns should matchPattern { case Seq(BurnInfoResponse(`assetId`, `quantity`)) =>
+  ): String = method match {
+    case CallableMethod =>
+      val txId = invoke(api, account, "reissueAsset", assetId = assetId, count = quantity, isReissuable = reissuable, fee = fee)
+      if (checkStateChanges)
+        assertStateChanges(txId) { sd =>
+          sd.reissues should matchPattern { case Seq(ReissueInfoResponse(`assetId`, `reissuable`, `quantity`)) =>
           }
         }
-        tx
-      case _ => sender.burn(account, assetId, quantity, fee = invokeFee, version = TxVersion.V2, waitForTx = true)
+      txId
+
+    case _ =>
+      val txId = api match {
+        case Api.Rest => sender.reissue(account, assetId, quantity, reissuable, version = TxVersion.V2).id
+        case Api.Grpc => idOf(grpc.broadcastReissue(account, fee, assetId, quantity, reissuable, version = TxVersion.V2))
+      }
+      settled(txId)
+      txId
+  }
+
+  def burn(api: Api, account: KeyPair, method: String, assetId: String, quantity: Long, fee: Long = invokeFee): String = method match {
+    case CallableMethod =>
+      val txId = invoke(api, account, "burnAsset", assetId = assetId, count = quantity, fee = fee)
+      assertStateChanges(txId) { sd =>
+        sd.burns should matchPattern { case Seq(BurnInfoResponse(`assetId`, `quantity`)) =>
+        }
+      }
+      txId
+
+    case _ =>
+      val txId = api match {
+        case Api.Rest => sender.burn(account, assetId, quantity, fee = invokeFee, version = TxVersion.V2).id
+        case Api.Grpc => idOf(grpc.broadcastBurn(account, assetId, quantity, fee = invokeFee, version = TxVersion.V2))
+      }
+      settled(txId)
+      txId
+  }
+
+  def sponsor(api: Api, account: KeyPair, assetId: String, minFee: Long): String = {
+    val txId = api match {
+      case Api.Rest => sender.sponsorAsset(account, assetId, minFee, sponsorFee).id
+      case Api.Grpc =>
+        idOf(grpc.broadcastSponsorFee(account, Some(Amount.of(ByteString.copyFrom(Base58.decode(assetId)), minFee)), sponsorFee))
     }
+    settled(txId)
+    txId
   }
 
   def isNft(asset: Asset): Boolean = {
@@ -614,4 +711,8 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
        |
        """.stripMargin
   }
+}
+
+object IssueReissueBurnAssetSuite {
+  enum Api { case Rest, Grpc }
 }
