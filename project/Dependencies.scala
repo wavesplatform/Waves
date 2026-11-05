@@ -1,4 +1,3 @@
-import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
 import sbt.Keys.scalaVersion
 import sbt.{Def, *}
 import scalapb.compiler.Version.scalapbVersion
@@ -37,7 +36,7 @@ object Dependencies {
 
   // Node protobuf schemas
   lazy val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.6.0" classifier "protobuf-src" intransitive ()
+    ("com.wavesplatform" % "protobuf-schemas" % "1.6.0").classifier("protobuf-src").intransitive()
 
   private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.7.0"
 
@@ -49,7 +48,7 @@ object Dependencies {
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.13.0" // 4.14+ requires Java 21 https://github.com/LFDT-web3j/web3j/releases/tag/v4.14.0
 
-  def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
+  def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %% s"monix-$module" % "3.4.1")
 
   private def grpcModule(module: String) = "io.grpc" % module % "1.83.1"
 
@@ -65,7 +64,7 @@ object Dependencies {
   val playJson = "org.playframework" %% "play-json" % "3.0.6"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.20" % Test
-  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.9.5" % Test)
+  val scalaJsTest = Def.setting("com.lihaoyi" %% "utest" % "0.9.5" % Test)
 
   private def sttp3Module(module: String) = "com.softwaremill.sttp.client3" %% module % "3.11.0"
 
@@ -75,7 +74,7 @@ object Dependencies {
   // 4.2.0 is built with Scala 3.9 (TASTy 28.9), which Scala 3.8 cannot read. Bump together with scalaVersion.
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 
-  def amazonCorretto(c: String): ModuleID = "software.amazon.cryptools" % "AmazonCorrettoCryptoProvider" % "2.5.0" classifier c
+  def amazonCorretto(c: String): ModuleID = ("software.amazon.cryptools" % "AmazonCorrettoCryptoProvider" % "2.5.0").classifier(c)
 
   val cryptoProviders = Seq(
     // Windows x86_64, Windows x86, macOS x86_64, linux x86_64
@@ -88,12 +87,12 @@ object Dependencies {
 
   val lang = Def.setting(
     Seq(
-      // defined here because %%% can only be used within a task or setting macro
+      // defined here because %% can only be used within a task or setting macro
       // explicit dependency can likely be removed when monix 3 is released
       monixModule("eval").value,
-      "org.typelevel" %%% s"cats-core" % "2.13.0",
-      "com.lihaoyi"   %%% "fastparse"  % "3.1.1",
-      "org.typelevel" %%% "cats-mtl"   % "1.7.0",
+      "org.typelevel" %% s"cats-core" % "2.13.0",
+      "com.lihaoyi"   %% "fastparse"  % "3.1.1",
+      "org.typelevel" %% "cats-mtl"   % "1.7.0",
       "ch.obermuhlner"  % "big-math"   % "2.3.2",
       googleGuava, // BaseEncoding.base16()
       curve25519,
@@ -105,8 +104,8 @@ object Dependencies {
 
   lazy val scalapbRuntimeJS = Def.setting(
     Seq(
-      "com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion,
-      "com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion % "protobuf"
+      "com.thesamet.scalapb" %% "scalapb-runtime" % scalapbVersion,
+      "com.thesamet.scalapb" %% "scalapb-runtime" % scalapbVersion % "protobuf"
     )
   )
 
@@ -158,7 +157,7 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       scalaLogging,
-      "eu.timepit"        %% "refined"  % "0.11.4" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      ("eu.timepit"       %% "refined"  % "0.11.4").exclude("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"     % "headlong" % "13.3.1",
       "com.github.jbellis" % "jamm"     % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
@@ -211,9 +210,9 @@ object Dependencies {
   lazy val circe = Def.setting {
     val circeVersion = "0.14.16"
     Seq(
-      "io.circe" %%% "circe-core",
-      "io.circe" %%% "circe-generic",
-      "io.circe" %%% "circe-parser"
+      "io.circe" %% "circe-core",
+      "io.circe" %% "circe-generic",
+      "io.circe" %% "circe-parser"
     ).map(_ % circeVersion)
   }
 

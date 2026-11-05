@@ -4,19 +4,21 @@ purpose: Canonical agent instructions for the Waves node repo (AGENTS.md is a th
 
 # Waves node: agent instructions
 
-Waves node in Scala 3 (consensus, state, REST/gRPC API, RIDE). sbt 1.x multi-module build; CI runs JDK 17 (temurin). README.md covers node quickstart; keep this file short and laconic.
+Waves node in Scala 3 (consensus, state, REST/gRPC API, RIDE). sbt 2.x multi-module build; CI runs JDK 17 (temurin). README.md covers node quickstart; keep this file short and laconic.
 
 ## Build / test
 
 - `sbt compilePR`: clean, `scalafmtCheck`, compile everything (Test included) with `-Werror`, then `checkTestLimits`; warnings block.
 - `sbt checkPR`: `compilePR` + unit tests (`lang-tests`, `lang-tests-js`, `repl-jvm`, `node-tests`, `grpc-server`, `ride-runner`) + `fullOptJS` for `lang-js`/`repl-js` + `node/assembly` + `stageForDocker`. This is what CI (`check-pr.yaml`) runs.
-- `sbt node-tests/test`: unit tests; single suite via `sbt "node-tests/testOnly *SuiteName"`. Chain several tasks with one quoted `;` argument (`sbt "a/test; b/test"`).
+- `sbt node-tests/testFull`: unit tests; single suite via `sbt "node-tests/testOnly *SuiteName"`. sbt 2's `test` is incremental: it reruns only what changed and prints `[success]` having run nothing, so it never proves a module green; `testFull` is the real run and what `checkPR` uses. Chain several tasks with one quoted `;` argument (`sbt "a/testFull; b/testFull"`).
+- sbt 2's `sbt` is a thin client that forks a background server and reuses it across runs. CI runs `sbt --server ... --batch` (foreground server, no client): see "sbt 2" in `docs/notes/build-tooling.md` before changing that or any task with side effects outside `target/`.
+- Build outputs live under `target/out/<platform>/u/<project>/` at the repo root (e.g. `target/out/jvm/u/node/waves-all-*.jar`), not under each module's `target/`.
 - `sbt "node-it/docker;node-it/testOnly ..."`: integration tests (needs Docker); slow, don't run by default. `node-it/docker` builds `com.wavesplatform/node-it:latest` from whatever `node`/`grpc-server` currently compile to; it is not rebuilt automatically, so re-run it by hand after touching either module's sources.
 - `sbt node-it/loadTests` / `sbt node-it/integrationTests`: the `@LoadTest`-annotated suites and their complement, discovered from the annotation. They run on separate runners (entries of the `node-it` matrix in `check-pr.yaml`); the load half runs serially, the other half is split across two runners by `-Dwaves.it.shard=i/n`. Read "Load tests" in `docs/notes/testing.md` before touching one, or before changing how node-it is invoked in CI.
 - Sandboxed dev environments: the default Docker builder here cannot do nested overlayfs mounts, so `node-it/docker` (or any `docker build` using the default `docker` driver) fails every `RUN` layer with `mount source: "overlay", ... err: operation not permitted`. Switch to a docker-container buildx builder (`docker buildx ls`; `docker buildx create --use` if none exists) and build by hand: `cd docker && docker buildx build --load -t com.wavesplatform/node-it:latest .`. `sbt node-it/docker` always uses the default builder, but its dependency `stageForDocker` still stages the node files into `docker/target`, so letting it fail once before the manual build is a reasonable sequence.
-- node-it suites run with `-Dwaves.it.max-parallel-suites=N` to cap Docker resource usage (each suite starts its own containers). Pass it on the `sbt` command line, not inside the sbt shell, and not through `sbt --client` (the thin client keeps the property to itself; see `docs/notes/build-tooling.md`). Per-suite logs land in `node-it/target/logs/<run-id>/<abbreviated.suite.Name>/`, but the real assertion/exception message is only in the sbt console output; grep it for `*** FAILED ***`/`*** ABORTED ***` and the lines after.
+- node-it suites run with `-Dwaves.it.max-parallel-suites=N` to cap Docker resource usage (each suite starts its own containers). Pass it as `sbt --server -D... --batch`, not inside the sbt shell and not through the thin client (`sbt -D...` or `sbt --client`), which keeps the property to itself; see `docs/notes/build-tooling.md`. Per-suite logs land in `target/out/jvm/u/node-it/logs/<run-id>/<abbreviated.suite.Name>/`, but the real assertion/exception message is only in the sbt console output; grep it for `*** FAILED ***`/`*** ABORTED ***` and the lines after.
 - `sbt scalafmt`: auto-format before committing. CI checks only `Compile` sources; `scalafmtAll` also rewrites unformatted test files nobody touched.
-- A long-lived sbt server (`sbt --client`) that loads the Amazon Corretto crypto provider after a recompile can abort with `IllegalAccessError: ... ZombieClassLoader` (the provider registers once per JVM, from the old layer). `sbt --client shutdown`, then rerun.
+- The long-lived sbt server (any thin-client `sbt` run) that loads the Amazon Corretto crypto provider after a recompile can abort with `IllegalAccessError: ... ZombieClassLoader` (the provider registers once per JVM, from the old layer). `sbt --client shutdown`, then rerun.
 
 ## Modules
 

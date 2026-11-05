@@ -69,9 +69,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'sbt'
-      - uses: sbt/setup-sbt@3afe9cf056c5d139bfc46579af1192d77a2f0821 # v1.4.0
+      - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
       - name: Stage node files for the docker build context
-        run: sbt --batch -Dproject.version=${{ steps.versions.outputs.node-version }} stageForDocker
+        run: sbt --server --batch -Dproject.version=${{ steps.versions.outputs.node-version }} stageForDocker
       - name: Extract image name and tags from workflow_call inputs
         if: inputs.raw-docker-tags != ''
         env:

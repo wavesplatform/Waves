@@ -1,8 +1,9 @@
 import sbt.Keys.Classpath
 import sbt._
+import sbtcompat.PluginCompat.FileRef
 
 trait ExtensionKeys {
-  val classpathOrdering = taskKey[Seq[(File, String)]](
+  val classpathOrdering = taskKey[Seq[(FileRef, String)]](
     "The order of the classpath used at runtime for the bat/bash scripts."
   )
   val projectDependencyArtifacts = taskKey[Classpath](

@@ -2,7 +2,7 @@ enablePlugins(JmhPlugin)
 
 Jmh / version := "1.37"
 
-incOptions := incOptions.value.withEnabled(false)
+incOptions := Def.uncached(incOptions.value.withEnabled(false))
 exportPipelining := false
 
 Test / classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.Flat
@@ -21,7 +21,7 @@ inConfig(Jmh)(
     classDirectory      := (Test / classDirectory).value,
     dependencyClasspath := (Test / dependencyClasspath).value,
     // rewire tasks, so that 'jmh:run' automatically invokes 'jmh:compile' (otherwise a clean 'jmh:run' would fail)
-    compile := compile.dependsOn(Test / compile).value,
+    compile := Def.uncached(compile.dependsOn(Test / compile).value),
     run     := run.dependsOn(compile).evaluated
   )
 )

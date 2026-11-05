@@ -12,11 +12,11 @@ object VersionObject extends AutoPlugin {
 
   import autoImport._
 
-  override def globalSettings: Seq[Def.Setting[_]] = Seq(
+  override def globalSettings: Seq[Def.Setting[?]] = Seq(
     V.fallback := (0, 0, 1)
 
   )
-  override def projectSettings: Seq[Def.Setting[_]] = Seq(
+  override def projectSettings: Seq[Def.Setting[?]] = Seq(
     V.scalaPackage := s"${organization.value}.${name.value}",
     (Compile / sourceGenerators) += Def.task {
       val packageName = V.scalaPackage.value
