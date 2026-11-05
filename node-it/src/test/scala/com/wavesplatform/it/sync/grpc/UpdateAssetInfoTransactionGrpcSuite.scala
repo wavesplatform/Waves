@@ -15,7 +15,7 @@ import scala.concurrent.duration.*
 
 class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with TableDrivenPropertyChecks {
   import UpdateAssetInfoTransactionGrpcSuite.*
-  val updateInterval                              = 5
+  val updateInterval                              = 2
   override protected def nodeConfigs: Seq[Config] = Seq(configWithUpdateIntervalSetting(updateInterval).withFallback(Miners.head))
 
   val issuer      = firstAcc

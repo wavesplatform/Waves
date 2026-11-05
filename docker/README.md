@@ -17,6 +17,8 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 ## Building Docker image
 `./build-with-docker.sh && docker build -t wavesplatform/wavesnode docker` (from the repository root) - builds an image with the current local repository
 
+`sbt stageForDocker && docker build -t wavesplatform/wavesnode docker` (from the repository root) - the same with a local sbt, staging only what the image needs into `docker/target`
+
 **You can specify following arguments when building the image:**
 
 

@@ -16,11 +16,16 @@ import scala.concurrent.duration.DurationInt
 class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLogging {
   import com.wavesplatform.it.NodeConfigs.*
   override val nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.quorum(0).preactivatedFeatures(
-      BlockchainFeatures.FairPoS,
-      BlockchainFeatures.DeterministicFinality
-    )
+    BiggestMiner
+      .quorum(0)
+      .preactivatedFeatures(
+        BlockchainFeatures.FairPoS,
+        BlockchainFeatures.DeterministicFinality
+      )
   )
+
+  // A block is finalized by endorsements in the next one's microblocks; the old height bound allowed one more
+  private val MaxFinalizationLag = 2
 
   private def node            = dockerNodes().last
   private lazy val miner1Acc  = node.keyPair
@@ -72,19 +77,19 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
       }
     }
 
-    // We need at least one transaction, otherwise there won't be a microblock, thus no voting, no finalization
-    // Finalization happened in a microblock
-    node.waitForHeight(Height(node.waitForTransaction(node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true).id).height + 1))
-    val fs = node.finalityStatus
-    if (fs.height > waitingFinalizedHeight + 2)
-      fail(
-        s"Finalization height doesn't rise: height=${fs.height}, waiting for finalized height=$waitingFinalizedHeight, last finalized height=$finalizedHeight1"
-      )
+    // We need at least one transaction, otherwise there won't be a microblock, thus no voting, no finalization.
+    // Wait for the finalized height itself: a bound on the chain height breaks whenever the test JVM stalls.
+    node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true)
+    val fs = node.waitFor(s"finalized height >= $waitingFinalizedHeight")(_.finalityStatus, _.finalizedHeight >= waitingFinalizedHeight, 500.millis)
+    log.debug(s"New finalized height: $finalizedHeight1 -> ${fs.finalizedHeight} at ${fs.height}")
 
-    if (fs.finalizedHeight < finalizedHeight1)
-      fail(s"Finalized height ${fs.finalizedHeight} became lower than the previous $finalizedHeight1")
-    else if (fs.finalizedHeight != finalizedHeight1)
-      log.debug(s"New finalized height: $finalizedHeight1 -> ${fs.finalizedHeight}")
+    // From recorded history, not the current height: finality stops with the last microblock, the chain does not.
+    node.waitForHeight(fs.height.next) // so the block that reached the target is solid and has a record
+    val reachedAt =
+      (waitingFinalizedHeight to fs.height).map(Height(_)).find(h => node.finalizedHeightAt(h) >= waitingFinalizedHeight).value
+    withClue(s"finalized height $waitingFinalizedHeight reached at $reachedAt: ") {
+      (reachedAt - waitingFinalizedHeight) should be <= MaxFinalizationLag
+    }
 
     step("Survives restart")
     isolated {

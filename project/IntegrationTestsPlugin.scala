@@ -14,6 +14,45 @@ object IntegrationTestsPlugin extends AutoPlugin {
   object autoImport extends ItKeys
   import autoImport.*
 
+  private val LoadTestTag = "com.wavesplatform.it.LoadTest"
+
+  /** `-Dwaves.it.shard=i/n` (1-based) for splitting `integrationTests` across CI runners; whole set when absent. */
+  private def itShard: (Int, Int) =
+    sys.props.get("waves.it.shard").fold((1, 1)) { spec =>
+      scala.util.Try(spec.split('/').map(_.trim.toInt)).toOption match {
+        case Some(Array(i, n)) if 1 <= i && i <= n => (i, n)
+        case _                                     => sys.error(s"waves.it.shard must be i/n with 1 <= i <= n, got '$spec'")
+      }
+    }
+
+  // A stable hash of the name rather than the position in a sorted list: Grpc/Http twin suites sort next to each other,
+  // and alternating by position put the slow twins on the same shard.
+  private def shardOfUntagged(split: (Seq[String], Seq[String])): Seq[String] = {
+    val (index, count) = itShard
+    split._2.filter { suite =>
+      val crc = new java.util.zip.CRC32
+      crc.update(suite.getBytes("UTF-8"))
+      crc.getValue % count == index - 1
+    }
+  }
+
+  private def shardSpec: String = { val (i, n) = itShard; s"$i/$n" }
+
+  /** Runs exactly the named suites through `testOnly`, failing loudly rather than reporting a green empty run. */
+  private def runSuites(select: ((Seq[String], Seq[String])) => Seq[String], emptyWhy: String, tagged: Boolean) =
+    Def.taskDyn {
+      // testOnly still inherits the `-l` built from SCALATEST_EXCLUDE_TAGS, so excluding the very tag loadTests
+      // selects on would filter every test out of the suites it forked and still exit 0.
+      val selfDefeating =
+        tagged && sys.env.get("SCALATEST_EXCLUDE_TAGS").exists(_.split("\\s+").contains(LoadTestTag))
+      select(loadTestNames.value) match {
+        case Nil => Def.task[Unit](sys.error(s"Nothing to run: $emptyWhy"))
+        case _ if selfDefeating =>
+          Def.task[Unit](sys.error(s"SCALATEST_EXCLUDE_TAGS excludes $LoadTestTag, so every selected test would be filtered out"))
+        case selected => (Test / testOnly).toTask(selected.mkString(" ", " ", "")).map(_ => ())
+      }
+    }
+
   override def projectSettings: Seq[Def.Setting[_]] =
     inConfig(Test)(
       Seq(
@@ -37,7 +76,24 @@ object IntegrationTestsPlugin extends AutoPlugin {
           val args = Seq("-fFW", (logDirectory.value / "summary.log").toString) ++ excludeTags
           Tests.Argument(TestFrameworks.ScalaTest, args: _*)
         },
+        // Both halves of the load-test split derive from this one name, so neither can drift: a renamed annotation is
+        // an error instead of an `-n`/`-l` tag argument that silently selects nothing (and exits 0).
+        loadTestNames := {
+          val loader = testLoader.value
+          val loadTest = scala.util
+            .Try(Class.forName(LoadTestTag, false, loader))
+            .getOrElse(sys.error(s"$LoadTestTag not found - has the annotation been moved or renamed?"))
+            .asSubclass(classOf[java.lang.annotation.Annotation])
+          definedTests.value.map(_.name).partition(Class.forName(_, false, loader).isAnnotationPresent(loadTest))
+        },
+        loadTests         := runSuites(_._1, s"no suite carries @$LoadTestTag", tagged = true).value,
+        integrationTests  := runSuites(shardOfUntagged, s"no untagged suites found in shard ${shardSpec}", tagged = false).value,
         parallelExecution := true,
+        // sbt tags every forked group with these too, so the default (Tags.Test, 1) puts suites under build.sbt's
+        // per-processor Tags.Test cap (4 on a GitHub runner) and the flag could only lower concurrency, never raise it.
+        // Cleared, the ForkedTestGroup limit (-Dwaves.it.max-parallel-suites) is the only one that applies.
+        testOnly / tags := Seq.empty,
+        test / tags     := Seq.empty,
         testGrouping := {
           // ffs, sbt!
           // https://github.com/sbt/sbt/issues/3266
@@ -91,10 +147,8 @@ object IntegrationTestsPlugin extends AutoPlugin {
                 sLog.value.info(s"System CPU count: ${EvaluateTask.SystemProcessors}")
                 EvaluateTask.SystemProcessors
             }
-          },
-        concurrentRestrictions := Seq(
-          Tags.limit(Tags.ForkedTestGroup, maxParallelSuites.value)
-        )
+          }
+        // concurrentRestrictions lives in build.sbt: a second Global assignment replaces, not adds.
       )
     )
 
@@ -103,4 +157,7 @@ object IntegrationTestsPlugin extends AutoPlugin {
 trait ItKeys {
   val logDirectory      = taskKey[File]("The directory where logs of integration tests are written")
   val maxParallelSuites = settingKey[Int]("Number of test suites to run in parallel")
+  val loadTestNames     = taskKey[(Seq[String], Seq[String])]("Suite names, split into @LoadTest-annotated and the rest")
+  val loadTests         = taskKey[Unit]("Runs only the @LoadTest-annotated suites")
+  val integrationTests  = taskKey[Unit]("Runs every suite except the @LoadTest-annotated ones")
 }

@@ -42,6 +42,8 @@ class DuplicateFeatureVotesRollbackSuite extends BaseFreeSpec with ActivationSta
   private val signer: KeyPair = KeyPair.fromSeed(NotMiner.getString("account-seed")).explicitGet()
   private val signerBalance   = 6_000_000_000_000_000L // From template.conf, never decreases: blocks have no transactions, only rewards
 
+  override protected def publishNetworkPort: Boolean = true
+
   override protected def nodeConfigs: Seq[Config] =
     Seq(BiggestMiner.overrides(s"""waves {
                                   |  blockchain.custom.functionality {
