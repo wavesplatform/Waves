@@ -17,7 +17,6 @@ class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLo
   override protected def nodeConfigs: Seq[Config] =
     Seq(Miners.head, Miners(3)).map(
       _.preactivatedFeatures(BlockchainFeatures.DeterministicFinality)
-        .overrides("waves.waves.blockchain.custom.functionality.min-block-time = 10s")
         .quorum(1)
     )
 
@@ -30,6 +29,10 @@ class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLo
   private lazy val miner2Addr = node2.address
 
   "finalization activated and works" in {
+    // A transaction broadcast before the handshake goes to no peers and is not resent in time: the commits would stay in
+    // node2's pool while node1 mines the rest of the current period, and expire once the next one starts.
+    node1.waitForPeers(1)
+    node2.waitForPeers(1)
     val period1 = node1.currentGenerationPeriod.value.next
 
     step("Commit to generation")
