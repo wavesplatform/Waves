@@ -34,9 +34,11 @@ WORKDIR $WVDATA
 # exist per platform in native/<arch>/, Waves' own jars and scripts in app/. Copying them as separate layers keeps the
 # big one cached across builds that only changed Waves code, and copying (rather than unpacking a tarball in a RUN)
 # needs no emulation on a cross-platform build. Nothing is downloaded at build time.
-COPY --link target/lib $WAVES_INSTALL_PATH/lib
-COPY --link target/native/$TARGETARCH $WAVES_INSTALL_PATH/lib
-COPY --link target/app $WAVES_INSTALL_PATH
+# --chmod: the node runs as waves, and stageForDocker never refreshes the mode of a staged file it considers unchanged,
+# so a stale 0600 jar in docker/target would otherwise reach the image unreadable. X keeps directories and scripts executable.
+COPY --link --chmod=u=rwX,go=rX target/lib $WAVES_INSTALL_PATH/lib
+COPY --link --chmod=u=rwX,go=rX target/native/$TARGETARCH $WAVES_INSTALL_PATH/lib
+COPY --link --chmod=u=rwX,go=rX target/app $WAVES_INSTALL_PATH
 COPY --link --chmod=755 entrypoint.sh $WAVES_INSTALL_PATH/bin/entrypoint.sh
 
 
