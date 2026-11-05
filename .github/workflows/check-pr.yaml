@@ -43,7 +43,7 @@ jobs:
               - 'lang/**'
               - 'build.sbt'
               - 'project/*'
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: waves-all
           path: node/target/waves-all-*.jar
@@ -60,7 +60,7 @@ jobs:
           done
       # Heap dumps hold the whole JVM environment and the artifact is public: keep secrets out of this job's env.
       - name: Save debug data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           if-no-files-found: ignore
@@ -157,7 +157,7 @@ jobs:
           create_check: false
           check_name: ${{ matrix.name }}
       - name: Upload Logs
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           if-no-files-found: ignore
