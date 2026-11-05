@@ -25,6 +25,7 @@ RUN groupadd -r waves --gid=999; \
     install -d -o waves -g waves -m 755 $WVDATA $WVLOG; \
     install -d -m 755 $WAVES_INSTALL_PATH
 
+
 # Ahead of the COPYs below: it is the only instruction left that touches the filesystem, and running it after them
 # would force BuildKit to materialize the merged --link layers instead of ending the build with them.
 WORKDIR $WVDATA
@@ -37,6 +38,7 @@ COPY --link target/lib $WAVES_INSTALL_PATH/lib
 COPY --link target/native/$TARGETARCH $WAVES_INSTALL_PATH/lib
 COPY --link target/app $WAVES_INSTALL_PATH
 COPY --link --chmod=755 entrypoint.sh $WAVES_INSTALL_PATH/bin/entrypoint.sh
+
 
 EXPOSE 6869 6868 6863 6862 6870
 VOLUME $WVDATA
