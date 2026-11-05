@@ -193,7 +193,7 @@ object Dependencies {
   lazy val rideRunner = Def.setting(
     Seq(
       rocksdb,
-      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.2.4",
+      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.3.1",
       "net.logstash.logback"          % "logstash-logback-encoder" % "9.0" % Runtime,
       kamonModule("caffeine"),
       kamonModule("prometheus"),
