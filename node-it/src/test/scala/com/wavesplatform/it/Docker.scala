@@ -593,7 +593,6 @@ object Docker {
 
   // Under the log directory: the install tree is not writable by the node user
   private val ProfilerDir = Paths.get("/var/log/waves/profiler")
-  private val ContainerRoot = Paths.get("/usr/share/waves")
   private val ProfilerPort  = 10001
 
   private val RunId = Option(System.getenv("RUN_ID")).getOrElse(DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now()))
