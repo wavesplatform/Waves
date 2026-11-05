@@ -95,7 +95,7 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
     val hitSource =
       crypto.verifyVRF(genSig, lastBlockVrfOrGenSig, signer.publicKey).explicitGet()
 
-    val posCalculator = FairPoSCalculator.V1
+    val posCalculator = FairPoSCalculator.fromSettings(nodes.head.settings.blockchainSettings.functionalitySettings)
     val version       = 5.toByte
 
     val validBlockDelay: Long = posCalculator
@@ -107,11 +107,11 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
 
     val baseTarget: Long = posCalculator
       .calculateBaseTarget(
-        10,
+        nodes.head.settings.blockchainSettings.genesisSettings.averageBlockDelay.toSeconds,
         height.toInt,
         lastBlock.baseTarget.get,
         lastBlock.timestamp,
-        None,
+        Option.when(height >= Height(3))(nodes.head.blockAt(height - 2).timestamp),
         lastBlock.timestamp + validBlockDelay
       )
 
