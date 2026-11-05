@@ -129,8 +129,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: 'Run integration tests (1/2)', id: '1', sbt: '-Dwaves.it.max-parallel-suites=5 -Dwaves.it.shard=1/2', task: integrationTests }
-          - { name: 'Run integration tests (2/2)', id: '2', sbt: '-Dwaves.it.max-parallel-suites=5 -Dwaves.it.shard=2/2', task: integrationTests }
+          - { name: 'Run integration tests (1/3)', id: '1', sbt: '-Dwaves.it.max-parallel-suites=4 -Dwaves.it.shard=1/3', task: integrationTests }
+          - { name: 'Run integration tests (2/3)', id: '2', sbt: '-Dwaves.it.max-parallel-suites=4 -Dwaves.it.shard=2/3', task: integrationTests }
+          - { name: 'Run integration tests (3/3)', id: '3', sbt: '-Dwaves.it.max-parallel-suites=4 -Dwaves.it.shard=3/3', task: integrationTests }
           - { name: 'Run load tests', id: 'load', sbt: '-Dwaves.it.max-parallel-suites=1', task: loadTests }
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3

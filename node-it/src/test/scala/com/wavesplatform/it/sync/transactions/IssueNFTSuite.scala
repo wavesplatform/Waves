@@ -19,8 +19,9 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
   val firstNodeIssuer: KeyPair  = KeyPair("first_node_issuer".getBytes("UTF-8"))
 
   import NodeConfigs.*
+  // The smallest miner keeps blocks about 10x slower than BiggestMiner, so a loaded runner does not reach activation before the first test
   override protected def nodeConfigs: Seq[Config] =
-    Seq(BiggestMiner.quorum(0), NotMiner).map(_.preactivatedFeatures((BlockchainFeatures.ReduceNFTFee, Height(10))))
+    Seq(Miners.head.quorum(0), NotMiner).map(_.preactivatedFeatures((BlockchainFeatures.ReduceNFTFee, Height(10))))
 
   test("Can't issue NFT before activation") {
     val assetName        = "NFTAsset"

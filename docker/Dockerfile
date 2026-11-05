@@ -17,11 +17,14 @@ ENV WVLOG=/var/log/waves
 ENV WAVES_INSTALL_PATH=/usr/share/waves
 ENV WAVES_CONFIG=/etc/waves/waves.conf
 
-# Setup node
+# Setup node. No USER instruction: entrypoint.sh takes ownership of bind-mounted data and log directories as root, then
+# drops to waves (uid 999). Only those two directories are writable by waves; code stays root-owned, so a compromised
+# node cannot rewrite what root runs on the next start.
 RUN groupadd -r waves --gid=999; \
     useradd -r -g waves --uid=999 --home-dir=$WVDATA --shell=/bin/bash waves; \
-    # The COPYs below own what they bring in, so only the directories themselves are created here
-    install -d -o waves -g waves -m 755 $WVDATA $WVLOG $WAVES_INSTALL_PATH
+    install -d -o waves -g waves -m 755 $WVDATA $WVLOG; \
+    install -d -m 755 $WAVES_INSTALL_PATH
+
 
 # Ahead of the COPYs below: it is the only instruction left that touches the filesystem, and running it after them
 # would force BuildKit to materialize the merged --link layers instead of ending the build with them.
@@ -31,11 +34,11 @@ WORKDIR $WVDATA
 # exist per platform in native/<arch>/, Waves' own jars and scripts in app/. Copying them as separate layers keeps the
 # big one cached across builds that only changed Waves code, and copying (rather than unpacking a tarball in a RUN)
 # needs no emulation on a cross-platform build. Nothing is downloaded at build time.
-# --chown is numeric because --link copies into a layer that has no user database of its own.
-COPY --link --chown=999:999 target/lib $WAVES_INSTALL_PATH/lib
-COPY --link --chown=999:999 target/native/$TARGETARCH $WAVES_INSTALL_PATH/lib
-COPY --link --chown=999:999 target/app $WAVES_INSTALL_PATH
-COPY --link --chown=999:999 entrypoint.sh $WAVES_INSTALL_PATH/bin/entrypoint.sh
+COPY --link target/lib $WAVES_INSTALL_PATH/lib
+COPY --link target/native/$TARGETARCH $WAVES_INSTALL_PATH/lib
+COPY --link target/app $WAVES_INSTALL_PATH
+COPY --link --chmod=755 entrypoint.sh $WAVES_INSTALL_PATH/bin/entrypoint.sh
+
 
 EXPOSE 6869 6868 6863 6862 6870
 VOLUME $WVDATA
