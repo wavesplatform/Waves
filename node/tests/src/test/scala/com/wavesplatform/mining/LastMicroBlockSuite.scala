@@ -1,25 +1,34 @@
 package com.wavesplatform.mining
 
 import cats.syntax.option.*
+import com.wavesplatform.block.Block
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
+import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.state.*
+import com.wavesplatform.state.appender.MicroblockAppender
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.{CatchLogs, FreeSpec, NumericExt, TestSchedulerOps, TestTime, WithResourceManager}
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.TxValidationError.MicroBlockAppendError
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
+import monix.execution.Scheduler
 import monix.execution.schedulers.TestScheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import org.scalatest.EitherValues
+import org.scalatest.concurrent.Eventually
 import org.scalatest.time.SpanSugar.convertLongToGrainOfTime
+import org.scalatest.{EitherValues, Inside}
 
-import scala.util.Using
+import java.util.concurrent.CountDownLatch
+import scala.concurrent.Promise
+import scala.util.{Try, Using}
 
-class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps with WithResourceManager with EitherValues {
+class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps with WithResourceManager with EitherValues with Inside with Eventually {
   private val thisNodeAcc1 = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 0)
   private val thisNodeAcc2 = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 1)
   private val otherNodeAcc = TxHelpers.defaultSigner
@@ -67,23 +76,19 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       val block2 = d.createBlock(generator = thisNodeAcc1, strictTime = true)
       d.appender.appendBlock(block2)
       time.setTime(block2.header.timestamp)
-      appenderScheduler.tickNext("this-appender-1", failIfNoTasks = false)
 
       log.debug("Append microBlock1")
       time.advance(microBlockInterval)
       val microBlock1 = d.createMicroBlock(signer = thisNodeAcc1.some)(TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc2.toAddress))
       d.appendMicroBlock(microBlock1)
       val refLiquidBlockId = d.lastBlockId
-      appenderScheduler.tickNext("this-appender-2", failIfNoTasks = false)
 
       log.debug("Append microBlock2")
       time.advance(microBlockInterval)
       d.appendMicroBlock(d.createMicroBlock(signer = thisNodeAcc1.some)(TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc2.toAddress)))
 
       log.debug("Trigger thisNode forging")
-      appenderScheduler.tickNext("this-appender-3")
-      minerScheduler.tickNext("this-miner-1")
-      appenderScheduler.tickNext("this-appender-4")
+      appenderScheduler.tickNext("this-appender-1")
 
       val lastBlock = d.blockchain.lastBlockHeader.value
       lastBlock.header.reference shouldBe refLiquidBlockId
@@ -126,13 +131,11 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       val block2 = d.createBlock(generator = otherNodeAcc, strictTime = true)
       d.appender.appendBlock(block2)
       time.setTime(block2.header.timestamp)
-      appenderScheduler.tickNext("this-appender-1", failIfNoTasks = false)
 
       log.debug("Append microBlock1")
       time.advance(microBlockInterval)
       val microBlock1 = d.createMicroBlock(signer = otherNodeAcc.some)(TxHelpers.transfer(to = otherNodeAcc.toAddress))
       d.appendMicroBlock(microBlock1)
-      appenderScheduler.tickNext("this-appender-2", failIfNoTasks = false)
 
       log.debug("Append microBlock2")
       time.advance(microBlockInterval)
@@ -140,14 +143,155 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       val refLiquidBlockId = d.lastBlockId
 
       log.debug("Trigger thisNode forging")
-      appenderScheduler.tickNext("this-appender-3")
-      minerScheduler.tickNext("this-miner-1")
-      appenderScheduler.tickNext("this-appender-4")
+      appenderScheduler.tickNext("this-appender-1")
 
       val lastBlock = d.blockchain.lastBlockHeader.value
       lastBlock.header.reference shouldBe refLiquidBlockId
     }
   }.get
+
+  // thisNodeAcc1 mines alone with min-micro-block-age = 0; minerScheduler only runs microblock mining
+  private def withThisNodeMiner(
+      appenderScheduler: Scheduler,
+      minerScheduler: Scheduler = TestScheduler(),
+      maxTransactionsInMicroBlock: Int = defaultSettings.minerSettings.maxTransactionsInMicroBlock
+  )(f: (Domain, MinerImpl, TestTime) => Unit): Unit = withManager { manager =>
+    val channels = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
+    var miner    = Miner.StrictDisabledMiner
+    val time     = TestTime()
+    withDomain(
+      defaultSettings.copy(minerSettings =
+        defaultSettings.minerSettings.copy(minMicroBlockAge = 0.seconds, maxTransactionsInMicroBlock = maxTransactionsInMicroBlock)
+      ),
+      AddrWithBalance.enoughBalances(thisNodeAcc1, otherNodeAcc),
+      miner = Miner.forwardTo(miner),
+      time = time
+    ) { d =>
+      d.wallet.generateNewAccounts(1)
+      // The genesis timestamp comes from the JVM-wide TxHelpers counter, which can lag the wall clock (TestTime's start) by minutes
+      // in a full run; a block then gets "now - 1 minute" as its timestamp and the next attempt fires at once
+      time.setTime(d.lastBlock.header.timestamp)
+      val minerImpl = new MinerImpl(
+        channels,
+        d.blockchain,
+        d.settings,
+        time,
+        d.utxPool,
+        BlockEndorser.Disabled,
+        EndorsementStorage.Disabled,
+        d.wallet,
+        d.posSelector,
+        minerScheduler,
+        appenderScheduler,
+        Observable.never // The microblock miner waits on it when the UTX is empty; Observable.empty would fail it
+      )
+      miner = minerImpl
+      f(d, minerImpl, time)
+    }
+  }
+
+  private def advanceToNextBlockTime(d: Domain, time: TestTime): Unit =
+    time.setTimeIfGreater(d.nextBlockTime(thisNodeAcc1).max(d.lastBlock.header.timestamp + d.settings.minerSettings.minimalBlockGenerationOffset.toMillis))
+
+  // The miner scheduler is never run, so a key block can appear only if forging runs on the appender
+  private def withAppenderOnlyMiner(appenderScheduler: Scheduler)(f: (Domain, MinerImpl, Block) => Unit): Unit =
+    withThisNodeMiner(appenderScheduler) { (d, miner, time) =>
+      val block2 = d.createBlock(generator = thisNodeAcc1, strictTime = true)
+      d.appender.appendBlock(block2)
+      advanceToNextBlockTime(d, time)
+      f(d, miner, block2)
+    }
+
+  // TestScheduler runs tasks due at the same instant in random order, so FIFO order on the appender needs a real thread
+  "key block builds on a microblock appended on the appender ahead of the key block attempt" in {
+    val appenderScheduler = Scheduler.singleThread("test-appender")
+    try withAppenderOnlyMiner(appenderScheduler) { (d, miner, _) =>
+      val microBlock = d.createMicroBlock(signer = thisNodeAcc1.some)(TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc1.toAddress))
+      val gate       = new CountDownLatch(1)
+      appenderScheduler.execute(() => gate.await())
+      val totalBlockId = Promise[BlockId]()
+      appenderScheduler.execute(() => totalBlockId.complete(Try(d.appendMicroBlock(microBlock))))
+      miner.scheduleMining()
+      gate.countDown()
+
+      eventually(timeout(10.seconds))(d.blockchain.height shouldBe 3)
+      d.blockchain.lastBlockHeader.value.header.reference shouldBe totalBlockId.future.value.value.get
+    }
+    finally appenderScheduler.shutdown()
+  }
+
+  "key block is forged and appended within appender tasks, so a microblock queued behind it is rejected, not orphaned" in {
+    val appenderScheduler = TestScheduler()
+    withAppenderOnlyMiner(appenderScheduler) { (d, miner, block2) =>
+      val transfer = TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc1.toAddress)
+      d.utxPool.putIfNew(transfer).resultE.value shouldBe true
+      val microBlock = d.createMicroBlock(signer = thisNodeAcc1.some)(transfer)
+
+      log.debug("Run the key block attempt on the appender only")
+      miner.scheduleMining()
+      appenderScheduler.tick()
+
+      log.debug("Queue the microblock, packed on the old tip, behind it")
+      val microBlockAppended =
+        MicroblockAppender(d.blockchain, d.utxPool, appenderScheduler)(microBlock, None).runToFuture(using appenderScheduler)
+      appenderScheduler.tick()
+
+      d.blockchain.height shouldBe 3
+      val keyBlock = d.blockchain.lastBlockHeader.value
+      keyBlock.header.generator shouldBe thisNodeAcc1.publicKey
+      keyBlock.header.reference shouldBe block2.id()
+      inside(microBlockAppended.value.value.get) { case Left(MicroBlockAppendError(err, _)) =>
+        err should include("doesn't reference base block")
+      }
+      d.utxPool.transactionById(transfer.id()) shouldBe defined
+    }
+  }
+
+  "stale microblock of the previous sequence is dropped quietly and its transaction is mined on the new key block" in {
+    val minerScheduler    = TestScheduler()
+    val appenderScheduler = TestScheduler()
+    // One transaction fills a microblock: packing returns at once, then the sequence sleeps on minerScheduler, not in real time
+    withThisNodeMiner(appenderScheduler, minerScheduler, maxTransactionsInMicroBlock = 1) { (d, miner, time) =>
+      CatchLogs.withLogsOf(classOf[MicroBlockMinerImpl]) { microBlockMinerLog =>
+        def forgeKeyBlock(): Unit = {
+          advanceToNextBlockTime(d, time)
+          miner.scheduleMining()
+          appenderScheduler.tick()
+        }
+
+        log.debug("Forge block2 and append its first microblock")
+        forgeKeyBlock()
+        d.blockchain.height shouldBe 2
+        d.utxPool.putIfNew(TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc1.toAddress)).resultE.value shouldBe true
+        minerScheduler.tick()
+        appenderScheduler.tick()
+        val microBlock1TotalId = d.lastBlockId
+
+        log.debug("The block2 sequence packs tx2 and waits out micro-block-interval before building its microblock")
+        val tx2 = TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc1.toAddress, amount = 2)
+        d.utxPool.putIfNew(tx2).resultE.value shouldBe true
+        minerScheduler.tick()
+        withClue("the packed microblock is still pending: ") {
+          minerScheduler.state.tasks should not be empty
+          d.lastBlockId shouldBe microBlock1TotalId
+        }
+
+        log.debug("Block3 is forged and appended meanwhile")
+        forgeKeyBlock()
+        d.blockchain.height shouldBe 3
+        d.blockchain.lastBlockHeader.value.header.reference shouldBe microBlock1TotalId
+
+        log.debug("Let both microblock sequences run")
+        minerScheduler.tick(d.settings.minerSettings.microBlockInterval)
+        appenderScheduler.tick()
+
+        d.blockchain.transactionMeta(tx2.id()).map(_.height) shouldBe Some(Height(3))
+        // The logger is JVM-wide; TestScheduler runs this test's microblock miner on the test thread
+        val ownMessages = microBlockMinerLog.getEvents.filter(_.getThreadName == Thread.currentThread().getName).map(_.getFormattedMessage)
+        ownMessages.filter(m => m.contains("Error mining microblock") || m.contains("Could not append")) shouldBe empty
+      }
+    }
+  }
 
   "transfer in the last microblock of period, but it removed" in withManager { manager =>
     val channels     = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))

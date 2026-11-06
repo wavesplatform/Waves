@@ -60,7 +60,7 @@ A test that needs several transactions in the UTX pool before the miner packs an
 
 ## node-tests: finding why a block was rejected
 
-Tests log at `OFF` by default (`node/tests/src/test/resources/logback-test.xml`), so an append rejected inside the appender surfaces only as `Can't apply block ..., see logs` from `Domain.appendBlock`. Re-run with `-Dlogback.test.level=TRACE` and grep for the real reason.
+Tests log at `OFF` by default (`node/tests/src/test/resources/logback-test.xml`), so an append rejected inside the appender surfaces only as `Can't apply block ..., see logs` from `Domain.appendBlock`. Re-run with `sbt --server -Dlogback.test.level=TRACE --batch "node-tests/testOnly ..."` and grep for the real reason. node-tests run in a forked JVM, so `build.sbt` forwards the property into its `Test / javaOptions`; through the thin client (`sbt -D...`, `sbt --client`) it never reaches the build.
 
 ## node-it: the test JVM counts toward the miner quorum
 
@@ -73,3 +73,13 @@ Until a handshake is accepted a node has no peers (`HandshakeHandler` puts the c
 ## node-tests: suite resources close when the instance's run completes, not in afterAll
 
 `ParallelTestExecution` (through `OneInstancePerTest`) runs every test in a fresh suite instance made by `newInstance`, which runs the constructor again, and passes `runTestInNewInstance = true` to it; `BeforeAndAfterAll` skips both `beforeAll` and `afterAll` on such an instance. `WithState` used to open its RocksDB in the constructor and close it in `afterAll`, so every test of a `ParallelTestExecution` suite leaked one `rocks-temp-*` directory and an open DB (about 1G per node-tests run, enough to fill a tmpfs `/tmp` and fail unrelated suites with `No space left on device`). Resources a suite trait owns therefore go through `ClosesAfterRun` and `OnFirstUse` (node-testkit): opened on first use, closed when that instance's own `run` completes or throws, after `afterAll`. `TempRDB` is the temp-directory RocksDB that also deletes its directory when the open fails, and `TestHelpers.closeAll` runs every close step even when an earlier one throws. `SharedDomain` refuses `OneInstancePerTest` outright: a per-test instance never runs `beforeAll`, so each test would silently get an empty domain of its own. `TempDbCleanupSpec` runs probe suites from code and checks that nothing is left behind.
+
+## node-tests: TestScheduler does not keep FIFO order
+
+Monix `TestScheduler` runs tasks due at the same instant in random order, so two tasks queued back to back on it may run in either order, and a test that relies on that order passes or fails from run to run. The real appender (`singleThread("appender")`) is FIFO. To pin an ordering on the appender, either let one side finish in its own `tick()` before queuing the other, or use a real `Scheduler.singleThread` held behind a latch (see `LastMicroBlockSuite`, "key block builds on a microblock appended on the appender ahead of the key block attempt"). A `Task`-based appender call such as `MicroblockAppender(...)` also takes more than one scheduler hop, so even on a FIFO scheduler its work can land behind a task queued after it; queue a plain runnable when the position matters.
+
+## node-tests: TestTime and the genesis timestamp come from different clocks
+
+`TestTime()` starts at the wall clock, but `Domain`'s genesis (and every `TxHelpers` transaction) takes its timestamp from `TxHelpers.timestamp`, a JVM-wide counter that starts at JVM start and moves one millisecond per transaction. In a long forked run it lags the wall clock by minutes, so `time.setTimeIfGreater(d.nextBlockTime(...))` leaves the clock far ahead of the chain, `forgeBlock` dates the key block `now - 1 minute`, and the next attempt computes a zero offset and forges at once, inside the same scheduler tick. A test that passes alone then fails in `testFull` or CI (seen in `LastMicroBlockSuite`: a block3 appeared mid-scenario). Anchor the clock to the chain first, `time.setTime(d.lastBlock.header.timestamp)`, as `LastMicroBlockSuite.withThisNodeMiner` does. Separately, `UtxPoolImpl` in `Domain` uses `SystemTime`, not the suite's `TestTime`.
+
+Logs caught with `CatchLogs.withLogsOf(cls)` come from a JVM-wide logger, so they include other suites running in parallel; filter by thread (a `TestScheduler` runs its tasks on the test thread).

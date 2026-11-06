@@ -76,8 +76,6 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         log.debug("Trigger thisNode forging")
         d.testTime.setTimeIfGreater(d.nextBlockTime(thisNodeAcc))
         appenderScheduler.tickNext("appender-1")
-        minerScheduler.tickNext("miner-1")
-        appenderScheduler.tickNext("appender-2")
 
         d.lastBlock.header.generator.toAddress shouldBe thisNodeAcc.toAddress
         minerImpl.inMemoryLog.getMessages.find(_.contains("is not committed on 3")) shouldBe empty
@@ -138,8 +136,6 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         log.debug("Trigger thisNode forging")
         d.testTime.setTimeIfGreater(d.nextBlockTime(thisNodeAcc))
         appenderScheduler.tickNext("appender-1")
-        minerScheduler.tickNext("miner-1")
-        appenderScheduler.tickNext("appender-2")
 
         d.lastBlockId should not be block5Id
       }
@@ -190,8 +186,6 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         log.debug("Trigger thisNode forging")
         d.testTime.setTimeIfGreater(d.nextBlockTime(thisNodeAcc))
         appenderScheduler.tickNext("appender-1")
-        minerScheduler.tickNext("miner-1")
-        appenderScheduler.tickNext("appender-2")
 
         d.lastBlock.header.generator.toAddress shouldBe thisNodeAcc.toAddress
       }
@@ -285,11 +279,10 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         log.debug("Trigger thisNode forging")
         d.testTime.setTimeIfGreater(d.nextBlockTime(thisNodeAcc))
         appenderScheduler.tickNext("appender-1")
-        minerScheduler.tickNext("miner-1")
-        appenderScheduler.tickNext("appender-2")
 
         d.lastBlockId shouldBe block3WithVotes.id() // Not changed
         minerImpl.inMemoryLog.getMessages.find(_.contains("is conflict on 4")) should not be empty
+        withClue("gave up on the tip, so no retry is scheduled: ") { appenderScheduler.state.tasks shouldBe empty }
       }
     }
 
@@ -335,10 +328,9 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         log.debug("Trigger thisNode forging")
         d.testTime.setTimeIfGreater(d.nextBlockTime(thisNodeAcc))
         appenderScheduler.tickNext("appender-1")
-        minerScheduler.tickNext("miner-1")
-        appenderScheduler.tickNext("appender-2")
 
         d.lastBlockId shouldBe lastBlockId // Not changed
+        withClue("gave up on the tip, so no retry is scheduled: ") { appenderScheduler.state.tasks shouldBe empty }
       }
     }
   }
@@ -398,8 +390,6 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
       log.debug(s"Trigger forging block 3")
       time.setTimeIfGreater(d.nextBlockTime(generator1))
       appenderScheduler.tickNext("appender-1")
-      minerScheduler.tickNext("miner-1")
-      appenderScheduler.tickNext("appender-2")
 
       log.debug(s"Trigger forging micro block 1 of block 3, reaching finalization")
       endorsementStorage.tryAdd(
@@ -480,8 +470,6 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
       log.debug(s"Trigger forging block 3")
       time.setTimeIfGreater(d.nextBlockTime(thisNodeAcc))
       appenderScheduler.tickNext("appender-1")
-      minerScheduler.tickNext("miner-1")
-      appenderScheduler.tickNext("appender-2")
 
       log.debug(s"Trigger forging micro block 1 of block 3, reaching finalization")
       endorsementStorage.tryAdd(

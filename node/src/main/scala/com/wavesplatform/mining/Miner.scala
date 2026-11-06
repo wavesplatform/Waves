@@ -169,19 +169,19 @@ class MinerImpl(
     }
   }
 
-  /** @param referenceOpt Used only in tests
-    */
+  // The liquid tip, except that our own microblocks younger than min-micro-block-age are skipped (see application.conf)
+  private def bestReference(): ByteStr = {
+    val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
+
+    val maxMicroblockTimestampOffsetMs =
+      if (wallet.privateKeyAccount(lastBlockHeader.generator.toAddress).isRight) minMicroBlockDurationMills
+      else 0L
+
+    blockchainUpdater.bestLastBlockInfo(timeService.monotonicMillis() - maxMicroblockTimestampOffsetMs).get.blockId
+  }
+
   def forgeBlock(account: KeyPair, referenceOpt: Option[ByteStr] = None): ForgeAttemptResult = {
-    val reference = referenceOpt.getOrElse {
-      val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
-
-      val maxMicroblockTimestampOffsetMs = // See min-micro-block-age in application.conf
-        if (wallet.privateKeyAccount(lastBlockHeader.generator.toAddress).isRight) minMicroBlockDurationMills
-        else 0L
-
-      val lastBlockInfo = blockchainUpdater.bestLastBlockInfo(timeService.monotonicMillis() - maxMicroblockTimestampOffsetMs)
-      lastBlockInfo.get.blockId
-    }
+    val reference = referenceOpt.getOrElse(bestReference())
 
     val blockchain     = blockchainUpdater.referencedBlockchain(reference)
     val refBlockHeader = blockchain.lastBlockHeader.get
@@ -328,46 +328,13 @@ class MinerImpl(
           case None => Task.unit
         }
 
-        def appendTask(block: Block, totalConstraint: MiningConstraint) = // TODO: accept blockAppender instead all these dependencies?
-          BlockAppender(blockchainUpdater, timeService, utx, pos, blockEndorser, appenderScheduler)(block, None).flatMap {
-            case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
-              generateBlockTask(account, None)
-
-            case Left(err) =>
-              Task.raiseError(new RuntimeException(err.toString))
-
-            case Right(Applied(score = score)) =>
-              log.debug(s"Forged and applied $block with cumulative score $score")
-              BlockStats.mined(block, blockchainUpdater.height)
-              if (blockchainUpdater.isLastBlockId(block.id())) {
-                allChannels.broadcast(BlockForged(block))
-                if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
-              }
-              Task.unit
-
-            case Right(Ignored) =>
-              Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
-          }.uncancelable
-
         for {
           elapsed <- waitBlockAppendedTask.timed.map(_._1)
           newOffset = (offset - elapsed).max(Duration.Zero)
 
-          _      <- Task.sleep(newOffset)
-          result <- Task(forgeBlock(account)).executeOn(minerScheduler)
-
-          _ <- result match {
-            case ForgeAttemptResult.Success(block, restConstraint) =>
-              appendTask(block, restConstraint)
-
-            case ForgeAttemptResult.TemporaryFailure(err) =>
-              log.debug(s"No block generated because $err, retrying")
-              generateBlockTask(account, None)
-
-            case ForgeAttemptResult.PermanentFailure(err) =>
-              log.debug(s"No block generated because $err, stopping")
-              Task.unit
-          }
+          _ <- Task.sleep(newOffset)
+          // Cancelable until it starts, so an attempt replaced by scheduleMining does not forge
+          _ <- Task(forgeAndAppend(account)).executeOn(appenderScheduler).flatten
         } yield ()
 
       case Left(err) =>
@@ -376,6 +343,53 @@ class MinerImpl(
         Task.unit
     }
   }
+
+  // Runs on the appender, so the parent is the tip after every queued microblock (docs/notes/mining.md). Returns only the
+  // follow-up: our own append cancels this attempt, so whatever must follow it already ran here.
+  private def forgeAndAppend(account: KeyPair): Task[Unit] = {
+    val reference = bestReference()
+    forgeBlock(account, Some(reference)) match {
+      case ForgeAttemptResult.Success(block, restConstraint) =>
+        BlockAppender.appendBlock(blockchainUpdater, timeService, utx, pos, blockEndorser)(block, None) match {
+          case Right(Applied(score = score)) =>
+            announceApplied(account, block, restConstraint, score)
+            Task.unit
+          case Right(Ignored) =>
+            Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
+          case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
+            generateBlockTask(account, None)
+          case Left(err) =>
+            retryOrStop(account, reference, err.toString)(Task.raiseError(new RuntimeException(err.toString)))
+        }
+
+      case ForgeAttemptResult.TemporaryFailure(err) =>
+        log.debug(s"No block generated because $err, retrying")
+        generateBlockTask(account, None)
+
+      case ForgeAttemptResult.PermanentFailure(err) =>
+        retryOrStop(account, reference, err) {
+          log.debug(s"No block generated because $err, stopping")
+          Task.unit
+        }
+    }
+  }
+
+  private def announceApplied(account: KeyPair, block: Block, totalConstraint: MiningConstraint, score: BigInt): Unit = {
+    log.debug(s"Forged and applied $block with cumulative score $score")
+    BlockStats.mined(block, blockchainUpdater.height)
+    if (blockchainUpdater.isLastBlockId(block.id())) {
+      allChannels.broadcast(BlockForged(block))
+      if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+    }
+  }
+
+  // Off the tip, our skipped microblocks become eligible after min-micro-block-age; nothing else may reschedule mining
+  private def retryOrStop(account: KeyPair, reference: ByteStr, reason: String)(stop: => Task[Unit]): Task[Unit] =
+    if (blockchainUpdater.lastBlockId.contains(reference)) stop
+    else {
+      log.debug(s"No block generated on $reference because $reason, retrying on newer microblocks in ${minerSettings.minMicroBlockAge}")
+      Task.defer(generateBlockTask(account, None)).delayExecution(minerSettings.minMicroBlockAge)
+    }
 
   private def startMicroBlockMining(
       account: KeyPair,
