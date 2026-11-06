@@ -594,11 +594,12 @@ class BlockchainUpdaterImpl(
     result
   }
 
+  /** Validated without the write lock, like processBlock. */
   override def processMicroBlock(
       microBlock: MicroBlock,
       snapshot: Option[MicroBlockSnapshot],
       verify: Boolean = true
-  ): Either[ValidationError, BlockId] = // Validated without the write lock, see processBlock
+  ): Either[ValidationError, BlockId] =
     ngState match {
       case None =>
         Left(MicroBlockAppendError("No base block exists", microBlock))

@@ -30,8 +30,7 @@ import org.scalamock.scalatest.MockFactory
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.DurationInt
-import scala.util.Using
-import scala.util.Random
+import scala.util.{Random, Using}
 
 class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDomain with NTPTime with DBCacheSettings with MockFactory {
   import DomainPresets.*
