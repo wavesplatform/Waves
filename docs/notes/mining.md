@@ -16,10 +16,17 @@ Rules that keep this correct:
 - The task is cancelable until it starts: `scheduleMining` replaces `scheduledAttempts`, and a replaced attempt must not forge (otherwise a second wallet account forges on top of the block the first one just appended). Appending our own key block also cancels the running attempt, through `BlockchainUpdaterImpl` calling `scheduleMining`, so everything that must follow a successful append (broadcast, `startMicroBlockMining`) runs synchronously inside the task, never in a continuation.
 - Do not fix ordering problems by cancelling `microBlockAttempt` before forging. A key-block attempt can give up (`PermanentFailure`, a failed append) without rescheduling anything; the node recovers only because each microblock append calls `scheduleMining(cancelMicroBlockMining = false)` (`BlockchainUpdaterImpl.processMicroBlock`). Without microblocks nothing would schedule mining again.
 
+Checked and unchanged by the move:
+
+- `BlockFromFuture` retry: `generateBlockTask(account, None)` was already continued on `appenderScheduler` (the attempt runs there and the old append task shifted back to it); only the forge moved. A `TemporaryFailure` retries the same way, now from the appender.
+- `waitBlockAppendedTask` runs before the sleep and the forge, so where forging runs does not affect it.
+- `BlockChallenger` builds and appends challenging blocks through its own path (`BlockAppender.apply`), untouched here; our key block always has `challengedHeader = None`.
+- Finalization voting and endorsements: a key block carries `finalizationVoting = None` (votes go into microblocks, read from `EndorsementStorage` by `MicroBlockMinerImpl`), and `blockEndorser.vote` still runs inside `BlockAppender.appendBlock` after a successful append, as before.
+
 Costs and known gaps:
 
 - The appender now also computes consensus data, the light-node state hash and the signature of our key block, delaying peer appends by that much (not measured; under NG a key block has no transactions). Before NG activation it also packs UTX transactions on the appender, bounded by `micro-block-interval`.
-- An attempt fires as soon as its delay passes. If our newest microblock is younger than `min-micro-block-age`, the block is built on the previous liquid block, and if that parent does not let the account generate, the attempt gives up until the next `scheduleMining` (usually the next microblock). With forging on `minerScheduler`, TestScheduler-driven tests could hide this by ticking the miner later; see `MultipleAccountsMinerWithFinalitySuite` ("it tries again after new microblock of Account 1").
+- Not new, but now visible in tests: an attempt fires as soon as its delay passes. If our newest microblock is younger than `min-micro-block-age`, the block is built on the previous liquid block, and if that parent does not let the account generate, the attempt gives up until the next `scheduleMining` (usually the next microblock). The old code did the same in real time: with a zero offset the idle miner thread forged immediately, with the same clock and so the same parent. Only TestScheduler-driven tests hid it, by advancing the test clock between the hand-off to `minerScheduler` and the miner tick; see `MultipleAccountsMinerWithFinalitySuite` ("it tries again after new microblock of Account 1").
 - The rejected microblock of the previous sequence should be dropped quietly (our key block's append cancels `microBlockAttempt` before that microblock's append task runs), but no test drives this through `MicroBlockMinerImpl`.
 
 Driving `MinerImpl` with `TestScheduler`: a key-block attempt now completes in a single `appenderScheduler.tickNext` (sleep, forge, append), and the miner scheduler only runs microblock mining.

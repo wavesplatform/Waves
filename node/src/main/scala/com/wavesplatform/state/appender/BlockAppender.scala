@@ -42,7 +42,7 @@ object BlockAppender extends ScorexLogging {
     Task(appendBlock(blockchainUpdater, time, utxStorage, pos, blockEndorser, verify, txSignParCheck)(newBlock, snapshot)).executeOn(scheduler)
 
   /** Synchronous variant of [[apply]]; the caller must already be on the appender thread. */
-  def appendBlock(
+  private[wavesplatform] def appendBlock(
       blockchainUpdater: BlockchainUpdater & Blockchain,
       time: Time,
       utxStorage: UtxPool,

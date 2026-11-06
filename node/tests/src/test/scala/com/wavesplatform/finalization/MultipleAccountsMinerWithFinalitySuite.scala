@@ -297,6 +297,7 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
 
         // The first attempt after that microblock fails: the microblock is younger than min-micro-block-age, so the block is
         // built on the previous liquid block, where notCommittedAcc may not generate. The next microblock reschedules mining.
+        // Pins the "retry only after the next scheduleMining" gap in docs/notes/mining.md; update this if that gap is fixed.
         log.debug("Trigger next block forging - second attempt, after the next microblock of minerAcc")
         time.advance(defaultSettings.minerSettings.minMicroBlockAge)
         time.setTimeIfGreater(d.nextBlockTime(notCommittedAcc))

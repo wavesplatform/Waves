@@ -8,14 +8,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, Instrumented, *}
 import com.wavesplatform.mining.Miner.*
 import com.wavesplatform.mining.microblocks.MicroBlockMiner
 import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
-import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.BlockDiffer
@@ -330,31 +328,32 @@ class MinerImpl(
           case None => Task.unit
         }
 
-        def onAppended(block: Block, totalConstraint: MiningConstraint): Either[ValidationError, BlockApplyResult] => Task[Unit] = {
-          case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
-            generateBlockTask(account, None)
-
-          case Left(err) =>
-            Task.raiseError(new RuntimeException(err.toString))
-
-          case Right(Applied(score = score)) =>
-            log.debug(s"Forged and applied $block with cumulative score $score")
-            BlockStats.mined(block, blockchainUpdater.height)
-            if (blockchainUpdater.isLastBlockId(block.id())) {
-              allChannels.broadcast(BlockForged(block))
-              if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
-            }
-            Task.unit
-
-          case Right(Ignored) =>
-            Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
+        // Must stay a plain synchronous call: appending our block has already cancelled this attempt, so a Task here could be dropped
+        def announceApplied(block: Block, totalConstraint: MiningConstraint, score: BigInt): Unit = {
+          log.debug(s"Forged and applied $block with cumulative score $score")
+          BlockStats.mined(block, blockchainUpdater.height)
+          if (blockchainUpdater.isLastBlockId(block.id())) {
+            allChannels.broadcast(BlockForged(block))
+            if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+          }
         }
 
         // Forge and append in one appender task: the parent is then the tip after every microblock queued ahead of it,
         // and a microblock packed meanwhile is rejected instead of being orphaned by this block. See docs/notes/mining.md.
+        // Returns only the follow-up (retry or failure); everything a successful append requires has already run.
         def forgeAndAppend(): Task[Unit] = forgeBlock(account) match {
           case ForgeAttemptResult.Success(block, restConstraint) =>
-            onAppended(block, restConstraint)(BlockAppender.appendBlock(blockchainUpdater, timeService, utx, pos, blockEndorser)(block, None))
+            BlockAppender.appendBlock(blockchainUpdater, timeService, utx, pos, blockEndorser)(block, None) match {
+              case Right(Applied(score = score)) =>
+                announceApplied(block, restConstraint, score)
+                Task.unit
+              case Right(Ignored) =>
+                Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
+              case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
+                generateBlockTask(account, None)
+              case Left(err) =>
+                Task.raiseError(new RuntimeException(err.toString))
+            }
 
           case ForgeAttemptResult.TemporaryFailure(err) =>
             log.debug(s"No block generated because $err, retrying")
