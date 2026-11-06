@@ -11,7 +11,7 @@ libraryDependencies ++= Seq(
   "org.scodec"             %% "scodec-core"         % "2.3.3",
   "org.eclipse.collections" % "eclipse-collections" % "13.0.0",
   "commons-codec"           % "commons-codec"       % "1.22.1",
-  "org.apache.commons"      % "commons-lang3"       % "3.20.0"
+  "org.apache.commons"      % "commons-lang3"       % "3.21.0"
 ) ++ Dependencies.logDeps
 
 // https://github.com/ktoso/sbt-jmh#adding-to-your-project
