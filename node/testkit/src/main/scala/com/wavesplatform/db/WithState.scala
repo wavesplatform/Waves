@@ -38,40 +38,46 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxHelpers}
-import com.wavesplatform.{NTPTime, TestHelpers}
+import com.wavesplatform.NTPTime
 import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.scalatest.{Args, BeforeAndAfterAll, Status, Suite}
 
-import java.nio.file.Files
 import scala.concurrent.duration.*
 import scala.util.Using
 
 trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { suite: Suite =>
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
 
-  private val path  = Files.createTempDirectory(s"rocks-temp-${getClass.getSimpleName}").toAbsolutePath
-  protected val rdb = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
+  // ParallelTestExecution runs every test in a fresh instance whose afterAll never runs, so each instance opens its DB lazily and closes it
+  // when its own run completes
+  @volatile private var dbOpened = false
+  private lazy val tempRdb = {
+    val db = TempRDB(s"rocks-temp-${getClass.getSimpleName}", dbSettings)
+    dbOpened = true
+    db
+  }
+  protected def rdb: RDB = tempRdb.rdb
 
   private val MaxKey = Shorts.toByteArray(KeyTag.values.length.toShort)
   private val MinKey = new Array[Byte](2)
 
-  protected def tempDb[A](f: RDB => A): A = {
-    val path = Files.createTempDirectory(s"rocks-temp-tmp-${getClass.getSimpleName}").toAbsolutePath
-    val rdb  = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
-    try {
-      f(rdb)
-    } finally {
-      rdb.close()
-      TestHelpers.deleteRecursively(path)
-    }
+  protected def tempDb[A](f: RDB => A): A =
+    Using.resource(TempRDB(s"rocks-temp-tmp-${getClass.getSimpleName}", dbSettings))(db => f(db.rdb))
+
+  abstract override def run(testName: Option[String], args: Args): Status = {
+    val status =
+      try super.run(testName, args)
+      catch {
+        case e: Throwable =>
+          closeDb()
+          throw e
+      }
+    status.whenCompleted(_ => closeDb())
+    status
   }
 
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    rdb.close()
-    TestHelpers.deleteRecursively(path)
-  }
+  private def closeDb(): Unit = if (dbOpened) tempRdb.close()
 
   protected def withRocksDBWriter[A](ws: WavesSettings)(test: RocksDBWriter => A): A = {
     try {
