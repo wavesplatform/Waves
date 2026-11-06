@@ -26,6 +26,7 @@ import play.api.libs.json.*
 import play.api.libs.json.Json.parse
 
 import java.net.InetSocketAddress
+import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Awaitable, Future}
@@ -188,6 +189,19 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def lastBlock(amountsAsStrings: Boolean = false): Block = sync(async(n).lastBlock(amountsAsStrings))
 
     def blockById(id: String, amountsAsStrings: Boolean = false): Block = sync(async(n).blockById(id, amountsAsStrings))
+
+    /** /blocks/last matches the same block fetched by height and by id. Retries when a block or microblock lands between the reads. */
+    @tailrec
+    final def checkLastBlockMatchesExplicit(): Unit = {
+      val last     = lastBlock()
+      val byHeight = blockAt(Height(last.height))
+      val byId     = blockById(last.id)
+      if (lastBlock().id != last.id) checkLastBlockMatchesExplicit()
+      else {
+        byHeight shouldBe last
+        byId shouldBe last
+      }
+    }
 
     def lastBlockHeader(amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).lastBlockHeader(amountsAsStrings))
 
@@ -607,6 +621,14 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Height =
       waitForHeight(p.start, requestAwaitTime)
+
+    /** The period after the current one, read right after a period boundary. A commitment names the next period and is rejected once the
+      * chain enters it, so signing it late in the current period (a few seconds with the short node-it periods) races the boundary.
+      */
+    def nextGenerationPeriodWithMargin(): GenerationPeriod = {
+      waitForGenerationPeriod(currentGenerationPeriod.get.next)
+      currentGenerationPeriod.get.next
+    }
 
     def blacklist(address: InetSocketAddress): Unit =
       sync(async(n).blacklist(address))

@@ -118,9 +118,7 @@ class MicroBlockMinerImpl(
             .leftWiden[Throwable]
             .liftTo[Task]
           (signedBlock, microBlock) = blocks
-          blockId <- appendMicroBlock(microBlock)
-          _ = BlockStats.mined(microBlock, blockId)
-          _ <- broadcastMicroBlock(account, microBlock, blockId)
+          _ <- appendAndBroadcast(account, microBlock)
         } yield {
           if (updatedTotalConstraint.isFull) Stop
           else Success(signedBlock, updatedTotalConstraint)
@@ -142,15 +140,16 @@ class MicroBlockMinerImpl(
     }
   }
 
-  private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock, blockId: BlockId): Task[Unit] =
-    Task(if (allChannels != null) allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
-
-  private def appendMicroBlock(microBlock: MicroBlock): Task[BlockId] =
-    MicroblockAppender(blockchainUpdater, utx, appenderScheduler)(microBlock, None)
-      .flatMap {
-        case Left(err) => Task.raiseError(MicroBlockAppendError(microBlock, err))
-        case Right(v)  => Task.now(v)
+  // Broadcast in the append step itself: a cancellation (a key block applied right after) cannot drop the inv of a microblock that was
+  // appended, and peers get the inv before anything the appender processes next, such as our own key block on top of it.
+  private def appendAndBroadcast(account: KeyPair, microBlock: MicroBlock): Task[BlockId] =
+    MicroblockAppender
+      .appendThen(blockchainUpdater, utx, appenderScheduler)(microBlock, None) { blockId =>
+        BlockStats.mined(microBlock, blockId)
+        if (allChannels != null) allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference))
+        blockId
       }
+      .flatMap(_.leftMap(MicroBlockAppendError(microBlock, _)).liftTo[Task])
 
   private def forgeBlocks(
       account: KeyPair,

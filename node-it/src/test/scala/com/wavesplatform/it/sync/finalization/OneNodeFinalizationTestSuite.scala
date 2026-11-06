@@ -39,7 +39,7 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     log.warn(s"M2=$miner2Addr, M3=$miner3Addr")
 
     step("Commit to generation")
-    val period1 = node.currentGenerationPeriod.value.next
+    val period1 = node.nextGenerationPeriodWithMargin()
 
     val commitTxn1 = node.signCommitToGenerationRequest(miner1Addr)
     commitTxn1.generationPeriodStart.value shouldBe period1.start.toInt
@@ -62,8 +62,9 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     }
 
     step("Finalized height checks")
-    val finalizedHeight1       = node.finalizedHeight
-    val waitingFinalizedHeight = finalizedHeight1 + 2
+    val finalizedHeight1 = node.finalizedHeight
+    // The committed generators vote from the start of their period, and votes in a block finalize its parent
+    val waitingFinalizedHeight = period1.start - 1
 
     withClue("Finalized height is unknown: ") {
       try node.finalizedHeightAt(node.height)
