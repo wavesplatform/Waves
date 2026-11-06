@@ -169,19 +169,19 @@ class MinerImpl(
     }
   }
 
-  /** @param referenceOpt Used only in tests
-    */
+  // The liquid tip, except that our own microblocks younger than min-micro-block-age are skipped (see application.conf)
+  private def bestReference(): ByteStr = {
+    val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
+
+    val maxMicroblockTimestampOffsetMs =
+      if (wallet.privateKeyAccount(lastBlockHeader.generator.toAddress).isRight) minMicroBlockDurationMills
+      else 0L
+
+    blockchainUpdater.bestLastBlockInfo(timeService.monotonicMillis() - maxMicroblockTimestampOffsetMs).get.blockId
+  }
+
   def forgeBlock(account: KeyPair, referenceOpt: Option[ByteStr] = None): ForgeAttemptResult = {
-    val reference = referenceOpt.getOrElse {
-      val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
-
-      val maxMicroblockTimestampOffsetMs = // See min-micro-block-age in application.conf
-        if (wallet.privateKeyAccount(lastBlockHeader.generator.toAddress).isRight) minMicroBlockDurationMills
-        else 0L
-
-      val lastBlockInfo = blockchainUpdater.bestLastBlockInfo(timeService.monotonicMillis() - maxMicroblockTimestampOffsetMs)
-      lastBlockInfo.get.blockId
-    }
+    val reference = referenceOpt.getOrElse(bestReference())
 
     val blockchain     = blockchainUpdater.referencedBlockchain(reference)
     val refBlockHeader = blockchain.lastBlockHeader.get
@@ -341,27 +341,42 @@ class MinerImpl(
         // Forge and append in one appender task: the parent is then the tip after every microblock queued ahead of it,
         // and a microblock packed meanwhile is rejected instead of being orphaned by this block. See docs/notes/mining.md.
         // Returns only the follow-up (retry or failure); everything a successful append requires has already run.
-        def forgeAndAppend(): Task[Unit] = forgeBlock(account) match {
-          case ForgeAttemptResult.Success(block, restConstraint) =>
-            BlockAppender.appendBlock(blockchainUpdater, timeService, utx, pos, blockEndorser)(block, None) match {
-              case Right(Applied(score = score)) =>
-                announceApplied(block, restConstraint, score)
-                Task.unit
-              case Right(Ignored) =>
-                Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
-              case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
-                generateBlockTask(account, None)
-              case Left(err) =>
-                Task.raiseError(new RuntimeException(err.toString))
+        def forgeAndAppend(): Task[Unit] = {
+          val reference = bestReference()
+
+          // Giving up on the tip is final until the next scheduleMining. Giving up on an older parent means our newer microblocks
+          // were too young to build on; they are old enough after min-micro-block-age, and no other event may reschedule mining.
+          def giveUp(reason: String)(stop: => Task[Unit]): Task[Unit] =
+            if (blockchainUpdater.lastBlockId.contains(reference)) stop
+            else {
+              log.debug(s"No block generated on $reference because $reason, retrying on newer microblocks in ${minerSettings.minMicroBlockAge}")
+              Task.defer(generateBlockTask(account, None)).delayExecution(minerSettings.minMicroBlockAge)
             }
 
-          case ForgeAttemptResult.TemporaryFailure(err) =>
-            log.debug(s"No block generated because $err, retrying")
-            generateBlockTask(account, None)
+          forgeBlock(account, Some(reference)) match {
+            case ForgeAttemptResult.Success(block, restConstraint) =>
+              BlockAppender.appendBlock(blockchainUpdater, timeService, utx, pos, blockEndorser)(block, None) match {
+                case Right(Applied(score = score)) =>
+                  announceApplied(block, restConstraint, score)
+                  Task.unit
+                case Right(Ignored) =>
+                  Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
+                case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
+                  generateBlockTask(account, None)
+                case Left(err) =>
+                  giveUp(err.toString)(Task.raiseError(new RuntimeException(err.toString)))
+              }
 
-          case ForgeAttemptResult.PermanentFailure(err) =>
-            log.debug(s"No block generated because $err, stopping")
-            Task.unit
+            case ForgeAttemptResult.TemporaryFailure(err) =>
+              log.debug(s"No block generated because $err, retrying")
+              generateBlockTask(account, None)
+
+            case ForgeAttemptResult.PermanentFailure(err) =>
+              giveUp(err) {
+                log.debug(s"No block generated because $err, stopping")
+                Task.unit
+              }
+          }
         }
 
         for {

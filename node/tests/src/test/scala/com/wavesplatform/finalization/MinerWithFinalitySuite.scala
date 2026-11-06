@@ -282,6 +282,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
 
         d.lastBlockId shouldBe block3WithVotes.id() // Not changed
         minerImpl.inMemoryLog.getMessages.find(_.contains("is conflict on 4")) should not be empty
+        withClue("gave up on the tip, so no retry is scheduled: ") { appenderScheduler.state.tasks shouldBe empty }
       }
     }
 
@@ -329,6 +330,7 @@ class MinerWithFinalitySuite extends BaseFinalizationSpec, TestSchedulerOps {
         appenderScheduler.tickNext("appender-1")
 
         d.lastBlockId shouldBe lastBlockId // Not changed
+        withClue("gave up on the tip, so no retry is scheduled: ") { appenderScheduler.state.tasks shouldBe empty }
       }
     }
   }

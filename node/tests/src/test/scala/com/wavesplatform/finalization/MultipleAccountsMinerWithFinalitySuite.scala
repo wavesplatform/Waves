@@ -296,14 +296,11 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
         }
 
         // The first attempt after that microblock fails: the microblock is younger than min-micro-block-age, so the block is
-        // built on the previous liquid block, where notCommittedAcc may not generate. The next microblock reschedules mining.
-        // Pins the "retry only after the next scheduleMining" gap in docs/notes/mining.md; update this if that gap is fixed.
-        log.debug("Trigger next block forging - second attempt, after the next microblock of minerAcc")
+        // built on the previous liquid block, where notCommittedAcc may not generate. Having skipped a newer microblock, the
+        // attempt retries once that microblock is old enough, with no further microblock needed to reschedule it.
+        log.debug("Trigger next block forging - second attempt, once the microblock is old enough")
         time.advance(defaultSettings.minerSettings.minMicroBlockAge)
         time.setTimeIfGreater(d.nextBlockTime(notCommittedAcc))
-        d.utxPool.putIfNew(TxHelpers.transfer(notCommittedAcc, otherNodeAcc2Addr))
-        minerScheduler.tickNext("miner-7")
-        minerScheduler.tickNext("miner-8", failIfNoTasks = false) // Waits out microBlockInterval unless it has already passed
         appenderScheduler.tickNext("appender-7")
         withClue("Not committed forged: ") {
           d.lastBlock.header.generator.toAddress shouldBe notCommittedAcc.toAddress
