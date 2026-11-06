@@ -5,7 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.consensus.NxtPoSCalculator
+import com.wavesplatform.consensus.FairPoSCalculator
 import com.wavesplatform.consensus.PoSCalculator.hit
 import com.wavesplatform.crypto
 import com.wavesplatform.features.api.NodeFeatureStatus
@@ -58,8 +58,10 @@ class DuplicateFeatureVotesRollbackSuite extends BaseFreeSpec with ActivationSta
   private def featureVotesAt(h: Height): Seq[Short] =
     (Json.parse(node.get(s"/blocks/headers/at/$h").getResponseBody) \ "features").asOpt[Seq[Short]].getOrElse(Seq.empty)
 
-  /** Mirrors the checks in PoSSelector: FairPoS is not activated, so NxtPoSCalculator is used, and BlockV5 is pre-activated, so blocks have VRF */
+  /** Mirrors the checks in PoSSelector: FairPoS and BlockV5 are pre-activated, so the calculator comes from the settings and blocks have VRF */
   private def forgeBlock(featureVotes: Seq[Short]): Block = {
+    val posCalculator = FairPoSCalculator.fromSettings(node.settings.blockchainSettings.functionalitySettings)
+
     val parentHeight = node.height
     val parent       = node.blockHeaderAt(parentHeight)
     val greatGrandParentTs =
@@ -70,10 +72,10 @@ class DuplicateFeatureVotesRollbackSuite extends BaseFreeSpec with ActivationSta
 
     val generationSignature = crypto.signVRF(signer.privateKey, parentHitSource.arr)
     val hitSource           = crypto.verifyVRF(generationSignature, parentHitSource.arr, signer.publicKey).explicitGet()
-    val minTimestamp        = parent.timestamp + NxtPoSCalculator.calculateDelay(hit(hitSource.arr), parentBaseTarget, signerBalance)
+    val minTimestamp        = parent.timestamp + posCalculator.calculateDelay(hit(hitSource.arr), parentBaseTarget, signerBalance)
     val timestamp           = math.max(minTimestamp, System.currentTimeMillis())
 
-    val baseTarget = NxtPoSCalculator.calculateBaseTarget(
+    val baseTarget = posCalculator.calculateBaseTarget(
       node.settings.blockchainSettings.genesisSettings.averageBlockDelay.toSeconds,
       parentHeight.toInt,
       parentBaseTarget,

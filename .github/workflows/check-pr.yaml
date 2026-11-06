@@ -123,15 +123,15 @@ jobs:
     name: ${{ matrix.name }}
     # needs: check-pr
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
     strategy:
       # A failing entry must not cancel the others and throw away their results.
       fail-fast: false
       matrix:
         include:
-          - { name: 'Run integration tests (1/3)', id: '1', sbt: '-Dwaves.it.max-parallel-suites=4 -Dwaves.it.shard=1/3', task: integrationTests }
-          - { name: 'Run integration tests (2/3)', id: '2', sbt: '-Dwaves.it.max-parallel-suites=4 -Dwaves.it.shard=2/3', task: integrationTests }
-          - { name: 'Run integration tests (3/3)', id: '3', sbt: '-Dwaves.it.max-parallel-suites=4 -Dwaves.it.shard=3/3', task: integrationTests }
+          - { name: 'Run integration tests (1/3)', id: '1', sbt: '-Dwaves.it.max-parallel-suites=3 -Dwaves.it.shard=1/3', task: integrationTests }
+          - { name: 'Run integration tests (2/3)', id: '2', sbt: '-Dwaves.it.max-parallel-suites=3 -Dwaves.it.shard=2/3', task: integrationTests }
+          - { name: 'Run integration tests (3/3)', id: '3', sbt: '-Dwaves.it.max-parallel-suites=3 -Dwaves.it.shard=3/3', task: integrationTests }
           - { name: 'Run load tests', id: 'load', sbt: '-Dwaves.it.max-parallel-suites=1', task: loadTests }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -147,7 +147,9 @@ jobs:
           mkdir -p target/out/jvm/u/node-it/logs/$RUN_ID
           (while sleep 5; do echo "$(date +%T) $(head -1 /proc/pressure/cpu 2>/dev/null || echo no-psi) load=$(cut -d' ' -f1 /proc/loadavg)"; done) > target/out/jvm/u/node-it/logs/$RUN_ID/cpu.log &
           vmstat -t 5 > target/out/jvm/u/node-it/logs/$RUN_ID/vmstat.log &
-          sbt --server ${{ matrix.sbt }} --batch "node-it/docker;node-it/${{ matrix.task }}"
+          # exec: a cancel signals only the step's own process, and bash does not pass it on to a foreground child,
+          # so sbt and its forked suites ran on until the runner's orphan cleanup at the end of the job.
+          exec sbt --server ${{ matrix.sbt }} --batch "node-it/docker;node-it/${{ matrix.task }}"
         env:
           RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}-${{ matrix.id }}
       - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3

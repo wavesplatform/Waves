@@ -771,7 +771,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     import com.wavesplatform.it.api.AsyncHttpApi.NodesAsyncHttpApi as async
 
-    private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
+    // Was 8 * average-block-delay; pinned when template.conf lowered that to 4s, which a small-stake miner can exceed per block
+    private val TxInBlockchainAwaitTime = 80.seconds
     private val ConditionAwaitTime      = 5.minutes
 
     private def withTxIdMessage[T](transactionId: String)(f: => T): T =

@@ -87,7 +87,7 @@ object PreActivatedFeaturesTestSuite {
                                                                 |        5 = 100
                                                                 |        6 = 100
                                                                 |        7 = 100
-                                                                |        8 = 100
+                                                                |        8 = 0 # As in template.conf, which the other node uses: nodes must agree on the PoS calculator
                                                                 |        9 = 100
                                                                 |        10 = 100
                                                                 |        11 = 100

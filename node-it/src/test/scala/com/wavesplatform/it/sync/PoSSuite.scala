@@ -350,8 +350,11 @@ class PoSSuite extends BaseFunSuite {
       else
         crypto.verifyVRF(genSig, lastBlockVRF.getOrElse(lastBlockCData.generationSignature).arr, signerPK.publicKey).explicitGet()
 
-    val posCalculator = FairPoSCalculator.V1
-    val version       = if (height + 1 < vrfActivationHeight) 3.toByte else 5.toByte
+    // Mirrors PoSSelector: V1 until VRF activates, then the calculator from the node's settings
+    val posCalculator =
+      if (height >= vrfActivationHeight) FairPoSCalculator.fromSettings(nodes.head.settings.blockchainSettings.functionalitySettings)
+      else FairPoSCalculator.V1
+    val version = if (height + 1 < vrfActivationHeight) 3.toByte else 5.toByte
 
     val validBlockDelay: Long = updateDelay(
       posCalculator
@@ -365,7 +368,7 @@ class PoSSuite extends BaseFunSuite {
     val baseTarget: Long = updateBaseTarget(
       posCalculator
         .calculateBaseTarget(
-          10,
+          nodes.head.settings.blockchainSettings.genesisSettings.averageBlockDelay.toSeconds,
           height.toInt,
           lastBlockCData.baseTarget,
           lastBlockTS,
