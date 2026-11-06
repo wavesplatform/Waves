@@ -366,11 +366,6 @@ object InvokeDiffsCommon {
   private def checkDataEntries(blockchain: Blockchain, tx: InvokeScriptLike, dataEntries: Seq[DataEntry[?]], stdLibVersion: StdLibVersion) =
     for {
       _ <- Either.cond(
-        dataEntries.length <= ContractLimits.MaxWriteSetSize,
-        (),
-        s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
-      )
-      _ <- Either.cond(
         tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
         (), {
           val versionInfo = tx.root match {
@@ -752,6 +747,32 @@ object InvokeDiffsCommon {
         )
       case Success(s) => s
     }
+
+  def checkRootCallResultLimits(
+      version: StdLibVersion,
+      blockchain: Blockchain,
+      usedComplexity: Long,
+      log: Log[Id],
+      actions: List[CallableAction],
+      availableActions: ActionLimits
+  ): TracedResult[ValidationError, Unit] = {
+    val dataEntries         = actions.collect { case d: DataOp => dataItemToEntry(d) }
+    val dataCount           = dataEntries.length
+    val balanceActionsCount = actions.count { case _: AssetTransfer | _: Lease | _: LeaseCancel => true; case _ => false }
+    checkCallResultLimits(
+      version,
+      version,
+      blockchain,
+      usedComplexity,
+      log,
+      actions.length - dataCount,
+      balanceActionsCount,
+      actions.length - dataCount - balanceActionsCount,
+      dataCount,
+      DataTxValidator.invokeWriteSetSize(blockchain, dataEntries),
+      availableActions
+    )
+  }
 
   def checkCallResultLimits(
       currentVersion: StdLibVersion,
