@@ -8,11 +8,10 @@ import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.utils.ScorexLogging
-import org.scalatest.OptionValues
 
 import scala.concurrent.duration.DurationInt
 
-class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLogging {
+class TwoNodesFinalizationTestSuite extends BaseFreeSpec, ScorexLogging {
   import NodeConfigs.*
   override protected def nodeConfigs: Seq[Config] =
     Seq(Miners.head, Miners(3)).map(
@@ -33,7 +32,7 @@ class TwoNodesFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLo
     // node2's pool while node1 mines the rest of the current period, and expire once the next one starts.
     node1.waitForPeers(1)
     node2.waitForPeers(1)
-    val period1 = node1.currentGenerationPeriod.value.next
+    val period1 = node1.nextGenerationPeriodWithMargin()
 
     step("Commit to generation")
     val commitTxn1 = node1.signCommitToGenerationRequest(miner1Addr)

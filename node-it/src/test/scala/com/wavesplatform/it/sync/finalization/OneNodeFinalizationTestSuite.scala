@@ -39,7 +39,7 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     log.warn(s"M2=$miner2Addr, M3=$miner3Addr")
 
     step("Commit to generation")
-    val period1 = node.currentGenerationPeriod.value.next
+    val period1 = node.nextGenerationPeriodWithMargin()
 
     val commitTxn1 = node.signCommitToGenerationRequest(miner1Addr)
     commitTxn1.generationPeriodStart.value shouldBe period1.start.toInt

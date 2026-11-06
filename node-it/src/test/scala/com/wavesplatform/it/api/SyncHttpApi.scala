@@ -608,6 +608,14 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Height =
       waitForHeight(p.start, requestAwaitTime)
 
+    /** The period after the current one, read right after a period boundary. A commitment names the next period and is rejected once the
+      * chain enters it, so signing it late in the current period (a few seconds with the short node-it periods) races the boundary.
+      */
+    def nextGenerationPeriodWithMargin(): GenerationPeriod = {
+      waitForGenerationPeriod(currentGenerationPeriod.get.next)
+      currentGenerationPeriod.get.next
+    }
+
     def blacklist(address: InetSocketAddress): Unit =
       sync(async(n).blacklist(address))
 
