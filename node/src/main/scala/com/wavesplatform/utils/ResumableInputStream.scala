@@ -1,6 +1,7 @@
 package com.wavesplatform.utils
 
 import java.io.{EOFException, IOException, InputStream}
+import java.net.{HttpURLConnection, URL}
 import scala.annotation.tailrec
 import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
@@ -58,5 +59,26 @@ final class ResumableInputStream(
   override def close(): Unit = {
     closed = true
     closeCurrent()
+  }
+}
+
+object ResumableInputStream {
+
+  /** Opens `url` from `offset`; the announced length lets the stream tell a dropped connection from the end of the file. */
+  def openHttp(url: URL, timeout: FiniteDuration)(offset: Long): (InputStream, Option[Long]) = {
+    val connection = url.openConnection().asInstanceOf[HttpURLConnection]
+    connection.setConnectTimeout(timeout.toMillis.toInt)
+    connection.setReadTimeout(timeout.toMillis.toInt)
+    if (offset > 0) connection.setRequestProperty("Range", s"bytes=$offset-")
+    val in = connection.getInputStream
+    // A server that ignores Range sends the file from the start; reading on would feed misaligned bytes to the caller.
+    val contentRange = Option(connection.getHeaderField("Content-Range"))
+    if (offset > 0 && (connection.getResponseCode != HttpURLConnection.HTTP_PARTIAL || !contentRange.exists(_.startsWith(s"bytes $offset-")))) {
+      in.close()
+      throw new IllegalStateException(
+        s"$url did not honour Range: bytes=$offset- (status ${connection.getResponseCode}, Content-Range ${contentRange.getOrElse("absent")})"
+      )
+    }
+    in -> Some(connection.getContentLengthLong).filter(_ >= 0)
   }
 }
