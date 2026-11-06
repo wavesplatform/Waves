@@ -7,12 +7,14 @@ import com.wavesplatform.api.http.utils.{UtilsApiRoute, UtilsInvocationRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.directives.values.{V4, V5, V6}
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.ContractLimits.MaxWriteSetSize
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.state.IntegerDataEntry
+import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.DomainPresets.{RideV5, RideV6}
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -1037,6 +1039,60 @@ class UtilsRouteEvaluateSpec extends RouteSpec("/utils"), RestAPISettingsHelper,
         ) ~> route ~> check {
           (responseAs[JsObject] \ "payment" \ 0 \ "amount").as[Int] shouldBe 99
           (responseAs[JsObject] \ "message").as[String] should include("negative waves balance")
+        }
+      }
+    }
+
+    "root call data entry limits match the chain" in {
+      val thirdAddress = signer(2).toAddress
+      // V3 is left out: evaluate rejects every V3 WriteSet result (constructor args check); the chain side is in InvokeScriptTransactionDiffTest
+      for (version <- Seq(V4, V5, V6)) withClue(s"$version: ") {
+        withDomain(RideV6, Seq(AddrWithBalance(secondAddress, 1 waves), AddrWithBalance(thirdAddress, 1 waves))) { d =>
+          val route                           = seal(utilsApi.copy(blockchain = d.blockchain).route)
+          def entries(prefix: String, n: Int) = (1 to n).map(i => s"""IntegerEntry("$prefix$i", $i)""").mkString("[", ", ", "]")
+          val half                            = MaxWriteSetSize / 2 + 10
+          // sync calls exist since V5
+          val withSyncCalls = version >= V5
+          val callee = TestCompiler(version).compileContract(
+            s"""
+               | @Callable(i)
+               | func write() = ${entries("callee", half)}
+               |
+               | @Callable(i)
+               | func writeOverLimit() = ${entries("callee", MaxWriteSetSize + 1)}
+             """.stripMargin
+          )
+          def syncCall(function: String, rootEntries: Int) =
+            s"""
+               | @Callable(i)
+               | func $function() = {
+               |   strict r = Address(base58'$thirdAddress').invoke("${if (rootEntries > 0) "write" else "writeOverLimit"}", [], [])
+               |   ${entries("k", rootEntries)}
+               | }
+             """.stripMargin
+          val dApp = TestCompiler(version).compileContract(
+            s"""
+               | @Callable(i)
+               | func atLimit() = ${entries("k", MaxWriteSetSize)}
+               |
+               | @Callable(i)
+               | func overLimit() = ${entries("k", MaxWriteSetSize + 1)}
+               |
+               | ${if (withSyncCalls) syncCall("overLimitAcrossSyncCall", half) + syncCall("overLimitInSyncCall", 0) else ""}
+             """.stripMargin
+          )
+          d.appendBlock(setScript(secondSigner, dApp, fee = 0.1 waves), setScript(signer(2), callee, fee = 0.1 waves))
+
+          Post(routePath(s"/script/evaluate/$secondAddress"), Json.obj("expr" -> "atLimit()")) ~> route ~> check {
+            (responseAs[JsValue] \ "error").toOption shouldBe empty
+          }
+          val overLimitCalls = Seq("overLimit") ++ (if (withSyncCalls) Seq("overLimitAcrossSyncCall", "overLimitInSyncCall") else Nil)
+          for (call <- overLimitCalls) withClue(s"$call: ") {
+            d.transactionDiffer(invoke(secondAddress, Some(call))).resultE should produceRejectOrFailedDiff("Stored data count limit is exceeded")
+            Post(routePath(s"/script/evaluate/$secondAddress"), Json.obj("expr" -> s"$call()")) ~> route ~> check {
+              responseAs[String] should include("Stored data count limit is exceeded")
+            }
+          }
         }
       }
     }
