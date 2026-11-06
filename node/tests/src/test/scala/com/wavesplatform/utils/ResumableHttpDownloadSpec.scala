@@ -95,4 +95,26 @@ class ResumableHttpDownloadSpec extends FreeSpec {
     the[IllegalStateException] thrownBy download(url) should have message s"$url: HTTP 404"
     requests().size shouldBe 1
   }
+
+  "retries a server error" in withServer { case (0, exchange, _) =>
+    exchange.sendResponseHeaders(503, -1)
+  } { (url, requests) =>
+    download(url) shouldBe data
+    requests().size shouldBe 2
+  }
+
+  "fails when the file was replaced between connections, using the ETag of the first response" in withServer {
+    case (0, exchange, offset) => serve(exchange, offset, limit = 30_000)
+    case (_, exchange, offset) => serve(exchange, offset, File(data.reverse, Some("\"v2\"")))
+  } { (url, requests) =>
+    the[IllegalStateException] thrownBy download(url) should have message s"""$url changed since the download started ("v1" -> "v2")"""
+    requests().map(_.ifRange) shouldBe Seq(None, Some("\"v1\""))
+  }
+
+  "fails when the file was replaced between connections by one of a different size" in withServer {
+    case (0, exchange, offset) => serve(exchange, offset, File(data, None), limit = 30_000)
+    case (_, exchange, offset) => serve(exchange, offset, File(data ++ data, None))
+  } { (url, _) =>
+    the[IllegalStateException] thrownBy download(url) should have message s"$url changed size from 100000 to 200000 bytes"
+  }
 }

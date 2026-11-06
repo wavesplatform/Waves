@@ -4,6 +4,7 @@ import java.io.{EOFException, IOException, InputStream}
 import java.net.{HttpURLConnection, URL}
 import scala.annotation.tailrec
 import scala.concurrent.duration.FiniteDuration
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 /** Reopens the source at the last delivered byte when a read fails, so a long download survives a dropped connection. */
@@ -64,24 +65,52 @@ final class ResumableInputStream(
 
 object ResumableInputStream {
 
-  /** Opens `url` from `offset`; the announced length lets the stream tell a dropped connection from the end of the file. */
-  def openHttp(url: URL, timeout: FiniteDuration)(offset: Long): (InputStream, Option[Long]) = {
-    val connection = url.openConnection().asInstanceOf[HttpURLConnection]
-    connection.setConnectTimeout(timeout.toMillis.toInt)
-    connection.setReadTimeout(timeout.toMillis.toInt)
-    if (offset > 0) connection.setRequestProperty("Range", s"bytes=$offset-")
-    val status = connection.getResponseCode
-    // A client error other than a timeout or throttling will not go away on retry.
-    if (status >= 400 && status < 500 && status != 408 && status != 429) throw new IllegalStateException(s"$url: HTTP $status")
-    val in = connection.getInputStream
-    // A server that ignores Range sends the file from the start; reading on would feed misaligned bytes to the caller.
-    val contentRange = Option(connection.getHeaderField("Content-Range"))
-    if (offset > 0 && (connection.getResponseCode != HttpURLConnection.HTTP_PARTIAL || !contentRange.exists(_.startsWith(s"bytes $offset-")))) {
-      in.close()
-      throw new IllegalStateException(
-        s"$url did not honour Range: bytes=$offset- (status ${connection.getResponseCode}, Content-Range ${contentRange.getOrElse("absent")})"
-      )
+  /** Opens `url` from a given offset. The first response fixes the file's validator and size, so a resume cannot splice in a different file. */
+  def openHttp(url: URL, timeout: FiniteDuration): Long => (InputStream, Option[Long]) = {
+    var validator: Option[String] = None
+    var fileSize: Option[Long]    = None
+
+    offset => {
+      val connection = url.openConnection().asInstanceOf[HttpURLConnection]
+      connection.setConnectTimeout(timeout.toMillis.toInt)
+      connection.setReadTimeout(timeout.toMillis.toInt)
+      if (offset > 0) {
+        connection.setRequestProperty("Range", s"bytes=$offset-")
+        validator.foreach(connection.setRequestProperty("If-Range", _))
+      }
+      val status = connection.getResponseCode
+      // A client error other than a timeout or throttling will not go away on retry.
+      if (status >= 400 && status < 500 && status != 408 && status != 429) throw new IllegalStateException(s"$url: HTTP $status")
+      val in = connection.getInputStream
+      try {
+        val contentRange = Option(connection.getHeaderField("Content-Range"))
+        // A server that ignores Range, or whose file no longer matches If-Range, sends the file from the start.
+        val responseValidator = strongValidator(connection)
+        if (offset > 0 && (status != HttpURLConnection.HTTP_PARTIAL || !contentRange.exists(_.startsWith(s"bytes $offset-"))))
+          throw new IllegalStateException(
+            if (validator.isDefined && responseValidator != validator)
+              s"$url changed since the download started (${validator.get} -> ${responseValidator.getOrElse("none")})"
+            else s"$url did not honour Range: bytes=$offset- (status $status, Content-Range ${contentRange.getOrElse("absent")})"
+          )
+
+        val length = Some(connection.getContentLengthLong).filter(_ >= 0)
+        val size   = if (offset > 0) contentRange.flatMap(_.split('/').lastOption).flatMap(_.toLongOption) else length
+        (fileSize, size) match {
+          case (Some(expected), Some(actual)) if expected != actual => throw new IllegalStateException(s"$url changed size from $expected to $actual bytes")
+          case _                                                    => if (fileSize.isEmpty) fileSize = size
+        }
+        if (validator.isEmpty) validator = responseValidator
+
+        in -> length
+      } catch {
+        case NonFatal(e) =>
+          in.close()
+          throw e
+      }
     }
-    in -> Some(connection.getContentLengthLong).filter(_ >= 0)
   }
+
+  // If-Range only accepts a strong validator.
+  private def strongValidator(connection: HttpURLConnection): Option[String] =
+    Option(connection.getHeaderField("ETag")).filterNot(_.startsWith("W/")).orElse(Option(connection.getHeaderField("Last-Modified")))
 }
