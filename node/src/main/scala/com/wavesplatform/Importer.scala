@@ -277,7 +277,7 @@ object Importer extends ScorexLogging {
           } else {
             if (factReadBlockSize != blockSize)
               log.info(s"$factReadBlockSize != expected $blockSize for blocks")
-            if (factReadSnapshotsSize == snapshotsSize)
+            if (factReadSnapshotsSize != snapshotsSize)
               log.info(s"$factReadSnapshotsSize != expected $snapshotsSize for snapshots")
 
             quit = true
