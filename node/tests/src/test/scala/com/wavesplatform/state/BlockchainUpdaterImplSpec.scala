@@ -1,10 +1,13 @@
 package com.wavesplatform.state
 
 import com.google.common.primitives.Longs
+import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.database.{RocksDBWriter, loadActiveLeases}
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
@@ -24,7 +27,10 @@ import com.wavesplatform.{EitherMatchers, NTPTime}
 import monix.execution.Scheduler.Implicits.global
 import org.scalamock.scalatest.MockFactory
 
+import java.util.concurrent.{CountDownLatch, TimeUnit}
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.DurationInt
+import scala.util.Using
 import scala.util.Random
 
 class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDomain with NTPTime with DBCacheSettings with MockFactory {
@@ -313,6 +319,63 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
       appender(betterBlock).runSyncUnsafe(1.minute) should beRight
       d.lastBlock shouldBe betterBlock
       scheduler.shutdown()
+    }
+  }
+
+  "readers are not blocked while a block is validated" in withValidationGate { (bcu, gate) =>
+    val master      = TxHelpers.signer(1)
+    val genesis     = TxHelpers.genesis(master.toAddress, timestamp = 0)
+    val (block1, _) = chainBaseAndMicro(randomSig, genesis, Seq.empty)
+    val (block2, _) = chainBaseAndMicro(block1.id(), createTransfer(master, TxHelpers.signer(2).toAddress, 1), Seq.empty)
+
+    bcu.processBlock(block1) should beRight
+
+    gate.whileValidating(bcu.processBlock(block2)) {
+      Await.result(Future(bcu.height), 5.seconds) shouldBe 1
+    } should beRight
+    bcu.height shouldBe 2
+  }
+
+  /** Blocks the appending thread inside validation (BlockDiffer warms the caches before diffing transactions) until the body completes. */
+  private final class ValidationGate {
+    @volatile private var latches = Option.empty[(CountDownLatch, CountDownLatch)]
+
+    def await(): Unit = latches.foreach { case (entered, release) =>
+      latches = None
+      entered.countDown()
+      release.await()
+    }
+
+    def whileValidating[A](append: => A)(body: => Unit): A = {
+      val entered = new CountDownLatch(1)
+      val release = new CountDownLatch(1)
+      latches = Some(entered -> release)
+      val result = Future(append)
+      try {
+        entered.await(10, TimeUnit.SECONDS) shouldBe true
+        body
+      } finally release.countDown()
+      Await.result(result, 10.seconds)
+    }
+  }
+
+  private def withValidationGate(test: (BlockchainUpdaterImpl, ValidationGate) => Unit): Unit = tempDb { rdb =>
+    val settings = NG
+    val gate     = new ValidationGate
+    val writer = new RocksDBWriter(
+      rdb,
+      settings.blockchainSettings,
+      settings.dbSettings,
+      settings.enableLightMode,
+      MoreExecutors.newDirectExecutorService()
+    ) {
+      override def loadCacheData(addresses: Set[Address], orders: Set[ByteStr]): Unit = {
+        gate.await()
+        super.loadCacheData(addresses, orders)
+      }
+    }
+    Using.resource(writer) { w =>
+      test(new BlockchainUpdaterImpl(w, settings, ntpTime, BlockchainUpdateTriggers.noop, loadActiveLeases(rdb, _, _)), gate)
     }
   }
 }
