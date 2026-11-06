@@ -30,19 +30,20 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     )
 
   test("successful applying to the state") {
-    val id        = sender.invokeExpression(firstKeyPair, expr, waitForTx = true)._1.id
-    val lastBlock = sender.lastBlock()
+    val id = sender.invokeExpression(firstKeyPair, expr, waitForTx = true)._1.id
+    // Not lastBlock: a key block can land between the wait and the read
+    val block = sender.blockAt(Height(sender.transactionInfo[TransactionInfo](id).height))
 
-    val txFromLastBlock         = lastBlock.transactions.find(_.id == id).get
-    val txFromBlockByHeight     = sender.blockAt(Height(lastBlock.height)).transactions.find(_.id == id).get
-    val txFromBlockById         = sender.blockById(lastBlock.id).transactions.find(_.id == id).get
+    val txFromBlockByHeight     = block.transactions.find(_.id == id).get
+    val txFromBlockById         = sender.blockById(block.id).transactions.find(_.id == id).get
     val txFromBlockSeq          = sender.blockSeq(Height(1), Height(100)).flatMap(_.transactions).find(_.id == id).get
     val txFromBlockSeqByAddress = sender.blockSeqByAddress(sender.address, Height(1), Height(100)).flatMap(_.transactions).find(_.id == id).get
-    List(txFromLastBlock, txFromBlockByHeight, txFromBlockById, txFromBlockSeq, txFromBlockSeqByAddress).foreach(checkTx(_))
+    List(txFromBlockByHeight, txFromBlockById, txFromBlockSeq, txFromBlockSeqByAddress).foreach(checkTx(_))
+    sender.checkLastBlockMatchesExplicit()
 
     val txFromInfoById  = sender.transactionInfo[TransactionInfo](id)
     val txFromByAddress = sender.transactionsByAddress(firstAddress, 100).find(_.id == id).get
-    List(txFromInfoById, txFromByAddress).foreach(checkTxInfo(_, lastBlock.height))
+    List(txFromInfoById, txFromByAddress).foreach(checkTxInfo(_, block.height))
 
     val stateChanges          = sender.stateChanges(id).stateChanges
     val stateChangesByAddress = sender.transactionsByAddress(firstAddress, 1).flatMap(_.stateChanges).headOption
