@@ -38,46 +38,27 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxHelpers}
-import com.wavesplatform.NTPTime
+import com.wavesplatform.{NTPTime, TestHelpers}
 import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.{Args, BeforeAndAfterAll, Status, Suite}
+import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.duration.*
 import scala.util.Using
 
-trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { suite: Suite =>
+trait WithState extends BeforeAndAfterAll with ClosesAfterRun with DBCacheSettings with Matchers with NTPTime { suite: Suite =>
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
 
-  // ParallelTestExecution runs every test in a fresh instance whose afterAll never runs, so each instance opens its DB lazily and closes it
-  // when its own run completes
-  @volatile private var dbOpened = false
-  private lazy val tempRdb = {
-    val db = TempRDB(s"rocks-temp-${getClass.getSimpleName}", dbSettings)
-    dbOpened = true
-    db
-  }
-  protected def rdb: RDB = tempRdb.rdb
+  private val tempRdb    = OnFirstUse(TempRDB(s"rocks-temp-${getClass.getSimpleName}", dbSettings))
+  protected def rdb: RDB = tempRdb.get.rdb
+
+  override protected def closeAfterRun(): Unit = TestHelpers.closeAll(() => super.closeAfterRun(), () => tempRdb.close())
 
   private val MaxKey = Shorts.toByteArray(KeyTag.values.length.toShort)
   private val MinKey = new Array[Byte](2)
 
   protected def tempDb[A](f: RDB => A): A =
     Using.resource(TempRDB(s"rocks-temp-tmp-${getClass.getSimpleName}", dbSettings))(db => f(db.rdb))
-
-  abstract override def run(testName: Option[String], args: Args): Status = {
-    val status =
-      try super.run(testName, args)
-      catch {
-        case e: Throwable =>
-          closeDb()
-          throw e
-      }
-    status.whenCompleted(_ => closeDb())
-    status
-  }
-
-  private def closeDb(): Unit = if (dbOpened) tempRdb.close()
 
   protected def withRocksDBWriter[A](ws: WavesSettings)(test: RocksDBWriter => A): A = {
     try {

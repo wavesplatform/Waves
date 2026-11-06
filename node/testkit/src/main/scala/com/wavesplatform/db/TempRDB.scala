@@ -8,9 +8,7 @@ import java.nio.file.{Files, Path}
 
 /** A RocksDB in a fresh temporary directory; closing it also deletes the directory. */
 final class TempRDB private (val path: Path, val rdb: RDB) extends AutoCloseable {
-  override def close(): Unit =
-    try rdb.close()
-    finally TestHelpers.deleteRecursively(path)
+  override def close(): Unit = TestHelpers.closeAll(() => rdb.close(), () => TestHelpers.deleteRecursively(path))
 }
 
 object TempRDB {
