@@ -60,7 +60,7 @@ A test that needs several transactions in the UTX pool before the miner packs an
 
 ## node-tests: finding why a block was rejected
 
-Tests log at `OFF` by default (`node/tests/src/test/resources/logback-test.xml`), so an append rejected inside the appender surfaces only as `Can't apply block ..., see logs` from `Domain.appendBlock`. Re-run with `-Dlogback.test.level=TRACE` and grep for the real reason.
+Tests log at `OFF` by default (`node/tests/src/test/resources/logback-test.xml`), so an append rejected inside the appender surfaces only as `Can't apply block ..., see logs` from `Domain.appendBlock`. Re-run with `sbt --server -Dlogback.test.level=TRACE --batch "node-tests/testOnly ..."` and grep for the real reason. node-tests run in a forked JVM, so `build.sbt` forwards the property into its `Test / javaOptions`; through the thin client (`sbt -D...`, `sbt --client`) it never reaches the build.
 
 ## node-it: the test JVM counts toward the miner quorum
 

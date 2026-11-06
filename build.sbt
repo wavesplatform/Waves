@@ -112,7 +112,8 @@ lazy val `node-tests` = project
     // it, leaving nothing to diagnose. A fork confines that to its own JVM and dumps its heap on OOM.
     Test / fork               := true,
     Test / testForkedParallel := true,
-    Test / javaOptions ++= {
+    // Uncached: the forwarded -Dlogback.test.level is read from sbt's own JVM, which the action cache does not track
+    Test / javaOptions ++= Def.uncached {
       val root = (ThisBuild / baseDirectory).value
       Seq(
         "-Xmx4g",
@@ -124,7 +125,7 @@ lazy val `node-tests` = project
         "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
         "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED",
         s"-Djava.io.tmpdir=${(Test / testTmpDir).value}"
-      )
+      ) ++ sys.props.get("logback.test.level").map(level => s"-Dlogback.test.level=$level")
     },
     // Suites clean up after themselves, but a killed fork (cancel, SIGKILL, ExitOnOutOfMemoryError) cannot: keep its temp files (RocksDB
     // dirs, native libraries) out of the shared /tmp and wipe them before the next run
