@@ -331,7 +331,9 @@ object Importer extends ScorexLogging {
         case _ =>
           System.setProperty("http.agent", s"waves-node/${Version.VersionString}")
           val uri = new URI(file)
-          if (isRemoteResource(uri)) {
+          if (uri.getScheme == "http" || uri.getScheme == "https") {
+            new ResumableInputStream(ResumableInputStream.openHttp(uri.toURL, 1.minute), offset, maxRetries = 10, retryDelay = 5.seconds)
+          } else if (isRemoteResource(uri)) {
             val connection = uri.toURL.openConnection()
             if (offset > 0) connection.setRequestProperty("Range", s"bytes=$offset-")
             connection.connect()
