@@ -30,7 +30,20 @@ object MicroblockAppender extends ScorexLogging {
       microBlock: MicroBlock,
       snapshot: Option[MicroBlockSnapshot]
   ): Task[Either[ValidationError, BlockId]] =
-    Task(microblockProcessingTimeStats.measureSuccessful {
+    appendThen(blockchainUpdater, utxStorage, scheduler, verify)(microBlock, snapshot)(identity)
+
+  /** Appends on `scheduler` and runs `onAppended` in the same step, so a cancellation of the returned task cannot fall between the two. */
+  def appendThen[A](blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
+      microBlock: MicroBlock,
+      snapshot: Option[MicroBlockSnapshot]
+  )(onAppended: BlockId => A): Task[Either[ValidationError, A]] =
+    Task(append(blockchainUpdater, utxStorage, verify)(microBlock, snapshot).map(onAppended)).executeOn(scheduler)
+
+  private def append(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPool, verify: Boolean)(
+      microBlock: MicroBlock,
+      snapshot: Option[MicroBlockSnapshot]
+  ): Either[ValidationError, BlockId] =
+    microblockProcessingTimeStats.measureSuccessful {
       blockchainUpdater
         .processMicroBlock(microBlock, snapshot, verify)
         .map { totalBlockId =>
@@ -44,7 +57,7 @@ object MicroblockAppender extends ScorexLogging {
           utxStorage.scheduleCleanup()
           totalBlockId
         }
-    }).executeOn(scheduler)
+    }
 
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
@@ -68,6 +81,7 @@ object MicroblockAppender extends ScorexLogging {
 
       blockId <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock, microBlockSnapshot))
     } yield blockId).value.flatMap {
+      // A separate step is fine here: relaying is not part of a mining task, so nothing cancels it between the append and the broadcast
       case Right(blockId) =>
         Task {
           md.invOpt match {
