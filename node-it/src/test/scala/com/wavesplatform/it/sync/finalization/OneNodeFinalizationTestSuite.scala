@@ -5,7 +5,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.state.Height
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.utils.ScorexLogging
 import org.apache.pekko.http.scaladsl.model.StatusCodes
@@ -22,10 +21,10 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
         BlockchainFeatures.FairPoS,
         BlockchainFeatures.DeterministicFinality
       )
+      // Only the committed period's generators vote, and only in a microblock, so the one transfer has to be mined inside that period. Three
+      // blocks (as little as 3s while the chain catches up with the clock) were shorter than the test JVM can stall, e.g. on its first signature.
+      .overrides("waves.blockchain.custom.functionality.generation-period-length = 10")
   )
-
-  // A block is finalized by endorsements in the next one's microblocks; the old height bound allowed one more
-  private val MaxFinalizationLag = 2
 
   private def node            = dockerNodes().last
   private lazy val miner1Acc  = node.keyPair
@@ -79,18 +78,13 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     }
 
     // We need at least one transaction, otherwise there won't be a microblock, thus no voting, no finalization.
-    // Wait for the finalized height itself: a bound on the chain height breaks whenever the test JVM stalls.
-    node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true)
-    val fs = node.waitFor(s"finalized height >= $waitingFinalizedHeight")(_.finalityStatus, _.finalizedHeight >= waitingFinalizedHeight, 500.millis)
-    log.debug(s"New finalized height: $finalizedHeight1 -> ${fs.finalizedHeight} at ${fs.height}")
-
-    // From recorded history, not the current height: finality stops with the last microblock, the chain does not.
-    node.waitForHeight(fs.height.next) // so the block that reached the target is solid and has a record
-    val reachedAt =
-      (waitingFinalizedHeight to fs.height).map(Height(_)).find(h => node.finalizedHeightAt(h) >= waitingFinalizedHeight).value
-    withClue(s"finalized height $waitingFinalizedHeight reached at $reachedAt: ") {
-      (reachedAt - waitingFinalizedHeight) should be <= MaxFinalizationLag
+    val transferHeight = node.waitForSettledTransaction(node.transfer(miner1Acc, miner3Addr, 1.waves).id)
+    withClue(s"transfer mined at $transferHeight, outside the committed period $period1: ") {
+      transferHeight.toInt should (be >= period1.start.toInt and be <= period1.end.toInt)
     }
+    // From recorded history, not the current height: the votes in the transfer's microblock finalize its parent at once
+    node.finalizedHeightAt(transferHeight) shouldBe transferHeight - 1
+    node.finalizedHeight should be >= waitingFinalizedHeight
 
     step("Survives restart")
     isolated {
