@@ -62,8 +62,9 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     }
 
     step("Finalized height checks")
-    val finalizedHeight1       = node.finalizedHeight
-    val waitingFinalizedHeight = finalizedHeight1 + 2
+    val finalizedHeight1 = node.finalizedHeight
+    // Finality starts once the committed generators vote, i.e. from the start of their period
+    val waitingFinalizedHeight = period1.start
 
     withClue("Finalized height is unknown: ") {
       try node.finalizedHeightAt(node.height)

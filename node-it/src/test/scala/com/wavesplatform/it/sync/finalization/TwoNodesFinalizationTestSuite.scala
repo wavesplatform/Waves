@@ -54,9 +54,10 @@ class TwoNodesFinalizationTestSuite extends BaseFreeSpec, ScorexLogging {
     }
 
     step("Finalized height checks")
-    val deadline               = 2.minutes.fromNow
-    var finalizedHeight1       = node1.finalizedHeight
-    val waitingFinalizedHeight = finalizedHeight1 + 2
+    val deadline         = 2.minutes.fromNow
+    var finalizedHeight1 = node1.finalizedHeight
+    // Finality starts once the committed generators vote, i.e. from the start of their period
+    val waitingFinalizedHeight = period1.start
 
     var done = false
     while (!done && deadline.hasTimeLeft()) {
