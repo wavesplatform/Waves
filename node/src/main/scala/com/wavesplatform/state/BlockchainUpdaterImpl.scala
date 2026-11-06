@@ -598,7 +598,7 @@ class BlockchainUpdaterImpl(
       microBlock: MicroBlock,
       snapshot: Option[MicroBlockSnapshot],
       verify: Boolean = true
-  ): Either[ValidationError, BlockId] = writeLock {
+  ): Either[ValidationError, BlockId] = // Validated without the write lock, see processBlock
     ngState match {
       case None =>
         Left(MicroBlockAppendError("No base block exists", microBlock))
@@ -648,25 +648,24 @@ class BlockchainUpdaterImpl(
               )
             } yield {
               val BlockDiffer.Result(snapshot, carry, totalFee, updatedMdConstraint, keyBlockSnapshot, computedStateHash) = blockDifferResult
-              restTotalConstraint = updatedMdConstraint
-              val blockId = ng.createTotalBlockId(microBlock)
-
+              val blockId          = ng.createTotalBlockId(microBlock)
               val transactionsRoot = ng.createTransactionsRoot(microBlock)
-              blockchainUpdateTriggers.onProcessMicroBlock(microBlock, keyBlockSnapshot, this, blockId, transactionsRoot)
 
-              this.ngState = Some(ng.append(microBlock, snapshot, carry, totalFee, time.monotonicMillis(), computedStateHash, Some(blockId), b))
+              writeLock {
+                restTotalConstraint = updatedMdConstraint
+                blockchainUpdateTriggers.onProcessMicroBlock(microBlock, keyBlockSnapshot, this, blockId, transactionsRoot)
+                this.ngState = Some(ng.append(microBlock, snapshot, carry, totalFee, time.monotonicMillis(), computedStateHash, Some(blockId), b))
+                internalLastBlockInfo.onNext(
+                  LastBlockInfo(blockId, Height(height), score, syncBoundary, ready = true)
+                )
+              }
 
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${snapshot.hashString}")
-              internalLastBlockInfo.onNext(
-                LastBlockInfo(blockId, Height(height), score, syncBoundary, ready = true)
-              )
-
               miner.scheduleMining(baseBlockchain = None, cancelMicroBlockMining = false)
               blockId
             }
         }
     }
-  }
 
   def shutdown(): Unit = {
     internalLastBlockInfo.onComplete()

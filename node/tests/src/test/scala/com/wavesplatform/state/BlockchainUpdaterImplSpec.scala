@@ -336,6 +336,20 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
     bcu.height shouldBe 2
   }
 
+  "readers are not blocked while a microblock is validated" in withValidationGate { (bcu, gate) =>
+    val master           = TxHelpers.signer(1)
+    val genesis          = TxHelpers.genesis(master.toAddress, timestamp = 0)
+    val transfer         = createTransfer(master, TxHelpers.signer(2).toAddress, 1)
+    val (block1, micros) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(transfer)))
+
+    bcu.processBlock(block1) should beRight
+
+    gate.whileValidating(bcu.processMicroBlock(micros.head, None)) {
+      Await.result(Future(bcu.containsTransaction(transfer)), 5.seconds) shouldBe false
+    } should beRight
+    bcu.containsTransaction(transfer) shouldBe true
+  }
+
   /** Blocks the appending thread inside validation (BlockDiffer warms the caches before diffing transactions) until the body completes. */
   private final class ValidationGate {
     @volatile private var latches = Option.empty[(CountDownLatch, CountDownLatch)]
