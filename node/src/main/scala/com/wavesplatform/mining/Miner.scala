@@ -8,12 +8,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, Instrumented, *}
 import com.wavesplatform.mining.Miner.*
 import com.wavesplatform.mining.microblocks.MicroBlockMiner
 import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.BlockDiffer
@@ -328,46 +330,49 @@ class MinerImpl(
           case None => Task.unit
         }
 
-        def appendTask(block: Block, totalConstraint: MiningConstraint) = // TODO: accept blockAppender instead all these dependencies?
-          BlockAppender(blockchainUpdater, timeService, utx, pos, blockEndorser, appenderScheduler)(block, None).flatMap {
-            case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
-              generateBlockTask(account, None)
+        def onAppended(block: Block, totalConstraint: MiningConstraint): Either[ValidationError, BlockApplyResult] => Task[Unit] = {
+          case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
+            generateBlockTask(account, None)
 
-            case Left(err) =>
-              Task.raiseError(new RuntimeException(err.toString))
+          case Left(err) =>
+            Task.raiseError(new RuntimeException(err.toString))
 
-            case Right(Applied(score = score)) =>
-              log.debug(s"Forged and applied $block with cumulative score $score")
-              BlockStats.mined(block, blockchainUpdater.height)
-              if (blockchainUpdater.isLastBlockId(block.id())) {
-                allChannels.broadcast(BlockForged(block))
-                if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
-              }
-              Task.unit
+          case Right(Applied(score = score)) =>
+            log.debug(s"Forged and applied $block with cumulative score $score")
+            BlockStats.mined(block, blockchainUpdater.height)
+            if (blockchainUpdater.isLastBlockId(block.id())) {
+              allChannels.broadcast(BlockForged(block))
+              if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+            }
+            Task.unit
 
-            case Right(Ignored) =>
-              Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
-          }.uncancelable
+          case Right(Ignored) =>
+            Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
+        }
+
+        // Forge and append in one appender task: the parent is then the tip after every microblock queued ahead of it,
+        // and a microblock packed meanwhile is rejected instead of being orphaned by this block. See docs/notes/mining.md.
+        def forgeAndAppend(): Task[Unit] = forgeBlock(account) match {
+          case ForgeAttemptResult.Success(block, restConstraint) =>
+            onAppended(block, restConstraint)(BlockAppender.appendBlock(blockchainUpdater, timeService, utx, pos, blockEndorser)(block, None))
+
+          case ForgeAttemptResult.TemporaryFailure(err) =>
+            log.debug(s"No block generated because $err, retrying")
+            generateBlockTask(account, None)
+
+          case ForgeAttemptResult.PermanentFailure(err) =>
+            log.debug(s"No block generated because $err, stopping")
+            Task.unit
+        }
 
         for {
           elapsed <- waitBlockAppendedTask.timed.map(_._1)
           newOffset = (offset - elapsed).max(Duration.Zero)
 
-          _      <- Task.sleep(newOffset)
-          result <- Task(forgeBlock(account)).executeOn(minerScheduler)
-
-          _ <- result match {
-            case ForgeAttemptResult.Success(block, restConstraint) =>
-              appendTask(block, restConstraint)
-
-            case ForgeAttemptResult.TemporaryFailure(err) =>
-              log.debug(s"No block generated because $err, retrying")
-              generateBlockTask(account, None)
-
-            case ForgeAttemptResult.PermanentFailure(err) =>
-              log.debug(s"No block generated because $err, stopping")
-              Task.unit
-          }
+          _ <- Task.sleep(newOffset)
+          // Cancelable until it starts, so an attempt replaced by scheduleMining does not forge. Appending our own block
+          // cancels this attempt too, which is why the post-append side effects run inside the same task.
+          _ <- Task(forgeAndAppend()).executeOn(appenderScheduler).flatten
         } yield ()
 
       case Left(err) =>
