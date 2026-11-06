@@ -53,10 +53,10 @@ object IntegrationTestsPlugin extends AutoPlugin {
       }
     }
 
-  override def projectSettings: Seq[Def.Setting[_]] =
+  override def projectSettings: Seq[Def.Setting[?]] =
     inConfig(Test)(
       Seq(
-        logDirectory := {
+        logDirectory := Def.uncached {
           val runId = Option(System.getenv("RUN_ID")).getOrElse {
             val formatter = DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss")
             formatter.format(LocalDateTime.now()) // git branch?
@@ -74,11 +74,11 @@ object IntegrationTestsPlugin extends AutoPlugin {
            * W - without color
            */
           val args = Seq("-fFW", (logDirectory.value / "summary.log").toString) ++ excludeTags
-          Tests.Argument(TestFrameworks.ScalaTest, args: _*)
+          Tests.Argument(TestFrameworks.ScalaTest, args*)
         },
         // Both halves of the load-test split derive from this one name, so neither can drift: a renamed annotation is
         // an error instead of an `-n`/`-l` tag argument that silently selects nothing (and exits 0).
-        loadTestNames := {
+        loadTestNames := Def.uncached {
           val loader = testLoader.value
           val loadTest = scala.util
             .Try(Class.forName(LoadTestTag, false, loader))
@@ -94,7 +94,7 @@ object IntegrationTestsPlugin extends AutoPlugin {
         // Cleared, the ForkedTestGroup limit (-Dwaves.it.max-parallel-suites) is the only one that applies.
         testOnly / tags := Seq.empty,
         test / tags     := Seq.empty,
-        testGrouping := {
+        testGrouping := Def.uncached {
           // ffs, sbt!
           // https://github.com/sbt/sbt/issues/3266
           val javaHomeValue     = javaHome.value

@@ -48,11 +48,11 @@ jobs:
       digest: ${{ steps.push.outputs.digest }}
       node-version: ${{ steps.versions.outputs.node-version }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
       - uses: regclient/actions/regctl-installer@dd58ad94f76adb73d8ac1bf75ed25f01545d5b32 # v0.2.0
-      - uses: proudust/gh-describe@80412be8ce0e77d8afba6b340e34790bc772aa45 # v2.2.0
+      - uses: proudust/gh-describe@9b42731dd866e3cd8165a65f94cc58613def3114 # v2.2.2
         id: ghd
         with:
           commit-ish: ${{ inputs.ref || github.sha}}
@@ -69,9 +69,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'sbt'
-      - uses: sbt/setup-sbt@3afe9cf056c5d139bfc46579af1192d77a2f0821 # v1.4.0
+      - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
       - name: Stage node files for the docker build context
-        run: sbt --batch -Dproject.version=${{ steps.versions.outputs.node-version }} stageForDocker
+        run: sbt --server --batch -Dproject.version=${{ steps.versions.outputs.node-version }} stageForDocker
       - name: Extract image name and tags from workflow_call inputs
         if: inputs.raw-docker-tags != ''
         env:
@@ -159,7 +159,7 @@ jobs:
       id-token: write
     if: ${{ inputs.publish-private-node }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - run: |
           {

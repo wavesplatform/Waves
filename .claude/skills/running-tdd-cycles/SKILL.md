@@ -35,7 +35,7 @@ Always one requirement per cycle. If the cycle feels big, the requirement was to
 - **Smallest possible change.** Hard-coded returns are fine for the first cycle; generalise only when a second test forces it.
 - **No bonus features.** Don't add error handling, logging, or generality unless a test demands it.
 - **Don't modify the test.** If the test is wrong, go back to RED. If the test is right and the implementation is wrong, fix the implementation.
-- **Run the affected suite after each change**; run `sbt node-tests/test` before committing.
+- **Run the affected suite after each change**; run `sbt node-tests/testFull` before committing (`test` is incremental and can skip suites).
 
 ## REFACTOR: improve structure
 

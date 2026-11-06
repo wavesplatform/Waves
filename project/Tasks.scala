@@ -6,7 +6,7 @@ import sbt.{Def, IO, *}
 
 import java.io.File
 import java.nio.file.{Files, Paths}
-import scala.collection.JavaConverters.*
+import scala.jdk.CollectionConverters.*
 import complete.DefaultParsers.*
 
 object Tasks {
@@ -46,7 +46,9 @@ object Tasks {
           },
           "Duplicate detected"
         )
+        .view
         .mapValues(_.head)
+        .toMap
 
     def str(s: String): String = "\"" + s + "\""
 

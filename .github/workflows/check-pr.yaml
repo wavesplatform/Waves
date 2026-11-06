@@ -16,7 +16,7 @@ jobs:
     outputs:
       lang-changed: ${{ steps.filter.outputs.lang == 'true' }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: 'temurin'
@@ -24,15 +24,15 @@ jobs:
           cache: 'sbt'
           gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-      - uses: sbt/setup-sbt@3afe9cf056c5d139bfc46579af1192d77a2f0821 # v1.4.0
-      - uses: proudust/gh-describe@80412be8ce0e77d8afba6b340e34790bc772aa45 # v2.2.0
+      - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
+      - uses: proudust/gh-describe@9b42731dd866e3cd8165a65f94cc58613def3114 # v2.2.2
         id: ghd
       - name: Check PR
-        run: sbt -Dproject.version=$(echo ${{ steps.ghd.outputs.describe }} | cut -c 2-) -J-Xlog:gc*=debug:file=./gc.log --batch checkPR
+        run: sbt --server -Dproject.version=$(echo ${{ steps.ghd.outputs.describe }} | cut -c 2-) -J-Xlog:gc*=debug:file=./gc.log --batch checkPR
       - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3
         if: always()
         with:
-          report_paths: '**/target/test-reports/*.xml'
+          report_paths: 'target/out/*/u/*/test-reports/*.xml'
           create_check: false
           check_name: 'Check PR'
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -43,10 +43,10 @@ jobs:
               - 'lang/**'
               - 'build.sbt'
               - 'project/*'
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: waves-all
-          path: node/target/waves-all-*.jar
+          path: target/out/jvm/u/node/waves-all-*.jar
       # A hang or a GC death spiral never throws OutOfMemoryError (G1 has no GC overhead limit), so the JVMs are still
       # alive after a cancel or a timeout: dump them here, before the runner kills them.
       - name: Dump live JVMs
@@ -60,7 +60,7 @@ jobs:
           done
       # Heap dumps hold the whole JVM environment and the artifact is public: keep secrets out of this job's env.
       - name: Save debug data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           if-no-files-found: ignore
@@ -85,7 +85,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # 8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # 8.0.2
         with:
           name: waves-all
       - run: java -cp '*' com.wavesplatform.utils.UtilApp smoke
@@ -102,14 +102,14 @@ jobs:
           - waves-exchange/contracts
           - swopfi/swopfi-smart-contracts
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ matrix.repo }}
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: 'temurin'
           java-version: '17'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # 8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # 8.0.2
         with:
           name: waves-all
       - run: find -name "*.ride" -type f -exec java -cp '*' com.wavesplatform.lang.FileCompiler {} +;
@@ -134,39 +134,39 @@ jobs:
           - { name: 'Run integration tests (3/3)', id: '3', sbt: '-Dwaves.it.max-parallel-suites=3 -Dwaves.it.shard=3/3', task: integrationTests }
           - { name: 'Run load tests', id: 'load', sbt: '-Dwaves.it.max-parallel-suites=1', task: loadTests }
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'sbt'
-      - uses: sbt/setup-sbt@3afe9cf056c5d139bfc46579af1192d77a2f0821 # v1.4.0
+      - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
       - name: Run tests
         # Samples CPU pressure and vmstat into the uploaded logs, to tell whether the runner has room for more parallel suites.
         run: |
-          mkdir -p node-it/target/logs/$RUN_ID
-          (while sleep 5; do echo "$(date +%T) $(head -1 /proc/pressure/cpu 2>/dev/null || echo no-psi) load=$(cut -d' ' -f1 /proc/loadavg)"; done) > node-it/target/logs/$RUN_ID/cpu.log &
-          vmstat -t 5 > node-it/target/logs/$RUN_ID/vmstat.log &
+          mkdir -p target/out/jvm/u/node-it/logs/$RUN_ID
+          (while sleep 5; do echo "$(date +%T) $(head -1 /proc/pressure/cpu 2>/dev/null || echo no-psi) load=$(cut -d' ' -f1 /proc/loadavg)"; done) > target/out/jvm/u/node-it/logs/$RUN_ID/cpu.log &
+          vmstat -t 5 > target/out/jvm/u/node-it/logs/$RUN_ID/vmstat.log &
           # exec: a cancel signals only the step's own process, and bash does not pass it on to a foreground child,
           # so sbt and its forked suites ran on until the runner's orphan cleanup at the end of the job.
-          exec sbt ${{ matrix.sbt }} --batch "node-it/docker;node-it/${{ matrix.task }}"
+          exec sbt --server ${{ matrix.sbt }} --batch "node-it/docker;node-it/${{ matrix.task }}"
         env:
           RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}-${{ matrix.id }}
       - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3
         if: always()
         with:
-          report_paths: '**/target/test-reports/*.xml'
+          report_paths: 'target/out/*/u/*/test-reports/*.xml'
           create_check: false
           check_name: ${{ matrix.name }}
       - name: Upload Logs
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           if-no-files-found: ignore
           name: node-it-logs-${{ matrix.id }}
           path: |
-            node-it/target/logs/*/
-            node-it/target/test-reports
+            target/out/jvm/u/node-it/logs/*/
+            target/out/jvm/u/node-it/test-reports
 
   publish-snapshots:
     name: Publish snapshot packages
@@ -176,7 +176,7 @@ jobs:
     env:
       PR_NUMBER: ${{ github.event.number }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: 'temurin'
@@ -184,8 +184,8 @@ jobs:
           cache: 'sbt'
           gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-      - uses: sbt/setup-sbt@3afe9cf056c5d139bfc46579af1192d77a2f0821 # v1.4.0
-      - run: sbt -Dproject.version=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-$PR_NUMBER-SNAPSHOT --batch publish
+      - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
+      - run: sbt --server -Dproject.version=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-$PR_NUMBER-SNAPSHOT --batch publish
         env:
           SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}

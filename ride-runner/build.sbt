@@ -1,3 +1,5 @@
+import sbtcompat.PluginCompat.toFileRef
+
 name        := "waves-ride-runner"
 description := "Allows to execute RIDE code independently from Waves NODE"
 
@@ -57,12 +59,14 @@ javaAgents ++= Dependencies.kanela
 
 inConfig(Universal)(
   Seq(
-    mappings ++=
-      (baseDirectory.value / "doc").listFiles().map { x => (x, s"doc/${x.getName}") }.toSeq ++
+    mappings ++= {
+      implicit val conv: xsbti.FileConverter = fileConverter.value
+      ((baseDirectory.value / "doc").listFiles().map { x => (x, s"doc/${x.getName}") }.toSeq ++
         Seq(
           (Compile / resourceDirectory).value / "logback.xml" -> "doc/logback.xml",
           (baseDirectory.value / "README.md")                 -> "doc/README.md"
-        ),
+        )).map { case (f, path) => toFileRef(f) -> path }
+    },
     javaOptions ++= mkJavaOptions(
       forPackager = true,
       Seq(
@@ -85,7 +89,8 @@ inConfig(Debian)(
 )
 
 // Fat JAR settings
-inTask(assembly)(
+// sbt 2 dropped inTask; this is its expansion.
+inScope(ThisScope.copy(task = Select(assembly.key)))(
   CommonSettings.assemblySettings ++
     Seq(
       mainClass := Some("com.wavesplatform.ride.runner.entrypoints.WavesRideRunnerWithPreparedStateApp")

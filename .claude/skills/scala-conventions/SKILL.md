@@ -18,7 +18,7 @@ allowed-tools: Read, Edit, Write, Grep, Glob, Bash(sbt *), Bash(git status *), B
 - **Extend the testkit base classes**, not raw ScalaTest: `com.wavesplatform.test.{FreeSpec, PropSpec, FlatSpec, FunSuite, FeatureSpec}`. They mix in `BaseSuite` (Matchers, `ScalaCheckPropertyChecks`, `ShrinkLowPriority`, `TransactionGen`, `EitherMatchers`, `EitherValues`, `OptionValues`, logging). Bypassing `BaseSuite` silently loses the shrink policy and shared generators.
 - **Style choice**: `FreeSpec` for behaviour trees (`"validation" - { "rejects X" in { ... } }`), `PropSpec` + `forAll` for property-based invariants, `FlatSpec`/`FunSuite` only when matching an existing sibling suite.
 - **Generators are shared.** Before writing a new `Gen`, check `node-testkit` (`TransactionGen`, `BlockGen`, `DomainPresets`, ...); add reusable generators there, not in the test file.
-- **Run**: `sbt node-tests/test` for the suite, `sbt "node-tests/testOnly *FooSpec"` for one class, `sbt grpc-server/test` for gRPC. Integration tests (`node-it`) need Docker and are run explicitly, never as part of a routine change.
+- **Run**: `sbt node-tests/testFull` for the suite (plain `test` is incremental in sbt 2 and can pass having run nothing), `sbt "node-tests/testOnly *FooSpec"` for one class, `sbt grpc-server/testFull` for gRPC. Integration tests (`node-it`) need Docker and are run explicitly, never as part of a routine change.
 - Test names are claims: name the behaviour (`"rejects a transfer with negative amount"`), not the method under test.
 
 ## Layout and idioms
