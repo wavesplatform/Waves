@@ -37,7 +37,6 @@ import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.InvokeTransaction.DefaultCall
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
-import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 
 object InvokeScriptTransactionDiff {
@@ -168,31 +167,8 @@ object InvokeScriptTransactionDiff {
         process = (actions: List[CallableAction], unusedComplexity: Long) => {
           val storingComplexity = limit - unusedComplexity
 
-          val dataEntries  = actions.collect { case d: DataOp => InvokeDiffsCommon.dataItemToEntry(d) }
-          val dataCount    = dataEntries.length
-          val dataSize     = DataTxValidator.invokeWriteSetSize(blockchain, dataEntries)
-          val actionsCount = actions.length - dataCount
-          val balanceActionsCount = actions.collect {
-            case tr: AssetTransfer => tr
-            case l: Lease          => l
-            case lc: LeaseCancel   => lc
-          }.length
-          val assetActionsCount = actions.length - dataCount - balanceActionsCount
-
           for {
-            _ <- InvokeDiffsCommon.checkCallResultLimits(
-              version,
-              version,
-              blockchain,
-              storingComplexity,
-              log,
-              actionsCount,
-              balanceActionsCount,
-              assetActionsCount,
-              dataCount,
-              dataSize,
-              availableActions
-            )
+            _    <- InvokeDiffsCommon.checkRootCallResultLimits(version, blockchain, storingComplexity, log, actions, availableActions)
             diff <- doProcessActions(StructuredCallableActions(actions, blockchain), storingComplexity.toInt)
           } yield diff
         }

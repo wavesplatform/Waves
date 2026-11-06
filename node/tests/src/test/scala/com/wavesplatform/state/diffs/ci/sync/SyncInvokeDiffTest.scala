@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.lang.directives.values.{V5, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -25,6 +25,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
   import DomainPresets.*
 
   private val fsWithV5 = RideV5.blockchainSettings.functionalitySettings
+  private val fsWithV6 = RideV6.blockchainSettings.functionalitySettings
 
   private val invoker        = TxHelpers.signer(0)
   private val dApp           = TxHelpers.signer(1)
@@ -1304,6 +1305,62 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
       snapshot.errorMessage(invokeTx.id()) shouldBe None
       bc.balance(thirdAcc.toAddress, IssuedAsset(transferIssue.id())) shouldBe transferAssetAmount
       bc.balance(thirdAcc.toAddress, IssuedAsset(paymentIssue.id())) shouldBe paymentAssetAmount
+    }
+  }
+
+  // the 1000-complexity prefix gets each invoke past the fail-free limit, so it fails instead of being rejected;
+  // throw() costs one more than throw(String) because it is a user function wrapping it
+  private def throwCalls(withMessage: Int, withoutMessage: Int) =
+    Seq(("""throw("fail")""", "fail", withMessage), ("throw()", "Explicit script termination", withoutMessage))
+
+  property("throw complexity inside a sync call") {
+    for ((throwCall, message, complexity) <- throwCalls(withMessage = 1078, withoutMessage = 1079)) withClue(throwCall) {
+      val callee = TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func bar() = $throwCall
+         """.stripMargin
+      )
+      val caller = TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func foo() = {
+           |   strict a = 1${" + 1" * 1000}
+           |   strict r = invoke(Address(base58'$thirdAddress'), "bar", [], [])
+           |   []
+           | }
+         """.stripMargin
+      )
+      val genesisTxs =
+        Seq(TxHelpers.genesis(dAppAddress), TxHelpers.genesis(invokerAddress), TxHelpers.genesis(thirdAddress)) ++
+          Seq(TxHelpers.setScript(thirdAcc, callee), TxHelpers.setScript(dApp, caller))
+      val invoke = TxHelpers.invoke(dAppAddress, Some("foo"))
+
+      assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV6) { case (snapshot, _) =>
+        snapshot.errorMessage(invoke.id()).map(_.text).getOrElse("") should include(message)
+        snapshot.scriptsComplexity shouldBe complexity
+      }
+    }
+  }
+
+  property("throw complexity inside a callable") {
+    for ((throwCall, message, complexity) <- throwCalls(withMessage = 1002, withoutMessage = 1003)) withClue(throwCall) {
+      val script = TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func foo() = {
+           |   let a = 1${" + 1" * 1000}
+           |   if (a == 1) then [] else $throwCall
+           | }
+         """.stripMargin
+      )
+      val genesisTxs = Seq(TxHelpers.genesis(dAppAddress), TxHelpers.genesis(invokerAddress), TxHelpers.setScript(dApp, script))
+      val invoke     = TxHelpers.invoke(dAppAddress, Some("foo"))
+
+      assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV6) { case (snapshot, _) =>
+        snapshot.errorMessage(invoke.id()).map(_.text).getOrElse("") should include(message)
+        snapshot.scriptsComplexity shouldBe complexity
+      }
     }
   }
 }
