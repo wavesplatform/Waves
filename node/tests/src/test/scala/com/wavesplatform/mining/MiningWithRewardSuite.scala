@@ -72,44 +72,14 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
     val bps: Seq[BlockProducer] = Seq((ts, reference, account) => {
       val recipient1 = createAccount.toAddress
       val recipient2 = createAccount.toAddress
-      val tx1 = TxHelpers.transfer(
-        from = account,
-        to = recipient1,
-        amount = 10 * Constants.UnitsInWave,
-        asset = Waves,
-        fee = 400000,
-        feeAsset = Waves,
-        attachment = ByteStr.empty,
-        timestamp = ts,
-        version = 2.toByte
-      )
-      val tx2 = TxHelpers.transfer(
-        from = account,
-        to = recipient2,
-        amount = 5 * Constants.UnitsInWave,
-        asset = Waves,
-        fee = 400000,
-        feeAsset = Waves,
-        attachment = ByteStr.empty,
-        timestamp = ts,
-        version = 2.toByte
-      )
+      val tx1 = TxHelpers.transfer(from = account, to = recipient1, amount = 10 * Constants.UnitsInWave, asset = Waves, fee = 400000, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts, version = 2.toByte)
+      val tx2 = TxHelpers.transfer(from = account, to = recipient2, amount = 5 * Constants.UnitsInWave, asset = Waves, fee = 400000, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts, version = 2.toByte)
       TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion).block
     })
 
     val txs: Seq[TransactionProducer] = Seq((ts, account) => {
       val recipient1 = createAccount.toAddress
-      TxHelpers.transfer(
-        from = account,
-        to = recipient1,
-        amount = 10 * Constants.UnitsInWave,
-        asset = Waves,
-        fee = 400000,
-        feeAsset = Waves,
-        attachment = ByteStr.empty,
-        timestamp = ts,
-        version = 2.toByte
-      )
+      TxHelpers.transfer(from = account, to = recipient1, amount = 10 * Constants.UnitsInWave, asset = Waves, fee = 400000, feeAsset = Waves, attachment = ByteStr.empty, timestamp = ts, version = 2.toByte)
     })
 
     withEnv(bps, txs) { case Env(_, account, miner, blockchain) =>
@@ -178,7 +148,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
       } yield r
     }
 
-  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] = miner.generateBlockTask(account)
+  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] = miner.generateBlockTask(account, None)
 
   private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, ForgeAttemptResult.Success] = miner.forgeBlock(account).toEither
 

@@ -170,5 +170,5 @@ class MiningFailuresSuite extends FlatSpec, WithNewDBForEachTest {
   }
 
   private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
-    miner.generateBlockTask(account)
+    miner.generateBlockTask(account, None)
 }

@@ -410,7 +410,12 @@ object Importer extends ScorexLogging {
             ByteStr.empty,
             Nil
           )
-          blockchainUpdater.processBlock(pseudoBlock, hitSource = ByteStr.empty, snapshot = None, generatorSet = Seq.empty, verify = false)
+          // On the appender, like every other write: BlockchainUpdaterImpl validates outside its write lock, so writers must not overlap
+          Await.result(
+            Task(blockchainUpdater.processBlock(pseudoBlock, hitSource = ByteStr.empty, snapshot = None, generatorSet = Seq.empty, verify = false))
+              .runAsyncLogErr(using scheduler),
+            Duration.Inf
+          )
         }
 
         // Terminate appender
