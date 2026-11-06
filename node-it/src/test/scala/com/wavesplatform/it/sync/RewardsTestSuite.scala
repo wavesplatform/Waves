@@ -20,6 +20,9 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
   lazy val initMinerBalance: Long = miner.balanceAtHeight(miner.address, Height(1))
   val InitialAmount               = Docker.initialWavesAmount
 
+  // The reward of the block at `height`, not at the tip: after the rollback the miner forges back-to-back, so the tip runs ahead of the waits
+  private def rewardAt(height: Height): Long = miner.rewardStatus(Some(height)).currentReward
+
   "reward changes accordingly node's votes and miner's balance changes by reward amount after block generation" - {
     "when miner votes for increase" in {
       assertApiError(miner.rewardStatus(Some(Height(1))), CustomValidationError("Block reward feature is not activated yet"))
@@ -32,7 +35,7 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
       featureInfo.blockchainStatus shouldBe BlockchainFeatureStatus.Activated
 
       val minerBalanceAtActivationHeight = miner.balanceAtHeight(miner.address, activationHeight)
-      minerBalanceAtActivationHeight shouldBe initMinerBalance + miner.rewardStatus().currentReward
+      minerBalanceAtActivationHeight shouldBe initMinerBalance + rewardAt(activationHeight)
 
       val rewardAtActivation = miner.rewardStatus(Some(activationHeight))
       rewardAtActivation.currentReward shouldBe initial
@@ -46,7 +49,7 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
       rewardAtActivation.totalWavesAmount shouldBe InitialAmount + initial
 
       miner.waitForHeight(activationHeight + 1) // 5
-      miner.balanceAtHeight(miner.address, activationHeight + 1) shouldBe minerBalanceAtActivationHeight + miner.rewardStatus().currentReward
+      miner.balanceAtHeight(miner.address, activationHeight + 1) shouldBe minerBalanceAtActivationHeight + rewardAt(activationHeight + 1)
 
       val votingStartHeight = activationHeight + term - votingInterval
       miner.waitForHeight(votingStartHeight, 2.minutes) // 8
@@ -66,9 +69,9 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
       val amountAfterTerm = InitialAmount + BigInt(initial) * BigInt(term) + newReward
 
       miner.waitForHeight(termEndHeight - 1, 2.minutes) // 11
-      miner.rewardStatus().currentReward shouldBe initial
+      rewardAt(termEndHeight - 1) shouldBe initial
       val minerBalanceBeforeTermEnd = miner.balanceAtHeight(miner.address, termEndHeight - 1)
-      minerBalanceBeforeTermEnd shouldBe minerBalanceAtActivationHeight + (termEndHeight - activationHeight - 1) * miner.rewardStatus().currentReward
+      minerBalanceBeforeTermEnd shouldBe minerBalanceAtActivationHeight + (termEndHeight - activationHeight - 1) * rewardAt(termEndHeight - 1)
 
       miner.waitForHeight(termEndHeight) // 12
 
@@ -83,11 +86,11 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
       rewardAtTermEnd.votes.decrease shouldBe 0
       rewardAtTermEnd.totalWavesAmount shouldBe amountAfterTerm
       val minerBalanceAtTermEndHeight = miner.balanceAtHeight(miner.address, termEndHeight)
-      minerBalanceAtTermEndHeight shouldBe minerBalanceBeforeTermEnd + miner.rewardStatus().currentReward
+      minerBalanceAtTermEndHeight shouldBe minerBalanceBeforeTermEnd + rewardAt(termEndHeight)
 
       miner.waitForHeight(termEndHeight + 1) // 13
-      miner.rewardStatus().currentReward shouldBe newReward
-      miner.balanceAtHeight(miner.address, termEndHeight + 1) shouldBe minerBalanceAtTermEndHeight + miner.rewardStatus().currentReward
+      rewardAt(termEndHeight + 1) shouldBe newReward
+      miner.balanceAtHeight(miner.address, termEndHeight + 1) shouldBe minerBalanceAtTermEndHeight + rewardAt(termEndHeight + 1)
 
       val secondVotingStartHeightPlusTwo = termEndHeight + term - votingInterval + 2
 
@@ -109,7 +112,7 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
 
       miner.waitForHeight(activationHeight, 2.minutes)
       val minerBalanceAtActivationHeight = miner.balanceAtHeight(miner.address, activationHeight)
-      minerBalanceAtActivationHeight shouldBe initMinerBalance + miner.rewardStatus().currentReward
+      minerBalanceAtActivationHeight shouldBe initMinerBalance + rewardAt(activationHeight)
 
       val rewardAtActivation = miner.rewardStatus(Some(activationHeight))
       rewardAtActivation.currentReward shouldBe initial
@@ -128,7 +131,7 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
 
       miner.waitForHeight(termEndHeight - 1, 2.minutes)
       val minerBalanceBeforeTermEnd = miner.balanceAtHeight(miner.address, termEndHeight - 1)
-      minerBalanceBeforeTermEnd shouldBe minerBalanceAtActivationHeight + (termEndHeight - activationHeight - 1) * miner.rewardStatus().currentReward
+      minerBalanceBeforeTermEnd shouldBe minerBalanceAtActivationHeight + (termEndHeight - activationHeight - 1) * rewardAt(termEndHeight - 1)
 
       miner.waitForHeight(termEndHeight)
       val rewardAtTermEnd = miner.rewardStatus(Some(termEndHeight))
@@ -142,11 +145,11 @@ class RewardsTestSuite extends BaseFreeSpec with ActivationStatusRequest with Op
       rewardAtTermEnd.votes.decrease shouldBe 0
       rewardAtTermEnd.totalWavesAmount shouldBe amountAfterTerm
       val minerBalanceAtTermEnd = miner.balanceAtHeight(miner.address, termEndHeight)
-      minerBalanceAtTermEnd shouldBe minerBalanceBeforeTermEnd + miner.rewardStatus().currentReward
+      minerBalanceAtTermEnd shouldBe minerBalanceBeforeTermEnd + rewardAt(termEndHeight)
 
       miner.waitForHeight(termEndHeight + 1)
-      miner.rewardStatus(Some(termEndHeight + 1)).currentReward shouldBe newReward
-      miner.balanceAtHeight(miner.address, termEndHeight + 1) shouldBe minerBalanceAtTermEnd + miner.rewardStatus().currentReward
+      rewardAt(termEndHeight + 1) shouldBe newReward
+      miner.balanceAtHeight(miner.address, termEndHeight + 1) shouldBe minerBalanceAtTermEnd + rewardAt(termEndHeight + 1)
 
       val secondVotingStartHeightPlusTwo = termEndHeight + term - votingInterval + 2
       miner.waitForHeight(secondVotingStartHeightPlusTwo, 5.minutes) // 18
