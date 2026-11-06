@@ -6,6 +6,7 @@ import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{Args, DoNotDiscover, ParallelTestExecution, Reporter}
 
 import java.nio.file.{Files, Path, Paths}
+import scala.jdk.CollectionConverters.*
 import scala.jdk.StreamConverters.*
 import scala.util.Using
 
@@ -22,6 +23,12 @@ class TempDbCleanupSpec extends FreeSpec with DBCacheSettings {
     status.waitUntilCompleted()
     status.succeeds() shouldBe true
     tempDirs(prefix) -- before
+  }
+
+  "node-tests keep temporary files under the build's target, where a killed run's leftovers are wiped by the next one" in {
+    val tmp = Paths.get(System.getProperty("java.io.tmpdir")).toAbsolutePath
+    tmp.iterator().asScala.map(_.toString).toSeq should contain("target")
+    Files.isDirectory(tmp) shouldBe true
   }
 
   "TempRDB" - {
