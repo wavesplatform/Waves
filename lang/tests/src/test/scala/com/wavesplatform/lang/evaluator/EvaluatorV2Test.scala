@@ -50,6 +50,21 @@ class EvaluatorV2Test extends PropSpec with Inside {
     (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
   }
 
+  private def spentOnError(script: String, limit: Int, newMode: Boolean): Int =
+    EvaluatorV2
+      .applyLimitedCoeval(
+        compile(script),
+        LogExtraInfo(),
+        limit,
+        ctx.evaluationContext(environment),
+        version,
+        correctFunctionCallScope = true,
+        newMode,
+        fixedThrownError = true
+      )
+      .value()
+      .fold({ case (_, unusedComplexity, _) => limit - unusedComplexity }, r => fail(s"Expected an error, got $r"))
+
   private def evalNew(expr: EXPR, limit: Int): (EXPR, String, Int) = {
     val (result, unusedComplexity) = evalEither(expr, limit, newMode = true).explicitGet()
     (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
@@ -1281,5 +1296,20 @@ class EvaluatorV2Test extends PropSpec with Inside {
         | f(1 + 2 + 3)
       """.stripMargin
     evalNew(script3, 100)._3 shouldBe 3
+  }
+
+  property("throw complexity inside user functions") {
+    def script(throwCall: String) =
+      s"""
+         | func a() = $throwCall
+         | func f() = if (1 == 1) then a() else false
+         | f()
+       """.stripMargin
+
+    spentOnError(script("""throw("xxx")"""), 10, newMode = false) shouldBe 3
+    spentOnError(script("throw()"), 10, newMode = false) shouldBe 3
+    spentOnError(script("""throw("xxx")"""), 10, newMode = true) shouldBe 2
+    // throw() is a user function wrapping throw(String), and new mode charges 1 per user function call
+    spentOnError(script("throw()"), 10, newMode = true) shouldBe 3
   }
 }
