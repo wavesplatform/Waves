@@ -19,7 +19,6 @@ Rules that keep this correct:
 Checked and unchanged by the move:
 
 - `BlockFromFuture` retry: `generateBlockTask(account, None)` was already continued on `appenderScheduler` (the attempt runs there and the old append task shifted back to it); only the forge moved. A `TemporaryFailure` retries the same way, now from the appender.
-- `waitBlockAppendedTask` runs before the sleep and the forge, so where forging runs does not affect it.
 - `BlockChallenger` builds and appends challenging blocks through its own path (`BlockAppender.apply`), untouched here; our key block always has `challengedHeader = None`.
 - Finalization voting and endorsements: a key block carries `finalizationVoting = None` (votes go into microblocks, read from `EndorsementStorage` by `MicroBlockMinerImpl`), and `blockEndorser.vote` still runs inside `BlockAppender.appendBlock` after a successful append, as before.
 
@@ -31,3 +30,7 @@ Costs and behaviour to know:
 - Follow-up (not done): a `TemporaryFailure` retries through `generateBlockTask` with no minimum delay. The delay is computed from the liquid tip, the forge from `bestReference()`; they can disagree only on generating balance (a microblock at the current height lowered it and a later one raised it back), in which case the delay is 0 while the forge fails with "from the future", and the attempt re-forges on the appender in a tight loop until the skipped microblocks pass `min-micro-block-age`. Bounded and FIFO-interleaved with peer appends, and the old code looped the same way. A fixed floor would delay legitimate retries and can cost a block slot; the intended fix is to sleep until the forged `blockTime - maxTimeDrift` on "from the future", with a short backoff for the other (deterministic) temporary failures.
 
 Driving `MinerImpl` with `TestScheduler`: a key-block attempt now completes in a single `appenderScheduler.tickNext` (sleep, forge, append), and the miner scheduler only runs microblock mining.
+
+## No pacing between key blocks
+
+`BlockchainUpdaterImpl` calls `scheduleMining()` after the block is committed, so the next attempt's offset is computed from the updated state and there is nothing to wait for. Before, it was called before the commit with a pre-commit view, and `generateBlockTask` polled `contains(newBlock)` every second, which always missed the first time: every append, our own or a peer's, delayed the next attempt by at least 1s even at offset 0. Now a generator that is behind schedule (`blockTime = max(prevTs + delay, now - 1min)` is already past) forges back-to-back blocks dated in the past until it catches up with the clock; `minimal-block-generation-offset` is the explicit knob for spacing. In tests with `TestTime` ahead of the chain, one `tickNext` (`tick(0)`) therefore also runs the zero-delay attempt scheduled by our own append: assert on the block at `height + 1`, not on `lastBlockHeader` (`LastMicroBlockSuite`).

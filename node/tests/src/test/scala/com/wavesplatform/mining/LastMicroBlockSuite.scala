@@ -28,7 +28,14 @@ import java.util.concurrent.CountDownLatch
 import scala.concurrent.Promise
 import scala.util.{Try, Using}
 
-class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps with WithResourceManager with EitherValues with Inside with Eventually {
+class LastMicroBlockSuite
+    extends FreeSpec
+    with WithDomain
+    with TestSchedulerOps
+    with WithResourceManager
+    with EitherValues
+    with Inside
+    with Eventually {
   private val thisNodeAcc1 = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 0)
   private val thisNodeAcc2 = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 1)
   private val otherNodeAcc = TxHelpers.defaultSigner
@@ -88,10 +95,11 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       d.appendMicroBlock(d.createMicroBlock(signer = thisNodeAcc1.some)(TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc2.toAddress)))
 
       log.debug("Trigger thisNode forging")
+      val heightBefore = d.blockchain.height
       appenderScheduler.tickNext("this-appender-1")
 
-      val lastBlock = d.blockchain.lastBlockHeader.value
-      lastBlock.header.reference shouldBe refLiquidBlockId
+      // Forging resumes right after our own append, so the tick can forge more than one block (TestTime is ahead of block2)
+      d.blockchain.blockHeader(heightBefore + 1).value.header.reference shouldBe refLiquidBlockId
     }
   }.get
 
@@ -143,10 +151,11 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       val refLiquidBlockId = d.lastBlockId
 
       log.debug("Trigger thisNode forging")
+      val heightBefore = d.blockchain.height
       appenderScheduler.tickNext("this-appender-1")
 
-      val lastBlock = d.blockchain.lastBlockHeader.value
-      lastBlock.header.reference shouldBe refLiquidBlockId
+      // Forging resumes right after our own append, so the tick can forge more than one block (TestTime is ahead of block2)
+      d.blockchain.blockHeader(heightBefore + 1).value.header.reference shouldBe refLiquidBlockId
     }
   }.get
 
@@ -191,7 +200,9 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
   }
 
   private def advanceToNextBlockTime(d: Domain, time: TestTime): Unit =
-    time.setTimeIfGreater(d.nextBlockTime(thisNodeAcc1).max(d.lastBlock.header.timestamp + d.settings.minerSettings.minimalBlockGenerationOffset.toMillis))
+    time.setTimeIfGreater(
+      d.nextBlockTime(thisNodeAcc1).max(d.lastBlock.header.timestamp + d.settings.minerSettings.minimalBlockGenerationOffset.toMillis)
+    )
 
   // The miner scheduler is never run, so a key block can appear only if forging runs on the appender
   private def withAppenderOnlyMiner(appenderScheduler: Scheduler)(f: (Domain, MinerImpl, Block) => Unit): Unit =
@@ -205,18 +216,19 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
   // TestScheduler runs tasks due at the same instant in random order, so FIFO order on the appender needs a real thread
   "key block builds on a microblock appended on the appender ahead of the key block attempt" in {
     val appenderScheduler = Scheduler.singleThread("test-appender")
-    try withAppenderOnlyMiner(appenderScheduler) { (d, miner, _) =>
-      val microBlock = d.createMicroBlock(signer = thisNodeAcc1.some)(TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc1.toAddress))
-      val gate       = new CountDownLatch(1)
-      appenderScheduler.execute(() => gate.await())
-      val totalBlockId = Promise[BlockId]()
-      appenderScheduler.execute(() => totalBlockId.complete(Try(d.appendMicroBlock(microBlock))))
-      miner.scheduleMining()
-      gate.countDown()
+    try
+      withAppenderOnlyMiner(appenderScheduler) { (d, miner, _) =>
+        val microBlock = d.createMicroBlock(signer = thisNodeAcc1.some)(TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc1.toAddress))
+        val gate       = new CountDownLatch(1)
+        appenderScheduler.execute(() => gate.await())
+        val totalBlockId = Promise[BlockId]()
+        appenderScheduler.execute(() => totalBlockId.complete(Try(d.appendMicroBlock(microBlock))))
+        miner.scheduleMining()
+        gate.countDown()
 
-      eventually(timeout(10.seconds))(d.blockchain.height shouldBe 3)
-      d.blockchain.lastBlockHeader.value.header.reference shouldBe totalBlockId.future.value.value.get
-    }
+        eventually(timeout(10.seconds))(d.blockchain.height shouldBe 3)
+        d.blockchain.lastBlockHeader.value.header.reference shouldBe totalBlockId.future.value.value.get
+      }
     finally appenderScheduler.shutdown()
   }
 
