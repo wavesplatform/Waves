@@ -661,7 +661,7 @@ class BlockchainUpdaterImpl(
               }
 
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${snapshot.hashString}")
-              miner.scheduleMining(baseBlockchain = None, cancelMicroBlockMining = false)
+              miner.scheduleMining(cancelMicroBlockMining = false)
               blockId
             }
         }
