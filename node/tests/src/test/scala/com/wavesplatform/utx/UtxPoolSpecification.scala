@@ -8,8 +8,8 @@ import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.database.{RDB, RocksDBWriter, TestStorageFactory}
-import com.wavesplatform.db.WithDomain
+import com.wavesplatform.database.TestStorageFactory
+import com.wavesplatform.db.{TempRDB, WithDomain}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
@@ -26,7 +26,6 @@ import com.wavesplatform.mining.*
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.{invoke as _, *}
-import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.*
@@ -43,24 +42,10 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
 
-import java.nio.file.{Files, Path}
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.*
 import scala.util.{Random, Using}
 
-private object UtxPoolSpecification {
-  final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) extends AutoCloseable {
-    val path: Path            = Files.createTempDirectory("rocksdb-test-utx")
-    val rdb                   = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
-    val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(rdb, fs)
-
-    override def close(): Unit = {
-      writer.close()
-      rdb.close()
-      TestHelpers.deleteRecursively(path)
-    }
-  }
-}
 
 class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDomain, EitherValues, Eventually {
   private val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
@@ -68,7 +53,6 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
   import DomainPresets.*
   import FeeValidation.ScriptExtraFee as extraFee
   import FunctionalitySettings.TESTNET.maxTransactionTimeBackOffset as maxAge
-  import UtxPoolSpecification.*
 
   private def withBlockchain[A](genAccounts: Map[Address, Long])(test: BlockchainUpdaterImpl => A): A = {
     val genesisSettings = TestHelpers.genesisSettings(genAccounts)
@@ -89,7 +73,7 @@ class UtxPoolSpecification extends FreeSpec, BlocksTransactionsHelpers, WithDoma
       featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    Using.resource(TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)) { dbContext =>
+    Using.resource(TempRDB("rocks-temp-UtxPoolSpecification", settings.dbSettings)) { dbContext =>
       val (bcu, rdbWriter) = TestStorageFactory(settings, dbContext.rdb, new TestTime, ignoreBlockchainUpdateTriggers)
       Using.resource(rdbWriter) { _ =>
         bcu.processBlock(
