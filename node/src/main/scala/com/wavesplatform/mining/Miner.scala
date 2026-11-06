@@ -328,65 +328,13 @@ class MinerImpl(
           case None => Task.unit
         }
 
-        // Must stay a plain synchronous call: appending our block has already cancelled this attempt, so a Task here could be dropped
-        def announceApplied(block: Block, totalConstraint: MiningConstraint, score: BigInt): Unit = {
-          log.debug(s"Forged and applied $block with cumulative score $score")
-          BlockStats.mined(block, blockchainUpdater.height)
-          if (blockchainUpdater.isLastBlockId(block.id())) {
-            allChannels.broadcast(BlockForged(block))
-            if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
-          }
-        }
-
-        // Forge and append in one appender task: the parent is then the tip after every microblock queued ahead of it,
-        // and a microblock packed meanwhile is rejected instead of being orphaned by this block. See docs/notes/mining.md.
-        // Returns only the follow-up (retry or failure); everything a successful append requires has already run.
-        def forgeAndAppend(): Task[Unit] = {
-          val reference = bestReference()
-
-          // Giving up on the tip is final until the next scheduleMining. Giving up on an older parent means our newer microblocks
-          // were too young to build on; they are old enough after min-micro-block-age, and no other event may reschedule mining.
-          def giveUp(reason: String)(stop: => Task[Unit]): Task[Unit] =
-            if (blockchainUpdater.lastBlockId.contains(reference)) stop
-            else {
-              log.debug(s"No block generated on $reference because $reason, retrying on newer microblocks in ${minerSettings.minMicroBlockAge}")
-              Task.defer(generateBlockTask(account, None)).delayExecution(minerSettings.minMicroBlockAge)
-            }
-
-          forgeBlock(account, Some(reference)) match {
-            case ForgeAttemptResult.Success(block, restConstraint) =>
-              BlockAppender.appendBlock(blockchainUpdater, timeService, utx, pos, blockEndorser)(block, None) match {
-                case Right(Applied(score = score)) =>
-                  announceApplied(block, restConstraint, score)
-                  Task.unit
-                case Right(Ignored) =>
-                  Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
-                case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
-                  generateBlockTask(account, None)
-                case Left(err) =>
-                  giveUp(err.toString)(Task.raiseError(new RuntimeException(err.toString)))
-              }
-
-            case ForgeAttemptResult.TemporaryFailure(err) =>
-              log.debug(s"No block generated because $err, retrying")
-              generateBlockTask(account, None)
-
-            case ForgeAttemptResult.PermanentFailure(err) =>
-              giveUp(err) {
-                log.debug(s"No block generated because $err, stopping")
-                Task.unit
-              }
-          }
-        }
-
         for {
           elapsed <- waitBlockAppendedTask.timed.map(_._1)
           newOffset = (offset - elapsed).max(Duration.Zero)
 
           _ <- Task.sleep(newOffset)
-          // Cancelable until it starts, so an attempt replaced by scheduleMining does not forge. Appending our own block
-          // cancels this attempt too, which is why the post-append side effects run inside the same task.
-          _ <- Task(forgeAndAppend()).executeOn(appenderScheduler).flatten
+          // Cancelable until it starts, so an attempt replaced by scheduleMining does not forge
+          _ <- Task(forgeAndAppend(account)).executeOn(appenderScheduler).flatten
         } yield ()
 
       case Left(err) =>
@@ -395,6 +343,53 @@ class MinerImpl(
         Task.unit
     }
   }
+
+  // Runs on the appender, so the parent is the tip after every queued microblock (docs/notes/mining.md). Returns only the
+  // follow-up: our own append cancels this attempt, so whatever must follow it already ran here.
+  private def forgeAndAppend(account: KeyPair): Task[Unit] = {
+    val reference = bestReference()
+    forgeBlock(account, Some(reference)) match {
+      case ForgeAttemptResult.Success(block, restConstraint) =>
+        BlockAppender.appendBlock(blockchainUpdater, timeService, utx, pos, blockEndorser)(block, None) match {
+          case Right(Applied(score = score)) =>
+            announceApplied(account, block, restConstraint, score)
+            Task.unit
+          case Right(Ignored) =>
+            Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
+          case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
+            generateBlockTask(account, None)
+          case Left(err) =>
+            retryOrStop(account, reference, err.toString)(Task.raiseError(new RuntimeException(err.toString)))
+        }
+
+      case ForgeAttemptResult.TemporaryFailure(err) =>
+        log.debug(s"No block generated because $err, retrying")
+        generateBlockTask(account, None)
+
+      case ForgeAttemptResult.PermanentFailure(err) =>
+        retryOrStop(account, reference, err) {
+          log.debug(s"No block generated because $err, stopping")
+          Task.unit
+        }
+    }
+  }
+
+  private def announceApplied(account: KeyPair, block: Block, totalConstraint: MiningConstraint, score: BigInt): Unit = {
+    log.debug(s"Forged and applied $block with cumulative score $score")
+    BlockStats.mined(block, blockchainUpdater.height)
+    if (blockchainUpdater.isLastBlockId(block.id())) {
+      allChannels.broadcast(BlockForged(block))
+      if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+    }
+  }
+
+  // Off the tip, our skipped microblocks become eligible after min-micro-block-age; nothing else may reschedule mining
+  private def retryOrStop(account: KeyPair, reference: ByteStr, reason: String)(stop: => Task[Unit]): Task[Unit] =
+    if (blockchainUpdater.lastBlockId.contains(reference)) stop
+    else {
+      log.debug(s"No block generated on $reference because $reason, retrying on newer microblocks in ${minerSettings.minMicroBlockAge}")
+      Task.defer(generateBlockTask(account, None)).delayExecution(minerSettings.minMicroBlockAge)
+    }
 
   private def startMicroBlockMining(
       account: KeyPair,

@@ -295,9 +295,7 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
           d.lastBlock.header.generator.toAddress shouldBe minerAcc.toAddress
         }
 
-        // The first attempt after that microblock fails: the microblock is younger than min-micro-block-age, so the block is
-        // built on the previous liquid block, where notCommittedAcc may not generate. Having skipped a newer microblock, the
-        // attempt retries once that microblock is old enough, with no further microblock needed to reschedule it.
+        // The first attempt skipped that too-young microblock and failed; it retries on its own once the microblock is old enough
         log.debug("Trigger next block forging - second attempt, once the microblock is old enough")
         time.advance(defaultSettings.minerSettings.minMicroBlockAge)
         time.setTimeIfGreater(d.nextBlockTime(notCommittedAcc))
