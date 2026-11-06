@@ -7,7 +7,10 @@ import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
-/** Reopens the source at the last delivered byte when a read fails, so a long download survives a dropped connection. */
+/** Reopens the source at the last delivered byte when a read fails, so a long download survives a dropped connection.
+  *
+  * A source that ends early without an error is caught only when `open` reports the remaining length; otherwise it reads as the end of the data.
+  */
 final class ResumableInputStream(
     open: Long => (InputStream, Option[Long]),
     startOffset: Long,
@@ -15,9 +18,9 @@ final class ResumableInputStream(
     retryDelay: FiniteDuration
 ) extends InputStream
     with ScorexLogging {
-  private var position             = startOffset
-  private var current: InputStream = null
-  private var end: Option[Long]    = None
+  private var position                       = startOffset
+  @volatile private var current: InputStream = null
+  private var end: Option[Long]              = None
   // Closed from the importer's shutdown hook while the main thread may be reading; must stop it from reopening.
   @volatile private var closed = false
 
@@ -32,12 +35,15 @@ final class ResumableInputStream(
   private def readWithRetry(b: Array[Byte], off: Int, len: Int, failures: Int): Int =
     Try {
       if (closed) throw new IOException("Stream closed")
-      if (current == null) {
-        val (in, length) = open(position)
-        current = in
+      // One read of `current`: close() may null it concurrently, and reading the closed stream then fails as an IOException.
+      val in = Option(current).getOrElse {
+        val (opened, length) = open(position)
+        current = opened
         end = length.map(position + _)
+        if (closed) closeCurrent() // close() ran while opening; `opened` is now closed and the read below fails
+        opened
       }
-      val n = current.read(b, off, len)
+      val n = in.read(b, off, len)
       if (n < 0 && end.exists(position < _)) throw new EOFException(s"Stream ended at offset $position, expected ${end.get}")
       n
     } match {
@@ -53,7 +59,7 @@ final class ResumableInputStream(
     }
 
   private def closeCurrent(): Unit = {
-    if (current != null) Try(current.close())
+    Option(current).foreach(in => Try(in.close()))
     current = null
   }
 
@@ -63,7 +69,7 @@ final class ResumableInputStream(
   }
 }
 
-object ResumableInputStream {
+object ResumableInputStream extends ScorexLogging {
 
   /** Opens `url` from a given offset. The first response fixes the file's validator and size, so a resume cannot splice in a different file. */
   def openHttp(url: URL, timeout: FiniteDuration): Long => (InputStream, Option[Long]) = {
@@ -101,6 +107,7 @@ object ResumableInputStream {
         }
         if (validator.isEmpty) validator = responseValidator
 
+        if (length.isEmpty) log.warn(s"$url announced no length: a connection dropped without an error will read as the end of the file")
         in -> length
       } catch {
         case NonFatal(e) =>
