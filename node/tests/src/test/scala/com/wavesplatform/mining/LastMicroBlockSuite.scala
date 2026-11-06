@@ -10,7 +10,8 @@ import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.transaction.TxValidationError.MicroBlockAppendError
-import com.wavesplatform.test.{CatchLogs, FreeSpec, NumericExt, TestSchedulerOps, TestTime, WithResourceManager}
+import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
+import com.wavesplatform.test.{CatchLogs, FreeSpec, InMemoryAppender, NumericExt, TestSchedulerOps, TestTime, WithResourceManager}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
@@ -38,6 +39,16 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
   private val defaultSettings = baseSettings.copy(
     minerSettings = baseSettings.minerSettings.copy(quorum = 0, microBlockInterval = microBlockInterval, minMicroBlockAge = minMicroBlockAge)
   )
+
+  private def catchLogsOf(cls: Class[?]): InMemoryAppender = {
+    val logger = org.slf4j.LoggerFactory.getLogger(cls).asInstanceOf[ch.qos.logback.classic.Logger]
+    val r      = new InMemoryAppender()
+    r.setContext(logger.getLoggerContext)
+    r.start()
+    logger.addAppender(r)
+    logger.setLevel(ch.qos.logback.classic.Level.TRACE)
+    r
+  }
 
   "Same node accounts - next account mining with minMicroblockAge" in Using.Manager { manager =>
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
@@ -228,6 +239,79 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       }
       d.utxPool.transactionById(transfer.id()) shouldBe defined
     }
+  }
+
+  "stale microblock of the previous sequence is dropped quietly and its transaction is mined on the new key block" in withManager {
+    manager =>
+      val channels = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
+      var miner    = Miner.StrictDisabledMiner
+      val time     = TestTime()
+      // One transaction fills a microblock, so packing returns at once and the sequence then sleeps out micro-block-interval
+      // on minerScheduler instead of blocking in real time in PackStrategy.Estimate
+      withDomain(
+        defaultSettings.copy(minerSettings = defaultSettings.minerSettings.copy(minMicroBlockAge = 0.seconds, maxTransactionsInMicroBlock = 1)),
+        AddrWithBalance.enoughBalances(thisNodeAcc1, otherNodeAcc),
+        miner = Miner.forwardTo(miner),
+        time = time
+      ) { d =>
+        val minerScheduler    = TestScheduler()
+        val appenderScheduler = TestScheduler()
+        d.wallet.generateNewAccounts(1)
+        val utxEvents = ConcurrentSubject.publish[Unit](using minerScheduler)
+        val minerImpl = new MinerImpl(
+          channels,
+          d.blockchain,
+          d.settings,
+          time,
+          d.utxPool,
+          BlockEndorser.Disabled,
+          EndorsementStorage.Disabled,
+          d.wallet,
+          d.posSelector,
+          minerScheduler,
+          appenderScheduler,
+          utxEvents
+        )
+        miner = minerImpl
+        val microBlockMinerLog = catchLogsOf(classOf[MicroBlockMinerImpl])
+
+        def forgeKeyBlock(): Unit = {
+          time.setTimeIfGreater(
+            d.nextBlockTime(thisNodeAcc1).max(d.lastBlock.header.timestamp + d.settings.minerSettings.minimalBlockGenerationOffset.toMillis)
+          )
+          minerImpl.scheduleMining()
+          appenderScheduler.tick()
+        }
+
+        log.debug("Forge block2 and append its first microblock")
+        forgeKeyBlock()
+        d.blockchain.height shouldBe 2
+        d.utxPool.putIfNew(TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc1.toAddress)).resultE.value shouldBe true
+        minerScheduler.tick()
+        appenderScheduler.tick()
+        val microBlock1TotalId = d.lastBlockId
+
+        log.debug("The block2 sequence packs tx2 and waits out micro-block-interval before building its microblock")
+        val tx2 = TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc1.toAddress, amount = 2)
+        d.utxPool.putIfNew(tx2).resultE.value shouldBe true
+        minerScheduler.tick()
+        withClue("the packed microblock is still pending: ") {
+          minerScheduler.state.tasks should not be empty
+          d.lastBlockId shouldBe microBlock1TotalId
+        }
+
+        log.debug("Block3 is forged and appended meanwhile")
+        forgeKeyBlock()
+        d.blockchain.height shouldBe 3
+        d.blockchain.lastBlockHeader.value.header.reference shouldBe microBlock1TotalId
+
+        log.debug("Let both microblock sequences run")
+        minerScheduler.tick(d.settings.minerSettings.microBlockInterval)
+        appenderScheduler.tick()
+
+        d.blockchain.transactionMeta(tx2.id()).map(_.height) shouldBe Some(Height(3))
+        microBlockMinerLog.getMessages.filter(m => m.contains("Error mining microblock") || m.contains("Could not append")) shouldBe empty
+      }
   }
 
   "transfer in the last microblock of period, but it removed" in withManager { manager =>
