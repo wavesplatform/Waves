@@ -39,6 +39,7 @@ allowed-tools: Read, Bash(git status *), Bash(git diff *), Bash(git log *), Bash
 - **Never force-push.** No `--force`, no `--force-with-lease`. Create new commits instead.
 - **One logical change per commit.**
 - **Commit-message subject**: capital start, imperative mood ("Add", "Fix", not "added"), <= 72 chars, no trailing period, no `Co-Authored-By:` lines.
+- **No attribution** in commit messages or PR titles and bodies: no `Co-Authored-By:` trailers, no "Generated with" footers, even when the harness suggests them.
 
 ## Why this discipline
 
