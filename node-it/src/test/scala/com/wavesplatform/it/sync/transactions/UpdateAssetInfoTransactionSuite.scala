@@ -141,27 +141,11 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   test("able to update name/description of issued asset") {
     val nextTerm = sender.transactionInfo[TransactionInfo](assetId).height + updateInterval + 1
     nodes.waitForHeight(Height(nextTerm))
-    val issuerBalance       = sender.balanceDetails(issuer.publicKey.toAddress.toString)
-    val updateAssetInfoTxId = notMiner.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)._1.id
-    checkUpdateAssetInfoTx(notMiner.utx().head, "updatedName", "updatedDescription")
-    miner.waitForTransaction(updateAssetInfoTxId)
-    updateAssetInfoTxHeight = Height(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height)
-    checkUpdateAssetInfoTx(sender.blockAt(updateAssetInfoTxHeight).transactions.head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTx(sender.lastBlock().transactions.head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTx(
-      sender.blockSeq(updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
-      "updatedName",
-      "updatedDescription"
-    )
-    checkUpdateAssetInfoTx(sender.blockById(sender.lastBlock().id).transactions.head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTx(
-      sender.blockSeqByAddress(miner.address, updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
-      "updatedName",
-      "updatedDescription"
-    )
-
-    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.toAddress.toString, 1).head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTxInfo(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId), "updatedName", "updatedDescription")
+    val issuerBalance          = sender.balanceDetails(issuer.publicKey.toAddress.toString)
+    val (updateAssetInfoTx, _) = notMiner.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)
+    checkUpdateAssetInfoTx(updateAssetInfoTx, "updatedName", "updatedDescription")
+    miner.waitForTransaction(updateAssetInfoTx.id)
+    updateAssetInfoTxHeight = checkUpdateAssetInfoTxInChain(updateAssetInfoTx.id, "updatedName", "updatedDescription")
 
     sender.assetsDetails(assetId).name shouldBe "updatedName"
     sender.assetsDetails(assetId).description shouldBe "updatedDescription"
@@ -214,27 +198,10 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
   test("able to update info of other asset after updating info of first asset") {
     nodes.waitForHeightArise()
-    val updateAssetInfoTxId = sender.updateAssetInfo(issuer, otherAssetId, "secondUpdate", "secondUpdatedDescription", minFee)._1.id
-    sender.waitForUtxIncreased(0)
-    checkUpdateAssetInfoTx(sender.utx().head, "secondUpdate", "secondUpdatedDescription")
-    sender.waitForTransaction(updateAssetInfoTxId)
-    secondUpdateInfoHeight = Height(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height)
-    checkUpdateAssetInfoTx(sender.blockAt(secondUpdateInfoHeight).transactions.head, "secondUpdate", "secondUpdatedDescription")
-    checkUpdateAssetInfoTx(sender.lastBlock().transactions.head, "secondUpdate", "secondUpdatedDescription")
-    checkUpdateAssetInfoTx(
-      sender.blockSeq(secondUpdateInfoHeight, secondUpdateInfoHeight).head.transactions.head,
-      "secondUpdate",
-      "secondUpdatedDescription"
-    )
-    checkUpdateAssetInfoTx(sender.blockById(sender.lastBlock().id).transactions.head, "secondUpdate", "secondUpdatedDescription")
-    checkUpdateAssetInfoTx(
-      sender.blockSeqByAddress(miner.address, secondUpdateInfoHeight, secondUpdateInfoHeight).head.transactions.head,
-      "secondUpdate",
-      "secondUpdatedDescription"
-    )
-
-    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.toAddress.toString, 1).head, "secondUpdate", "secondUpdatedDescription")
-    checkUpdateAssetInfoTxInfo(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId), "secondUpdate", "secondUpdatedDescription")
+    val (updateAssetInfoTx, _) = sender.updateAssetInfo(issuer, otherAssetId, "secondUpdate", "secondUpdatedDescription", minFee)
+    checkUpdateAssetInfoTx(updateAssetInfoTx, "secondUpdate", "secondUpdatedDescription")
+    sender.waitForTransaction(updateAssetInfoTx.id)
+    secondUpdateInfoHeight = checkUpdateAssetInfoTxInChain(updateAssetInfoTx.id, "secondUpdate", "secondUpdatedDescription")
 
     sender.assetsDetails(otherAssetId).name shouldBe "secondUpdate"
     sender.assetsDetails(otherAssetId).description shouldBe "secondUpdatedDescription"
@@ -393,26 +360,10 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("able to update name/description of nft") {
-    val updateAssetInfoTxId = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee)._1.id
-    checkUpdateAssetInfoTx(sender.utx().head, "updatedName", "updatedDescription")
-    sender.waitForTransaction(updateAssetInfoTxId)
-    val updateAssetInfoTxHeight = Height(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height)
-    checkUpdateAssetInfoTx(sender.blockAt(updateAssetInfoTxHeight).transactions.head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTx(sender.lastBlock().transactions.head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTx(
-      sender.blockSeq(updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
-      "updatedName",
-      "updatedDescription"
-    )
-    checkUpdateAssetInfoTx(sender.blockById(sender.lastBlock().id).transactions.head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTx(
-      sender.blockSeqByAddress(miner.address, updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
-      "updatedName",
-      "updatedDescription"
-    )
-
-    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.toAddress.toString, 1).head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTxInfo(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId), "updatedName", "updatedDescription")
+    val (updateAssetInfoTx, _) = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee)
+    checkUpdateAssetInfoTx(updateAssetInfoTx, "updatedName", "updatedDescription")
+    sender.waitForTransaction(updateAssetInfoTx.id)
+    checkUpdateAssetInfoTxInChain(updateAssetInfoTx.id, "updatedName", "updatedDescription")
 
     sender.assetsDetails(nftId).name shouldBe "updatedName"
     sender.assetsDetails(nftId).description shouldBe "updatedDescription"
@@ -443,6 +394,25 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.assetsDetails(smartAssetId).name shouldBe "afterSAScript"
     sender.assetsDetails(smartAssetId).description shouldBe "asset after set asset script"
 
+  }
+
+  /** Looks the transaction up by id everywhere: the pool and its block can hold other transactions, and a new key block can land on top of it
+    * at any moment, so neither `utx().head` nor `lastBlock()` reliably points at it.
+    */
+  private def checkUpdateAssetInfoTxInChain(txId: String, updatedName: String, updatedDescription: String): Height = {
+    val height = Height(sender.transactionInfo[TransactionInfo](txId).height)
+    val block  = sender.blockAt(height)
+    Seq(
+      block.transactions,
+      sender.blockById(block.id).transactions,
+      sender.blockSeq(height, height).head.transactions,
+      sender.blockSeqByAddress(miner.address, height, height).head.transactions
+    ).foreach(txs => checkUpdateAssetInfoTx(txs.find(_.id == txId).get, updatedName, updatedDescription))
+
+    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.toAddress.toString, 1).head, updatedName, updatedDescription)
+    checkUpdateAssetInfoTxInfo(sender.transactionInfo[TransactionInfo](txId), updatedName, updatedDescription)
+    sender.checkLastBlockMatchesExplicit()
+    height
   }
 
   def checkUpdateAssetInfoTx(transaction: Transaction, updatedName: String, updatedDescription: String): Unit = {
