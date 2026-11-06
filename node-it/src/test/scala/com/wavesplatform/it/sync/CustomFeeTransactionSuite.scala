@@ -5,6 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.{Height, Sponsorship}
 import com.wavesplatform.test.*
@@ -42,6 +43,9 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val unsponsoredId =
       notMiner.transfer(senderKeyPair, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(unsponsoredId)
+    withClue("the unsponsored transfer must be mined before sponsorship switches on: ") {
+      notMiner.transactionInfo[TransactionInfo](unsponsoredId).height should be < featureCheckBlocksPeriod
+    }
     notMiner.assertBalances(senderAddress, balance1 - fees, eff1 - fees)
     notMiner.assertBalances(secondAddress, balance2, eff2)
     notMiner.assertBalances(minerAddress, balance3 + fees, eff3 + fees)
@@ -68,14 +72,25 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 }
 
 object CustomFeeTransactionSuite {
-  private val minerAddress             = Default.head.getString("address")
-  private val senderAddress            = Default(2).getString("address")
-  private val seed                     = Default(2).getString("account-seed")
-  private val senderKeyPair            = KeyPair.fromSeed(seed).explicitGet()
-  private val defaultAssetQuantity     = 999999999999L
-  private val featureCheckBlocksPeriod = 8
+  private val minerAddress         = Default.head.getString("address")
+  private val senderAddress        = Default(2).getString("address")
+  private val seed                 = Default(2).getString("account-seed")
+  private val senderKeyPair        = KeyPair.fromSeed(seed).explicitGet()
+  private val defaultAssetQuantity = 999999999999L
+  // Sponsorship switches on at this height; with blocks every 2s the unsponsored transfer is mined at about 5 to 8, so 8 left no margin
+  private val featureCheckBlocksPeriod = 20
 
-  private val assetTx = TxHelpers.issue(issuer = senderKeyPair, amount = defaultAssetQuantity, decimals = 2, name = "asset", description = "asset description", fee = 1.waves, script = None, reissuable = false, version = TxVersion.V1)
+  private val assetTx = TxHelpers.issue(
+    issuer = senderKeyPair,
+    amount = defaultAssetQuantity,
+    decimals = 2,
+    name = "asset",
+    description = "asset description",
+    fee = 1.waves,
+    script = None,
+    reissuable = false,
+    version = TxVersion.V1
+  )
 
   private val assetId = assetTx.id()
 

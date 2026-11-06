@@ -18,11 +18,8 @@ class MicroblocksSponsoredFeeTestSuite extends BaseFreeSpec with ScorexLogging {
 
   private def secondAddress = nodes(2).address
 
-  private def txRequestsGen(n: Int, sponsorAssetId: String): Unit = {
-    1 to n map (_ => {
-      sponsor.transfer(sponsor.keyPair, secondAddress, Token, fee = SmallFee, None, Some(sponsorAssetId))
-    })
-  }
+  private def txRequestsGen(n: Int, sponsorAssetId: String): Seq[String] =
+    (1 to n).map(_ => sponsor.transfer(sponsor.keyPair, secondAddress, Token, fee = SmallFee, None, Some(sponsorAssetId)).id)
 
   "fee distribution with sponsorship" - {
     "check fee distribution" in {
@@ -39,39 +36,40 @@ class MicroblocksSponsoredFeeTestSuite extends BaseFreeSpec with ScorexLogging {
 
       val height = nodes.waitForHeightArise()
 
-      txRequestsGen(50, sponsorAssetId)
-      nodes.waitForHeight(height + 2)
+      val txIds = txRequestsGen(50, sponsorAssetId)
+      // The transfers spread over however many blocks the broadcasts take, and the block after the last one gets its 60% share
+      val lastTxHeight = txIds.map(notMiner.waitForSettledTransaction).max
+      nodes.waitForHeight(lastTxHeight + 2)
 
-      val blockHeadersSeq = notMiner.blockHeadersSeq(height - 1, height + 2)
+      // The block before `height` is only the baseline balance; it may still hold the sponsorship transaction
+      val blockHeadersSeq = notMiner.blockHeadersSeq(height - 1, lastTxHeight.next)
+      val transferBlocks  = blockHeadersSeq.drop(1)
+      transferBlocks.map(_.transactionCount).sum shouldBe txIds.size
+      transferBlocks.map(_.totalFee).sum shouldBe txIds.size * FeeValidation.FeeUnit * SmallFee / minSponsorFee
 
-      val filteredBlocks = blockHeadersSeq
-        .zip(blockHeadersSeq.drop(1))
-        .withFilter(t => t._1.transactionCount != t._2.transactionCount)
-        .map(_._1) :+ blockHeadersSeq.last
-
-      val filteredBlocksFee        = filteredBlocks.map(b => b.transactionCount * FeeValidation.FeeUnit * SmallFee / minSponsorFee)
-      val minerBalances: Seq[Long] = filteredBlocks.map(b => notMiner.debugStateAt(b.height)(b.generator))
-
-      minerBalances.zip(filteredBlocksFee).sliding(2).foreach {
+      val minerBalances = blockHeadersSeq.map(b => notMiner.debugStateAt(b.height)(b.generator))
+      minerBalances.zip(blockHeadersSeq.map(_.totalFee)).sliding(2).foreach {
         case Seq((minerBalance1, blockFee1), (minerBalance2, blockFee2)) =>
           minerBalance2 should be(minerBalance1 + blockFee1 * 6 / 10 + blockFee2 * 4 / 10)
 
         case _ => ???
       }
 
-      val block   = notMiner.blockAt(height)
-      val realFee = block.transactions.map(tx => Sponsorship.toWaves(tx.fee, Token)).sum
-      blockHeadersSeq(1).totalFee shouldBe realFee
+      transferBlocks.foreach { header =>
+        val realFee = notMiner.blockAt(header.height).transactions.map(tx => Sponsorship.toWaves(tx.fee, Token)).sum
+        header.totalFee shouldBe realFee
+      }
     }
   }
 
   import NodeConfigs.*
   override def nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.quorum(0).overrides(
-      """waves.blockchain.custom.functionality {
-        |  blocks-for-feature-activation = 1
-        |  feature-check-blocks-period = 1
-        |}""".stripMargin),
+    BiggestMiner
+      .quorum(0)
+      .overrides("""waves.blockchain.custom.functionality {
+                   |  blocks-for-feature-activation = 1
+                   |  feature-check-blocks-period = 1
+                   |}""".stripMargin),
     Default(1).notMiner,
     Default(2).notMiner
   ).map(_.preactivatedFeatures((BlockchainFeatures.BlockReward, Height(1000000))))

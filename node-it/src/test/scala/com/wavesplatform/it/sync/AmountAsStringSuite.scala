@@ -7,12 +7,13 @@ import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.it.BaseFunSuite
 import com.wavesplatform.it.NodeConfigs.*
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.it.api.{Transaction, TransactionInfo}
+import com.wavesplatform.it.api.{Transaction, TransactionInfo, UnexpectedStatusCodeException}
 import com.wavesplatform.state.{Height, IntegerDataEntry}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.{CreateAliasTransaction, TxExchangeAmount, TxExchangePrice, TxVersion}
 import com.wavesplatform.utils.ScorexLogging
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.asynchttpclient.Response
 import org.scalatest
 import org.scalatest.Assertion
@@ -28,6 +29,24 @@ class AmountAsStringSuite extends BaseFunSuite with ScorexLogging {
   private def firstAddress = firstKeyPair.toAddress.toString
 
   val (headerName, headerValue) = ("Accept", "application/json;large-significand-format=string")
+
+  /** The miner packs a transaction at any moment, so the pool views are checked only while it is still pending. */
+  private def checkPending(id: String)(check: Transaction => Assertion): Unit = {
+    sender.utx(amountsAsStrings = true).find(_.id == id).foreach(check)
+    try check(sender.utxById(id, amountsAsStrings = true))
+    catch { case ApiCallException(e: UnexpectedStatusCodeException) if e.statusCode == StatusCodes.NotFound.intValue => () }
+  }
+
+  /** The transaction as every block view returns it, at the height it settled at. /blocks/last is compared with the same block by height and id
+    * instead: a key block can land on top of the transaction at any moment, and the next block may hold none.
+    */
+  private def inBlocks(id: String): Seq[Transaction] = {
+    val height = sender.waitForSettledTransaction(id)
+    val block  = sender.blockAt(height, amountsAsStrings = true)
+    sender.checkLastBlockMatchesExplicit(amountsAsStrings = true)
+    Seq(block, sender.blockById(block.id, amountsAsStrings = true), sender.blockSeq(height, height, amountsAsStrings = true).head)
+      .map(_.transactions.find(_.id == id).get)
+  }
 
   test("amount as string in assets api") {
     val assetId = sender.issue(firstKeyPair, "assetName", "description", someAssetAmount, 8, fee = issueFee, waitForTx = true).id
@@ -123,23 +142,8 @@ class AmountAsStringSuite extends BaseFunSuite with ScorexLogging {
         amountsAsStrings = true
       )
     checkExchangeTx(exchangeTx)
-
-    val utxExchangeTxInfoById = sender.utxById(exchangeTx.id, amountsAsStrings = true)
-    val utxExchangeTxInfo     = sender.utx(amountsAsStrings = true)
-    checkExchangeTx(utxExchangeTxInfoById)
-    checkExchangeTx(utxExchangeTxInfo.head)
-
-    val exchangeTxHeightInt        = sender.waitForTransaction(exchangeTx.id).height
-    val exchangeTxHeight           = Height(exchangeTxHeightInt)
-    val lastBlock                  = sender.lastBlock(amountsAsStrings = true)
-    val exchangeTxBlockAt          = sender.blockAt(exchangeTxHeight, amountsAsStrings = true).transactions.head
-    val exchangeTxBlockBySignature = sender.blockById(sender.blockAt(exchangeTxHeight).id, amountsAsStrings = true).transactions.head
-    val exchangeTxBlockSeq         = sender.blockSeq(exchangeTxHeight, exchangeTxHeight, amountsAsStrings = true).head.transactions.head
-    // A key block mined after waitForTransaction leaves /blocks/last without the tx
-    if (lastBlock.height == exchangeTxHeightInt) checkExchangeTx(lastBlock.transactions.head)
-    checkExchangeTx(exchangeTxBlockAt)
-    checkExchangeTx(exchangeTxBlockBySignature)
-    checkExchangeTx(exchangeTxBlockSeq)
+    checkPending(exchangeTx.id)(checkExchangeTx)
+    inBlocks(exchangeTx.id).foreach(checkExchangeTx)
 
     val exchangeTxInfo = sender.transactionInfo[TransactionInfo](exchangeTx.id, amountsAsStrings = true)
     exchangeTxInfo.amount shouldBe Some(amount)
@@ -157,27 +161,10 @@ class AmountAsStringSuite extends BaseFunSuite with ScorexLogging {
     val dataFee     = calcDataFee(dataEntries, TxVersion.V1)
     val dataTx      = sender.putData(sender.keyPair, dataEntries, dataFee, amountsAsStrings = true)
     dataTx.fee shouldBe dataFee
-    dataTx.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
-
-    sender.utx(amountsAsStrings = true).head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
-    sender.utxById(dataTx.id, amountsAsStrings = true).data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
-
-    val dataTxHeight = Height(sender.waitForTransaction(dataTx.id).height)
-    sender.lastBlock(amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
-    sender.blockAt(dataTxHeight, amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
-    sender
-      .blockById(sender.lastBlock().id, amountsAsStrings = true)
-      .transactions
-      .head
-      .data
-      .map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
-    sender
-      .blockSeq(dataTxHeight, dataTxHeight, amountsAsStrings = true)
-      .head
-      .transactions
-      .head
-      .data
-      .map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+    def checkDataTx(tx: Transaction): Assertion = tx.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+    checkDataTx(dataTx)
+    checkPending(dataTx.id)(checkDataTx)
+    inBlocks(dataTx.id).foreach(checkDataTx)
 
     sender.transactionInfo[TransactionInfo](dataTx.id, amountsAsStrings = true).data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
     sender.getData(sender.address, amountsAsStrings = true).filter(_.key == "int").head.value shouldBe 666
@@ -192,19 +179,8 @@ class AmountAsStringSuite extends BaseFunSuite with ScorexLogging {
     nodes.waitForHeightArise()
     val sponsorshipTx = sender.sponsorAsset(sender.keyPair, sponsoredAssetId, 10000, sponsorFee, amountsAsStrings = true)
     checkSponsorshipTx(sponsorshipTx)
-
-    checkSponsorshipTx(sender.utx(amountsAsStrings = true).head)
-    checkSponsorshipTx(sender.utxById(sponsorshipTx.id))
-
-    val sponsorshipTxHeight           = Height(sender.waitForTransaction(sponsorshipTx.id).height)
-    val sponsorshipTxBlockLast        = sender.lastBlock(amountsAsStrings = true).transactions.head
-    val sponsorshipTxBlockAt          = sender.blockAt(sponsorshipTxHeight, amountsAsStrings = true).transactions.head
-    val sponsorshipTxBlockBySignature = sender.blockById(sender.blockAt(sponsorshipTxHeight).id, amountsAsStrings = true).transactions.head
-    val sponsorshipTxBlockSeq         = sender.blockSeq(sponsorshipTxHeight, sponsorshipTxHeight, amountsAsStrings = true).head.transactions.head
-    checkSponsorshipTx(sponsorshipTxBlockLast)
-    checkSponsorshipTx(sponsorshipTxBlockAt)
-    checkSponsorshipTx(sponsorshipTxBlockBySignature)
-    checkSponsorshipTx(sponsorshipTxBlockSeq)
+    checkPending(sponsorshipTx.id)(checkSponsorshipTx)
+    inBlocks(sponsorshipTx.id).foreach(checkSponsorshipTx)
 
     val sponsorshipTxInfo = sender.transactionInfo[TransactionInfo](sponsorshipTx.id)
     sponsorshipTxInfo.minSponsoredAssetFee shouldBe Some(10000)
@@ -221,17 +197,8 @@ class AmountAsStringSuite extends BaseFunSuite with ScorexLogging {
     val (transfers, massTransferFee) = (List(Transfer(miner.address, transferAmount)), calcMassTransferFee(1))
     val massTransferTx               = sender.massTransfer(firstKeyPair, transfers, massTransferFee, amountsAsStrings = true)
     checkMassTransferTx(massTransferTx)
-
-    checkMassTransferTx(sender.utx(amountsAsStrings = true).head)
-    checkMassTransferTx(sender.utxById(massTransferTx.id, amountsAsStrings = true))
-
-    val massTransferTxHeight           = Height(sender.waitForTransaction(massTransferTx.id).height)
-    val massTransferTxBlockAt          = sender.blockAt(massTransferTxHeight, amountsAsStrings = true).transactions.head
-    val massTransferTxBlockBySignature = sender.blockById(sender.blockAt(massTransferTxHeight).id, amountsAsStrings = true).transactions.head
-    val massTransferTxBlockSeq         = sender.blockSeq(massTransferTxHeight, massTransferTxHeight, amountsAsStrings = true).head.transactions.head
-    checkMassTransferTx(massTransferTxBlockAt)
-    checkMassTransferTx(massTransferTxBlockBySignature)
-    checkMassTransferTx(massTransferTxBlockSeq)
+    checkPending(massTransferTx.id)(checkMassTransferTx)
+    inBlocks(massTransferTx.id).foreach(checkMassTransferTx)
 
     val massTransferTxInfo = sender.transactionInfo[TransactionInfo](massTransferTx.id)
     massTransferTxInfo.transfers.get.head.amount shouldBe transferAmount
