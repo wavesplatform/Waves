@@ -102,8 +102,9 @@ object ResumableInputStream extends ScorexLogging {
         val length = Some(connection.getContentLengthLong).filter(_ >= 0)
         val size   = if (offset > 0) contentRange.flatMap(_.split('/').lastOption).flatMap(_.toLongOption) else length
         (fileSize, size) match {
-          case (Some(expected), Some(actual)) if expected != actual => throw new IllegalStateException(s"$url changed size from $expected to $actual bytes")
-          case _                                                    => if (fileSize.isEmpty) fileSize = size
+          case (Some(expected), Some(actual)) if expected != actual =>
+            throw new IllegalStateException(s"$url changed size from $expected to $actual bytes")
+          case _ => if (fileSize.isEmpty) fileSize = size
         }
         if (validator.isEmpty) validator = responseValidator
 
