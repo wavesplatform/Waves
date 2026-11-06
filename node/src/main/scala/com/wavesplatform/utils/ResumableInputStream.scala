@@ -70,6 +70,9 @@ object ResumableInputStream {
     connection.setConnectTimeout(timeout.toMillis.toInt)
     connection.setReadTimeout(timeout.toMillis.toInt)
     if (offset > 0) connection.setRequestProperty("Range", s"bytes=$offset-")
+    val status = connection.getResponseCode
+    // A client error other than a timeout or throttling will not go away on retry.
+    if (status >= 400 && status < 500 && status != 408 && status != 429) throw new IllegalStateException(s"$url: HTTP $status")
     val in = connection.getInputStream
     // A server that ignores Range sends the file from the start; reading on would feed misaligned bytes to the caller.
     val contentRange = Option(connection.getHeaderField("Content-Range"))
