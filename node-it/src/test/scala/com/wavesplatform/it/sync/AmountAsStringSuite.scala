@@ -129,12 +129,14 @@ class AmountAsStringSuite extends BaseFunSuite with ScorexLogging {
     checkExchangeTx(utxExchangeTxInfoById)
     checkExchangeTx(utxExchangeTxInfo.head)
 
-    val exchangeTxHeight           = Height(sender.waitForTransaction(exchangeTx.id).height)
-    val exchangeTxBlockLast        = sender.lastBlock(amountsAsStrings = true).transactions.head
+    val exchangeTxHeightInt        = sender.waitForTransaction(exchangeTx.id).height
+    val exchangeTxHeight           = Height(exchangeTxHeightInt)
+    val lastBlock                  = sender.lastBlock(amountsAsStrings = true)
     val exchangeTxBlockAt          = sender.blockAt(exchangeTxHeight, amountsAsStrings = true).transactions.head
     val exchangeTxBlockBySignature = sender.blockById(sender.blockAt(exchangeTxHeight).id, amountsAsStrings = true).transactions.head
     val exchangeTxBlockSeq         = sender.blockSeq(exchangeTxHeight, exchangeTxHeight, amountsAsStrings = true).head.transactions.head
-    checkExchangeTx(exchangeTxBlockLast)
+    // A key block mined after waitForTransaction leaves /blocks/last without the tx
+    if (lastBlock.height == exchangeTxHeightInt) checkExchangeTx(lastBlock.transactions.head)
     checkExchangeTx(exchangeTxBlockAt)
     checkExchangeTx(exchangeTxBlockBySignature)
     checkExchangeTx(exchangeTxBlockSeq)
