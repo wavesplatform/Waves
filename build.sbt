@@ -101,6 +101,8 @@ lazy val `node-testkit` = project
   .enablePlugins(PublishedModule)
   .settings(libraryDependencies ++= Dependencies.nodeTests)
 
+lazy val testTmpDir = settingKey[File]("java.io.tmpdir of forked test JVMs, emptied before every test run")
+
 lazy val `node-tests` = project
   .in(file("node/tests"))
   .dependsOn(`node-testkit`)
@@ -120,8 +122,19 @@ lazy val `node-tests` = project
         s"-XX:ErrorFile=$root/hs_err_pid%p.log",
         "-Dfile.encoding=UTF-8",
         "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-        "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED"
+        "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED",
+        s"-Djava.io.tmpdir=${(Test / testTmpDir).value}"
       )
+    },
+    // Suites clean up after themselves, but a killed fork (cancel, SIGKILL, ExitOnOutOfMemoryError) cannot: keep its temp files (RocksDB
+    // dirs, native libraries) out of the shared /tmp and wipe them before the next run
+    Test / testTmpDir := target.value / "test-tmp",
+    Test / testOptions += {
+      val dir = (Test / testTmpDir).value
+      Tests.Setup { () =>
+        IO.delete(dir)
+        IO.createDirectory(dir)
+      }
     }
   )
 

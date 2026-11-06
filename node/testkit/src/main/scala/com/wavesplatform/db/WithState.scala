@@ -43,35 +43,22 @@ import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
-import java.nio.file.Files
 import scala.concurrent.duration.*
 import scala.util.Using
 
-trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { suite: Suite =>
+trait WithState extends BeforeAndAfterAll with ClosesAfterRun with DBCacheSettings with Matchers with NTPTime { suite: Suite =>
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
 
-  private val path  = Files.createTempDirectory(s"rocks-temp-${getClass.getSimpleName}").toAbsolutePath
-  protected val rdb = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
+  private val tempRdb    = OnFirstUse(TempRDB(s"rocks-temp-${getClass.getSimpleName}", dbSettings))
+  protected def rdb: RDB = tempRdb.get.rdb
+
+  override protected def closeAfterRun(): Unit = TestHelpers.closeAll(() => super.closeAfterRun(), () => tempRdb.close())
 
   private val MaxKey = Shorts.toByteArray(KeyTag.values.length.toShort)
   private val MinKey = new Array[Byte](2)
 
-  protected def tempDb[A](f: RDB => A): A = {
-    val path = Files.createTempDirectory(s"rocks-temp-tmp-${getClass.getSimpleName}").toAbsolutePath
-    val rdb  = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
-    try {
-      f(rdb)
-    } finally {
-      rdb.close()
-      TestHelpers.deleteRecursively(path)
-    }
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    rdb.close()
-    TestHelpers.deleteRecursively(path)
-  }
+  protected def tempDb[A](f: RDB => A): A =
+    Using.resource(TempRDB(s"rocks-temp-tmp-${getClass.getSimpleName}", dbSettings))(db => f(db.rdb))
 
   protected def withRocksDBWriter[A](ws: WavesSettings)(test: RocksDBWriter => A): A = {
     try {
