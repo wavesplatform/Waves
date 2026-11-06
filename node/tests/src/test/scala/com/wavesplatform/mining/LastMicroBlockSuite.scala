@@ -168,6 +168,9 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       time = time
     ) { d =>
       d.wallet.generateNewAccounts(1)
+      // The genesis timestamp comes from the JVM-wide TxHelpers counter, which can lag the wall clock (TestTime's start) by minutes
+      // in a full run; a block then gets "now - 1 minute" as its timestamp and the next attempt fires at once
+      time.setTime(d.lastBlock.header.timestamp)
       val minerImpl = new MinerImpl(
         channels,
         d.blockchain,
@@ -283,7 +286,9 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
         appenderScheduler.tick()
 
         d.blockchain.transactionMeta(tx2.id()).map(_.height) shouldBe Some(Height(3))
-        microBlockMinerLog.getMessages.filter(m => m.contains("Error mining microblock") || m.contains("Could not append")) shouldBe empty
+        // The logger is JVM-wide; TestScheduler runs this test's microblock miner on the test thread
+        val ownMessages = microBlockMinerLog.getEvents.filter(_.getThreadName == Thread.currentThread().getName).map(_.getFormattedMessage)
+        ownMessages.filter(m => m.contains("Error mining microblock") || m.contains("Could not append")) shouldBe empty
       }
     }
   }
