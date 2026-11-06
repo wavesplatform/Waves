@@ -74,8 +74,6 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
       log.debug("Trigger forging block3")
       time.setTimeIfGreater(d.nextBlockTime(minerAcc))
       appenderScheduler.tickNext("appender-1")
-      minerScheduler.tickNext("miner-1")
-      appenderScheduler.tickNext("appender-2")
       withClue("Make sure, test works as expected: ") {
         d.lastBlock.header.generator.toAddress shouldBe minerAcc.toAddress
       }
@@ -98,8 +96,6 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
       time.setTimeIfGreater(d.nextBlockTime(notCommittedAcc))
       minerScheduler.tickNext("miner-3")
       appenderScheduler.tickNext("appender-4")
-      minerScheduler.tickNext("miner-4")
-      appenderScheduler.tickNext("appender-5")
       withClue("Forged: ") {
         d.lastBlockId should not be liquidBlock1
         d.blockchain.height shouldBe 4
@@ -158,8 +154,6 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
         log.debug("Trigger forging block3")
         time.setTimeIfGreater(d.nextBlockTime(minerAcc))
         appenderScheduler.tickNext("appender-1")
-        minerScheduler.tickNext("miner-1")
-        appenderScheduler.tickNext("appender-2")
         withClue("Make sure, test works as expected: ") {
           d.lastBlock.header.generator.toAddress shouldBe minerAcc.toAddress
         }
@@ -182,8 +176,6 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
         time.setTimeIfGreater(d.nextBlockTime(notCommittedAcc))
         minerScheduler.tickNext("miner-3")
         appenderScheduler.tickNext("appender-4")
-        minerScheduler.tickNext("miner-4") // Second time because of two accounts on node
-        appenderScheduler.tickNext("appender-5")
         withClue("Not forged: ") {
           d.lastBlockId shouldBe liquidBlock1
         }
@@ -256,8 +248,6 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
         log.debug("Trigger forging block3")
         time.setTimeIfGreater(d.nextBlockTime(minerAcc))
         appenderScheduler.tickNext("appender-1")
-        minerScheduler.tickNext("miner-1")
-        appenderScheduler.tickNext("appender-2")
         withClue("Make sure, test works as expected: ") {
           d.lastBlock.header.generator.toAddress shouldBe minerAcc.toAddress
         }
@@ -280,8 +270,6 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
         time.setTimeIfGreater(d.nextBlockTime(notCommittedAcc))
         minerScheduler.tickNext("miner-3")
         appenderScheduler.tickNext("appender-4")
-        minerScheduler.tickNext("miner-4") // Second time because of two accounts on node
-        appenderScheduler.tickNext("appender-5")
         withClue("Not forged: ") {
           d.lastBlockId shouldBe liquidBlock1
         }
@@ -307,10 +295,10 @@ class MultipleAccountsMinerWithFinalitySuite extends BaseFinalizationSpec, TestS
           d.lastBlock.header.generator.toAddress shouldBe minerAcc.toAddress
         }
 
-        log.debug("Trigger next block forging - second attempt")
+        // The first attempt skipped that too-young microblock and failed; it retries on its own once the microblock is old enough
+        log.debug("Trigger next block forging - second attempt, once the microblock is old enough")
         time.advance(defaultSettings.minerSettings.minMicroBlockAge)
         time.setTimeIfGreater(d.nextBlockTime(notCommittedAcc))
-        minerScheduler.tickNext("miner-7")
         appenderScheduler.tickNext("appender-7")
         withClue("Not committed forged: ") {
           d.lastBlock.header.generator.toAddress shouldBe notCommittedAcc.toAddress

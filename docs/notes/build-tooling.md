@@ -42,6 +42,10 @@ Two things to know when checking this by hand. `print Global/concurrentRestricti
 
 Fixing the shadowing above still left `-Dwaves.it.max-parallel-suites` unable to go above 4 on a GitHub runner. sbt's `ForkTests` tags every forked group with `(ForkedTestGroup, 1)` *plus* the tags of `Test / testOnly` (or `Test / test`), which default to `(Tags.Test, 1)`, so each node-it suite counted against `Tags.limit(Tags.Test, min(SystemProcessors, 8))` as well, and the smaller of the two limits won. `IntegrationTestsPlugin` clears both `tags` settings for node-it, which leaves `ForkedTestGroup` as the only cap on suite concurrency. Other modules keep the `Tags.Test` limit. `checkTestLimits` also fails if `Tags.Test` reappears on node-it's test tasks. To check by hand: `show node-it/Test/testOnly/tags` must print an empty list.
 
+## node-tests: forked JVMs get their own java.io.tmpdir
+
+Forked node-tests JVMs run with `-Djava.io.tmpdir` at `target/out/jvm/u/node-tests/test-tmp` (the `testTmpDir` key), and a `Tests.Setup` deletes and recreates it before every test task; the setup runs in sbt before the fork starts. Suites clean up after themselves, but a fork that dies (cancel, SIGKILL, `-XX:+ExitOnOutOfMemoryError`) cannot, and its RocksDB directories and unpacked native libraries used to stay in the shared `/tmp` for good. Two consequences: two test runs of node-tests in the same checkout at once (for example from two sbt servers) delete each other's live temp files, and a suite run outside sbt (an IDE runner that does not fork) sees the system default instead. grpc-server tests are not forked, so they still write to the sbt server's `/tmp`.
+
 ## Docker image build: staged directories, not a tarball
 
 `sbt stageForDocker` copies the node and grpc-server universal mappings straight into `docker/target`, the image build context, and `docker/Dockerfile` `COPY`s them in. It used to package both as `.tgz` (`buildTarballsForDocker`) and unpack them in a `RUN`, which cost a recompression plus an unpack per iteration:
