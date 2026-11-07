@@ -39,6 +39,7 @@ import scopt.OParser
 import java.io.*
 import java.net.URI
 import java.time
+import java.util.Locale
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.duration.*
@@ -182,6 +183,11 @@ object Importer extends ScorexLogging {
       }
     }
 
+  // Rides out a server restart or a network blip; a dead mirror still fails within about 11 minutes (10 x (5 s + up to 1 min)).
+  private val HttpTimeout    = 1.minute
+  private val HttpMaxRetries = 10
+  private val HttpRetryDelay = 5.seconds
+
   @volatile private var quit = false
   private val lock           = new Object
 
@@ -277,7 +283,7 @@ object Importer extends ScorexLogging {
           } else {
             if (factReadBlockSize != blockSize)
               log.info(s"$factReadBlockSize != expected $blockSize for blocks")
-            if (factReadSnapshotsSize == snapshotsSize)
+            if (factReadSnapshotsSize != snapshotsSize)
               log.info(s"$factReadSnapshotsSize != expected $snapshotsSize for snapshots")
 
             quit = true
@@ -330,12 +336,15 @@ object Importer extends ScorexLogging {
 
         case _ =>
           System.setProperty("http.agent", s"waves-node/${Version.VersionString}")
-          val uri = new URI(file)
-          if (isRemoteResource(uri)) {
-            val connection = uri.toURL.openConnection()
-            if (offset > 0) connection.setRequestProperty("Range", s"bytes=$offset-")
-            connection.connect()
-            connection.getInputStream
+          val uri    = new URI(file)
+          val scheme = Option(uri.getScheme).map(_.toLowerCase(Locale.ROOT))
+          if (scheme.exists(Set("http", "https"))) {
+            new ResumableInputStream(ResumableInputStream.openHttp(uri.toURL, HttpTimeout), offset, HttpMaxRetries, HttpRetryDelay)
+          } else if (scheme.exists(_ != "file")) {
+            // Other URL schemes have no Range request, so read up to the offset instead.
+            val in = uri.toURL.openStream()
+            ByteStreams.skipFully(in, offset)
+            in
           } else {
             val fs = new FileInputStream(file)
             if (offset > 0) fs.skip(offset)
@@ -444,10 +453,5 @@ object Importer extends ScorexLogging {
       scheduler
     )
     Await.result(Kamon.stopModules(), 10.seconds)
-  }
-
-  private def isRemoteResource(uri: URI): Boolean = {
-    val scheme = uri.getScheme
-    scheme != null && scheme != "file"
   }
 }

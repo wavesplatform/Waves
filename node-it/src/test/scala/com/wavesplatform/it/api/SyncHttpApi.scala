@@ -192,11 +192,11 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     /** /blocks/last matches the same block fetched by height and by id. Retries when a block or microblock lands between the reads. */
     @tailrec
-    final def checkLastBlockMatchesExplicit(): Unit = {
-      val last     = lastBlock()
-      val byHeight = blockAt(Height(last.height))
-      val byId     = blockById(last.id)
-      if (lastBlock().id != last.id) checkLastBlockMatchesExplicit()
+    final def checkLastBlockMatchesExplicit(amountsAsStrings: Boolean = false): Unit = {
+      val last     = lastBlock(amountsAsStrings)
+      val byHeight = blockAt(Height(last.height), amountsAsStrings)
+      val byId     = blockById(last.id, amountsAsStrings)
+      if (lastBlock().id != last.id) checkLastBlockMatchesExplicit(amountsAsStrings)
       else {
         byHeight shouldBe last
         byId shouldBe last
@@ -616,6 +616,16 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def waitForHeight(expectedHeight: Height, requestAwaitTime: FiniteDuration = RequestAwaitTime): Height =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
+
+    /** The height of the transaction once a key block is on top of it and it is still there. The miner can orphan its own newest microblock
+      * and mine its transactions again one block higher (docs/notes/testing.md), and a block only gets its solid-state records once covered.
+      */
+    @tailrec
+    final def waitForSettledTransaction(txId: String): Height = {
+      val height = Height(waitForTransaction(txId).height)
+      waitForHeight(height.next)
+      if (Height(waitForTransaction(txId).height) == height) height else waitForSettledTransaction(txId)
+    }
 
     def currentGenerationPeriod: Option[GenerationPeriod] = sync(async(n).finalityStatus).currentGenerationPeriod
 
