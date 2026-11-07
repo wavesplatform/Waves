@@ -3,7 +3,7 @@ import sbt.{Def, *}
 import scalapb.compiler.Version.scalapbVersion
 
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.17.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.20.Final"
 
   val gProtoVersion = "4.36.2"
   val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
@@ -36,11 +36,11 @@ object Dependencies {
 
   // Node protobuf schemas
   lazy val protoSchemasLib =
-    ("com.wavesplatform" % "protobuf-schemas" % "1.6.0").classifier("protobuf-src").intransitive()
+    ("com.wavesplatform" % "protobuf-schemas" % "1.6.1").classifier("protobuf-src").intransitive()
 
-  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.7.0"
+  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.7.1"
 
-  private def pekkoHttpModule(module: String, version: String = "1.4.0") = "org.apache.pekko" %% module % version
+  private def pekkoHttpModule(module: String, version: String = "1.4.2") = "org.apache.pekko" %% module % version
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.8.1"
 
@@ -48,9 +48,10 @@ object Dependencies {
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.13.0" // 4.14+ requires Java 21 https://github.com/LFDT-web3j/web3j/releases/tag/v4.14.0
 
+  // 3.5.x reorders Coeval effects and corrupts SerdeV1 CaseObj output (SerdeTest, EvaluatedPBSerializationTest fail)
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.83.1"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.85.1"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.8.0-jre"
@@ -71,13 +72,13 @@ object Dependencies {
   val sttp3      = sttp3Module("core")
   val sttp3Monix = sttp3Module("monix")
 
-  // 4.2.0 is built with Scala 3.9 (TASTy 28.9), which Scala 3.8 cannot read. Bump together with scalaVersion.
-  val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
+  val console = Seq("com.github.scopt" %% "scopt" % "4.2.0")
 
   def amazonCorretto(c: String): ModuleID = ("software.amazon.cryptools" % "AmazonCorrettoCryptoProvider" % "2.5.0").classifier(c)
 
   val cryptoProviders = Seq(
     // Windows x86_64, Windows x86, macOS x86_64, linux x86_64
+    // Backs consensus P-256 checks (p256Verify, validateCertificateChain); bump only with proof of identical results
     "org.conscrypt" % "conscrypt-openjdk-uber" % "2.8.0",
     // macOS aarch64
     amazonCorretto("osx-aarch_64"),
@@ -111,17 +112,18 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
-    "com.github.jnr" % "jnr-unixsocket" % "0.39.8", // To support Apple ARM
+    "com.github.jnr" % "jnr-unixsocket" % "0.39.9", // To support Apple ARM
     "com.spotify"    % "docker-client"  % "8.16.0",
-    jacksonModule("dataformat", "dataformat-properties", "2.22.2"),
+    jacksonModule("dataformat", "dataformat-properties", "2.22.4"),
     asyncHttpClient
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
     logback,
-    "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
-    "org.scalacheck"    %% "scalacheck"      % "1.20.0",
-    "org.scalamock"     %% "scalamock"       % "7.5.5"
+    "org.scalatestplus" %% "scalacheck-1-16"     % "3.2.14.0",
+    "org.scalacheck"    %% "scalacheck"          % "1.20.0",
+    "org.scalamock"     %% "scalamock"           % "7.6.3",
+    "org.scalamock"     %% "scalamock-scalatest" % "7.6.3"
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
@@ -208,7 +210,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.14.16"
+    val circeVersion = "0.14.17"
     Seq(
       "io.circe" %% "circe-core",
       "io.circe" %% "circe-generic",
