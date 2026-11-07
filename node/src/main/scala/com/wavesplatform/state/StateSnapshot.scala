@@ -33,14 +33,15 @@ case class StateSnapshot(
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
     scriptsComplexity: Long = 0,
     erc20Addresses: Map[ERC20Address, IssuedAsset] = Map(),
-    nextCommittedGenerators: Seq[(PublicKey, BlsPublicKey)] = Seq.empty
+    nextCommittedGenerators: Seq[(PublicKey, BlsPublicKey)] = Seq.empty,
+    touchedAddresses: TouchedAddresses = TouchedAddresses.empty
 ) {
 
   // ignores lease balances from portfolios
   def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, StateSnapshot] =
     StateSnapshot
       .balances(portfolios, SnapshotBlockchain(blockchain, this))
-      .map(b => copy(balances = balances ++ b))
+      .map(b => copy(balances = balances ++ b, touchedAddresses = touchedAddresses ++ portfolios.keySet))
 
   def withTransaction(tx: NewTransactionInfo): StateSnapshot =
     copy(transactions + (tx.transaction.id() -> tx))
@@ -114,7 +115,8 @@ object StateSnapshot {
         ethereumTransactionMeta,
         scriptsComplexity,
         issuedAssets.view.map { case (id, _) => ERC20Address(id) -> id }.toMap,
-        nextCommittedGenerators
+        nextCommittedGenerators,
+        TouchedAddresses(portfolios.keySet)
       )
     r.leftMap(GenericError(_))
   }
@@ -233,7 +235,8 @@ object StateSnapshot {
         s1.ethereumTransactionMeta ++ s2.ethereumTransactionMeta,
         s1.scriptsComplexity + s2.scriptsComplexity,
         s1.erc20Addresses ++ s2.erc20Addresses,
-        s1.nextCommittedGenerators ++ s2.nextCommittedGenerators
+        s1.nextCommittedGenerators ++ s2.nextCommittedGenerators,
+        s1.touchedAddresses ++ s2.touchedAddresses.value
       )
 
     private def combineDataEntries(
@@ -250,4 +253,22 @@ object StateSnapshot {
   }
 
   val empty: StateSnapshot = StateSnapshot()
+}
+
+/** Addresses whose portfolio a transaction touched, including those whose deltas netted to zero and so left no balance entry. It feeds only the
+  * address transaction index: it is neither serialized nor hashed, and it is kept out of `StateSnapshot` equality, which decides how the state hash is
+  * computed (`initSnapshot == StateSnapshot.empty`) and must not depend on how a snapshot was built.
+  */
+final class TouchedAddresses(val value: Set[Address]) {
+  def ++(other: Set[Address]): TouchedAddresses = TouchedAddresses(value ++ other)
+
+  override def equals(obj: Any): Boolean = obj.isInstanceOf[TouchedAddresses]
+  override def hashCode(): Int           = 0
+  override def toString: String          = value.mkString("TouchedAddresses(", ",", ")")
+}
+
+object TouchedAddresses {
+  val empty: TouchedAddresses = TouchedAddresses(Set.empty)
+
+  def apply(value: Set[Address]): TouchedAddresses = new TouchedAddresses(value)
 }
