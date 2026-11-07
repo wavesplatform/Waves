@@ -23,10 +23,14 @@ class LightNodeMiningSuite extends BaseFunSuite with TransferSending {
     val fullNodeAddress  = fullNode.keyPair.toAddress.toString
 
     nodes.waitForHeight(Height(5))
-    fullNode.transfer(fullNode.keyPair, lightNodeAddress, fullNode.balance(fullNodeAddress).balance - 1.waves)
-    lightNode.blockSeq(Height(2), Height(5)).foreach(_.generator shouldBe fullNodeAddress)
+    // The light node schedules mining once the block fields are supported at the current height (4), so it may already compete for block 5
+    lightNode.blockSeq(Height(2), Height(4)).foreach(_.generator shouldBe fullNodeAddress)
 
-    lightNode.waitForHeight(Height(6))
-    lightNode.blockAt(Height(6)).generator shouldBe lightNodeAddress
+    // After the transfer the full node cannot generate, so the next block is the light node's
+    val transfer       = fullNode.transfer(fullNode.keyPair, lightNodeAddress, fullNode.balance(fullNodeAddress).balance - 1.waves)
+    val transferHeight = Height(fullNode.waitForTransaction(transfer.id).height)
+
+    lightNode.waitForHeight(transferHeight + 1)
+    lightNode.blockAt(transferHeight + 1).generator shouldBe lightNodeAddress
   }
 }
