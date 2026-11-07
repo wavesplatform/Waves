@@ -85,10 +85,37 @@ class InvokeAffectedAddressTest extends PropSpec with WithDomain {
            | func default() = [ScriptTransfer(Address(base58'$recipient'), 0, unit)]
          """.stripMargin
       )
+      val invokeTx = invoke(secondAddress)
       d.appendBlock(setScript(secondSigner, caller), setScript(dApp2, callee))
-      d.appendAndAssertSucceed(invoke(secondAddress))
+      d.appendAndAssertSucceed(invokeTx)
       d.liquidSnapshot.balances.keySet.map(_._1) should not contain recipient
-      d.liquidSnapshot.transactions.head._2.affected shouldBe Set(defaultAddress, secondAddress, dApp2.toAddress, recipient)
+      d.liquidSnapshot.transactions(invokeTx.id()).affected shouldBe Set(defaultAddress, secondAddress, dApp2.toAddress, recipient)
+    }
+  }
+
+  property("failed tx does not belong to ScriptTransfer recipient of a nested call") {
+    val dApp2     = signer(2)
+    val recipient = signer(3).toAddress
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, dApp2)) { d =>
+      val caller = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict r = Address(base58'${dApp2.toAddress}').invoke("default", [], [])
+           |   [Burn(base58'', 1)]
+           | }
+         """.stripMargin
+      )
+      val callee = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [ScriptTransfer(Address(base58'$recipient'), 1, unit)]
+         """.stripMargin
+      )
+      val invokeTx = invoke(secondAddress)
+      d.appendBlock(setScript(secondSigner, caller), setScript(dApp2, callee))
+      d.appendAndAssertFailed(invokeTx)
+      d.liquidSnapshot.transactions(invokeTx.id()).affected shouldBe Set(defaultAddress, secondAddress, dApp2.toAddress)
     }
   }
 
@@ -104,9 +131,10 @@ class InvokeAffectedAddressTest extends PropSpec with WithDomain {
            | }
          """.stripMargin
       )
+      val invokeTx = invoke(secondAddress)
       d.appendBlock(setScript(secondSigner, dApp))
-      d.appendAndAssertSucceed(invoke(secondAddress))
-      d.liquidSnapshot.transactions.head._2.affected shouldBe Set(defaultAddress, secondAddress, recipient)
+      d.appendAndAssertSucceed(invokeTx)
+      d.liquidSnapshot.transactions(invokeTx.id()).affected shouldBe Set(defaultAddress, secondAddress, recipient)
     }
   }
 

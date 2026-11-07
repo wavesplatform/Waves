@@ -89,27 +89,16 @@ object NewTransactionInfo {
           .map(_.recipientAddress)
           .toSet
       case t: LeaseTransaction =>
-        Set(t.sender.toAddress) ++ (t.recipient match {
-          case alias: Alias     => blockchain.resolveAlias(alias).toOption.toSet
-          case address: Address => Set(address)
-        })
+        Set(t.sender.toAddress) ++ blockchain.resolveAlias(t.recipient).toOption
       case t: MassTransferTransaction =>
-        Set(t.sender.toAddress) ++ t.transfers.flatMap {
-          _.address match {
-            case alias: Alias     => blockchain.resolveAlias(alias).toOption.toSet
-            case address: Address => Set(address)
-          }
-        }
+        Set(t.sender.toAddress) ++ t.transfers.flatMap(transfer => blockchain.resolveAlias(transfer.address).toOption)
       case t: ReissueTransaction         => Set(t.sender.toAddress)
       case t: SetAssetScriptTransaction  => Set(t.sender.toAddress)
       case t: SetScriptTransaction       => Set(t.sender.toAddress)
       case t: SponsorFeeTransaction      => Set(t.sender.toAddress)
       case t: UpdateAssetInfoTransaction => Set(t.sender.toAddress)
       case t: TransferTransaction =>
-        Set(t.sender.toAddress) ++ (t.recipient match {
-          case alias: Alias     => blockchain.resolveAlias(alias).toOption.toSet
-          case address: Address => Set(address)
-        })
+        Set(t.sender.toAddress) ++ blockchain.resolveAlias(t.recipient).toOption
       case t: CommitToGenerationTransaction => Set(t.sender.toAddress)
       case _                                => Set.empty
     }

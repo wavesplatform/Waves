@@ -18,8 +18,8 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
+import com.wavesplatform.transaction.assets.exchange.OrderType
 import io.netty.channel.embedded.EmbeddedChannel
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
