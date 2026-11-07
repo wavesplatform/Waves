@@ -9,7 +9,6 @@ import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, PeerData
 import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.ExtensionAppender
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.test.produce
 import com.wavesplatform.transaction.{Transaction, TxHelpers}
 import io.netty.channel.embedded.EmbeddedChannel
 import monix.execution.Scheduler.Implicits.global
@@ -36,7 +35,7 @@ class ExtensionAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
 
   private val allGenerators = Seq(committedGenerator1, committedGenerator2, committedGenerator3)
 
-  "Should re-append blocks of original branch and preserve generators info if failed to append of better fork" in withDomain(
+  "restores the original branch and its generator info when a better fork fails to apply" in withDomain(
     defaultSettings,
     AddrWithBalance.enoughBalances(allGenerators*)
   ) { d =>
@@ -61,6 +60,8 @@ class ExtensionAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     appendBlock()
 
     log.debug("Append block 3 (activation height)")
+    // Created while altChainBlock1 is not in the state, so its VRF proof is computed from the wrong hit source and the fork fails on this block,
+    // after altChainBlock1 has been applied
     val altChainBlock2 = d.createBlock(ref = altChainBlock1.id().some, generator = committedGenerator2, strictTime = true)
     appendBlock()
 
@@ -98,8 +99,9 @@ class ExtensionAppenderAfterFinalizationSpec extends BaseFinalizationSpec {
     val extensionAppender =
       ExtensionAppender(d.blockchain, d.utxPool, d.posSelector, d.testTime, InvalidBlockStorage.NoOp, PeerDatabase.NoOp, global)(channel, _)
 
-    val altChain = Seq(genesisBlock, altChainBlock1, altChainBlock2)
-    extensionAppender(ExtensionBlocks(d.blockchain.score + 1, altChain, Map.empty, channel)).runSyncUnsafe() should produce("is invalid")
+    val altChain    = Seq(genesisBlock, altChainBlock1, altChainBlock2)
+    val appendError = extensionAppender(ExtensionBlocks(d.blockchain.score + 1, altChain, Map.empty, channel)).runSyncUnsafe().left.value.toString
+    appendError should (include(altChainBlock2.id().toString) and include("Could not verify VRF proof"))
 
     log.debug("Checks")
     withClue("Restored: ") {

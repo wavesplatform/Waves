@@ -243,48 +243,15 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
   }
 
   property("can't use deposited funds for sync call payment when master has only deposit") {
-    val miner       = TxHelpers.signer(0)
-    val invoker     = TxHelpers.signer(1)
-    val masterDApp  = TxHelpers.signer(2)
-    val serviceDApp = TxHelpers.signer(3)
-
-    val settings = DeterministicFinality
-      .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
-      .configure(_.copy(generationPeriodLength = 2))
-
-    val initBalance  = 2000.waves
-    val initBalances = Seq(miner, invoker, serviceDApp, masterDApp).map(kp => AddrWithBalance(kp.toAddress, initBalance))
-
-    withDomain(settings, initBalances) { d =>
-      log.debug("Append block 2 with scripts and commitment")
-      val txFeeAmount    = 1.waves
-      val available      = initBalance - (CommitToGenerationTransaction.DepositInWavelets + 2 * txFeeAmount)
-      val transferAmount = available + 1
-
-      val setMasterScript  = TxHelpers.setScript(masterDApp, invokerDAppScript(serviceDApp.toAddress, amount = transferAmount), txFeeAmount)
-      val setServiceScript = TxHelpers.setScript(serviceDApp, simpleDAppScript())
-      val commitments = Seq(miner, masterDApp).map { kp =>
-        TxHelpers.commitToGeneration(generationPeriodStart = Height(3), sender = kp, fee = txFeeAmount)
-      }
-
-      d.appender.appendBlock(
-        d.createBlock(
-          txs = Seq(setMasterScript, setServiceScript) ++ commitments,
-          strictTime = true
-        )
-      )
-
-      log.debug("Check master dApp balances")
-      val balanceDetails = d.accountsApi.balanceDetails(masterDApp.toAddress).explicitGet()
-      balanceDetails.available shouldBe available
-
-      log.debug("Try to spend")
-      val invoke = TxHelpers.invoke(masterDApp.toAddress, invoker = invoker)
-      d.appendBlockE(invoke) should produce(s"${masterDApp.toAddress} -> trying to spend a deposit")
-    }
+    depositSpendScenario(leaseAmount = None, expectedError = "trying to spend a deposit")
   }
 
   property("can't use deposited funds for sync call payment when master has deposit and leasing") {
+    depositSpendScenario(leaseAmount = Some(100.waves), expectedError = "trying to spend either a deposit or leased money")
+  }
+
+  // The master dApp commits to generation (locking a deposit), optionally leases, then pays one wavelet more than is available
+  private def depositSpendScenario(leaseAmount: Option[Long], expectedError: String): Unit = {
     val miner       = TxHelpers.signer(0)
     val invoker     = TxHelpers.signer(1)
     val masterDApp  = TxHelpers.signer(2)
@@ -300,20 +267,20 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     withDomain(settings, initBalances) { d =>
       log.debug("Append block 2 with scripts and commitment")
       val txFeeAmount    = 1.waves
-      val leaseAmount    = 100.waves
-      val available      = initBalance - (leaseAmount + CommitToGenerationTransaction.DepositInWavelets + 3 * txFeeAmount)
+      val lease          = leaseAmount.map(TxHelpers.lease(masterDApp, invoker.toAddress, _, txFeeAmount))
+      val masterFees     = (2 + lease.size) * txFeeAmount // set script, commitment, lease
+      val available      = initBalance - (leaseAmount.getOrElse(0L) + CommitToGenerationTransaction.DepositInWavelets + masterFees)
       val transferAmount = available + 1
 
       val setMasterScript  = TxHelpers.setScript(masterDApp, invokerDAppScript(serviceDApp.toAddress, amount = transferAmount), txFeeAmount)
       val setServiceScript = TxHelpers.setScript(serviceDApp, simpleDAppScript())
-      val lease            = TxHelpers.lease(masterDApp, invoker.toAddress, leaseAmount, txFeeAmount)
       val commitments = Seq(miner, masterDApp).map { kp =>
         TxHelpers.commitToGeneration(generationPeriodStart = Height(3), sender = kp, fee = txFeeAmount)
       }
 
       d.appender.appendBlock(
         d.createBlock(
-          txs = Seq(setMasterScript, setServiceScript, lease) ++ commitments,
+          txs = Seq(setMasterScript, setServiceScript) ++ lease ++ commitments,
           strictTime = true
         )
       )
@@ -324,7 +291,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
 
       log.debug("Try to spend")
       val invoke = TxHelpers.invoke(masterDApp.toAddress, invoker = invoker)
-      d.appendBlockE(invoke) should produce(s"${masterDApp.toAddress} -> trying to spend either a deposit or leased money")
+      d.appendBlockE(invoke) should produce(s"${masterDApp.toAddress} -> $expectedError")
     }
   }
 

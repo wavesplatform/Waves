@@ -15,7 +15,10 @@ class FinalizationActivationSuite extends BaseFinalizationSpec {
     .setFeaturesHeight(BlockchainFeatures.DeterministicFinality -> 5)
     .configure(_.copy(generationPeriodLength = 3))
 
-  "activation from 5" in withDomain(defaultSettings, AddrWithBalance.enoughBalances(node0Acc, node1Acc)) { d =>
+  "activated at height 5, votes in block 9 finalize height 8 once the next block is appended" in withDomain(
+    defaultSettings,
+    AddrWithBalance.enoughBalances(node0Acc, node1Acc)
+  ) { d =>
     val genesisBlockId = d.blockchain.lastBlockId.value
     (2 to 4).foreach(_ => d.appendBlock())
 
@@ -23,7 +26,7 @@ class FinalizationActivationSuite extends BaseFinalizationSpec {
     d.appendBlock(Seq(node0Acc, node1Acc).map(x => TxHelpers.commitToGeneration(Height(9), x))*)
     (6 to 8).foreach(_ => d.appendBlock())
 
-    log.debug(s"Append block 9 with votes")
+    log.debug("Append block 9 with votes")
     d.appender.appendBlock(
       d.createBlock(
         generator = node0Acc,
