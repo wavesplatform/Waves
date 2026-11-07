@@ -73,4 +73,43 @@ trait WithMiner extends WithDomain { suite: Suite =>
     withDomain(settings, balances) { d =>
       withMiner(d.blockchain, d.testTime, d.settings, verify, timeDrift)(assert(d, _, _))
     }
+
+  /** A domain whose BlockchainUpdater schedules mining on a MinerImpl that runs on the given (usually Test-) schedulers. Mining accounts are the
+    * first `minerAccounts` of the domain wallet.
+    */
+  def withDomainAndTestMiner(
+      settings: WavesSettings,
+      balances: Seq[AddrWithBalance],
+      minerScheduler: Scheduler,
+      appenderScheduler: Scheduler,
+      utxEvents: Observable[Unit] = Observable.never, // The microblock miner waits on it when the UTX is empty; Observable.empty would fail it
+      minerAccounts: Int = 1
+  )(f: (Domain, MinerImpl) => Unit): Unit = {
+    val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+    var miner    = Miner.StrictDisabledMiner
+    try
+      withDomain(settings, balances, miner = Miner.forwardTo(miner)) { d =>
+        d.wallet.generateNewAccounts(minerAccounts)
+        // The genesis timestamp comes from the JVM-wide TxHelpers counter, which can lag the wall clock (TestTime's start) by minutes
+        // in a full run; a block then gets "now - 1 minute" as its timestamp and the next attempt fires at once
+        d.testTime.setTime(d.lastBlock.header.timestamp)
+        val minerImpl = new MinerImpl(
+          channels,
+          d.blockchain,
+          d.settings,
+          d.testTime,
+          d.utxPool,
+          BlockEndorser.Disabled,
+          EndorsementStorage.Disabled,
+          d.wallet,
+          d.posSelector,
+          minerScheduler,
+          appenderScheduler,
+          utxEvents
+        )
+        miner = minerImpl
+        f(d, minerImpl)
+      }
+    finally channels.close()
+  }
 }

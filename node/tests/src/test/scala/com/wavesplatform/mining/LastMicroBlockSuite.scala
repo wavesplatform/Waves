@@ -3,7 +3,6 @@ package com.wavesplatform.mining
 import cats.syntax.option.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
@@ -28,7 +27,7 @@ import java.util.concurrent.CountDownLatch
 import scala.concurrent.Promise
 import scala.util.{Try, Using}
 
-class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps with WithResourceManager with EitherValues with Inside with Eventually {
+class LastMicroBlockSuite extends FreeSpec with WithMiner with TestSchedulerOps with WithResourceManager with EitherValues with Inside with Eventually {
   private val thisNodeAcc1 = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 0)
   private val thisNodeAcc2 = Wallet.generateNewAccount(Domain.DefaultWalletSeed, nonce = 1)
   private val otherNodeAcc = TxHelpers.defaultSigner
@@ -155,40 +154,15 @@ class LastMicroBlockSuite extends FreeSpec with WithDomain with TestSchedulerOps
       appenderScheduler: Scheduler,
       minerScheduler: Scheduler = TestScheduler(),
       maxTransactionsInMicroBlock: Int = defaultSettings.minerSettings.maxTransactionsInMicroBlock
-  )(f: (Domain, MinerImpl, TestTime) => Unit): Unit = withManager { manager =>
-    val channels = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
-    var miner    = Miner.StrictDisabledMiner
-    val time     = TestTime()
-    withDomain(
+  )(f: (Domain, MinerImpl, TestTime) => Unit): Unit =
+    withDomainAndTestMiner(
       defaultSettings.copy(minerSettings =
         defaultSettings.minerSettings.copy(minMicroBlockAge = 0.seconds, maxTransactionsInMicroBlock = maxTransactionsInMicroBlock)
       ),
       AddrWithBalance.enoughBalances(thisNodeAcc1, otherNodeAcc),
-      miner = Miner.forwardTo(miner),
-      time = time
-    ) { d =>
-      d.wallet.generateNewAccounts(1)
-      // The genesis timestamp comes from the JVM-wide TxHelpers counter, which can lag the wall clock (TestTime's start) by minutes
-      // in a full run; a block then gets "now - 1 minute" as its timestamp and the next attempt fires at once
-      time.setTime(d.lastBlock.header.timestamp)
-      val minerImpl = new MinerImpl(
-        channels,
-        d.blockchain,
-        d.settings,
-        time,
-        d.utxPool,
-        BlockEndorser.Disabled,
-        EndorsementStorage.Disabled,
-        d.wallet,
-        d.posSelector,
-        minerScheduler,
-        appenderScheduler,
-        Observable.never // The microblock miner waits on it when the UTX is empty; Observable.empty would fail it
-      )
-      miner = minerImpl
-      f(d, minerImpl, time)
-    }
-  }
+      minerScheduler,
+      appenderScheduler
+    )((d, minerImpl) => f(d, minerImpl, d.testTime))
 
   private def advanceToNextBlockTime(d: Domain, time: TestTime): Unit =
     time.setTimeIfGreater(d.nextBlockTime(thisNodeAcc1).max(d.lastBlock.header.timestamp + d.settings.minerSettings.minimalBlockGenerationOffset.toMillis))
