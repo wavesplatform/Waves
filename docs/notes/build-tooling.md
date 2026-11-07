@@ -26,7 +26,7 @@ The build runs on sbt 2 (`project/build.properties`), whose meta-build is Scala 
 
 **Plugins on pre-releases.** `sbt-protoc` 1.1.0-RC2 and `sbt-git` 3.0.0-RC1 are the only sbt 2 builds of either; `sbt-git` 3 also makes the build load from a linked git worktree, which 2.x cannot (`NoWorkTreeException` from its JGit). `sbt-javaagent` moved to `com.github.sbt`.
 
-**Known noise.** `SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder"` at load comes from an SLF4J 1.x API on sbt 2's own classpath; neither a 1.7 nor a 2.0 `slf4j-nop` in `plugins.sbt` silences it. `JVM Options are defined twice` while packaging `node` is an sbt-native-packager 1.11.7 bug: `ApplicationIniGenerator` recognises the duplicate `application.ini` (one from the bash, one from the bat start script) by comparing a `File` against a `FileRef`, which never matches under sbt 2. The duplicate is still dropped, so the package is unaffected.
+**Known noise.** `SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder"` at load comes from an SLF4J 1.x API on sbt 2's own classpath; neither a 1.7 nor a 2.0 `slf4j-nop` in `plugins.sbt` silences it. `JVM Options are defined twice` while packaging `node` is an sbt-native-packager bug (still present in 1.13.0): `ApplicationIniGenerator` recognises the duplicate `application.ini` (one from the bash, one from the bat start script) by comparing a `File` against a `FileRef`, which never matches under sbt 2. The duplicate is still dropped, so the package is unaffected.
 
 ## A second assignment of a Global key replaces the first, it does not add to it
 

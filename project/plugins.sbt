@@ -9,9 +9,9 @@ addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.1.0-RC2")
 libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "1.0.0-alpha.6"
 
 Seq(
-  "com.eed3si9n"       % "sbt-assembly"             % "2.4.2",
+  "com.eed3si9n"       % "sbt-assembly"             % "2.5.0",
   "com.github.sbt"     % "sbt-git"                  % "3.0.0-RC1",
-  "com.github.sbt"     % "sbt-native-packager"      % "1.11.7",
+  "com.github.sbt"     % "sbt-native-packager"      % "1.13.0",
   "com.github.sbt"     % "sbt-pgp"                  % "2.3.2",
   "com.github.sbt"     % "sbt-javaagent"            % "0.3.0",
   "org.portable-scala" % "sbt-scalajs-crossproject" % "1.4.0",
@@ -24,10 +24,10 @@ Seq(
 val dockerJavaVersion = "3.7.1"
 
 libraryDependencies ++= Seq(
-  "com.fasterxml.jackson.module" %% "jackson-module-scala"              % "2.22.2",
+  "com.fasterxml.jackson.module" %% "jackson-module-scala"              % "2.22.4",
   "org.hjson"                     % "hjson"                             % "3.1.0",
-  ("org.vafer"                    % "jdeb"                              % "1.14").artifacts(Artifact("jdeb", "jar", "jar")),
-  "org.slf4j"                     % "jcl-over-slf4j"                    % "2.0.18",
+  ("org.vafer"                    % "jdeb"                              % "1.15").artifacts(Artifact("jdeb", "jar", "jar")),
+  "org.slf4j"                     % "jcl-over-slf4j"                    % "2.0.20",
   "com.github.docker-java"        % "docker-java-core"                  % dockerJavaVersion,
   "com.github.docker-java"        % "docker-java-transport-httpclient5" % dockerJavaVersion
 )
