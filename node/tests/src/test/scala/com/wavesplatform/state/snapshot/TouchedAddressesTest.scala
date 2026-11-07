@@ -15,4 +15,12 @@ class TouchedAddressesTest extends PropSpec with WithDomain {
       snapshot.hashCode() shouldBe StateSnapshot.empty.hashCode()
     }
   }
+
+  property("addBalances records zero-delta portfolios as touched") {
+    withDomain() { d =>
+      val snapshot = StateSnapshot.empty.addBalances(Map(defaultAddress -> Portfolio.empty), d.blockchain).explicitGet()
+      snapshot.touchedAddresses.value shouldBe Set(defaultAddress)
+      snapshot.balances shouldBe empty
+    }
+  }
 }

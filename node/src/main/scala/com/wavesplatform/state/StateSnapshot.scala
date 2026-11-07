@@ -41,7 +41,7 @@ case class StateSnapshot(
   def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, StateSnapshot] =
     StateSnapshot
       .balances(portfolios, SnapshotBlockchain(blockchain, this))
-      .map(b => copy(balances = balances ++ b, touchedAddresses = touchedAddresses ++ portfolios.keySet))
+      .map(b => copy(balances = balances ++ b, touchedAddresses = touchedAddresses ++ TouchedAddresses(portfolios.keySet)))
 
   def withTransaction(tx: NewTransactionInfo): StateSnapshot =
     copy(transactions + (tx.transaction.id() -> tx))
@@ -236,7 +236,7 @@ object StateSnapshot {
         s1.scriptsComplexity + s2.scriptsComplexity,
         s1.erc20Addresses ++ s2.erc20Addresses,
         s1.nextCommittedGenerators ++ s2.nextCommittedGenerators,
-        s1.touchedAddresses ++ s2.touchedAddresses.value
+        s1.touchedAddresses ++ s2.touchedAddresses
       )
 
     private def combineDataEntries(
@@ -255,13 +255,11 @@ object StateSnapshot {
   val empty: StateSnapshot = StateSnapshot()
 }
 
-/** Addresses whose portfolio a transaction touched, including those whose deltas netted to zero and so left no balance entry. It feeds only the
-  * address transaction index: it is neither serialized nor hashed, and it is kept out of `StateSnapshot` equality, which decides how the state hash is
-  * computed (`initSnapshot == StateSnapshot.empty`) and must not depend on how a snapshot was built.
-  */
+/** Addresses whose portfolio a transaction touched, including zero-net ones with no balance entry; feeds only the address transaction index. */
 final class TouchedAddresses(val value: Set[Address]) {
-  def ++(other: Set[Address]): TouchedAddresses = TouchedAddresses(value ++ other)
+  def ++(other: TouchedAddresses): TouchedAddresses = TouchedAddresses(value ++ other.value)
 
+  // Always equal: StateSnapshot equality picks how the state hash is computed (initSnapshot == empty), so it must ignore this; compare .value instead
   override def equals(obj: Any): Boolean = obj.isInstanceOf[TouchedAddresses]
   override def hashCode(): Int           = 0
   override def toString: String          = value.mkString("TouchedAddresses(", ",", ")")
