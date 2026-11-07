@@ -79,6 +79,15 @@ class MassTransferTransactionDiffTest extends PropSpec with WithDomain {
     testDiff(5)
   }
 
+  property("tx belongs to a zero-amount recipient") {
+    val recipient = TxHelpers.address(2)
+    withDomain(DomainPresets.RideV6) { d =>
+      d.appendAndAssertSucceed(TxHelpers.massTransfer(to = Seq(recipient -> 0L), fee = 0.002.waves))
+      d.liquidSnapshot.balances.keySet.map(_._1) should not contain recipient
+      d.liquidSnapshot.transactions.head._2.affected shouldBe Set(TxHelpers.defaultAddress, recipient)
+    }
+  }
+
   property("MassTransfer fails on non-existent alias") {
     val setup = {
       val (genesis, master) = baseSetup
