@@ -184,6 +184,7 @@ object UtilsEvaluator {
                 usedComplexity,
                 invoke,
                 SnapshotBlockchain(blockchain, environment.currentSnapshot),
+                blockchain,
                 System.currentTimeMillis(),
                 isSyncCall = false,
                 limitedExecution = false,

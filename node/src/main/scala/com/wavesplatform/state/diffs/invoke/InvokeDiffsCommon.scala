@@ -148,6 +148,7 @@ object InvokeDiffsCommon {
       storingComplexity: Int,
       tx: InvokeScriptLike,
       blockchain: Blockchain,
+      feeBlockchain: Blockchain,
       blockTime: Long,
       isSyncCall: Boolean,
       limitedExecution: Boolean,
@@ -180,7 +181,7 @@ object InvokeDiffsCommon {
           calcAndCheckFee(
             FailedTransactionError.feeForActions(_, _, log),
             tx.root,
-            blockchain,
+            feeBlockchain,
             stepLimit,
             storingComplexity.min(stepLimit), // complexity increased by sync calls should not require fee for additional steps
             actions.issueList ++ otherIssues,
@@ -193,7 +194,7 @@ object InvokeDiffsCommon {
         else if (version < V5)
           TracedResult(paymentsPart(blockchain, tx, dAppAddress, feePortfolios))
         else
-          TracedResult(StateSnapshot.build(blockchain, txFeeDiff(blockchain, tx.root).explicitGet()._2))
+          TracedResult(StateSnapshot.build(blockchain, txFeeDiff(feeBlockchain, tx.root).explicitGet()._2))
       complexityLimit =
         if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - storingComplexity
         else Int.MaxValue
