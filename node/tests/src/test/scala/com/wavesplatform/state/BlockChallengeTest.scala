@@ -98,6 +98,44 @@ class BlockChallengeTest
     }
   }
 
+  // a valid block whose probe reads the generating balance after a dip and a restore made in different microblocks
+  private def challengeSplitDipBlock(fixHeight: Int): Either[ValidationError, BlockApplyResult] = {
+    val challengingMiner = TxHelpers.signer(3)
+    val dipping          = TxHelpers.signer(4)
+    val counterparty     = TxHelpers.signer(5)
+    val dApp             = TxHelpers.signer(6)
+    withDomain(
+      settings.configure(_.copy(liquidGeneratingBalanceFixHeight = fixHeight)),
+      balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner, challengingMiner, dipping, counterparty, dApp)
+    ) { d =>
+      val probe = TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [IntegerEntry("generating", wavesBalance(Address(base58'${dipping.toAddress}')).generating)]
+        """.stripMargin
+      )
+      d.appendBlock(TxHelpers.setScript(dApp, probe))
+      d.appendKeyBlock()
+      d.appendMicroBlock(TxHelpers.transfer(dipping, counterparty.toAddress, 1.waves))
+      d.appendMicroBlock(
+        TxHelpers.transfer(counterparty, dipping.toAddress, 1.waves + TestValues.fee),
+        TxHelpers.invoke(dApp.toAddress, invoker = counterparty)
+      )
+      val originalBlock = d.lastBlock
+      d.rollbackTo(originalBlock.header.reference)
+
+      d.appendBlockE(d.createChallengingBlock(challengingMiner, originalBlock))
+    }
+  }
+
+  property("valid block can't be challenged by splitting a generating balance dip and restore across microblocks") {
+    challengeSplitDipBlock(fixHeight = 0) shouldBe Left(GenericError("Invalid block challenge"))
+  }
+
+  property("block that read a generating balance dip within its height can be challenged below the fix height") {
+    challengeSplitDipBlock(fixHeight = Int.MaxValue) should beRight
+  }
+
   property("NODE-884. Challenging miner should have correct balances") {
     val challengedMiner = TxHelpers.signer(1)
     val testSettings = settings
