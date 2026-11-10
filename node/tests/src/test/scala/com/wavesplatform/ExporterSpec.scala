@@ -7,6 +7,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Height
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
@@ -64,6 +65,16 @@ class ExporterSpec extends FreeSpec with WithDomain {
       val blocks = (2 to height).map(h => loadBlock(Height(h), d.rdb).get)
       blocks.map(_.header.version) should contain allOf (Block.NgBlockVersion, Block.ProtoBlockVersion)
       out.toByteArray shouldBe lengthPrefixed(blocks.map(_.bytes()))
+    }
+
+    "as length-prefixed protobuf blocks without chain id in the protobuf format" in withMixedChain { d =>
+      val height = d.rocksDBWriter.height
+      val out    = new ByteArrayOutputStream()
+
+      Exporter.exportBlocks(d.rdb, height, legacy = false, out, None)
+
+      val expected = (2 to height).map(h => PBBlocks.clearChainId(PBBlocks.protobuf(loadBlock(Height(h), d.rdb).get)).toByteArray)
+      out.toByteArray shouldBe lengthPrefixed(expected)
     }
 
     "with each block's stored transaction snapshots" in withMixedChain { d =>

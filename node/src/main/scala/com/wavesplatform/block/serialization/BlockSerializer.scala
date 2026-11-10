@@ -147,13 +147,18 @@ object BlockSerializer {
     )
   }
 
-  def mkTxsDataBytes(header: BlockHeader, transactions: Seq[Transaction]): Array[Byte] = {
-    val transactionsDataBytes = writeTransactionData(header.version, transactions)
+  def mkTxsDataBytes(header: BlockHeader, transactions: Seq[Transaction]): Array[Byte] =
+    lengthPrefixed(writeTransactionData(header.version, transactions))
+
+  /** Legacy (pre-protobuf) block bytes from already serialized transactions. */
+  def toLegacyBytes(header: BlockHeader, signature: ByteStr, txsBytes: Seq[Array[Byte]]): Array[Byte] =
     Bytes.concat(
-      Ints.toByteArray(transactionsDataBytes.length),
-      transactionsDataBytes
+      mkPrefixBytes(header),
+      lengthPrefixed(writeTransactionBytes(header.version, txsBytes)),
+      mkSuffixBytes(header, signature)
     )
-  }
+
+  private def lengthPrefixed(bytes: Array[Byte]): Array[Byte] = Bytes.concat(Ints.toByteArray(bytes.length), bytes)
 
   def mkSuffixBytes(header: BlockHeader, signature: ByteStr): Array[Byte] = {
     val featureVotesBytes = header.version match {
