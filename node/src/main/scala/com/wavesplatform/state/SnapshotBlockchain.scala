@@ -168,9 +168,12 @@ case class SnapshotBlockchain(
 
       val bs         = BalanceSnapshot(h, Portfolio(balance, lease, generationDeposit = deposit))
       val height2Fix = h.toInt == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
-      if (inner.height > 0 && (from1 < h.toInt - 1 || height2Fix))
-        bs +: inner.balanceSnapshots(address, from1, to)
-      else
+      if (inner.height > 0 && (from1 < h.toInt - 1 || height2Fix)) {
+        val innerSnapshots = inner.balanceSnapshots(address, from1, to)
+        // inner layers at this height hold intermediate balances that depend on how the block was split into microblocks
+        if (h.toInt >= settings.functionalitySettings.liquidGeneratingBalanceFixHeight) bs +: innerSnapshots.filter(_.height < h)
+        else bs +: innerSnapshots
+      } else
         Seq(bs)
     }
   }

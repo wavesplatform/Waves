@@ -268,6 +268,7 @@ object InvokeScriptDiff {
                     storingComplexity,
                     tx,
                     SnapshotBlockchain(blockchain, resultSnapshot),
+                    blockchain,
                     blockTime,
                     isSyncCall = true,
                     limitedExecution,
