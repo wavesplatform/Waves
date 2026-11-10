@@ -9,6 +9,8 @@ import com.wavesplatform.transaction.lease.*
 import com.wavesplatform.transaction.smart.*
 import com.wavesplatform.transaction.transfer.*
 
+import scala.collection.mutable
+
 case class NewTransactionInfo(
     transaction: Transaction,
     snapshot: StateSnapshot,
@@ -24,7 +26,6 @@ object NewTransactionInfo {
       snapshot: StateSnapshot,
       blockchain: Blockchain
   ): NewTransactionInfo = {
-    val calledScripts = snapshot.scriptResults.values.flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
     val maybeDApp = tx match {
       case i: InvokeTransaction =>
         i.dApp match {
@@ -39,19 +40,34 @@ object NewTransactionInfo {
       case _ =>
         None
     }
+    // Participants with a zero net diff (or of an elided tx, whose snapshot is empty) have no balance entry,
+    // so they come from the tx and the script results
     val affectedAddresses =
-      if (status == Status.Elided)
-        elidedAffectedAddresses(tx, blockchain) ++ maybeDApp
-      else
-        snapshot.balances.keySet.map(_._1) ++
-          snapshot.leaseBalances.keySet ++
-          snapshot.accountData.keySet ++
-          calledScripts ++
-          maybeDApp
+      snapshot.balances.keySet.map(_._1) ++
+        snapshot.leaseBalances.keySet ++
+        snapshot.accountData.keySet ++
+        scriptResultAddresses(snapshot.scriptResults.values) ++
+        (if (status == Status.Failed) Set.empty else txParticipants(tx, blockchain)) ++
+        maybeDApp
     NewTransactionInfo(tx, snapshot, affectedAddresses, status, snapshot.scriptsComplexity)
   }
 
-  private def elidedAffectedAddresses(tx: Transaction, blockchain: Blockchain): Set[Address] =
+  // Called dApps and ScriptTransfer recipients at any depth; iterative so that deep call chains cannot overflow the stack
+  private def scriptResultAddresses(results: Iterable[InvokeScriptResult]): Set[Address] = {
+    val addresses = Set.newBuilder[Address]
+    val pending   = mutable.Stack.from(results)
+    while (pending.nonEmpty) {
+      val result = pending.pop()
+      addresses ++= result.transfers.map(_.address)
+      result.invokes.foreach { inv =>
+        addresses += inv.dApp
+        pending.push(inv.stateChanges)
+      }
+    }
+    addresses.result()
+  }
+
+  private def txParticipants(tx: Transaction, blockchain: Blockchain): Set[Address] =
     tx match {
       case t: BurnTransaction        => Set(t.sender.toAddress)
       case t: CreateAliasTransaction => Set(t.sender.toAddress)
@@ -71,27 +87,16 @@ object NewTransactionInfo {
           .map(_.recipientAddress)
           .toSet
       case t: LeaseTransaction =>
-        Set(t.sender.toAddress) ++ (t.recipient match {
-          case alias: Alias     => blockchain.resolveAlias(alias).toOption.toSet
-          case address: Address => Set(address)
-        })
+        Set(t.sender.toAddress) ++ blockchain.resolveAlias(t.recipient).toOption
       case t: MassTransferTransaction =>
-        Set(t.sender.toAddress) ++ t.transfers.flatMap {
-          _.address match {
-            case alias: Alias     => blockchain.resolveAlias(alias).toOption.toSet
-            case address: Address => Set(address)
-          }
-        }
+        Set(t.sender.toAddress) ++ t.transfers.flatMap(transfer => blockchain.resolveAlias(transfer.address).toOption)
       case t: ReissueTransaction         => Set(t.sender.toAddress)
       case t: SetAssetScriptTransaction  => Set(t.sender.toAddress)
       case t: SetScriptTransaction       => Set(t.sender.toAddress)
       case t: SponsorFeeTransaction      => Set(t.sender.toAddress)
       case t: UpdateAssetInfoTransaction => Set(t.sender.toAddress)
       case t: TransferTransaction =>
-        Set(t.sender.toAddress) ++ (t.recipient match {
-          case alias: Alias     => blockchain.resolveAlias(alias).toOption.toSet
-          case address: Address => Set(address)
-        })
+        Set(t.sender.toAddress) ++ blockchain.resolveAlias(t.recipient).toOption
       case t: CommitToGenerationTransaction => Set(t.sender.toAddress)
       case _                                => Set.empty
     }

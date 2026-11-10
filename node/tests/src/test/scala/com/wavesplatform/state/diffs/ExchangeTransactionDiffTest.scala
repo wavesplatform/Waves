@@ -2035,6 +2035,21 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
+  property("tx belongs to matcher whose balance diff nets to zero") {
+    val matcher = TxHelpers.signer(2)
+    withDomain(DomainPresets.RideV6, Seq(AddrWithBalance(matcher.toAddress))) { d =>
+      val issueTx  = TxHelpers.issue()
+      val asset    = IssuedAsset(issueTx.id())
+      val buy      = TxHelpers.order(OrderType.BUY, Waves, asset, fee = TestValues.fee / 2, matcher = matcher)
+      val sell     = TxHelpers.order(OrderType.SELL, Waves, asset, fee = TestValues.fee / 2, matcher = matcher)
+      val exchange = TxHelpers.exchangeFromOrders(buy, sell, matcher = matcher, fee = TestValues.fee)
+      d.appendBlock(issueTx)
+      d.appendAndAssertSucceed(exchange)
+      d.liquidSnapshot.balances.keySet.map(_._1) should not contain matcher.toAddress
+      d.liquidSnapshot.transactions(exchange.id()).affected shouldBe Set(matcher.toAddress, defaultAddress)
+    }
+  }
+
   def script(caseType: String, v: Boolean, complex: Boolean = false): Seq[String] = Seq(true, false).map { full =>
     val expr =
       s"""
