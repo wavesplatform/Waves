@@ -138,6 +138,57 @@ class InvokeAffectedAddressTest extends PropSpec with WithDomain {
     }
   }
 
+  property("tx belongs to alias recipient of a lease cancelled in the same nested call") {
+    val dApp2     = signer(2)
+    val recipient = signer(3)
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, dApp2, recipient)) { d =>
+      val caller = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict r = Address(base58'${dApp2.toAddress}').invoke("default", [], [])
+           |   []
+           | }
+         """.stripMargin
+      )
+      val callee = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   let lease = Lease(Alias("recipient"), 1)
+           |   [lease, LeaseCancel(calculateLeaseId(lease))]
+           | }
+         """.stripMargin
+      )
+      val invokeTx = invoke(secondAddress)
+      d.appendBlock(createAlias("recipient", recipient), setScript(secondSigner, caller), setScript(dApp2, callee))
+      d.appendAndAssertSucceed(invokeTx)
+      d.liquidSnapshot.transactions(invokeTx.id()).affected shouldBe Set(defaultAddress, secondAddress, dApp2.toAddress, recipient.toAddress)
+    }
+  }
+
+  property("tx belongs to recipient whose cancelled lease is replaced by an equal one") {
+    val recipient = signer(3).toAddress
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func lease() = {
+           |   let l = Lease(Address(base58'$recipient'), 1, 0)
+           |   [l, BinaryEntry("id", calculateLeaseId(l))]
+           | }
+           |
+           | @Callable(i)
+           | func relet() = [LeaseCancel(this.getBinaryValue("id")), Lease(Address(base58'$recipient'), 1, 1)]
+         """.stripMargin
+      )
+      val invokeTx = invoke(secondAddress, Some("relet"))
+      d.appendBlock(setScript(secondSigner, dApp), invoke(secondAddress, Some("lease")))
+      d.appendAndAssertSucceed(invokeTx)
+      d.liquidSnapshot.transactions(invokeTx.id()).affected shouldBe Set(defaultAddress, secondAddress, recipient)
+    }
+  }
+
   property("collecting addresses of a deep call chain does not overflow the stack") {
     withDomain(RideV5) { d =>
       val depth = 100000

@@ -40,17 +40,15 @@ object NewTransactionInfo {
       case _ =>
         None
     }
-    // Participants with a zero net diff have no balance entry, so they come from the tx and the script results
+    // Participants with a zero net diff (or of an elided tx, whose snapshot is empty) have no balance entry,
+    // so they come from the tx and the script results
     val affectedAddresses =
-      if (status == Status.Elided)
-        txParticipants(tx, blockchain) ++ maybeDApp
-      else
-        snapshot.balances.keySet.map(_._1) ++
-          snapshot.leaseBalances.keySet ++
-          snapshot.accountData.keySet ++
-          scriptResultAddresses(snapshot.scriptResults.values) ++
-          (if (status == Status.Succeeded) txParticipants(tx, blockchain) else Set.empty) ++
-          maybeDApp
+      snapshot.balances.keySet.map(_._1) ++
+        snapshot.leaseBalances.keySet ++
+        snapshot.accountData.keySet ++
+        scriptResultAddresses(snapshot.scriptResults.values) ++
+        (if (status == Status.Failed) Set.empty else txParticipants(tx, blockchain)) ++
+        maybeDApp
     NewTransactionInfo(tx, snapshot, affectedAddresses, status, snapshot.scriptsComplexity)
   }
 
