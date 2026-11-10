@@ -72,27 +72,9 @@ object Exporter extends ScorexLogging {
           ) { case (blocksOutput, snapshotsOutput, _) =>
             Using.resources(createBufferedOutputStream(blocksOutput, 10), snapshotsOutput.map(createBufferedOutputStream(_, 100))) {
               case (blocksStream, snapshotsStream) =>
-                var exportedBlocksBytes    = 0L
-                var exportedSnapshotsBytes = 0L
-                val start                  = System.currentTimeMillis()
-
-                new BlockSnapshotIterator(rdb, height, exportSnapshots).asScala.foreach { case (h, block, txSnapshots) =>
-                  val txCount = block.transactionData.length
-                  if (exportSnapshots && txCount != txSnapshots.length)
-                    throw new RuntimeException(
-                      s"${txSnapshots.length} snapshot(s) don't match $txCount transaction(s) on height $h, data is corrupted"
-                    )
-                  exportedBlocksBytes += IO.exportBlock(blocksStream, Some(block), format == Formats.Binary)
-                  snapshotsStream.foreach { output =>
-                    exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
-                  }
-
-                  if (h % (height / 10) == 0) {
-                    log.info(
-                      s"$h blocks exported, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
-                    )
-                  }
-                }
+                val start = System.currentTimeMillis()
+                val (exportedBlocksBytes, exportedSnapshotsBytes) =
+                  exportBlocks(rdb, height, format == Formats.Binary, blocksStream, snapshotsStream)
                 val duration = System.currentTimeMillis() - start
                 log
                   .info(
@@ -105,6 +87,38 @@ object Exporter extends ScorexLogging {
         Try(Await.result(Kamon.stopModules(), 10.seconds))
         Metrics.shutdown()
     }
+  }
+
+  /** Writes blocks 2 to `height` (and their transaction snapshots, when `snapshotsStream` is given); returns the bytes written to each. */
+  private[wavesplatform] def exportBlocks(
+      rdb: RDB,
+      height: Int,
+      legacy: Boolean,
+      blocksStream: OutputStream,
+      snapshotsStream: Option[OutputStream]
+  ): (Long, Long) = {
+    val exportSnapshots        = snapshotsStream.isDefined
+    var exportedBlocksBytes    = 0L
+    var exportedSnapshotsBytes = 0L
+
+    new BlockSnapshotIterator(rdb, height, exportSnapshots).asScala.foreach { case (h, block, txSnapshots) =>
+      val txCount = block.transactionData.length
+      if (exportSnapshots && txCount != txSnapshots.length)
+        throw new RuntimeException(
+          s"${txSnapshots.length} snapshot(s) don't match $txCount transaction(s) on height $h, data is corrupted"
+        )
+      exportedBlocksBytes += IO.exportBlock(blocksStream, Some(block), legacy)
+      snapshotsStream.foreach { output =>
+        exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
+      }
+
+      if (h % math.max(1, height / 10) == 0) {
+        log.info(
+          s"$h blocks exported, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
+        )
+      }
+    }
+    (exportedBlocksBytes, exportedSnapshotsBytes)
   }
 
   private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, exportSnapshots: Boolean)
