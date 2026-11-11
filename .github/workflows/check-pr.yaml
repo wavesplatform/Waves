@@ -29,7 +29,7 @@ jobs:
         id: ghd
       - name: Check PR
         run: sbt --server -Dproject.version=$(echo ${{ steps.ghd.outputs.describe }} | cut -c 2-) -J-Xlog:gc*=debug:file=./gc.log --batch checkPR
-      - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3
+      - uses: ScalableCapital/action-surefire-report@4004a71652495d6ed111f5b717c2cf9aa0f37627 # v2.0.5
         if: always()
         with:
           report_paths: 'target/out/*/u/*/test-reports/*.xml'
@@ -152,7 +152,7 @@ jobs:
           exec sbt --server ${{ matrix.sbt }} --batch "node-it/docker;node-it/${{ matrix.task }}"
         env:
           RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}-${{ matrix.id }}
-      - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3
+      - uses: ScalableCapital/action-surefire-report@4004a71652495d6ed111f5b717c2cf9aa0f37627 # v2.0.5
         if: always()
         with:
           report_paths: 'target/out/*/u/*/test-reports/*.xml'
