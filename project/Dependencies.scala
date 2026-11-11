@@ -26,7 +26,7 @@ object Dependencies {
       jacksonModule("datatype", "datatype-jdk8"),
       jacksonModule("datatype", "datatype-jsr310"),
       "tools.jackson.core" % "jackson-core"     % "3.2.4",
-      "tools.jackson.core" % "jackson-databind" % "3.2.4",
+      "tools.jackson.core" % "jackson-databind" % "3.3.0",
       // Scala 3 compiler and scaladoc toolchains, no Scala release ships the patched versions yet
       "org.jline"          % "jline-reader"     % "3.30.15",
       "org.jsoup"          % "jsoup"            % "1.23.2",
