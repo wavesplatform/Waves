@@ -29,7 +29,7 @@ object Dependencies {
       "tools.jackson.core" % "jackson-databind" % "3.2.4",
       // Scala 3 compiler and scaladoc toolchains, no Scala release ships the patched versions yet
       "org.jline"          % "jline-reader"     % "3.30.15",
-      "org.jsoup"          % "jsoup"            % "1.23.2",
+      "org.jsoup"          % "jsoup"            % "1.24.1",
       gProto
     )
   )
