@@ -2,13 +2,13 @@ package com.wavesplatform
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
-import com.wavesplatform.database.{DBExt, KeyTag, loadBlock}
+import com.wavesplatform.database.{DBExt, KeyTag, Keys, loadBlock, writeTransaction}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.state.Height
+import com.wavesplatform.state.{Height, TxMeta, TxNum}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.transaction.{EthTxGenerator, TxHelpers, TxVersion}
@@ -91,6 +91,14 @@ class ExporterSpec extends FreeSpec with WithDomain {
         b shouldBe blocks
         s shouldBe snapshots
       }
+    }
+
+    "refusing an Ethereum transaction stored in a legacy block" in withMixedChain { d =>
+      val eth = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, Waves)
+      val key = Keys.transactionAt(Height(2), TxNum(0.toShort), d.rdb.txHandle)
+      d.rdb.db.put(d.rdb.txHandle.handle, key.keyBytes, writeTransaction(TxMeta(Height(2), TxMeta.Status.Succeeded, 0) -> eth))
+
+      (the[IllegalStateException] thrownBy Exporter.exportBlocks(d.rdb, d.rocksDBWriter.height, legacy = true, new ByteArrayOutputStream(), None)).getMessage should include("height 2")
     }
 
     "with each block's stored transaction snapshots" in withMixedChain { d =>

@@ -20,6 +20,7 @@ import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB}
 import scopt.OParser
 
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
+import java.util.HexFormat
 import scala.annotation.tailrec
 import scala.concurrent.Await
 import scala.concurrent.duration.*
@@ -115,7 +116,7 @@ object Exporter extends ScorexLogging {
         throw new RuntimeException(
           s"${txSnapshots.length} snapshot(s) don't match $txCount transaction(s) on height $h, data is corrupted"
         )
-      exportedBlocksBytes += IO.writeLengthPrefixed(blocksStream, blockBytes(meta, txs, legacy))
+      exportedBlocksBytes += IO.writeLengthPrefixed(blocksStream, blockBytes(h, meta, txs, legacy))
       snapshotsStream.foreach { output =>
         exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
       }
@@ -129,20 +130,19 @@ object Exporter extends ScorexLogging {
     (exportedBlocksBytes, exportedSnapshotsBytes)
   }
 
-  /** Same bytes as `Block.bytes()` (or the protobuf export format) of the stored block, built from the stored header and transaction
-    * bytes: decoding every transaction into a [[com.wavesplatform.transaction.Transaction]] only to encode it again dominated the export.
-    */
-  private def blockBytes(meta: BlockMeta, txs: Seq[TransactionData], legacy: Boolean): Array[Byte] =
+  /** Same bytes as `Block.bytes()` or the protobuf export, built from stored bytes to skip decoding transactions. */
+  private def blockBytes(height: Int, meta: BlockMeta, txs: Seq[TransactionData], legacy: Boolean): Array[Byte] =
     if (legacy && meta.getHeader.version < Block.ProtoBlockVersion)
-      BlockSerializer.toLegacyBytes(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, txs.map(legacyTxBytes))
+      BlockSerializer.toLegacyBytes(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, txs.map(legacyTxBytes(height, _)))
     else {
       val block = new PBBlock(meta.header, meta.signature, txs.map(signedTx))
       if (legacy) PBUtils.encodeDeterministic(block) else PBBlocks.clearChainId(block).toByteArray
     }
 
-  private def legacyTxBytes(td: TransactionData): Array[Byte] = td.transaction match {
-    case TD.LegacyBytes(bytes) => bytes.toByteArray
-    case other                 => toVanillaTransaction(other).bytes()
+  private def legacyTxBytes(height: Int, td: TransactionData): Array[Byte] = td.transaction match {
+    case TD.LegacyBytes(bytes)     => bytes.toByteArray
+    case TD.EthereumTransaction(_) => throw new IllegalStateException(s"Ethereum transaction in a pre-protobuf block at height $height")
+    case other                     => toVanillaTransaction(other).bytes()
   }
 
   private def signedTx(td: TransactionData): PBSignedTransaction = td.transaction match {
@@ -261,11 +261,8 @@ object Exporter extends ScorexLogging {
     private val dbIterator = db.newIterator(cfHandle, readOptions)
 
     // Keys are the prefix followed by the height; `key()` copies over JNI, so it's read once.
-    private def hasPrefix(key: Array[Byte]): Boolean = {
-      var i = 0
-      while (i < prefixBytes.length && i < key.length && key(i) == prefixBytes(i)) i += 1
-      i == prefixBytes.length
-    }
+    private def hasPrefix(key: Array[Byte]): Boolean =
+      key.length >= prefixBytes.length && java.util.Arrays.equals(key, 0, prefixBytes.length, prefixBytes, 0, prefixBytes.length)
 
     dbIterator.seek(prefixBytes)
 
@@ -274,6 +271,7 @@ object Exporter extends ScorexLogging {
       val key = if (dbIterator.isValid) dbIterator.key() else null
       if (key != null && hasPrefix(key)) {
         val p = prefixBytes.length
+        if (key.length < p + Ints.BYTES) throw new IllegalStateException(s"Corrupted key without a height: ${HexFormat.of().formatHex(key)}")
         val h = Ints.fromBytes(key(p), key(p + 1), key(p + 2), key(p + 3))
         if (h > 1) {
           val txData = parseDataF(dbIterator.value())

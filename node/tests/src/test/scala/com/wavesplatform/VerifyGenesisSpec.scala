@@ -1,13 +1,14 @@
 package com.wavesplatform
 
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.history.Domain
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 class VerifyGenesisSpec extends FreeSpec with WithDomain {
-  private def withConfiguredGenesis(f: com.wavesplatform.history.Domain => Unit): Unit =
+  private def withConfiguredGenesis(f: Domain => Unit): Unit =
     withDomain() { d =>
       checkGenesis(d.settings, d.blockchainUpdater, Miner.StrictDisabledMiner)
       f(d)

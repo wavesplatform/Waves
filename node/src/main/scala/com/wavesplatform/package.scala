@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory
 package object wavesplatform {
   private lazy val logger: Logger =
     Logger(LoggerFactory.getLogger(this.getClass.getName))
+
   private def configuredGenesis(settings: WavesSettings, blockchain: Blockchain): Either[ValidationError, Block] =
     Block.genesis(
       settings.blockchainSettings.genesisSettings,
