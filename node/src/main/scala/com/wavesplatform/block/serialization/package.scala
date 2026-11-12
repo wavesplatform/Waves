@@ -11,16 +11,21 @@ import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction, TransactionParsers}
 
 package object serialization {
-  private[block] def writeTransactionData(version: Byte, txs: Seq[Transaction]): Array[Byte] = {
-    val txsBytes = txs.map(tx =>
-      if (version == ProtoBlockVersion) PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
-      else tx.bytes().ensuring(!tx.isInstanceOf[EthereumTransaction])
+  private[block] def writeTransactionData(version: Byte, txs: Seq[Transaction]): Array[Byte] =
+    writeTransactionBytes(
+      version,
+      txs.map(tx =>
+        if (version == ProtoBlockVersion) PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
+        else tx.bytes().ensuring(!tx.isInstanceOf[EthereumTransaction])
+      )
     )
+
+  private[block] def writeTransactionBytes(version: Byte, txsBytes: Seq[Array[Byte]]): Array[Byte] = {
     val txsBytesSize = txsBytes.map(_.length + Ints.BYTES).sum
     val txsBuf       = ByteBuffer.allocate(txsBytesSize)
     txsBytes.foreach(tx => txsBuf.putInt(tx.length).put(tx))
 
-    Bytes.concat(mkTxsCountBytes(version, txs.size), txsBuf.array())
+    Bytes.concat(mkTxsCountBytes(version, txsBytes.size), txsBuf.array())
   }
 
   private[block] def readTransactionData(version: Byte, buf: ByteBuffer): Seq[Transaction] =

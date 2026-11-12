@@ -3,21 +3,24 @@ package com.wavesplatform
 import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
-import com.wavesplatform.database.protobuf.BlockMeta
-import com.wavesplatform.database.{KeyTag, RDB, createBlock, readBlockMeta, readTransaction}
+import com.wavesplatform.block.serialization.BlockSerializer
+import com.wavesplatform.database.protobuf.TransactionData.Transaction as TD
+import com.wavesplatform.database.protobuf.{BlockMeta, TransactionData}
+import com.wavesplatform.database.{KeyTag, RDB, readBlockMeta, toVanillaTransaction}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.metrics.Metrics
-import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks}
 import com.wavesplatform.protobuf.toByteStr
-import com.wavesplatform.state.Height
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.utils.*
 import kamon.Kamon
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB}
 import scopt.OParser
 
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
+import java.util.HexFormat
 import scala.annotation.tailrec
 import scala.concurrent.Await
 import scala.concurrent.duration.*
@@ -47,8 +50,13 @@ object Exporter extends ScorexLogging {
           RDB.open(settings.dbSettings)
         ) { (time, rdb) =>
           val (blockchain, rdbWriter) = StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.noop)
-          val blockchainHeight        = blockchain.height
-          val height                  = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
+          // Stored bytes are exported without decoding, so a config for another chain would otherwise surface late, if at all.
+          verifyGenesis(settings, blockchain).left.foreach { e =>
+            log.error(s"Incorrect configuration for this blockchain: $e")
+            forceStopApplication(Misconfiguration)
+          }
+          val blockchainHeight = blockchain.height
+          val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
           log.info(s"Blockchain height is $blockchainHeight exporting to $height")
           val blocksOutputFilename = s"$blocksOutputFileNamePrefix-$height"
           log.info(s"Blocks output file: $blocksOutputFilename")
@@ -72,27 +80,9 @@ object Exporter extends ScorexLogging {
           ) { case (blocksOutput, snapshotsOutput, _) =>
             Using.resources(createBufferedOutputStream(blocksOutput, 10), snapshotsOutput.map(createBufferedOutputStream(_, 100))) {
               case (blocksStream, snapshotsStream) =>
-                var exportedBlocksBytes    = 0L
-                var exportedSnapshotsBytes = 0L
-                val start                  = System.currentTimeMillis()
-
-                new BlockSnapshotIterator(rdb, height, exportSnapshots).asScala.foreach { case (h, block, txSnapshots) =>
-                  val txCount = block.transactionData.length
-                  if (exportSnapshots && txCount != txSnapshots.length)
-                    throw new RuntimeException(
-                      s"${txSnapshots.length} snapshot(s) don't match $txCount transaction(s) on height $h, data is corrupted"
-                    )
-                  exportedBlocksBytes += IO.exportBlock(blocksStream, Some(block), format == Formats.Binary)
-                  snapshotsStream.foreach { output =>
-                    exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
-                  }
-
-                  if (h % (height / 10) == 0) {
-                    log.info(
-                      s"$h blocks exported, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
-                    )
-                  }
-                }
+                val start = System.currentTimeMillis()
+                val (exportedBlocksBytes, exportedSnapshotsBytes) =
+                  exportBlocks(rdb, height, format == Formats.Binary, blocksStream, snapshotsStream)
                 val duration = System.currentTimeMillis() - start
                 log
                   .info(
@@ -107,9 +97,62 @@ object Exporter extends ScorexLogging {
     }
   }
 
+  /** Writes blocks 2 to `height` (and their transaction snapshots, when `snapshotsStream` is given); returns the bytes written to each. */
+  private[wavesplatform] def exportBlocks(
+      rdb: RDB,
+      height: Int,
+      legacy: Boolean,
+      blocksStream: OutputStream,
+      snapshotsStream: Option[OutputStream]
+  ): (Long, Long) = {
+    val exportSnapshots        = snapshotsStream.isDefined
+    var exportedBlocksBytes    = 0L
+    var exportedSnapshotsBytes = 0L
+
+    new BlockSnapshotIterator(rdb, height, exportSnapshots).asScala.foreach { case (h, meta, txs, txSnapshots) =>
+      val txCount = txs.length
+      if (exportSnapshots && txCount != txSnapshots.length)
+        throw new RuntimeException(
+          s"${txSnapshots.length} snapshot(s) don't match $txCount transaction(s) on height $h, data is corrupted"
+        )
+      exportedBlocksBytes += IO.writeLengthPrefixed(blocksStream, blockBytes(h, meta, txs, legacy))
+      snapshotsStream.foreach { output =>
+        exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
+      }
+
+      if (h % math.max(1, height / 10) == 0) {
+        log.info(
+          s"$h blocks exported, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
+        )
+      }
+    }
+    (exportedBlocksBytes, exportedSnapshotsBytes)
+  }
+
+  /** Same bytes as `Block.bytes()` or the protobuf export, built from stored bytes to skip decoding transactions. */
+  private def blockBytes(height: Int, meta: BlockMeta, txs: Seq[TransactionData], legacy: Boolean): Array[Byte] =
+    if (legacy && meta.getHeader.version < Block.ProtoBlockVersion)
+      BlockSerializer.toLegacyBytes(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, txs.map(legacyTxBytes(height, _)))
+    else {
+      val block = new PBBlock(meta.header, meta.signature, txs.map(signedTx))
+      if (legacy) PBUtils.encodeDeterministic(block) else PBBlocks.clearChainId(block).toByteArray
+    }
+
+  private def legacyTxBytes(height: Int, td: TransactionData): Array[Byte] = td.transaction match {
+    case TD.LegacyBytes(bytes)     => bytes.toByteArray
+    case TD.EthereumTransaction(_) => throw new IllegalStateException(s"Ethereum transaction in a pre-protobuf block at height $height")
+    case other                     => toVanillaTransaction(other).bytes()
+  }
+
+  private def signedTx(td: TransactionData): PBSignedTransaction = td.transaction match {
+    case TD.WavesTransaction(tx)       => tx
+    case TD.EthereumTransaction(bytes) => PBSignedTransaction(PBSignedTransaction.Transaction.EthereumTransaction(bytes))
+    case other                         => PBTransactions.protobuf(toVanillaTransaction(other))
+  }
+
   private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, exportSnapshots: Boolean)
-      extends AbstractIterator[(Int, Block, Seq[Array[Byte]])] {
-    var nextTxEntry: Option[(Int, Transaction)]       = None
+      extends AbstractIterator[(Int, BlockMeta, Seq[TransactionData], Seq[Array[Byte]])] {
+    var nextTxEntry: Option[(Int, TransactionData)]   = None
     var nextSnapshotEntry: Option[(Int, Array[Byte])] = None
 
     val blockMetaIterator: DataIterator[BlockMeta] =
@@ -117,17 +160,15 @@ object Exporter extends ScorexLogging {
         rdb.db,
         rdb.db.getDefaultColumnFamily,
         KeyTag.BlockInfoAtHeight.prefixBytes,
-        _.takeRight(Ints.BYTES),
-        _ => readBlockMeta
+        readBlockMeta
       )
-    val txIterator: DataIterator[Transaction] = {
+    val txIterator: DataIterator[TransactionData] = {
       val prefixBytes = KeyTag.NthTransactionInfoAtHeight.prefixBytes
       new DataIterator(
         rdb.db,
         rdb.txHandle.handle,
         prefixBytes,
-        _.slice(prefixBytes.length, prefixBytes.length + Ints.BYTES),
-        h => readTransaction(Height(h))(_)._2
+        TransactionData.parseFrom
       )
     }
     val snapshotIterator: DataIterator[Array[Byte]] = {
@@ -136,8 +177,7 @@ object Exporter extends ScorexLogging {
         rdb.db,
         rdb.txSnapshotHandle.handle,
         prefixBytes,
-        _.slice(prefixBytes.length, prefixBytes.length + Ints.BYTES),
-        _ => identity
+        identity
       )
     }
 
@@ -154,16 +194,16 @@ object Exporter extends ScorexLogging {
       } else acc.reverse
     }
 
-    override final def computeNext(): (Int, Block, Seq[Array[Byte]]) = {
+    override final def computeNext(): (Int, BlockMeta, Seq[TransactionData], Seq[Array[Byte]]) = {
       if (blockMetaIterator.hasNext) {
         val (h, meta) = blockMetaIterator.next()
         if (h <= targetHeight) {
           val txs = nextTxEntry match {
             case Some((txHeight, tx)) if txHeight == h =>
               nextTxEntry = None
-              loadTxData[Transaction](Seq(tx), h, txIterator, (h, tx) => nextTxEntry = Some(h -> tx))
+              loadTxData[TransactionData](Seq(tx), h, txIterator, (h, tx) => nextTxEntry = Some(h -> tx))
             case Some(_) => Seq.empty
-            case _       => loadTxData[Transaction](Seq.empty, h, txIterator, (h, tx) => nextTxEntry = Some(h -> tx))
+            case _       => loadTxData[TransactionData](Seq.empty, h, txIterator, (h, tx) => nextTxEntry = Some(h -> tx))
           }
           val snapshots = if (exportSnapshots) {
             nextSnapshotEntry match {
@@ -174,7 +214,7 @@ object Exporter extends ScorexLogging {
               case _       => loadTxData[Array[Byte]](Seq.empty, h, snapshotIterator, (h, sn) => nextSnapshotEntry = Some(h -> sn))
             }
           } else Seq.empty
-          (h, createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, txs), snapshots)
+          (h, meta, txs, snapshots)
         } else {
           closeResources()
           endOfData()
@@ -196,21 +236,33 @@ object Exporter extends ScorexLogging {
       db: RocksDB,
       cfHandle: ColumnFamilyHandle,
       prefixBytes: Array[Byte],
-      heightFromKeyF: Array[Byte] => Array[Byte],
-      parseDataF: Int => Array[Byte] => A
+      parseDataF: Array[Byte] => A
   ) extends AbstractIterator[(Int, A)] {
-    private val snapshot    = db.getSnapshot
-    private val readOptions = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
-    private val dbIterator  = db.newIterator(cfHandle, readOptions.setTotalOrderSeek(true))
+    private val snapshot = db.getSnapshot
+    // Each block is read once: caching it only churns the LRU cache, and a large readahead replaces a pread per (small) data block.
+    private val readOptions = new ReadOptions()
+      .setSnapshot(snapshot)
+      .setVerifyChecksums(false)
+      .setFillCache(false)
+      .setReadaheadSize(16L << 20) // fastest on a testnet export; async IO added almost nothing
+      .setTotalOrderSeek(true)
+    private val dbIterator = db.newIterator(cfHandle, readOptions)
+
+    // Keys are the prefix followed by the height; `key()` copies over JNI, so it's read once.
+    private def hasPrefix(key: Array[Byte]): Boolean =
+      key.length >= prefixBytes.length && java.util.Arrays.equals(key, 0, prefixBytes.length, prefixBytes, 0, prefixBytes.length)
 
     dbIterator.seek(prefixBytes)
 
     @tailrec
     override final def computeNext(): (Int, A) = {
-      if (dbIterator.isValid && dbIterator.key().startsWith(prefixBytes)) {
-        val h = Ints.fromByteArray(heightFromKeyF(dbIterator.key()))
+      val key = if (dbIterator.isValid) dbIterator.key() else null
+      if (key != null && hasPrefix(key)) {
+        val p = prefixBytes.length
+        if (key.length < p + Ints.BYTES) throw new IllegalStateException(s"Corrupted key without a height: ${HexFormat.of().formatHex(key)}")
+        val h = Ints.fromBytes(key(p), key(p + 1), key(p + 2), key(p + 3))
         if (h > 1) {
-          val txData = parseDataF(h)(dbIterator.value())
+          val txData = parseDataF(dbIterator.value())
           dbIterator.next()
           h -> txData
         } else {
@@ -235,16 +287,14 @@ object Exporter extends ScorexLogging {
       Try(new FileOutputStream(filename))
 
     def exportBlock(stream: OutputStream, maybeBlock: Option[Block], legacy: Boolean): Int = maybeBlock
-      .map { block =>
-        val bytes       = if (legacy) block.bytes() else PBBlocks.clearChainId(PBBlocks.protobuf(block)).toByteArray
-        val bytesLength = bytes.length
-
-        stream.write(Ints.toByteArray(bytesLength))
-        stream.write(bytes)
-
-        Ints.BYTES + bytesLength
-      }
+      .map(block => writeLengthPrefixed(stream, if (legacy) block.bytes() else PBBlocks.clearChainId(PBBlocks.protobuf(block)).toByteArray))
       .getOrElse(0)
+
+    def writeLengthPrefixed(stream: OutputStream, bytes: Array[Byte]): Int = {
+      stream.write(Ints.toByteArray(bytes.length))
+      stream.write(bytes)
+      Ints.BYTES + bytes.length
+    }
 
     def exportBlockTxSnapshots(stream: OutputStream, snapshots: Seq[Array[Byte]]): Int = {
       val snapshotBytesWithSizes = snapshots.map { snapshot =>
