@@ -77,22 +77,6 @@ class ExporterSpec extends FreeSpec with WithDomain {
       out.toByteArray shouldBe lengthPrefixed(expected)
     }
 
-    "regardless of readahead and async IO" in withMixedChain { d =>
-      val height = d.rocksDBWriter.height
-      def exportWith(settings: Exporter.ScanSettings): (Array[Byte], Array[Byte]) = {
-        val (blocks, snapshots) = (new ByteArrayOutputStream(), new ByteArrayOutputStream())
-        Exporter.exportBlocks(d.rdb, height, legacy = true, blocks, Some(snapshots), settings)
-        (blocks.toByteArray, snapshots.toByteArray)
-      }
-
-      val (blocks, snapshots) = exportWith(Exporter.ScanSettings())
-      Seq(Exporter.ScanSettings(readaheadSize = 0), Exporter.ScanSettings(asyncIo = true)).foreach { settings =>
-        val (b, s) = exportWith(settings)
-        b shouldBe blocks
-        s shouldBe snapshots
-      }
-    }
-
     "refusing an Ethereum transaction stored in a legacy block" in withMixedChain { d =>
       val eth = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, Waves)
       val key = Keys.transactionAt(Height(2), TxNum(0.toShort), d.rdb.txHandle)

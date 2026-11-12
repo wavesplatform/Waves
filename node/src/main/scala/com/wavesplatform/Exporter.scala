@@ -42,7 +42,7 @@ object Exporter extends ScorexLogging {
   // noinspection ScalaStyle
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
-      case ExporterOptions(configFile, blocksOutputFileNamePrefix, snapshotsOutputFileNamePrefix, exportHeight, format, scanSettings) =>
+      case ExporterOptions(configFile, blocksOutputFileNamePrefix, snapshotsOutputFileNamePrefix, exportHeight, format) =>
         val settings = Application.loadApplicationConfig(configFile)
 
         Using.resources(
@@ -82,7 +82,7 @@ object Exporter extends ScorexLogging {
               case (blocksStream, snapshotsStream) =>
                 val start = System.currentTimeMillis()
                 val (exportedBlocksBytes, exportedSnapshotsBytes) =
-                  exportBlocks(rdb, height, format == Formats.Binary, blocksStream, snapshotsStream, scanSettings)
+                  exportBlocks(rdb, height, format == Formats.Binary, blocksStream, snapshotsStream)
                 val duration = System.currentTimeMillis() - start
                 log
                   .info(
@@ -103,14 +103,13 @@ object Exporter extends ScorexLogging {
       height: Int,
       legacy: Boolean,
       blocksStream: OutputStream,
-      snapshotsStream: Option[OutputStream],
-      scanSettings: ScanSettings = ScanSettings()
+      snapshotsStream: Option[OutputStream]
   ): (Long, Long) = {
     val exportSnapshots        = snapshotsStream.isDefined
     var exportedBlocksBytes    = 0L
     var exportedSnapshotsBytes = 0L
 
-    new BlockSnapshotIterator(rdb, height, exportSnapshots, scanSettings).asScala.foreach { case (h, meta, txs, txSnapshots) =>
+    new BlockSnapshotIterator(rdb, height, exportSnapshots).asScala.foreach { case (h, meta, txs, txSnapshots) =>
       val txCount = txs.length
       if (exportSnapshots && txCount != txSnapshots.length)
         throw new RuntimeException(
@@ -151,13 +150,7 @@ object Exporter extends ScorexLogging {
     case other                         => PBTransactions.protobuf(toVanillaTransaction(other))
   }
 
-  /** Read options for the one-pass scans of the export. */
-  private[wavesplatform] final case class ScanSettings(readaheadSize: Long = ScanSettings.DefaultReadaheadSize, asyncIo: Boolean = false)
-  private[wavesplatform] object ScanSettings {
-    val DefaultReadaheadSize: Long = 16L << 20
-  }
-
-  private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, exportSnapshots: Boolean, scanSettings: ScanSettings)
+  private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, exportSnapshots: Boolean)
       extends AbstractIterator[(Int, BlockMeta, Seq[TransactionData], Seq[Array[Byte]])] {
     var nextTxEntry: Option[(Int, TransactionData)]   = None
     var nextSnapshotEntry: Option[(Int, Array[Byte])] = None
@@ -167,7 +160,6 @@ object Exporter extends ScorexLogging {
         rdb.db,
         rdb.db.getDefaultColumnFamily,
         KeyTag.BlockInfoAtHeight.prefixBytes,
-        scanSettings,
         readBlockMeta
       )
     val txIterator: DataIterator[TransactionData] = {
@@ -176,7 +168,6 @@ object Exporter extends ScorexLogging {
         rdb.db,
         rdb.txHandle.handle,
         prefixBytes,
-        scanSettings,
         TransactionData.parseFrom
       )
     }
@@ -186,7 +177,6 @@ object Exporter extends ScorexLogging {
         rdb.db,
         rdb.txSnapshotHandle.handle,
         prefixBytes,
-        scanSettings,
         identity
       )
     }
@@ -246,7 +236,6 @@ object Exporter extends ScorexLogging {
       db: RocksDB,
       cfHandle: ColumnFamilyHandle,
       prefixBytes: Array[Byte],
-      scanSettings: ScanSettings,
       parseDataF: Array[Byte] => A
   ) extends AbstractIterator[(Int, A)] {
     private val snapshot = db.getSnapshot
@@ -255,8 +244,7 @@ object Exporter extends ScorexLogging {
       .setSnapshot(snapshot)
       .setVerifyChecksums(false)
       .setFillCache(false)
-      .setReadaheadSize(scanSettings.readaheadSize)
-      .setAsyncIo(scanSettings.asyncIo)
+      .setReadaheadSize(16L << 20) // fastest on a testnet export; async IO added almost nothing
       .setTotalOrderSeek(true)
     private val dbIterator = db.newIterator(cfHandle, readOptions)
 
@@ -336,8 +324,7 @@ object Exporter extends ScorexLogging {
       blocksOutputFileNamePrefix: String = "blockchain",
       snapshotsFileNamePrefix: Option[String] = None,
       exportHeight: Option[Int] = None,
-      format: String = Formats.Binary,
-      scanSettings: ScanSettings = ScanSettings()
+      format: String = Formats.Binary
   )
 
   private lazy val commandParser = {
@@ -378,15 +365,6 @@ object Exporter extends ScorexLogging {
         .text("Export to height")
         .action((h, c) => c.copy(exportHeight = Some(h)))
         .validate(h => if (h > 0) success else failure("Export height must be > 0")),
-      opt[Int]("readahead-mb")
-        .hidden()
-        .text(s"RocksDB readahead size for the scans, in MiB (default is ${ScanSettings.DefaultReadaheadSize >> 20})")
-        .action((mb, c) => c.copy(scanSettings = c.scanSettings.copy(readaheadSize = mb.toLong << 20)))
-        .validate(mb => if (mb >= 0) success else failure("Readahead size must be >= 0")),
-      opt[Unit]("async-io")
-        .hidden()
-        .text("Prefetch RocksDB blocks asynchronously")
-        .action((_, c) => c.copy(scanSettings = c.scanSettings.copy(asyncIo = true))),
       help("help").hidden()
     )
   }
