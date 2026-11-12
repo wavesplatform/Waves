@@ -15,7 +15,8 @@ import scala.reflect.ClassTag
 import scala.util.Try
 
 package object state {
-  def safeSum(x: Long, y: Long, source: String): Either[String, Long] =
+  // By-name: callers interpolate addresses into the source, and Base58 is too costly to pay for on every balance change.
+  def safeSum(x: Long, y: Long, source: => String): Either[String, Long] =
     Try(Math.addExact(x, y)).toEither.leftMap(_ => s"$source sum overflow")
 
   implicit val safeSummarizer: Summarizer[[X] =>> Either[String, X]] = safeSum(_, _, _)
