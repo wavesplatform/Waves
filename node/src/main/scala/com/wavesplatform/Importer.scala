@@ -209,7 +209,7 @@ object Importer extends ScorexLogging {
 
     val startHeight   = blockchain.height
     val blocksToSkip  = if (skipBlocks) startHeight - 1 else 0
-    val blocksToApply = importOptions.importHeight - startHeight + 1
+    val blocksToApply = importOptions.importHeight - startHeight
 
     if (blocksToSkip > 0) log.info(s"Skipping $blocksToSkip block(s)")
 

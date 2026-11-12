@@ -56,4 +56,8 @@ class ImporterSpec extends FreeSpec with WithDomain with MixedChain {
   "imports an exported chain block for block" in {
     importExported(ImportOptions()) shouldBe exported.blockIds
   }
+
+  "stops at the requested height" in {
+    importExported(ImportOptions(importHeight = 4)) shouldBe exported.blockIds.take(4)
+  }
 }
