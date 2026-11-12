@@ -77,6 +77,22 @@ class ExporterSpec extends FreeSpec with WithDomain {
       out.toByteArray shouldBe lengthPrefixed(expected)
     }
 
+    "regardless of readahead and async IO" in withMixedChain { d =>
+      val height = d.rocksDBWriter.height
+      def exportWith(settings: Exporter.ScanSettings): (Array[Byte], Array[Byte]) = {
+        val (blocks, snapshots) = (new ByteArrayOutputStream(), new ByteArrayOutputStream())
+        Exporter.exportBlocks(d.rdb, height, legacy = true, blocks, Some(snapshots), settings)
+        (blocks.toByteArray, snapshots.toByteArray)
+      }
+
+      val (blocks, snapshots) = exportWith(Exporter.ScanSettings())
+      Seq(Exporter.ScanSettings(readaheadSize = 0), Exporter.ScanSettings(asyncIo = true)).foreach { settings =>
+        val (b, s) = exportWith(settings)
+        b shouldBe blocks
+        s shouldBe snapshots
+      }
+    }
+
     "with each block's stored transaction snapshots" in withMixedChain { d =>
       val height    = d.rocksDBWriter.height
       val snapshots = new ByteArrayOutputStream()
