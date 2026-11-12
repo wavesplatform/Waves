@@ -50,8 +50,10 @@ object Exporter extends ScorexLogging {
         ) { (time, rdb) =>
           val (blockchain, rdbWriter) = StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.noop)
           // Stored bytes are exported without decoding, so a config for another chain would otherwise surface late, if at all.
-          verifyGenesis(settings, blockchain).left
-            .foreach(e => throw new IllegalArgumentException(s"Incorrect configuration for this blockchain: $e"))
+          verifyGenesis(settings, blockchain).left.foreach { e =>
+            log.error(s"Incorrect configuration for this blockchain: $e")
+            forceStopApplication(Misconfiguration)
+          }
           val blockchainHeight = blockchain.height
           val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
           log.info(s"Blockchain height is $blockchainHeight exporting to $height")
