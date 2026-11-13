@@ -433,4 +433,60 @@ object Terms {
 
   implicit val orderingConstBigInt: Ordering[CONST_BIGINT] =
     (a, b) => a.t compare b.t
+
+  // Marks the node below it on the work stack as one whose children are all copied.
+  private object Rebuild
+
+  /** Copies a tree for the evaluator, which writes into it. Equal to [[EXPR.deepCopy]], but a loop over explicit stacks: going through
+    * `Eval` allocated several objects per node and took a third of block appending on dApp-heavy blocks. Leaves are immutable and shared.
+    */
+  def deepCopy(root: EXPR): EXPR = {
+    val work   = new java.util.ArrayDeque[AnyRef]()
+    val copies = new java.util.ArrayDeque[AnyRef]()
+
+    def copy[A]: A = copies.pop().asInstanceOf[A]
+
+    work.push(root)
+    while (!work.isEmpty) work.pop() match {
+      case Rebuild =>
+        val copied = work.pop() match {
+          case g: GETTER => GETTER(copy, g.field)
+          case lb: LET_BLOCK =>
+            val body = copy[EXPR]
+            LET_BLOCK(LET(lb.let.name, copy), body)
+          case _: BLOCK =>
+            val body = copy[EXPR]
+            BLOCK(copy, body)
+          case l: LET  => LET(l.name, copy)
+          case f: FUNC => FUNC(f.name, f.args, copy)
+          case _: IF =>
+            val ifFalse = copy[EXPR]
+            val ifTrue  = copy[EXPR]
+            IF(copy, ifTrue, ifFalse)
+          case fc: FUNCTION_CALL =>
+            var args = List.empty[EXPR]
+            fc.args.foreach(_ => args = copy[EXPR] :: args)
+            FUNCTION_CALL(fc.function, args)
+          case other => throw new IllegalStateException(s"Unexpected node $other")
+        }
+        copies.push(copied)
+      case leaf @ (_: REF | _: FAILED_EXPR | _: EVALUATED | _: FAILED_DEC) =>
+        copies.push(leaf)
+      case node =>
+        work.push(node)
+        work.push(Rebuild)
+        // Children go on in reverse, so they are copied first to last and come off the copies stack last to first.
+        node match {
+          case g: GETTER         => work.push(g.expr)
+          case lb: LET_BLOCK     => work.push(lb.body); work.push(lb.let.value)
+          case b: BLOCK          => work.push(b.body); work.push(b.dec)
+          case l: LET            => work.push(l.value)
+          case f: FUNC           => work.push(f.body)
+          case i: IF             => work.push(i.ifFalse); work.push(i.ifTrue); work.push(i.cond)
+          case fc: FUNCTION_CALL => fc.args.reverseIterator.foreach(work.push)
+          case other             => throw new IllegalStateException(s"Unexpected node $other")
+        }
+    }
+    copies.pop().asInstanceOf[EXPR]
+  }
 }

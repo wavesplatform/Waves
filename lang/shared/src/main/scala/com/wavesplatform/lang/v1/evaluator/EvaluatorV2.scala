@@ -7,6 +7,7 @@ import cats.syntax.foldable.*
 import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
@@ -152,7 +153,7 @@ class EvaluatorV2(
         .map { case (signature, precalculatedLimitOpt, functionScopeBlocks) =>
           val argsWithExpr =
             (signature.args zip fc.args)
-              .foldRight(signature.body.deepCopy.value) { case ((argName, argValue), argsWithExpr) =>
+              .foldRight(Terms.deepCopy(signature.body)) { case ((argName, argValue), argsWithExpr) =>
                 BLOCK(LET(argName, argValue), argsWithExpr)
               }
           update(argsWithExpr)
@@ -369,7 +370,7 @@ object EvaluatorV2 {
     } else {
       DisabledLogEvaluationContext[Environment, Id](ctx)
     }
-    var ref = expr.deepCopy.value
+    var ref = Terms.deepCopy(expr)
     logCall(loggedCtx, logExtraInfo, ref, enableExecutionLog)
     new EvaluatorV2(
       loggedCtx,
