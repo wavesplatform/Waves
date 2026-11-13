@@ -1,5 +1,6 @@
 package com.wavesplatform
 
+import com.google.common.primitives.Ints
 import com.wavesplatform.Importer.ImportOptions
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -16,31 +17,28 @@ class ImporterSpec extends FreeSpec with WithDomain with MixedChain {
   private case class Exported(genesis: Block, blocks: Array[Byte], blockIds: Seq[String], time: Time)
 
   // Domains of one suite share a database, so the source chain is exported before the target domain is opened.
-  private lazy val exported: Exported = {
-    var result: Exported = null
+  private lazy val exported: Exported =
     withMixedChain { d =>
       val height = d.rocksDBWriter.height
       val out    = new ByteArrayOutputStream()
       Exporter.exportBlocks(d.rdb, height, legacy = true, out, None)
-      result = Exported(
+      Exported(
         loadBlock(Height(1), d.rdb).get,
         out.toByteArray,
         (1 to height).map(h => d.blockchain.blockHeader(h).get.id().toString),
         d.testTime
       )
     }
-    result
-  }
 
   // Imports into a fresh domain that holds only the source's genesis block, and returns the ids of the target's blocks.
-  private def importExported(options: ImportOptions): Seq[String] =
+  private def importExported(options: ImportOptions, blocks: Array[Byte] = exported.blocks): Seq[String] =
     withDomain(mixedChainSettings) { target =>
       val genesis = exported.genesis
       target.blockchain.processBlock(genesis, genesis.header.generationSignature, snapshot = None, generatorSet = Seq.empty).explicitGet()
       val appender = Schedulers.singleThread("test-appender")
       try {
         Importer.startImport(
-          new BufferedInputStream(new ByteArrayInputStream(exported.blocks)),
+          new BufferedInputStream(new ByteArrayInputStream(blocks)),
           None,
           target.blockchain,
           // The fixture chain skips block validation (Domain.appendBlock), so the import does too.
@@ -59,5 +57,11 @@ class ImporterSpec extends FreeSpec with WithDomain with MixedChain {
 
   "stops at the requested height" in {
     importExported(ImportOptions(importHeight = 4)) shouldBe exported.blockIds.take(4)
+  }
+
+  "fails on a record that does not parse instead of ending the import as if the input had ended" in {
+    val garbage = Array.fill[Byte](16)(-1)
+    val blocks  = exported.blocks ++ Ints.toByteArray(garbage.length) ++ garbage
+    an[Exception] should be thrownBy importExported(ImportOptions(), blocks)
   }
 }

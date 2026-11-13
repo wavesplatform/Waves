@@ -25,7 +25,7 @@ trait MixedChain { self: WithDomain =>
     BlockchainFeatures.BlockReward      -> ProtoBlocksFrom
   )
 
-  def withMixedChain(f: Domain => Unit): Unit =
+  def withMixedChain[A](f: Domain => A): A =
     withDomain(
       mixedChainSettings,
       Seq(AddrWithBalance(TxHelpers.defaultAddress), AddrWithBalance(TxHelpers.defaultSigner.toEthWavesAddress))

@@ -45,7 +45,6 @@ import java.util.concurrent.ArrayBlockingQueue
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
@@ -196,6 +195,9 @@ object Importer extends ScorexLogging {
 
   private type ImportedBlock = (VanillaBlock, Option[BlockSnapshotResponse])
 
+  // What the reader hands to the appender: a block, the end of the input (None), or the error that stopped it.
+  private type ReadResult = Either[Throwable, Option[ImportedBlock]]
+
   // noinspection UnstableApiUsage
   def startImport(
       blocksInputStream: BufferedInputStream,
@@ -223,25 +225,26 @@ object Importer extends ScorexLogging {
       )
     }
 
-    // Parsing runs on its own thread so that the appender never waits for the next block. None marks the end of the input.
-    val queue = new ArrayBlockingQueue[Option[ImportedBlock]](importOptions.maxQueueSize)
+    // Parsing runs on its own thread so that the appender never waits for the next block.
+    val queue = new ArrayBlockingQueue[ReadResult](importOptions.maxQueueSize)
     val reader =
       new Thread(() => readBlocks(blocksInputStream, snapshotsInputStream, blockchain, startHeight, blocksToSkip, queue), "importer-reader")
     reader.setDaemon(true)
     reader.start()
 
     try {
-      var endOfInput = false
-      while (!endOfInput && !quit && counter < blocksToApply)
+      var stop = false
+      while (!stop && !quit && counter < blocksToApply)
         queue.take() match {
-          case None => endOfInput = true
-          case Some((block, snapshot)) =>
+          case Left(error) => throw error
+          case Right(None) => stop = true
+          case Right(Some((block, snapshot))) =>
             lock.synchronized {
               if (blockchain.lastBlockId.contains(block.header.reference)) {
                 Await.result(appendBlock(block, snapshot).runAsyncLogErr(using appender), Duration.Inf) match {
                   case Left(ve) =>
                     log.error(s"Error appending block ${blockchain.height + 1}: $ve")
-                    endOfInput = true
+                    stop = true
                   case _ =>
                     counter = counter + 1
                 }
@@ -285,7 +288,7 @@ object Importer extends ScorexLogging {
       blockchain: Blockchain,
       startHeight: Int,
       blocksToSkip: Int,
-      queue: ArrayBlockingQueue[Option[ImportedBlock]]
+      queue: ArrayBlockingQueue[ReadResult]
   ): Unit = {
     val lenBlockBytes     = new Array[Byte](Ints.BYTES)
     val lenSnapshotsBytes = if (snapshotsInputStream.isDefined) Some(new Array[Byte](Ints.BYTES)) else None
@@ -346,7 +349,7 @@ object Importer extends ScorexLogging {
             ParSignatureChecker.checkBlockAndTxSignatures(block, blockSnapshot.isEmpty, rideV6)
             vrfPrecheck.add(block, height)
 
-            queue.put(Some(block -> blockSnapshot))
+            queue.put(Right(Some(block -> blockSnapshot)))
             enqueued += 1
           }
           true
@@ -371,12 +374,13 @@ object Importer extends ScorexLogging {
 
     try {
       while (readNext()) ()
-      queue.put(None)
+      queue.put(Right(None))
     } catch {
       case _: InterruptedException => () // the import ended before the input did
-      case NonFatal(e) =>
-        log.error("Error reading blocks", e)
-        queue.put(None)
+      case e: Throwable =>
+        // The appender rethrows it. Fatal errors too: the appender would otherwise wait for the next block forever.
+        try queue.put(Left(e))
+        catch { case _: InterruptedException => () }
     }
   }
 
