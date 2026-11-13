@@ -38,9 +38,9 @@ class EvaluatorV2(
       limit: Int,
       parentBlocks: List[BLOCK_DEF]
   ): EvaluationResult[Int] = {
-    // A loop rather than foldM over a LazyList of the indices, which boxed every index and allocated per argument.
+    // Steps through the arguments by index with flatMap: foldM over a LazyList of the indices boxed every index and allocated per argument.
     def evaluateFunctionArgs(fc: FUNCTION_CALL): EvaluationResult[Int] =
-      Defer {
+      EvaluationResult.defer {
         val argCount = fc.args.size
         def evaluateFrom(argIndex: Int, unused: Int): EvaluationResult[Int] =
           if (argIndex >= argCount || unused <= 0) EvaluationResult(unused)
@@ -191,11 +191,11 @@ class EvaluatorV2(
 
     expr match {
       case b: BLOCK_DEF =>
-        Defer {
+        EvaluationResult.defer {
           root(
             expr = b.body,
             update = {
-              case ev: EVALUATED => Defer(update(ev))
+              case ev: EVALUATED => EvaluationResult.defer(update(ev))
               case nonEvaluated  => EvaluationResult(b.body = nonEvaluated)
             },
             limit = limit,
@@ -203,7 +203,7 @@ class EvaluatorV2(
           )
         }
       case g: GETTER =>
-        Defer {
+        EvaluationResult.defer {
           root(
             expr = g.expr,
             update = v => EvaluationResult(g.expr = v),
@@ -219,7 +219,7 @@ class EvaluatorV2(
           }
         }
       case i: IF =>
-        Defer {
+        EvaluationResult.defer {
           root(
             expr = i.cond,
             update = v => EvaluationResult(i.cond = v),
@@ -254,7 +254,7 @@ class EvaluatorV2(
         }
 
       case REF(key) =>
-        Defer {
+        EvaluationResult.defer {
           visitRef(key, update, limit, parentBlocks)
             .orElse(findGlobalVar(key, update, limit))
             .getOrElse(EvaluationResult(s"A definition of '$key' not found", limit))

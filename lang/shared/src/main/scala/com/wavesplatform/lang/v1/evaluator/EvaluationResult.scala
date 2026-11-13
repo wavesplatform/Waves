@@ -29,16 +29,19 @@ sealed abstract class EvaluationResult[+A] {
 }
 
 object EvaluationResult {
-  private final case class Now[A](result: Either[(ExecutionError, Int), A])                                       extends EvaluationResult[A]
-  private final case class Delay[A](thunk: () => Either[(ExecutionError, Int), A])                                extends EvaluationResult[A]
-  private final case class Suspend[A](thunk: () => EvaluationResult[A])                                           extends EvaluationResult[A]
-  private final case class FlatMap[A, B](source: EvaluationResult[A], f: A => EvaluationResult[B])                extends EvaluationResult[B]
-  private final case class Map[A, B](source: EvaluationResult[A], f: A => B)                                      extends EvaluationResult[B]
-  private final case class HandleError[A](source: EvaluationResult[A], handler: Throwable => EvaluationResult[A]) extends EvaluationResult[A]
+  private final case class Now[A](result: Either[(ExecutionError, Int), A])        extends EvaluationResult[A]
+  private final case class Delay[A](thunk: () => Either[(ExecutionError, Int), A]) extends EvaluationResult[A]
+  private final case class Suspend[A](thunk: () => EvaluationResult[A])            extends EvaluationResult[A]
+
+  // A step that waits for the result of its source.
+  private sealed abstract class Bind[A, B] extends EvaluationResult[B] { def source: EvaluationResult[A] }
+  private final case class FlatMap[A, B](source: EvaluationResult[A], f: A => EvaluationResult[B])                extends Bind[A, B]
+  private final case class Map[A, B](source: EvaluationResult[A], f: A => B)                                      extends Bind[A, B]
+  private final case class HandleError[A](source: EvaluationResult[A], handler: Throwable => EvaluationResult[A]) extends Bind[A, A]
   private final case class Transform[A, B](
       source: EvaluationResult[A],
       f: Either[(ExecutionError, Int), A] => Either[(ExecutionError, Int), B]
-  ) extends EvaluationResult[B]
+  ) extends Bind[A, B]
 
   def apply[A](value: A): EvaluationResult[A]                  = Now(Right(value))
   def apply[A](error: String, limit: Int): EvaluationResult[A] = Now(Left((CommonError(error), limit)))
@@ -55,8 +58,8 @@ object EvaluationResult {
     Delay(() => coeval.runAttempt().fold(e => throw e, identity))
 
   private def run(start: EvaluationResult[Any]): Either[(ExecutionError, Int), Any] = {
-    // FlatMap, Map, Transform and HandleError nodes waiting for the value of their source, innermost first.
-    val pending = new java.util.ArrayDeque[EvaluationResult[Any]]()
+    // Steps waiting for the value of their source, innermost first.
+    val pending = new java.util.ArrayDeque[Bind[?, ?]]()
 
     var current: EvaluationResult[Any] = start
     // The value of the last finished step, Right or Left, when current is null.
@@ -86,18 +89,9 @@ object EvaluationResult {
             case Delay(thunk) =>
               result = thunk()
               current = null
-            case Suspend(thunk) => current = thunk()
-            case node: FlatMap[?, ?] =>
-              pending.push(node.asInstanceOf[EvaluationResult[Any]])
-              current = node.source.asInstanceOf[EvaluationResult[Any]]
-            case node: Map[?, ?] =>
-              pending.push(node.asInstanceOf[EvaluationResult[Any]])
-              current = node.source.asInstanceOf[EvaluationResult[Any]]
-            case node: Transform[?, ?] =>
-              pending.push(node.asInstanceOf[EvaluationResult[Any]])
-              current = node.source.asInstanceOf[EvaluationResult[Any]]
-            case node: HandleError[?] =>
-              pending.push(node.asInstanceOf[EvaluationResult[Any]])
+            case Suspend(thunk) => current = java.util.Objects.requireNonNull(thunk())
+            case node: Bind[?, ?] =>
+              pending.push(node)
               current = node.source.asInstanceOf[EvaluationResult[Any]]
           }
         } catch { case NonFatal(t) => error = t; current = null }
@@ -109,7 +103,7 @@ object EvaluationResult {
             case FlatMap(_, f) =>
               result match {
                 case Right(value) =>
-                  current = f.asInstanceOf[Any => EvaluationResult[Any]](value)
+                  current = java.util.Objects.requireNonNull(f.asInstanceOf[Any => EvaluationResult[Any]](value))
                   result = null
                 case Left(_) =>
               }
@@ -121,15 +115,10 @@ object EvaluationResult {
             case Transform(_, f) =>
               result = f.asInstanceOf[Either[(ExecutionError, Int), Any] => Either[(ExecutionError, Int), Any]](result)
             case HandleError(_, _) =>
-            case other             => throw new IllegalStateException(s"Unexpected pending step $other")
           }
         } catch { case NonFatal(t) => error = t; result = null }
       }
     }
     throw new IllegalStateException("unreachable")
   }
-}
-
-object Defer {
-  def apply[A](r: => EvaluationResult[A]): EvaluationResult[A] = EvaluationResult.defer(r)
 }
