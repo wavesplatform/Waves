@@ -10,6 +10,10 @@ A full import takes hours, so measure a slice instead. Import once to a height j
 
 Check every variant for correctness by digesting the resulting database: entry count and a hash over all key/value pairs, per column family, opened read-only. The node puts each column family in its own subdirectory (`cf_paths`), so a read-only open needs those paths set too. Imports that append the same blocks must leave byte-identical databases; executing transactions and applying exported snapshots (`-s`) already leave different `default` and `api` column families.
 
+The importer logs the file offset it starts reading from (`Opening import file: ..., offset=N`). The blocks file is a sequence of records, each a 4-byte big-endian length and a block (legacy bytes early in the chain, protobuf `PBBlock` later), so a throwaway `runMain` that seeks to such an offset and parses records can count transactions by type over a stretch without importing it.
+
+Profile with the JProfiler agent started from a config file (`-agentpath:...=config=jprofiler_config.xml`), and take intermediate snapshots with `jpcontroller -n <pid>` (`saveSnapshot <path>`): attaching another session replaces the agent's settings and drops what it recorded. A periodic snapshot is a `<timer intervalTime="10" intervalTimeUnit="m">` trigger; the period is in attributes, and an unknown child element is ignored. On macOS, JProfiler's async sampling puts 40 to 50% of the appender into the `write` syscall under RocksDB's WAL while RocksDB's own timers measure a few percent, so take proportions from Linux profiles and the database share from RocksDB statistics.
+
 `waves.db.rocksdb.enable-statistics = true` writes RocksDB statistics to `<data>/LOG`, but only every `stats_dump_period_sec` (600 s by default, not configurable here). `rocksdb.db.write.micros`, `rocksdb.db.multiget.micros`, `rocksdb.db.get.micros` and `rocksdb.sst.read.micros` show where the database time goes; the per column family `flush_started` events count the keys each family receives.
 
 ## Where the time goes
@@ -27,7 +31,9 @@ Things that were slow for reasons unrelated to the work itself:
 - Block validation checked each VRF proof twice (`validateGenerationSignature`, `validateBlockDelay`), serially on the appender. `consensus.CachedVrf` keeps successful results, and the importer checks proofs ahead on the signature pool: a proof needs the hit source from 101 blocks back under fair PoS, so many run in parallel. Both take the hit source height from `PoSSelector.hitSourceHeight`, so they cannot drift apart.
 - Comparing `Height`s went through an implicit conversion to `Ordered`, boxing the `Int` on every comparison, and the balance-at-height caches were keyed by `(Height, AddressId)` tuples, which box both fields in `equals` and `hashCode`.
 
-Past height 2M testnet blocks are dominated by dApp invocations: from 2146124 to 2176100 (30k blocks, about 11 minutes), 94% of the appender is `InvokeScriptTransactionDiff`, so that stretch measures the RIDE evaluator rather than the importer.
+Past height 2M testnet blocks are dominated by dApp invocations: from 2146124 to 2176100 (30k blocks, about 11 minutes), 94% of the appender is `InvokeScriptTransactionDiff`, so that stretch measures the RIDE evaluator rather than the importer (see `docs/notes/ride-evaluator.md`).
+
+A full testnet import with all the changes, on an Apple silicon Mac with `rocksdb.main-cache-size = 2G`, reached height 2137047 in 51 minutes; `rocksdb.write.self` counts one write per block, which gives the height per statistics window. Up to about 1.8M the database took 15 to 25% of each window; past 2.15M it takes 4 to 5% (10 to 25 s per 10 minutes, no stalls, compaction keeping up), throughput drops to 50 to 180 blocks per second, and the rest is script execution. Block size is not worth tuning there: SST reads take 2 to 3 s per window, filter and index partitions mostly hit the cache, and the many data block misses are compaction reads, which bypass the cache.
 
 ## Snapshot import (`-s`)
 
