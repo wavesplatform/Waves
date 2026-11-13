@@ -1333,4 +1333,23 @@ class EvaluatorV2Test extends PropSpec with Inside {
     evalEither(expr, 1000, newMode = true) shouldBe first
     expr shouldBe before
   }
+
+  property("a reference finds the nearest declaration, and a function sees the declarations around its own definition") {
+    // The compiler rejects redeclared names, so the tree is built by hand.
+    def sum(a: EXPR, b: EXPR) = FUNCTION_CALL(FunctionHeader.Native(FunctionIds.SUM_LONG), List(a, b))
+    def call(name: String)    = FUNCTION_CALL(FunctionHeader.User(name), Nil)
+    val g = FUNC(
+      "g",
+      Nil,
+      BLOCK(
+        LET("a", CONST_LONG(20)),
+        BLOCK(
+          LET("b", BLOCK(LET("a", CONST_LONG(300)), REF("a"))),
+          BLOCK(LET("f", CONST_LONG(4000)), sum(sum(sum(call("f"), REF("a")), REF("b")), REF("f")))
+        )
+      )
+    )
+    val expr = BLOCK(LET("a", CONST_LONG(1)), BLOCK(FUNC("f", Nil, REF("a")), BLOCK(g, call("g"))))
+    evalEither(expr, 1000, newMode = true).map(_._1) shouldBe Right(CONST_LONG(4321))
+  }
 }
