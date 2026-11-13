@@ -53,12 +53,17 @@ object PureContext {
       catch { case _: ArithmeticException => throw new ArithmeticException("/ by zero") }
     }
 
+  // Since JDK 22 the same applies to overflow in the Math.*Exact intrinsics.
+  private inline def overflowing(inline op: Long): Long =
+    try op
+    catch { case _: ArithmeticException => throw new ArithmeticException("long overflow") }
+
   lazy val mulLong: BaseFunction[NoContext] =
-    createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a, b))
+    createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => overflowing(Math.multiplyExact(a, b)))
   lazy val sumLong: BaseFunction[NoContext] =
-    createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => Math.addExact(a, b))
+    createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => overflowing(Math.addExact(a, b)))
   lazy val subLong: BaseFunction[NoContext] =
-    createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => Math.subtractExact(a, b))
+    createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => overflowing(Math.subtractExact(a, b)))
 
   lazy val sumString: BaseFunction[NoContext] =
     createRawOp(
