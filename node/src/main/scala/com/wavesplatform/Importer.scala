@@ -8,6 +8,7 @@ import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.api.common.*
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{DBExt, KeyTag, RDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
@@ -41,6 +42,7 @@ import java.net.URI
 import java.time
 import java.util.Locale
 import java.util.concurrent.ArrayBlockingQueue
+import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 import scala.util.control.NonFatal
@@ -251,6 +253,35 @@ object Importer extends ScorexLogging {
     } finally reader.interrupt()
   }
 
+  /** Verifies block VRF proofs on the signature pool ahead of the appender, which then finds the results in the VRF cache of
+    * [[crypto.verifyVRF]]. A proof needs the hit source of an earlier block (101 blocks back under fair PoS), so many run in parallel. The
+    * inputs mirror [[PoSSelector.validateGenerationSignature]]; where they differ, such as a feature approved by a block still in the
+    * queue, the appender just misses the cache and verifies the proof itself.
+    */
+  private final class VrfPrecheck(blockchain: Blockchain) {
+    private val hitSources = mutable.Map.empty[Int, Future[ByteStr]]
+
+    private def hitSource(height: Int): Future[ByteStr] =
+      hitSources.getOrElse(
+        height,
+        blockchain.hitSource(height).fold(Future.failed[ByteStr](new NoSuchElementException(s"No hit source at $height")))(Future.successful)
+      )
+
+    def add(block: Block, height: Int): Unit = {
+      val parentHeight = height - 1
+      val blockHitSource =
+        if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)) {
+          val messageHeight =
+            if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight) && parentHeight > 100) parentHeight - 100 else parentHeight
+          hitSource(messageHeight).map(message =>
+            crypto.verifyVRF(block.header.generationSignature, message.arr, block.header.generator).explicitGet()
+          )(using sigverify)
+        } else Future.successful(block.header.generationSignature)
+      hitSources.update(height, blockHitSource)
+      hitSources.remove(height - 101)
+    }
+  }
+
   private def readBlocks(
       blocksInputStream: BufferedInputStream,
       snapshotsInputStream: Option[BufferedInputStream],
@@ -264,6 +295,7 @@ object Importer extends ScorexLogging {
     val CurrentTS         = System.currentTimeMillis()
     var skipped           = 0
     var enqueued          = 0
+    val vrfPrecheck       = new VrfPrecheck(blockchain)
 
     // Reads the next block and its snapshots, or returns false at the end of the input or on a truncated record.
     def readNext(): Boolean = {
@@ -293,7 +325,8 @@ object Importer extends ScorexLogging {
           if (skipped < blocksToSkip) {
             skipped += 1
           } else {
-            val rideV6                = blockchain.isFeatureActivated(BlockchainFeatures.RideV6, startHeight + enqueued + 1)
+            val height                = startHeight + enqueued + 1
+            val rideV6                = blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height)
             lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
             val block = (if (1 < blockBytes.head && blockBytes.head < 5 && Longs.fromByteArray(blockBytes.slice(1, 9)) < CurrentTS)
                            Block.parseBytes(blockBytes).orElse(parsedProtoBlock)
@@ -314,6 +347,7 @@ object Importer extends ScorexLogging {
             }
 
             ParSignatureChecker.checkBlockAndTxSignatures(block, blockSnapshot.isEmpty, rideV6)
+            vrfPrecheck.add(block, height)
 
             queue.put(Some(block -> blockSnapshot))
             enqueued += 1
