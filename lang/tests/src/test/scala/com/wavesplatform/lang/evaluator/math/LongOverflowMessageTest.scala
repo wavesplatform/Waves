@@ -2,9 +2,11 @@ package com.wavesplatform.lang.evaluator.math
 
 import cats.Id
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
+import com.wavesplatform.lang.v1.compiler.Types.LONG
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.test.PropSpec
 
 class LongOverflowMessageTest extends PropSpec {
@@ -21,5 +23,10 @@ class LongOverflowMessageTest extends PropSpec {
     errorMessages(PureContext.sumLong, Long.MaxValue, 1) shouldBe Set("long overflow")
     errorMessages(PureContext.subLong, Long.MinValue, 1) shouldBe Set("long overflow")
     errorMessages(PureContext.mulLong, Long.MaxValue, 2) shouldBe Set("long overflow")
+  }
+
+  property("an operator failing with a message-less exception reports the exception instead of null") {
+    val failing = PureContext.createTryOp(SUM_OP, LONG, LONG, 0)((_, _) => throw new ArithmeticException())
+    errorMessages(failing, 1, 1) shouldBe Set("java.lang.ArithmeticException")
   }
 }

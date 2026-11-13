@@ -1406,7 +1406,7 @@ object PureContext {
         try {
           Right(CONST_LONG(body(a, b)))
         } catch {
-          case e: Throwable => Left(e.getMessage)
+          case e: Throwable => Left(Option(e.getMessage).getOrElse(e.toString))
         }
       case xs => notImplemented[Id, EVALUATED](s"${opsToFunctions(op)}(a: ${t.toString}, b: ${t.toString})", xs)
     }
