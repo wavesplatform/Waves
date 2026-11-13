@@ -22,7 +22,7 @@ Anything that starts evaluating a tree, or adds a path that writes into one, has
 
 An invoke between dApps evaluates the callee in a nested run on the same thread (the `Extended` function's `Coeval`, then a new `run()`), so the call stack grows with the depth of the chain, up to 100 invokes. A `StackOverflowError` is fatal and nothing catches it, so nodes with different stack sizes could disagree about a block. `SyncDAppLimits` runs the deepest allowed chain on a thread with a 1 MB stack to keep the margin visible.
 
-Monix stack tracing (`monix.eval.stackTracingMode`, `cached` by default) records every `Coeval` and `Task` step to add async frames to exception traces, and script evaluation still enters `Coeval` for every invocation. `Application.main` turns it off unless the property is set.
+Monix stack tracing (`monix.eval.stackTracingMode`, `cached` by default) cost 7% of the slice below while every evaluator step ran on `Coeval`. Since the trampoline it makes no difference (2146124 to 2176100 on one machine: 269.6 s with it off, 269.5 s with it on), so the node keeps the Monix default.
 
 ## Measuring
 
