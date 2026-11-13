@@ -103,7 +103,10 @@ case class UserFunction[C[_[_]]](
     signature: FunctionTypeSignature,
     ev: ContextfulUserFunction[C],
     args: Seq[String]
-) extends BaseFunction[C]
+) extends BaseFunction[C] {
+  // The evaluator needs the names as a List on every call.
+  private[lang] val argList: List[String] = args.toList
+}
 
 object UserFunction {
   def withEnvironment[C[_[_]]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: ContextfulUserFunction[C]): UserFunction[C] =

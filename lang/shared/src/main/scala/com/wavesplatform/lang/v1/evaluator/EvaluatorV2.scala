@@ -138,7 +138,7 @@ class EvaluatorV2(
         .get(fc.function)
         .map(_.asInstanceOf[UserFunction[Environment]])
         .map { f =>
-          val func = FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment, startArgs))
+          val func = FUNC(f.name, f.argList, f.ev[Id](ctx.ec.environment, startArgs))
           val precalculatedLimit =
             if (newMode) {
               val cost = f.costByLibVersion(stdLibVersion).toInt
