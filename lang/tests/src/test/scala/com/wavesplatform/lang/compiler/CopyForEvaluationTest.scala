@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 
-class DeepCopyTest extends PropSpec {
+class CopyForEvaluationTest extends PropSpec {
   private val names = Gen.oneOf("a", "b", "c")
 
   private def declaration(depth: Int): Gen[DECLARATION] =
@@ -37,15 +37,15 @@ class DeepCopyTest extends PropSpec {
         )
       )
 
-  // The evaluator writes into these nodes, so a copy must not share any of them with the original.
+  // The evaluator writes into these nodes, so a copy must not share any of them with the original. Function bodies are left out: the
+  // evaluator copies a body at every call and never writes into it in place.
   private def mutableNodes(e: EXPR): List[AnyRef] = e match {
     case g: GETTER     => g :: mutableNodes(g.expr)
     case lb: LET_BLOCK => lb :: lb.let :: mutableNodes(lb.let.value) ++ mutableNodes(lb.body)
     case b: BLOCK =>
       b :: (b.dec match {
-        case l: LET  => l :: mutableNodes(l.value)
-        case f: FUNC => mutableNodes(f.body)
-        case _       => Nil
+        case l: LET => l :: mutableNodes(l.value)
+        case _      => Nil
       }) ++ mutableNodes(b.body)
     case i: IF             => i :: mutableNodes(i.cond) ++ mutableNodes(i.ifTrue) ++ mutableNodes(i.ifFalse)
     case fc: FUNCTION_CALL => fc :: fc.args.flatMap(mutableNodes)
@@ -54,7 +54,7 @@ class DeepCopyTest extends PropSpec {
 
   property("copies a tree into an equal one that shares no node the evaluator writes into") {
     forAll(expr(6)) { e =>
-      val copy = Terms.deepCopy(e)
+      val copy = Terms.copyForEvaluation(e)
       copy shouldBe e.deepCopy.value
       mutableNodes(e).zip(mutableNodes(copy)).foreach { case (original, copied) => copied shouldNot be theSameInstanceAs original }
     }
@@ -62,6 +62,6 @@ class DeepCopyTest extends PropSpec {
 
   property("copies a tree nested far deeper than a recursive copy could go") {
     val deep = (1 to 100_000).foldLeft[EXPR](REF("x"))((body, i) => BLOCK(LET(s"v$i", CONST_LONG(i)), body))
-    Terms.deepCopy(deep) shouldBe deep
+    Terms.copyForEvaluation(deep) shouldBe deep
   }
 }

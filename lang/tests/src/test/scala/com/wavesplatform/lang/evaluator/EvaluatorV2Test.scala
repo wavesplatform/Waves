@@ -1312,4 +1312,22 @@ class EvaluatorV2Test extends PropSpec with Inside {
     // throw() is a user function wrapping throw(String), and new mode charges 1 per user function call
     spentOnError(script("throw()"), 10, newMode = true) shouldBe 3
   }
+
+  property("evaluation leaves the script tree unchanged, function bodies included") {
+    val expr = compile(
+      """
+        | func f(a: Int) = {
+        |   let b = a + 1
+        |   if (b > 2) then b * 2 else b
+        | }
+        | func g(x: Int) = f(x) + f(x + 1)
+        | g(1) + g(2)
+      """.stripMargin
+    )
+    val before = expr.deepCopy.value
+    val first  = evalEither(expr, 1000, newMode = true)
+    first.map(_._1) shouldBe Right(CONST_LONG(22))
+    evalEither(expr, 1000, newMode = true) shouldBe first
+    expr shouldBe before
+  }
 }

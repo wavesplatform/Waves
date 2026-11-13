@@ -153,7 +153,7 @@ class EvaluatorV2(
         .map { case (signature, precalculatedLimitOpt, functionScopeBlocks) =>
           val argsWithExpr =
             (signature.args zip fc.args)
-              .foldRight(Terms.deepCopy(signature.body)) { case ((argName, argValue), argsWithExpr) =>
+              .foldRight(Terms.copyForEvaluation(signature.body)) { case ((argName, argValue), argsWithExpr) =>
                 BLOCK(LET(argName, argValue), argsWithExpr)
               }
           update(argsWithExpr)
@@ -370,7 +370,7 @@ object EvaluatorV2 {
     } else {
       DisabledLogEvaluationContext[Environment, Id](ctx)
     }
-    var ref = Terms.deepCopy(expr)
+    var ref = Terms.copyForEvaluation(expr)
     logCall(loggedCtx, logExtraInfo, ref, enableExecutionLog)
     new EvaluatorV2(
       loggedCtx,
