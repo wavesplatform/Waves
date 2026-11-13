@@ -149,8 +149,6 @@ object RDB extends StrictLogging {
           // Partitions let a lookup load only the few kilobytes it needs.
           .setIndexType(IndexType.kTwoLevelIndexSearch)
           .setPartitionFilters(true)
-          .setMetadataBlockSize(4096)
-          .setPinTopLevelIndexAndFilter(true)
           .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
           .setDataBlockHashTableUtilRatio(0.5)
       )

@@ -56,6 +56,7 @@ class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadO
       case DeleteRange(h, from, to) => batch.deleteRange(h, from, to)
     }
     ops.clear()
+    hasRangeDelete = false
   }
 
   private def cf(key: Key[?]): ColumnFamilyHandle = key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)

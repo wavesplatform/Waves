@@ -51,13 +51,7 @@ class ExporterSpec extends FreeSpec with WithDomain with MixedChain {
       val key = Keys.transactionAt(Height(2), TxNum(0.toShort), d.rdb.txHandle)
       d.rdb.db.put(d.rdb.txHandle.handle, key.keyBytes, writeTransaction(TxMeta(Height(2), TxMeta.Status.Succeeded, 0) -> eth))
 
-      (the[IllegalStateException] thrownBy Exporter.exportBlocks(
-        d.rdb,
-        d.rocksDBWriter.height,
-        legacy = true,
-        new ByteArrayOutputStream(),
-        None
-      )).getMessage should include("height 2")
+      (the[IllegalStateException] thrownBy Exporter.exportBlocks(d.rdb, d.rocksDBWriter.height, legacy = true, new ByteArrayOutputStream(), None)).getMessage should include("height 2")
     }
 
     "with each block's stored transaction snapshots" in withMixedChain { d =>
