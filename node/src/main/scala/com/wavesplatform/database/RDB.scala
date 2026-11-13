@@ -145,6 +145,12 @@ object RDB extends StrictLogging {
           .setBlockSize(blockSize)
           .setBlockCache(blockCache)
           .setCacheIndexAndFilterBlocksWithHighPriority(true)
+          // A full-file filter is megabytes, more than the cache can hold for every file, so each miss reloaded all of it.
+          // Partitions let a lookup load only the few kilobytes it needs.
+          .setIndexType(IndexType.kTwoLevelIndexSearch)
+          .setPartitionFilters(true)
+          .setMetadataBlockSize(4096)
+          .setPinTopLevelIndexAndFilter(true)
           .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
           .setDataBlockHashTableUtilRatio(0.5)
       )
