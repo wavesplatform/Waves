@@ -30,9 +30,9 @@ sealed abstract class BaseFunction[C[_[_]]] {
     costByLibVersionMap.get(version) match {
       case Some(cost) => cost
       case None =>
-        val earlier = costByLibVersionMap.maxBefore(version)
-        require(earlier.nonEmpty, s"$name $signature ver=$version, cost=$costByLibVersionMap")
-        earlier.get._2
+        costByLibVersionMap
+          .maxBefore(version)
+          .fold(throw new IllegalArgumentException(s"requirement failed: $name $signature ver=$version, cost=$costByLibVersionMap"))(_._2)
     }
 }
 
