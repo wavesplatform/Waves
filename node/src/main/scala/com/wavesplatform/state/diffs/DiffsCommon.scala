@@ -32,6 +32,10 @@ import com.wavesplatform.transaction.TxPositiveAmount
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object DiffsCommon {
+  def useV1PreCheck(blockchain: Blockchain): Boolean =
+    blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight &&
+      !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
+
   def countVerifierComplexity(
       script: Option[Script],
       blockchain: Blockchain,
@@ -39,10 +43,6 @@ object DiffsCommon {
   ): Either[ValidationError, Option[(Script, Long)]] =
     script
       .traverse { script =>
-        val useV1PreCheck =
-          blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight &&
-            !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
-
         val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
         def complexity(estimator: ScriptEstimator) =
           Script.verifierComplexity(
@@ -53,7 +53,7 @@ object DiffsCommon {
           )
 
         val cost =
-          if (useV1PreCheck) complexity(ScriptEstimatorV1) *> complexity(ScriptEstimatorV2)
+          if (useV1PreCheck(blockchain)) complexity(ScriptEstimatorV1) *> complexity(ScriptEstimatorV2)
           else complexity(blockchain.estimator)
 
         cost.map((script, _))
