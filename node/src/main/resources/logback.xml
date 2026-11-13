@@ -44,7 +44,9 @@
     <property name="logback.stdout.enabled" value="true"/>
     <property name="logback.utx-trace.enabled" value="false"/>
 
-    <!-- TRACE only when an appender asks for it: with the root at TRACE every log.trace call builds its message just to be filtered out. -->
+    <!-- TRACE only when an appender asks for it: with the root at TRACE every log.trace call builds its message just to be filtered out.
+         The match is exact, so the level must be spelled TRACE. A logback.xml included below that wants TRACE output sets <root level="TRACE"/>
+         itself, because this is decided before the include. -->
     <property name="logback.root.level" value="DEBUG"/>
     <condition class="ch.qos.logback.core.boolex.PropertyEqualityCondition">
         <key>logback.stdout.level</key>
