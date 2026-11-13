@@ -255,8 +255,8 @@ object Importer extends ScorexLogging {
 
   /** Verifies block VRF proofs on the signature pool ahead of the appender, which then finds the results in the VRF cache of
     * [[crypto.verifyVRF]]. A proof needs the hit source of an earlier block (101 blocks back under fair PoS), so many run in parallel. The
-    * inputs mirror [[PoSSelector.validateGenerationSignature]]; where they differ, such as a feature approved by a block still in the
-    * queue, the appender just misses the cache and verifies the proof itself.
+    * heights come from the same rules as [[PoSSelector.validateGenerationSignature]]; where the feature state differs, such as a feature
+    * approved by a block still in the queue, the appender just misses the cache and verifies the proof itself.
     */
   private final class VrfPrecheck(blockchain: Blockchain) {
     private val hitSources = mutable.Map.empty[Int, Future[ByteStr]]
@@ -268,12 +268,9 @@ object Importer extends ScorexLogging {
       )
 
     def add(block: Block, height: Int): Unit = {
-      val parentHeight = height - 1
       val blockHitSource =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)) {
-          val messageHeight =
-            if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight) && parentHeight > 100) parentHeight - 100 else parentHeight
-          hitSource(messageHeight).map(message =>
+        if (PoSSelector.vrfActivated(blockchain, height)) {
+          hitSource(PoSSelector.hitSourceHeight(blockchain, height - 1)).map(message =>
             crypto.verifyVRF(block.header.generationSignature, message.arr, block.header.generator).explicitGet()
           )(using sigverify)
         } else Future.successful(block.header.generationSignature)
