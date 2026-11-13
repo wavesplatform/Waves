@@ -37,14 +37,14 @@ class CopyForEvaluationTest extends PropSpec {
         )
       )
 
-  // The evaluator writes into these nodes, so a copy must not share any of them with the original. Function bodies are left out: the
-  // evaluator copies a body at every call and never writes into it in place.
+  // The evaluator writes into these nodes before it reaches them, so a copy must not share any of them with the original. Function bodies
+  // and LET values are left out: the evaluator copies those itself when it gets to them.
   private def mutableNodes(e: EXPR): List[AnyRef] = e match {
     case g: GETTER     => g :: mutableNodes(g.expr)
-    case lb: LET_BLOCK => lb :: lb.let :: mutableNodes(lb.let.value) ++ mutableNodes(lb.body)
+    case lb: LET_BLOCK => lb :: lb.let :: mutableNodes(lb.body)
     case b: BLOCK =>
       b :: (b.dec match {
-        case l: LET => l :: mutableNodes(l.value)
+        case l: LET => List(l)
         case _      => Nil
       }) ++ mutableNodes(b.body)
     case i: IF             => i :: mutableNodes(i.cond) ++ mutableNodes(i.ifTrue) ++ mutableNodes(i.ifFalse)
@@ -52,11 +52,24 @@ class CopyForEvaluationTest extends PropSpec {
     case _                 => Nil
   }
 
-  property("copies a tree into an equal one that shares no node the evaluator writes into") {
+  property("copies a tree into an equal one that shares no node the evaluator writes into before reaching it") {
     forAll(expr(6)) { e =>
       val copy = Terms.copyForEvaluation(e)
       copy shouldBe e.deepCopy.value
       mutableNodes(e).zip(mutableNodes(copy)).foreach { case (original, copied) => copied shouldNot be theSameInstanceAs original }
+    }
+  }
+
+  property("marks every copied LET whose value still needs copying") {
+    forAll(expr(6)) { e =>
+      val copiedLets = mutableNodes(Terms.copyForEvaluation(e)).collect { case l: LET => l }
+      copiedLets.foreach { l =>
+        val needsCopy = l.value match {
+          case _: REF | _: FAILED_EXPR | _: EVALUATED => false
+          case _                                      => true
+        }
+        l.valueShared shouldBe needsCopy
+      }
     }
   }
 

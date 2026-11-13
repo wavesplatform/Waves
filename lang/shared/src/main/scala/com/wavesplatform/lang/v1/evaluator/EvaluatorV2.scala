@@ -297,6 +297,10 @@ class EvaluatorV2(
       let: LET,
       nextParentBlocks: List[BLOCK_DEF]
   ): EvaluationResult[Int] = {
+    if (let.valueShared) {
+      let.valueShared = false
+      let.value = Terms.copyForEvaluation(let.value)
+    }
     val result = root(
       expr = let.value,
       update = v =>

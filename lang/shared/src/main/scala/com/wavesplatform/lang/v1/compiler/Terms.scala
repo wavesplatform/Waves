@@ -36,6 +36,10 @@ object Terms {
       Eval.now(this)
   }
   case class LET(name: String, var value: EXPR) extends DECLARATION {
+    // Set by copyForEvaluation when the value is still the original's; the evaluator copies the value before it first evaluates it. Not part
+    // of equality.
+    private[lang] var valueShared: Boolean = false
+
     def toStr: Coeval[String] =
       for {
         e <- value.toStr
@@ -438,9 +442,11 @@ object Terms {
   private object Rebuild
 
   /** Copies a tree for the evaluator, which writes into it. A loop over explicit stacks: going through `Eval` ([[EXPR.deepCopy]]) allocated
-    * several objects per node and took a third of block appending on dApp-heavy blocks. Leaves are immutable and shared, and so are function
-    * declarations: the evaluator never writes into a function body in place, it copies the body at every call. That skips copying most of a
-    * dApp for every invocation.
+    * several objects per node and took a third of block appending on dApp-heavy blocks.
+    *
+    * Only what the evaluator writes into before it is reached gets copied. Leaves are immutable and shared. Function declarations are shared:
+    * the evaluator copies a body at every call and never writes into it in place. A LET is copied, but its value is shared and marked with
+    * `valueShared`; the evaluator copies the value when it first evaluates it, so values that are never referenced are never copied.
     */
   def copyForEvaluation(root: EXPR): EXPR = {
     val work   = new java.util.ArrayDeque[AnyRef]()
@@ -448,18 +454,26 @@ object Terms {
 
     def copy[A]: A = copies.pop().asInstanceOf[A]
 
+    def isShared(e: AnyRef): Boolean = e match {
+      case _: REF | _: FAILED_EXPR | _: EVALUATED | _: FAILED_DEC | _: FUNC => true
+      case _                                                                => false
+    }
+
+    def copyLet(l: LET): LET = {
+      val copied = LET(l.name, l.value)
+      copied.valueShared = !isShared(l.value)
+      copied
+    }
+
     work.push(root)
     while (!work.isEmpty) work.pop() match {
       case Rebuild =>
         val copied = work.pop() match {
-          case g: GETTER => GETTER(copy, g.field)
-          case lb: LET_BLOCK =>
-            val body = copy[EXPR]
-            LET_BLOCK(LET(lb.let.name, copy), body)
+          case g: GETTER     => GETTER(copy, g.field)
+          case lb: LET_BLOCK => LET_BLOCK(copyLet(lb.let), copy)
           case _: BLOCK =>
             val body = copy[EXPR]
             BLOCK(copy, body)
-          case l: LET => LET(l.name, copy)
           case _: IF =>
             val ifFalse = copy[EXPR]
             val ifTrue  = copy[EXPR]
@@ -471,17 +485,18 @@ object Terms {
           case other => throw new IllegalStateException(s"Unexpected node $other")
         }
         copies.push(copied)
-      case shared @ (_: REF | _: FAILED_EXPR | _: EVALUATED | _: FAILED_DEC | _: FUNC) =>
+      case shared if isShared(shared) =>
         copies.push(shared)
+      case l: LET =>
+        copies.push(copyLet(l))
       case node =>
         work.push(node)
         work.push(Rebuild)
         // Children go on in reverse, so they are copied first to last and come off the copies stack last to first.
         node match {
           case g: GETTER         => work.push(g.expr)
-          case lb: LET_BLOCK     => work.push(lb.body); work.push(lb.let.value)
+          case lb: LET_BLOCK     => work.push(lb.body)
           case b: BLOCK          => work.push(b.body); work.push(b.dec)
-          case l: LET            => work.push(l.value)
           case i: IF             => work.push(i.ifFalse); work.push(i.ifTrue); work.push(i.cond)
           case fc: FUNCTION_CALL => fc.args.reverseIterator.foreach(work.push)
           case other             => throw new IllegalStateException(s"Unexpected node $other")

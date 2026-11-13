@@ -1313,20 +1313,23 @@ class EvaluatorV2Test extends PropSpec with Inside {
     spentOnError(script("throw()"), 10, newMode = true) shouldBe 3
   }
 
-  property("evaluation leaves the script tree unchanged, function bodies included") {
+  property("evaluation leaves the script tree unchanged, function bodies and LET values included") {
     val expr = compile(
       """
+        | let unused = 1 + 1
+        | let base = 2 * 3
         | func f(a: Int) = {
         |   let b = a + 1
+        |   let c = b * 100
         |   if (b > 2) then b * 2 else b
         | }
-        | func g(x: Int) = f(x) + f(x + 1)
+        | func g(x: Int) = f(x) + f(x + 1) + base
         | g(1) + g(2)
       """.stripMargin
     )
     val before = expr.deepCopy.value
     val first  = evalEither(expr, 1000, newMode = true)
-    first.map(_._1) shouldBe Right(CONST_LONG(22))
+    first.map(_._1) shouldBe Right(CONST_LONG(34))
     evalEither(expr, 1000, newMode = true) shouldBe first
     expr shouldBe before
   }
