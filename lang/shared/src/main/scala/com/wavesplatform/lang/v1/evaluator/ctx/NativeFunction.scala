@@ -24,8 +24,7 @@ sealed abstract class BaseFunction[C[_[_]]] {
 
   val costByLibVersionMap: SortedMap[StdLibVersion, Long]
 
-  // Asked for every function call a script makes. A range of the TreeMap built a new tree each time, and function objects are created for
-  // every invocation, so a table per object did not pay off either.
+  // Asked for every function call a script makes; rangeTo(version).last built a new tree each time.
   def costByLibVersion(version: StdLibVersion): Long =
     costByLibVersionMap.get(version) match {
       case Some(cost) => cost

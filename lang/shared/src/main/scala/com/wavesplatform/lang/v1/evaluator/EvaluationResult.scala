@@ -5,12 +5,9 @@ import monix.eval.Coeval
 
 import scala.util.control.NonFatal
 
-/** A deferred evaluation step: a value, or an error with the complexity left when it happened. Once a step produces an error, the following
-  * `flatMap` and `map` steps are skipped. A thrown non-fatal exception unwinds to the nearest `handleErrorWith`, or out of [[run]].
-  *
-  * A small trampoline rather than Monix `Coeval`, which every evaluator step used to go through: Coeval's run loop with its chunked stack,
-  * and a `Coeval` plus an `Either` per step, took a sixth of evaluating dApp scripts. Steps are immutable descriptions and can be run more
-  * than once. A run keeps its stack locally, so it is stack safe but not meant to be shared between threads while running.
+/** A deferred evaluation step: a value, or an error with the complexity left when it happened. An error skips the following `flatMap` and
+  * `map` steps; a thrown non-fatal exception unwinds to the nearest `handleErrorWith`, or out of [[run]]. Steps are immutable and can be run
+  * more than once. Replaces Monix `Coeval`, see docs/notes/ride-evaluator.md.
   */
 sealed abstract class EvaluationResult[+A] {
   import EvaluationResult.*

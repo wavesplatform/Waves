@@ -1,12 +1,12 @@
-package com.wavesplatform.lang.compiler
+package com.wavesplatform.lang.evaluator
 
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.evaluator.EvaluationCopy
 import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 
-class CopyForEvaluationTest extends PropSpec {
+class EvaluationCopyTest extends PropSpec {
   private val names = Gen.oneOf("a", "b", "c")
 
   private def declaration(depth: Int): Gen[DECLARATION] =
@@ -54,7 +54,7 @@ class CopyForEvaluationTest extends PropSpec {
 
   property("copies a tree into an equal one that shares no node the evaluator writes into before reaching it") {
     forAll(expr(6)) { e =>
-      val copy = Terms.copyForEvaluation(e)
+      val copy = EvaluationCopy(e)
       copy shouldBe e.deepCopy.value
       mutableNodes(e).zip(mutableNodes(copy)).foreach { case (original, copied) => copied shouldNot be theSameInstanceAs original }
     }
@@ -62,7 +62,7 @@ class CopyForEvaluationTest extends PropSpec {
 
   property("marks every copied LET whose value still needs copying") {
     forAll(expr(6)) { e =>
-      val copiedLets = mutableNodes(Terms.copyForEvaluation(e)).collect { case l: LET => l }
+      val copiedLets = mutableNodes(EvaluationCopy(e)).collect { case l: LET => l }
       copiedLets.foreach { l =>
         val needsCopy = l.value match {
           case _: REF | _: FAILED_EXPR | _: EVALUATED => false
@@ -75,6 +75,6 @@ class CopyForEvaluationTest extends PropSpec {
 
   property("copies a tree nested far deeper than a recursive copy could go") {
     val deep = (1 to 100_000).foldLeft[EXPR](REF("x"))((body, i) => BLOCK(LET(s"v$i", CONST_LONG(i)), body))
-    Terms.copyForEvaluation(deep) shouldBe deep
+    EvaluationCopy(deep) shouldBe deep
   }
 }

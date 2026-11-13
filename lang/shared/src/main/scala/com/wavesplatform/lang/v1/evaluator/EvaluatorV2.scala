@@ -5,7 +5,6 @@ import cats.syntax.either.*
 import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
@@ -151,7 +150,7 @@ class EvaluatorV2(
         .map { case (signature, precalculatedLimitOpt, functionScopeBlocks) =>
           val argsWithExpr =
             (signature.args zip fc.args)
-              .foldRight(Terms.copyForEvaluation(signature.body)) { case ((argName, argValue), argsWithExpr) =>
+              .foldRight(EvaluationCopy(signature.body)) { case ((argName, argValue), argsWithExpr) =>
                 BLOCK(LET(argName, argValue), argsWithExpr)
               }
           update(argsWithExpr)
@@ -300,7 +299,7 @@ class EvaluatorV2(
   ): EvaluationResult[Int] = {
     if (let.valueShared) {
       let.valueShared = false
-      let.value = Terms.copyForEvaluation(let.value)
+      let.value = EvaluationCopy(let.value)
     }
     val result = root(
       expr = let.value,
@@ -369,7 +368,7 @@ object EvaluatorV2 {
     } else {
       DisabledLogEvaluationContext[Environment, Id](ctx)
     }
-    var ref = Terms.copyForEvaluation(expr)
+    var ref = EvaluationCopy(expr)
     logCall(loggedCtx, logExtraInfo, ref, enableExecutionLog)
     val evaluation = new EvaluatorV2(
       loggedCtx,

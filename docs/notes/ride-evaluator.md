@@ -1,20 +1,20 @@
 ---
-purpose: Implementation notes for the RIDE evaluator (EvaluatorV2, EvaluationResult, Terms.copyForEvaluation) and how to measure its speed
+purpose: Implementation notes for the RIDE evaluator (EvaluatorV2, EvaluationResult, EvaluationCopy) and how to measure its speed
 ---
 
 # RIDE evaluator
 
 ## The evaluator rewrites the script tree in place
 
-`EvaluatorV2` evaluates by writing results back into the tree: `FUNCTION_CALL.args`, `BLOCK.body`, `GETTER.expr`, `IF.cond` and `LET.value` are `var`s, and a reference to a `LET` replaces its value with the evaluated one, which is how LETs are lazy and evaluated once. So it must never run on the tree a script holds, which is shared between invocations and threads. `Terms.copyForEvaluation` makes the copy it runs on, and copies only what gets written into before the evaluator reaches it:
+`EvaluatorV2` evaluates by writing results back into the tree: `FUNCTION_CALL.args`, `BLOCK.body`, `GETTER.expr`, `IF.cond` and `LET.value` are `var`s, and a reference to a `LET` replaces its value with the evaluated one, which is how LETs are lazy and evaluated once. So it must never run on the tree a script holds, which is shared between invocations and threads. `EvaluationCopy` makes the copy it runs on, and copies only what gets written into before the evaluator reaches it:
 
 - Leaves (`REF`, evaluated constants, `FAILED_*`) are immutable and shared.
 - Function declarations are shared: a user function call copies the function body (`evaluateUserFunction`) and evaluates the copy, never the body in place.
 - A `LET` is a new node whose value is still the original's, marked with `LET.valueShared`. `evaluateRef` copies the value when it first evaluates it, so values nothing references are never copied. `valueShared` is a body field, not part of `LET`'s equality.
 
-Anything that starts evaluating a tree, or adds a path that writes into one, has to keep to this: a node written into must have been copied first. In particular, never rebuild a `LET` (`copy`, `LET(name, value)`) between `copyForEvaluation` and its first evaluation: the new node drops `valueShared` while still holding the original value, and the evaluator would write into the shared tree. `EvaluatorV2Test` evaluates one tree twice and checks it is unchanged afterwards.
+Anything that starts evaluating a tree, or adds a path that writes into one, has to keep to this: a node written into must have been copied first. In particular, never rebuild a `LET` (`copy`, `LET(name, value)`) between `EvaluationCopy` and its first evaluation: the new node drops `valueShared` while still holding the original value, and the evaluator would write into the shared tree. `EvaluatorV2Test` evaluates one tree twice and checks it is unchanged afterwards.
 
-The old `EXPR.deepCopy` (through `cats.Eval`) is still there for the benchmarks and as the reference in `CopyForEvaluationTest`; it allocated several objects per node and copied whole dApps for every invocation.
+`EXPR.deepCopy` (through `cats.Eval`) is no longer used by the evaluator and is kept on purpose: it is the reference `EvaluationCopyTest` compares against and the baseline in `FunctionCallCopyBenchmark`. It allocated several objects per node and copied whole dApps for every invocation.
 
 ## EvaluationResult is a trampoline, not Monix
 
