@@ -76,26 +76,28 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
     }
   }
 
+  // foo(n) invokes itself n times in a chain.
+  private def setSelfInvokingScript =
+    TxHelpers.setScript(
+      alice,
+      TestCompiler(V6).compileContract(
+        s""" @Callable(inv)
+           | func foo(n: Int) = {
+           |   if (n > 0) then {
+           |     strict res = invoke(Address(base58'$aliceAddr'), "foo", [n - 1], [])
+           |     ([], 0)
+           |   } else {
+           |     ([], 1 + 1)
+           |   }
+           | }
+           | """.stripMargin
+      ),
+      fee = 1.waves
+    )
+
   property("NODE-726 A limit of inner invokes is 100 in RideV6") {
     withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice)) { d =>
-      d.appendBlock(
-        TxHelpers.setScript(
-          alice,
-          TestCompiler(V6).compileContract(
-            s""" @Callable(inv)
-               | func foo(n: Int) = {
-               |   if (n > 0) then {
-               |     strict res = invoke(Address(base58'$aliceAddr'), "foo", [n - 1], [])
-               |     ([], 0)
-               |   } else {
-               |     ([], 1 + 1)
-               |   }
-               | }
-               | """.stripMargin
-          ),
-          fee = 1.waves
-        )
-      )
+      d.appendBlock(setSelfInvokingScript)
 
       val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(101)), invoker = alice)
 
@@ -106,6 +108,23 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
       d.appendBlock(invokeTx)
       val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
       invokeTxMeta.status == Status.Succeeded shouldBe false
+    }
+  }
+
+  property("The deepest allowed chain of inner invokes runs on a 1 MB thread stack") {
+    // Each inner invoke evaluates its script in a nested run on the same thread, so the call stack grows with the depth of the chain.
+    // Nodes with different stack sizes must not disagree on a valid transaction.
+    withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice)) { d =>
+      d.appendBlock(setSelfInvokingScript)
+      val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(100)), invoker = alice, fee = 1.waves)
+
+      var failure = Option.empty[Throwable]
+      val thread  = new Thread(null, () => try d.appendBlock(invokeTx) catch { case t: Throwable => failure = Some(t) }, "small-stack", 1L << 20)
+      thread.start()
+      thread.join()
+
+      failure shouldBe None
+      d.transactionsApi.transactionById(invokeTx.id()).value.status shouldBe Status.Succeeded
     }
   }
 
