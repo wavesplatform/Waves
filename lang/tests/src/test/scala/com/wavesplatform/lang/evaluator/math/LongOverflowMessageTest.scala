@@ -11,22 +11,24 @@ import com.wavesplatform.test.PropSpec
 
 class LongOverflowMessageTest extends PropSpec {
   // JDK 22+ C2 throws a preallocated ArithmeticException without a message from hot Math.*Exact overflows; a few thousand calls get there.
+  // CI runs JDK 17, where the first property passes with or without the fix; only a JDK 22+ run exercises it.
   private val calls = 20000
 
-  private def errorMessages(function: BaseFunction[?], a: Long, b: Long): Set[String] = {
+  // Calls the operator body directly: going through the evaluator would cost a script compilation per call.
+  private def errors(function: BaseFunction[?], a: Long, b: Long): Set[Option[String]] = {
     val ev   = function.asInstanceOf[NativeFunction[[_[_]] =>> Any]].ev.asInstanceOf[ContextfulNativeFunction.Simple[[_[_]] =>> Any]]
     val args = List(CONST_LONG(a), CONST_LONG(b))
-    (1 to calls).map(_ => ev.evaluate[Id]((), args).left.map(_.message).swap.toOption.orNull).toSet
+    (1 to calls).map(_ => ev.evaluate[Id]((), args).swap.toOption.map(_.message)).toSet
   }
 
   property("long overflow keeps its message however hot the operator is") {
-    errorMessages(PureContext.sumLong, Long.MaxValue, 1) shouldBe Set("long overflow")
-    errorMessages(PureContext.subLong, Long.MinValue, 1) shouldBe Set("long overflow")
-    errorMessages(PureContext.mulLong, Long.MaxValue, 2) shouldBe Set("long overflow")
+    errors(PureContext.sumLong, Long.MaxValue, 1) shouldBe Set(Some("long overflow"))
+    errors(PureContext.subLong, Long.MinValue, 1) shouldBe Set(Some("long overflow"))
+    errors(PureContext.mulLong, Long.MaxValue, 2) shouldBe Set(Some("long overflow"))
   }
 
   property("an operator failing with a message-less exception reports the exception instead of null") {
     val failing = PureContext.createTryOp(SUM_OP, LONG, LONG, 0)((_, _) => throw new ArithmeticException())
-    errorMessages(failing, 1, 1) shouldBe Set("java.lang.ArithmeticException")
+    errors(failing, 1, 1) shouldBe Set(Some("java.lang.ArithmeticException"))
   }
 }

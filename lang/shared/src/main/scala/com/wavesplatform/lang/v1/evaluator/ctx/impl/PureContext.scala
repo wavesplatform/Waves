@@ -40,30 +40,22 @@ object PureContext {
   val BigIntMin: BigInt = -BigIntMax - 1
   val MaxListLengthV4   = 1000
 
-  // As an optimization, JVM might throw an ArithmeticException with empty stack trace and null message.
-  // The workaround below rethrows an exception with the message explicitly set.
-  lazy val divLong: BaseFunction[NoContext] =
-    createTryOp(DIV_OP, LONG, LONG, DIV_LONG) { (a, b) =>
-      try Math.floorDiv(a, b)
-      catch { case _: ArithmeticException => throw new ArithmeticException("/ by zero") }
-    }
-  lazy val modLong: BaseFunction[NoContext] =
-    createTryOp(MOD_OP, LONG, LONG, MOD_LONG) { (a, b) =>
-      try Math.floorMod(a, b)
-      catch { case _: ArithmeticException => throw new ArithmeticException("/ by zero") }
-    }
-
-  // Since JDK 22 the same applies to overflow in the Math.*Exact intrinsics.
-  private inline def overflowing(inline op: Long): Long =
+  // On hot code the JIT throws a preallocated ArithmeticException with a null message: for division by zero on any JDK,
+  // for Math.*Exact overflow since JDK 22. Rethrow with the message the error text must carry.
+  private inline def withMessage(message: String)(inline op: Long): Long =
     try op
-    catch { case _: ArithmeticException => throw new ArithmeticException("long overflow") }
+    catch { case _: ArithmeticException => throw new ArithmeticException(message) }
 
+  lazy val divLong: BaseFunction[NoContext] =
+    createTryOp(DIV_OP, LONG, LONG, DIV_LONG)((a, b) => withMessage("/ by zero")(Math.floorDiv(a, b)))
+  lazy val modLong: BaseFunction[NoContext] =
+    createTryOp(MOD_OP, LONG, LONG, MOD_LONG)((a, b) => withMessage("/ by zero")(Math.floorMod(a, b)))
   lazy val mulLong: BaseFunction[NoContext] =
-    createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => overflowing(Math.multiplyExact(a, b)))
+    createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => withMessage("long overflow")(Math.multiplyExact(a, b)))
   lazy val sumLong: BaseFunction[NoContext] =
-    createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => overflowing(Math.addExact(a, b)))
+    createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => withMessage("long overflow")(Math.addExact(a, b)))
   lazy val subLong: BaseFunction[NoContext] =
-    createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => overflowing(Math.subtractExact(a, b)))
+    createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => withMessage("long overflow")(Math.subtractExact(a, b)))
 
   lazy val sumString: BaseFunction[NoContext] =
     createRawOp(
