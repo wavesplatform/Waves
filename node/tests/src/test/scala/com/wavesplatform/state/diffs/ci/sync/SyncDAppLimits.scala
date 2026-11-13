@@ -119,7 +119,14 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
       val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(100)), invoker = alice, fee = 1.waves)
 
       var failure = Option.empty[Throwable]
-      val thread  = new Thread(null, () => try d.appendBlock(invokeTx) catch { case t: Throwable => failure = Some(t) }, "small-stack", 1L << 20)
+      val thread = new Thread(
+        null,
+        () =>
+          try d.appendBlock(invokeTx)
+          catch { case t: Throwable => failure = Some(t) },
+        "small-stack",
+        1L << 20
+      )
       thread.start()
       thread.join()
 
