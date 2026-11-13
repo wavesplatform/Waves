@@ -8,7 +8,8 @@ import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteBatch}
 import java.util.Arrays
 import scala.collection.mutable.ArrayBuffer
 
-class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB(db, readOptions) {
+// Writes reach the batch only on flush(), so only readWrite, which flushes before writing the batch, creates one.
+class RW private[database] (db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB(db, readOptions) {
   import RW.*
 
   private val ops            = ArrayBuffer.empty[Op]
