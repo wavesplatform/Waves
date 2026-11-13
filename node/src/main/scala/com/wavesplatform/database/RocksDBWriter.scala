@@ -83,6 +83,12 @@ object RocksDBWriter extends ScorexLogging {
       } yield db.get(valueKey(lastChange))
   }
 
+  // A tuple key would box both fields in every equals and hashCode the cache calls.
+  private final case class HeightAndAddress(height: Int, addressId: Long)
+  private object HeightAndAddress {
+    def of(height: Height, addressId: AddressId): HeightAndAddress = new HeightAndAddress(height.toInt, addressId.toLong)
+  }
+
   /** Merges height sequences: {{{([15, 12, 3], [12, 5], [3, 1]) => [(15, 12, 3), (12, 12, 3), (3, 5, 3), (3, 5, 1)]}}}
     * @return
     *   Each tuple contains balance components at {{{Height(max(x._1, x._2, x._3))}}}
@@ -1057,8 +1063,8 @@ class RocksDBWriter(
 
             rollbackLeaseBalance(rw, addressId, currentHeight)
 
-            balanceAtHeightCache.invalidate((currentHeight, addressId))
-            leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
+            balanceAtHeightCache.invalidate(HeightAndAddress.of(currentHeight, addressId))
+            leaseBalanceAtHeightCache.invalidate(HeightAndAddress.of(currentHeight, addressId))
             discardLeaseBalance(address)
 
             if (dbSettings.storeTransactionsByAddress) {
@@ -1377,13 +1383,13 @@ class RocksDBWriter(
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
-    .build[(Height, AddressId), BalanceNode]()
+    .build[HeightAndAddress, BalanceNode]()
 
   private val leaseBalanceAtHeightCache = CacheBuilder
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
-    .build[(Height, AddressId), LeaseBalanceNode]()
+    .build[HeightAndAddress, LeaseBalanceNode]()
 
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
     db.get(Keys.addressId(address)).flatMap { aid =>
@@ -1421,7 +1427,7 @@ class RocksDBWriter(
         if (hh < Height(from) || hh <= Height(0))
           acc :+ hh
         else {
-          val bn     = balanceAtHeightCache.get((hh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, hh)))
+          val bn     = balanceAtHeightCache.get(HeightAndAddress.of(hh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, hh)))
           val newAcc = if (hh > toHeight) acc else acc :+ hh
           collectBalanceHistory(newAcc, bn.prevHeight)
         }
@@ -1431,7 +1437,7 @@ class RocksDBWriter(
         if (hh < Height(from) || hh <= Height(0))
           acc :+ hh
         else {
-          val lbn    = leaseBalanceAtHeightCache.get((hh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, hh)))
+          val lbn    = leaseBalanceAtHeightCache.get(HeightAndAddress.of(hh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, hh)))
           val newAcc = if (hh > toHeight) acc else acc :+ hh
           collectLeaseBalanceHistory(newAcc, lbn.prevHeight)
         }
@@ -1448,8 +1454,8 @@ class RocksDBWriter(
       val lbh  = slice(clbh, Height(from), toHeight)
       for {
         (wh, lh, dh) <- merge3(wbh, lbh, slidedDepositHeights)
-        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, wh)))
-        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, lh)))
+        wb = balanceAtHeightCache.get(HeightAndAddress.of(wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, wh)))
+        lb = leaseBalanceAtHeightCache.get(HeightAndAddress.of(lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, lh)))
         d  = collectedDeposits.depositSize.getOrElse(dh, 0L)
       } yield {
         val maxHeight = wh.max(lh).max(dh)
