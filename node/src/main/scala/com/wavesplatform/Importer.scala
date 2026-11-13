@@ -385,7 +385,7 @@ object Importer extends ScorexLogging {
       queue.put(Right(None))
     } catch {
       case _: InterruptedException => () // the import ended before the input did
-      case e: Throwable =>
+      case e: Throwable            =>
         // The appender rethrows it. Fatal errors too: the appender would otherwise wait for the next block forever.
         try queue.put(Left(e))
         catch { case _: InterruptedException => () }
