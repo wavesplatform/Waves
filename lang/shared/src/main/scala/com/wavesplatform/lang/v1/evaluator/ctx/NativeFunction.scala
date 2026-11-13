@@ -24,11 +24,16 @@ sealed abstract class BaseFunction[C[_[_]]] {
 
   val costByLibVersionMap: SortedMap[StdLibVersion, Long]
 
-  def costByLibVersion(version: StdLibVersion): Long = {
-    val rng = costByLibVersionMap.rangeTo(version)
-    require(rng.nonEmpty, s"$name $signature ver=$version, cost=$costByLibVersionMap")
-    rng.last._2
-  }
+  // Asked for every function call a script makes. A range of the TreeMap built a new tree each time, and function objects are created for
+  // every invocation, so a table per object did not pay off either.
+  def costByLibVersion(version: StdLibVersion): Long =
+    costByLibVersionMap.get(version) match {
+      case Some(cost) => cost
+      case None =>
+        val earlier = costByLibVersionMap.maxBefore(version)
+        require(earlier.nonEmpty, s"$name $signature ver=$version, cost=$costByLibVersionMap")
+        earlier.get._2
+    }
 }
 
 object BaseFunction {
