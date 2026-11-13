@@ -53,10 +53,16 @@ package object state {
 
       def max(that: Height): Height = math.max(h, that)
       def min(that: Height): Height = math.min(h, that)
+
+      // Defined here rather than through a Conversion to Ordered, which boxes the Int on every comparison.
+      def <(that: Height): Boolean         = h < that
+      def <=(that: Height): Boolean        = h <= that
+      def >(that: Height): Boolean         = h > that
+      def >=(that: Height): Boolean        = h >= that
+      infix def compare(that: Height): Int = Integer.compare(h, that)
     }
 
-    given Ordering[Height]                    = Ordering[Int]
-    given Conversion[Height, Ordered[Height]] = scala.math.Ordered.orderingToOrdered(_)
+    given Ordering[Height] = Ordering[Int]
 
     given Writes[Height] = Writes.IntWrites
     given Reads[Height]  = Reads.IntReads
