@@ -282,6 +282,31 @@ object Importer extends ScorexLogging {
     }
   }
 
+  // A block in either export format, with its transaction snapshots when the import has them.
+  private def parseRecord(blockBytes: Array[Byte], snapshotsBytes: Option[Array[Byte]], currentTs: Long): ImportedBlock = {
+    lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
+    val block = (if (1 < blockBytes.head && blockBytes.head < 5 && Longs.fromByteArray(blockBytes.slice(1, 9)) < currentTs)
+                   Block.parseBytes(blockBytes).orElse(parsedProtoBlock)
+                 else
+                   parsedProtoBlock).get
+    block -> snapshotsBytes.map(bytes => BlockSnapshotResponse(block.id(), parseSnapshots(bytes, block.transactionData.size)))
+  }
+
+  // One snapshot per transaction, each a 4-byte length and that many bytes, filling the record exactly (Exporter.IO.exportBlockTxSnapshots).
+  private def parseSnapshots(bytes: Array[Byte], count: Int): Seq[TransactionStateSnapshot] = {
+    var offset = 0
+    val snapshots = Seq.fill(count) {
+      require(offset + Ints.BYTES <= bytes.length, s"Snapshot record of ${bytes.length} bytes ends before snapshot length at $offset")
+      val size  = Ints.fromByteArray(bytes.slice(offset, offset + Ints.BYTES))
+      val start = offset + Ints.BYTES
+      require(size >= 0 && size <= bytes.length - start, s"Snapshot of $size bytes at $start does not fit a record of ${bytes.length} bytes")
+      offset = start + size
+      TransactionStateSnapshot.parseFrom(bytes.slice(start, offset))
+    }
+    require(offset == bytes.length, s"Snapshot record of ${bytes.length} bytes has ${bytes.length - offset} bytes after $count snapshots")
+    snapshots
+  }
+
   private def readBlocks(
       blocksInputStream: BufferedInputStream,
       snapshotsInputStream: Option[BufferedInputStream],
@@ -325,26 +350,9 @@ object Importer extends ScorexLogging {
           if (skipped < blocksToSkip) {
             skipped += 1
           } else {
-            val height                = startHeight + enqueued + 1
-            val rideV6                = blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height)
-            lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
-            val block = (if (1 < blockBytes.head && blockBytes.head < 5 && Longs.fromByteArray(blockBytes.slice(1, 9)) < CurrentTS)
-                           Block.parseBytes(blockBytes).orElse(parsedProtoBlock)
-                         else
-                           parsedProtoBlock).get
-            val blockSnapshot = snapshotsBytes.map { bytes =>
-              BlockSnapshotResponse(
-                block.id(),
-                block.transactionData
-                  .foldLeft((0, Seq.empty[TransactionStateSnapshot])) { case ((offset, acc), _) =>
-                    val txSnapshotSize = Ints.fromByteArray(bytes.slice(offset, offset + Ints.BYTES))
-                    val txSnapshot     = TransactionStateSnapshot.parseFrom(bytes.slice(offset + Ints.BYTES, offset + Ints.BYTES + txSnapshotSize))
-                    (offset + Ints.BYTES + txSnapshotSize, txSnapshot +: acc)
-                  }
-                  ._2
-                  .reverse
-              )
-            }
+            val height                 = startHeight + enqueued + 1
+            val rideV6                 = blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height)
+            val (block, blockSnapshot) = parseRecord(blockBytes, snapshotsBytes, CurrentTS)
 
             ParSignatureChecker.checkBlockAndTxSignatures(block, blockSnapshot.isEmpty, rideV6)
             vrfPrecheck.add(block, height)
