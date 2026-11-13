@@ -45,6 +45,7 @@ Waves node in Scala 3 (consensus, state, REST/gRPC API, RIDE). sbt 2.x multi-mod
 Hard-won implementation knowledge lives in `docs/notes/`, one file per subsystem; the matching file MUST be read before working in its area. New learnings go into the matching topic file plus one trigger line here, never as new always-loaded text in CLAUDE.md.
 
 - Writing or fixing tests (node-it suites and fixtures, Docker.scala ports, load tests, node-tests helpers): read `docs/notes/testing.md` first.
+- Touching the RIDE evaluator (EvaluatorV2, EvaluationResult, Terms.copyForEvaluation) or measuring script execution speed: read `docs/notes/ride-evaluator.md` first.
 - Touching the BlockchainUpdates extension or events.StateUpdate: read `docs/notes/blockchain-updates.md` first.
 - Touching block or microblock mining (Miner.scala, MicroBlockMinerImpl), or a test that reacts to the liquid block: read `docs/notes/mining.md` first.
 - Touching build.sbt, sbt plugins or tasks (IntegrationTestsPlugin, concurrentRestrictions, checkTestLimits), or the docker image (Dockerfile, entrypoint.sh, stageForDocker): read `docs/notes/build-tooling.md` first.
