@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -45,29 +44,11 @@ package object crypto {
 
   def verifyVRF(signature: ByteStr, message: Array[Byte], publicKey: PublicKey, checkWeakPk: Boolean = false): Either[ValidationError, ByteStr] = {
     for {
-      _      <- Either.cond(!checkWeakPk || !isWeakPublicKey(publicKey.arr), (), GenericError("Could not verify VRF proof: weak public key is used"))
-      result <- verifiedVrfOutput(signature, message, publicKey)
+      _ <- Either.cond(!checkWeakPk || !isWeakPublicKey(publicKey.arr), (), GenericError("Could not verify VRF proof: weak public key is used"))
+      result <- Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message, signature.arr))).toEither.left
+        .map(_ => GenericError("Could not verify VRF proof"))
     } yield result
   }
-
-  // Block validation checks each VRF proof twice, and the importer checks proofs ahead of the appender, so successful results are reused.
-  // A failed check throws in the loader and is not cached. The size holds the importer's read-ahead (--max-queue-size, 100 blocks by
-  // default) many times over.
-  private val vrfOutputs: LoadingCache[(ByteStr, ByteStr, PublicKey), ByteStr] =
-    CacheBuilder
-      .newBuilder()
-      .maximumSize(1024)
-      .build(CacheLoader.from { (key: (ByteStr, ByteStr, PublicKey)) =>
-        val (signature, message, publicKey) = key
-        ByteStr(provider.verifyVrfSignature(publicKey.arr, message.arr, signature.arr))
-      })
-
-  // The message is copied into the key and the output out of the cache, so a caller that changes its array cannot change a cached entry.
-  private def verifiedVrfOutput(signature: ByteStr, message: Array[Byte], publicKey: PublicKey): Either[ValidationError, ByteStr] =
-    Try(vrfOutputs.getUnchecked((signature, ByteStr(message.clone()), publicKey))).toEither
-      .map(output => ByteStr(output.arr.clone()))
-      .left
-      .map(_ => GenericError("Could not verify VRF proof"))
 
   // see
   // https://github.com/jedisct1/libsodium/blob/ab4ab23d5744a8e060864a7cec1a7f9b059f9ddd/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c#L17

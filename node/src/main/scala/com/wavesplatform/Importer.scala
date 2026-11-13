@@ -9,7 +9,7 @@ import com.wavesplatform.api.common.*
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.consensus.{CachedVrf, PoSSelector}
 import com.wavesplatform.database.{DBExt, KeyTag, RDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
@@ -257,7 +257,7 @@ object Importer extends ScorexLogging {
   }
 
   /** Verifies block VRF proofs on the signature pool ahead of the appender, which then finds the results in the VRF cache of
-    * [[crypto.verifyVRF]]. A proof needs the hit source of an earlier block (101 blocks back under fair PoS), so many run in parallel. The
+    * [[CachedVrf]]. A proof needs the hit source of an earlier block (101 blocks back under fair PoS), so many run in parallel. The
     * heights come from the same rules as [[PoSSelector.validateGenerationSignature]]; where the feature state differs, such as a feature
     * approved by a block still in the queue, the appender just misses the cache and verifies the proof itself.
     */
@@ -274,7 +274,7 @@ object Importer extends ScorexLogging {
       val blockHitSource =
         if (PoSSelector.vrfActivated(blockchain, height)) {
           hitSource(PoSSelector.hitSourceHeight(blockchain, height - 1)).map(message =>
-            crypto.verifyVRF(block.header.generationSignature, message.arr, block.header.generator).explicitGet()
+            CachedVrf.verify(block.header.generationSignature, message.arr, block.header.generator, checkWeakPk = false).explicitGet()
           )(using sigverify)
         } else Future.successful(block.header.generationSignature)
       hitSources.update(height, blockHitSource)
