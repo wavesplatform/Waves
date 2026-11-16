@@ -4,47 +4,16 @@ import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.database.{DBExt, KeyTag, Keys, loadBlock, writeTransaction}
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.{Height, TxMeta, TxNum}
 import com.wavesplatform.test.*
-import com.wavesplatform.test.DomainPresets.WavesSettingsOps
-import com.wavesplatform.transaction.{EthTxGenerator, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{EthTxGenerator, TxHelpers}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.utils.EthConverters.*
 
 import java.io.ByteArrayOutputStream
 
-class ExporterSpec extends FreeSpec with WithDomain {
-  private val ProtoBlocksFrom = 4
-
-  // Legacy blocks first, then protobuf blocks holding legacy-bytes, protobuf and Ethereum transactions, plus an empty block.
-  private def withMixedChain(f: Domain => Unit): Unit =
-    withDomain(
-      DomainPresets.RideV6.setFeaturesHeight(
-        BlockchainFeatures.BlockV5           -> ProtoBlocksFrom,
-        BlockchainFeatures.SynchronousCalls  -> ProtoBlocksFrom,
-        BlockchainFeatures.RideV6            -> ProtoBlocksFrom,
-        BlockchainFeatures.BlockReward       -> ProtoBlocksFrom
-      ),
-      Seq(AddrWithBalance(TxHelpers.defaultAddress), AddrWithBalance(TxHelpers.defaultSigner.toEthWavesAddress))
-    ) { d =>
-      d.appendBlock(Block.NgBlockVersion, TxHelpers.transfer(version = TxVersion.V1), TxHelpers.transfer(version = TxVersion.V2))
-      d.appendBlock(Block.NgBlockVersion, TxHelpers.transfer(version = TxVersion.V2))
-      d.appendBlock(
-        Block.ProtoBlockVersion,
-        TxHelpers.transfer(version = TxVersion.V2),
-        TxHelpers.transfer(version = TxVersion.V3),
-        EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, Waves)
-      )
-      d.appendBlock(Block.ProtoBlockVersion)
-      d.appendBlock(Block.ProtoBlockVersion, TxHelpers.transfer(version = TxVersion.V3))
-      d.appendBlock(Block.ProtoBlockVersion)
-      f(d)
-    }
-
+class ExporterSpec extends FreeSpec with WithDomain with MixedChain {
   private def lengthPrefixed(records: Seq[Array[Byte]]): Array[Byte] =
     records.flatMap(r => Ints.toByteArray(r.length) ++ r).toArray
 
