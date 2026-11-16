@@ -60,6 +60,8 @@ Script probes (`<scriptProbes>` in the session) did not record when defined by h
 
 Past mainnet height 4.5M RIDE's `wavesBalance()` was about 8% of the appender on macOS: it computes the generating balance (the minimum over 1,000 blocks of balance history) on every call, even when the script reads only `available`, and blocks query the same few dApp addresses again and again. `RocksDBWriter` keeps the persisted part of `balanceSnapshots` per address, `from` and target height until the next append or rollback; the import probe's `balanceSnapshots` cache lines show its hit rate.
 
+At mainnet height 4.58M RIDE `pow` (BigDecimalMath at 154 digits) was about 590 calls/s and 7% of the appender, about 116 us per call, measured with a temporary counter; only 8% of calls repeated the arguments of one of the last 10,000, so an argument cache would save under 1%, and the counter was removed. BigDecimalMath must stay the implementation: another library could differ in the last digits, and an exact result such as 1.999...9 against 2 rounds differently, which would break consensus on replay.
+
 ## Snapshot import (`-s`)
 
 Applying snapshots skips `BlockDiffer.prepareCaches`, so every account the block touches is read with its own `RocksDB.get` in `Caches.append`, and those point reads mostly hit SST files. On the slice above that made snapshot import over four times slower than executing the transactions. Batch-loading the accounts named in the snapshots (balances, lease balances, order fills) brought it from 1343 s to 228 s; not merged yet.
