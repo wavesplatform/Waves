@@ -233,7 +233,7 @@ inScope(Global)(
       "-Wconf:id=E235&src=lang/.*:s",
       "-Wconf:id=E235&src=(.*/src/test/|node/testkit/).*:s",
       // Catches that predate the lint, to be reviewed one by one; new ones stay flagged
-      "-Wconf:id=E235&src=.*/(Metrics|MicroBlockSynchronizer|UPnP|Time|api/http/package|RootActorSystem|protobuf/serde/package|RequestService|AppInitializer)\\.scala:s",
+      "-Wconf:id=E235&src=.*/(Metrics|MicroBlockSynchronizer|UPnP|Time|api/http/package|RootActorSystem|protobuf/serde/package|RequestService|AppInitializer|Importer)\\.scala:s",
       "-Wconf:src=src_managed/.*:s"
     ),
     crossPaths        := false,
