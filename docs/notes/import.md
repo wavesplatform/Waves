@@ -35,6 +35,28 @@ Past height 2M testnet blocks are dominated by dApp invocations: from 2146124 to
 
 A full testnet import with all the changes, on an Apple silicon Mac with `rocksdb.main-cache-size = 2G`, reached height 2137047 in 51 minutes; `rocksdb.write.self` counts one write per block, which gives the height per statistics window. Up to about 1.8M the database took 15 to 25% of each window; past 2.15M it takes 4 to 5% (10 to 25 s per 10 minutes, no stalls, compaction keeping up), throughput drops to 50 to 180 blocks per second, and the rest is script execution. Block size is not worth tuning there: SST reads take 2 to 3 s per window, filter and index partitions mostly hit the cache, and the many data block misses are compaction reads, which bypass the cache.
 
+## Import probe (JProfiler)
+
+`metrics.ImportProbe` is an embedded JProfiler probe; without the agent its calls do nothing and its telemetries are never computed. It records the time of each block append as a payload named after its 50,000-block height range, so the probe's hot spots give the append time per range, and these telemetries, polled once per second by the agent:
+
+- Import height, blocks/s, transactions/s, and script complexity/s. Complexity is read after each append from the liquid block's snapshot (`scriptsComplexity`, the sum over its transactions).
+- RocksDB time in get, multiGet, write and seek, and stall time, as a share of one thread's wall time (100% means the appender spent the whole second there). SST read and table open IO time count all threads, compactions included, so they can exceed 100%.
+- Block cache hit rate for data, index and filter blocks; 0 in a second with no lookups of that kind.
+- Gets served by the memtable, L0, L1 and L2+, and lookups skipped by a bloom filter; table opens/s; keys written/s; bytes/s written, read by gets, to the WAL, by flushes and by compactions.
+- Per column family: L0 file count and pending compaction bytes. Totals over all column families: block cache usage and memtable size. Running compactions and flushes.
+
+Everything except height, throughput and complexity needs `waves.db.rocksdb.enable-statistics = true`; without it those lines stay at 0. The gauges come from RocksDB properties, which need no statistics. `num-files-at-level<N>` is a string property: `getLongProperty` throws `NotFound` for it, and a throwing telemetry aborts the whole sample.
+
+To record it, start the agent from a config file as above and add a probe recording action to the session's `jvmStart` trigger, next to `startRecording`:
+
+```xml
+<startProbeRecording name="com.wavesplatform.metrics.ImportProbe" events="false" />
+```
+
+Keep `events` off: one event per block is millions over a full import. The probe and its telemetries are under "JVM & Custom Probes" in the JProfiler UI, and the MCP server serves them as subsystem `custom:com.wavesplatform.metrics.ImportProbe` (hot spots in `performance.hotspots`, telemetries in `telemetry.list`). Telemetry values are stored as 32-bit ints, which is why byte rates are returned in kB with `scale = -3` and percentages in tenths with `scale = 1`.
+
+Script probes (`<scriptProbes>` in the session) did not record when defined by hand in an offline config file: with JProfiler 16.3 neither the probe nor an error appeared, with or without a `startProbeRecording` for it. Per-dApp RIDE time needs them defined in the JProfiler UI or through the MCP server instead (`InvokeScriptTransactionDiff$.apply`, the transaction is `param4`), or an embedded payload.
+
 ## Snapshot import (`-s`)
 
 Applying snapshots skips `BlockDiffer.prepareCaches`, so every account the block touches is read with its own `RocksDB.get` in `Caches.append`, and those point reads mostly hit SST files. On the slice above that made snapshot import over four times slower than executing the transactions. Batch-loading the accounts named in the snapshots (balances, lease balances, order fills) brought it from 1343 s to 228 s; not merged yet.
