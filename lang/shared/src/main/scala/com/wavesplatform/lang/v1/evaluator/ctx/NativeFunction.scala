@@ -24,11 +24,15 @@ sealed abstract class BaseFunction[C[_[_]]] {
 
   val costByLibVersionMap: SortedMap[StdLibVersion, Long]
 
-  def costByLibVersion(version: StdLibVersion): Long = {
-    val rng = costByLibVersionMap.rangeTo(version)
-    require(rng.nonEmpty, s"$name $signature ver=$version, cost=$costByLibVersionMap")
-    rng.last._2
-  }
+  // Asked for every function call a script makes; rangeTo(version).last built a new tree each time.
+  def costByLibVersion(version: StdLibVersion): Long =
+    costByLibVersionMap.get(version) match {
+      case Some(cost) => cost
+      case None =>
+        costByLibVersionMap
+          .maxBefore(version)
+          .fold(throw new IllegalArgumentException(s"requirement failed: $name $signature ver=$version, cost=$costByLibVersionMap"))(_._2)
+    }
 }
 
 object BaseFunction {
@@ -99,7 +103,10 @@ case class UserFunction[C[_[_]]](
     signature: FunctionTypeSignature,
     ev: ContextfulUserFunction[C],
     args: Seq[String]
-) extends BaseFunction[C]
+) extends BaseFunction[C] {
+  // The evaluator needs the names as a List on every call.
+  private[lang] val argList: List[String] = args.toList
+}
 
 object UserFunction {
   def withEnvironment[C[_[_]]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: ContextfulUserFunction[C]): UserFunction[C] =
