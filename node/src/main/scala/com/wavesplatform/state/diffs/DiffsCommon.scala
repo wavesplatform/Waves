@@ -31,30 +31,53 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxPositiveAmount
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
-object DiffsCommon {
-  def useV1PreCheck(blockchain: Blockchain): Boolean =
-    blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight &&
-      !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
+/** Every blockchain setting script estimation reads. Estimation takes these instead of a Blockchain, so a cache keyed by them is complete. */
+final case class EstimationSettings(
+    estimator: ScriptEstimator,
+    rideV6: Boolean,
+    reducedVerifierLimit: Boolean,
+    checkEstimationOverflow: Boolean,
+    v1PreCheck: Boolean
+)
 
+object EstimationSettings {
+  def apply(blockchain: Blockchain): EstimationSettings =
+    EstimationSettings(
+      blockchain.estimator,
+      blockchain.isFeatureActivated(BlockchainFeatures.RideV6),
+      blockchain.useReducedVerifierComplexityLimit,
+      blockchain.checkEstimationOverflow,
+      v1PreCheck = blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight &&
+        !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
+    )
+}
+
+object DiffsCommon {
   def countVerifierComplexity(
       script: Option[Script],
       blockchain: Blockchain,
       isAsset: Boolean
   ): Either[ValidationError, Option[(Script, Long)]] =
+    verifierComplexity(script, EstimationSettings(blockchain), isAsset)
+
+  def verifierComplexity(
+      script: Option[Script],
+      settings: EstimationSettings,
+      isAsset: Boolean
+  ): Either[ValidationError, Option[(Script, Long)]] =
     script
       .traverse { script =>
-        val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
         def complexity(estimator: ScriptEstimator) =
           Script.verifierComplexity(
             script,
             estimator,
-            fixEstimateOfVerifier,
-            useContractVerifierLimit = !isAsset && blockchain.useReducedVerifierComplexityLimit
+            settings.rideV6,
+            useContractVerifierLimit = !isAsset && settings.reducedVerifierLimit
           )
 
         val cost =
-          if (useV1PreCheck(blockchain)) complexity(ScriptEstimatorV1) *> complexity(ScriptEstimatorV2)
-          else complexity(blockchain.estimator)
+          if (settings.v1PreCheck) complexity(ScriptEstimatorV1) *> complexity(ScriptEstimatorV2)
+          else complexity(settings.estimator)
 
         cost.map((script, _))
       }

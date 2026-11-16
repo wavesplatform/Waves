@@ -6,9 +6,8 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.RideV6
-import com.wavesplatform.features.ComplexityCheckPolicyProvider.*
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
@@ -48,37 +47,24 @@ object SetScriptTransactionDiff {
       )
     } yield snapshot
 
-  // Estimation depends only on the script and these blockchain settings, and estimating a dApp against every estimator is costly: past testnet
-  // height 2.1M, two thirds of SetScript transactions set a script that was set before.
-  private final case class EstimationKey(
-      script: ByteStr,
-      estimator: ScriptEstimator,
-      rideV6: Boolean,
-      reducedVerifierLimit: Boolean,
-      checkEstimationOverflow: Boolean,
-      v1PreCheck: Boolean
-  )
+  // Estimating a dApp against every estimator is costly, and past testnet height 2.1M two thirds of SetScript transactions set a script that
+  // was set before. Keyed by a hash of the script, so an entry stays small however large the script.
+  private final case class EstimationKey(scriptHash: ByteStr, settings: EstimationSettings)
   private val estimations: Cache[EstimationKey, Either[ValidationError, (Map[Int, Map[String, Long]], Long)]] =
     CacheBuilder.newBuilder().maximumSize(1000).build()
 
   // Callable complexities by estimator version, and the verifier complexity. Not computed through the cache's loader, so an exception
   // thrown by an estimator reaches the caller as it is.
   private def complexities(blockchain: Blockchain, script: Script): Either[ValidationError, (Map[Int, Map[String, Long]], Long)] = {
-    val key = EstimationKey(
-      script.bytes(),
-      blockchain.estimator,
-      blockchain.isFeatureActivated(RideV6),
-      blockchain.useReducedVerifierComplexityLimit,
-      blockchain.checkEstimationOverflow,
-      DiffsCommon.useV1PreCheck(blockchain)
-    )
+    val settings = EstimationSettings(blockchain)
+    val key      = EstimationKey(ByteStr(crypto.fastHash(script.bytes().arr)), settings)
     Option(estimations.getIfPresent(key)).getOrElse {
       val result = for {
         callableComplexities <- script match {
-          case ContractScriptImpl(version, dApp) => estimate(blockchain, version, dApp)
+          case ContractScriptImpl(version, dApp) => estimate(settings, version, dApp)
           case _                                 => Right(Map[Int, Map[String, Long]]())
         }
-        verifierWithComplexity <- DiffsCommon.countVerifierComplexity(Some(script), blockchain, isAsset = false)
+        verifierWithComplexity <- DiffsCommon.verifierComplexity(Some(script), settings, isAsset = false)
       } yield (callableComplexities, verifierWithComplexity.fold(0L)(_._2))
       estimations.put(key, result)
       result
@@ -93,8 +79,11 @@ object SetScriptTransactionDiff {
     )
   }
 
-  def estimate(
-      blockchain: Blockchain,
+  def estimate(blockchain: Blockchain, version: StdLibVersion, dApp: DApp): Either[GenericError, Map[Int, Map[String, Long]]] =
+    estimate(EstimationSettings(blockchain), version, dApp)
+
+  private def estimate(
+      settings: EstimationSettings,
       version: StdLibVersion,
       dApp: DApp
   ): Either[GenericError, Map[Int, Map[String, Long]]] = {
@@ -104,13 +93,13 @@ object SetScriptTransactionDiff {
         currentComplexity <- ContractScript.estimateComplexity(
           version,
           callables,
-          blockchain.estimator,
-          fixEstimateOfVerifier = blockchain.isFeatureActivated(RideV6),
-          useReducedVerifierLimit = blockchain.useReducedVerifierComplexityLimit
+          settings.estimator,
+          fixEstimateOfVerifier = settings.rideV6,
+          useReducedVerifierLimit = settings.reducedVerifierLimit
         )
-        nextComplexities <- estimateNext(blockchain, version, callables)
+        nextComplexities <- estimateNext(settings, version, callables)
         complexitiesByEstimator = (currentComplexity :: nextComplexities).mapWithIndex { case ((_, complexitiesByCallable), i) =>
-          (i + blockchain.estimator.version, complexitiesByCallable)
+          (i + settings.estimator.version, complexitiesByCallable)
         }.toMap
       } yield complexitiesByEstimator
 
@@ -118,16 +107,16 @@ object SetScriptTransactionDiff {
   }
 
   private def estimateNext(
-      blockchain: Blockchain,
+      settings: EstimationSettings,
       version: StdLibVersion,
       dApp: DApp
   ): Either[String, List[(Long, Map[String, Long])]] =
     ScriptEstimator
-      .all(fixOverflow = blockchain.checkEstimationOverflow)
-      .drop(blockchain.estimator.version)
+      .all(fixOverflow = settings.checkEstimationOverflow)
+      .drop(settings.estimator.version)
       .traverse(se =>
         ContractScript
-          .estimateComplexityExact(version, dApp, se, fixEstimateOfVerifier = blockchain.isFeatureActivated(RideV6))
+          .estimateComplexityExact(version, dApp, se, fixEstimateOfVerifier = settings.rideV6)
           .map { case ((_, maxComplexity), complexities) => (maxComplexity, complexities) }
       )
 
