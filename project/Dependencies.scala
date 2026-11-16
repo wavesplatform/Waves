@@ -25,11 +25,8 @@ object Dependencies {
       jacksonModule("core", "databind"),
       jacksonModule("datatype", "datatype-jdk8"),
       jacksonModule("datatype", "datatype-jsr310"),
-      "tools.jackson.core" % "jackson-core"     % "3.2.4",
-      "tools.jackson.core" % "jackson-databind" % "3.2.4",
-      // Scala 3 compiler and scaladoc toolchains, no Scala release ships the patched versions yet
-      "org.jline"          % "jline-reader"     % "3.30.15",
-      "org.jsoup"          % "jsoup"            % "1.23.2",
+      "tools.jackson.core" % "jackson-core"     % "3.3.0",
+      "tools.jackson.core" % "jackson-databind" % "3.3.0",
       gProto
     )
   )
@@ -44,7 +41,7 @@ object Dependencies {
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.8.1"
 
-  private def jacksonModule(group: String, module: String, version: String = "2.21.7") = s"com.fasterxml.jackson.$group" % s"jackson-$module" % version
+  private def jacksonModule(group: String, module: String, version: String = "2.21.8") = s"com.fasterxml.jackson.$group" % s"jackson-$module" % version
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.13.0" // 4.14+ requires Java 21 https://github.com/LFDT-web3j/web3j/releases/tag/v4.14.0
 
@@ -57,7 +54,7 @@ object Dependencies {
   val googleGuava     = "com.google.guava"    % "guava"             % "33.8.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.6.6"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.6.7"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.14"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
@@ -83,7 +80,7 @@ object Dependencies {
     // macOS aarch64
     amazonCorretto("osx-aarch_64"),
     // fallback Java
-    "org.bouncycastle" % "bcprov-jdk18on" % "1.86"
+    "org.bouncycastle" % "bcprov-jdk18on" % "1.87"
   )
 
   val lang = Def.setting(
@@ -114,7 +111,7 @@ object Dependencies {
     logback,
     "com.github.jnr" % "jnr-unixsocket" % "0.39.9", // To support Apple ARM
     "com.spotify"    % "docker-client"  % "8.16.0",
-    jacksonModule("dataformat", "dataformat-properties", "2.22.4"),
+    jacksonModule("dataformat", "dataformat-properties", "2.23.0"),
     asyncHttpClient
   ).map(_ % Test)
 
