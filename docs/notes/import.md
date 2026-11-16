@@ -40,10 +40,11 @@ A full testnet import with all the changes, on an Apple silicon Mac with `rocksd
 `metrics.ImportProbe` is an embedded JProfiler probe; without the agent its calls do nothing and its telemetries are never computed. It records the time of each block append as a payload named after its 50,000-block height range, so the probe's hot spots give the append time per range, and these telemetries, polled once per second by the agent:
 
 - Import height, blocks/s, transactions/s, and script complexity/s. Complexity is read after each append from the liquid block's snapshot (`scriptsComplexity`, the sum over its transactions).
-- RocksDB time in get, multiGet, write and seek, and stall time, as a share of one thread's wall time (100% means the appender spent the whole second there). SST read and table open IO time count all threads, compactions included, so they can exceed 100%.
+- RocksDB time in get, multiGet, write and seek, and stall time, in microseconds per second (1 s means the appender spent the whole second there). SST read and table open IO time count all threads, compactions included, so they can exceed 1 s.
 - Block cache hit rate for data, index and filter blocks; 0 in a second with no lookups of that kind.
 - Gets served by the memtable, L0, L1 and L2+, and lookups skipped by a bloom filter; table opens/s; keys written/s; bytes/s written, read by gets, to the WAL, by flushes and by compactions.
-- Per column family: L0 file count and pending compaction bytes. Totals over all column families: block cache usage and memtable size. Running compactions and flushes.
+- Per column family: L0 file count and pending compaction in MB. Totals over all column families: block cache usage and memtable size in MB. Running compactions and flushes.
+- Per state cache (the Guava caches in `Caches` and `RocksDBWriter`, named in `Caches.cacheStats`): hit rate, misses/s and evictions/s.
 
 Everything except height, throughput and complexity needs `waves.db.rocksdb.enable-statistics = true`; without it those lines stay at 0. The gauges come from RocksDB properties, which need no statistics. `num-files-at-level<N>` is a string property: `getLongProperty` throws `NotFound` for it, and a throwing telemetry aborts the whole sample.
 
@@ -53,7 +54,7 @@ To record it, start the agent from a config file as above and add a probe record
 <startProbeRecording name="com.wavesplatform.metrics.ImportProbe" events="false" />
 ```
 
-Keep `events` off: one event per block is millions over a full import. The probe and its telemetries are under "JVM & Custom Probes" in the JProfiler UI, and the MCP server serves them as subsystem `custom:com.wavesplatform.metrics.ImportProbe` (hot spots in `performance.hotspots`, telemetries in `telemetry.list`). Telemetry values are stored as 32-bit ints, which is why byte rates are returned in kB with `scale = -3` and percentages in tenths with `scale = 1`.
+`startProbeRecording` is an action of its own; nested inside `startRecording` it is silently ignored. Keep `events` off: one event per block is millions over a full import. Leave `<allocation>` out of `startRecording` for a full import: allocation recording put 72% of the appender's samples into `JvmtiObjectAllocEventCollector` and cut a mainnet import to about 2,000 blocks in 20 minutes. `asyncBufferPercentage` only sizes the per-thread sampling buffers and cost nothing measurable at 400. The probe and its telemetries are under "JVM & Custom Probes" in the JProfiler UI, and the MCP server serves them as subsystem `custom:com.wavesplatform.metrics.ImportProbe` (hot spots in `performance.hotspots`, telemetries in `telemetry.list`). Telemetry values are stored as 32-bit ints. Do not use `TelemetryFormat.scale`: the MCP server applies it but the JProfiler 16.3 UI did not, so byte rates returned in kB with `scale = -3` showed as 0 MB. Byte rates are plain bytes (an int holds up to 2 GB/s) and anything that reaches gigabytes is a plain number of MB with the unit in the telemetry name.
 
 Script probes (`<scriptProbes>` in the session) did not record when defined by hand in an offline config file: with JProfiler 16.3 neither the probe nor an error appeared, with or without a `startProbeRecording` for it. Per-dApp RIDE time needs them defined in the JProfiler UI or through the MCP server instead (`InvokeScriptTransactionDiff$.apply`, the transaction is `param4`), or an embedded payload.
 
