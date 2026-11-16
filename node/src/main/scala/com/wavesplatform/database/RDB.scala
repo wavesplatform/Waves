@@ -20,6 +20,8 @@ final class RDB(
     val apiHandle: ApiHandle,
     acquiredResources: Seq[RocksObject]
 ) extends AutoCloseable {
+  def statistics: Option[Statistics] = acquiredResources.collectFirst { case s: Statistics => s }
+
   override def close(): Unit = {
     acquiredResources.foreach(_.close())
     db.close()

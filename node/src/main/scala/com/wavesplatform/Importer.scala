@@ -16,6 +16,7 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.metrics.ImportProbe
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.BlockSnapshotResponse
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
@@ -241,7 +242,9 @@ object Importer extends ScorexLogging {
           case Right(Some((block, snapshot))) =>
             lock.synchronized {
               if (blockchain.lastBlockId.contains(block.header.reference)) {
-                Await.result(appendBlock(block, snapshot).runAsyncLogErr(using appender), Duration.Inf) match {
+                ImportProbe.appendBlock(startHeight + counter + 1, block.transactionData.size) {
+                  Await.result(appendBlock(block, snapshot).runAsyncLogErr(using appender), Duration.Inf)
+                } match {
                   case Left(ve) =>
                     log.error(s"Error appending block ${blockchain.height + 1}: $ve")
                     stop = true
@@ -425,6 +428,7 @@ object Importer extends ScorexLogging {
     val time      = Time(settings.ntpServer)
 
     val rdb = RDB.open(settings.dbSettings)
+    ImportProbe.watch(rdb)
     val (blockchainUpdater, rdbWriter) =
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
@@ -500,6 +504,7 @@ object Importer extends ScorexLogging {
         utxPool.close()
         blockchainUpdater.shutdown()
         rdbWriter.close()
+        ImportProbe.unwatch()
         rdb.close()
       }
       blocksInputStream.close()
