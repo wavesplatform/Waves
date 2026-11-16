@@ -66,12 +66,16 @@ object ImportProbe {
   @volatile private var height = 0
   @volatile private var blocks = 0L
   @volatile private var txs    = 0L
-  private var rangeStart       = -1
-  private var rangeLabel       = ""
+  // Written by the appender thread only.
+  @volatile private var complexity = 0L
+  private var rangeStart           = -1
+  private var rangeLabel           = ""
 
   // Guarded by this object's lock.
   private var source: Option[Source] = None
   private var lastNanos              = System.nanoTime()
+  private var lastComplexity         = 0L
+  private var complexityRate         = 0.0
   private var lastBlocks, lastTxs    = 0L
   private var blockRate, txRate      = 0.0
   private val lastRates              = new Array[Long](Rate.values.length)
@@ -89,6 +93,9 @@ object ImportProbe {
       txs += txCount
     }
   }
+
+  /** Script complexity spent by the block just appended. */
+  def blockApplied(scriptsComplexity: Long): Unit = complexity += scriptsComplexity
 
   private def label(height: Int): String = {
     val start = height / HeightRange * HeightRange
@@ -122,6 +129,9 @@ object ImportProbe {
       txRate = (t - lastTxs) / seconds
       lastBlocks = b
       lastTxs = t
+      val c = complexity
+      complexityRate = (c - lastComplexity) / seconds
+      lastComplexity = c
       source.foreach { s =>
         s.statistics.foreach { st =>
           Rate.values.foreach { r =>
@@ -158,6 +168,10 @@ object ImportProbe {
   @static @Telemetry("Import height") def importHeight(): Int                                                         = height
   @static @Telemetry(value = "Import blocks", format = new TelemetryFormat(PER_SECOND)) def blocksPerSecond(): Int    = { sample(); int(blockRate) }
   @static @Telemetry(value = "Import transactions", format = new TelemetryFormat(PER_SECOND)) def txsPerSecond(): Int = { sample(); int(txRate) }
+
+  @static @Telemetry(value = "Script complexity", format = new TelemetryFormat(PER_SECOND)) def complexityPerSecond(): Int = {
+    sample(); int(complexityRate)
+  }
 
   @static @Telemetry(value = "RocksDB keys written", format = new TelemetryFormat(PER_SECOND)) def keysWritten(): Int = rate(Rate.KeysWritten)
   @static @Telemetry(value = "RocksDB table opens", format = new TelemetryFormat(PER_SECOND)) def tableOpens(): Int   = rate(Rate.TableOpens)

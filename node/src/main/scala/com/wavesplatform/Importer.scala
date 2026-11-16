@@ -433,8 +433,16 @@ object Importer extends ScorexLogging {
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-    val extAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]] =
-      BlockAppender(blockchainUpdater, time, utxPool, pos, BlockEndorser.Disabled, scheduler, importOptions.verify, txSignParCheck = false)
+    val extAppender: AppendBlock = {
+      val append =
+        BlockAppender(blockchainUpdater, time, utxPool, pos, BlockEndorser.Disabled, scheduler, importOptions.verify, txSignParCheck = false)
+      (block, snapshot) =>
+        append(block, snapshot).map { result =>
+          // The appended block is the liquid one, and its snapshot sums the complexity of its transactions.
+          if (result.isRight) ImportProbe.blockApplied(blockchainUpdater.bestLiquidSnapshot.fold(0L)(_.scriptsComplexity))
+          result
+        }
+    }
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb)
     checkGenesis(settings, blockchainUpdater, Miner.StrictDisabledMiner)
