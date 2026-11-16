@@ -166,6 +166,7 @@ object Dependencies {
       ("eu.timepit"       %% "refined"  % "0.11.4").exclude("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"     % "headlong" % "13.3.1",
       "com.github.jbellis" % "jamm"     % "0.4.0", // Weighing caches
+      "com.jprofiler"      % "jprofiler-probe-embedded" % "16.3.1", // ImportProbe; no-op without the JProfiler agent
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
       "com.wavesplatform"         % "blst-java"                    % "0.3.15-1",
       amazonCorretto("linux-x86_64") % Optional,

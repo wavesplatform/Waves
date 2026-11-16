@@ -1,9 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
-import cats.instances.lazyList.*
 import cats.syntax.either.*
-import cats.syntax.foldable.*
 import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -39,21 +37,20 @@ class EvaluatorV2(
       limit: Int,
       parentBlocks: List[BLOCK_DEF]
   ): EvaluationResult[Int] = {
+    // Steps through the arguments by index with flatMap: foldM over a LazyList of the indices boxed every index and allocated per argument.
     def evaluateFunctionArgs(fc: FUNCTION_CALL): EvaluationResult[Int] =
-      Defer {
-        fc.args.indices
-          .to(LazyList)
-          .foldM(limit) { case (unused, argIndex) =>
-            if (unused <= 0)
-              EvaluationResult(unused)
-            else
-              root(
-                expr = fc.args(argIndex),
-                update = argValue => EvaluationResult(fc.args = fc.args.updated(argIndex, argValue)),
-                limit = unused,
-                parentBlocks
-              )
-          }
+      EvaluationResult.defer {
+        val argCount = fc.args.size
+        def evaluateFrom(argIndex: Int, unused: Int): EvaluationResult[Int] =
+          if (argIndex >= argCount || unused <= 0) EvaluationResult(unused)
+          else
+            root(
+              expr = fc.args(argIndex),
+              update = argValue => EvaluationResult(fc.args = fc.args.updated(argIndex, argValue)),
+              limit = unused,
+              parentBlocks
+            ).flatMap(evaluateFrom(argIndex + 1, _))
+        evaluateFrom(0, limit)
       }
 
     def evaluateFunction(fc: FUNCTION_CALL, startArgs: List[EXPR], limit: Int): EvaluationResult[Int] = {
@@ -81,11 +78,11 @@ class EvaluatorV2(
 
     def evaluateNativeFunction(fc: FUNCTION_CALL, limit: Int): EvaluationResult[Int] =
       for {
-        function <- EvaluationResult(Coeval {
+        function <- EvaluationResult.delay[BaseFunction[Environment]](
           ctx.ec.functions
             .get(fc.function)
             .toRight((CommonError(s"function '${fc.function}' not found"), limit))
-        })
+        )
         cost = function.costByLibVersion(stdLibVersion).toInt
         result <-
           if (limit < cost) {
@@ -96,41 +93,42 @@ class EvaluatorV2(
 
     def doEvaluateNativeFunction(fc: FUNCTION_CALL, function: NativeFunction[Environment], limit: Int, cost: Int): EvaluationResult[Int] = {
       val args = fc.args.asInstanceOf[List[EVALUATED]]
-      val evaluation = function.ev match {
+      val evaluation: EvaluationResult[(Either[ExecutionError, EVALUATED], Int)] = function.ev match {
         case f: Extended[Environment] =>
-          f.evaluate[Id](ctx.ec.environment, args, limit - cost).map { case (result, unusedComplexity) =>
-            result.map { case (evaluated, log) =>
+          EvaluationResult.fromCoeval(f.evaluate[Id](ctx.ec.environment, args, limit - cost).map { case (result, unusedComplexity) =>
+            Right(result.map { case (evaluated, log) =>
               log.foreach { case (logItemName, logItemValue) => ctx.log(LET(logItemName, TRUE), logItemValue) }
               evaluated
-            } -> unusedComplexity
-          }
+            } -> unusedComplexity)
+          })
         case f: Simple[Environment] =>
-          Coeval((f.evaluate(ctx.ec.environment, args), limit - cost))
+          EvaluationResult.delay(Right((f.evaluate(ctx.ec.environment, args), limit - cost)))
       }
       for {
-        (result, unusedComplexity) <- EvaluationResult(
+        (result, unusedComplexity) <-
           evaluation
-            .map { case (result, evaluatedComplexity) =>
-              result.bimap(
-                {
-                  case e: ThrownError if !fixedThrownError && function.ev.isInstanceOf[Extended[Environment]] => (e, this.limit)
-                  case e: ThrownError if !fixedThrownError                                                    => (e, 0)
-                  case e                                                                                      => (e, evaluatedComplexity)
-                },
-                (_, evaluatedComplexity)
+            .flatMap { case (result, evaluatedComplexity) =>
+              EvaluationResult.fromEither(
+                result.bimap(
+                  {
+                    case e: ThrownError if !fixedThrownError && function.ev.isInstanceOf[Extended[Environment]] => (e, this.limit)
+                    case e: ThrownError if !fixedThrownError                                                    => (e, 0)
+                    case e                                                                                      => (e, evaluatedComplexity)
+                  },
+                  (_, evaluatedComplexity)
+                )
               )
             }
-            .onErrorHandleWith {
+            .handleErrorWith {
               case _: SecurityException =>
-                Coeval(Left((CommonError(s"""An access to ${function.ev} is denied"""), 0)))
+                EvaluationResult.delay(Left((CommonError(s"""An access to ${function.ev} is denied"""), 0)))
               case e: Throwable =>
                 val error = e.getMessage match {
                   case null => e.toString
                   case msg  => msg
                 }
-                Coeval(Left((CommonError(s"""An error during run ${function.ev}: ${e.getClass} $error"""), 0)))
+                EvaluationResult.delay(Left((CommonError(s"""An error during run ${function.ev}: ${e.getClass} $error"""), 0)))
             }
-        )
         _ <- update(result)
       } yield unusedComplexity
     }
@@ -140,7 +138,7 @@ class EvaluatorV2(
         .get(fc.function)
         .map(_.asInstanceOf[UserFunction[Environment]])
         .map { f =>
-          val func = FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment, startArgs))
+          val func = FUNC(f.name, f.argList, f.ev[Id](ctx.ec.environment, startArgs))
           val precalculatedLimit =
             if (newMode) {
               val cost = f.costByLibVersion(stdLibVersion).toInt
@@ -152,7 +150,7 @@ class EvaluatorV2(
         .map { case (signature, precalculatedLimitOpt, functionScopeBlocks) =>
           val argsWithExpr =
             (signature.args zip fc.args)
-              .foldRight(signature.body.deepCopy.value) { case ((argName, argValue), argsWithExpr) =>
+              .foldRight(EvaluationCopy(signature.body)) { case ((argName, argValue), argsWithExpr) =>
                 BLOCK(LET(argName, argValue), argsWithExpr)
               }
           update(argsWithExpr)
@@ -192,11 +190,11 @@ class EvaluatorV2(
 
     expr match {
       case b: BLOCK_DEF =>
-        Defer {
+        EvaluationResult.defer {
           root(
             expr = b.body,
             update = {
-              case ev: EVALUATED => Defer(update(ev))
+              case ev: EVALUATED => EvaluationResult.defer(update(ev))
               case nonEvaluated  => EvaluationResult(b.body = nonEvaluated)
             },
             limit = limit,
@@ -204,7 +202,7 @@ class EvaluatorV2(
           )
         }
       case g: GETTER =>
-        Defer {
+        EvaluationResult.defer {
           root(
             expr = g.expr,
             update = v => EvaluationResult(g.expr = v),
@@ -220,7 +218,7 @@ class EvaluatorV2(
           }
         }
       case i: IF =>
-        Defer {
+        EvaluationResult.defer {
           root(
             expr = i.cond,
             update = v => EvaluationResult(i.cond = v),
@@ -255,7 +253,7 @@ class EvaluatorV2(
         }
 
       case REF(key) =>
-        Defer {
+        EvaluationResult.defer {
           visitRef(key, update, limit, parentBlocks)
             .orElse(findGlobalVar(key, update, limit))
             .getOrElse(EvaluationResult(s"A definition of '$key' not found", limit))
@@ -299,6 +297,10 @@ class EvaluatorV2(
       let: LET,
       nextParentBlocks: List[BLOCK_DEF]
   ): EvaluationResult[Int] = {
+    if (let.valueShared) {
+      let.valueShared = false
+      let.value = EvaluationCopy(let.value)
+    }
     val result = root(
       expr = let.value,
       update = v =>
@@ -321,13 +323,10 @@ class EvaluatorV2(
   }
 
   private def logError(let: LET, r: EvaluationResult[Int]): EvaluationResult[Int] =
-    EvaluationResult(
-      r.value
-        .map(_.leftMap { case l @ (error, _) =>
-          ctx.log(let, Left(error))
-          l
-        })
-    )
+    r.transform(_.leftMap { case l @ (error, _) =>
+      ctx.log(let, Left(error))
+      l
+    })
 
   private def findGlobalVar(key: String, update: EVALUATED => EvaluationResult[Unit], limit: Int): Option[EvaluationResult[Int]] =
     ctx.ec.letDefs
@@ -369,9 +368,9 @@ object EvaluatorV2 {
     } else {
       DisabledLogEvaluationContext[Environment, Id](ctx)
     }
-    var ref = expr.deepCopy.value
+    var ref = EvaluationCopy(expr)
     logCall(loggedCtx, logExtraInfo, ref, enableExecutionLog)
-    new EvaluatorV2(
+    val evaluation = new EvaluatorV2(
       loggedCtx,
       stdLibVersion,
       limit,
@@ -383,7 +382,7 @@ object EvaluatorV2 {
     )
       .root(ref, v => EvaluationResult { ref = v }, limit, Nil)
       .map((ref, _))
-      .value
+    Coeval(evaluation.run())
       .redeem(
         e => Left((e.getMessage, limit, log.toList)),
         _.bimap(

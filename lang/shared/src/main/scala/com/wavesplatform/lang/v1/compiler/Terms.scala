@@ -36,6 +36,9 @@ object Terms {
       Eval.now(this)
   }
   case class LET(name: String, var value: EXPR) extends DECLARATION {
+    // Still the original tree's value: the evaluator copies it before evaluating it (EvaluationCopy). Not part of equality.
+    private[lang] var valueShared: Boolean = false
+
     def toStr: Coeval[String] =
       for {
         e <- value.toStr

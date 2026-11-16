@@ -1,6 +1,6 @@
 package com.wavesplatform.database
 
-import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+import com.google.common.cache.{CacheBuilder, CacheLoader, CacheStats, LoadingCache}
 import com.google.common.collect.ArrayListMultimap
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
@@ -202,6 +202,20 @@ abstract class Caches extends Blockchain, Storage, StrictLogging {
   protected def discardAlias(alias: Alias): Unit = aliasCache.invalidate(alias)
 
   protected val blockHeightCache: LoadingCache[ByteStr, Option[Int]] = cache(dbSettings.maxRollbackDepth + 1000, loadBlockHeight)
+
+  /** Guava statistics of the state caches. */
+  def cacheStats: Seq[(StateCache, CacheStats)] = Seq(
+    StateCache.Balance          -> balancesCache.stats(),
+    StateCache.LeaseBalance     -> leaseBalanceCache.stats(),
+    StateCache.AssetDescription -> assetDescriptionCache.stats(),
+    StateCache.VolumeAndFee     -> volumeAndFeeCache.stats(),
+    StateCache.AccountScript    -> scriptCache.stats(),
+    StateCache.AssetScript      -> assetScriptCache.stats(),
+    StateCache.AddressId        -> addressIdCache.stats(),
+    StateCache.AccountData      -> accountDataCache.stats(),
+    StateCache.Alias            -> aliasCache.stats(),
+    StateCache.BlockHeight      -> blockHeightCache.stats()
+  )
   protected def loadBlockHeight(blockId: ByteStr): Option[Int]
   protected def discardBlockHeight(blockId: ByteStr): Unit = blockHeightCache.invalidate(blockId)
 
