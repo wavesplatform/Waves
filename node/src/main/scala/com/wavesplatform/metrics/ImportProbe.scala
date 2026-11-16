@@ -148,7 +148,7 @@ object ImportProbe {
       cacheRates = stats.map { case (name, st) =>
         val d     = lastCacheStats.get(name).fold(st)(st.minus)
         val total = d.requestCount
-        name -> CacheRates(if (total == 0) 0 else d.hitCount * 1000.0 / total, d.missCount / seconds, d.evictionCount / seconds)
+        name -> CacheRates(if (total == 0) 0 else d.hitCount * 100.0 / total, d.missCount / seconds, d.evictionCount / seconds)
       }
       lastCacheStats = stats
       source.foreach { s =>
@@ -167,25 +167,24 @@ object ImportProbe {
     }
   }
 
-  // Probe telemetries are stored as 32-bit ints.
+  // Probe telemetries are 32-bit ints, and the UI ignored TelemetryFormat.scale (BYTES lines read 0 MB), so no line uses it:
+  // byte rates are plain bytes (under 2 GB/s) and gauges that reach gigabytes are plain MB.
   private def int(v: Double): Int = math.min(v, Int.MaxValue.toDouble).toInt
 
-  private def rate(r: Rate): Int   = { sample(); int(rates(r.ordinal)) }
-  private def kbRate(r: Rate): Int = { sample(); int(rates(r.ordinal) / 1000) }
-  // Share of one thread's time, in tenths of a percent.
-  private def timeShare(r: Rate): Int = { sample(); int(rates(r.ordinal) / 1000) }
-  // In tenths of a percent.
+  private def rate(r: Rate): Int      = { sample(); int(rates(r.ordinal)) }
+  private def bytesRate(r: Rate): Int = { sample(); int(rates(r.ordinal)) }
+  // Microseconds spent per second.
+  private def timeShare(r: Rate): Int = { sample(); int(rates(r.ordinal)) }
   private def hitRate(hit: Rate, miss: Rate): Int = {
     sample()
     val total = rates(hit.ordinal) + rates(miss.ordinal)
-    if (total == 0) 0 else int(rates(hit.ordinal) * 1000 / total)
+    if (total == 0) 0 else int(rates(hit.ordinal) * 100 / total)
   }
-  // In tenths of a percent, like hitRate.
   private def cacheHitRate(name: String): Int                       = { sample(); cacheRates.get(name).fold(0)(r => int(r.hitRate)) }
   private def cacheRate(name: String, f: CacheRates => Double): Int = { sample(); cacheRates.get(name).fold(0)(r => int(f(r))) }
   private def cf(g: CfGauge, i: Int): Int                           = { sample(); int(cfGauges(g.ordinal)(i).toDouble) }
-  private def cfKb(g: CfGauge, i: Int): Int                         = { sample(); int(cfGauges(g.ordinal)(i) / 1000.0) }
-  private def cfTotalKb(g: CfGauge): Int                            = { sample(); int(cfGauges(g.ordinal).sum / 1000.0) }
+  private def cfMb(g: CfGauge, i: Int): Int                         = { sample(); int(cfGauges(g.ordinal)(i) / 1e6) }
+  private def cfTotalMb(g: CfGauge): Int                            = { sample(); int(cfGauges(g.ordinal).sum / 1e6) }
 
   @static @Telemetry("Import height") def importHeight(): Int                                                         = height
   @static @Telemetry(value = "Import blocks", format = new TelemetryFormat(PER_SECOND)) def blocksPerSecond(): Int    = { sample(); int(blockRate) }
@@ -198,33 +197,33 @@ object ImportProbe {
   @static @Telemetry(value = "RocksDB keys written", format = new TelemetryFormat(PER_SECOND)) def keysWritten(): Int = rate(Rate.KeysWritten)
   @static @Telemetry(value = "RocksDB table opens", format = new TelemetryFormat(PER_SECOND)) def tableOpens(): Int   = rate(Rate.TableOpens)
 
-  private final val Time = "RocksDB time (100% = one thread)"
-  @static @Telemetry(value = Time, line = "get", format = new TelemetryFormat(value = PERCENT, scale = 1)) def getTime(): Int = timeShare(
+  private final val Time = "RocksDB time per second (1 s = one busy thread)"
+  @static @Telemetry(value = Time, line = "get", format = new TelemetryFormat(MICROSECONDS)) def getTime(): Int = timeShare(
     Rate.GetMicros
   )
-  @static @Telemetry(value = Time, line = "multiGet", format = new TelemetryFormat(value = PERCENT, scale = 1)) def multiGetTime(): Int = timeShare(
+  @static @Telemetry(value = Time, line = "multiGet", format = new TelemetryFormat(MICROSECONDS)) def multiGetTime(): Int = timeShare(
     Rate.MultiGetMicros
   )
-  @static @Telemetry(value = Time, line = "write", format = new TelemetryFormat(value = PERCENT, scale = 1)) def writeTime(): Int = timeShare(
+  @static @Telemetry(value = Time, line = "write", format = new TelemetryFormat(MICROSECONDS)) def writeTime(): Int = timeShare(
     Rate.WriteMicros
   )
-  @static @Telemetry(value = Time, line = "seek", format = new TelemetryFormat(value = PERCENT, scale = 1)) def seekTime(): Int = timeShare(
+  @static @Telemetry(value = Time, line = "seek", format = new TelemetryFormat(MICROSECONDS)) def seekTime(): Int = timeShare(
     Rate.SeekMicros
   )
-  @static @Telemetry(value = Time, line = "stall", format = new TelemetryFormat(value = PERCENT, scale = 1)) def stallTime(): Int = timeShare(
+  @static @Telemetry(value = Time, line = "stall", format = new TelemetryFormat(MICROSECONDS)) def stallTime(): Int = timeShare(
     Rate.StallMicros
   )
-  @static @Telemetry(value = Time, line = "SST read, all threads", format = new TelemetryFormat(value = PERCENT, scale = 1)) def sstReadTime(): Int =
+  @static @Telemetry(value = Time, line = "SST read, all threads", format = new TelemetryFormat(MICROSECONDS)) def sstReadTime(): Int =
     timeShare(Rate.SstReadMicros)
-  @static @Telemetry(value = Time, line = "table open IO, all threads", format = new TelemetryFormat(value = PERCENT, scale = 1)) def tableOpenTime()
-      : Int = timeShare(Rate.TableOpenMicros)
+  @static @Telemetry(value = Time, line = "table open IO, all threads", format = new TelemetryFormat(MICROSECONDS)) def tableOpenTime(): Int =
+    timeShare(Rate.TableOpenMicros)
 
   private final val Hits = "RocksDB block cache hit rate"
-  @static @Telemetry(value = Hits, line = "data", format = new TelemetryFormat(value = PERCENT, scale = 1)) def dataHits(): Int =
+  @static @Telemetry(value = Hits, line = "data", format = new TelemetryFormat(PERCENT)) def dataHits(): Int =
     hitRate(Rate.DataHit, Rate.DataMiss)
-  @static @Telemetry(value = Hits, line = "index", format = new TelemetryFormat(value = PERCENT, scale = 1)) def indexHits(): Int =
+  @static @Telemetry(value = Hits, line = "index", format = new TelemetryFormat(PERCENT)) def indexHits(): Int =
     hitRate(Rate.IndexHit, Rate.IndexMiss)
-  @static @Telemetry(value = Hits, line = "filter", format = new TelemetryFormat(value = PERCENT, scale = 1)) def filterHits(): Int =
+  @static @Telemetry(value = Hits, line = "filter", format = new TelemetryFormat(PERCENT)) def filterHits(): Int =
     hitRate(Rate.FilterHit, Rate.FilterMiss)
 
   private final val Gets                                                                                                = "RocksDB gets served by"
@@ -236,21 +235,15 @@ object ImportProbe {
     Rate.FilterUseful
   )
 
-  private final val Io = "RocksDB IO per second"
-  @static @Telemetry(value = Io, line = "written", format = new TelemetryFormat(value = BYTES, scale = -3)) def bytesWritten(): Int = kbRate(
-    Rate.BytesWritten
-  )
-  @static @Telemetry(value = Io, line = "read by gets", format = new TelemetryFormat(value = BYTES, scale = -3)) def bytesRead(): Int = kbRate(
-    Rate.BytesRead
-  )
-  @static @Telemetry(value = Io, line = "WAL", format = new TelemetryFormat(value = BYTES, scale = -3)) def walBytes(): Int = kbRate(Rate.WalBytes)
-  @static @Telemetry(value = Io, line = "flush", format = new TelemetryFormat(value = BYTES, scale = -3)) def flushBytes(): Int = kbRate(
-    Rate.FlushBytes
-  )
-  @static @Telemetry(value = Io, line = "compaction read", format = new TelemetryFormat(value = BYTES, scale = -3)) def compactReadBytes(): Int =
-    kbRate(Rate.CompactReadBytes)
-  @static @Telemetry(value = Io, line = "compaction write", format = new TelemetryFormat(value = BYTES, scale = -3)) def compactWriteBytes(): Int =
-    kbRate(Rate.CompactWriteBytes)
+  private final val Io                                                                                            = "RocksDB IO per second"
+  @static @Telemetry(value = Io, line = "written", format = new TelemetryFormat(BYTES)) def bytesWritten(): Int   = bytesRate(Rate.BytesWritten)
+  @static @Telemetry(value = Io, line = "read by gets", format = new TelemetryFormat(BYTES)) def bytesRead(): Int = bytesRate(Rate.BytesRead)
+  @static @Telemetry(value = Io, line = "WAL", format = new TelemetryFormat(BYTES)) def walBytes(): Int           = bytesRate(Rate.WalBytes)
+  @static @Telemetry(value = Io, line = "flush", format = new TelemetryFormat(BYTES)) def flushBytes(): Int       = bytesRate(Rate.FlushBytes)
+  @static @Telemetry(value = Io, line = "compaction read", format = new TelemetryFormat(BYTES)) def compactReadBytes(): Int =
+    bytesRate(Rate.CompactReadBytes)
+  @static @Telemetry(value = Io, line = "compaction write", format = new TelemetryFormat(BYTES)) def compactWriteBytes(): Int =
+    bytesRate(Rate.CompactWriteBytes)
 
   private final val L0                                                         = "RocksDB L0 files"
   @static @Telemetry(value = L0, line = "default") def l0Default(): Int        = cf(CfGauge.L0Files, 0)
@@ -259,62 +252,65 @@ object ImportProbe {
   @static @Telemetry(value = L0, line = "tx-snapshot") def l0TxSnapshot(): Int = cf(CfGauge.L0Files, 3)
   @static @Telemetry(value = L0, line = "api") def l0Api(): Int                = cf(CfGauge.L0Files, 4)
 
-  private final val Pending = "RocksDB pending compaction"
-  @static @Telemetry(value = Pending, line = "default", format = new TelemetryFormat(value = BYTES, scale = -3)) def pendingDefault(): Int =
-    cfKb(CfGauge.PendingCompaction, 0)
-  @static @Telemetry(value = Pending, line = "tx-meta", format = new TelemetryFormat(value = BYTES, scale = -3)) def pendingTxMeta(): Int =
-    cfKb(CfGauge.PendingCompaction, 1)
-  @static @Telemetry(value = Pending, line = "tx", format = new TelemetryFormat(value = BYTES, scale = -3)) def pendingTx(): Int =
-    cfKb(CfGauge.PendingCompaction, 2)
-  @static @Telemetry(value = Pending, line = "tx-snapshot", format = new TelemetryFormat(value = BYTES, scale = -3)) def pendingTxSnapshot(): Int =
-    cfKb(CfGauge.PendingCompaction, 3)
-  @static @Telemetry(value = Pending, line = "api", format = new TelemetryFormat(value = BYTES, scale = -3)) def pendingApi(): Int =
-    cfKb(CfGauge.PendingCompaction, 4)
+  private final val Pending = "RocksDB pending compaction, MB"
+  @static @Telemetry(value = Pending, line = "default") def pendingDefault(): Int =
+    cfMb(CfGauge.PendingCompaction, 0)
+  @static @Telemetry(value = Pending, line = "tx-meta") def pendingTxMeta(): Int =
+    cfMb(CfGauge.PendingCompaction, 1)
+  @static @Telemetry(value = Pending, line = "tx") def pendingTx(): Int =
+    cfMb(CfGauge.PendingCompaction, 2)
+  @static @Telemetry(value = Pending, line = "tx-snapshot") def pendingTxSnapshot(): Int =
+    cfMb(CfGauge.PendingCompaction, 3)
+  @static @Telemetry(value = Pending, line = "api") def pendingApi(): Int =
+    cfMb(CfGauge.PendingCompaction, 4)
 
   private final val Jobs                                                               = "RocksDB background jobs"
   @static @Telemetry(value = Jobs, line = "compactions") def runningCompactions(): Int = { sample(); compactions.toInt }
   @static @Telemetry(value = Jobs, line = "flushes") def runningFlushes(): Int         = { sample(); flushes.toInt }
 
-  private final val Memory = "RocksDB memory"
-  @static @Telemetry(value = Memory, line = "block caches", format = new TelemetryFormat(value = BYTES, scale = -3)) def blockCacheUsage(): Int =
-    cfTotalKb(CfGauge.BlockCacheUsage)
-  @static @Telemetry(value = Memory, line = "memtables", format = new TelemetryFormat(value = BYTES, scale = -3)) def memtables(): Int = cfTotalKb(
-    CfGauge.Memtables
-  )
+  private final val Memory = "RocksDB memory, MB"
+  @static @Telemetry(value = Memory, line = "block caches") def blockCacheUsage(): Int =
+    cfTotalMb(CfGauge.BlockCacheUsage)
+  @static @Telemetry(value = Memory, line = "memtables") def memtables(): Int = cfTotalMb(CfGauge.Memtables)
 
   private final val CacheHits = "State cache hit rate"
-  @static @Telemetry(value = CacheHits, line = "balance", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsBalance(): Int =
+  @static @Telemetry(value = CacheHits, line = "balance", format = new TelemetryFormat(PERCENT)) def cacheHitsBalance(): Int =
     cacheHitRate("balance")
-  @static @Telemetry(value = CacheHits, line = "leaseBalance", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsLeaseBalance()
-      : Int = cacheHitRate("leaseBalance")
+  @static @Telemetry(value = CacheHits, line = "leaseBalance", format = new TelemetryFormat(PERCENT)) def cacheHitsLeaseBalance(): Int = cacheHitRate(
+    "leaseBalance"
+  )
   @static @Telemetry(
     value = CacheHits,
     line = "assetDescription",
-    format = new TelemetryFormat(value = PERCENT, scale = 1)
+    format = new TelemetryFormat(PERCENT)
   ) def cacheHitsAssetDescription(): Int = cacheHitRate("assetDescription")
-  @static @Telemetry(value = CacheHits, line = "volumeAndFee", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsVolumeAndFee()
-      : Int = cacheHitRate("volumeAndFee")
-  @static @Telemetry(value = CacheHits, line = "accountScript", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsAccountScript()
-      : Int = cacheHitRate("accountScript")
-  @static @Telemetry(value = CacheHits, line = "assetScript", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsAssetScript()
-      : Int = cacheHitRate("assetScript")
-  @static @Telemetry(value = CacheHits, line = "addressId", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsAddressId(): Int =
+  @static @Telemetry(value = CacheHits, line = "volumeAndFee", format = new TelemetryFormat(PERCENT)) def cacheHitsVolumeAndFee(): Int = cacheHitRate(
+    "volumeAndFee"
+  )
+  @static @Telemetry(value = CacheHits, line = "accountScript", format = new TelemetryFormat(PERCENT)) def cacheHitsAccountScript(): Int =
+    cacheHitRate("accountScript")
+  @static @Telemetry(value = CacheHits, line = "assetScript", format = new TelemetryFormat(PERCENT)) def cacheHitsAssetScript(): Int = cacheHitRate(
+    "assetScript"
+  )
+  @static @Telemetry(value = CacheHits, line = "addressId", format = new TelemetryFormat(PERCENT)) def cacheHitsAddressId(): Int =
     cacheHitRate("addressId")
-  @static @Telemetry(value = CacheHits, line = "accountData", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsAccountData()
-      : Int = cacheHitRate("accountData")
-  @static @Telemetry(value = CacheHits, line = "alias", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsAlias(): Int =
+  @static @Telemetry(value = CacheHits, line = "accountData", format = new TelemetryFormat(PERCENT)) def cacheHitsAccountData(): Int = cacheHitRate(
+    "accountData"
+  )
+  @static @Telemetry(value = CacheHits, line = "alias", format = new TelemetryFormat(PERCENT)) def cacheHitsAlias(): Int =
     cacheHitRate("alias")
-  @static @Telemetry(value = CacheHits, line = "blockHeight", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsBlockHeight()
-      : Int = cacheHitRate("blockHeight")
+  @static @Telemetry(value = CacheHits, line = "blockHeight", format = new TelemetryFormat(PERCENT)) def cacheHitsBlockHeight(): Int = cacheHitRate(
+    "blockHeight"
+  )
   @static @Telemetry(
     value = CacheHits,
     line = "balanceAtHeight",
-    format = new TelemetryFormat(value = PERCENT, scale = 1)
+    format = new TelemetryFormat(PERCENT)
   ) def cacheHitsBalanceAtHeight(): Int = cacheHitRate("balanceAtHeight")
   @static @Telemetry(
     value = CacheHits,
     line = "leaseBalanceAtHeight",
-    format = new TelemetryFormat(value = PERCENT, scale = 1)
+    format = new TelemetryFormat(PERCENT)
   ) def cacheHitsLeaseBalanceAtHeight(): Int = cacheHitRate("leaseBalanceAtHeight")
 
   private final val CacheMisses = "State cache misses"
