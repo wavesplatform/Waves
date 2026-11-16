@@ -5,6 +5,8 @@ import scalapb.compiler.Version.scalapbVersion
 object Dependencies {
   private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.20.Final"
 
+  private def jlineModule(module: String) = "org.jline" % s"jline-$module" % "4.7.0"
+
   val gProtoVersion = "4.36.2"
   val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
   val overrides = Def.setting(
@@ -27,6 +29,11 @@ object Dependencies {
       jacksonModule("datatype", "datatype-jsr310"),
       "tools.jackson.core" % "jackson-core"     % "3.3.0",
       "tools.jackson.core" % "jackson-databind" % "3.3.0",
+      // Scala 3.10.1 REPL toolchain ships jline 4.4.8; 4.5.0 fixes GHSA-rcc3-r7r7-qvg2 and GHSA-p73x-fv3x-mvv6. Keep all four modules on one version
+      jlineModule("reader"),
+      jlineModule("terminal"),
+      jlineModule("terminal-jni"),
+      jlineModule("native"),
       gProto
     )
   )
