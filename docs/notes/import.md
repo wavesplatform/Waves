@@ -58,6 +58,8 @@ To record it, start the agent from a config file as above and add a probe record
 
 Script probes (`<scriptProbes>` in the session) did not record when defined by hand in an offline config file: with JProfiler 16.3 neither the probe nor an error appeared, with or without a `startProbeRecording` for it. Per-dApp RIDE time needs them defined in the JProfiler UI or through the MCP server instead (`InvokeScriptTransactionDiff$.apply`, the transaction is `param4`), or an embedded payload.
 
+Past mainnet height 4.5M RIDE's `wavesBalance()` was about 8% of the appender on macOS: it computes the generating balance (the minimum over 1,000 blocks of balance history) on every call, even when the script reads only `available`, and blocks query the same few dApp addresses again and again. `RocksDBWriter` keeps the persisted part of `balanceSnapshots` per address, `from` and target height until the next append or rollback; the import probe's `balanceSnapshots` cache lines show its hit rate.
+
 ## Snapshot import (`-s`)
 
 Applying snapshots skips `BlockDiffer.prepareCaches`, so every account the block touches is read with its own `RocksDB.get` in `Caches.append`, and those point reads mostly hit SST files. On the slice above that made snapshot import over four times slower than executing the transactions. Batch-loading the accounts named in the snapshots (balances, lease balances, order fills) brought it from 1343 s to 228 s; not merged yet.

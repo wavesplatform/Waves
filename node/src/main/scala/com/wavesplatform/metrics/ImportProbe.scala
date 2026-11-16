@@ -312,6 +312,8 @@ object ImportProbe {
     line = "leaseBalanceAtHeight",
     format = new TelemetryFormat(PERCENT)
   ) def cacheHitsLeaseBalanceAtHeight(): Int = cacheHitRate("leaseBalanceAtHeight")
+  @static @Telemetry(value = CacheHits, line = "balanceSnapshots", format = new TelemetryFormat(PERCENT)) def cacheHitsBalanceSnapshots(): Int =
+    cacheHitRate("balanceSnapshots")
 
   private final val CacheMisses = "State cache misses"
   @static @Telemetry(value = CacheMisses, line = "balance", format = new TelemetryFormat(PER_SECOND)) def cacheMissesBalance(): Int =
@@ -341,6 +343,8 @@ object ImportProbe {
     line = "leaseBalanceAtHeight",
     format = new TelemetryFormat(PER_SECOND)
   ) def cacheMissesLeaseBalanceAtHeight(): Int = cacheRate("leaseBalanceAtHeight", _.misses)
+  @static @Telemetry(value = CacheMisses, line = "balanceSnapshots", format = new TelemetryFormat(PER_SECOND)) def cacheMissesBalanceSnapshots()
+      : Int = cacheRate("balanceSnapshots", _.misses)
 
   private final val CacheEvictions = "State cache evictions"
   @static @Telemetry(value = CacheEvictions, line = "balance", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsBalance(): Int =
@@ -370,4 +374,6 @@ object ImportProbe {
     line = "leaseBalanceAtHeight",
     format = new TelemetryFormat(PER_SECOND)
   ) def cacheEvictionsLeaseBalanceAtHeight(): Int = cacheRate("leaseBalanceAtHeight", _.evictions)
+  @static @Telemetry(value = CacheEvictions, line = "balanceSnapshots", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsBalanceSnapshots()
+      : Int = cacheRate("balanceSnapshots", _.evictions)
 }

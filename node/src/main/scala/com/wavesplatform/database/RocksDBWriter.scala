@@ -513,6 +513,7 @@ class RocksDBWriter(
       conflictGenerators: Seq[GeneratorIndex],
       stateHash: StateHashBuilder.Result
   ): Unit = {
+    balanceSnapshotsCache.invalidateAll()
     log.trace(s"Persisting block ${blockMeta.id} at height $height")
     readWrite { rw =>
       val expiredKeys = new ArrayBuffer[Array[Byte]]
@@ -1001,6 +1002,7 @@ class RocksDBWriter(
   }
 
   override protected def doRollback(targetHeight: Height): DiscardedBlocks = {
+    balanceSnapshotsCache.invalidateAll()
     val targetBlockId = readOnly(_.get(Keys.blockMetaAt(targetHeight)))
       .map(_.id)
       .getOrElse(throw new IllegalArgumentException(s"No block at height $targetHeight"))
@@ -1392,7 +1394,11 @@ class RocksDBWriter(
     .build[HeightAndAddress, LeaseBalanceNode]()
 
   override def cacheStats: Seq[(String, CacheStats)] =
-    super.cacheStats ++ Seq("balanceAtHeight" -> balanceAtHeightCache.stats(), "leaseBalanceAtHeight" -> leaseBalanceAtHeightCache.stats())
+    super.cacheStats ++ Seq(
+      "balanceAtHeight"      -> balanceAtHeightCache.stats(),
+      "leaseBalanceAtHeight" -> leaseBalanceAtHeightCache.stats(),
+      "balanceSnapshots"     -> balanceSnapshotsCache.stats()
+    )
 
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
     db.get(Keys.addressId(address)).flatMap { aid =>
@@ -1408,8 +1414,27 @@ class RocksDBWriter(
     }
   }
 
-  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readOnly { db =>
+  // RIDE's wavesBalance() computes the generating balance on every call, so a block asks for the same addresses again and again.
+  // Persisted history only changes on append and rollback, which clear this; both run under the updater's write lock, and every
+  // read goes through its read lock.
+  private val balanceSnapshotsCache = CacheBuilder
+    .newBuilder()
+    .maximumSize(1000)
+    .recordStats()
+    .build[(Address, Int, Height), Seq[BalanceSnapshot]]()
+
+  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
     val toHeight = Height(to.flatMap(this.heightOf).getOrElse(this.height))
+    val key      = (address, from, toHeight)
+    // Not Cache.get(key, loader): it would wrap what the loader throws in an UncheckedExecutionException.
+    Option(balanceSnapshotsCache.getIfPresent(key)).getOrElse {
+      val snapshots = loadBalanceSnapshots(address, from, toHeight)
+      balanceSnapshotsCache.put(key, snapshots)
+      snapshots
+    }
+  }
+
+  private def loadBalanceSnapshots(address: Address, from: Int, toHeight: Height): Seq[BalanceSnapshot] = readOnly { db =>
 
     val depositPeriods = for {
       activation <- this.featureActivationHeight(BlockchainFeatures.DeterministicFinality)
