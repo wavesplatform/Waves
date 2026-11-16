@@ -52,11 +52,12 @@ object ImportProbe {
     case TableOpenMicros   extends Rate(_.getHistogramData(HistogramType.TABLE_OPEN_IO_MICROS).getSum)
   }
 
-  private enum CfGauge(val property: String) {
-    case L0Files           extends CfGauge("rocksdb.num-files-at-level0")
-    case PendingCompaction extends CfGauge("rocksdb.estimate-pending-compaction-bytes")
-    case BlockCacheUsage   extends CfGauge("rocksdb.block-cache-usage")
-    case Memtables         extends CfGauge("rocksdb.cur-size-all-mem-tables")
+  private enum CfGauge(val read: (RocksDB, ColumnFamilyHandle) => Long) {
+    // A string property: getLongProperty only serves the integer ones and throws NotFound for it.
+    case L0Files           extends CfGauge(_.getProperty(_, "rocksdb.num-files-at-level0").toLong)
+    case PendingCompaction extends CfGauge(_.getLongProperty(_, "rocksdb.estimate-pending-compaction-bytes"))
+    case BlockCacheUsage   extends CfGauge(_.getLongProperty(_, "rocksdb.block-cache-usage"))
+    case Memtables         extends CfGauge(_.getLongProperty(_, "rocksdb.cur-size-all-mem-tables"))
   }
 
   // In the order of RDB's column families: default, tx-meta, tx, tx-snapshot, api.
@@ -140,7 +141,7 @@ object ImportProbe {
             lastRates(r.ordinal) = v
           }
         }
-        for (g <- CfGauge.values; (cf, i) <- s.cfs.zipWithIndex) cfGauges(g.ordinal)(i) = s.db.getLongProperty(cf, g.property)
+        for (g <- CfGauge.values; (cf, i) <- s.cfs.zipWithIndex) cfGauges(g.ordinal)(i) = g.read(s.db, cf)
         compactions = s.db.getLongProperty("rocksdb.num-running-compactions")
         flushes = s.db.getLongProperty("rocksdb.num-running-flushes")
       }
