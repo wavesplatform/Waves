@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits.{catsSyntaxOption, catsSyntaxSemigroup, toFoldableOps}
+import cats.implicits.{catsSyntaxOption, catsSyntaxSemigroup}
 import cats.syntax.either.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
@@ -50,6 +50,10 @@ object BlockDiffer {
   case class TxFeeInfo(feeAsset: Asset, feeAmount: Long, carry: Long, wavesFee: Long)
 
   val CurrentBlockFeePart: Fraction = Fraction(2, 5)
+
+  // Not cats' foldM: for a Seq it reads elements by index, which is quadratic on the List that holds block transactions.
+  private def sumPortfolios(portfolios: Seq[Portfolio]): Either[String, Portfolio] =
+    portfolios.foldLeft(Portfolio.empty.asRight[String])((acc, p) => acc.flatMap(_.combine(p)))
 
   def fromBlock(
       blockchain: Blockchain,
@@ -136,12 +140,10 @@ object BlockDiffer {
         // it's important to combine tx fee fractions (instead of getting a fraction of the combined tx fee)
         // so that we end up with the same value as when computing per-transaction fee part
         // during microblock processing below
-        pb.transactionData
-          .map { t =>
-            val pf = Portfolio.build(t.assetFee)
-            pf.minus(pf.multiply(CurrentBlockFeePart))
-          }
-          .foldM(Portfolio.empty)(_.combine(_))
+        sumPortfolios(pb.transactionData.map { t =>
+          val pf = Portfolio.build(t.assetFee)
+          pf.minus(pf.multiply(CurrentBlockFeePart))
+        })
       }
       else
         Right(Portfolio.empty)
@@ -149,7 +151,7 @@ object BlockDiffer {
     val initialFeeFromThisBlockE =
       if (stateHeight < ngHeight) {
         // before NG activation, miner immediately received all the fee from the block
-        block.transactionData.map(_.assetFee).map(Portfolio.build).foldM(Portfolio.empty)(_.combine(_))
+        sumPortfolios(block.transactionData.map(t => Portfolio.build(t.assetFee)))
       } else
         Right(Portfolio.empty)
 

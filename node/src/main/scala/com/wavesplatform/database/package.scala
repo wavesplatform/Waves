@@ -448,6 +448,7 @@ package object database {
       val rw    = new RW(db, readOptions, batch)
       try {
         val r = f(rw)
+        rw.flush()
         db.write(writeOptions, batch)
         r
       } finally batch.close()
