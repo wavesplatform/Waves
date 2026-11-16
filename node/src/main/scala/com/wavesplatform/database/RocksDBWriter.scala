@@ -1,7 +1,7 @@
 package com.wavesplatform.database
 
 import cats.implicits.catsSyntaxNestedBitraverse
-import com.google.common.cache.CacheBuilder
+import com.google.common.cache.{CacheBuilder, CacheStats}
 import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
@@ -1390,6 +1390,9 @@ class RocksDBWriter(
     .maximumSize(100000)
     .recordStats()
     .build[HeightAndAddress, LeaseBalanceNode]()
+
+  override def cacheStats: Seq[(String, CacheStats)] =
+    super.cacheStats ++ Seq("balanceAtHeight" -> balanceAtHeightCache.stats(), "leaseBalanceAtHeight" -> leaseBalanceAtHeightCache.stats())
 
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
     db.get(Keys.addressId(address)).flatMap { aid =>

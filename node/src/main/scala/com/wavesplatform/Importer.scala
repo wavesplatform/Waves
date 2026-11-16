@@ -428,9 +428,9 @@ object Importer extends ScorexLogging {
     val time      = Time(settings.ntpServer)
 
     val rdb = RDB.open(settings.dbSettings)
-    ImportProbe.watch(rdb)
     val (blockchainUpdater, rdbWriter) =
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
+    ImportProbe.watch(rdb, () => rdbWriter.cacheStats)
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender: AppendBlock = {

@@ -3,6 +3,7 @@ package com.wavesplatform.metrics
 import com.jprofiler.api.probe.embedded.telemetry.{Telemetry, TelemetryFormat, TelemetryUnit}
 import com.jprofiler.api.probe.embedded.{Payload, PayloadProbe}
 import com.wavesplatform.database.RDB
+import com.google.common.cache.CacheStats
 import org.rocksdb.{ColumnFamilyHandle, HistogramType, RocksDB, Statistics, TickerType}
 
 import scala.annotation.static
@@ -72,17 +73,22 @@ object ImportProbe {
   private var rangeStart           = -1
   private var rangeLabel           = ""
 
+  private final case class CacheRates(hitRate: Double, misses: Double, evictions: Double)
+
   // Guarded by this object's lock.
-  private var source: Option[Source] = None
-  private var lastNanos              = System.nanoTime()
-  private var lastComplexity         = 0L
-  private var complexityRate         = 0.0
-  private var lastBlocks, lastTxs    = 0L
-  private var blockRate, txRate      = 0.0
-  private val lastRates              = new Array[Long](Rate.values.length)
-  private val rates                  = new Array[Double](Rate.values.length)
-  private val cfGauges               = Array.ofDim[Long](CfGauge.values.length, 5)
-  private var compactions, flushes   = 0L
+  private var cacheSource: () => Seq[(String, CacheStats)] = () => Nil
+  private var lastCacheStats                               = Map.empty[String, CacheStats]
+  private var cacheRates                                   = Map.empty[String, CacheRates]
+  private var source: Option[Source]                       = None
+  private var lastNanos                                    = System.nanoTime()
+  private var lastComplexity                               = 0L
+  private var complexityRate                               = 0.0
+  private var lastBlocks, lastTxs                          = 0L
+  private var blockRate, txRate                            = 0.0
+  private val lastRates                                    = new Array[Long](Rate.values.length)
+  private val rates                                        = new Array[Double](Rate.values.length)
+  private val cfGauges                                     = Array.ofDim[Long](CfGauge.values.length, 5)
+  private var compactions, flushes                         = 0L
 
   def appendBlock[A](height: Int, txCount: Int)(append: => A): A = {
     Payload.enter(classOf[ImportProbe])
@@ -107,7 +113,9 @@ object ImportProbe {
     rangeLabel
   }
 
-  def watch(rdb: RDB): Unit = synchronized {
+  def watch(rdb: RDB, caches: () => Seq[(String, CacheStats)]): Unit = synchronized {
+    cacheSource = caches
+    lastCacheStats = caches().toMap
     val s = Source(
       rdb.db,
       rdb.statistics,
@@ -118,7 +126,10 @@ object ImportProbe {
   }
 
   /** Call before closing the database: a telemetry poll must not reach a closed RocksDB handle. */
-  def unwatch(): Unit = synchronized { source = None }
+  def unwatch(): Unit = synchronized {
+    source = None
+    cacheSource = () => Nil
+  }
 
   private def sample(): Unit = synchronized {
     val now = System.nanoTime()
@@ -133,6 +144,13 @@ object ImportProbe {
       val c = complexity
       complexityRate = (c - lastComplexity) / seconds
       lastComplexity = c
+      val stats = cacheSource().toMap
+      cacheRates = stats.map { case (name, st) =>
+        val d     = lastCacheStats.get(name).fold(st)(st.minus)
+        val total = d.requestCount
+        name -> CacheRates(if (total == 0) 0 else d.hitCount * 1000.0 / total, d.missCount / seconds, d.evictionCount / seconds)
+      }
+      lastCacheStats = stats
       source.foreach { s =>
         s.statistics.foreach { st =>
           Rate.values.foreach { r =>
@@ -162,9 +180,12 @@ object ImportProbe {
     val total = rates(hit.ordinal) + rates(miss.ordinal)
     if (total == 0) 0 else int(rates(hit.ordinal) * 1000 / total)
   }
-  private def cf(g: CfGauge, i: Int): Int   = { sample(); int(cfGauges(g.ordinal)(i).toDouble) }
-  private def cfKb(g: CfGauge, i: Int): Int = { sample(); int(cfGauges(g.ordinal)(i) / 1000.0) }
-  private def cfTotalKb(g: CfGauge): Int    = { sample(); int(cfGauges(g.ordinal).sum / 1000.0) }
+  // In tenths of a percent, like hitRate.
+  private def cacheHitRate(name: String): Int                       = { sample(); cacheRates.get(name).fold(0)(r => int(r.hitRate)) }
+  private def cacheRate(name: String, f: CacheRates => Double): Int = { sample(); cacheRates.get(name).fold(0)(r => int(f(r))) }
+  private def cf(g: CfGauge, i: Int): Int                           = { sample(); int(cfGauges(g.ordinal)(i).toDouble) }
+  private def cfKb(g: CfGauge, i: Int): Int                         = { sample(); int(cfGauges(g.ordinal)(i) / 1000.0) }
+  private def cfTotalKb(g: CfGauge): Int                            = { sample(); int(cfGauges(g.ordinal).sum / 1000.0) }
 
   @static @Telemetry("Import height") def importHeight(): Int                                                         = height
   @static @Telemetry(value = "Import blocks", format = new TelemetryFormat(PER_SECOND)) def blocksPerSecond(): Int    = { sample(); int(blockRate) }
@@ -260,4 +281,97 @@ object ImportProbe {
   @static @Telemetry(value = Memory, line = "memtables", format = new TelemetryFormat(value = BYTES, scale = -3)) def memtables(): Int = cfTotalKb(
     CfGauge.Memtables
   )
+
+  private final val CacheHits = "State cache hit rate"
+  @static @Telemetry(value = CacheHits, line = "balance", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsBalance(): Int =
+    cacheHitRate("balance")
+  @static @Telemetry(value = CacheHits, line = "leaseBalance", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsLeaseBalance()
+      : Int = cacheHitRate("leaseBalance")
+  @static @Telemetry(
+    value = CacheHits,
+    line = "assetDescription",
+    format = new TelemetryFormat(value = PERCENT, scale = 1)
+  ) def cacheHitsAssetDescription(): Int = cacheHitRate("assetDescription")
+  @static @Telemetry(value = CacheHits, line = "volumeAndFee", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsVolumeAndFee()
+      : Int = cacheHitRate("volumeAndFee")
+  @static @Telemetry(value = CacheHits, line = "accountScript", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsAccountScript()
+      : Int = cacheHitRate("accountScript")
+  @static @Telemetry(value = CacheHits, line = "assetScript", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsAssetScript()
+      : Int = cacheHitRate("assetScript")
+  @static @Telemetry(value = CacheHits, line = "addressId", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsAddressId(): Int =
+    cacheHitRate("addressId")
+  @static @Telemetry(value = CacheHits, line = "accountData", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsAccountData()
+      : Int = cacheHitRate("accountData")
+  @static @Telemetry(value = CacheHits, line = "alias", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsAlias(): Int =
+    cacheHitRate("alias")
+  @static @Telemetry(value = CacheHits, line = "blockHeight", format = new TelemetryFormat(value = PERCENT, scale = 1)) def cacheHitsBlockHeight()
+      : Int = cacheHitRate("blockHeight")
+  @static @Telemetry(
+    value = CacheHits,
+    line = "balanceAtHeight",
+    format = new TelemetryFormat(value = PERCENT, scale = 1)
+  ) def cacheHitsBalanceAtHeight(): Int = cacheHitRate("balanceAtHeight")
+  @static @Telemetry(
+    value = CacheHits,
+    line = "leaseBalanceAtHeight",
+    format = new TelemetryFormat(value = PERCENT, scale = 1)
+  ) def cacheHitsLeaseBalanceAtHeight(): Int = cacheHitRate("leaseBalanceAtHeight")
+
+  private final val CacheMisses = "State cache misses"
+  @static @Telemetry(value = CacheMisses, line = "balance", format = new TelemetryFormat(PER_SECOND)) def cacheMissesBalance(): Int =
+    cacheRate("balance", _.misses)
+  @static @Telemetry(value = CacheMisses, line = "leaseBalance", format = new TelemetryFormat(PER_SECOND)) def cacheMissesLeaseBalance(): Int =
+    cacheRate("leaseBalance", _.misses)
+  @static @Telemetry(value = CacheMisses, line = "assetDescription", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAssetDescription()
+      : Int = cacheRate("assetDescription", _.misses)
+  @static @Telemetry(value = CacheMisses, line = "volumeAndFee", format = new TelemetryFormat(PER_SECOND)) def cacheMissesVolumeAndFee(): Int =
+    cacheRate("volumeAndFee", _.misses)
+  @static @Telemetry(value = CacheMisses, line = "accountScript", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAccountScript(): Int =
+    cacheRate("accountScript", _.misses)
+  @static @Telemetry(value = CacheMisses, line = "assetScript", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAssetScript(): Int =
+    cacheRate("assetScript", _.misses)
+  @static @Telemetry(value = CacheMisses, line = "addressId", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAddressId(): Int =
+    cacheRate("addressId", _.misses)
+  @static @Telemetry(value = CacheMisses, line = "accountData", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAccountData(): Int =
+    cacheRate("accountData", _.misses)
+  @static @Telemetry(value = CacheMisses, line = "alias", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAlias(): Int =
+    cacheRate("alias", _.misses)
+  @static @Telemetry(value = CacheMisses, line = "blockHeight", format = new TelemetryFormat(PER_SECOND)) def cacheMissesBlockHeight(): Int =
+    cacheRate("blockHeight", _.misses)
+  @static @Telemetry(value = CacheMisses, line = "balanceAtHeight", format = new TelemetryFormat(PER_SECOND)) def cacheMissesBalanceAtHeight(): Int =
+    cacheRate("balanceAtHeight", _.misses)
+  @static @Telemetry(
+    value = CacheMisses,
+    line = "leaseBalanceAtHeight",
+    format = new TelemetryFormat(PER_SECOND)
+  ) def cacheMissesLeaseBalanceAtHeight(): Int = cacheRate("leaseBalanceAtHeight", _.misses)
+
+  private final val CacheEvictions = "State cache evictions"
+  @static @Telemetry(value = CacheEvictions, line = "balance", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsBalance(): Int =
+    cacheRate("balance", _.evictions)
+  @static @Telemetry(value = CacheEvictions, line = "leaseBalance", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsLeaseBalance(): Int =
+    cacheRate("leaseBalance", _.evictions)
+  @static @Telemetry(value = CacheEvictions, line = "assetDescription", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAssetDescription()
+      : Int = cacheRate("assetDescription", _.evictions)
+  @static @Telemetry(value = CacheEvictions, line = "volumeAndFee", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsVolumeAndFee(): Int =
+    cacheRate("volumeAndFee", _.evictions)
+  @static @Telemetry(value = CacheEvictions, line = "accountScript", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAccountScript()
+      : Int = cacheRate("accountScript", _.evictions)
+  @static @Telemetry(value = CacheEvictions, line = "assetScript", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAssetScript(): Int =
+    cacheRate("assetScript", _.evictions)
+  @static @Telemetry(value = CacheEvictions, line = "addressId", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAddressId(): Int =
+    cacheRate("addressId", _.evictions)
+  @static @Telemetry(value = CacheEvictions, line = "accountData", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAccountData(): Int =
+    cacheRate("accountData", _.evictions)
+  @static @Telemetry(value = CacheEvictions, line = "alias", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAlias(): Int =
+    cacheRate("alias", _.evictions)
+  @static @Telemetry(value = CacheEvictions, line = "blockHeight", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsBlockHeight(): Int =
+    cacheRate("blockHeight", _.evictions)
+  @static @Telemetry(value = CacheEvictions, line = "balanceAtHeight", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsBalanceAtHeight()
+      : Int = cacheRate("balanceAtHeight", _.evictions)
+  @static @Telemetry(
+    value = CacheEvictions,
+    line = "leaseBalanceAtHeight",
+    format = new TelemetryFormat(PER_SECOND)
+  ) def cacheEvictionsLeaseBalanceAtHeight(): Int = cacheRate("leaseBalanceAtHeight", _.evictions)
 }
