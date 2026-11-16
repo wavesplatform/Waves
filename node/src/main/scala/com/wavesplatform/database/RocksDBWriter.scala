@@ -1393,11 +1393,11 @@ class RocksDBWriter(
     .recordStats()
     .build[HeightAndAddress, LeaseBalanceNode]()
 
-  override def cacheStats: Seq[(String, CacheStats)] =
+  override def cacheStats: Seq[(StateCache, CacheStats)] =
     super.cacheStats ++ Seq(
-      "balanceAtHeight"      -> balanceAtHeightCache.stats(),
-      "leaseBalanceAtHeight" -> leaseBalanceAtHeightCache.stats(),
-      "balanceSnapshots"     -> balanceSnapshotsCache.stats()
+      StateCache.BalanceAtHeight      -> balanceAtHeightCache.stats(),
+      StateCache.LeaseBalanceAtHeight -> leaseBalanceAtHeightCache.stats(),
+      StateCache.BalanceSnapshots     -> balanceSnapshotsCache.stats()
     )
 
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>

@@ -37,7 +37,7 @@ A full testnet import with all the changes, on an Apple silicon Mac with `rocksd
 
 ## Import probe (JProfiler)
 
-`metrics.ImportProbe` is an embedded JProfiler probe; without the agent its calls do nothing and its telemetries are never computed. It records the time of each block append as a payload named after its 50,000-block height range, so the probe's hot spots give the append time per range, and these telemetries, polled once per second by the agent:
+`metrics.ImportProbe` is an embedded JProfiler probe; without the agent its calls do nothing and its telemetries are never computed. It ships in the node jar because `Importer` calls it directly: the API jar (`com.jprofiler:jprofiler-probe-embedded`, Apache 2.0) is a 9 kB jar whose methods are empty until the agent replaces them, so it needs no setting and costs nothing in a node that is not profiled. It records the time of each block append as a payload named after its 50,000-block height range, so the probe's hot spots give the append time per range, and these telemetries, polled once per second by the agent:
 
 - Import height, blocks/s, transactions/s, and script complexity/s. Complexity is read after each append from the liquid block's snapshot (`scriptsComplexity`, the sum over its transactions).
 - RocksDB time in get, multiGet, write and seek, and stall time, in microseconds per second (1 s means the appender spent the whole second there). SST read and table open IO time count all threads, compactions included, so they can exceed 1 s.

@@ -203,18 +203,18 @@ abstract class Caches extends Blockchain, Storage, StrictLogging {
 
   protected val blockHeightCache: LoadingCache[ByteStr, Option[Int]] = cache(dbSettings.maxRollbackDepth + 1000, loadBlockHeight)
 
-  /** Guava statistics of the state caches by name, read by [[com.wavesplatform.metrics.ImportProbe]]. */
-  def cacheStats: Seq[(String, CacheStats)] = Seq(
-    "balance"          -> balancesCache.stats(),
-    "leaseBalance"     -> leaseBalanceCache.stats(),
-    "assetDescription" -> assetDescriptionCache.stats(),
-    "volumeAndFee"     -> volumeAndFeeCache.stats(),
-    "accountScript"    -> scriptCache.stats(),
-    "assetScript"      -> assetScriptCache.stats(),
-    "addressId"        -> addressIdCache.stats(),
-    "accountData"      -> accountDataCache.stats(),
-    "alias"            -> aliasCache.stats(),
-    "blockHeight"      -> blockHeightCache.stats()
+  /** Guava statistics of the state caches. */
+  def cacheStats: Seq[(StateCache, CacheStats)] = Seq(
+    StateCache.Balance          -> balancesCache.stats(),
+    StateCache.LeaseBalance     -> leaseBalanceCache.stats(),
+    StateCache.AssetDescription -> assetDescriptionCache.stats(),
+    StateCache.VolumeAndFee     -> volumeAndFeeCache.stats(),
+    StateCache.AccountScript    -> scriptCache.stats(),
+    StateCache.AssetScript      -> assetScriptCache.stats(),
+    StateCache.AddressId        -> addressIdCache.stats(),
+    StateCache.AccountData      -> accountDataCache.stats(),
+    StateCache.Alias            -> aliasCache.stats(),
+    StateCache.BlockHeight      -> blockHeightCache.stats()
   )
   protected def loadBlockHeight(blockId: ByteStr): Option[Int]
   protected def discardBlockHeight(blockId: ByteStr): Unit = blockHeightCache.invalidate(blockId)

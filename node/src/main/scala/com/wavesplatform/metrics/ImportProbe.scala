@@ -2,7 +2,7 @@ package com.wavesplatform.metrics
 
 import com.jprofiler.api.probe.embedded.telemetry.{Telemetry, TelemetryFormat, TelemetryUnit}
 import com.jprofiler.api.probe.embedded.{Payload, PayloadProbe}
-import com.wavesplatform.database.RDB
+import com.wavesplatform.database.{RDB, StateCache}
 import com.google.common.cache.CacheStats
 import org.rocksdb.{ColumnFamilyHandle, HistogramType, RocksDB, Statistics, TickerType}
 
@@ -76,19 +76,19 @@ object ImportProbe {
   private final case class CacheRates(hitRate: Double, misses: Double, evictions: Double)
 
   // Guarded by this object's lock.
-  private var cacheSource: () => Seq[(String, CacheStats)] = () => Nil
-  private var lastCacheStats                               = Map.empty[String, CacheStats]
-  private var cacheRates                                   = Map.empty[String, CacheRates]
-  private var source: Option[Source]                       = None
-  private var lastNanos                                    = System.nanoTime()
-  private var lastComplexity                               = 0L
-  private var complexityRate                               = 0.0
-  private var lastBlocks, lastTxs                          = 0L
-  private var blockRate, txRate                            = 0.0
-  private val lastRates                                    = new Array[Long](Rate.values.length)
-  private val rates                                        = new Array[Double](Rate.values.length)
-  private val cfGauges                                     = Array.ofDim[Long](CfGauge.values.length, 5)
-  private var compactions, flushes                         = 0L
+  private var cacheSource: () => Seq[(StateCache, CacheStats)] = () => Nil
+  private var lastCacheStats                                   = Map.empty[StateCache, CacheStats]
+  private var cacheRates                                       = Map.empty[StateCache, CacheRates]
+  private var source: Option[Source]                           = None
+  private var lastNanos                                        = System.nanoTime()
+  private var lastComplexity                                   = 0L
+  private var complexityRate                                   = 0.0
+  private var lastBlocks, lastTxs                              = 0L
+  private var blockRate, txRate                                = 0.0
+  private val lastRates                                        = new Array[Long](Rate.values.length)
+  private val rates                                            = new Array[Double](Rate.values.length)
+  private val cfGauges                                         = Array.ofDim[Long](CfGauge.values.length, 5)
+  private var compactions, flushes                             = 0L
 
   def appendBlock[A](height: Int, txCount: Int)(append: => A): A = {
     Payload.enter(classOf[ImportProbe])
@@ -113,7 +113,7 @@ object ImportProbe {
     rangeLabel
   }
 
-  def watch(rdb: RDB, caches: () => Seq[(String, CacheStats)]): Unit = synchronized {
+  def watch(rdb: RDB, caches: () => Seq[(StateCache, CacheStats)]): Unit = synchronized {
     cacheSource = caches
     lastCacheStats = caches().toMap
     val s = Source(
@@ -180,11 +180,11 @@ object ImportProbe {
     val total = rates(hit.ordinal) + rates(miss.ordinal)
     if (total == 0) 0 else int(rates(hit.ordinal) * 100 / total)
   }
-  private def cacheHitRate(name: String): Int                       = { sample(); cacheRates.get(name).fold(0)(r => int(r.hitRate)) }
-  private def cacheRate(name: String, f: CacheRates => Double): Int = { sample(); cacheRates.get(name).fold(0)(r => int(f(r))) }
-  private def cf(g: CfGauge, i: Int): Int                           = { sample(); int(cfGauges(g.ordinal)(i).toDouble) }
-  private def cfMb(g: CfGauge, i: Int): Int                         = { sample(); int(cfGauges(g.ordinal)(i) / 1e6) }
-  private def cfTotalMb(g: CfGauge): Int                            = { sample(); int(cfGauges(g.ordinal).sum / 1e6) }
+  private def cacheHitRate(cache: StateCache): Int                       = { sample(); cacheRates.get(cache).fold(0)(r => int(r.hitRate)) }
+  private def cacheRate(cache: StateCache, f: CacheRates => Double): Int = { sample(); cacheRates.get(cache).fold(0)(r => int(f(r))) }
+  private def cf(g: CfGauge, i: Int): Int                                = { sample(); int(cfGauges(g.ordinal)(i).toDouble) }
+  private def cfMb(g: CfGauge, i: Int): Int                              = { sample(); int(cfGauges(g.ordinal)(i) / 1e6) }
+  private def cfTotalMb(g: CfGauge): Int                                 = { sample(); int(cfGauges(g.ordinal).sum / 1e6) }
 
   @static @Telemetry("Import height") def importHeight(): Int                                                         = height
   @static @Telemetry(value = "Import blocks", format = new TelemetryFormat(PER_SECOND)) def blocksPerSecond(): Int    = { sample(); int(blockRate) }
@@ -275,105 +275,105 @@ object ImportProbe {
 
   private final val CacheHits = "State cache hit rate"
   @static @Telemetry(value = CacheHits, line = "balance", format = new TelemetryFormat(PERCENT)) def cacheHitsBalance(): Int =
-    cacheHitRate("balance")
+    cacheHitRate(StateCache.Balance)
   @static @Telemetry(value = CacheHits, line = "leaseBalance", format = new TelemetryFormat(PERCENT)) def cacheHitsLeaseBalance(): Int = cacheHitRate(
-    "leaseBalance"
+    StateCache.LeaseBalance
   )
   @static @Telemetry(
     value = CacheHits,
     line = "assetDescription",
     format = new TelemetryFormat(PERCENT)
-  ) def cacheHitsAssetDescription(): Int = cacheHitRate("assetDescription")
+  ) def cacheHitsAssetDescription(): Int = cacheHitRate(StateCache.AssetDescription)
   @static @Telemetry(value = CacheHits, line = "volumeAndFee", format = new TelemetryFormat(PERCENT)) def cacheHitsVolumeAndFee(): Int = cacheHitRate(
-    "volumeAndFee"
+    StateCache.VolumeAndFee
   )
   @static @Telemetry(value = CacheHits, line = "accountScript", format = new TelemetryFormat(PERCENT)) def cacheHitsAccountScript(): Int =
-    cacheHitRate("accountScript")
+    cacheHitRate(StateCache.AccountScript)
   @static @Telemetry(value = CacheHits, line = "assetScript", format = new TelemetryFormat(PERCENT)) def cacheHitsAssetScript(): Int = cacheHitRate(
-    "assetScript"
+    StateCache.AssetScript
   )
   @static @Telemetry(value = CacheHits, line = "addressId", format = new TelemetryFormat(PERCENT)) def cacheHitsAddressId(): Int =
-    cacheHitRate("addressId")
+    cacheHitRate(StateCache.AddressId)
   @static @Telemetry(value = CacheHits, line = "accountData", format = new TelemetryFormat(PERCENT)) def cacheHitsAccountData(): Int = cacheHitRate(
-    "accountData"
+    StateCache.AccountData
   )
   @static @Telemetry(value = CacheHits, line = "alias", format = new TelemetryFormat(PERCENT)) def cacheHitsAlias(): Int =
-    cacheHitRate("alias")
+    cacheHitRate(StateCache.Alias)
   @static @Telemetry(value = CacheHits, line = "blockHeight", format = new TelemetryFormat(PERCENT)) def cacheHitsBlockHeight(): Int = cacheHitRate(
-    "blockHeight"
+    StateCache.BlockHeight
   )
   @static @Telemetry(
     value = CacheHits,
     line = "balanceAtHeight",
     format = new TelemetryFormat(PERCENT)
-  ) def cacheHitsBalanceAtHeight(): Int = cacheHitRate("balanceAtHeight")
+  ) def cacheHitsBalanceAtHeight(): Int = cacheHitRate(StateCache.BalanceAtHeight)
   @static @Telemetry(
     value = CacheHits,
     line = "leaseBalanceAtHeight",
     format = new TelemetryFormat(PERCENT)
-  ) def cacheHitsLeaseBalanceAtHeight(): Int = cacheHitRate("leaseBalanceAtHeight")
+  ) def cacheHitsLeaseBalanceAtHeight(): Int = cacheHitRate(StateCache.LeaseBalanceAtHeight)
   @static @Telemetry(value = CacheHits, line = "balanceSnapshots", format = new TelemetryFormat(PERCENT)) def cacheHitsBalanceSnapshots(): Int =
-    cacheHitRate("balanceSnapshots")
+    cacheHitRate(StateCache.BalanceSnapshots)
 
   private final val CacheMisses = "State cache misses"
   @static @Telemetry(value = CacheMisses, line = "balance", format = new TelemetryFormat(PER_SECOND)) def cacheMissesBalance(): Int =
-    cacheRate("balance", _.misses)
+    cacheRate(StateCache.Balance, _.misses)
   @static @Telemetry(value = CacheMisses, line = "leaseBalance", format = new TelemetryFormat(PER_SECOND)) def cacheMissesLeaseBalance(): Int =
-    cacheRate("leaseBalance", _.misses)
+    cacheRate(StateCache.LeaseBalance, _.misses)
   @static @Telemetry(value = CacheMisses, line = "assetDescription", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAssetDescription()
-      : Int = cacheRate("assetDescription", _.misses)
+      : Int = cacheRate(StateCache.AssetDescription, _.misses)
   @static @Telemetry(value = CacheMisses, line = "volumeAndFee", format = new TelemetryFormat(PER_SECOND)) def cacheMissesVolumeAndFee(): Int =
-    cacheRate("volumeAndFee", _.misses)
+    cacheRate(StateCache.VolumeAndFee, _.misses)
   @static @Telemetry(value = CacheMisses, line = "accountScript", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAccountScript(): Int =
-    cacheRate("accountScript", _.misses)
+    cacheRate(StateCache.AccountScript, _.misses)
   @static @Telemetry(value = CacheMisses, line = "assetScript", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAssetScript(): Int =
-    cacheRate("assetScript", _.misses)
+    cacheRate(StateCache.AssetScript, _.misses)
   @static @Telemetry(value = CacheMisses, line = "addressId", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAddressId(): Int =
-    cacheRate("addressId", _.misses)
+    cacheRate(StateCache.AddressId, _.misses)
   @static @Telemetry(value = CacheMisses, line = "accountData", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAccountData(): Int =
-    cacheRate("accountData", _.misses)
+    cacheRate(StateCache.AccountData, _.misses)
   @static @Telemetry(value = CacheMisses, line = "alias", format = new TelemetryFormat(PER_SECOND)) def cacheMissesAlias(): Int =
-    cacheRate("alias", _.misses)
+    cacheRate(StateCache.Alias, _.misses)
   @static @Telemetry(value = CacheMisses, line = "blockHeight", format = new TelemetryFormat(PER_SECOND)) def cacheMissesBlockHeight(): Int =
-    cacheRate("blockHeight", _.misses)
+    cacheRate(StateCache.BlockHeight, _.misses)
   @static @Telemetry(value = CacheMisses, line = "balanceAtHeight", format = new TelemetryFormat(PER_SECOND)) def cacheMissesBalanceAtHeight(): Int =
-    cacheRate("balanceAtHeight", _.misses)
+    cacheRate(StateCache.BalanceAtHeight, _.misses)
   @static @Telemetry(
     value = CacheMisses,
     line = "leaseBalanceAtHeight",
     format = new TelemetryFormat(PER_SECOND)
-  ) def cacheMissesLeaseBalanceAtHeight(): Int = cacheRate("leaseBalanceAtHeight", _.misses)
+  ) def cacheMissesLeaseBalanceAtHeight(): Int = cacheRate(StateCache.LeaseBalanceAtHeight, _.misses)
   @static @Telemetry(value = CacheMisses, line = "balanceSnapshots", format = new TelemetryFormat(PER_SECOND)) def cacheMissesBalanceSnapshots()
-      : Int = cacheRate("balanceSnapshots", _.misses)
+      : Int = cacheRate(StateCache.BalanceSnapshots, _.misses)
 
   private final val CacheEvictions = "State cache evictions"
   @static @Telemetry(value = CacheEvictions, line = "balance", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsBalance(): Int =
-    cacheRate("balance", _.evictions)
+    cacheRate(StateCache.Balance, _.evictions)
   @static @Telemetry(value = CacheEvictions, line = "leaseBalance", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsLeaseBalance(): Int =
-    cacheRate("leaseBalance", _.evictions)
+    cacheRate(StateCache.LeaseBalance, _.evictions)
   @static @Telemetry(value = CacheEvictions, line = "assetDescription", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAssetDescription()
-      : Int = cacheRate("assetDescription", _.evictions)
+      : Int = cacheRate(StateCache.AssetDescription, _.evictions)
   @static @Telemetry(value = CacheEvictions, line = "volumeAndFee", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsVolumeAndFee(): Int =
-    cacheRate("volumeAndFee", _.evictions)
+    cacheRate(StateCache.VolumeAndFee, _.evictions)
   @static @Telemetry(value = CacheEvictions, line = "accountScript", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAccountScript()
-      : Int = cacheRate("accountScript", _.evictions)
+      : Int = cacheRate(StateCache.AccountScript, _.evictions)
   @static @Telemetry(value = CacheEvictions, line = "assetScript", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAssetScript(): Int =
-    cacheRate("assetScript", _.evictions)
+    cacheRate(StateCache.AssetScript, _.evictions)
   @static @Telemetry(value = CacheEvictions, line = "addressId", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAddressId(): Int =
-    cacheRate("addressId", _.evictions)
+    cacheRate(StateCache.AddressId, _.evictions)
   @static @Telemetry(value = CacheEvictions, line = "accountData", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAccountData(): Int =
-    cacheRate("accountData", _.evictions)
+    cacheRate(StateCache.AccountData, _.evictions)
   @static @Telemetry(value = CacheEvictions, line = "alias", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsAlias(): Int =
-    cacheRate("alias", _.evictions)
+    cacheRate(StateCache.Alias, _.evictions)
   @static @Telemetry(value = CacheEvictions, line = "blockHeight", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsBlockHeight(): Int =
-    cacheRate("blockHeight", _.evictions)
+    cacheRate(StateCache.BlockHeight, _.evictions)
   @static @Telemetry(value = CacheEvictions, line = "balanceAtHeight", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsBalanceAtHeight()
-      : Int = cacheRate("balanceAtHeight", _.evictions)
+      : Int = cacheRate(StateCache.BalanceAtHeight, _.evictions)
   @static @Telemetry(
     value = CacheEvictions,
     line = "leaseBalanceAtHeight",
     format = new TelemetryFormat(PER_SECOND)
-  ) def cacheEvictionsLeaseBalanceAtHeight(): Int = cacheRate("leaseBalanceAtHeight", _.evictions)
+  ) def cacheEvictionsLeaseBalanceAtHeight(): Int = cacheRate(StateCache.LeaseBalanceAtHeight, _.evictions)
   @static @Telemetry(value = CacheEvictions, line = "balanceSnapshots", format = new TelemetryFormat(PER_SECOND)) def cacheEvictionsBalanceSnapshots()
-      : Int = cacheRate("balanceSnapshots", _.evictions)
+      : Int = cacheRate(StateCache.BalanceSnapshots, _.evictions)
 }
