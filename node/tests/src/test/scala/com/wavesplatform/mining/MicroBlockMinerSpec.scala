@@ -10,23 +10,30 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
+import com.wavesplatform.network.MicroBlockInv
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{Blockchain, EndorsementStorage, StateSnapshot}
 import com.wavesplatform.test.DomainPresets.RideV6
-import com.wavesplatform.test.FlatSpec
+import com.wavesplatform.test.{FlatSpec, WithResourceManager}
 import com.wavesplatform.transaction.TxHelpers.{createAlias, defaultAddress, defaultSigner, secondAddress, transfer}
 import com.wavesplatform.transaction.{Transaction, TxVersion}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl, UtxPriorityPool}
-import monix.execution.Scheduler
+import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.channel.group.DefaultChannelGroup
+import io.netty.util.concurrent.GlobalEventExecutor
+import monix.eval.Task
+import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import org.scalatest.Inside
 
-import java.util.concurrent.CountDownLatch
+import java.util.concurrent.{CountDownLatch, TimeUnit}
+import scala.concurrent.{Await, Promise}
 import scala.concurrent.duration.*
 import scala.util.Random
 
-class MicroBlockMinerSpec extends FlatSpec with WithDomain {
+class MicroBlockMinerSpec extends FlatSpec with WithDomain with WithResourceManager with Inside {
   "Micro block miner" should "generate microblocks in flat interval" in {
     val scheduler = Schedulers.singleThread("test")
     val acc       = TestValues.keyPair
@@ -182,6 +189,52 @@ class MicroBlockMinerSpec extends FlatSpec with WithDomain {
       appender.shutdown()
       mbminer.shutdown()
       inner.close()
+    }
+  }
+
+  "Micro block miner" should "broadcast an appended microblock even if mining is cancelled right after the append" in withManager { manager =>
+    withDomain(RideV6, Seq(AddrWithBalance(defaultAddress, TestValues.bigMoney))) { d =>
+      val miner    = manager(Schedulers.singleThread("miner"))
+      val appender = manager(Schedulers.singleThread("appender"))
+      val channels = manager(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
+      val peer     = manager(new EmbeddedChannel())
+      channels.add(peer)
+
+      val mining   = Promise[CancelableFuture[?]]()
+      val appended = new CountDownLatch(1)
+      // UTX cleanup is scheduled on the appender thread right after the microblock is appended: cancel there, like a key block queued behind it
+      val utxPool = manager(new UtxPoolImpl(ntpTime, d.blockchainUpdater, RideV6.utxSettings, RideV6.maxTxErrorLogSize, RideV6.minerSettings.enable) {
+        override def scheduleCleanup(): Unit = {
+          super.scheduleCleanup()
+          Await.result(mining.future, 10.seconds).cancel()
+          appended.countDown()
+        }
+      })
+      val microBlockMiner = new MicroBlockMinerImpl(
+        _ => (),
+        channels,
+        d.blockchainUpdater,
+        utxPool,
+        EndorsementStorage.Disabled,
+        RideV6.minerSettings,
+        miner,
+        appender,
+        Observable.empty
+      )
+
+      val block = d.appendBlock(ProtoBlockVersion)
+      utxPool.putIfNew(transfer(amount = 123)).resultE.explicitGet()
+      mining.success(microBlockMiner.generateOneMicroBlockTask(defaultSigner, block, MiningConstraint.Unlimited, 0).runToFuture(using miner))
+
+      appended.await(10, TimeUnit.SECONDS) shouldBe true
+      // drain both queues so that a broadcast forked after the append has run, if it was not dropped
+      Seq(appender, miner).foreach(s => Await.result(Task.evalAsync(()).runToFuture(using s), 10.seconds))
+
+      d.balance(secondAddress) shouldBe 123
+      inside(Option(peer.readOutbound[AnyRef]()).value) { case inv: MicroBlockInv =>
+        inv.totalBlockId shouldBe d.lastBlockId
+        inv.reference shouldBe block.id()
+      }
     }
   }
 }

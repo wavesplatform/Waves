@@ -23,8 +23,8 @@ class WideStateGenerationSuite extends BaseFreeSpec with TransferSending {
         |
         |waves {
         |  network.traffic-logger {
-        |    ignore-tx-messages = [1, 2, 23, 25]
-        |    ignore-rx-messages = [1, 2, 25]
+        |    ignore-tx-messages = [1, 2, 23, 25, 31]
+        |    ignore-rx-messages = [1, 2, 25, 31]
         |  }
         |  miner.minimal-block-generation-offset = 10s
         |  synchronization.utx-synchronizer {

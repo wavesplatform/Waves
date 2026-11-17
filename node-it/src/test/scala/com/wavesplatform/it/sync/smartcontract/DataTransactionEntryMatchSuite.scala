@@ -14,8 +14,11 @@ import com.wavesplatform.state.{Height, StringDataEntry}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
+import scala.concurrent.duration.DurationInt
+
 class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
-  private val activationHeight = Height(10)
+  // Setup alone can take the chain past a low height on a loaded runner, see docs/notes/testing.md
+  private val activationHeight = Height(30)
 
   private def compile(scriptText: String) =
     ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
@@ -90,7 +93,7 @@ class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
   }
 
   test("successful validation of data transaction for DApp verifier after activation of fix") {
-    sender.waitForHeight(activationHeight)
+    sender.waitForHeight(activationHeight, 3.minutes)
     sendDataTransaction(dAppVerifier)
   }
 

@@ -28,42 +28,45 @@ jobs:
       attestations: write
       id-token: write
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: proudust/gh-describe@70f72d4f6304ea053cf5a3d71c36211d5acc0c73
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: proudust/gh-describe@9b42731dd866e3cd8165a65f94cc58613def3114 # v2.2.2
         id: ghd
-      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'sbt'
-      - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
-      # Emits the single combined ScalaJS artifact directly into ride-js-bundle/scalajs
-      # (see repl/js/build.sbt). lang-js is compiled transitively as a dependency of repl-js.
-      - run: sbt -Dproject.version=${{ steps.ghd.outputs.describe }} --batch ';lang-tests/test;repl/test;replJS/fullOptJS'
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+      - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
+      - run: sbt --server -Dproject.version=${{ steps.ghd.outputs.describe }} --batch ';lang-tests/testFull;repl/testFull;replJS/fullOptJS'
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: ride-js-bundle/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           registry-url: 'https://registry.npmjs.org'
-          node-version: '>=24.7.0' # Trusted publishing requires npm CLI version 11.5.1 or later.
-      - run: corepack enable
-      - name: Build & test @waves/ride-js
-        env:
-          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+          node-version: '24' # Trusted publishing requires npm CLI 11.5.1 or later (Node 24.7+).
+      - working-directory: ride-js-bundle
         run: |
-          cd ride-js-bundle
           pnpm install --frozen-lockfile
-          pnpm run build
           pnpm test
+      # @waves/ride-js is versioned independently of the node: a release publishes the version in package.json,
+      # and skips publishing when that version is already on npm (no bump since the last release).
       - if: github.event_name == 'workflow_dispatch'
-        run:
+        run: |
           echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
           echo "TAG=${{ inputs.tag }}" >> $GITHUB_ENV
       - if: github.event_name == 'release'
+        working-directory: ride-js-bundle
         run: |
-          echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_ENV
+          echo "VERSION=$(node -p 'require("./package.json").version')" >> $GITHUB_ENV
           echo "TAG=latest" >> $GITHUB_ENV
       - id: publish
+        working-directory: ride-js-bundle
         run: |
-          cd ride-js-bundle
-          npm version $VERSION --no-git-tag-version --allow-same-version
-          npm publish --provenance --access public --tag $TAG
+          if [ -n "$(npm view "@waves/ride-js@$VERSION" version 2>/dev/null)" ]; then
+            echo "::notice::@waves/ride-js@$VERSION is already published, skipping"
+            exit 0
+          fi
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          npm publish --provenance --access public --tag "$TAG"
           echo "url=https://www.npmjs.com/package/@waves/ride-js/v/$VERSION" >> "$GITHUB_OUTPUT"

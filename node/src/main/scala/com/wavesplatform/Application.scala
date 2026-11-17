@@ -64,7 +64,7 @@ import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
 
-class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
+class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: Time) extends ScorexLogging {
   app =>
 
   import Application.*
@@ -83,6 +83,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val stopOnAppendError = UncaughtExceptionReporter { cause =>
     log.error("Error in Appender", cause)
     forceStopApplication(FatalDBError)
+  }
+
+  private def reportErrorAndBlacklist(errorMessage: String, source: Channel)(maybeThrowable: Option[Throwable]): Task[Unit] = {
+    maybeThrowable.foreach { t =>
+      peerDatabase.blacklistAndClose(source, errorMessage)
+      log.warn(errorMessage, t)
+    }
+    Task.now(())
   }
 
   private val appenderScheduler = singleThread("appender", stopOnAppendError)
@@ -322,20 +330,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       microblockSynchronizerScheduler
     )
 
-    messageObserver.endorseBlocks.foreach { case (ch, x) =>
-      endorsementStorage.tryAdd(x) match {
-        case Left(err)   => log.trace(s"Unexpected $x: $err")
-        case Right(true) => allChannels.broadcast(x, Some(ch))
-        case _           =>
-      }
-    }(using endorseBlockSynchronizerScheduler)
+    EndorsementStorage.process(endorsementStorage, messageObserver.endorseBlocks, (ch, x) => allChannels.broadcast(x, Some(ch)))(using
+      endorseBlockSynchronizerScheduler
+    )
 
     val (newBlocksWithSnapshot, extLoaderState, _) = RxExtensionLoader(
       settings.synchronizationSettings.synchronizationTimeout,
       settings.synchronizationSettings.processedBlocksCacheTimeout,
       settings.enableLightMode,
       settings.synchronizationSettings.blacklistOnScoreMismatch,
-      Coeval(blockchainUpdater.lastBlockIds(settings.synchronizationSettings.maxRollback)),
+      Coeval(blockchainUpdater.lastBlockIds),
       peerDatabase,
       knownInvalidBlocks,
       messageObserver.blocks,
@@ -344,12 +348,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       syncWithChannelClosed,
       extensionLoaderScheduler,
       timeoutSubject
-    ) { case (c, b) =>
-      processFork(c, b).doOnFinish {
-        case None    => Task.now(())
-        case Some(e) => Task(stopOnAppendError.reportFailure(e))
-      }
-    }
+    ) { case (c, b) => processFork(c, b).doOnFinish(reportErrorAndBlacklist("Exception caught while processing extension", c)) }
 
     TransactionSynchronizer(
       settings.synchronizationSettings.utxSynchronizer,
@@ -360,11 +359,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     Observable(
       microblockDataWithSnapshot
-        .mapEval(processMicroBlock.tupled),
+        .mapEval { case (c, md, sd) => processMicroBlock(c, md, sd).doOnFinish(reportErrorAndBlacklist("Error appending microblock", c)) },
       newBlocksWithSnapshot
-        .mapEval(processBlock.tupled)
+        .mapEval { case (c, b, s) => processBlock(c, b, s).doOnFinish(reportErrorAndBlacklist("Error appending blocks", c)) }
     ).mergeMap(identity)
-      .onErrorHandle(stopOnAppendError.reportFailure)
       .subscribe()
 
     // API start
@@ -684,7 +682,7 @@ object Application extends ScorexLogging {
       SystemInformationReporter.report(settings.config)
     }
 
-    val time = new NTP(settings.ntpServer)
+    val time = Time(settings.ntpServer)
     Metrics.start(settings.metrics, time)
 
     def dumpMinerConfig(): Unit = {

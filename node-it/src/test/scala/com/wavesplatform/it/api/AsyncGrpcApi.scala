@@ -341,7 +341,8 @@ object AsyncGrpcApi {
     def height: Future[Int] = blocks.getCurrentHeight(Empty.of())
 
     def waitForHeight(expectedHeight: Int): Future[Int] = {
-      waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 5.seconds)
+      // Polling is a 1ms request; a coarser interval only adds up to a full interval to every wait for a block.
+      waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 1.second)
     }
 
     def wavesBalance(address: ByteString): Future[WavesBalances] = {

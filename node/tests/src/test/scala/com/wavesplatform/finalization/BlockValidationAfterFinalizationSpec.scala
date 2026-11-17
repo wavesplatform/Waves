@@ -23,6 +23,15 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
     )
 
   "should append a valid block" - {
+    "with conflicting endorsement of poor generator before Finality Improvements" in new BaseTest {
+      override def continue(d: Domain): Unit = {
+        d.makeGenerator2Poor()
+
+        val block4 = d.createBlock(mkFinalizationVoting().withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlockId))
+        d.appender.appendBlockWithoutFallback(block4) should beRight
+      }
+    }.run()
+
     "with finalization voting" in new BaseTest {
       override def continue(d: Domain): Unit = {
         val block3WithVotes = d.createBlock(
@@ -72,19 +81,7 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
 
     "with endorsement of poor generator" in new BaseTest {
       override def continue(d: Domain): Unit = {
-        d.appender.appendBlock(
-          d.createBlock(
-            txs = Seq(
-              TxHelpers.transfer(
-                from = committedGenerator2,
-                to = committedGenerator1Addr,
-                amount = d.blockchain.balance(committedGenerator2Addr) - CommitToGenerationTransaction.DepositInWavelets - 2.waves
-              )
-            ),
-            generator = committedGenerator1,
-            strictTime = true
-          )
-        )
+        d.makeGenerator2Poor()
 
         log.debug("Append block 4 with poor generator endorsement")
         val block4 = d.createBlock(
@@ -99,6 +96,36 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
           )
         )
         d.appender.appendBlockWithoutFallback(block4) should produce(s"Valid endorser $committedGenerator2Idx has insufficient balance")
+      }
+    }.run()
+
+    "with conflicting endorsement of poor generator since Finality Improvements" in new BaseTest {
+      override def settings: WavesSettings = defaultSettings.addFeatures(BlockchainFeatures.FinalityImprovements)
+
+      override def continue(d: Domain): Unit = {
+        d.makeGenerator2Poor()
+
+        log.debug("Append block 4 with poor generator conflicting endorsement")
+        val block4 = d.createBlock(mkFinalizationVoting().withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlockId))
+        d.appender.appendBlockWithoutFallback(block4) should produce(
+          s"Conflicting endorsement sender $committedGenerator2Addr has insufficient balance"
+        )
+      }
+    }.run()
+
+    "with conflicting endorsement of poor generator in microblock since Finality Improvements" in new BaseTest {
+      override def settings: WavesSettings = defaultSettings.addFeatures(BlockchainFeatures.FinalityImprovements)
+
+      override def continue(d: Domain): Unit = {
+        d.makeGenerator2Poor()
+        d.appender.appendBlock(d.createBlock(generator = committedGenerator1, strictTime = true))
+
+        // A conflict new to the liquid block: only those it already carries are exempt from the balance check
+        val microBlock = d.createMicroBlock(
+          signer = Some(committedGenerator1),
+          finalizationVoting = Some(mkFinalizationVoting().withConflict(committedGenerator2, committedGenerator2Idx, d.lastBlockId))
+        )(TxHelpers.transfer(committedGenerator3, committedGenerator1Addr))
+        d.appendMicroBlockE(microBlock) should produce(s"Conflicting endorsement sender $committedGenerator2Addr has insufficient balance")
       }
     }.run()
 
@@ -269,7 +296,8 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
 
     def run(): Unit = withDomain(settings, AddrWithBalance.enoughBalances(allGenerators*)) { d =>
       log.debug(s"Append block 2 with commitments")
-      val txs                   = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x))
+      val senderBound = settings.blockchainSettings.functionalitySettings.preActivatedFeatures.contains(BlockchainFeatures.FinalityImprovements.id)
+      val txs         = committedGenerators.map(x => TxHelpers.commitToGeneration(generationPeriodStart = Height(3), x, senderBound = senderBound))
       val block2WithCommitments = d.createBlock(txs, generator = notCommittedGenerator, strictTime = true)
       d.appender.appendBlock(block2WithCommitments)
 
@@ -282,6 +310,22 @@ class BlockValidationAfterFinalizationSpec extends BaseFinalizationSpec {
 
       def createBlock(finalizationVoting: FinalizationVoting): Block =
         d.createBlock(generator = committedGenerator1, strictTime = true, finalizationVoting = Some(finalizationVoting))
+
+      /** Appends block 3, leaving committedGenerator2 its deposit plus too little to generate. */
+      def makeGenerator2Poor(): Unit =
+        d.appender.appendBlock(
+          d.createBlock(
+            txs = Seq(
+              TxHelpers.transfer(
+                from = committedGenerator2,
+                to = committedGenerator1Addr,
+                amount = d.blockchain.balance(committedGenerator2Addr) - CommitToGenerationTransaction.DepositInWavelets - 2.waves
+              )
+            ),
+            generator = committedGenerator1,
+            strictTime = true
+          )
+        )
     }
   }
 }

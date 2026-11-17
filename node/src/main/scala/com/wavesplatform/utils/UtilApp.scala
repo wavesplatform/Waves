@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.crypto.{P256Curve, Sha256}
+import com.wavesplatform.database.RDB
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.{Script, ScriptReader}
@@ -24,11 +25,11 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 import java.util
 import scala.annotation.nowarn
-import scala.util.Random
+import scala.util.{Random, Try}
 
 object UtilApp {
   enum Mode {
-    case CompileScript, DecompileScript, SignBytes, VerifySignature, CreateKeyPair, Hash, SerializeTx, SignTx, SmokeTest
+    case CompileScript, DecompileScript, SignBytes, VerifySignature, CreateKeyPair, Hash, SerializeTx, SignTx, SmokeTest, TruncateCF
   }
 
   case class CompileOptions(assetScript: Boolean = false)
@@ -54,7 +55,9 @@ object UtilApp {
       signOptions: String | KeyPair = "",
       verifyOptions: VerifyOptions = VerifyOptions(),
       hashOptions: HashOptions = HashOptions(),
-      keyPairOptions: KeyPairOptions = KeyPairOptions()
+      keyPairOptions: KeyPairOptions = KeyPairOptions(),
+      bindPopToSender: Boolean = false,
+      columnFamily: String = ""
   )
 
   private def maybeFindKeyPair(cmd: Command): Either[ValidationError, KeyPair] = {
@@ -77,8 +80,9 @@ object UtilApp {
         case Mode.CreateKeyPair   => Actions.doCreateKeyPair(cmd, inBytes)
         case Mode.Hash            => Actions.doHash(cmd, inBytes)
         case Mode.SerializeTx     => Actions.doSerializeTx(inBytes)
-        case Mode.SignTx          => maybeFindKeyPair(cmd).flatMap(Actions.doSignTx(_, inBytes))
+        case Mode.SignTx          => maybeFindKeyPair(cmd).flatMap(Actions.doSignTx(_, inBytes, cmd.bindPopToSender))
         case Mode.SmokeTest       => Actions.doSmokeTest()
+        case Mode.TruncateCF      => Actions.doTruncateCF(Application.loadApplicationConfig(cmd.configFile.map(new File(_))), cmd.columnFamily)
       }
 
       result match {
@@ -93,6 +97,10 @@ object UtilApp {
 
     val builder = OParser.builder[Command]
     import builder.*
+
+    val bindPopToSenderOpt = opt[Unit]("bind-pop-to-sender")
+      .text("Bind a CommitToGeneration's proof of possession to its sender, required once Finality Improvements (27) is activated")
+      .action((_, c) => c.copy(bindPopToSender = true))
 
     OParser.sequence(
       programName("waves util"),
@@ -200,7 +208,8 @@ object UtilApp {
             opt[String]("signer-address")
               .abbr("sa")
               .text("Signer address (requires corresponding key in wallet.dat)")
-              .action((a, c) => c.copy(signOptions = a))
+              .action((a, c) => c.copy(signOptions = a)),
+            bindPopToSenderOpt
           ),
         cmd("sign-with-sk")
           .text("Sign JSON transaction with private key")
@@ -209,10 +218,24 @@ object UtilApp {
             opt[String]("private-key")
               .abbr("sk")
               .text("Private key")
-              .action((a, c) => c.copy(signOptions = PKKeyPair(PrivateKey(Base58.decode(a)))))
+              .action((a, c) => c.copy(signOptions = PKKeyPair(PrivateKey(Base58.decode(a))))),
+            bindPopToSenderOpt
           )
       ),
       cmd("smoke").action((_, c) => c.copy(mode = Mode.SmokeTest, inputData = Input.Str(""))),
+      cmd("truncate-cf")
+        .text(s"Removes all data from a non-essential column family (${RDB.NonEssentialColumnFamilies.mkString("|")})")
+        .action((_, c) => c.copy(mode = Mode.TruncateCF, inputData = Input.Str("")))
+        .children(
+          arg[String]("<column-family>")
+            .text(s"Column family to truncate (${RDB.NonEssentialColumnFamilies.mkString("|")})")
+            .required()
+            .action((cf, c) => c.copy(columnFamily = cf))
+            .validate {
+              case cf if RDB.NonEssentialColumnFamilies.contains(cf) => success
+              case cf => failure(s"Column family $cf can not be truncated, expected one of ${RDB.NonEssentialColumnFamilies.mkString(", ")}")
+            }
+        ),
       help("help").hidden(),
       checkConfig(_.mode match {
         case null => failure("Command should be provided")
@@ -287,14 +310,19 @@ object UtilApp {
         .map(_.toString)
         .map(_.bytes())
 
-    def doSignTx(signerKeyPair: KeyPair, data: Array[Byte]): ActionResult = {
+    def doSignTx(signerKeyPair: KeyPair, data: Array[Byte], bindPopToSender: Boolean): ActionResult = {
       import cats.syntax.either.*
 
       TransactionFactory
-        .parseRequestAndSign(Json.parse(data).as[JsObject], signerKeyPair, None)
+        .parseRequestAndSign(Json.parse(data).as[JsObject], signerKeyPair, None, bindPopToSender)
         .leftMap(_.toString)
         .map(_.json().toString().getBytes())
     }
+
+    def doTruncateCF(settings: WavesSettings, cfName: String): ActionResult =
+      Try(RDB.truncateColumnFamily(settings.dbSettings, cfName)).toEither.left
+        .map(_.toString)
+        .map(_ => Array.emptyByteArray)
 
     def doSmokeTest(): ActionResult = {
       val message = Base64.decode(

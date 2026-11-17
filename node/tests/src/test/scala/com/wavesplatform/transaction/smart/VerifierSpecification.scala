@@ -29,8 +29,7 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
       "",
       1.waves,
       script,
-      reissuable = false,
-      ntpTime.getTimestamp()
+      reissuable = false
     )
 
   private def mkOrder(
@@ -50,8 +49,8 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
         orderType,
         100,
         5.waves,
-        ntpTime.getTimestamp(),
-        ntpTime.getTimestamp() + 200000,
+        ntpTime.correctedTime(),
+        ntpTime.correctedTime() + 200000,
         fee,
         feeAsset
       )
@@ -94,8 +93,7 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
               )
               .explicitGet()
               ._1,
-            0.001.waves,
-            timestamp = ntpTime.getTimestamp()
+            0.001.waves
           )
         )
 
@@ -108,8 +106,7 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
             5.waves,
             0.003.waves,
             0.003.waves,
-            0.003.waves,
-            ntpTime.getTimestamp()
+            0.003.waves
           )
         )
       }
@@ -133,8 +130,7 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
       5.waves,
       100,
       100,
-      0.003.waves,
-      timestamp = ntpTime.getTimestamp()
+      0.003.waves
     ),
     buyFeeAssetId,
     sellFeeAssetId
@@ -143,7 +139,7 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
   property("matcher fee asset script is executed during exchange transaction validation") {
     forAll(sharedParamGen2) { case (sender, genesisTxs, exchangeTx, buyFeeAsset, sellFeeAsset) =>
       def setAssetScript(assetId: IssuedAsset, script: Script): SetAssetScriptTransaction =
-        TxHelpers.setAssetScript(sender, assetId, script, 0.001.waves, ntpTime.getTimestamp())
+        TxHelpers.setAssetScript(sender, assetId, script, 0.001.waves)
 
       withDomain(
         domainSettingsWithPreactivatedFeatures(

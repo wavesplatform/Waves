@@ -187,13 +187,18 @@ case class TransactionsApiRoute(
 
   def sign: Route = (pathPrefix("sign") & withAuth) {
     pathEndOrSingleSlash(jsonPost[JsObject] { jsv =>
-      TransactionFactory.parseRequestAndSign(jsv, wallet, None, blockchain.currentGenerationPeriod.map(_.next.start.toInt))
+      TransactionFactory.parseRequestAndSign(jsv, wallet, None, nextGenerationPeriodStart, popSenderBound)
     }) ~ signWithSigner
   }
 
+  private def nextGenerationPeriodStart: Option[Int] = blockchain.currentGenerationPeriod.map(_.next.start.toInt)
+
+  // The transaction goes into a block after the current one
+  private def popSenderBound: Boolean = blockchain.isFeatureActivated(BlockchainFeatures.FinalityImprovements, blockchain.height + 1)
+
   def signWithSigner: Route = path(AddrSegment) { address =>
     jsonPost[JsObject](
-      TransactionFactory.parseRequestAndSign(_, wallet, Some(address.toString), blockchain.currentGenerationPeriod.map(_.next.start.toInt))
+      TransactionFactory.parseRequestAndSign(_, wallet, Some(address.toString), nextGenerationPeriodStart, popSenderBound)
     )
   }
 

@@ -24,9 +24,13 @@ import scala.concurrent.Await
 import scala.concurrent.duration.*
 
 class BlockChallengeSuite extends BaseFunSuite with TransferSending {
+  override protected def publishNetworkPort: Boolean = true
+
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
-      .overrideBase(_.quorum(4))
+      // Unreachable quorum keeps every regular miner idle, so nothing races the injected block (BlockChallenger ignores the quorum).
+      // quorum(4) was not enough: the test JVM's own connection is a 4th channel and let the challenger forge its own block.
+      .overrideBase(_.quorum(100))
       .overrideBase(_.minAssetInfoUpdateInterval(0))
       .overrideBase(
         _.preactivatedFeatures(
@@ -91,7 +95,7 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
     val hitSource =
       crypto.verifyVRF(genSig, lastBlockVrfOrGenSig, signer.publicKey).explicitGet()
 
-    val posCalculator = FairPoSCalculator.V1
+    val posCalculator = FairPoSCalculator.fromSettings(nodes.head.settings.blockchainSettings.functionalitySettings)
     val version       = 5.toByte
 
     val validBlockDelay: Long = posCalculator
@@ -103,11 +107,11 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
 
     val baseTarget: Long = posCalculator
       .calculateBaseTarget(
-        10,
+        nodes.head.settings.blockchainSettings.genesisSettings.averageBlockDelay.toSeconds,
         height.toInt,
         lastBlock.baseTarget.get,
         lastBlock.timestamp,
-        None,
+        Option.when(height >= Height(3))(nodes.head.blockAt(height - 2).timestamp),
         lastBlock.timestamp + validBlockDelay
       )
 

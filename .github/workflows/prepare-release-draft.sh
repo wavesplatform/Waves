@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-sbt -Dproject.version=${RELEASE_VERSION} --batch "buildReleaseArtifacts $RELEASE_NETWORKS"
+sbt --server -Dproject.version=${RELEASE_VERSION} --batch "buildReleaseArtifacts $RELEASE_NETWORKS"
 
 assets=$(find . \( -name '*.deb' -o -name '*all*.jar' -o -name '*.tgz' \) -print)
 

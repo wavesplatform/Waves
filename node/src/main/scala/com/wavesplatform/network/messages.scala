@@ -16,6 +16,14 @@ import monix.eval.Coeval
 import java.net.InetSocketAddress
 import java.util
 
+/** Protobuf carries an id as a length-delimited field, so unlike the hand-rolled specs its size is whatever a peer chose to send. Deserializers run
+  * inside a Try whose failure blacklists the sender, so this is where a wrong-length id is rejected.
+  */
+private[network] def requireBlockId(id: BlockId): BlockId = {
+  require(Block.validateReferenceLength(id.arr.length), s"Invalid block id length ${id.arr.length}")
+  id
+}
+
 sealed trait Message
 
 case object GetPeers extends Message
@@ -100,7 +108,7 @@ case class BlockSnapshotResponse(blockId: BlockId, snapshots: Seq[TransactionSta
 
 object BlockSnapshotResponse {
   def fromProtobuf(snapshot: PBBlockSnapshot): BlockSnapshotResponse =
-    BlockSnapshotResponse(snapshot.blockId.toByteStr, snapshot.snapshots)
+    BlockSnapshotResponse(requireBlockId(snapshot.blockId.toByteStr), snapshot.snapshots)
 }
 
 case class MicroBlockSnapshotResponse(totalBlockId: BlockId, snapshots: Seq[TransactionStateSnapshot]) extends Message {
@@ -112,7 +120,7 @@ case class MicroBlockSnapshotResponse(totalBlockId: BlockId, snapshots: Seq[Tran
 
 object MicroBlockSnapshotResponse {
   def fromProtobuf(snapshot: PBMicroBlockSnapshot): MicroBlockSnapshotResponse =
-    MicroBlockSnapshotResponse(snapshot.totalBlockId.toByteStr, snapshot.snapshots)
+    MicroBlockSnapshotResponse(requireBlockId(snapshot.totalBlockId.toByteStr), snapshot.snapshots)
 }
 
 case class EndorseBlock(endorserIndex: Int, finalizedId: BlockId, finalizedHeight: Height, endorsedId: BlockId, signature: ByteStr) extends Message {
@@ -130,9 +138,9 @@ case class EndorseBlock(endorserIndex: Int, finalizedId: BlockId, finalizedHeigh
 object EndorseBlock {
   def fromProtobuf(x: PBEndorseBlock): EndorseBlock = EndorseBlock(
     x.endorserIndex,
-    x.finalizedBlockId.toByteStr,
+    requireBlockId(x.finalizedBlockId.toByteStr),
     Height(x.finalizedBlockHeight),
-    x.endorsedBlockId.toByteStr,
+    requireBlockId(x.endorsedBlockId.toByteStr),
     x.signature.toByteStr
   )
 

@@ -3,12 +3,16 @@ package com.wavesplatform.state
 import cats.syntax.traverse.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.BlockEndorsement
+import com.wavesplatform.block.{BlockEndorsement, FinalizationVoting}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.bls.BlsKeyPair
 import com.wavesplatform.network.EndorseBlock
 import com.wavesplatform.test.{FreeSpec, NumericExt, produce}
 import com.wavesplatform.transaction.TxHelpers
+import io.netty.channel.Channel
+import io.netty.channel.embedded.EmbeddedChannel
+import monix.execution.schedulers.TestScheduler
+import monix.reactive.subjects.PublishSubject
 import org.scalactic.source.Position
 import org.scalatest.EitherValues
 
@@ -35,6 +39,30 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
   }
 
   private val defaultGenerators: IndexedSeq[TestGenerator] = mkGeneratorSet(4)
+
+  "process" - {
+    "keeps processing after tryAdd throws" in {
+      given scheduler: TestScheduler = TestScheduler()
+      val endorsements               = PublishSubject[(Channel, EndorseBlock)]()
+      val first, second              = EndorseBlock(1, expectedFinalizedId, expectedFinalizedHeight, expectedEndorsedId, ByteStr.empty)
+      val throwing = new EndorsementStorage {
+        override def tryAdd(msg: EndorseBlock): Either[String, Boolean] =
+          if (msg eq first) throw new IllegalStateException("broken") else Right(true)
+        override def startVoting(filter: EndorsementFilter): Boolean                     = false
+        override def tryCollectAndClear(endorsedId: BlockId): Option[FinalizationVoting] = None
+      }
+      val relayed = Seq.newBuilder[EndorseBlock]
+
+      EndorsementStorage.process(throwing, endorsements, (_, x) => relayed += x)
+      scheduler.tick()
+      Seq(first, second).foreach { x =>
+        endorsements.onNext((new EmbeddedChannel(), x))
+        scheduler.tick()
+      }
+
+      relayed.result() shouldBe Seq(second)
+    }
+  }
 
   "tryAddVote" - {
     def mk(
@@ -90,6 +118,10 @@ class EndorsementStorageSpec extends FreeSpec with EitherValues {
           EndorseBlock(-1, expectedFinalizedId, expectedFinalizedHeight, expectedEndorsedId, ByteStr.empty),
           "Invalid endorser index"
         )
+
+        "an index below -1, which a peer can send as any int32" in Seq(-2, Int.MinValue).foreach { index =>
+          test(EndorseBlock(index, expectedFinalizedId, expectedFinalizedHeight, expectedEndorsedId, ByteStr.empty), "Invalid endorser index")
+        }
 
         "an unexpected endorser" in test(
           EndorseBlock.from(mk(committedGenerator, GeneratorIndex(2))),

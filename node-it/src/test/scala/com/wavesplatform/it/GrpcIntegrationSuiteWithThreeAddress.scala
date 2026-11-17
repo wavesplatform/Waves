@@ -14,6 +14,9 @@ import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 trait GrpcIntegrationSuiteWithThreeAddress extends BaseSuite with ScalaFutures with IntegrationPatience with RecoverMethods with ScorexLogging {
   this: TestSuite & Nodes =>
 
+  // template.conf runs no extensions, so that suites which never call gRPC don't start a server or publish its port.
+  override protected def nodeExtensions: Seq[String] = super.nodeExtensions :+ Docker.GrpcExtension
+
   protected lazy val firstAcc: KeyPair  = KeyPair("first_acc".getBytes("UTF-8"))
   protected lazy val secondAcc: KeyPair = KeyPair("second_acc".getBytes("UTF-8"))
   protected lazy val thirdAcc: KeyPair  = KeyPair("third_acc".getBytes("UTF-8"))

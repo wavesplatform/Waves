@@ -26,6 +26,7 @@ import play.api.libs.json.*
 import play.api.libs.json.Json.parse
 
 import java.net.InetSocketAddress
+import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Awaitable, Future}
@@ -188,6 +189,19 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def lastBlock(amountsAsStrings: Boolean = false): Block = sync(async(n).lastBlock(amountsAsStrings))
 
     def blockById(id: String, amountsAsStrings: Boolean = false): Block = sync(async(n).blockById(id, amountsAsStrings))
+
+    /** /blocks/last matches the same block fetched by height and by id. Retries when a block or microblock lands between the reads. */
+    @tailrec
+    final def checkLastBlockMatchesExplicit(amountsAsStrings: Boolean = false): Unit = {
+      val last     = lastBlock(amountsAsStrings)
+      val byHeight = blockAt(Height(last.height), amountsAsStrings)
+      val byId     = blockById(last.id, amountsAsStrings)
+      if (lastBlock().id != last.id) checkLastBlockMatchesExplicit(amountsAsStrings)
+      else {
+        byHeight shouldBe last
+        byId shouldBe last
+      }
+    }
 
     def lastBlockHeader(amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).lastBlockHeader(amountsAsStrings))
 
@@ -603,10 +617,28 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def waitForHeight(expectedHeight: Height, requestAwaitTime: FiniteDuration = RequestAwaitTime): Height =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 
+    /** The height of the transaction once a key block is on top of it and it is still there. The miner can orphan its own newest microblock
+      * and mine its transactions again one block higher (docs/notes/testing.md), and a block only gets its solid-state records once covered.
+      */
+    @tailrec
+    final def waitForSettledTransaction(txId: String): Height = {
+      val height = Height(waitForTransaction(txId).height)
+      waitForHeight(height.next)
+      if (Height(waitForTransaction(txId).height) == height) height else waitForSettledTransaction(txId)
+    }
+
     def currentGenerationPeriod: Option[GenerationPeriod] = sync(async(n).finalityStatus).currentGenerationPeriod
 
     def waitForGenerationPeriod(p: GenerationPeriod, requestAwaitTime: FiniteDuration = 3.minutes): Height =
       waitForHeight(p.start, requestAwaitTime)
+
+    /** The period after the current one, read right after a period boundary. A commitment names the next period and is rejected once the
+      * chain enters it, so signing it late in the current period (a few seconds with the short node-it periods) races the boundary.
+      */
+    def nextGenerationPeriodWithMargin(): GenerationPeriod = {
+      waitForGenerationPeriod(currentGenerationPeriod.get.next)
+      currentGenerationPeriod.get.next
+    }
 
     def blacklist(address: InetSocketAddress): Unit =
       sync(async(n).blacklist(address))
@@ -771,7 +803,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     import com.wavesplatform.it.api.AsyncHttpApi.NodesAsyncHttpApi as async
 
-    private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
+    // Was 8 * average-block-delay; pinned when template.conf lowered that to 4s, which a small-stake miner can exceed per block
+    private val TxInBlockchainAwaitTime = 80.seconds
     private val ConditionAwaitTime      = 5.minutes
 
     private def withTxIdMessage[T](transactionId: String)(f: => T): T =
@@ -792,7 +825,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def waitForSameBlockHeadersAt(
         height: Height,
-        retryInterval: FiniteDuration = 5.seconds,
+        retryInterval: FiniteDuration = 1.second,
         conditionAwaitTime: FiniteDuration = ConditionAwaitTime
     ): Boolean =
       sync(async(nodes).waitForSameBlockHeadersAt(height, retryInterval), conditionAwaitTime)

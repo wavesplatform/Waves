@@ -6,33 +6,37 @@ concurrency:
   group: check-pr-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  checks: write
+
 jobs:
   check-pr:
     name: Check PR
     runs-on: ubuntu-latest
     outputs:
       lang-changed: ${{ steps.filter.outputs.lang == 'true' }}
+      ride-js-changed: ${{ steps.filter.outputs.ride-js == 'true' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'sbt'
           gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-      - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
-      - uses: proudust/gh-describe@d2398810d922ababf1ec0efb454e42953dfdc460 # v2.1.2
+      - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
+      - uses: proudust/gh-describe@9b42731dd866e3cd8165a65f94cc58613def3114 # v2.2.2
         id: ghd
       - name: Check PR
-        run: sbt -Dproject.version=$(echo ${{ steps.ghd.outputs.describe }} | cut -c 2-) -J-Xlog:gc*=debug:file=./gc.log --batch checkPR
-      - uses: scacap/action-surefire-report@5609ce4db72c09db044803b344a8968fd1f315da
+        run: sbt --server -Dproject.version=$(echo ${{ steps.ghd.outputs.describe }} | cut -c 2-) -J-Xlog:gc*=debug:file=./gc.log --batch checkPR
+      - uses: ScalableCapital/action-surefire-report@4004a71652495d6ed111f5b717c2cf9aa0f37627 # v2.0.5
         if: always()
         with:
-          report_paths: '**/target/test-reports/*.xml'
+          report_paths: 'target/out/*/u/*/test-reports/*.xml'
           create_check: false
           check_name: 'Check PR'
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           filters: |
@@ -40,20 +44,48 @@ jobs:
               - 'lang/**'
               - 'build.sbt'
               - 'project/*'
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+            ride-js:
+              - 'lang/**'
+              - 'repl/**'
+              - 'ride-js-bundle/**'
+              - 'build.sbt'
+              - 'project/*'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: waves-all
-          path: node/target/waves-all-*.jar
+          path: target/out/jvm/u/node/waves-all-*.jar
+      # checkPR links repl-js straight into the @waves/ride-js package (repl/js/build.sbt).
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.filter.outputs.ride-js == 'true'
+        with:
+          name: ride-scalajs
+          path: ride-js-bundle/scalajs/ride-scalajs.js
+          if-no-files-found: error
+      # A hang or a GC death spiral never throws OutOfMemoryError (G1 has no GC overhead limit), so the JVMs are still
+      # alive after a cancel or a timeout: dump them here, before the runner kills them.
+      - name: Dump live JVMs
+        if: failure() || cancelled()
+        run: |
+          for pid in $(jps -q); do
+            jcmd $pid Thread.print > threads-$pid.txt 2>&1 || true
+          done
+          for pid in $(jps -l | awk '/ForkMain/ {print $1}'); do
+            jcmd $pid GC.heap_dump $PWD/java_pid$pid.hprof || true
+          done
+      # Heap dumps hold the whole JVM environment and the artifact is public: keep secrets out of this job's env.
       - name: Save debug data
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           if-no-files-found: ignore
+          retention-days: 3
           name: debug-data
           path: |
             gc.log*
             hs*.log
             core*
+            threads-*.txt
+            *.hprof
 
   run-smoke-tests:
     needs: check-pr
@@ -63,11 +95,11 @@ jobs:
       matrix:
         os: [macos-15-intel, macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2022]
     steps:
-      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # 8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # 8.0.2
         with:
           name: waves-all
       - run: java -cp '*' com.wavesplatform.utils.UtilApp smoke
@@ -82,17 +114,16 @@ jobs:
         repo:
           - waves-exchange/neutrino-contract
           - waves-exchange/contracts
-          - waves-ducks-core/wavesducks-public
           - swopfi/swopfi-smart-contracts
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ matrix.repo }}
-      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # 8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # 8.0.2
         with:
           name: waves-all
       - run: find -name "*.ride" -type f -exec java -cp '*' com.wavesplatform.lang.FileCompiler {} +;
@@ -101,60 +132,79 @@ jobs:
     name: RIDE JS bundle tests
     runs-on: ubuntu-latest
     needs: check-pr
-    if: needs.check-pr.outputs.lang-changed == 'true'
+    if: needs.check-pr.outputs.ride-js-changed == 'true'
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # 8.0.2
         with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'sbt'
-      - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
-      - name: Build combined ScalaJS artifact into ride-js-bundle/scalajs
-        run: sbt --batch replJS/fullOptJS
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+          name: ride-scalajs
+          path: ride-js-bundle/scalajs
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
-          node-version: '>=24.7.0'
-      - run: corepack enable
-      - name: Build & test @waves/ride-js
-        env:
-          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+          package_json_file: ride-js-bundle/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: ride-js-bundle/pnpm-lock.yaml
+      - working-directory: ride-js-bundle
         run: |
-          cd ride-js-bundle
           pnpm install --frozen-lockfile
           pnpm test
 
-  run-integration-tests:
-    name: Run integration tests
+  # node-it, one runner per entry. integrationTests is split across runners by a hash of the suite name
+  # (-Dwaves.it.shard), about 25 min each instead of 50 on one. The @LoadTest suites measure whether a node keeps up
+  # with thousands of transactions, so they get a runner of their own, one suite at a time: sharing it with other suites
+  # turns them into a measurement of the runner. Check names come from `name`: changing one (or the shard count) means
+  # updating branch protection.
+  node-it:
+    name: ${{ matrix.name }}
     # needs: check-pr
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      # A failing entry must not cancel the others and throw away their results.
+      fail-fast: false
+      matrix:
+        include:
+          - { name: 'Run integration tests (1/3)', id: '1', sbt: '-Dwaves.it.max-parallel-suites=3 -Dwaves.it.shard=1/3', task: integrationTests }
+          - { name: 'Run integration tests (2/3)', id: '2', sbt: '-Dwaves.it.max-parallel-suites=3 -Dwaves.it.shard=2/3', task: integrationTests }
+          - { name: 'Run integration tests (3/3)', id: '3', sbt: '-Dwaves.it.max-parallel-suites=3 -Dwaves.it.shard=3/3', task: integrationTests }
+          - { name: 'Run load tests', id: 'load', sbt: '-Dwaves.it.max-parallel-suites=1', task: loadTests }
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'sbt'
-      - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
-      - name: Run Integration Tests
-        run: sbt --batch "node-it/docker;node-it/test"
+      - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
+      - name: Run tests
+        # Samples CPU pressure and vmstat into the uploaded logs, to tell whether the runner has room for more parallel suites.
+        run: |
+          mkdir -p target/out/jvm/u/node-it/logs/$RUN_ID
+          (while sleep 5; do echo "$(date +%T) $(head -1 /proc/pressure/cpu 2>/dev/null || echo no-psi) load=$(cut -d' ' -f1 /proc/loadavg)"; done) > target/out/jvm/u/node-it/logs/$RUN_ID/cpu.log &
+          vmstat -t 5 > target/out/jvm/u/node-it/logs/$RUN_ID/vmstat.log &
+          # exec: a cancel signals only the step's own process, and bash does not pass it on to a foreground child,
+          # so sbt and its forked suites ran on until the runner's orphan cleanup at the end of the job.
+          exec sbt --server ${{ matrix.sbt }} --batch "node-it/docker;node-it/${{ matrix.task }}"
         env:
-          RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}
-      - uses: scacap/action-surefire-report@5609ce4db72c09db044803b344a8968fd1f315da
+          RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}-${{ matrix.id }}
+      - uses: ScalableCapital/action-surefire-report@4004a71652495d6ed111f5b717c2cf9aa0f37627 # v2.0.5
         if: always()
         with:
-          report_paths: '**/target/test-reports/*.xml'
+          report_paths: 'target/out/*/u/*/test-reports/*.xml'
           create_check: false
-          check_name: 'Run integration tests'
+          check_name: ${{ matrix.name }}
       - name: Upload Logs
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           if-no-files-found: ignore
-          name: test-logs
+          name: node-it-logs-${{ matrix.id }}
           path: |
-            node-it/target/logs/*/
-            node-it/target/test-reports
+            target/out/jvm/u/node-it/logs/*/
+            target/out/jvm/u/node-it/test-reports
 
   publish-snapshots:
     name: Publish snapshot packages
@@ -164,16 +214,16 @@ jobs:
     env:
       PR_NUMBER: ${{ github.event.number }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'sbt'
           gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-      - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
-      - run: sbt -Dproject.version=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-$PR_NUMBER-SNAPSHOT --batch publish
+      - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
+      - run: sbt --server -Dproject.version=$(awk -F '[".]' '{print $3"."$4"."$5+1}' version.sbt)-$PR_NUMBER-SNAPSHOT --batch publish
         env:
           SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}

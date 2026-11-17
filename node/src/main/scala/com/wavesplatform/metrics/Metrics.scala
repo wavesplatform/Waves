@@ -43,7 +43,7 @@ object Metrics extends ScorexLogging {
 
   private def currentTimestamp: Long =
     if (time == null) System.currentTimeMillis()
-    else time.getTimestamp()
+    else time.correctedTime()
 
   def withRetentionPolicy(retentionPolicy: String)(f: => Unit): Unit =
     db.synchronized(db.foreach { db =>

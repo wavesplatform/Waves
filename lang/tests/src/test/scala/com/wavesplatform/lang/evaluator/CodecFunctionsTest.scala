@@ -14,7 +14,7 @@ import java.util
 class CodecFunctionsTest extends FreeSpec, EvaluatorSpecBase {
   private val kilobyte = {
     val bs = new Array[Byte](1024)
-    util.Arrays.fill(bs, -1.toByte)
+    util.Arrays.fill(bs, (-1).toByte)
     bs
   }
 

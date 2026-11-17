@@ -29,10 +29,12 @@ object BlockchainFeatures {
   val BoostBlockReward                = BlockchainFeature(23, "Boost Block Reward")
   val EcrecoverFix                    = BlockchainFeature(24, "ecrecover fix")
   val DeterministicFinality           = BlockchainFeature(25, "Deterministic Finality & RIDE V9")
+  val AdjustedBlockRewardDistribution = BlockchainFeature(26, "Adjusted Block Reward Distribution")
+  val FinalityImprovements            = BlockchainFeature(27, "Finality Improvements")
 
   // Not exposed
-  val ContinuationTransaction = BlockchainFeature(26, "Continuation Transaction")
-  val LeaseExpiration         = BlockchainFeature(27, "Lease Expiration")
+  val LeaseExpiration         = BlockchainFeature(28, "Lease Expiration")
+  val ContinuationTransaction = BlockchainFeature(29, "Continuation Transaction")
 
   // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.
   val Dummy = BlockchainFeature(-1, "Non Votable!")
@@ -62,7 +64,9 @@ object BlockchainFeatures {
     LightNode,
     BoostBlockReward,
     EcrecoverFix,
-    DeterministicFinality
+    DeterministicFinality,
+    AdjustedBlockRewardDistribution,
+    FinalityImprovements
   ).map(f => f.id -> f).toMap
 
   val implemented: Set[Short] = dict.keySet

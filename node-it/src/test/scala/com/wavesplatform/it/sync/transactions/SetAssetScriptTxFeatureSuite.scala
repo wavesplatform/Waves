@@ -12,7 +12,9 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class SetAssetScriptTxFeatureSuite extends BaseFunSuite {
 
-  private val featureActivationHeight = Height(11)
+  // Blocks come every second from node start, and on a loaded runner the first request can arrive 20 blocks later; the first test needs the
+  // feature still inactive by then.
+  private val featureActivationHeight = Height(35)
 
   private var assetId = ""
 

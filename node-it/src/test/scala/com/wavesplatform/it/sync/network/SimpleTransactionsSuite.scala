@@ -15,6 +15,8 @@ import java.nio.charset.StandardCharsets
 import scala.concurrent.duration.*
 
 class SimpleTransactionsSuite extends BaseTransactionSuite {
+  override protected def publishNetworkPort: Boolean = true
+
   import com.wavesplatform.it.NodeConfigs.*
   override val nodeConfigs: Seq[Config] = Seq(BiggestMiner.quorum(0))
 

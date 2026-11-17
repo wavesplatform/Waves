@@ -11,6 +11,22 @@ import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, Genes
 import scala.concurrent.duration.*
 
 object TestHelpers {
+
+  /** Runs every step, even after one throws; rethrows the first failure with the later ones suppressed. */
+  def closeAll(steps: (() => Unit)*): Unit = {
+    val failure = steps.foldLeft(Option.empty[Throwable]) { (failure, step) =>
+      try {
+        step()
+        failure
+      } catch {
+        case e: Throwable =>
+          failure.foreach(_.addSuppressed(e))
+          failure.orElse(Some(e))
+      }
+    }
+    failure.foreach(throw _)
+  }
+
   def genesisSettings(balances: Map[Address, Long], blockTimestamp: Long = System.currentTimeMillis()): GenesisSettings = {
     val totalAmount = balances.values.sum
     val transactions = balances.map { case (account, amount) =>

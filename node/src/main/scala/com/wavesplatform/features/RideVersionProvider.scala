@@ -6,8 +6,11 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.state.Blockchain
 
 object RideVersionProvider {
+
+  /** Ordered from the latest version down. A version may come with several features, any of which activates it. */
   val actualVersionByFeature: Seq[(BlockchainFeature, StdLibVersion)] =
     List(
+      FinalityImprovements    -> V9,
       DeterministicFinality   -> V9,
       LightNode               -> V8,
       BlockRewardDistribution -> V7,

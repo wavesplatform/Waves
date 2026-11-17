@@ -1,5 +1,6 @@
 package com.wavesplatform.state.appender
 
+import cats.syntax.either.*
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.BlockchainFeatures
@@ -47,6 +48,13 @@ object ExtensionAppender extends ScorexLogging {
 
                 val droppedBlocksEi = for {
                   commonBlockHeight <- blockchainUpdater.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
+                  syncBoundary = blockchainUpdater.syncBoundary
+                  _ <- Either.raiseWhen(commonBlockHeight < syncBoundary.toInt)(
+                    GenericError(
+                      s"Fork from $lastCommonBlockId at $commonBlockHeight is below the sync boundary $syncBoundary " +
+                        "(finalized height or max-rollback)"
+                    )
+                  )
                   droppedBlocks <- {
                     if (commonBlockHeight < initialHeight)
                       blockchainUpdater.removeAfter(lastCommonBlockId)
@@ -87,7 +95,7 @@ object ExtensionAppender extends ScorexLogging {
                         if (i == 0) log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $declinedBlock: $e")
                         else
                           log.warn(
-                            s"Processed only ${i + 1} of ${newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e"
+                            s"Processed only $i of ${newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e"
                           )
 
                         Left(e)
@@ -134,8 +142,16 @@ object ExtensionAppender extends ScorexLogging {
         Right(maybeNewScore)
       case Left(ve) =>
         val errorMessage = s"${id(ch)} Error appending extension ${formatBlocks(extensionBlocks.blocks)}: $ve"
-        log.warn(errorMessage)
-        peerDatabase.blacklistAndClose(ch, errorMessage)
+
+        ve match {
+          case _: TxValidationError.BlockFromFuture =>
+            // don't blacklist on block from future
+            log.debug(errorMessage)
+          case _ =>
+            log.warn(errorMessage)
+            peerDatabase.blacklistAndClose(ch, errorMessage)
+        }
+
         Left(ve)
     }
   }

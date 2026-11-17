@@ -48,7 +48,10 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
     log.underlying
       .atLevel(if (resp.status == StatusCodes.OK) Level.INFO else Level.WARN)
       .log { () =>
-        s"HTTP ${resp.status.value} from ${req.method.value} ${req.uri}${req.attribute(requestTimestamp).fold("")(ts => f" in ${(System.nanoTime() - ts) * 1e-6}%.3f ms")}"
+        // https://github.com/apache/pekko-http/issues/1056
+        s"HTTP ${resp.status.value} from ${req.method.value} ${req.uri}${req.attributes.get(requestTimestamp).fold("") { ts =>
+            f" in ${(System.nanoTime() - ts.asInstanceOf[Long]) * 1e-6}%.3f ms"
+          }}"
       }
     r
   }

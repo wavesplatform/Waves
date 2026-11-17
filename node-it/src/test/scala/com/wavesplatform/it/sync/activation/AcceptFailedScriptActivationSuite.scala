@@ -106,11 +106,12 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     val startHeight = sender.height
 
     sender.setAssetScript(asset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
-    sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
+    // The invokes go first: once the `false` script is in a microblock, the UTX pool rejects them outright
     val txs =
       (1 to MaxTxsInMicroBlock * 2).map { _ =>
         sender.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee)._1.id
       }
+    sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
 
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
 
@@ -286,7 +287,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     val assetPair = AssetPair.createAssetPair("WAVES", tradeAsset)
 
-    val ts = ntpTime.getTimestamp()
+    val ts = ntpTime.correctedTime()
     val buyOrder = Order
       .buy(
         Order.V4,
@@ -361,7 +362,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     val assetPair = AssetPair.createAssetPair("WAVES", tradeAsset).get
 
     def orders: (Order, Order) = {
-      val ts = ntpTime.getTimestamp()
+      val ts = ntpTime.correctedTime()
       val buy = Order
         .buy(
           Order.V4,

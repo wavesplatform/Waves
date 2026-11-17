@@ -204,6 +204,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
     CacheBuilder
       .newBuilder()
       .expireAfterWrite(timeout.toJava)
+      .maximumSize(200)
       .build[K, V]()
 
   case class CacheSizes(microBlockOwners: Long, nextInvs: Long, awaiting: Long, successfullyReceived: Long)

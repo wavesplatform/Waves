@@ -8,8 +8,10 @@ import com.wavesplatform.crypto.Blake2b256
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.state.Height
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.scalatest.*
 
 import scala.concurrent.duration.*
@@ -37,6 +39,7 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
     val txId1 = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
     val txId2 = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
     val txId3 = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
+    settle(txId1, txId2, txId3)
     miner.getMerkleProof(txId1, txId2, txId3).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2, txId3)
     miner.getMerkleProofPost(txId1, txId2, txId3).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2, txId3)
     miner.getMerkleProof(txId1, txId2, txId3).map(resp => resp.transactionIndex) should contain theSameElementsAs Seq(0, 1, 2)
@@ -72,6 +75,7 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
     val txId1        = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
     val txId2        = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
     val inexistentTx = "FCym43ddiKKT3d4kznawWasoMbWd1LWyX8DUrwAAbcUA"
+    settle(txId1, txId2)
     miner.getMerkleProof(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
     miner.getMerkleProofPost(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
   }
@@ -89,23 +93,39 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
     var transactionsRootBefore = ""
 
     while (miner.height == currentHeight) {
-      val newTxId                   = miner.transfer(miner.keyPair, miner.address, 1, waitForTx = true).id
-      val newTxIds                  = txIds :+ newTxId
-      val newMerkleProofGetBefore   = miner.getMerkleProof(newTxIds*).map(_.merkleProof)
-      val newMerkleProofPostBefore  = miner.getMerkleProofPost(newTxIds*).map(_.merkleProof)
-      val newTransactionsRootBefore = miner.blockAt(currentHeight).transactionsRoot.get
-      if (miner.height == currentHeight) {
-        txIds = newTxIds
-        merkleProofGetBefore = newMerkleProofGetBefore
-        merkleProofPostBefore = newMerkleProofPostBefore
-        transactionsRootBefore = newTransactionsRootBefore
+      val newTxId  = miner.transfer(miner.keyPair, miner.address, 1, waitForTx = true).id
+      val newTxIds = txIds :+ newTxId
+      merkleProofs(newTxIds).foreach { (newMerkleProofGetBefore, newMerkleProofPostBefore) =>
+        val newTransactionsRootBefore = miner.blockAt(currentHeight).transactionsRoot.get
+        if (miner.height == currentHeight) {
+          txIds = newTxIds
+          merkleProofGetBefore = newMerkleProofGetBefore
+          merkleProofPostBefore = newMerkleProofPostBefore
+          transactionsRootBefore = newTransactionsRootBefore
+        }
       }
     }
     miner.height shouldBe currentHeight + 1
-    miner.getMerkleProof(txIds*).map(_.merkleProof) should not be merkleProofGetBefore
-    miner.getMerkleProofPost(txIds*).map(_.merkleProof) should not be merkleProofPostBefore
+    val (merkleProofGetAfter, merkleProofPostAfter) =
+      miner.waitFor("re-mined transactions")(_ => merkleProofs(txIds), (_: Option[?]).isDefined, 100.millis).value
+    merkleProofGetAfter should not be merkleProofGetBefore
+    merkleProofPostAfter should not be merkleProofPostBefore
     miner.blockAt(currentHeight).transactionsRoot.get should not be transactionsRootBefore
   }
+
+  /** A liquid transaction can drop out of every block: the next key block discards microblocks younger than min-micro-block-age. */
+  private def settle(txIds: String*): Unit = txIds.foreach(miner.waitForSettledTransaction)
+
+  /** None while the transactions are in no block: the next key block discards the microblocks younger than min-micro-block-age, and their
+    * transactions stay in the UTX pool until the next microblock re-mines them.
+    */
+  private def merkleProofs(txIds: Seq[String]): Option[(Seq[Seq[String]], Seq[Seq[String]])] =
+    try Some((miner.getMerkleProof(txIds*).map(_.merkleProof), miner.getMerkleProofPost(txIds*).map(_.merkleProof)))
+    catch {
+      case ApiCallException(e: UnexpectedStatusCodeException)
+          if e.statusCode == StatusCodes.BadRequest.intValue && e.responseBody.contains(s"\"error\":${CustomValidationError.Id}") =>
+        None
+    }
 }
 
 object MerkleRootTestSuite {

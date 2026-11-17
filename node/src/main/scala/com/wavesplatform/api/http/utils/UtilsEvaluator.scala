@@ -174,8 +174,16 @@ object UtilsEvaluator {
         .bimap(
           _ => Right(StateSnapshot.empty),
           r =>
-            InvokeDiffsCommon
-              .processActions(
+            (for {
+              _ <- InvokeDiffsCommon.checkRootCallResultLimits(
+                script.stdLibVersion,
+                blockchain,
+                usedComplexity,
+                log,
+                r.actions,
+                environment.availableActions
+              )
+              snapshot <- InvokeDiffsCommon.processActions(
                 StructuredCallableActions(r.actions, blockchain),
                 ds.stdLibVersion,
                 script.stdLibVersion,
@@ -184,6 +192,7 @@ object UtilsEvaluator {
                 usedComplexity,
                 invoke,
                 SnapshotBlockchain(blockchain, environment.currentSnapshot),
+                blockchain,
                 System.currentTimeMillis(),
                 isSyncCall = false,
                 limitedExecution = false,
@@ -192,7 +201,7 @@ object UtilsEvaluator {
                 enableExecutionLog = true,
                 log
               )
-              .resultE
+            } yield snapshot).resultE
         )
         .merge
       totalDiff     = paymentsSnapshot |+| snapshot

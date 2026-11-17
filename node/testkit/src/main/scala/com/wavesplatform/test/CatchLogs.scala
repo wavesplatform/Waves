@@ -1,18 +1,34 @@
 package com.wavesplatform.test
 
-import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.{Level, Logger}
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
 import com.wavesplatform.utils.ScorexLogging
+import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ListBuffer
 
 trait CatchLogs { this: ScorexLogging =>
-  import ch.qos.logback.classic.Logger
+  val inMemoryLog: InMemoryAppender = CatchLogs.attach(log.underlying.asInstanceOf[Logger])
+}
 
-  val inMemoryLog = {
-    val logger = log.underlying.asInstanceOf[Logger]
-    val r      = new InMemoryAppender()
+object CatchLogs {
+
+  /** Catches the logs of `cls`, which the test does not construct itself, and detaches afterwards: its logger is JVM-wide. */
+  def withLogsOf[A](cls: Class[?])(f: InMemoryAppender => A): A = {
+    val logger    = LoggerFactory.getLogger(cls).asInstanceOf[Logger]
+    val prevLevel = logger.getLevel
+    val appender  = attach(logger)
+    try f(appender)
+    finally {
+      logger.detachAppender(appender)
+      appender.stop()
+      logger.setLevel(prevLevel)
+    }
+  }
+
+  private def attach(logger: Logger): InMemoryAppender = {
+    val r = new InMemoryAppender()
     r.setContext(logger.getLoggerContext)
     r.start()
     logger.addAppender(r)

@@ -339,7 +339,8 @@ object AsyncHttpApi extends Assertions {
     )
 
     def waitForHeight(expectedHeight: Height): Future[Height] =
-      waitFor[Height](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 2.seconds)
+      // Polling is a 1ms request; a coarser interval only adds up to a full interval to every wait for a block.
+      waitFor[Height](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 1.second)
 
     def rawTransactionInfo(txId: String): Future[JsValue] = get(s"/transactions/info/$txId").map(r => Json.parse(r.getResponseBody))
 
@@ -1049,7 +1050,7 @@ object AsyncHttpApi extends Assertions {
         _      <- traverse(nodes)(_.waitForHeight(height + 1))
       } yield height + 1
 
-    def waitForSameBlockHeadersAt(height: Height, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
+    def waitForSameBlockHeadersAt(height: Height, retryInterval: FiniteDuration = 1.second): Future[Boolean] = {
 
       def waitHeight = waitFor[Height](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
 

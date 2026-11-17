@@ -7,15 +7,17 @@ Waves is a decentralized platform that allows any user to issue, transfer, swap 
 ## About the image
 This Docker image is focused on fast and convenient deployment of Waves Node.
 The image contains scripts and configs to run Waves Node for `mainnet`, `testnet` or `stagenet` networks.
-If you need to run node in private network, see [Waves private node](https://github.com/wavesplatform/Waves/tree/master/docker#waves-private-node) section.
+If you need to run node in private network, see [Waves private node](https://github.com/wavesplatform/Waves/tree/HEAD/docker#waves-private-node) section.
 
-GitHub repository: https://github.com/wavesplatform/Waves/tree/master/docker
+GitHub repository: https://github.com/wavesplatform/Waves/tree/HEAD/docker
 
 ## Prerequisites
 It is highly recommended to read more about [Waves Node configuration](https://docs.waves.tech/en/waves-node/node-configuration) before running the container.
 
 ## Building Docker image
 `./build-with-docker.sh && docker build -t wavesplatform/wavesnode docker` (from the repository root) - builds an image with the current local repository
+
+`sbt stageForDocker && docker build -t wavesplatform/wavesnode docker` (from the repository root) - the same with a local sbt, staging only what the image needs into `docker/target`
 
 **You can specify following arguments when building the image:**
 
@@ -28,11 +30,19 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 
 ## Running Docker image
 
+### The node runs as an unprivileged user
+
+The node process runs as `waves` (uid 999, gid 999), never as root. The container still starts as root so that `entrypoint.sh` can take ownership of `/var/lib/waves` and `/var/log/waves` - a bind-mounted host directory arrives with the host's ownership, unlike a named volume - and then drops to `waves` before starting the JVM. That chown runs whenever the directory or anything in it is not owned by `waves` (including data left root-owned by an older image) and is skipped otherwise, so nothing needs to be prepared by hand.
+
+Two things follow from it:
+
+- A config directory mounted at `/etc/waves` is left alone, so its files must be readable by uid 999. It is never chowned: it belongs to whoever runs the image.
+- `docker run --user ...` is honoured as given. The entrypoint drops privileges only when it starts as root, so an explicit `--user` runs the node as that user and takes responsibility for the mounted directories' ownership.
 
 
 ### Configuration options
 
-1. The image supports Waves Node config customization. To change a config field use corresponding JVM options. JVM options can be sent to JVM using `JAVA_OPTS` environment variable. Please refer to ([complete configuration file](https://github.com/wavesplatform/Waves/blob/master/node/src/main/resources/application.conf)) to get the full path of the configuration item you want to change.
+1. The image supports Waves Node config customization. To change a config field use corresponding JVM options. JVM options can be sent to JVM using `JAVA_OPTS` environment variable. Please refer to ([complete configuration file](https://github.com/wavesplatform/Waves/blob/HEAD/node/src/main/resources/application.conf)) to get the full path of the configuration item you want to change.
 
     ```
     docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -p 6869:6869 -p 6862:6862 -e JAVA_OPTS="-Dwaves.rest-api.enable=yes -Dwaves.wallet.password=myWalletSuperPassword" -ti wavesplatform/wavesnode
@@ -114,7 +124,7 @@ mkdir -p /docker/waves/waves-data
 
 wget -qO- http://blockchain-stagenet.wavesnodes.com/blockchain_last.tar --show-progress | tar -xvf - -C /docker/waves/waves-data
 
-docker run -v /docker/waves/waves-data:/var/lib/waves wavesplatform/Node -e WAVES_NETWORK=stagenet -e WAVES_WALLET_PASSWORD=myWalletSuperPassword -ti wavesplatform/wavesnode
+docker run -v /docker/waves/waves-data:/var/lib/waves -e WAVES_NETWORK=stagenet -e WAVES_WALLET_PASSWORD=myWalletSuperPassword -ti wavesplatform/wavesnode
 ```
 
 ### Network Ports
@@ -182,7 +192,7 @@ The node is configured with:
       Account address:     3M4qwDomRabJKLZxuXhwfqLApQkU592nWxF
   ```
 
-Full node configuration is available on Github in `waves.custom.conf`: https://github.com/wavesplatform/Waves/blob/master/docker/private/waves.custom.conf
+Full node configuration is available on Github in `waves.custom.conf`: https://github.com/wavesplatform/Waves/blob/HEAD/docker/private/waves.custom.conf
 
 ### Image tags
 

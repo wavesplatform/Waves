@@ -34,7 +34,7 @@ class PoSSuite extends BaseFunSuite {
 
     val height = nodes.last.height
 
-    for (h <- height to (height + 10)) {
+    for (h <- height to (height + BlocksPerTimestampCheck - 1)) {
 
       val block = forgeBlock(Height(h), signerPK)()
 
@@ -140,7 +140,7 @@ class PoSSuite extends BaseFunSuite {
     nodes.waitForHeight(vrfActivationHeight)
     val height = nodes.last.height
 
-    for (h <- height to (height + 10)) {
+    for (h <- height to (height + BlocksPerTimestampCheck - 1)) {
 
       val block = forgeBlock(Height(h), signerPK)()
 
@@ -279,7 +279,11 @@ class PoSSuite extends BaseFunSuite {
       .get
   }
 
-  private val vrfActivationHeight = Height(20)
+  // Past the BlockV4 tests: the timestamp loop plus one block per remaining V4 test, with a few blocks of margin.
+  private val BlocksPerTimestampCheck = 5
+  private val vrfActivationHeight     = Height(15)
+
+  override protected def publishNetworkPort: Boolean = true
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -346,8 +350,11 @@ class PoSSuite extends BaseFunSuite {
       else
         crypto.verifyVRF(genSig, lastBlockVRF.getOrElse(lastBlockCData.generationSignature).arr, signerPK.publicKey).explicitGet()
 
-    val posCalculator = FairPoSCalculator.V1
-    val version       = if (height + 1 < vrfActivationHeight) 3.toByte else 5.toByte
+    // Mirrors PoSSelector: V1 until VRF activates, then the calculator from the node's settings
+    val posCalculator =
+      if (height >= vrfActivationHeight) FairPoSCalculator.fromSettings(nodes.head.settings.blockchainSettings.functionalitySettings)
+      else FairPoSCalculator.V1
+    val version = if (height + 1 < vrfActivationHeight) 3.toByte else 5.toByte
 
     val validBlockDelay: Long = updateDelay(
       posCalculator
@@ -361,7 +368,7 @@ class PoSSuite extends BaseFunSuite {
     val baseTarget: Long = updateBaseTarget(
       posCalculator
         .calculateBaseTarget(
-          10,
+          nodes.head.settings.blockchainSettings.genesisSettings.averageBlockDelay.toSeconds,
           height.toInt,
           lastBlockCData.baseTarget,
           lastBlockTS,

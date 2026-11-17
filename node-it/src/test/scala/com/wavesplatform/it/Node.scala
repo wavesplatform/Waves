@@ -1,7 +1,6 @@
 package com.wavesplatform.it
 
 import java.net.{InetSocketAddress, URL}
-import scala.concurrent.duration.FiniteDuration
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{KeyPair, PublicKey, SeedKeyPair}
@@ -50,7 +49,7 @@ abstract class Node(val config: Config) extends AutoCloseable {
     * inaccessible from the host.
     */
   def networkAddress: InetSocketAddress
-  
+
   def networkAddressAccessibleFromHost: InetSocketAddress
 
   override def close(): Unit = client.close()
@@ -58,9 +57,8 @@ abstract class Node(val config: Config) extends AutoCloseable {
 
 object Node {
   implicit class NodeExt(val n: Node) extends AnyVal {
-    def name: String               = n.settings.networkSettings.derivedNodeName
-    def publicKeyStr: String       = n.publicKey.toString
-    def fee(txTypeId: Byte): Long  = FeeValidation.FeeConstants(TransactionType.fromId(txTypeId)) * FeeValidation.FeeUnit
-    def blockDelay: FiniteDuration = n.settings.blockchainSettings.genesisSettings.averageBlockDelay
+    def name: String              = n.settings.networkSettings.derivedNodeName
+    def publicKeyStr: String      = n.publicKey.toString
+    def fee(txTypeId: Byte): Long = FeeValidation.FeeConstants(TransactionType.fromId(txTypeId)) * FeeValidation.FeeUnit
   }
 }

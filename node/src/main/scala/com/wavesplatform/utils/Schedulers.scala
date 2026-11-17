@@ -41,7 +41,7 @@ object Schedulers {
     }
   }
 
-  private def threadFactory(name: String, daemonic: Boolean, reporter: UncaughtExceptionReporter): ThreadFactory = {
+  def threadFactory(name: String, daemonic: Boolean, reporter: UncaughtExceptionReporter): ThreadFactory = {
     val counter = new AtomicInteger(1)
 
     { (r: Runnable) =>

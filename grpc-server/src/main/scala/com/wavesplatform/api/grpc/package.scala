@@ -100,7 +100,7 @@ package object grpc {
                 sendNextItem()
 
               p.future
-            } else Future.failed(new IllegalStateException(s"An element ${nextItem()} is pending"))
+            } else Future.failed(new IllegalStateException(s"An element ${nextItem.get()} is pending"))
           },
         err => cso.onError(err),
         { () =>

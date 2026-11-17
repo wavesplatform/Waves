@@ -1,3 +1,8 @@
+import java.nio.file.Files
+import sbt.protocol.testing.TestResult
+
+import scala.jdk.CollectionConverters.*
+
 /* IDEA notes
  * May require to delete .idea and re-import with all checkboxes
  * Worksheets may not work: https://youtrack.jetbrains.com/issue/SCL-6726
@@ -29,12 +34,12 @@ lazy val lang =
     .withoutSuffixFor(JVMPlatform)
     .crossType(CrossType.Full)
     .settings(
-      assembly / test := {},
+      assembly / test := TestResult.Passed,
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       inConfig(Compile)(
         Seq(
           sourceGenerators += Tasks.docSource,
-          PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
+          PB.targets += PB.Target(scalapb.gen(flatPackage = true), sourceManaged.value),
           PB.protoSources += PB.externalIncludePath.value,
           PB.generate / includeFilter := { (f: File) =>
             (** / "waves" / "lang" / "*.proto").matches(f.toPath)
@@ -87,10 +92,43 @@ lazy val `node-testkit` = project
   .enablePlugins(PublishedModule)
   .settings(libraryDependencies ++= Dependencies.nodeTests)
 
+lazy val testTmpDir = settingKey[File]("java.io.tmpdir of forked test JVMs, emptied before every test run")
+
 lazy val `node-tests` = project
   .in(file("node/tests"))
   .dependsOn(`node-testkit`)
-  .settings(libraryDependencies ++= Dependencies.logDeps)
+  .settings(
+    libraryDependencies ++= Dependencies.logDeps,
+    // In-process, a leaking or hung suite exhausts the heap of sbt itself, which then thrashes in GC until CI cancels
+    // it, leaving nothing to diagnose. A fork confines that to its own JVM and dumps its heap on OOM.
+    Test / fork               := true,
+    Test / testForkedParallel := true,
+    // Uncached: the forwarded -Dlogback.test.level is read from sbt's own JVM, which the action cache does not track
+    Test / javaOptions ++= Def.uncached {
+      val root = (ThisBuild / baseDirectory).value
+      Seq(
+        "-Xmx4g",
+        "-XX:+HeapDumpOnOutOfMemoryError",
+        s"-XX:HeapDumpPath=$root",
+        "-XX:+ExitOnOutOfMemoryError",
+        s"-XX:ErrorFile=$root/hs_err_pid%p.log",
+        "-Dfile.encoding=UTF-8",
+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+        "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED",
+        s"-Djava.io.tmpdir=${(Test / testTmpDir).value}"
+      ) ++ sys.props.get("logback.test.level").map(level => s"-Dlogback.test.level=$level")
+    },
+    // Suites clean up after themselves, but a killed fork (cancel, SIGKILL, ExitOnOutOfMemoryError) cannot: keep its temp files (RocksDB
+    // dirs, native libraries) out of the shared /tmp and wipe them before the next run
+    Test / testTmpDir := target.value / "test-tmp",
+    Test / testOptions += {
+      val dir = (Test / testTmpDir).value
+      Tests.Setup { () =>
+        IO.delete(dir)
+        IO.createDirectory(dir)
+      }
+    }
+  )
 
 lazy val `grpc-server` =
   project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test")
@@ -111,7 +149,7 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
     ),
     inConfig(Compile)(
       Seq(
-        PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
+        PB.targets += PB.Target(scalapb.gen(flatPackage = true), sourceManaged.value),
         PB.protoSources += PB.externalIncludePath.value,
         PB.generate / includeFilter := { (f: File) =>
           (** / "waves" / "*.proto").matches(f.toPath)
@@ -134,7 +172,7 @@ lazy val `repl-js` = repl.js
   .dependsOn(`lang-js`)
   .settings(
     libraryDependencies ++= Dependencies.scalapbRuntimeJS.value ++ Seq(
-      "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
+      "org.scala-js" %% "scala-js-macrotask-executor" % "1.1.1"
     )
   )
 
@@ -160,11 +198,11 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "3.8.3",
+    scalaVersion         := "3.10.1",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
-    organizationHomepage := Some(url("https://wavesplatform.com")),
-    licenses             := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
+    organizationHomepage := Some(uri("https://wavesplatform.com")),
+    licenses             := Seq(("MIT", uri("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     publish / skip       := true,
     scalacOptions ++= Seq(
       "-feature",
@@ -180,6 +218,12 @@ inScope(Global)(
       "-Wconf:cat=deprecation&origin=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&origin=com.wavesplatform.state.InvokeScriptResult.*:s",
       "-Wconf:cat=deprecation&origin=com\\.wavesplatform\\.(lang\\..*|JsApiUtils)&origin=com\\.wavesplatform\\.lang\\.v1\\.compiler\\.Terms\\.LET_BLOCK:s",
+      "-Wconf:cat=deprecation&msg=ArrowAssoc.* is deprecated since 3\\.10:s", // Deprecated in Scala 3.10, play-json, pureconfig and fastparse macros still expand to it
+      // E235 "Catching Throwable" (Scala 3.10.1). lang: narrowing the RIDE evaluator's catches to NonFatal would change consensus results
+      "-Wconf:id=E235&src=lang/.*:s",
+      "-Wconf:id=E235&src=(.*/src/test/|node/testkit/).*:s",
+      // Catches that predate the lint, to be reviewed one by one; new ones stay flagged
+      "-Wconf:id=E235&src=.*/(Metrics|MicroBlockSynchronizer|UPnP|Time|api/http/package|RootActorSystem|protobuf/serde/package|RequestService|AppInitializer|Importer)\\.scala:s",
       "-Wconf:src=src_managed/.*:s"
     ),
     crossPaths        := false,
@@ -194,67 +238,160 @@ inScope(Global)(
      * u - select the JUnit XML reporter with output directory
      */
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
-    testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
+    testOptions += Tests.Setup(() => sys.props("sbt-testing") = "true"),
     network := Network.default(),
     resolvers ++= Resolver.sonatypeCentralSnapshots +: Seq(Resolver.mavenLocal),
     Compile / packageDoc / publishArtifact := false,
-    concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
+    // Both limits in one assignment: a Global key is last-writer-wins, and .sbt files load after AutoPlugins, so a
+    // second assignment in IntegrationTestsPlugin used to be silently shadowed by this one, making
+    // -Dwaves.it.max-parallel-suites a no-op. checkTestLimits guards against that happening again.
+    concurrentRestrictions := Seq(
+      Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8)),
+      Tags.limit(Tags.ForkedTestGroup, maxParallelSuites.value)
+    ),
     excludeLintKeys ++= Set(
       node / Universal / configuration,
       node / Linux / configuration,
       node / Debian / configuration,
-      Global / maxParallelSuites
+      Global / maxParallelSuites,
+      // sbt-native-packager scope bridges (Debian/Rpm/Universal) nothing here reads; sbt 2's lint reports them, sbt 1's
+      // did not. sbt matches this set by key label alone, so one entry per key covers every project and scope.
+      daemonGroup,
+      daemonGroupGid,
+      daemonStdoutLogFile,
+      daemonUser,
+      daemonUserUid,
+      debianControlScriptsDirectory,
+      executableScriptName,
+      javaOptions,
+      name,
+      rpmScriptsDirectory,
+      sourceDirectory
     )
   )
 )
 
 commands += Command.command("packageAll") { state =>
-  "node / assembly" :: "ride-runner / assembly" :: "buildDebPackages" :: "buildTarballsForDocker" :: state
+  "node / assembly" :: "ride-runner / assembly" :: "buildDebPackages" :: "stageForDocker" :: state
 }
 
-lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server tarballs and copy them to docker/target")
-buildTarballsForDocker := {
-  IO.copyFile(
-    (node / Universal / packageZipTarball).value,
-    baseDirectory.value / "docker" / "target" / "waves.tgz"
-  )
-  IO.copyFile(
-    (`grpc-server` / Universal / packageZipTarball).value,
-    baseDirectory.value / "docker" / "target" / "waves-grpc-server.tgz"
-  )
+// The image runs on Linux only, so the cross-platform jars the universal package carries are ~90MB it would transfer
+// and throw away: conscrypt is the crypto provider for the platforms the image is not, and the Linux-only rocksdb and
+// Corretto builds are staged in their place (see stageForDocker below).
+lazy val dockerExcludedJars = Seq("AmazonCorrettoCryptoProvider", "conscrypt", "rocksdbjni")
+
+// Corretto ships one jar per platform and the image needs the one matching its own, so they are staged under the
+// name docker gives that platform in TARGETARCH and the Dockerfile copies just that directory.
+lazy val dockerCorrettoArchs = Map("linux-x86_64" -> "amd64", "linux-aarch_64" -> "arm64")
+
+// A configuration of its own, because a dependency reachable from node - Optional included - is packaged into the
+// release tarball and the deb, which ship the cross-platform rocksdb jar on purpose.
+lazy val DockerNative = config("docker-native")
+ivyConfigurations += DockerNative
+libraryDependencies += Dependencies.rocksdbForLinux % DockerNative
+
+lazy val stageForDocker = taskKey[Unit]("Stage node and grpc-server files into docker/target, the image build context")
+// Uncached: docker/target is outside sbt's tracked outputs, so a cache hit would skip the copy and leave it stale or empty.
+stageForDocker := Def.uncached {
+  val dest = baseDirectory.value / "docker" / "target"
+  val conv = fileConverter.value
+
+  // Third-party jars change only when a dependency does, so they are staged apart from Waves' own jars and scripts:
+  // the image copies each directory as its own layer, and the big one stays cached across code-only builds.
+  val universal = ((node / Universal / mappings).value ++ (`grpc-server` / Universal / mappings).value).map { case (ref, path) =>
+    conv.toPath(ref).toFile -> path
+  }
+
+  val corretto = universal.flatMap { case (file, path) =>
+    dockerCorrettoArchs.collectFirst {
+      case (classifier, arch) if path.contains("AmazonCorrettoCryptoProvider") && path.contains(s"-$classifier.") =>
+        file -> dest / "native" / arch / path.stripPrefix("lib/")
+    }
+  }
+
+  val rocksdb = update.value
+    .select(configurationFilter(DockerNative.name))
+    .map(file => file -> dest / "lib" / s"org.rocksdb.${file.getName}")
+
+  val staged = universal
+    .filterNot { case (_, path) => dockerExcludedJars.exists(path.contains) }
+    .map { case (file, path) =>
+      val target =
+        if (path.startsWith("lib/") && !path.startsWith("lib/com.wavesplatform.")) dest / "lib" / path.stripPrefix("lib/")
+        else dest / "app" / path
+      file -> target
+    } ++ corretto ++ rocksdb
+
+  val wanted = staged.map(_._2).toSet
+  if (dest.isDirectory) {
+    val walk = Files.walk(dest.toPath)
+    val stale =
+      try walk.iterator().asScala.map(_.toFile).filter(f => f.isFile && !wanted.contains(f)).toList
+      finally walk.close()
+    stale.foreach(IO.delete)
+  }
+
+  staged.foreach { case (source, target) =>
+    // Copying only what changed keeps BuildKit's context transfer incremental: it detects an unchanged file by
+    // size and modification time, and re-sends nothing for one it has already seen.
+    if (!target.exists() || target.length() != source.length() || target.lastModified() != source.lastModified())
+      IO.copyFile(source, target, preserveLastModified = true)
+  }
 }
 
 lazy val buildRIDERunnerForDocker = taskKey[Unit]("Package RIDE Runner tarball and copy it to docker/target")
-buildRIDERunnerForDocker := {
+buildRIDERunnerForDocker := Def.uncached {
   IO.copyFile(
-    (`ride-runner` / Universal / packageZipTarball).value,
+    fileConverter.value.toPath((`ride-runner` / Universal / packageZipTarball).value).toFile,
     (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
   )
 }
 
+// The ForkedTestGroup limit is what makes -Dwaves.it.max-parallel-suites mean anything, and it was missing because a
+// second Global assignment of concurrentRestrictions shadowed it. Assert it rather than trust a comment.
+lazy val checkTestLimits = taskKey[Unit]("Fails if Global/concurrentRestrictions no longer caps forked test groups")
+checkTestLimits := Def.uncached {
+  val limit     = (Global / maxParallelSuites).value
+  val overLimit = Map[ConcurrentRestrictions.Tag, Int](Tags.ForkedTestGroup -> (limit + 1))
+  if ((Global / concurrentRestrictions).value.forall(_(overLimit)))
+    sys.error(
+      s"Global/concurrentRestrictions no longer caps ${Tags.ForkedTestGroup} at $limit - another assignment of that Global key has shadowed it"
+    )
+  // Forked groups inherit these tags; a Tags.Test entry would cap node-it at the per-processor Tags.Test limit instead.
+  val itTags = (`node-it` / Test / testOnly / tags).value ++ (`node-it` / Test / test / tags).value
+  if (itTags.exists(_._1 == Tags.Test))
+    sys.error(s"node-it test tasks carry ${Tags.Test} again, so its forked suites are capped by that limit, not by maxParallelSuites")
+}
+
 lazy val compilePRRaw = taskKey[Unit]("Compile the project")
-compilePRRaw := Def
-  .sequential(
-    clean.all(ScopeFilter(inAnyProject)),
-    scalafmtCheck.all(ScopeFilter(inAnyProject, inConfigurations(Compile))),
-    compile.all(ScopeFilter(inAnyProject, inConfigurations(Test)))
-  )
-  .value
+compilePRRaw := Def.uncached(
+  Def
+    .sequential(
+      clean.all(ScopeFilter(inAnyProject)),
+      scalafmtCheck.all(ScopeFilter(inAnyProject, inConfigurations(Compile))),
+      compile.all(ScopeFilter(inAnyProject, inConfigurations(Test))),
+      checkTestLimits
+    )
+    .value
+)
 
 lazy val checkPRRaw = taskKey[Unit]("Compile the project and run unit tests")
-checkPRRaw := Def
-  .sequential(
-    compilePRRaw,
-    Def.sequential(
-      test.all(
-        ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
-      ),
-      fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
-      assembly.all(ScopeFilter(inProjects(node))),
-      buildTarballsForDocker
+checkPRRaw := Def.uncached(
+  Def
+    .sequential(
+      compilePRRaw,
+      Def.sequential(
+        // testFull, not test: sbt 2's test is incremental and reports success having run nothing it ran before.
+        testFull.all(
+          ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
+        ),
+        fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
+        assembly.all(ScopeFilter(inProjects(node))),
+        stageForDocker
+      )
     )
-  )
-  .value
+    .value
+)
 
 def commandWithFatalWarnings(commandName: String, task: TaskKey[Unit]): Command =
   Command.command(commandName) { state =>
@@ -281,7 +418,7 @@ commands += Command.command("buildDebPackages") { state =>
 }
 
 lazy val buildPlatformIndependentArtifacts = taskKey[Unit]("Build fat JARs for node and ride-runner and TGZ for grpc-server")
-buildPlatformIndependentArtifacts := {
+buildPlatformIndependentArtifacts := Def.uncached {
   (node / assembly).value
   (`ride-runner` / assembly).value
   (`grpc-server` / Universal / packageZipTarball).value

@@ -5,7 +5,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.BaseFreeSpec
 import com.wavesplatform.it.api.*
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.state.Height
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.utils.ScorexLogging
 import org.apache.pekko.http.scaladsl.model.StatusCodes
@@ -16,10 +15,15 @@ import scala.concurrent.duration.DurationInt
 class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLogging {
   import com.wavesplatform.it.NodeConfigs.*
   override val nodeConfigs: Seq[Config] = Seq(
-    BiggestMiner.quorum(0).preactivatedFeatures(
-      BlockchainFeatures.FairPoS,
-      BlockchainFeatures.DeterministicFinality
-    )
+    BiggestMiner
+      .quorum(0)
+      .preactivatedFeatures(
+        BlockchainFeatures.FairPoS,
+        BlockchainFeatures.DeterministicFinality
+      )
+      // Only the committed period's generators vote, and only in a microblock, so the one transfer has to be mined inside that period. Three
+      // blocks (as little as 3s while the chain catches up with the clock) were shorter than the test JVM can stall, e.g. on its first signature.
+      .overrides("waves.blockchain.custom.functionality.generation-period-length = 10")
   )
 
   private def node            = dockerNodes().last
@@ -34,7 +38,7 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     log.warn(s"M2=$miner2Addr, M3=$miner3Addr")
 
     step("Commit to generation")
-    val period1 = node.currentGenerationPeriod.value.next
+    val period1 = node.nextGenerationPeriodWithMargin()
 
     val commitTxn1 = node.signCommitToGenerationRequest(miner1Addr)
     commitTxn1.generationPeriodStart.value shouldBe period1.start.toInt
@@ -57,8 +61,9 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
     }
 
     step("Finalized height checks")
-    val finalizedHeight1       = node.finalizedHeight
-    val waitingFinalizedHeight = finalizedHeight1 + 2
+    val finalizedHeight1 = node.finalizedHeight
+    // The committed generators vote from the start of their period, and votes in a block finalize its parent
+    val waitingFinalizedHeight = period1.start - 1
 
     withClue("Finalized height is unknown: ") {
       try node.finalizedHeightAt(node.height)
@@ -72,19 +77,14 @@ class OneNodeFinalizationTestSuite extends BaseFreeSpec, OptionValues, ScorexLog
       }
     }
 
-    // We need at least one transaction, otherwise there won't be a microblock, thus no voting, no finalization
-    // Finalization happened in a microblock
-    node.waitForHeight(Height(node.waitForTransaction(node.transfer(miner1Acc, miner3Addr, 1.waves, waitForTx = true).id).height + 1))
-    val fs = node.finalityStatus
-    if (fs.height > waitingFinalizedHeight + 2)
-      fail(
-        s"Finalization height doesn't rise: height=${fs.height}, waiting for finalized height=$waitingFinalizedHeight, last finalized height=$finalizedHeight1"
-      )
-
-    if (fs.finalizedHeight < finalizedHeight1)
-      fail(s"Finalized height ${fs.finalizedHeight} became lower than the previous $finalizedHeight1")
-    else if (fs.finalizedHeight != finalizedHeight1)
-      log.debug(s"New finalized height: $finalizedHeight1 -> ${fs.finalizedHeight}")
+    // We need at least one transaction, otherwise there won't be a microblock, thus no voting, no finalization.
+    val transferHeight = node.waitForSettledTransaction(node.transfer(miner1Acc, miner3Addr, 1.waves).id)
+    withClue(s"transfer mined at $transferHeight, outside the committed period $period1: ") {
+      transferHeight.toInt should (be >= period1.start.toInt and be <= period1.end.toInt)
+    }
+    // From recorded history, not the current height: the votes in the transfer's microblock finalize its parent at once
+    node.finalizedHeightAt(transferHeight) shouldBe transferHeight - 1
+    node.finalizedHeight should be >= waitingFinalizedHeight
 
     step("Survives restart")
     isolated {

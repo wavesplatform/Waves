@@ -17,7 +17,7 @@ inConfig(Compile)(
         ((** / "waves" / "node" / "grpc" / ** / "*.proto") || (** / "waves" / "events" / ** / "*.proto"))
           .accept(f.toPath, FileAttributes(f.toPath).getOrElse(FileAttributes.NonExistent))
     ),
-    PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
+    PB.targets += PB.Target(scalapb.gen(flatPackage = true), sourceManaged.value)
   )
 )
 

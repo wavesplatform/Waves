@@ -153,8 +153,15 @@ object CommonValidation {
       )
 
     def scriptActivation(sc: Script): Either[ActivationError, T] = {
-      val barrierByVersion =
-        RideVersionProvider.actualVersionByFeature.map { case (feature, version) => (version, activationBarrier(feature)) }.toMap
+      // Any of a version's features activates it; the error names the last of them, the one the version originally came with
+      val barrierByVersion: Map[StdLibVersion, Either[ActivationError, T]] =
+        RideVersionProvider.actualVersionByFeature
+          .groupMap(_._2)(_._1)
+          .view
+          .mapValues { features =>
+            features.map(activationBarrier(_)).find(_.isRight).getOrElse(activationBarrier(features.last))
+          }
+          .toMap
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
         case V1 | V2 | V3 if sc.containsArray => barrierByVersion(V4)

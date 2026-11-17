@@ -63,7 +63,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
         case Some("eth_blockNumber") =>
           resp(id, quantity(blockchain.height))
         case Some("eth_getTransactionCount") =>
-          resp(id, quantity(time.getTimestamp()))
+          resp(id, quantity(time.correctedTime()))
         case Some("eth_getBlockByNumber") =>
           extractParam1[String](jso) { str =>
             val blockNumberOpt = str match {

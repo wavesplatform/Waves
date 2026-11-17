@@ -44,7 +44,11 @@ final case class CommitToGenerationTransaction(
       )
     )
 
-  lazy val popMessage: Array[Byte] = CommitToGenerationTransaction.mkPopMessage(endorserPublicKey, generationPeriodStart)
+  /** @param senderBound
+    *   whether [[com.wavesplatform.features.BlockchainFeatures.FinalityImprovements]] is activated, see [[CommitToGenerationTransaction.mkPopMessage]]
+    */
+  def popMessage(senderBound: Boolean): Array[Byte] =
+    CommitToGenerationTransaction.mkPopMessage(endorserPublicKey, generationPeriodStart, Option.when(senderBound)(sender))
 }
 
 object CommitToGenerationTransaction {
@@ -55,11 +59,17 @@ object CommitToGenerationTransaction {
   implicit def signed(tx: CommitToGenerationTransaction, privateKey: PrivateKey): CommitToGenerationTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  def mkPopSignature(blsKeyPair: BlsKeyPair, generationPeriodStart: Height): BlsSignature =
-    blsKeyPair.sign(mkPopMessage(blsKeyPair.publicKey, generationPeriodStart))
+  /** @param sender See [[mkPopMessage]] */
+  def mkPopSignature(blsKeyPair: BlsKeyPair, generationPeriodStart: Height, sender: Option[PublicKey]): BlsSignature =
+    blsKeyPair.sign(mkPopMessage(blsKeyPair.publicKey, generationPeriodStart, sender))
 
-  def mkPopMessage(blsPublicKey: BlsPublicKey, generationPeriodStart: Height): Array[Byte] =
-    blsPublicKey.arr ++ generationPeriodStart.toByteArray
+  /** @param sender
+    *   the transaction's sender since [[com.wavesplatform.features.BlockchainFeatures.FinalityImprovements]], None before it. A proof that does
+    *   not name its sender can be copied from a pending transaction into another account's commitment, which takes the BLS key for the period
+    *   and locks its owner out.
+    */
+  def mkPopMessage(blsPublicKey: BlsPublicKey, generationPeriodStart: Height, sender: Option[PublicKey]): Array[Byte] =
+    blsPublicKey.arr ++ generationPeriodStart.toByteArray ++ sender.fold(Array.emptyByteArray)(_.arr)
 
   def create(
       version: TxVersion,

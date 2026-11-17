@@ -38,16 +38,16 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
   private val genesis = for {
     lessor         <- accountGen
     aliasRecipient <- accountGen
-    ts = ntpTime.getTimestamp()
+    ts = ntpTime.correctedTime()
     maxFeeAmount <- Gen.choose(100000L, 1 * Constants.UnitsInWave)
-    transfer     <- transferGeneratorP(ntpTime.getTimestamp(), lessor, aliasRecipient.toAddress, maxFeeAmount)
+    transfer     <- transferGeneratorP(ntpTime.correctedTime(), lessor, aliasRecipient.toAddress, maxFeeAmount)
     alias        <- aliasGen
-    createAlias  <- createAliasGen(aliasRecipient, alias, transfer.amount.value, ntpTime.getTimestamp())
+    createAlias  <- createAliasGen(aliasRecipient, alias, transfer.amount.value, ntpTime.correctedTime())
     genesisBlock = TestBlock
       .create(
         ts,
         Seq(
-          GenesisTransaction.create(lessor.toAddress, Constants.TotalWaves * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
+          GenesisTransaction.create(lessor.toAddress, Constants.TotalWaves * Constants.UnitsInWave, ntpTime.correctedTime()).explicitGet(),
           transfer,
           createAlias
         )
@@ -60,13 +60,13 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
     for {
       amount <- Gen.choose(1 * Constants.UnitsInWave, 1000 * Constants.UnitsInWave)
       fee    <- smallFeeGen
-      l      <- createLease(sender, amount, fee, ntpTime.getTimestamp(), recipient)
+      l      <- createLease(sender, amount, fee, ntpTime.correctedTime(), recipient)
     } yield l
 
   private def lease(sender: KeyPair, recipient: AddressOrAlias, amount: Long): Gen[LeaseTransaction] =
     for {
       fee <- smallFeeGen
-      l   <- createLease(sender, amount, fee, ntpTime.getTimestamp(), recipient)
+      l   <- createLease(sender, amount, fee, ntpTime.correctedTime(), recipient)
     } yield l
 
   private def blockWithAliases(ref: ByteStr, lessor: KeyPair, alias: Alias): Gen[Block] =
@@ -74,7 +74,7 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
       addressRecipient <- accountGen
       l1               <- lease(lessor, addressRecipient.toAddress)
       l2               <- lease(lessor, alias)
-    } yield TestBlock.create(ntpTime.getTimestamp(), ref, Seq(l1, l2)).block
+    } yield TestBlock.create(ntpTime.correctedTime(), ref, Seq(l1, l2)).block
 
   private def ensureNoLeases(b: Blockchain, addresses: Set[AddressOrAlias])(implicit pos: Position): Unit = {
     for (aoa <- addresses) {
@@ -132,9 +132,9 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
   "Cancel lease transaction" - {
     val validCancel = for {
       (lessor, alias, genesisBlock) <- genesis
-      (l1, c1)                      <- leaseAndCancelGeneratorP(lessor, alias, ntpTime.getTimestamp())
+      (l1, c1)                      <- leaseAndCancelGeneratorP(lessor, alias, ntpTime.correctedTime())
       recipient                     <- accountGen
-      (l2, c2)                      <- leaseAndCancelGeneratorP(lessor, recipient.toAddress, ntpTime.getTimestamp())
+      (l2, c2)                      <- leaseAndCancelGeneratorP(lessor, recipient.toAddress, ntpTime.correctedTime())
       b2 = TestBlock.create(ntpNow, genesisBlock.id(), Seq(l1, l2)).block
       b3 = mkEmptyBlock(b2.id())
       b4 = TestBlock.create(ntpNow, b3.id(), Seq(c1, c2)).block
@@ -155,9 +155,9 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
 
     val invalidCancel = for {
       (lessor, alias, genesisBlock) <- genesis
-      (l1, c1)                      <- leaseAndCancelGeneratorP(lessor, alias, ntpTime.getTimestamp())
+      (l1, c1)                      <- leaseAndCancelGeneratorP(lessor, alias, ntpTime.correctedTime())
       recipient                     <- accountGen
-      (l2, c2)                      <- leaseAndCancelGeneratorP(lessor, recipient.toAddress, ntpTime.getTimestamp())
+      (l2, c2)                      <- leaseAndCancelGeneratorP(lessor, recipient.toAddress, ntpTime.correctedTime())
       b2 = TestBlock.create(ntpNow, genesisBlock.id(), Seq(l1, l2)).block
       b3 = mkEmptyBlock(b2.id())
       b4 = mkEmptyBlock(b3.id())

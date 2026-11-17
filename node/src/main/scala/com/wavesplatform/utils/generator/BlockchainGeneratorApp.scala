@@ -35,7 +35,7 @@ class FakeTime(val startTime: Long) extends Time {
   var time: Long = startTime
 
   override def correctedTime(): Long = time
-  override def getTimestamp(): Long  = time
+  def getTimestamp(): Long           = time
 }
 
 object BlockchainGeneratorApp extends ScorexLogging {

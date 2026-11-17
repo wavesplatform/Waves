@@ -5,8 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.database.RDB
-import com.wavesplatform.db.DBCacheSettings
+import com.wavesplatform.db.{DBCacheSettings, TempRDB}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{WavesSettings, *}
@@ -19,7 +18,6 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.{TestHelpers, WithNewDBForEachTest, crypto}
 import org.scalacheck.{Arbitrary, Gen}
 
-import java.nio.file.Files
 import scala.concurrent.duration.*
 import scala.util.Random
 
@@ -273,8 +271,8 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
 
   def withEnv(gen: Time => Gen[(Seq[KeyPair], Seq[Block])], VRFActivated: Boolean = false)(f: Env => Unit): Unit = {
     // we are not using the db instance from WithDB trait as it should be recreated between property checks
-    val path = Files.createTempDirectory("lvl").toAbsolutePath
-    val rdb  = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
+    val tempRdb = TempRDB("rocks-temp-FPPoSSelectorTest", dbSettings)
+    val rdb     = tempRdb.rdb
     val defaultWriter = TestRocksDB.withFunctionalitySettings(
       rdb,
       TestFunctionalitySettings.Stub.copy(preActivatedFeatures =
@@ -300,12 +298,7 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
 
       f(Env(pos, bcu, accounts, blocks))
       bcu.shutdown()
-    } finally {
-      bcu.shutdown()
-      defaultWriter.close()
-      rdb.close()
-      TestHelpers.deleteRecursively(path)
-    }
+    } finally TestHelpers.closeAll(() => bcu.shutdown(), () => defaultWriter.close(), () => tempRdb.close())
   }
 }
 

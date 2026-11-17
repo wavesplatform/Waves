@@ -148,6 +148,7 @@ object InvokeDiffsCommon {
       storingComplexity: Int,
       tx: InvokeScriptLike,
       blockchain: Blockchain,
+      feeBlockchain: Blockchain,
       blockTime: Long,
       isSyncCall: Boolean,
       limitedExecution: Boolean,
@@ -180,7 +181,7 @@ object InvokeDiffsCommon {
           calcAndCheckFee(
             FailedTransactionError.feeForActions(_, _, log),
             tx.root,
-            blockchain,
+            feeBlockchain,
             stepLimit,
             storingComplexity.min(stepLimit), // complexity increased by sync calls should not require fee for additional steps
             actions.issueList ++ otherIssues,
@@ -193,7 +194,7 @@ object InvokeDiffsCommon {
         else if (version < V5)
           TracedResult(paymentsPart(blockchain, tx, dAppAddress, feePortfolios))
         else
-          TracedResult(StateSnapshot.build(blockchain, txFeeDiff(blockchain, tx.root).explicitGet()._2))
+          TracedResult(StateSnapshot.build(blockchain, txFeeDiff(feeBlockchain, tx.root).explicitGet()._2))
       complexityLimit =
         if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - storingComplexity
         else Int.MaxValue
@@ -365,11 +366,6 @@ object InvokeDiffsCommon {
 
   private def checkDataEntries(blockchain: Blockchain, tx: InvokeScriptLike, dataEntries: Seq[DataEntry[?]], stdLibVersion: StdLibVersion) =
     for {
-      _ <- Either.cond(
-        dataEntries.length <= ContractLimits.MaxWriteSetSize,
-        (),
-        s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
-      )
       _ <- Either.cond(
         tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
         (), {
@@ -752,6 +748,32 @@ object InvokeDiffsCommon {
         )
       case Success(s) => s
     }
+
+  def checkRootCallResultLimits(
+      version: StdLibVersion,
+      blockchain: Blockchain,
+      usedComplexity: Long,
+      log: Log[Id],
+      actions: List[CallableAction],
+      availableActions: ActionLimits
+  ): TracedResult[ValidationError, Unit] = {
+    val dataEntries         = actions.collect { case d: DataOp => dataItemToEntry(d) }
+    val dataCount           = dataEntries.length
+    val balanceActionsCount = actions.count { case _: AssetTransfer | _: Lease | _: LeaseCancel => true; case _ => false }
+    checkCallResultLimits(
+      version,
+      version,
+      blockchain,
+      usedComplexity,
+      log,
+      actions.length - dataCount,
+      balanceActionsCount,
+      actions.length - dataCount - balanceActionsCount,
+      dataCount,
+      DataTxValidator.invokeWriteSetSize(blockchain, dataEntries),
+      availableActions
+    )
+  }
 
   def checkCallResultLimits(
       currentVersion: StdLibVersion,

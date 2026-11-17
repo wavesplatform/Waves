@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.lang.v1.FunctionCallCopyBenchmark.FuncCallSt
 import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.evaluator.EvaluationCopy
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
@@ -26,6 +27,19 @@ class FunctionCallCopyBenchmark {
   @Benchmark
   def fourLevelsDeep(st: FuncCallSt, bh: Blackhole): Unit =
     bh.consume(st.fourLevelsDeep.deepCopy.value)
+
+  // The copy the evaluator makes, next to deepCopy above.
+  @Benchmark
+  def twoLevelsDeepForEvaluation(st: FuncCallSt, bh: Blackhole): Unit =
+    bh.consume(EvaluationCopy(st.twoLevelsDeep))
+
+  @Benchmark
+  def threeLevelsDeepForEvaluation(st: FuncCallSt, bh: Blackhole): Unit =
+    bh.consume(EvaluationCopy(st.threeLevelsDeep))
+
+  @Benchmark
+  def fourLevelsDeepForEvaluation(st: FuncCallSt, bh: Blackhole): Unit =
+    bh.consume(EvaluationCopy(st.fourLevelsDeep))
 }
 
 object FunctionCallCopyBenchmark {

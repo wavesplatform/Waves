@@ -131,8 +131,6 @@ object Blockchain {
     def lastBlockHeader: Option[SignedBlockHeader] = blockchain.blockHeader(blockchain.height)
     def lastBlockId: Option[BlockId]               = lastBlockHeader.map(_.id())
     def lastBlockTimestamp: Option[Long]           = lastBlockHeader.map(_.header.timestamp)
-    def lastBlockIds(maxRollbackLength: Int): Seq[ByteStr] =
-      (blockchain.height to blockchain.finalizedHeightOrFallback(maxRollbackLength).toInt by -1).flatMap(blockId)
 
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       (aoa: @unchecked) match {
@@ -273,13 +271,21 @@ object Blockchain {
         .featureActivationHeight(BlockchainFeatures.LightNode)
         .exists(Height(height) >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
 
+    // Came with whichever of these features activates first
+    def strictEthSignatureChecks: Boolean =
+      Seq(BlockchainFeatures.DeterministicFinality, BlockchainFeatures.AdjustedBlockRewardDistribution, BlockchainFeatures.FinalityImprovements)
+        .exists(isFeatureActivated(_))
+
+    // AdjustedBlockRewardDistribution supersedes BoostBlockReward: the block reward it votes on is already the full amount issued per block
     def blockRewardBoost(height: Height): Int =
-      blockchain
-        .featureActivationHeight(BlockchainFeatures.BoostBlockReward)
-        .filter { boostHeight =>
-          boostHeight <= height && height < boostHeight + blockchain.settings.functionalitySettings.blockRewardBoostPeriod
-        }
-        .fold(1)(_ => BlockRewardCalculator.RewardBoost)
+      if (isFeatureActivated(BlockchainFeatures.AdjustedBlockRewardDistribution, height.toInt)) 1
+      else
+        blockchain
+          .featureActivationHeight(BlockchainFeatures.BoostBlockReward)
+          .filter { boostHeight =>
+            boostHeight <= height && height < boostHeight + blockchain.settings.functionalitySettings.blockRewardBoostPeriod
+          }
+          .fold(1)(_ => BlockRewardCalculator.RewardBoost)
 
     /** @return None, if DeterministicFinality is not activated for provided height
       */

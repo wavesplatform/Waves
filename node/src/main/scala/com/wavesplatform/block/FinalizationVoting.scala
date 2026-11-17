@@ -22,6 +22,8 @@ case class FinalizationVoting(
 
   def nonEmpty: Boolean = valid.nonEmpty || conflict.nonEmpty
 
+  def conflictingEndorsers: Set[GeneratorIndex] = conflict.map(_.endorserIndex).toSet
+
   override def toString: String =
     s"Voting(v=[${valid.mkString(",")}], h=$finalizedHeight, c=[${conflict.mkString(", ")}], s=$aggregatedEndorsement)"
 }

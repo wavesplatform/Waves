@@ -15,7 +15,8 @@ import scala.reflect.ClassTag
 import scala.util.Try
 
 package object state {
-  def safeSum(x: Long, y: Long, source: String): Either[String, Long] =
+  // By-name: callers interpolate addresses into the source, and Base58 is too costly to pay for on every balance change.
+  def safeSum(x: Long, y: Long, source: => String): Either[String, Long] =
     Try(Math.addExact(x, y)).toEither.leftMap(_ => s"$source sum overflow")
 
   implicit val safeSummarizer: Summarizer[[X] =>> Either[String, X]] = safeSum(_, _, _)
@@ -52,10 +53,16 @@ package object state {
 
       def max(that: Height): Height = math.max(h, that)
       def min(that: Height): Height = math.min(h, that)
+
+      // Defined here rather than through a Conversion to Ordered, which boxes the Int on every comparison.
+      def <(that: Height): Boolean         = h < that
+      def <=(that: Height): Boolean        = h <= that
+      def >(that: Height): Boolean         = h > that
+      def >=(that: Height): Boolean        = h >= that
+      infix def compare(that: Height): Int = Integer.compare(h, that)
     }
 
-    given Ordering[Height]                    = Ordering[Int]
-    given Conversion[Height, Ordered[Height]] = scala.math.Ordered.orderingToOrdered(_)
+    given Ordering[Height] = Ordering[Int]
 
     given Writes[Height] = Writes.IntWrites
     given Reads[Height]  = Reads.IntReads

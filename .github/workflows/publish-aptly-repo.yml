@@ -30,7 +30,7 @@ jobs:
           echo "aptly_cachekey=aptly-$APTLY_VERSION" >> "$GITHUB_OUTPUT"
       - name: Cache aptly
         id: cache-aptly
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.cache-aptly-path.outputs.aptly_toolpath }}
           key: ${{ steps.cache-aptly-path.outputs.aptly_cachekey }}
@@ -50,14 +50,14 @@ jobs:
           cd "$APTLY_TOOLPATH"
           ls -la aptly_${APTLY_VERSION}_linux_amd64/aptly
           echo "$PWD/aptly_${APTLY_VERSION}_linux_amd64" >> "$GITHUB_PATH"
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: ./.github/workflows/create-aptly-repo.sh
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: /home/runner/.aptly/public
-      - uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

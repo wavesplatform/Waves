@@ -61,8 +61,8 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
       parentHitSource <- getHitSource(parentHeight)
       gs <-
         if (vrfActivated(parentHeight + 1)) {
-          crypto
-            .verifyVRF(
+          CachedVrf
+            .verify(
               header.generationSignature,
               parentHitSource.arr,
               header.generator,
@@ -89,7 +89,7 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
       if (vrfActivated(height + 1)) {
         getHitSource(height)
           .flatMap(hs =>
-            crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height))
+            CachedVrf.verify(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height))
           )
       } else {
         blockchain
@@ -150,10 +150,8 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
     } yield ()
   }
 
-  private def getHitSource(height: Int): Either[ValidationError, ByteStr] = {
-    val hitSource = if (fairPosActivated(height) && height > 100) blockchain.hitSource(height - 100) else blockchain.hitSource(height)
-    hitSource.toRight(GenericError(s"Couldn't find hit source for height: $height"))
-  }
+  private def getHitSource(height: Int): Either[ValidationError, ByteStr] =
+    blockchain.hitSource(PoSSelector.hitSourceHeight(blockchain, height)).toRight(GenericError(s"Couldn't find hit source for height: $height"))
 
   private def getHit(height: Int, account: KeyPair): Either[ValidationError, BigInt] =
     for {
@@ -167,6 +165,19 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
         }
     } yield hit(gs)
 
-  private def fairPosActivated(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPoS.id)
-  private def vrfActivated(height: Int): Boolean     = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.BlockV5.id)
+  private def fairPosActivated(height: Int): Boolean = PoSSelector.fairPosActivated(blockchain, height)
+  private def vrfActivated(height: Int): Boolean     = PoSSelector.vrfActivated(blockchain, height)
+}
+
+object PoSSelector {
+
+  /** The height whose hit source the block above `parentHeight` is generated from. */
+  def hitSourceHeight(blockchain: Blockchain, parentHeight: Int): Int =
+    if (fairPosActivated(blockchain, parentHeight) && parentHeight > 100) parentHeight - 100 else parentHeight
+
+  /** Whether the block at `height` carries a VRF proof as its generation signature. */
+  def vrfActivated(blockchain: Blockchain, height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.BlockV5.id)
+
+  private def fairPosActivated(blockchain: Blockchain, height: Int): Boolean =
+    blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPoS.id)
 }

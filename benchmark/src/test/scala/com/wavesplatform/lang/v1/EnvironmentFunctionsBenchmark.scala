@@ -13,7 +13,6 @@ import com.wavesplatform.crypto.Curve25519
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp, V4}
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.*
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, EVALUATED, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
@@ -37,7 +36,7 @@ import scala.util.Random
 @Warmup(iterations = 10, time = 1)
 @Measurement(iterations = 10, time = 1)
 class EnvironmentFunctionsBenchmark {
-
+  import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.*
   @Benchmark
   def random_bytes_500_test(): Array[Byte] = randomBytes(DataBytesLength)
 
@@ -165,6 +164,7 @@ object EnvironmentFunctionsBenchmark {
 
 @State(Scope.Benchmark)
 class AddressFromString {
+  import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.*
   val ctx: EvaluationContext[Environment, Id] =
     WavesContext
       .build(Global, DirectiveSet(V4, Account, DApp).explicitGet(), true)
