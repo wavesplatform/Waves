@@ -208,7 +208,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "3.10.0",
+    scalaVersion         := "3.10.1",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(uri("https://wavesplatform.com")),
@@ -229,6 +229,11 @@ inScope(Global)(
       "-Wconf:cat=deprecation&origin=com.wavesplatform.state.InvokeScriptResult.*:s",
       "-Wconf:cat=deprecation&origin=com\\.wavesplatform\\.(lang\\..*|JsApiUtils)&origin=com\\.wavesplatform\\.lang\\.v1\\.compiler\\.Terms\\.LET_BLOCK:s",
       "-Wconf:cat=deprecation&msg=ArrowAssoc.* is deprecated since 3\\.10:s", // Deprecated in Scala 3.10, play-json, pureconfig and fastparse macros still expand to it
+      // E235 "Catching Throwable" (Scala 3.10.1). lang: narrowing the RIDE evaluator's catches to NonFatal would change consensus results
+      "-Wconf:id=E235&src=lang/.*:s",
+      "-Wconf:id=E235&src=(.*/src/test/|node/testkit/).*:s",
+      // Catches that predate the lint, to be reviewed one by one; new ones stay flagged
+      "-Wconf:id=E235&src=.*/(Metrics|MicroBlockSynchronizer|UPnP|Time|api/http/package|RootActorSystem|protobuf/serde/package|RequestService|AppInitializer|Importer)\\.scala:s",
       "-Wconf:src=src_managed/.*:s"
     ),
     crossPaths        := false,

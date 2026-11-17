@@ -17,7 +17,7 @@ jobs:
       lang-changed: ${{ steps.filter.outputs.lang == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -29,7 +29,7 @@ jobs:
         id: ghd
       - name: Check PR
         run: sbt --server -Dproject.version=$(echo ${{ steps.ghd.outputs.describe }} | cut -c 2-) -J-Xlog:gc*=debug:file=./gc.log --batch checkPR
-      - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3
+      - uses: ScalableCapital/action-surefire-report@4004a71652495d6ed111f5b717c2cf9aa0f37627 # v2.0.5
         if: always()
         with:
           report_paths: 'target/out/*/u/*/test-reports/*.xml'
@@ -81,7 +81,7 @@ jobs:
       matrix:
         os: [macos-15-intel, macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2022]
     steps:
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -105,7 +105,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ matrix.repo }}
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -135,7 +135,7 @@ jobs:
           - { name: 'Run load tests', id: 'load', sbt: '-Dwaves.it.max-parallel-suites=1', task: loadTests }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -152,7 +152,7 @@ jobs:
           exec sbt --server ${{ matrix.sbt }} --batch "node-it/docker;node-it/${{ matrix.task }}"
         env:
           RUN_ID: ${{ github.head_ref }}-${{ github.run_number }}-${{ github.run_attempt }}-${{ matrix.id }}
-      - uses: ScalableCapital/action-surefire-report@1e92f48016e566e4eed2d81560edbfe0f524cfb7 # v2.0.3
+      - uses: ScalableCapital/action-surefire-report@4004a71652495d6ed111f5b717c2cf9aa0f37627 # v2.0.5
         if: always()
         with:
           report_paths: 'target/out/*/u/*/test-reports/*.xml'
@@ -177,7 +177,7 @@ jobs:
       PR_NUMBER: ${{ github.event.number }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: 'temurin'
           java-version: '17'
