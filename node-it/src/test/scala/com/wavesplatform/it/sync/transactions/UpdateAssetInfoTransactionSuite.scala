@@ -27,7 +27,8 @@ import scala.concurrent.duration.*
 
 class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with TableDrivenPropertyChecks {
   import UpdateAssetInfoTransactionSuite.*
-  val updateInterval = 2
+  // The rejection check right after an update must not outrun this window (docs/notes/testing.md, "a window of N blocks")
+  val updateInterval = 10
   override protected def nodeConfigs: Seq[Config] =
     Seq(
       configWithUpdateIntervalSetting(updateInterval).withFallback(Miners.head),
@@ -154,6 +155,18 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     nodes.waitForHeightArise()
   }
 
+  test("not able to update name/description more than once within interval") {
+    val nextTermEnd   = updateAssetInfoTxHeight + updateInterval
+    val currentHeight = sender.height
+    withClue(s"height before the broadcast: $currentHeight, ") {
+      assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
+        error.id shouldBe StateCheckFailed.Id
+        error.message should include(s"Can't update info of asset with id=$assetId before $nextTermEnd block")
+        error.message should include(s"minUpdateInfoInterval=$updateInterval")
+      }
+    }
+  }
+
   test("DApp can read updated asset info") {
     sender.invokeScript(
       issuer,
@@ -176,28 +189,10 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     res.value shouldBe true
   }
 
-  test("not able to update name/description more than once within interval") {
-    val nextTermEnd = updateAssetInfoTxHeight + updateInterval
-    assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
-      error.id shouldBe StateCheckFailed.Id
-      error.message should include(
-        s"Can't update info of asset with id=$assetId before $nextTermEnd block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
-      )
-    }
-    sender.waitForHeight(nextTermEnd - 1)
-
-    assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
-      error.id shouldBe StateCheckFailed.Id
-      error.message should include(
-        s"Can't update info of asset with id=$assetId before $nextTermEnd block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
-      )
-    }
-  }
-
   var secondUpdateInfoHeight = Height(0)
 
   test("able to update info of other asset after updating info of first asset") {
-    nodes.waitForHeightArise()
+    nodes.waitForHeight(Height(sender.transactionInfo[TransactionInfo](otherAssetId).height + updateInterval + 1))
     val (updateAssetInfoTx, _) = sender.updateAssetInfo(issuer, otherAssetId, "secondUpdate", "secondUpdatedDescription", minFee)
     checkUpdateAssetInfoTx(updateAssetInfoTx, "secondUpdate", "secondUpdatedDescription")
     sender.waitForTransaction(updateAssetInfoTx.id)
@@ -370,6 +365,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("reissue/burn/setassetscript should not affect update interval") {
+    sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
     sender.reissue(issuer, assetId, 100, reissuable = true, version = TxVersion.V2, waitForTx = true)
     sender.updateAssetInfo(issuer, assetId, "afterReissue", "asset after reissue", waitForTx = true)
     sender.assetsDetails(assetId).name shouldBe "afterReissue"

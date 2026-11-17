@@ -87,10 +87,11 @@ class LastMicroBlockSuite extends FreeSpec with WithMiner with TestSchedulerOps 
       d.appendMicroBlock(d.createMicroBlock(signer = thisNodeAcc1.some)(TxHelpers.transfer(from = otherNodeAcc, to = thisNodeAcc2.toAddress)))
 
       log.debug("Trigger thisNode forging")
+      val heightBefore = d.blockchain.height
       appenderScheduler.tickNext("this-appender-1")
 
-      val lastBlock = d.blockchain.lastBlockHeader.value
-      lastBlock.header.reference shouldBe refLiquidBlockId
+      // Forging resumes right after our own append, so the tick can forge more than one block (TestTime is ahead of block2)
+      d.blockchain.blockHeader(heightBefore + 1).value.header.reference shouldBe refLiquidBlockId
     }
   }.get
 
@@ -142,10 +143,11 @@ class LastMicroBlockSuite extends FreeSpec with WithMiner with TestSchedulerOps 
       val refLiquidBlockId = d.lastBlockId
 
       log.debug("Trigger thisNode forging")
+      val heightBefore = d.blockchain.height
       appenderScheduler.tickNext("this-appender-1")
 
-      val lastBlock = d.blockchain.lastBlockHeader.value
-      lastBlock.header.reference shouldBe refLiquidBlockId
+      // Forging resumes right after our own append, so the tick can forge more than one block (TestTime is ahead of block2)
+      d.blockchain.blockHeader(heightBefore + 1).value.header.reference shouldBe refLiquidBlockId
     }
   }.get
 

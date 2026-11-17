@@ -39,6 +39,7 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
     val txId1 = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
     val txId2 = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
     val txId3 = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
+    settle(txId1, txId2, txId3)
     miner.getMerkleProof(txId1, txId2, txId3).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2, txId3)
     miner.getMerkleProofPost(txId1, txId2, txId3).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2, txId3)
     miner.getMerkleProof(txId1, txId2, txId3).map(resp => resp.transactionIndex) should contain theSameElementsAs Seq(0, 1, 2)
@@ -74,6 +75,7 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
     val txId1        = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
     val txId2        = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
     val inexistentTx = "FCym43ddiKKT3d4kznawWasoMbWd1LWyX8DUrwAAbcUA"
+    settle(txId1, txId2)
     miner.getMerkleProof(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
     miner.getMerkleProofPost(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
   }
@@ -110,6 +112,9 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
     merkleProofPostAfter should not be merkleProofPostBefore
     miner.blockAt(currentHeight).transactionsRoot.get should not be transactionsRootBefore
   }
+
+  /** A liquid transaction can drop out of every block: the next key block discards microblocks younger than min-micro-block-age. */
+  private def settle(txIds: String*): Unit = txIds.foreach(miner.waitForSettledTransaction)
 
   /** None while the transactions are in no block: the next key block discards the microblocks younger than min-micro-block-age, and their
     * transactions stay in the UTX pool until the next microblock re-mines them.

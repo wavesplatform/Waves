@@ -148,7 +148,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
       } yield r
     }
 
-  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] = miner.generateBlockTask(account, None)
+  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] = miner.generateBlockTask(account)
 
   private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, ForgeAttemptResult.Success] = miner.forgeBlock(account).toEither
 
