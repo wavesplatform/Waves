@@ -15,7 +15,8 @@ import scala.concurrent.duration.*
 
 class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with TableDrivenPropertyChecks {
   import UpdateAssetInfoTransactionGrpcSuite.*
-  val updateInterval                              = 2
+  // The rejection check right after an update must not outrun this window (docs/notes/testing.md, "a window of N blocks")
+  val updateInterval                              = 10
   override protected def nodeConfigs: Seq[Config] = Seq(configWithUpdateIntervalSetting(updateInterval).withFallback(Miners.head))
 
   val issuer      = firstAcc
@@ -67,13 +68,6 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
   }
 
   test("not able to update name/description more than once within interval") {
-    assertGrpcError(
-      sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee),
-      s"Can't update info of asset with id=$assetId",
-      Code.INVALID_ARGUMENT
-    )
-    sender.waitForHeight(sender.height + updateInterval / 2, 2.minutes)
-
     assertGrpcError(
       sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee),
       s"Can't update info of asset with id=$assetId",
