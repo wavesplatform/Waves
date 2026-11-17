@@ -1,6 +1,6 @@
 {
   "name": "@waves/ride-js",
-  "version": "2.3.0",
+  "version": "3.0.0",
   "description": "Js compiler for Ride - Waves smart contract language.",
   "packageManager": "pnpm@11.5.2",
   "main": "dist/index.js",

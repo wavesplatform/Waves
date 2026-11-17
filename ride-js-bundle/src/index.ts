@@ -1,9 +1,6 @@
-// Public @waves/ride-js API. Ported from the original ride-js src/index.js.
-// The single substantive change vs. the original: instead of requiring the two
-// separate npm packages (@waves/ride-lang + @waves/ride-repl) — each carrying its
-// own copy of the ScalaJS runtime — this requires ONE combined ScalaJS artifact
-// (scalajs/ride-scalajs.js, the linked repl-js output) that exports both the
-// compiler API and the repl API. So ScalaJS is bundled once.
+// Public @waves/ride-js API, ported from the wavesplatform/ride-js src/index.js. The original required
+// @waves/ride-lang and @waves/ride-repl, each with its own copy of the ScalaJS runtime; this requires one
+// combined artifact (scalajs/ride-scalajs.js, the linked repl-js output) that exports both APIs.
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-var-requires */
 require("./interop"); // side effect: installs crypto/http globals before the artifact runs
 const crypto: any = require("@waves/ts-lib-crypto");

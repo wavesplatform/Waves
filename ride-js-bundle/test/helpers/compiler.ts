@@ -1,8 +1,9 @@
 // Tests exercise the real shipped public API of @waves/ride-js (the wrapped glue),
 // which loads ./interop (real @waves/ts-lib-crypto globals) and the single combined
-// ScalaJS artifact. We require the built CommonJS entry (dist/index.js) — the glue
+// ScalaJS artifact. We require the built CommonJS entry (dist/index.js): the glue
 // uses require/module.exports/global, so it must be consumed as CJS, not the TS
-// source. `npm test` runs `pretest` (build:scalajs + build:ts) to produce it.
+// source. `pnpm test` runs `pretest` (build:ts) to produce it; the ScalaJS artifact
+// comes from `sbt replJS/fullOptJS`.
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);

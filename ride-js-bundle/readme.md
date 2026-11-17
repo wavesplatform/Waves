@@ -26,14 +26,14 @@ The same `RideJS` global is exposed by the browser bundle (`dist/ride.min.js`).
 
 ## Layout
 
-- `src/` — TypeScript glue (`index.ts` public API, `interop.ts` crypto/http globals) plus the
+- `src/`: TypeScript glue (`index.ts` public API, `interop.ts` crypto/http globals) plus the
   hand-maintained `index.d.ts` public typings, which `package.json` references directly (no copy).
-- `scalajs/ride-scalajs.js` — the single combined ScalaJS artifact (the linked `repl-js`
+- `scalajs/ride-scalajs.js`: the single combined ScalaJS artifact (the linked `repl-js`
   output, which exports both the compiler API and the repl API). The Waves `sbt replJS/fullOptJS`
   task is configured to emit it **directly** here (see `repl/js/build.sbt`), so there is no copy
   step.
-- `dist/` — build output: `index.js` (node `main`), `interop.js`, `ride.min.js` (browser).
-- `pnpm-workspace.yaml` — pnpm settings: the `allowBuilds` install-script policy + dependency
+- `dist/`: build output: `index.js` (node `main`), `interop.js`, `ride.min.js` (browser).
+- `pnpm-workspace.yaml`: pnpm settings: the `allowBuilds` install-script policy + dependency
   `overrides`.
 
 ## Build & test
@@ -47,8 +47,11 @@ script fails the install until a deliberate decision is recorded.
 ```
 sbt replJS/fullOptJS        # from the Waves repo root: emits ride-js-bundle/scalajs/ride-scalajs.js
 cd ride-js-bundle
-corepack enable             # makes the pinned pnpm available
 pnpm install --frozen-lockfile
 pnpm run build              # build:ts -> build:browser (consumes the emitted artifact)
 pnpm test                   # Vitest suite (compiles RIDE through the public API)
 ```
+
+## Releasing
+
+The version in `package.json` is independent of the node version. A Waves GitHub release runs `.github/workflows/publish-to-npmjs.yml`, which publishes that version with the `latest` tag, or skips publishing when it is already on npm; bump it in the PR that changes the package. A manual run of the workflow publishes an explicit version and tag (for snapshots).
