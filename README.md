@@ -1,211 +1,80 @@
-<h1 align="center">🔷 Waves Node</h1>
+# Waves Node
 
-<p align="center">
-  <a href="https://github.com/wavesplatform/Waves/actions" target="_blank">
-    <img alt="Checks status" src="https://badgen.net/github/checks/wavesplatform/waves?cache=600"  />
-  </a>
-  <a href="https://github.com/wavesplatform/Waves/releases" target="_blank">
-    <img alt="Downloads" src="https://badgen.net/github/assets-dl/wavesplatform/waves?color=blue" />
-  </a>
-  <a href="https://hub.docker.com/r/wavesplatform/wavesnode" target="_blank">
-    <img alt="Docker pulls" src="https://badgen.net/docker/pulls/wavesplatform/wavesnode?icon=docker" />
-  </a>
+Reference implementation of the [Waves](https://waves.tech) blockchain node: transaction validation, block generation, peer-to-peer networking, the [REST API](https://docs.waves.tech/en/waves-node/node-api/), gRPC and the RIDE smart contract language. See the [node documentation](https://docs.waves.tech/en/waves-node/).
 
-  <br/>
+## Running a node
 
-  <a href="https://medium.com/wavesprotocol" target="_blank">
-    <img alt="Medium: Waves Tech" src="https://badgen.net/runkit/msmolyakov/get-medium-followers?icon=medium&cache=86400" />
-  </a>
-  <a href="https://t.me/waves_ride_dapps_dev" target="_blank">
-    <img alt="Telegram" src="https://badgen.net/badge/icon/Waves%20Dev%20Jedi?icon=telegram&label=Telegram"/>
-  </a>
-  <a href="https://github.com/msmolyakov/awesome-waves" target="_blank">
-    <img alt="Awesome Waves" src="https://badgen.net/badge/icon/Awesome%20Waves?icon=awesome&label&color=pink" />
-  </a>
-</p>
-
-> Waves is an open source [blockchain protocol](https://waves.tech). <br/> 
-You can use it to build your own decentralized applications. Waves provides full blockchain ecosystem including smart contracts language called RIDE.
-
-
-## ✨ Demo
-
-<p align="center">
-    <img src="https://user-images.githubusercontent.com/1945126/78667964-88209480-78e2-11ea-9304-72178a6a5974.gif" alt="Waves Node Run Demo">
-</p>
-
-Waves node is a host connected to the blockchain network with the following functions:
-
-- Processing and validation of [transactions](https://docs.waves.tech/en/blockchain/transaction/transaction-validation)
-- Generation and storage of [blocks](https://docs.waves.tech/en/blockchain/block/)
-- Network communication with [other nodes](https://docs.waves.tech/en/blockchain/blockchain/#node)
-- [REST API](https://docs.waves.tech/en/waves-node/node-api/)
-- [Extensions](https://docs.waves.tech/en/waves-node/extensions/) management
-
-Learn more about Waves Node in the [documentation](https://docs.waves.tech/en/waves-node/).
-
-## 🚀️ Getting started
-
-A quick introduction of the minimal setup you need to get a running node. 
-
-*Prerequisites:*
-- configuration file for a needed network from [here](https://github.com/wavesplatform/Waves/tree/HEAD/node)
-- `waves-all*.jar` file from [releases](https://github.com/wavesplatform/Waves/releases) 
-
-Linux systems:
-```bash
-sudo apt-get update
-sudo apt-get install openjdk-17-jre
-java -jar target/out/jvm/u/node/waves-all*.jar path/to/config/waves-{network}.conf
-```
-
-Mac systems (assuming already installed homebrew):
-```bash
-brew cask install adoptopenjdk/openjdk/adoptopenjdk17
-java -jar target/out/jvm/u/node/waves-all*.jar path/to/config/waves-{network}.conf
-```
-
-Windows systems (assuming already installed OpenJDK 17):
-```bash
-java -jar target/out/jvm/u/node/waves-all*.jar path/to/config/waves-{network}.conf
-```
-
-Using docker, follow the [official image documentation](https://hub.docker.com/r/wavesplatform/wavesnode).
-
-> More details on how to install a node for different platforms you can [find in the documentation](https://docs.waves.tech/en/waves-node/how-to-install-a-node/how-to-install-a-node). 
-
-## 🔧 Configuration
-
-The best starting point to understand available configuration parameters is [this article](https://docs.waves.tech/en/waves-node/node-configuration).
-
-The easiest way to start playing around with configurations is to use default configuration files for different networks; they're available in [network-defaults.conf](./node/src/main/resources/network-defaults.conf).
-
-Logging configuration with all available levels and parameters is described [here](https://docs.waves.tech/en/waves-node/logging-configuration).
-
-## 👨‍💻 Development
-
-The node can be built and installed wherever Java can run. 
-To build and test this project, you will have to follow these steps:
-
-<details><summary><b>Show instructions</b></summary>
-
-*1. Setup the environment.*
-- Install Java for your platform:
+The recommended way is the container image published to [Docker Hub](https://hub.docker.com/r/wavesplatform/wavesnode) with every release:
 
 ```bash
-sudo apt-get update
-sudo apt-get install openjdk-17-jre                     # Ubuntu
-# or
-# brew cask install adoptopenjdk/openjdk/adoptopenjdk17 # Mac
+docker run -d --name waves-node \
+  -v waves-data:/var/lib/waves \
+  -e WAVES_NETWORK=mainnet \
+  -e WAVES_WALLET_PASSWORD=<password> \
+  -p 6868:6868 -p 127.0.0.1:6869:6869 \
+  wavesplatform/wavesnode:latest
 ```
 
-- Install SBT (Scala Build Tool)
+- Tags: `latest` (latest stable release) and `X.Y.Z` (specific version).
+- `WAVES_NETWORK`: `mainnet`, `testnet` or `stagenet`. The peer-to-peer port is `6868` on Mainnet, `6863` on Testnet, `6862` on Stagenet.
+- `6869` is the REST API; keep it bound to localhost or behind a proxy.
+- A custom config can be mounted at `/etc/waves/waves.conf`; individual settings can be overridden with `JAVA_OPTS="-Dwaves.<path>=<value>"`.
 
-Please follow the SBT installation instructions depending on your platform ([Linux](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Linux.html), [Mac](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Mac.html), [Windows](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Windows.html))
+All image options (environment variables, volumes, extensions, private network image) are described in [docker/README.md](docker/README.md).
 
-*2. Clone this repo*
+Alternatively, run the `waves-all-*.jar` from [releases](https://github.com/wavesplatform/Waves/releases) on JDK 17 or newer: `java -jar waves-all-X.Y.Z.jar waves.conf` (start from [node/waves-sample.conf](node/waves-sample.conf)). See [how to install a node](https://docs.waves.tech/en/waves-node/how-to-install-a-node/how-to-install-a-node).
+
+A fresh node downloads and verifies the whole chain. To speed this up, see [synchronizing the blockchain](https://docs.waves.tech/en/waves-node/options-for-getting-actual-blockchain/).
+
+## Configuration
+
+- [Node configuration](https://docs.waves.tech/en/waves-node/node-configuration) and [logging](https://docs.waves.tech/en/waves-node/logging-configuration).
+- Defaults: [application.conf](node/src/main/resources/application.conf), per-network overrides in [network-defaults.conf](node/src/main/resources/network-defaults.conf).
+- [Extensions](https://docs.waves.tech/en/waves-node/extensions/), such as gRPC server and blockchain updates.
+
+## Building
+
+Requires JDK 17 and [sbt](https://www.scala-sbt.org/download/).
 
 ```bash
-git clone https://github.com/wavesplatform/Waves.git
-cd Waves
+sbt node/assembly        # fat jar: target/out/jvm/u/node/waves-all-*.jar
+sbt packageAll           # jars, deb packages and the docker build context
+sbt stageForDocker && docker build -t waves-node docker   # local image
 ```
 
-*3. Compile and run tests*
+## Testing
 
 ```bash
-sbt checkPR
+sbt node-tests/testFull                  # node unit tests
+sbt "node-tests/testOnly *SuiteName"     # single suite
+sbt checkPR                              # what CI runs: format check, -Werror compile, all unit tests, packaging
 ```
 
-*4. Run integration tests (optional)*
+Integration tests run nodes in Docker and need the `node-it` image built first:
 
-Create a Docker image before you run any test: 
 ```bash
 sbt node-it/docker
+sbt --server -Dwaves.it.max-parallel-suites=2 --batch "node-it/testOnly *SuiteName"
 ```
 
-- Run all tests. You can increase or decrease number of parallel running tests by changing `waves.it.max-parallel-suites`
-system property:
-```bash
-sbt --server -Dwaves.it.max-parallel-suites=1 --batch node-it/testFull
-```
+See [docs/notes/testing.md](docs/notes/testing.md) for details.
 
-- Run one test:
-```bash
-sbt node-it/testOnly *.TestClassName
-# or 
-# bash node-it/testOnly full.package.TestClassName
-```
+## Contributing
 
-*5. Build packages* 
+Open an issue to discuss major changes first. Pull requests target `version-1.6.x` and must pass `sbt checkPR`. Follow the [code of conduct](CODE_OF_CONDUCT.md).
 
-```bash
-sbt packageAll                   # Mainnet
-sbt --server -Dnetwork=testnet --batch packageAll # Testnet
-```
-
-`sbt packageAll` ‌produces only `deb` package along with a fat `jar`. 
-
-*6. Install DEB package*
-
-`deb` package is located in target folder. You can replace '*' with actual package name:
-
-```bash
-sudo dpkg -i target/out/jvm/u/node/*.deb
-```
-
-
-*7. Run an extension project locally during development (optional)*
-
-```bash
-sbt "extension-module/run /path/to/configuration"
-```
-
-*8. Configure IntelliJ IDEA (optional)*
-
-The majority of contributors to this project use IntelliJ IDEA for development, if you want to use it as well please follow these steps:
-
-1. Click `Add configuration` (or `Edit configurations...`).
-2. Click `+` to add a new configuration, choose `Application`.
-3. Specify:
-   - Main class: `com.wavesplatform.Application`
-   - Program arguments: `/path/to/configuration`
-   - Use classpath of module: `extension-module`
-4. Click `OK`.
-5. Run this configuration.
-
-</details>
-
-## 🤝 Contributing
-
-If you'd like to contribute, please fork the repository and use a feature branch. Pull requests are warmly welcome.
-
-For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate.
-
-Please follow the [code of conduct](./CODE_OF_CONDUCT.md) during communication with each other. 
-
-## ℹ️ Support (get help)
-
-Keep up with the latest news and articles, and find out all about events happening on the [Waves Protocol](https://waves.tech/).
-
-- [Telegram Dev Chat](https://t.me/waves_ride_dapps_dev)
-- [Waves Blog](https://medium.com/wavesprotocol)
-
-## ⛓ Links
+## Links
 
 - [Documentation](https://docs.waves.tech/)
-- Blockchain clients for Mainnet: [Waves Exchange](https://waves.exchange/)
-- Blockchain clients for Testnet: [Waves Exchange](https://testnet.waves.exchange/)
-- Blockchain Explorer: [Mainnet](https://wavesexplorer.com/), [Testnet](https://testnet.wavesexplorer.com/), [Stagenet](https://stagenet.wavesexplorer.com/) 
-- [Ride Online IDE](https://waves-ide.com/)
+- Explorer: [Mainnet](https://wavesexplorer.com/), [Testnet](https://testnet.wavesexplorer.com/), [Stagenet](https://stagenet.wavesexplorer.com/)
+- [Ride IDE](https://waves-ide.com/)
 
-## 📝 Licence
+## License
 
-The code in this project is licensed under [MIT license](./LICENSE)
+[MIT](LICENSE)
 
-## 👏 Acknowledgements
+## Acknowledgements
 
-[<img src="https://www.yourkit.com/images/yklogo.png">](https://www.yourkit.com)
+[![JProfiler](https://www.ej-technologies.com/images/product_banners/jprofiler_small.png)](https://www.ej-technologies.com/jprofiler)
 
-We use YourKit full-featured Java Profiler to make Waves node faster. YourKit, LLC is the creator of innovative and intelligent tools for profiling Java and .NET applications.
-
-Take a look at YourKit's leading software products: YourKit Java Profiler and YourKit .NET Profiler.
+Performance work on the node uses [JProfiler, the Java profiler](https://www.ej-technologies.com/jprofiler) by ej-technologies, provided under their open source license.

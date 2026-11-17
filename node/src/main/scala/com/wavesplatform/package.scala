@@ -16,6 +16,25 @@ import org.slf4j.LoggerFactory
 package object wavesplatform {
   private lazy val logger: Logger =
     Logger(LoggerFactory.getLogger(this.getClass.getName))
+
+  private def configuredGenesis(settings: WavesSettings, blockchain: Blockchain): Either[ValidationError, Block] =
+    Block.genesis(
+      settings.blockchainSettings.genesisSettings,
+      blockchain.isFeatureActivated(BlockchainFeatures.RideV6),
+      blockchain.isFeatureActivated(BlockchainFeatures.LightNode)
+    )
+
+  private def matchesGenesis(genesis: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
+    blockchain.blockHeader(1).map(_.id()) match {
+      case Some(id) if id == genesis.id() => Right(())
+      case Some(_)                        => Left(GenericError("Mismatched genesis blocks in configuration and blockchain"))
+      case None                           => Left(GenericError("Blockchain is empty"))
+    }
+
+  /** Read-only counterpart of [[checkGenesis]] for tools that must not write to the state. */
+  def verifyGenesis(settings: WavesSettings, blockchain: Blockchain): Either[ValidationError, Unit] =
+    configuredGenesis(settings, blockchain).flatMap(matchesGenesis(_, blockchain))
+
   private def checkOrAppend(block: Block, blockchainUpdater: Blockchain & BlockchainUpdater, miner: Miner): Either[ValidationError, Unit] =
     if (blockchainUpdater.isEmpty) {
       blockchainUpdater.processBlock(block, block.header.generationSignature, snapshot = None, generatorSet = Seq.empty).map { _ =>
@@ -24,22 +43,10 @@ package object wavesplatform {
           s"Genesis block ${genesisHeader.id()} (generated at ${Instant.ofEpochMilli(genesisHeader.header.timestamp)}) has been added to the state"
         )
       }
-    } else
-      blockchainUpdater.blockHeader(1).map(_.id()) match {
-        case Some(id) if id == block.id() =>
-          miner.scheduleMining()
-          Right(())
-        case _ =>
-          Left(GenericError("Mismatched genesis blocks in configuration and blockchain"))
-      }
+    } else matchesGenesis(block, blockchainUpdater).map(_ => miner.scheduleMining())
 
   def checkGenesis(settings: WavesSettings, blockchainUpdater: Blockchain & BlockchainUpdater, miner: Miner): Unit = {
-    Block
-      .genesis(
-        settings.blockchainSettings.genesisSettings,
-        blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6),
-        blockchainUpdater.isFeatureActivated(BlockchainFeatures.LightNode)
-      )
+    configuredGenesis(settings, blockchainUpdater)
       .flatMap { genesis =>
         logger.trace(s"Genesis block json: ${genesis.json()}")
         checkOrAppend(genesis, blockchainUpdater, miner)

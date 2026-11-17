@@ -5,6 +5,7 @@ import cats.syntax.traverse.*
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.Height
 import pureconfig.*
 import pureconfig.generic.semiauto.deriveReader
@@ -83,7 +84,9 @@ case class FunctionalitySettings(
     unitsRegistryAddress: Option[String] = None,
     maxValidEndorsers: Int = 5,
     generationPeriodLength: Int = 1000,
-    enforceEthTxValidationAfter: Int = 0
+    enforceEthTxValidationAfter: Int = 0,
+    sponsoredInvokeFeeFixHeight: Int = 0,
+    liquidGeneratingBalanceFixHeight: Int = 0
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -134,6 +137,7 @@ object FunctionalitySettings {
   val MAINNET: FunctionalitySettings = apply(
     featureCheckBlocksPeriod = 5000,
     blocksForFeatureActivation = 4000,
+    preActivatedFeatures = Map(BlockchainFeatures.AdjustedBlockRewardDistribution.id -> 5481021),
     generationBalanceDepthFrom50To1000AfterHeight = 232000,
     blockVersion3AfterHeight = 795000,
     doubleFeaturesPeriodsAfterHeight = 810000,
@@ -150,7 +154,9 @@ object FunctionalitySettings {
     unitsRegistryAddress = Some("3P8LfPXcveST7WKkV3UACQNdr6J3shPYong"),
     maxValidEndorsers = 128, // BLS has much worse performance from 129
     generationPeriodLength = 10_000,
-    enforceEthTxValidationAfter = 5234000
+    enforceEthTxValidationAfter = 5234000,
+    sponsoredInvokeFeeFixHeight = 5481021,
+    liquidGeneratingBalanceFixHeight = 5481021
   )
 
   val TESTNET: FunctionalitySettings = apply(
@@ -169,7 +175,9 @@ object FunctionalitySettings {
     blockRewardBoostPeriod = 2_000,
     unitsRegistryAddress = Some("3N9fwNGJcUcAbhh7YPr6mrpuGJD4tApZFsT"),
     maxValidEndorsers = 64,
-    generationPeriodLength = 3000
+    generationPeriodLength = 3000,
+    sponsoredInvokeFeeFixHeight = Int.MaxValue,
+    liquidGeneratingBalanceFixHeight = Int.MaxValue
   )
 
   val STAGENET: FunctionalitySettings = apply(
@@ -186,7 +194,9 @@ object FunctionalitySettings {
     xtnBuybackRewardPeriod = 1000,
     paymentsCheckHeight = 2195900,
     maxValidEndorsers = 32,
-    generationPeriodLength = 1000
+    generationPeriodLength = 1000,
+    sponsoredInvokeFeeFixHeight = Int.MaxValue,
+    liquidGeneratingBalanceFixHeight = Int.MaxValue
   )
 }
 

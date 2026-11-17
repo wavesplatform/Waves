@@ -1312,4 +1312,65 @@ class EvaluatorV2Test extends PropSpec with Inside {
     // throw() is a user function wrapping throw(String), and new mode charges 1 per user function call
     spentOnError(script("throw()"), 10, newMode = true) shouldBe 3
   }
+
+  property("evaluation leaves the script tree unchanged, function bodies and LET values included") {
+    val expr = compile(
+      """
+        | let unused = 1 + 1
+        | let base = 2 * 3
+        | func f(a: Int) = {
+        |   let b = a + 1
+        |   let c = b * 100
+        |   if (b > 2) then b * 2 else b
+        | }
+        | func g(x: Int) = f(x) + f(x + 1) + base
+        | g(1) + g(2)
+      """.stripMargin
+    )
+    val before = expr.deepCopy.value
+    val first  = evalEither(expr, 1000, newMode = true)
+    first.map(_._1) shouldBe Right(CONST_LONG(34))
+    evalEither(expr, 1000, newMode = true) shouldBe first
+    expr shouldBe before
+  }
+
+  property("a reference finds the nearest declaration, and a function sees the declarations around its own definition") {
+    // The compiler rejects redeclared names, so the tree is built by hand.
+    def sum(a: EXPR, b: EXPR) = FUNCTION_CALL(FunctionHeader.Native(FunctionIds.SUM_LONG), List(a, b))
+    def call(name: String)    = FUNCTION_CALL(FunctionHeader.User(name), Nil)
+    val g = FUNC(
+      "g",
+      Nil,
+      BLOCK(
+        LET("a", CONST_LONG(20)),
+        BLOCK(
+          LET("b", BLOCK(LET("a", CONST_LONG(300)), REF("a"))),
+          BLOCK(LET("f", CONST_LONG(4000)), sum(sum(sum(call("f"), REF("a")), REF("b")), REF("f")))
+        )
+      )
+    )
+    val expr = BLOCK(LET("a", CONST_LONG(1)), BLOCK(FUNC("f", Nil, REF("a")), BLOCK(g, call("g"))))
+    evalEither(expr, 1000, newMode = true).map(_._1) shouldBe Right(CONST_LONG(4321))
+  }
+
+  property("a top-level declaration hides an earlier one only for what follows it") {
+    def sum(a: EXPR, b: EXPR) = FUNCTION_CALL(FunctionHeader.Native(FunctionIds.SUM_LONG), List(a, b))
+    def call(name: String)    = FUNCTION_CALL(FunctionHeader.User(name), Nil)
+    // g is declared between the two a's and the two f's, so it sees the first of each; the body at the end sees the second.
+    val expr =
+      BLOCK(
+        LET("a", CONST_LONG(1)),
+        BLOCK(
+          FUNC("f", Nil, REF("a")),
+          BLOCK(
+            LET("a", CONST_LONG(20)),
+            BLOCK(
+              FUNC("g", Nil, sum(call("f"), REF("a"))),
+              BLOCK(FUNC("f", Nil, CONST_LONG(300)), sum(sum(call("g"), call("f")), REF("a")))
+            )
+          )
+        )
+      )
+    evalEither(expr, 1000, newMode = true).map(_._1) shouldBe Right(CONST_LONG(341))
+  }
 }

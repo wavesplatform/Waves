@@ -8,13 +8,15 @@ import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.api.common.*
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.common.utils.EitherExt2.*
+import com.wavesplatform.consensus.{CachedVrf, PoSSelector}
 import com.wavesplatform.database.{DBExt, KeyTag, RDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.metrics.ImportProbe
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.BlockSnapshotResponse
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
@@ -40,7 +42,7 @@ import java.io.*
 import java.net.URI
 import java.time
 import java.util.Locale
-import scala.annotation.tailrec
+import java.util.concurrent.ArrayBlockingQueue
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
@@ -188,8 +190,14 @@ object Importer extends ScorexLogging {
   private val HttpMaxRetries = 10
   private val HttpRetryDelay = 5.seconds
 
+  // Set by the shutdown hook: stops the import before the state is closed.
   @volatile private var quit = false
   private val lock           = new Object
+
+  private type ImportedBlock = (VanillaBlock, Option[BlockSnapshotResponse])
+
+  // What the reader hands to the appender: a block, the end of the input (None), or the error that stopped it.
+  private type ReadResult = Either[Throwable, Option[ImportedBlock]]
 
   // noinspection UnstableApiUsage
   def startImport(
@@ -201,14 +209,12 @@ object Importer extends ScorexLogging {
       skipBlocks: Boolean,
       appender: Scheduler
   ): Unit = {
-    val lenBlockBytes     = new Array[Byte](Ints.BYTES)
-    val lenSnapshotsBytes = if (snapshotsInputStream.isDefined) Some(new Array[Byte](Ints.BYTES)) else None
-    val start             = System.nanoTime()
-    var counter           = 0
+    val start   = System.nanoTime()
+    var counter = 0
 
     val startHeight   = blockchain.height
-    var blocksToSkip  = if (skipBlocks) startHeight - 1 else 0
-    val blocksToApply = importOptions.importHeight - startHeight + 1
+    val blocksToSkip  = if (skipBlocks) startHeight - 1 else 0
+    val blocksToApply = importOptions.importHeight - startHeight
 
     if (blocksToSkip > 0) log.info(s"Skipping $blocksToSkip block(s)")
 
@@ -220,108 +226,173 @@ object Importer extends ScorexLogging {
       )
     }
 
-    val maxSize = importOptions.maxQueueSize
-    val queue   = new mutable.Queue[(VanillaBlock, Option[BlockSnapshotResponse])](maxSize)
+    // Parsing runs on its own thread so that the appender never waits for the next block.
+    val queue = new ArrayBlockingQueue[ReadResult](importOptions.maxQueueSize)
+    val reader =
+      new Thread(() => readBlocks(blocksInputStream, snapshotsInputStream, blockchain, startHeight, blocksToSkip, queue), "importer-reader")
+    reader.setDaemon(true)
+    reader.start()
 
-    val CurrentTS = System.currentTimeMillis()
-
-    @tailrec
-    def readBlocks(queue: mutable.Queue[(VanillaBlock, Option[BlockSnapshotResponse])], remainCount: Int, maxCount: Int): Unit = {
-      if (remainCount == 0) ()
-      else {
-        val blockSizeBytesLength    = ByteStreams.read(blocksInputStream, lenBlockBytes, 0, Ints.BYTES)
-        val snapshotSizeBytesLength = (snapshotsInputStream, lenSnapshotsBytes).mapN(ByteStreams.read(_, _, 0, Ints.BYTES))
-        if (blockSizeBytesLength == Ints.BYTES && snapshotSizeBytesLength.forall(_ == Ints.BYTES)) {
-          val blockSize     = Ints.fromByteArray(lenBlockBytes)
-          val snapshotsSize = lenSnapshotsBytes.map(Ints.fromByteArray)
-
-          lazy val blockBytes     = new Array[Byte](blockSize)
-          lazy val snapshotsBytes = snapshotsSize.map(new Array[Byte](_))
-          val (factReadBlockSize, factReadSnapshotsSize) =
-            if (blocksToSkip > 0) {
-              // File IO optimization
-              ByteStreams.skipFully(blocksInputStream, blockSize)
-              (snapshotsInputStream, snapshotsSize).mapN(ByteStreams.skipFully(_, _))
-
-              blockSize -> snapshotsSize
-            } else {
-              (
-                ByteStreams.read(blocksInputStream, blockBytes, 0, blockSize),
-                (snapshotsInputStream, snapshotsBytes, snapshotsSize).mapN(ByteStreams.read(_, _, 0, _))
-              )
-            }
-
-          if (factReadBlockSize == blockSize && factReadSnapshotsSize == snapshotsSize) {
-            if (blocksToSkip > 0) {
-              blocksToSkip -= 1
-            } else {
-              val rideV6                = blockchain.isFeatureActivated(BlockchainFeatures.RideV6, blockchain.height + (maxCount - remainCount) + 1)
-              lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
-              val block = (if (1 < blockBytes.head && blockBytes.head < 5 && Longs.fromByteArray(blockBytes.slice(1, 9)) < CurrentTS)
-                             Block.parseBytes(blockBytes).orElse(parsedProtoBlock)
-                           else
-                             parsedProtoBlock).get
-              val blockSnapshot = snapshotsBytes.map { bytes =>
-                BlockSnapshotResponse(
-                  block.id(),
-                  block.transactionData
-                    .foldLeft((0, Seq.empty[TransactionStateSnapshot])) { case ((offset, acc), _) =>
-                      val txSnapshotSize = Ints.fromByteArray(bytes.slice(offset, offset + Ints.BYTES))
-                      val txSnapshot     = TransactionStateSnapshot.parseFrom(bytes.slice(offset + Ints.BYTES, offset + Ints.BYTES + txSnapshotSize))
-                      (offset + Ints.BYTES + txSnapshotSize, txSnapshot +: acc)
-                    }
-                    ._2
-                    .reverse
-                )
+    try {
+      var stop = false
+      while (!stop && !quit && counter < blocksToApply)
+        queue.take() match {
+          case Left(error) => throw error
+          case Right(None) => stop = true
+          case Right(Some((block, snapshot))) =>
+            lock.synchronized {
+              if (blockchain.lastBlockId.contains(block.header.reference)) {
+                ImportProbe.appendBlock(startHeight + counter + 1, block.transactionData.size) {
+                  Await.result(appendBlock(block, snapshot).runAsyncLogErr(using appender), Duration.Inf)
+                } match {
+                  case Left(ve) =>
+                    log.error(s"Error appending block ${blockchain.height + 1}: $ve")
+                    stop = true
+                  case _ =>
+                    counter = counter + 1
+                }
+              } else if (!quit) {
+                log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
               }
-
-              ParSignatureChecker.checkBlockAndTxSignatures(block, blockSnapshot.isEmpty, rideV6)
-
-              queue.enqueue(block -> blockSnapshot)
             }
-            readBlocks(queue, remainCount - 1, maxCount)
-          } else {
-            if (factReadBlockSize != blockSize)
-              log.info(s"$factReadBlockSize != expected $blockSize for blocks")
-            if (factReadSnapshotsSize != snapshotsSize)
-              log.info(s"$factReadSnapshotsSize != expected $snapshotsSize for snapshots")
-
-            quit = true
-          }
-        } else {
-          if (blocksInputStream.available() > 0 && blockSizeBytesLength != Ints.BYTES)
-            log.info(s"Expecting to read ${Ints.BYTES} but got $blockSizeBytesLength (${blocksInputStream.available()})")
-          (snapshotsInputStream, snapshotSizeBytesLength) match {
-            case (Some(is), Some(sizeBytesLength)) if is.available() > 0 && sizeBytesLength != Ints.BYTES =>
-              log.info(s"Expecting to read ${Ints.BYTES} but got $sizeBytesLength (${is.available()})")
-            case _ => ()
-          }
-
-          quit = true
         }
+    } finally reader.interrupt()
+  }
+
+  /** Verifies block VRF proofs on the signature pool ahead of the appender, which then finds the results in the VRF cache of
+    * [[CachedVrf]]. A proof needs the hit source of an earlier block (101 blocks back under fair PoS), so many run in parallel. The
+    * heights come from the same rules as [[PoSSelector.validateGenerationSignature]]; where the feature state differs, such as a feature
+    * approved by a block still in the queue, the appender just misses the cache and verifies the proof itself.
+    */
+  private final class VrfPrecheck(blockchain: Blockchain) {
+    private val hitSources = mutable.Map.empty[Int, Future[ByteStr]]
+
+    private def hitSource(height: Int): Future[ByteStr] =
+      hitSources.getOrElse(
+        height,
+        blockchain.hitSource(height).fold(Future.failed[ByteStr](new NoSuchElementException(s"No hit source at $height")))(Future.successful)
+      )
+
+    def add(block: Block, height: Int): Unit = {
+      val blockHitSource =
+        if (PoSSelector.vrfActivated(blockchain, height)) {
+          hitSource(PoSSelector.hitSourceHeight(blockchain, height - 1)).map(message =>
+            CachedVrf.verify(block.header.generationSignature, message.arr, block.header.generator, checkWeakPk = false).explicitGet()
+          )(using sigverify)
+        } else Future.successful(block.header.generationSignature)
+      hitSources.update(height, blockHitSource)
+      hitSources.remove(height - 101)
+    }
+  }
+
+  // A block in either export format, with its transaction snapshots when the import has them.
+  private def parseRecord(blockBytes: Array[Byte], snapshotsBytes: Option[Array[Byte]], currentTs: Long): ImportedBlock = {
+    lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
+    val block = (if (1 < blockBytes.head && blockBytes.head < 5 && Longs.fromByteArray(blockBytes.slice(1, 9)) < currentTs)
+                   Block.parseBytes(blockBytes).orElse(parsedProtoBlock)
+                 else
+                   parsedProtoBlock).get
+    block -> snapshotsBytes.map(bytes => BlockSnapshotResponse(block.id(), parseSnapshots(bytes, block.transactionData.size)))
+  }
+
+  // One snapshot per transaction, each a 4-byte length and that many bytes, filling the record exactly (Exporter.IO.exportBlockTxSnapshots).
+  private def parseSnapshots(bytes: Array[Byte], count: Int): Seq[TransactionStateSnapshot] = {
+    var offset = 0
+    val snapshots = Seq.fill(count) {
+      require(offset + Ints.BYTES <= bytes.length, s"Snapshot record of ${bytes.length} bytes ends before snapshot length at $offset")
+      val size  = Ints.fromByteArray(bytes.slice(offset, offset + Ints.BYTES))
+      val start = offset + Ints.BYTES
+      require(size >= 0 && size <= bytes.length - start, s"Snapshot of $size bytes at $start does not fit a record of ${bytes.length} bytes")
+      offset = start + size
+      TransactionStateSnapshot.parseFrom(bytes.slice(start, offset))
+    }
+    require(offset == bytes.length, s"Snapshot record of ${bytes.length} bytes has ${bytes.length - offset} bytes after $count snapshots")
+    snapshots
+  }
+
+  private def readBlocks(
+      blocksInputStream: BufferedInputStream,
+      snapshotsInputStream: Option[BufferedInputStream],
+      blockchain: Blockchain,
+      startHeight: Int,
+      blocksToSkip: Int,
+      queue: ArrayBlockingQueue[ReadResult]
+  ): Unit = {
+    val lenBlockBytes     = new Array[Byte](Ints.BYTES)
+    val lenSnapshotsBytes = if (snapshotsInputStream.isDefined) Some(new Array[Byte](Ints.BYTES)) else None
+    val CurrentTS         = System.currentTimeMillis()
+    var skipped           = 0
+    var enqueued          = 0
+    val vrfPrecheck       = new VrfPrecheck(blockchain)
+
+    // Reads the next block and its snapshots, or returns false at the end of the input or on a truncated record.
+    def readNext(): Boolean = {
+      val blockSizeBytesLength    = ByteStreams.read(blocksInputStream, lenBlockBytes, 0, Ints.BYTES)
+      val snapshotSizeBytesLength = (snapshotsInputStream, lenSnapshotsBytes).mapN(ByteStreams.read(_, _, 0, Ints.BYTES))
+      if (blockSizeBytesLength == Ints.BYTES && snapshotSizeBytesLength.forall(_ == Ints.BYTES)) {
+        val blockSize     = Ints.fromByteArray(lenBlockBytes)
+        val snapshotsSize = lenSnapshotsBytes.map(Ints.fromByteArray)
+
+        lazy val blockBytes     = new Array[Byte](blockSize)
+        lazy val snapshotsBytes = snapshotsSize.map(new Array[Byte](_))
+        val (factReadBlockSize, factReadSnapshotsSize) =
+          if (skipped < blocksToSkip) {
+            // File IO optimization
+            ByteStreams.skipFully(blocksInputStream, blockSize)
+            (snapshotsInputStream, snapshotsSize).mapN(ByteStreams.skipFully(_, _))
+
+            blockSize -> snapshotsSize
+          } else {
+            (
+              ByteStreams.read(blocksInputStream, blockBytes, 0, blockSize),
+              (snapshotsInputStream, snapshotsBytes, snapshotsSize).mapN(ByteStreams.read(_, _, 0, _))
+            )
+          }
+
+        if (factReadBlockSize == blockSize && factReadSnapshotsSize == snapshotsSize) {
+          if (skipped < blocksToSkip) {
+            skipped += 1
+          } else {
+            val height                 = startHeight + enqueued + 1
+            val rideV6                 = blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height)
+            val (block, blockSnapshot) = parseRecord(blockBytes, snapshotsBytes, CurrentTS)
+
+            ParSignatureChecker.checkBlockAndTxSignatures(block, blockSnapshot.isEmpty, rideV6)
+            vrfPrecheck.add(block, height)
+
+            queue.put(Right(Some(block -> blockSnapshot)))
+            enqueued += 1
+          }
+          true
+        } else {
+          if (factReadBlockSize != blockSize)
+            log.info(s"$factReadBlockSize != expected $blockSize for blocks")
+          if (factReadSnapshotsSize != snapshotsSize)
+            log.info(s"$factReadSnapshotsSize != expected $snapshotsSize for snapshots")
+          false
+        }
+      } else {
+        if (blocksInputStream.available() > 0 && blockSizeBytesLength != Ints.BYTES)
+          log.info(s"Expecting to read ${Ints.BYTES} but got $blockSizeBytesLength (${blocksInputStream.available()})")
+        (snapshotsInputStream, snapshotSizeBytesLength) match {
+          case (Some(is), Some(sizeBytesLength)) if is.available() > 0 && sizeBytesLength != Ints.BYTES =>
+            log.info(s"Expecting to read ${Ints.BYTES} but got $sizeBytesLength (${is.available()})")
+          case _ => ()
+        }
+        false
       }
     }
 
-    while ((!quit || queue.nonEmpty) && counter < blocksToApply)
-      if (!quit && queue.isEmpty) {
-        readBlocks(queue, maxSize, maxSize)
-      } else {
-        lock.synchronized {
-          val (block, snapshot) = queue.dequeue()
-          if (blockchain.lastBlockId.contains(block.header.reference)) {
-            Await.result(appendBlock(block, snapshot).runAsyncLogErr(using appender), Duration.Inf) match {
-              case Left(ve) =>
-                log.error(s"Error appending block ${blockchain.height + 1}: $ve")
-                queue.clear()
-                quit = true
-              case _ =>
-                counter = counter + 1
-            }
-          } else if (!quit) {
-            log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
-          }
-        }
-      }
+    try {
+      while (readNext()) ()
+      queue.put(Right(None))
+    } catch {
+      case _: InterruptedException => () // the import ended before the input did
+      case e: Throwable            =>
+        // The appender rethrows it. Fatal errors too: the appender would otherwise wait for the next block forever.
+        try queue.put(Left(e))
+        catch { case _: InterruptedException => () }
+    }
   }
 
   def main(args: Array[String]): Unit = {
@@ -359,10 +430,19 @@ object Importer extends ScorexLogging {
     val rdb = RDB.open(settings.dbSettings)
     val (blockchainUpdater, rdbWriter) =
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
+    ImportProbe.watch(rdb, () => rdbWriter.cacheStats)
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-    val extAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]] =
-      BlockAppender(blockchainUpdater, time, utxPool, pos, BlockEndorser.Disabled, scheduler, importOptions.verify, txSignParCheck = false)
+    val extAppender: AppendBlock = {
+      val append =
+        BlockAppender(blockchainUpdater, time, utxPool, pos, BlockEndorser.Disabled, scheduler, importOptions.verify, txSignParCheck = false)
+      (block, snapshot) =>
+        append(block, snapshot).map { result =>
+          // The appended block is the liquid one, and its snapshot sums the complexity of its transactions.
+          if (result.isRight) ImportProbe.blockApplied(blockchainUpdater.bestLiquidSnapshot.fold(0L)(_.scriptsComplexity))
+          result
+        }
+    }
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb)
     checkGenesis(settings, blockchainUpdater, Miner.StrictDisabledMiner)
@@ -437,6 +517,7 @@ object Importer extends ScorexLogging {
         utxPool.close()
         blockchainUpdater.shutdown()
         rdbWriter.close()
+        ImportProbe.unwatch()
         rdb.close()
       }
       blocksInputStream.close()

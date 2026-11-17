@@ -1,5 +1,6 @@
 package com.wavesplatform.state
 
+import com.wavesplatform.TestValues
 import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -15,8 +16,10 @@ import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
+import com.wavesplatform.transaction.assets.exchange.OrderType
 import io.netty.channel.embedded.EmbeddedChannel
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
@@ -193,6 +196,25 @@ class LightNodeTest extends PropSpec with WithDomain {
         Applied(Seq.empty, d.blockchain.score, Seq.empty)
       )
       d.lastBlock shouldBe challengingBlock
+    }
+  }
+
+  property("light node indexes the matcher whose balance diff nets to zero") {
+    val matcher = TxHelpers.signer(2)
+    withDomain(
+      settings.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)),
+      AddrWithBalance.enoughBalances(TxHelpers.defaultSigner, matcher)
+    ) { d =>
+      val issueTx = TxHelpers.issue()
+      val asset   = IssuedAsset(issueTx.id())
+      d.appendBlock(issueTx)
+      val buy      = TxHelpers.order(OrderType.BUY, Waves, asset, fee = TestValues.fee / 2, matcher = matcher)
+      val sell     = TxHelpers.order(OrderType.SELL, Waves, asset, fee = TestValues.fee / 2, matcher = matcher)
+      val exchange = TxHelpers.exchangeFromOrders(buy, sell, matcher = matcher, fee = TestValues.fee)
+      val block    = d.createBlock(Seq(exchange))
+
+      d.appendBlockE(block, Some(BlockSnapshot(block.id(), getTxSnapshots(d, block)))) should beRight
+      d.liquidSnapshot.transactions(exchange.id()).affected shouldBe Set(matcher.toAddress, TxHelpers.defaultAddress)
     }
   }
 

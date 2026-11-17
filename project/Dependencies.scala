@@ -3,7 +3,9 @@ import sbt.{Def, *}
 import scalapb.compiler.Version.scalapbVersion
 
 object Dependencies {
-  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.17.Final"
+  private def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.2.20.Final"
+
+  private def jlineModule(module: String) = "org.jline" % s"jline-$module" % "4.7.0"
 
   val gProtoVersion = "4.36.2"
   val gProto        = "com.google.protobuf" % "protobuf-java" % Dependencies.gProtoVersion
@@ -25,38 +27,41 @@ object Dependencies {
       jacksonModule("core", "databind"),
       jacksonModule("datatype", "datatype-jdk8"),
       jacksonModule("datatype", "datatype-jsr310"),
-      "tools.jackson.core" % "jackson-core"     % "3.2.4",
-      "tools.jackson.core" % "jackson-databind" % "3.2.4",
-      // Scala 3 compiler and scaladoc toolchains, no Scala release ships the patched versions yet
-      "org.jline"          % "jline-reader"     % "3.30.15",
-      "org.jsoup"          % "jsoup"            % "1.23.2",
+      "tools.jackson.core" % "jackson-core"     % "3.3.0",
+      "tools.jackson.core" % "jackson-databind" % "3.3.0",
+      // Scala 3.10.1 REPL toolchain ships jline 4.4.8; 4.5.0 fixes GHSA-rcc3-r7r7-qvg2 and GHSA-p73x-fv3x-mvv6. Keep all four modules on one version
+      jlineModule("reader"),
+      jlineModule("terminal"),
+      jlineModule("terminal-jni"),
+      jlineModule("native"),
       gProto
     )
   )
 
   // Node protobuf schemas
   lazy val protoSchemasLib =
-    ("com.wavesplatform" % "protobuf-schemas" % "1.6.0").classifier("protobuf-src").intransitive()
+    ("com.wavesplatform" % "protobuf-schemas" % "1.6.1").classifier("protobuf-src").intransitive()
 
-  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.7.0"
+  private def pekkoModule(module: String) = "org.apache.pekko" %% s"pekko-$module" % "1.7.1"
 
-  private def pekkoHttpModule(module: String, version: String = "1.4.0") = "org.apache.pekko" %% module % version
+  private def pekkoHttpModule(module: String, version: String = "1.4.2") = "org.apache.pekko" %% module % version
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.8.1"
 
-  private def jacksonModule(group: String, module: String, version: String = "2.21.7") = s"com.fasterxml.jackson.$group" % s"jackson-$module" % version
+  private def jacksonModule(group: String, module: String, version: String = "2.21.8") = s"com.fasterxml.jackson.$group" % s"jackson-$module" % version
 
   private def web3jModule(module: String) = "org.web3j" % module % "4.13.0" // 4.14+ requires Java 21 https://github.com/LFDT-web3j/web3j/releases/tag/v4.14.0
 
+  // 3.5.x reorders Coeval effects and corrupts SerdeV1 CaseObj output (SerdeTest, EvaluatedPBSerializationTest fail)
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.83.1"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.85.1"
 
   val pekkoHttp       = pekkoHttpModule("pekko-http")
   val googleGuava     = "com.google.guava"    % "guava"             % "33.8.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.6.6"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.6.7"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.14"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = nettyModule("handler")
@@ -71,18 +76,18 @@ object Dependencies {
   val sttp3      = sttp3Module("core")
   val sttp3Monix = sttp3Module("monix")
 
-  // 4.2.0 is built with Scala 3.9 (TASTy 28.9), which Scala 3.8 cannot read. Bump together with scalaVersion.
-  val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
+  val console = Seq("com.github.scopt" %% "scopt" % "4.2.0")
 
   def amazonCorretto(c: String): ModuleID = ("software.amazon.cryptools" % "AmazonCorrettoCryptoProvider" % "2.5.0").classifier(c)
 
   val cryptoProviders = Seq(
     // Windows x86_64, Windows x86, macOS x86_64, linux x86_64
+    // Backs consensus P-256 checks (p256Verify, validateCertificateChain); bump only with proof of identical results
     "org.conscrypt" % "conscrypt-openjdk-uber" % "2.8.0",
     // macOS aarch64
     amazonCorretto("osx-aarch_64"),
     // fallback Java
-    "org.bouncycastle" % "bcprov-jdk18on" % "1.86"
+    "org.bouncycastle" % "bcprov-jdk18on" % "1.87"
   )
 
   val lang = Def.setting(
@@ -111,17 +116,18 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
-    "com.github.jnr" % "jnr-unixsocket" % "0.39.8", // To support Apple ARM
+    "com.github.jnr" % "jnr-unixsocket" % "0.39.9", // To support Apple ARM
     "com.spotify"    % "docker-client"  % "8.16.0",
-    jacksonModule("dataformat", "dataformat-properties", "2.22.2"),
+    jacksonModule("dataformat", "dataformat-properties", "2.23.0"),
     asyncHttpClient
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
     logback,
-    "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
-    "org.scalacheck"    %% "scalacheck"      % "1.20.0",
-    "org.scalamock"     %% "scalamock"       % "7.5.5"
+    "org.scalatestplus" %% "scalacheck-1-16"     % "3.2.14.0",
+    "org.scalacheck"    %% "scalacheck"          % "1.20.0",
+    "org.scalamock"     %% "scalamock"           % "7.6.3",
+    "org.scalamock"     %% "scalamock-scalatest" % "7.6.3"
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
@@ -160,6 +166,7 @@ object Dependencies {
       ("eu.timepit"       %% "refined"  % "0.11.4").exclude("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"     % "headlong" % "13.3.1",
       "com.github.jbellis" % "jamm"     % "0.4.0", // Weighing caches
+      "com.jprofiler"      % "jprofiler-probe-embedded" % "16.3.1", // ImportProbe; no-op without the JProfiler agent
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
       "com.wavesplatform"         % "blst-java"                    % "0.3.15-1",
       amazonCorretto("linux-x86_64") % Optional,
@@ -208,7 +215,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.14.16"
+    val circeVersion = "0.14.17"
     Seq(
       "io.circe" %% "circe-core",
       "io.circe" %% "circe-generic",

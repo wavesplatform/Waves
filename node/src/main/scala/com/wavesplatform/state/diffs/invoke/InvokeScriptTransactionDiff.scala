@@ -144,7 +144,12 @@ object InvokeScriptTransactionDiff {
           availableActions,
           limit
         ) <- executeMainScript()
-        otherIssues = invocationSnapshot.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
+        otherIssues          = invocationSnapshot.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
+        blockchainForActions = SnapshotBlockchain(blockchain, invocationSnapshot)
+        // nested invokes may change the fee asset's sponsorship, but the block credits the miner at the pre-tx rate
+        feeBlockchain =
+          if (blockchain.height >= blockchain.settings.functionalitySettings.sponsoredInvokeFeeFixHeight) blockchain
+          else blockchainForActions
 
         doProcessActions = InvokeDiffsCommon.processActions(
           _,
@@ -154,7 +159,8 @@ object InvokeScriptTransactionDiff {
           pk,
           _,
           tx,
-          SnapshotBlockchain(blockchain, invocationSnapshot),
+          blockchainForActions,
+          feeBlockchain,
           blockTime,
           isSyncCall = false,
           limitedExecution,

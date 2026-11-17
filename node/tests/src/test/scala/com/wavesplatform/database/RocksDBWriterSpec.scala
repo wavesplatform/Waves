@@ -26,6 +26,36 @@ import org.rocksdb.{ReadOptions, RocksIterator}
 import scala.util.{Random, Using}
 
 class RocksDBWriterSpec extends FreeSpec with WithDomain {
+  "balanceSnapshots" - {
+    "follow appends and rollbacks" in withDomain(RideV6, AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
+      val recipient = TxHelpers.secondAddress
+      // Only persisted blocks are visible to the writer, so every block is followed by a key block.
+      def append(amount: Long): Unit = {
+        d.appendBlock(TxHelpers.transfer(to = recipient, amount = amount))
+        d.appendKeyBlock()
+      }
+      def latest(to: Option[ByteStr] = None) = d.rocksDBWriter.balanceSnapshots(recipient, 1, to).maxBy(_.height).regularBalance
+
+      append(1.waves)
+      val firstId = d.rocksDBWriter.lastBlockId.get
+      latest() shouldBe 1.waves
+
+      append(2.waves)
+      val secondHeight = d.rocksDBWriter.height
+      latest() shouldBe 3.waves
+      latest(Some(firstId)) shouldBe 1.waves
+
+      d.rollbackTo(firstId)
+      latest() shouldBe 1.waves
+
+      // Back to the same height with other blocks: what was cached for the discarded ones must not be returned.
+      append(5.waves)
+      d.appendKeyBlock()
+      d.rocksDBWriter.height shouldBe secondHeight
+      latest() shouldBe 6.waves
+    }
+  }
+
   "Slice" - {
     "drops tail" in {
       slice(H.seq(10, 7, 4), H(7), H(10)) shouldEqual H.seq(10, 7)
