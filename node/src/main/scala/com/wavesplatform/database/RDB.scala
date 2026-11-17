@@ -119,11 +119,31 @@ object RDB extends StrictLogging {
       case _            => throw new IllegalArgumentException(s"$cfName is not one of ${NonEssentialColumnFamilies.mkString(", ")}")
     }
 
-    Using.resource(open(settings)) { rdb =>
+    Using.resource(openExisting(settings)) { rdb =>
       logger.info(s"Truncating $cfName")
       rdb.db.dropColumnFamily(handleOf(rdb))
     }
   }
+
+  /** Auto compactions are disabled for tx-meta, so every flush adds an L0 file and a point lookup may probe all of them. A manual full compaction
+    * merges them into the bottom level.
+    */
+  def compactTxMeta(settings: DBSettings): Unit =
+    Using.resources(openExisting(settings), new CompactRangeOptions().setMaxSubcompactions(Runtime.getRuntime.availableProcessors())) {
+      (rdb, options) =>
+        val handle = rdb.txMetaHandle.handle
+        // defs, not vals: re-read after compaction
+        def l0Files  = rdb.db.getProperty(handle, "rocksdb.num-files-at-level0")
+        def sstBytes = rdb.db.getProperty(handle, "rocksdb.total-sst-files-size")
+        logger.info(s"Compacting $TxMetaCF, $l0Files L0 files, $sstBytes bytes")
+        rdb.db.compactRange(handle, null, null, options)
+        logger.info(s"Compacted $TxMetaCF, $l0Files L0 files, $sstBytes bytes")
+    }
+
+  // open creates a missing DB, so a wrong config would make an offline tool silently work on a fresh empty one
+  private def openExisting(settings: DBSettings): RDB =
+    if (Files.exists(Path.of(settings.directory, "CURRENT"))) open(settings)
+    else throw new IllegalStateException(s"No database at ${settings.directory}")
 
   private def newColumnFamilyOptions(
       bitsPerKey: Double,
