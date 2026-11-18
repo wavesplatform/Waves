@@ -24,8 +24,7 @@ ThisBuild / dependencyOverrides ++= Dependencies.overrides.value
 ThisBuild / pomIncludeRepository := { _ => false }
 ThisBuild / publishMavenStyle    := true
 ThisBuild / publishTo := {
-  val centralSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
-  if (isSnapshot.value) Some("central-snapshots" at centralSnapshots)
+  if (isSnapshot.value) Some(Resolver.sonatypeCentralSnapshots)
   else localStaging.value
 }
 
