@@ -24,7 +24,9 @@ The build runs on sbt 2 (`project/build.properties`), whose meta-build is Scala 
 
 **Lint.** sbt 2 reports 40 sbt-native-packager scope bridges (`Debian`/`Rpm`/`Universal` aliases such as `executableScriptName`, `daemonUser`) as unused; sbt 1's lint never saw them. `excludeLintKeys` lists them once each: sbt matches that set by key label alone (`LintUnused` maps it through `scopedKey.key.label`), so the scope written on an entry is decoration and one entry silences the key everywhere.
 
-**Plugins on pre-releases.** `sbt-protoc` 1.1.0-RC2 and `sbt-git` 3.0.0-RC1 are the only sbt 2 builds of either; `sbt-git` 3 also makes the build load from a linked git worktree, which 2.x cannot (`NoWorkTreeException` from its JGit). `sbt-javaagent` moved to `com.github.sbt`.
+**Plugins on pre-releases.** `sbt-protoc` 1.1.0-RC2 is its only sbt 2 build. `sbt-javaagent` moved to `com.github.sbt`.
+
+**Worktrees need sbt-git 3.0.0 or later.** Earlier versions (3.0.0-RC1 included) read the repo through JGit, which fails in a linked git worktree (`.claude/worktrees/*`) with `NoWorkTreeException: Bare Repository has neither a working tree, nor an index`. 3.0.0 reads through the `git` CLI by default; its sbt 2 build is compiled against sbt 2.1, so it needs sbt 2.1 or later.
 
 **Known noise.** `SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder"` at load comes from an SLF4J 1.x API on sbt 2's own classpath; neither a 1.7 nor a 2.0 `slf4j-nop` in `plugins.sbt` silences it. `JVM Options are defined twice` while packaging `node` is an sbt-native-packager bug (still present in 1.13.0): `ApplicationIniGenerator` recognises the duplicate `application.ini` (one from the bash, one from the bat start script) by comparing a `File` against a `FileRef`, which never matches under sbt 2. The duplicate is still dropped, so the package is unaffected.
 
