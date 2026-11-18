@@ -150,6 +150,7 @@ jobs:
       - working-directory: ride-js-bundle
         run: |
           pnpm install --frozen-lockfile
+          pnpm run format:check
           pnpm test
 
   # node-it, one runner per entry. integrationTests is split across runners by a hash of the suite name

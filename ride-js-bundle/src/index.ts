@@ -1,15 +1,10 @@
 // Public @waves/ride-js API, ported from the wavesplatform/ride-js src/index.js. The original required
 // @waves/ride-lang and @waves/ride-repl, each with its own copy of the ScalaJS runtime; this requires one
 // combined artifact (scalajs/ride-scalajs.js, the linked repl-js output) that exports both APIs.
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-var-requires */
 require("./interop"); // side effect: installs crypto/http globals before the artifact runs
 const crypto: any = require("@waves/ts-lib-crypto");
+// Exposes both the compiler exports (lang-js JsAPI) and the repl exports (repl-js JsAPI) as one module.
 const scalajs: any = require("../scalajs/ride-scalajs.js");
-
-// The combined artifact exposes both the compiler exports (from lang-js JsAPI)
-// and the repl exports (from repl-js JsAPI) as one module.
-const scalaJsCompiler = scalajs;
-const replJs = scalajs;
 
 function wrappedCompile(
   code: string,
@@ -24,7 +19,7 @@ function wrappedCompile(
     };
   }
   try {
-    const result = scalaJsCompiler.compile(code, estimatorVersion, needCompaction, removeUnusedCode, libraries);
+    const result = scalajs.compile(code, estimatorVersion, needCompaction, removeUnusedCode, libraries);
     if (result.error) {
       try {
         result.size = new Uint8Array(result.result).length;
@@ -57,7 +52,6 @@ function wrappedCompile(
       };
     }
   } catch (e: any) {
-    console.log(e);
     return typeof e === "object" ? { error: e.message } : { error: e };
   }
 }
@@ -65,13 +59,17 @@ function wrappedCompile(
 function wrappedRepl(opts?: { nodeUrl: string; chainId: string; address: string }): any {
   const repl =
     opts != null
-      ? replJs.repl(new replJs.NodeConnectionSettings(opts.nodeUrl, opts.chainId.charCodeAt(0), opts.address))
-      : replJs.repl();
+      ? scalajs.repl(new scalajs.NodeConnectionSettings(opts.nodeUrl, opts.chainId.charCodeAt(0), opts.address))
+      : scalajs.repl();
 
-  const wrapReconfigure = (repl: any): any => {
-    const reconfigureFn = repl.reconfigure.bind(repl);
-    return (opts: { nodeUrl: string; chainId: string; address: string }) => {
-      const settings = new replJs.NodeConnectionSettings(opts.nodeUrl, opts.chainId.charCodeAt(0), opts.address);
+  const wrapReconfigure = (target: any): any => {
+    const reconfigureFn = target.reconfigure.bind(target);
+    return (newOpts: { nodeUrl: string; chainId: string; address: string }) => {
+      const settings = new scalajs.NodeConnectionSettings(
+        newOpts.nodeUrl,
+        newOpts.chainId.charCodeAt(0),
+        newOpts.address
+      );
       const newRepl = reconfigureFn(settings);
       newRepl.reconfigure = wrapReconfigure(newRepl);
       return newRepl;
@@ -102,19 +100,19 @@ const api: any = {
   compile: wrappedCompile,
   repl: wrappedRepl,
   get contractLimits() {
-    return scalaJsCompiler.contractLimits();
+    return scalajs.contractLimits();
   },
   get version() {
-    const version = scalaJsCompiler.nodeVersion();
+    const version = scalajs.nodeVersion();
     return version && version.version;
   },
-  scriptInfo: scalaJsCompiler.scriptInfo,
-  getTypes: scalaJsCompiler.getTypes,
-  getVarsDoc: scalaJsCompiler.getVarsDoc,
-  getFunctionsDoc: scalaJsCompiler.getFunctionsDoc,
-  decompile: scalaJsCompiler.decompile,
+  scriptInfo: scalajs.scriptInfo,
+  getTypes: scalajs.getTypes,
+  getVarsDoc: scalajs.getVarsDoc,
+  getFunctionsDoc: scalajs.getFunctionsDoc,
+  decompile: scalajs.decompile,
   flattenCompilationResult,
-  parseAndCompile: scalaJsCompiler.parseAndCompile
+  parseAndCompile: scalajs.parseAndCompile
 };
 
 (global as any).RideJS = api;

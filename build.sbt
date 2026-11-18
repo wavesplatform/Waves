@@ -385,7 +385,7 @@ checkPRRaw := Def.uncached(
         testFull.all(
           ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
         ),
-        fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
+        fullOptJS.all(ScopeFilter(inProjects(`repl-js`), inConfigurations(Compile))), // links lang-js too
         assembly.all(ScopeFilter(inProjects(node))),
         stageForDocker
       )

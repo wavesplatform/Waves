@@ -1,7 +1,12 @@
 import { describe, test } from "vitest";
 import { assertCompileErrorDApp, assertCompileSuccessDApp, allStdLibVersions, V8 } from "../../helpers/jsTestBase";
 import { ContractGenerator } from "../../helpers/contractGenerator";
-import { randomAliasDataArrayElement, randomInt, randomIssuesArrayElement, randomStringArrayElement } from "../../helpers/randomData";
+import {
+  randomAliasDataArrayElement,
+  randomInt,
+  randomIssuesArrayElement,
+  randomStringArrayElement
+} from "../../helpers/randomData";
 import { nonMatchingTypes, invalidFunctionError, stringList } from "../../helpers/testData";
 
 describe("ReplaceByIndex", () => {

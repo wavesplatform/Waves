@@ -7,33 +7,25 @@
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const ride = require("../../dist/index.js");
+// The one place tests load the package; api.test.ts checks the raw API through it too.
+export const ride: any = require("../../dist/index.js");
 
 // The public `compile` wraps a successful result under `.result` ({ bytes, base64,
 // size, ast, complexity, verifierComplexity, callableComplexities, ... }); on
-// failure it returns a flat `{ error }`. `parseAndCompile`/`decompile`/`scriptInfo`
-// are raw passthroughs.
+// failure it returns a flat `{ error }`. `parseAndCompile` is a raw passthrough.
 export interface CompileResult {
   error?: unknown;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
 export interface ParseAndCompileResult {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   exprAst?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dAppAst?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ast?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   errorList?: any[];
   error?: unknown;
   complexity?: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
@@ -55,12 +47,4 @@ export function parseAndCompile(
   libraries: Record<string, string> = {}
 ): ParseAndCompileResult {
   return ride.parseAndCompile(input, estimatorVersion, needCompaction, removeUnusedCode, libraries);
-}
-
-export function decompile(input: string): { result?: string; error?: string } {
-  return ride.decompile(input);
-}
-
-export function scriptInfo(input: string): Record<string, unknown> {
-  return ride.scriptInfo(input);
 }

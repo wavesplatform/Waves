@@ -11,5 +11,6 @@ module.exports = {
     filename: "ride.min.js",
     library: "RideJS"
   },
-  plugins: [new NodePolyfillPlugin()]
+  // No crypto polyfill: @waves/ts-lib-crypto brings its own primitives, and crypto-browserify pulls in elliptic.
+  plugins: [new NodePolyfillPlugin({ excludeAliases: ["crypto"] })]
 };

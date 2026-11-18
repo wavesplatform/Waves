@@ -13,9 +13,9 @@ npm install @waves/ride-js
 ## Usage
 
 ```js
-const RideJS = require('@waves/ride-js');
+const RideJS = require("@waves/ride-js");
 
-const { result, error } = RideJS.compile('true');
+const { result, error } = RideJS.compile("true");
 // result: { bytes, base64, size, ast, complexity, verifierComplexity, callableComplexities, ... }
 
 const limits = RideJS.contractLimits;
@@ -27,10 +27,11 @@ The same `RideJS` global is exposed by the browser bundle (`dist/ride.min.js`).
 ## Layout
 
 - `src/`: TypeScript glue (`index.ts` public API, `interop.ts` crypto/http globals) plus the
-  hand-maintained `index.d.ts` public typings, which `package.json` references directly (no copy).
+  hand-maintained `index.d.ts` public typings, which `package.json` references directly (no copy);
+  `test/api.test.ts` fails when they drift from the compile result.
 - `scalajs/ride-scalajs.js`: the single combined ScalaJS artifact (the linked `repl-js`
   output, which exports both the compiler API and the repl API). The Waves `sbt replJS/fullOptJS`
-  task is configured to emit it **directly** here (see `repl/js/build.sbt`), so there is no copy
+  task is configured to emit it **directly** here (see `repl/js/build.sbt`; `fastOptJS` stays under `target/`), so there is no copy
   step.
 - `dist/`: build output: `index.js` (node `main`), `interop.js`, `ride.min.js` (browser).
 - `pnpm-workspace.yaml`: pnpm settings: the `allowBuilds` install-script policy + dependency
@@ -41,7 +42,7 @@ The same `RideJS` global is exposed by the browser bundle (`dist/ride.min.js`).
 This package uses **pnpm** (pinned via the `packageManager` field). pnpm does not run dependency
 install scripts: the policy lives in `pnpm-workspace.yaml` under `allowBuilds`, where every
 dependency that ships an install script must be explicitly allowed or denied. Ours are denied
-(`esbuild: false`), so no third-party code executes on install; a *new* dependency with a build
+(`esbuild: false`), so no third-party code executes on install; a _new_ dependency with a build
 script fails the install until a deliberate decision is recorded.
 
 ```
@@ -49,8 +50,11 @@ sbt replJS/fullOptJS        # from the Waves repo root: emits ride-js-bundle/sca
 cd ride-js-bundle
 pnpm install --frozen-lockfile
 pnpm run build              # build:ts -> build:browser (consumes the emitted artifact)
-pnpm test                   # Vitest suite (compiles RIDE through the public API)
+pnpm test                   # tsc over src/ and test/, then the Vitest suite (compiles RIDE through the public API)
+pnpm run format             # Prettier; CI runs format:check
 ```
+
+Test fixtures are picked at random from a seed printed as `RIDE_TEST_SEED=<n>` at the start of a run; rerun with that variable set to reproduce a failure.
 
 ## Releasing
 

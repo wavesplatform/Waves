@@ -2,11 +2,35 @@
 // compiler-focused builtInFunctions suite does not exercise directly. Guards the
 // shapes that consumers depend on for API compatibility.
 import { describe, test, expect } from "vitest";
-import { createRequire } from "module";
+import type { ICompilationResult, IFlattenedCompilationResult } from "@waves/ride-js";
+import { ride } from "./helpers/compiler";
+import { allStdLibVersions, dApp } from "./helpers/jsTestBase";
 
-const require = createRequire(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const ride = require("../dist/index.js");
+// Record<keyof T, true> fails tsc on a key the typings lack or declare extra, so these mirror src/index.d.ts exactly.
+const declaredResultKeys: Record<keyof ICompilationResult["result"], true> = {
+  ast: true,
+  base64: true,
+  bytes: true,
+  size: true,
+  complexity: true,
+  verifierComplexity: true,
+  callableComplexities: true,
+  userFunctionComplexities: true,
+  globalVariableComplexities: true
+};
+const declaredFlatKeys: Record<Exclude<keyof IFlattenedCompilationResult, "error">, true> = declaredResultKeys;
+
+const dAppWithEverything = dApp(
+  `
+let g = 1
+func f() = g
+@Callable(i)
+func c() = [IntegerEntry("k", f())]
+@Verifier(tx)
+func v() = true
+`,
+  6
+);
 
 describe("ride-js public API", () => {
   test("compile wraps a successful result under .result with bytes/base64/size/complexity", () => {
@@ -53,5 +77,20 @@ describe("ride-js public API", () => {
     for (const k of ["scriptInfo", "getTypes", "getVarsDoc", "getFunctionsDoc", "decompile", "parseAndCompile"]) {
       expect(typeof ride[k]).toBe("function");
     }
+  });
+
+  test("compile result matches the published typings", () => {
+    const r = ride.compile(dAppWithEverything);
+    expect(r.error).toBeUndefined();
+    expect(Object.keys(r.result).sort()).toEqual(Object.keys(declaredResultKeys).sort());
+    expect(Object.keys(ride.flattenCompilationResult(r)).sort()).toEqual(Object.keys(declaredFlatKeys).sort());
+  });
+
+  // allStdLibVersions is hand-kept; this fails when the compiler gains a version the list lacks.
+  test("allStdLibVersions lists every version the compiler accepts", () => {
+    const max = Math.max(...allStdLibVersions);
+    const withVersion = (v: number) => `{-# STDLIB_VERSION ${v} #-}\n{-# CONTENT_TYPE EXPRESSION #-}\ntrue`;
+    expect(ride.compile(withVersion(max)).error).toBeUndefined();
+    expect(String(ride.compile(withVersion(max + 1)).error)).toContain("Illegal directive value");
   });
 });

@@ -2,9 +2,23 @@
 // Picks random RIDE source fragments from fixed fixtures. As in the original,
 // randomness only selects which valid/invalid fixture is fed to the compiler;
 // assertions are about compile success/error, not the concrete value.
+// Seeded from RIDE_TEST_SEED (set and printed by test/globalSetup.ts), so a failure reproduces with the same seed.
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const random = mulberry32(Number(process.env.RIDE_TEST_SEED ?? Math.floor(Math.random() * 2 ** 32)));
 
 function pick(arr: readonly string[]): string {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(random() * arr.length)];
 }
 
 export const addressDataArray: readonly string[] = [
@@ -59,12 +73,13 @@ export const digestAlgorithmTypeArray: readonly string[] = [
   "SHA3512"
 ];
 
-export function randomInt(): number {
-  return Math.floor(Math.random() * 90000000);
+// Like the other generators, these return RIDE source literals, not JS values.
+export function randomInt(): string {
+  return String(Math.floor(random() * 90000000));
 }
 
-export function randomBoolean(): boolean {
-  return randomInt() % 2 === 0;
+export function randomBoolean(): string {
+  return String(random() < 0.5);
 }
 
 export const randomAddressDataArrayElement = (): string => pick(addressDataArray);

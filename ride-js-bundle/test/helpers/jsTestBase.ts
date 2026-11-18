@@ -35,7 +35,12 @@ export function assertCompileErrorDApp(code: string, version: number, expectingE
   expect(String(error)).toContain(expectingError);
 }
 
-export function assertCompileErrorExpression(code: string, version: number, expectingError: string, estimator = 3): void {
+export function assertCompileErrorExpression(
+  code: string,
+  version: number,
+  expectingError: string,
+  estimator = 3
+): void {
   const error = compile(expression(code, version), estimator).error;
   expect(String(error)).toContain(expectingError);
 }

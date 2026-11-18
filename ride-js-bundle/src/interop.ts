@@ -1,7 +1,6 @@
 // Sets the crypto/http primitives the ScalaJS compiler & repl resolve from the
 // global scope. Ported from the original @waves/ride-js src/interop.js. Must run
 // before the ScalaJS artifact is required.
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const crypto: any = require("@waves/ts-lib-crypto");
 const axios: any = require("axios");
 
@@ -34,32 +33,39 @@ g.curve25519verify = function (msg: ArrayBuffer, sig: ArrayBuffer, key: ArrayBuf
 g.merkleVerify = function (rootHash: ArrayBuffer, merkleProof: ArrayBuffer, leafData: ArrayBuffer) {
   return crypto.merkleVerify(new Uint8Array(rootHash), new Uint8Array(merkleProof), new Uint8Array(leafData));
 };
+// RIDE digest names that @waves/ts-lib-crypto spells differently; NONE means no digest. Others pass through.
+const RSA_ALG: Record<string, string | undefined> = {
+  SHA3224: "SHA3-224",
+  SHA3256: "SHA3-256",
+  SHA3384: "SHA3-384",
+  SHA3512: "SHA3-512",
+  NONE: undefined
+};
 g.rsaVerify = function (digest: any, msg: ArrayBuffer, sig: ArrayBuffer, key: ArrayBuffer) {
-  let alg = digest.toString();
-  switch (digest.toString()) {
-    case "SHA3224":
-      alg = "SHA3-224";
-      break;
-    case "SHA3256":
-      alg = "SHA3-256";
-      break;
-    case "SHA3384":
-      alg = "SHA3-384";
-      break;
-    case "SHA3512":
-      alg = "SHA3-512";
-      break;
-    case "NONE":
-      alg = undefined;
-      break;
-  } // fixme
+  const name = String(digest);
+  const alg = name in RSA_ALG ? RSA_ALG[name] : name;
   return crypto.rsaVerify(new Uint8Array(key), new Uint8Array(msg), new Uint8Array(sig), alg);
 };
+// The repl fetches from the configured nodeUrl, which must be trusted: only http(s), no redirects, bounded in time
+// and size, so a hostile or broken URL cannot hang the caller or exhaust its memory.
 g.httpGet = async function (data: any) {
   if (!data.url) return { ...data, status: 404, body: "url is undefined" };
-  const resp = await axios.get(data.url, { validateStatus: () => true });
+  let protocol: string;
+  try {
+    protocol = new URL(data.url).protocol;
+  } catch {
+    return { ...data, status: 400, body: `invalid url: ${data.url}` };
+  }
+  if (protocol !== "http:" && protocol !== "https:")
+    return { ...data, status: 400, body: `unsupported protocol: ${protocol}` };
+  const resp = await axios.get(data.url, {
+    validateStatus: () => true,
+    timeout: 30_000,
+    maxContentLength: 10 * 1024 * 1024,
+    maxRedirects: 0
+  });
   const status = resp.status;
-  let body = await resp.data;
+  let body = resp.data;
   if (typeof body !== "string") body = JSON.stringify(body);
   return { ...data, status, body };
 };

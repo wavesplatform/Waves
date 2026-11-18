@@ -158,7 +158,6 @@ describe("JsAPITest", () => {
     const r1 = parseAndCompile(script, 3, false, false, { lib1: import1, lib2: import2, lib3: import3 });
     const r2 = parseAndCompile(script, 3, false, false, { lib1: anotherImport1, lib2: import2, lib3: import3 });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function checkPos(expr: any): void {
       const letDec = expr.exprAst.expr.body.body.body.dec;
       expect(letDec.type).toBe("LET");
