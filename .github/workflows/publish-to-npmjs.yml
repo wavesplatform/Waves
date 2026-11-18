@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Package version
-        required: true
+        description: Package version (empty publishes the next <package.json version>-snapshot.N)
+        required: false
       tag:
         description: Package tag
         required: true
@@ -80,8 +80,9 @@ jobs:
           node-version: '24' # Trusted publishing requires npm CLI 11.5.1 or later (Node 24.7+).
       # @waves/ride-js is versioned independently of the node: a release publishes the version in package.json,
       # and skips publishing when that version is already on npm (no bump since the last release).
+      # A dispatch without a version publishes the next snapshot of that version.
       # Dispatch inputs go through env and are validated, never expanded into the script.
-      - if: github.event_name == 'workflow_dispatch'
+      - if: github.event_name == 'workflow_dispatch' && inputs.version != ''
         env:
           IN_VERSION: ${{ inputs.version }}
           IN_TAG: ${{ inputs.tag }}
@@ -95,6 +96,20 @@ jobs:
         run: |
           echo "VERSION=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
           echo "TAG=latest" >> "$GITHUB_ENV"
+      # Same numbering as https://github.com/wavesplatform/publish-to-npm/blob/main/.github/workflows/publish.yml:
+      # <package.json version>-snapshot.<max published N + 1>, starting at 1.
+      - if: github.event_name == 'workflow_dispatch' && inputs.version == ''
+        working-directory: ride-js-bundle
+        env:
+          IN_TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$IN_TAG" =~ ^[a-z][a-z0-9-]*$ ]] || { echo "::error::bad tag: $IN_TAG"; exit 1; }
+          PREFIX="$(node -p 'require("./package.json").version')-snapshot"
+          # npm prints a bare string instead of an array when there is a single version.
+          NEXT=$(npm view @waves/ride-js versions --json \
+            | jq -r --arg p "$PREFIX." '[.] | flatten | map(select(startswith($p)) | ltrimstr($p) | tonumber? // empty) | (max // 0) + 1')
+          echo "VERSION=$PREFIX.$NEXT" >> "$GITHUB_ENV"
+          echo "TAG=$IN_TAG" >> "$GITHUB_ENV"
       - id: publish
         working-directory: ride-js-bundle
         run: |

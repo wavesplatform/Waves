@@ -58,4 +58,4 @@ Test fixtures are picked at random from a seed printed as `RIDE_TEST_SEED=<n>` a
 
 ## Releasing
 
-The version in `package.json` is independent of the node version. A Waves GitHub release runs `.github/workflows/publish-to-npmjs.yml`, which publishes that version with the `latest` tag, or skips publishing when it is already on npm; bump it in the PR that changes the package. A manual run of the workflow publishes an explicit version and tag (for snapshots).
+The version in `package.json` is independent of the node version. A Waves GitHub release runs `.github/workflows/publish-to-npmjs.yml`, which publishes that version with the `latest` tag, or skips publishing when it is already on npm; bump it in the PR that changes the package. A manual run of the workflow with an empty version publishes the next `<version>-snapshot.N` with the given tag (default `snapshot`); with a version, it publishes exactly that version and tag. Snapshots sort before their release, so bump the version after releasing it.
