@@ -211,8 +211,10 @@ class EvaluatorV2(
     }
 
     private def evaluateBranch(branch: EXPR, f: IfFrame): Unit = {
-      write(f.slot, branch)
-      evaluate(branch, f.slot, unused - overheadCost, f.blocks)
+      // Only the branch taken is copied: a `match` compiles to a chain of IFs, most of whose branches are never evaluated.
+      val b = if (f.ifExpr.branchesShared) EvaluationCopy(branch) else branch
+      write(f.slot, b)
+      evaluate(b, f.slot, unused - overheadCost, f.blocks)
     }
 
     // Evaluates the arguments left to right while complexity remains, then the function itself.

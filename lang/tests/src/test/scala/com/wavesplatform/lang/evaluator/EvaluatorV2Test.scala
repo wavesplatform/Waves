@@ -1363,6 +1363,26 @@ class EvaluatorV2Test extends PropSpec with Inside {
     expr shouldBe before
   }
 
+  property("evaluation leaves IF branches unchanged, at the top level, in LET values and nested in branches") {
+    val expr = compile(
+      """
+        | let x = if (height > 0) then { if (height > 5) then 10 else 1 + 1 } else 3 * 3
+        | func f(a: Int) = if (a > 1) then a * 2 else a + 100
+        | if (x == 2) then {
+        |   if (f(x) == 4) then f(1) + x else 0
+        | } else {
+        |   x * 7
+        | }
+      """.stripMargin
+    )
+    val before = expr.deepCopy.value
+    val first  = evalEither(expr, 1000, newMode = true)
+    first.map(_._1) shouldBe Right(CONST_LONG(103))
+    evalEither(expr, 1000, newMode = true) shouldBe first
+    evalEither(expr, 1000, newMode = false).map(_._1) shouldBe Right(CONST_LONG(103))
+    expr shouldBe before
+  }
+
   private def evalLogged(
       ec: EvaluationContext[Environment, Id],
       expr: EXPR,
