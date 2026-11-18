@@ -1334,6 +1334,12 @@ class EvaluatorV2Test extends PropSpec with Inside {
     expr shouldBe before
   }
 
+  property("a value passes up through 100000 nested blocks without growing the call stack") {
+    val depth = 100000
+    val expr  = (1 to depth).foldLeft[EXPR](REF("x0"))((body, i) => BLOCK(LET(s"x$i", CONST_LONG(i)), body))
+    evalEither(BLOCK(LET("x0", CONST_LONG(42)), expr), 1000, newMode = true).map(_._1) shouldBe Right(CONST_LONG(42))
+  }
+
   property("a reference finds the nearest declaration, and a function sees the declarations around its own definition") {
     // The compiler rejects redeclared names, so the tree is built by hand.
     def sum(a: EXPR, b: EXPR) = FUNCTION_CALL(FunctionHeader.Native(FunctionIds.SUM_LONG), List(a, b))

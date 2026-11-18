@@ -1,5 +1,5 @@
 ---
-purpose: Implementation notes for the RIDE evaluator (EvaluatorV2, EvaluationResult, EvaluationCopy) and how to measure its speed
+purpose: Implementation notes for the RIDE evaluator (EvaluatorV2, its explicit stack, EvaluationCopy) and how to measure its speed
 ---
 
 # RIDE evaluator
@@ -16,11 +16,13 @@ Anything that starts evaluating a tree, or adds a path that writes into one, has
 
 `EXPR.deepCopy` (through `cats.Eval`) is no longer used by the evaluator and is kept on purpose: it is the reference `EvaluationCopyTest` compares against and the baseline in `FunctionCallCopyBenchmark`. It allocated several objects per node and copied whole dApps for every invocation.
 
-## EvaluationResult is a trampoline, not Monix
+## The evaluator runs on an explicit stack, not Monix
 
-`EvaluationResult` used to wrap `Coeval[Either[...]]`, so every evaluator step went through Monix's run loop and allocated a `Coeval` and an `Either`. It is now its own small trampoline: immutable step descriptions (`flatMap`, `map`, `transform`, `handleErrorWith`, `delay`, `defer`) run by `run()` with a stack local to the run. It keeps Coeval's behaviour where results depend on it: an error value skips the following `flatMap`/`map` steps, a thrown non-fatal exception unwinds to the nearest `handleErrorWith` or out of `run()`, and `applyLimitedCoeval` still returns a `Coeval` that turns an exception into `Left((e.getMessage, limit, log))`. Error texts of failed transactions end up in the state, so these paths must not change. `Extended` native functions (`invoke` and friends) still return a `Coeval`, run with `fromCoeval`.
+`EvaluatorV2` used to build every step as a `Coeval[Either[...]]`, later as steps of `EvaluationResult`, a small trampoline of its own; both allocated a closure for every continuation and for every place a value is written. Now `EvaluatorV2.run` is a single loop over a `java.util.ArrayDeque` of frames: a frame says what to do with the unused complexity when the subexpression above it finishes (`CallFrame` evaluates the next argument or calls the function, `GetterFrame`, `IfFrame`, `LetFrame`, `NewModeFrame`, `PrecalculatedFrame`), and a `Slot` says where the value of a subexpression is written (the old `update` callbacks). Each frame does exactly what the `flatMap` it replaced did, in the same order, so complexity, error texts and the log are unchanged; keep it that way, they end up in the state. An error skips every frame except `LetFrame`, which logs it (the old `logError`). The only exceptions caught are those of a native function call, turned into `An error during run ...` with complexity 0 as before; any other non-fatal exception leaves `run`, and `applyLimitedCoeval` still turns it into `Left((e.getMessage, limit, log))`. `BlockSlot` passes a value up through nested blocks in a `@tailrec` loop, so deep nesting does not grow the call stack. `Extended` native functions (`invoke` and friends) still return a `Coeval`, run with `.value()` inside the call.
 
-An invoke between dApps evaluates the callee in a nested run on the same thread (the `Extended` function's `Coeval`, then a new `run()`), so the call stack grows with the depth of the chain, up to 100 invokes. A `StackOverflowError` is fatal and nothing catches it, so nodes with different stack sizes could disagree about a block. `SyncDAppLimits` runs the deepest allowed chain on a thread with a 1 MB stack to keep the margin visible.
+Measured on testnet 2368890 to 2398890 on Linux (two alternating runs each, `~/waves-import-bench/evstack-ab.sh`): 479 s and 467 s on the trampoline, 394 s and 374 s on the explicit stack, 19% less import time, with RocksDB contents identical (entry count and SHA-256 per column family). The trampoline's own loop was a sixth of the appender in profiles; the closures every step allocated (one per `flatMap`, one per `update`) cost more than the loop itself showed.
+
+An invoke between dApps evaluates the callee in a nested run on the same thread (the `Extended` function's `Coeval`, then a new `EvaluatorV2.run`), so the call stack grows with the depth of the chain, up to 100 invokes. A `StackOverflowError` is fatal and nothing catches it, so nodes with different stack sizes could disagree about a block. `SyncDAppLimits` runs the deepest allowed chain on a thread with a 1 MB stack to keep the margin visible.
 
 Monix stack tracing (`monix.eval.stackTracingMode`, `cached` by default) cost 7% of the slice below while every evaluator step ran on `Coeval`. Since the trampoline it makes no difference (2146124 to 2176100 on one machine: 269.6 s with it off, 269.5 s with it on), so the node keeps the Monix default.
 
