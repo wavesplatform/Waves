@@ -34,15 +34,30 @@ class EvaluatorV2(
 
   /** Evaluates `expr` in place, as far as `limit` allows. Returns the expression the evaluation left in its place (a value when it completed)
     * and the unused complexity, or the first error with the complexity left when it happened. A thrown non-fatal exception other than one from
-    * a native function leaves this method.
+    * a native function fails the returned `Coeval`.
+    *
+    * An `Extended` native function (`invoke` and friends) is not run here: the loop stops, Monix runs its `Coeval` and the loop resumes with the
+    * result. An invoke evaluates the callee in a nested evaluation, so running it inside the loop would grow the call stack with every level of
+    * an invoke chain; this way the whole chain runs in Monix's stack-safe loop.
     */
-  def run(expr: EXPR): Either[(ExecutionError, Int), (EXPR, Int)] = {
-    val root = new RootSlot(expr)
-    new Run().apply(expr, root).map((root.value, _))
+  def run(expr: EXPR): Coeval[Either[(ExecutionError, Int), (EXPR, Int)]] = {
+    val root      = new RootSlot(expr)
+    val execution = new Run(expr, root)
+    def drive(): Coeval[Either[(ExecutionError, Int), (EXPR, Int)]] =
+      Coeval.defer {
+        execution.continue() match {
+          case null =>
+            execution.suspension.attempt.flatMap { outcome =>
+              execution.resumeWith(outcome); drive()
+            }
+          case result => Coeval.now(result.map((root.value, _)))
+        }
+      }
+    drive()
   }
 
   // One evaluation: the continuations of the evaluated subexpressions are frames on an explicit stack, see docs/notes/ride-evaluator.md.
-  private final class Run {
+  private final class Run(start: EXPR, root: Slot) {
     private val frames = new java.util.ArrayDeque[Frame]()
 
     // The next expression to evaluate; null when the last step finished with `unused` or `error`.
@@ -54,10 +69,17 @@ class EvaluatorV2(
     private var unused: Int                  = 0
     private var error: (ExecutionError, Int) = null
 
-    def apply(start: EXPR, root: Slot): Either[(ExecutionError, Int), Int] = {
-      evaluate(start, root, limit, Nil)
+    // An Extended native call waiting for its Coeval to run, between continue() returning null and resume().
+    private var suspended: SuspendedCall = null
+
+    evaluate(start, root, limit, Nil)
+
+    def suspension: Coeval[(Either[ExecutionError, EVALUATED], Int)] = suspended.coeval
+
+    // Runs until the evaluation finishes, or returns null when it stops at an Extended native call.
+    def continue(): Either[(ExecutionError, Int), Int] = {
       var result: Either[(ExecutionError, Int), Int] = null
-      while (result == null) {
+      while (result == null && suspended == null) {
         if (expr != null) step()
         else
           frames.poll() match {
@@ -68,6 +90,13 @@ class EvaluatorV2(
           }
       }
       result
+    }
+
+    // Completes the Extended native call the loop stopped at; continue() goes on from there.
+    def resumeWith(outcome: Either[Throwable, (Either[ExecutionError, EVALUATED], Int)]): Unit = {
+      val call = suspended
+      suspended = null
+      completeNativeCall(call.slot, nativeResult(call.function, outcome.fold(throw _, identity)))
     }
 
     private def evaluate(e: EXPR, s: Slot, l: Int, b: List[BLOCK_DEF]): Unit = {
@@ -206,35 +235,42 @@ class EvaluatorV2(
         case Some(function) =>
           val cost = function.costByLibVersion(stdLibVersion).toInt
           if (l < cost) done(l)
-          else
-            callNativeFunction(fc, function.asInstanceOf[NativeFunction[Environment]], l, cost) match {
-              case Right((result, u)) =>
-                write(s, result)
-                done(u)
-              case Left((e, u)) => fail(e, u)
+          else {
+            val native = function.asInstanceOf[NativeFunction[Environment]]
+            val args   = fc.args.asInstanceOf[List[EVALUATED]]
+            native.ev match {
+              case f: Extended[Environment] =>
+                // Deferred, so that what evaluate throws fails the Coeval and is handled like what running it throws.
+                val coeval = Coeval
+                  .defer(f.evaluate[Id](ctx.ec.environment, args, l - cost))
+                  .map { case (result, unusedComplexity) =>
+                    result.map { case (evaluated, log) =>
+                      log.foreach { case (logItemName, logItemValue) => ctx.log(LET(logItemName, TRUE), logItemValue) }
+                      evaluated
+                    } -> unusedComplexity
+                  }
+                suspended = SuspendedCall(native, s, coeval)
+              case f: Simple[Environment] =>
+                completeNativeCall(s, nativeResult(native, (f.evaluate(ctx.ec.environment, args), l - cost)))
             }
+          }
       }
 
-    private def callNativeFunction(
-        fc: FUNCTION_CALL,
+    private def completeNativeCall(s: Slot, result: Either[(ExecutionError, Int), (EVALUATED, Int)]): Unit =
+      result match {
+        case Right((value, u)) =>
+          write(s, value)
+          done(u)
+        case Left((e, u)) => fail(e, u)
+      }
+
+    // What a native call leaves, with the unused complexity; `outcome` is evaluated here, so an exception it throws becomes the call's error.
+    private def nativeResult(
         function: NativeFunction[Environment],
-        l: Int,
-        cost: Int
-    ): Either[(ExecutionError, Int), (EVALUATED, Int)] = {
-      val args = fc.args.asInstanceOf[List[EVALUATED]]
+        outcome: => (Either[ExecutionError, EVALUATED], Int)
+    ): Either[(ExecutionError, Int), (EVALUATED, Int)] =
       try {
-        val (result, evaluatedComplexity) = function.ev match {
-          case f: Extended[Environment] =>
-            f.evaluate[Id](ctx.ec.environment, args, l - cost)
-              .map { case (result, unusedComplexity) =>
-                result.map { case (evaluated, log) =>
-                  log.foreach { case (logItemName, logItemValue) => ctx.log(LET(logItemName, TRUE), logItemValue) }
-                  evaluated
-                } -> unusedComplexity
-              }
-              .value()
-          case f: Simple[Environment] => (f.evaluate(ctx.ec.environment, args), l - cost)
-        }
+        val (result, evaluatedComplexity) = outcome
         result.bimap(
           {
             // The whole limit of the evaluation, not the complexity left at this call: changing it would change past results.
@@ -254,7 +290,6 @@ class EvaluatorV2(
           }
           Left((CommonError(s"""An error during run ${function.ev}: ${e.getClass} $error"""), 0))
       }
-    }
 
     // A function of the context, or one declared in the enclosing blocks, with its precalculated limit and the blocks it sees.
     private def findCallee(f: CallFrame, l: Int, name: String): Option[(FUNC, Option[Int], List[BLOCK_DEF])] =
@@ -343,6 +378,13 @@ object EvaluatorV2 {
   private final case class NewModeFrame(fc: FUNCTION_CALL, limit: Int) extends Frame
   private final case class PrecalculatedFrame(unused: Int)             extends Frame
 
+  // An Extended native call the run stopped at: where its value goes and the Coeval that computes it.
+  private final case class SuspendedCall(
+      function: NativeFunction[Environment],
+      slot: Slot,
+      coeval: Coeval[(Either[ExecutionError, EVALUATED], Int)]
+  )
+
   // The blocks starting with the one that declares `key`, or Nil: the caller needs both, and this allocates nothing on the hot path.
   @tailrec
   private def findLet(key: String, blocks: List[BLOCK_DEF]): List[BLOCK_DEF] =
@@ -409,7 +451,8 @@ object EvaluatorV2 {
       checkConstructorArgsTypes,
       fixedThrownError
     )
-    Coeval(evaluator.run(exprCopy))
+    Coeval
+      .defer(evaluator.run(exprCopy))
       .redeem(
         e => Left((e.getMessage, limit, log.toList)),
         _.bimap(
