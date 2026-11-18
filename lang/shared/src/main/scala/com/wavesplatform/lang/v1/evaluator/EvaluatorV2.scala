@@ -66,6 +66,10 @@ class EvaluatorV2(
     private var available: Int          = 0
     private var blocks: List[BLOCK_DEF] = Nil
 
+    // Names of the LETs this run has entered. Every scope chain is made of entered blocks, so a name not here is in none of them and a
+    // reference to it is a global variable: skipping the walk saves the longest walks, which are those for `nil`, `unit` or `this`.
+    private val enteredLets = new java.util.HashSet[String]()
+
     private var unused: Int                  = 0
     private var error: (ExecutionError, Int) = null
 
@@ -142,13 +146,19 @@ class EvaluatorV2(
       val l = available
       val b = blocks
       expr match {
-        case block: BLOCK_DEF => evaluate(block.body, BlockSlot(block, s), l, block :: b)
+        case block: BLOCK_DEF =>
+          block.dec match {
+            case let: LET => enteredLets.add(let.name)
+            case _        =>
+          }
+          evaluate(block.body, BlockSlot(block, s), l, block :: b)
         case g: GETTER =>
           frames.push(GetterFrame(g, s))
           evaluate(g.expr, GetterSlot(g), l, b)
         case i: IF =>
           frames.push(IfFrame(i, s, b))
           evaluate(i.cond, IfSlot(i), l, b)
+        case REF(key) if !enteredLets.contains(key) => evaluateGlobalVar(key, s, l)
         case REF(key) =>
           findLet(key, b) match {
             // findLet stops only at a block declaring a LET.

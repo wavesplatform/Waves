@@ -983,6 +983,29 @@ class EvaluatorV2Test extends PropSpec with Inside {
     cost2 shouldBe 6
   }
 
+  property("let and function argument shadowing a global variable") {
+    def sum(a: EXPR, b: EXPR) = FUNCTION_CALL(FunctionHeader.Native(FunctionIds.SUM_LONG), List(a, b))
+    val expr =
+      BLOCK(
+        LET("a", REF("height")),
+        BLOCK(
+          LET("height", CONST_LONG(7)),
+          BLOCK(
+            FUNC("f", List("height"), sum(REF("height"), REF("a"))),
+            sum(sum(FUNCTION_CALL(FunctionHeader.User("f"), List(sum(REF("height"), CONST_LONG(10)))), REF("height")), REF("a"))
+          )
+        )
+      )
+    /*
+      let a = height                    # the global (1 in the test environment), first evaluated inside f, after `let height` was entered
+      let height = 7
+      func f(height: Int) = height + a
+      f(height + 10) + height + a       # (17 + 1) + 7 + 1
+     */
+    evalEither(expr, 100, newMode = true) shouldBe Right((CONST_LONG(26), 96))
+    evalEither(expr, 100, newMode = false) shouldBe Right((CONST_LONG(26), 90))
+  }
+
   property("big script randomly splitted") {
     val body =
       """
