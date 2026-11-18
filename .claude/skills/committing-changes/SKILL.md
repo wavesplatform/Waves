@@ -1,14 +1,14 @@
 ---
 name: committing-changes
 description: Commit via feature branch + PR; never push version-1.6.x, never merge.
-allowed-tools: Read, Bash(git status *), Bash(git diff *), Bash(git log *), Bash(git add *), Bash(git commit *), Bash(git push *), Bash(git checkout *), Bash(git branch *), Bash(git fetch *), Bash(git merge *), Bash(git rev-parse *), Bash(gh pr *), Bash(sbt *)
+allowed-tools: Read, Bash(git status *), Bash(git diff *), Bash(git log *), Bash(git add *), Bash(git commit *), Bash(git push *), Bash(git checkout *), Bash(git worktree *), Bash(git branch *), Bash(git fetch *), Bash(git merge *), Bash(git rev-parse *), Bash(gh pr *), Bash(sbt *)
 ---
 
 ## Workflow
 
-1. **Branch check.** The default branch is `version-1.6.x`. If on it, switch to a feature branch:
+1. **Branch in a worktree.** The default branch is `version-1.6.x` and the main checkout stays on it. Start every new branch in its own worktree from an up-to-date `version-1.6.x`, never with `git checkout -b` in the main checkout:
    ```
-   git checkout -b <type>/<description>
+   git worktree add .claude/worktrees/<description> -b <type>/<description> <version-1.6.x commit>
    ```
    Valid `type` prefixes: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `infra`.
 

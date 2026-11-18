@@ -36,6 +36,7 @@ Waves node in Scala 3 (consensus, state, REST/gRPC API, RIDE). sbt 2.x multi-mod
 ## PR workflow
 
 - Default branch is `version-1.6.x`. Never push to it; feature branch + PR, human merges.
+- Start every new branch in its own worktree, never by switching branches in the main checkout (it stays on `version-1.6.x`): `git worktree add .claude/worktrees/<name> -b <type>/<name> <up-to-date version-1.6.x>`. Each worktree gets its own sbt server; `sbt --client shutdown` there before removing it.
 - Before pushing: `sbt compilePR` locally; fix formatting with `sbt scalafmt`, never by hand-matching the checker. Then run `/review` and fix Critical/Major findings in the same branch.
 - After pushing: watch `gh pr checks` until green; a red check is yours to fix or explicitly hand over.
 - On a mistake repeated twice, encode the rule (lint config, test, CI, `docs/notes/` for implementation learnings, or this file for build/conventions/workflow rules only); never just fix the instance.
