@@ -2,12 +2,12 @@ package com.wavesplatform.utils
 
 import com.google.common.io.ByteStreams
 import com.wavesplatform.account.{KeyPair, PKKeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.api.http.DebugApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.crypto.{P256Curve, Sha256}
-import com.wavesplatform.api.http.DebugApiRoute
 import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.ValidationError
@@ -93,7 +93,7 @@ object UtilApp {
         case Mode.SignTx          => maybeFindKeyPair(cmd).flatMap(Actions.doSignTx(_, inBytes, cmd.bindPopToSender))
         case Mode.SmokeTest       => Actions.doSmokeTest()
         case Mode.TruncateCF      => Actions.doTruncateCF(Application.loadApplicationConfig(cmd.configFile.map(new File(_))), cmd.columnFamily)
-        case Mode.RollbackTo      => withRocksDBWriter(cmd)(Actions.doRollbackTo(_, cmd.height.get))
+        case Mode.RollbackTo      => cmd.height.toRight("Height is required").flatMap(h => withRocksDBWriter(cmd)(Actions.doRollbackTo(_, h)))
         case Mode.StateHash       => withRocksDBWriter(cmd)(Actions.doStateHash(_, cmd.height))
       }
 
@@ -255,6 +255,7 @@ object UtilApp {
           arg[Int]("<height>")
             .text("Target height")
             .required()
+            .validate(h => if (h > 0) success else failure("Height must be positive"))
             .action((h, c) => c.copy(height = Some(Height(h))))
         ),
       cmd("state-hash")
@@ -264,6 +265,7 @@ object UtilApp {
           arg[Int]("<height>")
             .text("Height, defaults to the top persisted height")
             .optional()
+            .validate(h => if (h > 0) success else failure("Height must be positive"))
             .action((h, c) => c.copy(height = Some(Height(h))))
         ),
       help("help").hidden(),
@@ -363,7 +365,10 @@ object UtilApp {
     }
 
     def doRollbackTo(db: RocksDBWriter, height: Height): ActionResult =
-      db.rollbackTo(height).map(_ => s"Rolled back to height ${db.height}\n".utf8Bytes)
+      for {
+        _ <- Either.cond(height.toInt < db.height, (), s"Height $height is not below the current height ${db.height}")
+        _ <- db.rollbackTo(height)
+      } yield s"Rolled back to height ${db.height}\n".utf8Bytes
 
     def doSmokeTest(): ActionResult = {
       val message = Base64.decode(

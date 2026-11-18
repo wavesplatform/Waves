@@ -45,6 +45,15 @@ class UtilAppSpec extends FreeSpec with WithDomain {
       d.rocksDBWriter.height shouldBe 2
     }
 
+    "refuses a height that is not below the persisted height" in withDomain(DomainPresets.RideV6) { d =>
+      (1 to 5).foreach(_ => d.appendBlock())
+      val height = d.rocksDBWriter.height
+
+      UtilApp.Actions.doRollbackTo(d.rocksDBWriter, Height(height + 10)) shouldBe Left(s"Height ${height + 10} is not below the current height $height")
+      UtilApp.Actions.doRollbackTo(d.rocksDBWriter, Height(height)) shouldBe Left(s"Height $height is not below the current height $height")
+      d.rocksDBWriter.height shouldBe height
+    }
+
     "refuses to roll back below the safe rollback height" in withDomain(
       DomainPresets.RideV6.copy(dbSettings = DomainPresets.RideV6.dbSettings.copy(maxRollbackDepth = 2))
     ) { d =>
