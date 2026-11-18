@@ -11,6 +11,8 @@ Every append sets `SafeRollbackHeight` to `height - max-rollback-depth` (`RocksD
 - Keys kept through `updateHistory` (`AssetDetails`, `LeaseDetails`, `AddressScript`, `AssetScript`, `Sponsorship`): on each update of a key, every entry below the threshold except the newest one is deleted, both the value and its height in the `*History` list. `CarryFee(threshold - 1)` is deleted on every append, so only the last `max-rollback-depth + 1` carry fees exist.
 - With `cleanup-interval` set (off by default), the background cleanup also deletes WAVES balance, asset balance and account data nodes behind the safe height. A rollback past it is then unrecoverable.
 
+An offline rollback (`waves util rollback-to`, or a repair as below) calls `RocksDBWriter.rollbackTo` directly, so BlockchainUpdates subscribers get no ROLLBACK event: the extension's own DB rolls back to the node height on the next start, but a consumer resuming from its stored height must re-check block ids.
+
 Never pruned: transactions, per-height lists (`IssuedAssets`, `UpdatedAssets`, `SponsoredAssets`, `ChangedAddresses`), `StateHash`, `BlockStateHash`, and (without `cleanup-interval`) balance, data, lease balance and order fill history.
 
 Forcing a rollback below the safe height (by lowering the `SafeRollbackHeight` key) runs without error and leaves state silently wrong: a key whose entry at or before the target was pruned ends up with an empty history, so the asset, lease or script reads as absent, and `CarryFee(target)` reads as 0, so the next block pays its miner the wrong amount.
