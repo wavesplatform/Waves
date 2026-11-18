@@ -52,4 +52,4 @@ Hard-won implementation knowledge lives in `docs/notes/`, one file per subsystem
 - Touching BlockchainUpdaterImpl (processBlock, processMicroBlock, removeAfter, the read/write lock): read `docs/notes/blockchain-updater.md` first.
 - Touching the importer (Importer.scala) or measuring block append speed: read `docs/notes/import.md` first.
 - Touching rollback or history pruning (max-rollback-depth, SafeRollbackHeight, `updateHistory`, cleanup-interval), or rolling a DB back past its safe height: read `docs/notes/rollback.md` first.
-- Touching build.sbt, sbt plugins or tasks (IntegrationTestsPlugin, concurrentRestrictions, checkTestLimits), or the docker image (Dockerfile, entrypoint.sh, stageForDocker): read `docs/notes/build-tooling.md` first.
+- Touching build.sbt, sbt plugins or tasks (IntegrationTestsPlugin, concurrentRestrictions, checkTestLimits), the docker image (Dockerfile, entrypoint.sh, stageForDocker), or `cache: 'sbt'` in a workflow: read `docs/notes/build-tooling.md` first.
