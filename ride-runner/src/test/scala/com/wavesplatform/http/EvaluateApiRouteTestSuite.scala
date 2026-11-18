@@ -1,5 +1,7 @@
 package com.wavesplatform.http
 
+import com.wavesplatform.BaseTestSuite
+import com.wavesplatform.ride.runner.entrypoints.AppInitializer
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, StatusCodes}
 import com.wavesplatform.ride.runner.http.EvaluateApiRoute
 import com.wavesplatform.ride.runner.requests.RideScriptRunResult
@@ -10,6 +12,9 @@ import java.nio.charset.StandardCharsets
 import scala.concurrent.Future
 
 class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettingsHelper {
+  // Suites run in parallel in one JVM and the first BaseTestSuite switches the global AddressScheme, so pin it before building an address
+  AppInitializer.setupChain(BaseTestSuite.settings.addressSchemeCharacter)
+
   private val default     = Wallet.generateNewAccount("test".getBytes(StandardCharsets.UTF_8), 0)
   private val defaultAddr = default.toAddress
 
