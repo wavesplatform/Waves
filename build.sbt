@@ -102,15 +102,6 @@ lazy val `lang-tests` = project
   .dependsOn(`lang-testkit`)
   .settings(forkedTests)
 
-lazy val `lang-tests-js` = project
-  .in(file("lang/tests-js"))
-  .enablePlugins(ScalaJSPlugin)
-  .dependsOn(`lang-js`)
-  .settings(
-    libraryDependencies += Dependencies.scalaJsTest.value,
-    testFrameworks += new TestFramework("utest.runner.Framework")
-  )
-
 lazy val node = project.dependsOn(`lang-jvm`)
 
 lazy val `node-testkit` = project
@@ -205,7 +196,6 @@ lazy val `waves-node` = (project in file("."))
     `lang-js`,
     `lang-jvm`,
     `lang-tests`,
-    `lang-tests-js`,
     `lang-testkit`,
     `repl-js`,
     `repl-jvm`,
@@ -372,7 +362,7 @@ buildRIDERunnerForDocker := Def.uncached {
 
 // The ForkedTestGroup limit is what makes -Dwaves.it.max-parallel-suites mean anything, and it was missing because a
 // second Global assignment of concurrentRestrictions shadowed it. Assert it rather than trust a comment.
-// Unit tests checkPR runs on the JVM; lang-tests-js runs on Node.js
+// Unit tests checkPR runs; the RIDE JS tests run under Vitest in ride-js-bundle
 lazy val jvmUnitTestModules = Seq[ProjectReference](`lang-tests`, `repl-jvm`, `grpc-server`, `node-tests`, `ride-runner`)
 lazy val jvmUnitTests        = ScopeFilter(inProjects(jvmUnitTestModules*))
 
@@ -413,9 +403,9 @@ checkPRRaw := Def.uncached(
       Def.sequential(
         // testFull, not test: sbt 2's test is incremental and reports success having run nothing it ran before.
         testFull.all(
-          ScopeFilter(inProjects((jvmUnitTestModules :+ (`lang-tests-js`: ProjectReference))*), inConfigurations(Test))
+          ScopeFilter(inProjects(jvmUnitTestModules*), inConfigurations(Test))
         ),
-        fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
+        fullOptJS.all(ScopeFilter(inProjects(`repl-js`), inConfigurations(Compile))), // links lang-js too
         assembly.all(ScopeFilter(inProjects(node))),
         stageForDocker
       )

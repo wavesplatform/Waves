@@ -1,0 +1,4 @@
+dist/
+scalajs/
+node_modules/
+pnpm-lock.yaml

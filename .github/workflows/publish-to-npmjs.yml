@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Package version
-        required: true
+        description: Package version (empty publishes the next <package.json version>-snapshot.N)
+        required: false
       tag:
         description: Package tag
         required: true
@@ -18,15 +18,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  # Builds and tests with read-only permissions: the npm dev dependencies (vitest, webpack, tsc) never run in the job
+  # that can mint the npm OIDC token.
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: NPMJS
-      url: ${{ steps.publish.outputs.url }}
     permissions:
       contents: read
-      attestations: write
-      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: proudust/gh-describe@9b42731dd866e3cd8165a65f94cc58613def3114 # v2.2.2
@@ -37,25 +34,90 @@ jobs:
           java-version: '17'
           cache: 'sbt'
       - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
-      - run: sbt --server -Dproject.version=${{ steps.ghd.outputs.describe }} --batch ';lang-tests/testFull;lang-tests-js/testFull;repl/testFull;langJS/fullOptJS;replJS/fullOptJS'
+      - env:
+          DESCRIBE: ${{ steps.ghd.outputs.describe }}
+        run: sbt --server "-Dproject.version=$DESCRIBE" --batch ';lang-tests/testFull;repl/testFull;replJS/fullOptJS'
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: ride-js-bundle/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - working-directory: ride-js-bundle
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm test
+          pnpm run build
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ride-js-package
+          if-no-files-found: error
+          path: |
+            ride-js-bundle/package.json
+            ride-js-bundle/readme.md
+            ride-js-bundle/dist
+            ride-js-bundle/scalajs/ride-scalajs.js
+            ride-js-bundle/src/index.d.ts
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: NPMJS
+      url: ${{ steps.publish.outputs.url }}
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # 8.0.2
+        with:
+          name: ride-js-package
+          path: ride-js-bundle
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           registry-url: 'https://registry.npmjs.org'
-          node-version: '>=24.7.0' # Trusted publishing requires npm CLI version 11.5.1 or later.
-      - if: github.event_name == 'workflow_dispatch'
-        run:
-          echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
-          echo "TAG=${{ inputs.tag }}" >> $GITHUB_ENV
+          node-version: '24' # Trusted publishing requires npm CLI 11.5.1 or later (Node 24.7+).
+      # @waves/ride-js is versioned independently of the node: a release publishes the version in package.json,
+      # and skips publishing when that version is already on npm (no bump since the last release).
+      # A dispatch without a version publishes the next snapshot of that version.
+      # Dispatch inputs go through env and are validated, never expanded into the script.
+      - if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+        env:
+          IN_VERSION: ${{ inputs.version }}
+          IN_TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$IN_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "::error::bad version: $IN_VERSION"; exit 1; }
+          [[ "$IN_TAG" =~ ^[a-z][a-z0-9-]*$ ]] || { echo "::error::bad tag: $IN_TAG"; exit 1; }
+          echo "VERSION=$IN_VERSION" >> "$GITHUB_ENV"
+          echo "TAG=$IN_TAG" >> "$GITHUB_ENV"
       - if: github.event_name == 'release'
+        working-directory: ride-js-bundle
         run: |
-          echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_ENV
-          echo "TAG=latest" >> $GITHUB_ENV
+          echo "VERSION=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
+          echo "TAG=latest" >> "$GITHUB_ENV"
+      # Same numbering as https://github.com/wavesplatform/publish-to-npm/blob/main/.github/workflows/publish.yml:
+      # <package.json version>-snapshot.<max published N + 1>, starting at 1.
+      - if: github.event_name == 'workflow_dispatch' && inputs.version == ''
+        working-directory: ride-js-bundle
+        env:
+          IN_TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$IN_TAG" =~ ^[a-z][a-z0-9-]*$ ]] || { echo "::error::bad tag: $IN_TAG"; exit 1; }
+          PREFIX="$(node -p 'require("./package.json").version')-snapshot"
+          # npm prints a bare string instead of an array when there is a single version.
+          NEXT=$(npm view @waves/ride-js versions --json \
+            | jq -r --arg p "$PREFIX." '[.] | flatten | map(select(startswith($p)) | ltrimstr($p) | tonumber? // empty) | (max // 0) + 1')
+          echo "VERSION=$PREFIX.$NEXT" >> "$GITHUB_ENV"
+          echo "TAG=$IN_TAG" >> "$GITHUB_ENV"
       - id: publish
+        working-directory: ride-js-bundle
         run: |
-          cd lang/js
-          npm version $VERSION --no-git-tag-version
-          npm publish --provenance --access public --tag $TAG
-          cd ../../repl/js
-          npm version $VERSION --no-git-tag-version
-          npm publish --provenance --access public --tag $TAG
-          echo "url=https://www.npmjs.com/package/@waves/ride-lang/v/$VERSION" >> "$GITHUB_OUTPUT"
+          echo "url=https://www.npmjs.com/package/@waves/ride-js/v/$VERSION" >> "$GITHUB_OUTPUT"
+          if [ -n "$(npm view "@waves/ride-js@$VERSION" version 2>/dev/null)" ]; then
+            echo "::notice::@waves/ride-js@$VERSION is already published, skipping"
+            exit 0
+          fi
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          # Built and tested by the build job; no lifecycle scripts run here.
+          npm publish --provenance --access public --tag "$TAG" --ignore-scripts

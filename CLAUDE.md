@@ -9,7 +9,8 @@ Waves node in Scala 3 (consensus, state, REST/gRPC API, RIDE). sbt 2.x multi-mod
 ## Build / test
 
 - `sbt compilePR`: clean, `scalafmtCheck`, compile everything (Test included) with `-Werror`, then `checkTestLimits`; warnings block.
-- `sbt checkPR`: `compilePR` + unit tests (`lang-tests`, `lang-tests-js`, `repl-jvm`, `node-tests`, `grpc-server`, `ride-runner`) + `fullOptJS` for `lang-js`/`repl-js` + `node/assembly` + `stageForDocker`. This is what CI (`check-pr.yaml`) runs.
+- `sbt checkPR`: `compilePR` + unit tests (`lang-tests`, `repl-jvm`, `node-tests`, `grpc-server`, `ride-runner`) + `fullOptJS` for `repl-js` (links `lang-js` too) + `node/assembly` + `stageForDocker`. This is what CI (`check-pr.yaml`) runs.
+- RIDE JS tests live in the `@waves/ride-js` package (`ride-js-bundle/`, Vitest, pnpm), not in sbt: `sbt replJS/fullOptJS` writes `ride-js-bundle/scalajs/ride-scalajs.js`, then `cd ride-js-bundle && pnpm install --frozen-lockfile && pnpm test` (type-checks `test/` too; see its readme). Format with `pnpm run format` before committing.
 - `sbt node-tests/testFull`: unit tests; single suite via `sbt "node-tests/testOnly *SuiteName"`. sbt 2's `test` is incremental: it reruns only what changed and prints `[success]` having run nothing, so it never proves a module green; `testFull` is the real run and what `checkPR` uses. Chain several tasks with one quoted `;` argument (`sbt "a/testFull; b/testFull"`).
 - sbt 2's `sbt` is a thin client that forks a background server and reuses it across runs. CI runs `sbt --server ... --batch` (foreground server, no client): see "sbt 2" in `docs/notes/build-tooling.md` before changing that or any task with side effects outside `target/`.
 - Build outputs live under `target/out/<platform>/u/<project>/` at the repo root (e.g. `target/out/jvm/u/node/waves-all-*.jar`), not under each module's `target/`.
@@ -22,7 +23,7 @@ Waves node in Scala 3 (consensus, state, REST/gRPC API, RIDE). sbt 2.x multi-mod
 
 ## Modules
 
-`lang` (jvm/js, plus `lang/testkit`, `lang/tests`, `lang/tests-js`), `node` (core), `node/testkit` (shared test base classes + generators), `node/tests` (unit tests), `grpc-server`, `node-it` (Docker integration tests), `node-generator`, `benchmark`, `ride-runner`, `repl` (cross JVM/JS), `curve25519-test`.
+`lang` (jvm/js, plus `lang/testkit`, `lang/tests`), `node` (core), `node/testkit` (shared test base classes + generators), `node/tests` (unit tests), `grpc-server`, `node-it` (Docker integration tests), `node-generator`, `benchmark`, `ride-runner`, `repl` (cross JVM/JS), `curve25519-test`; `ride-js-bundle` is the `@waves/ride-js` npm package (TypeScript glue + tests around the linked `repl-js`).
 
 ## Conventions
 
