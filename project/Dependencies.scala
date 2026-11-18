@@ -21,7 +21,6 @@ object Dependencies {
       nettyModule("codec-http"),
       nettyModule("handler-proxy"),
       nettyModule("codec-socks"),
-      nettyModule("transport-native-unix-common"),
       nettyModule("resolver-dns"),
       jacksonModule("core", "core"),
       jacksonModule("core", "databind"),
@@ -33,8 +32,7 @@ object Dependencies {
       jlineModule("reader"),
       jlineModule("terminal"),
       jlineModule("terminal-jni"),
-      jlineModule("native"),
-      gProto
+      jlineModule("native")
     )
   )
 
@@ -102,7 +100,7 @@ object Dependencies {
       googleGuava, // BaseEncoding.base16()
       curve25519,
       "com.wavesplatform" % "zwaves" % "0.2.1",
-      web3jModule("crypto").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
+      web3jModule("crypto"),
       protoSchemasLib % "protobuf"
     ) ++ cryptoProviders
   )
@@ -163,11 +161,11 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       scalaLogging,
-      ("eu.timepit"       %% "refined"  % "0.11.4").exclude("org.scala-lang.modules", "scala-xml_2.13"),
+      "eu.timepit"        %% "refined"  % "0.11.4",
       "com.esaulpaugh"     % "headlong" % "13.3.1",
       "com.github.jbellis" % "jamm"     % "0.4.0", // Weighing caches
       "com.jprofiler"      % "jprofiler-probe-embedded" % "16.3.1", // ImportProbe; no-op without the JProfiler agent
-      web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
+      web3jModule("abi"),
       "com.wavesplatform"         % "blst-java"                    % "0.3.15-1",
       amazonCorretto("linux-x86_64") % Optional,
       amazonCorretto("linux-aarch_64") % Optional
