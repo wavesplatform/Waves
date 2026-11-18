@@ -122,6 +122,7 @@ class EvaluatorV2(
           evaluate(i.cond, IfSlot(i), l, b)
         case REF(key) =>
           findLet(key, b) match {
+            // findLet stops only at a block declaring a LET.
             case letBlock :: next => evaluateRef(letBlock.dec.asInstanceOf[LET], s, l, next)
             case Nil              => evaluateGlobalVar(key, s, l)
           }
@@ -190,8 +191,12 @@ class EvaluatorV2(
     private def evaluateFunction(f: CallFrame, l: Int): Unit = {
       if (newMode) frames.push(NewModeFrame(f.fc, l))
       f.fc.function match {
-        case FunctionHeader.Native(_)     => evaluateNativeFunction(f.fc, f.slot, l)
-        case FunctionHeader.User(_, name) => if (!evaluateUserFunction(f, l, name)) evaluateConstructor(f.fc, f.slot, l, name)
+        case FunctionHeader.Native(_) => evaluateNativeFunction(f.fc, f.slot, l)
+        case FunctionHeader.User(_, name) =>
+          findCallee(f, l, name) match {
+            case Some((func, precalculatedLimit, scope)) => callUserFunction(f, l, func, precalculatedLimit, scope)
+            case None                                    => evaluateConstructor(f.fc, f.slot, l, name)
+          }
       }
     }
 
@@ -232,7 +237,8 @@ class EvaluatorV2(
         }
         result.bimap(
           {
-            case e: ThrownError if !fixedThrownError && function.ev.isInstanceOf[Extended[Environment]] => (e, limit)
+            // The whole limit of the evaluation, not the complexity left at this call: changing it would change past results.
+            case e: ThrownError if !fixedThrownError && function.ev.isInstanceOf[Extended[Environment]] => (e, EvaluatorV2.this.limit)
             case e: ThrownError if !fixedThrownError                                                    => (e, 0)
             case e                                                                                      => (e, evaluatedComplexity)
           },
@@ -250,8 +256,8 @@ class EvaluatorV2(
       }
     }
 
-    // Replaces the call with the function body wrapped in blocks with the arguments and evaluates it; false when no such function.
-    private def evaluateUserFunction(f: CallFrame, l: Int, name: String): Boolean =
+    // A function of the context, or one declared in the enclosing blocks, with its precalculated limit and the blocks it sees.
+    private def findCallee(f: CallFrame, l: Int, name: String): Option[(FUNC, Option[Int], List[BLOCK_DEF])] =
       ctx.ec.functions
         .get(f.fc.function)
         .map(_.asInstanceOf[UserFunction[Environment]])
@@ -263,17 +269,18 @@ class EvaluatorV2(
           (func, precalculatedLimit, f.blocks)
         }
         .orElse(findUserFunction(name, f.blocks).map { case (func, scope) => (func, None, scope) })
-        .map { case (signature, precalculatedLimitOpt, functionScopeBlocks) =>
-          val argsWithExpr =
-            (signature.args zip f.fc.args)
-              .foldRight(EvaluationCopy(signature.body)) { case ((argName, argValue), argsWithExpr) =>
-                BLOCK(LET(argName, argValue), argsWithExpr)
-              }
-          write(f.slot, argsWithExpr)
-          precalculatedLimitOpt.foreach(p => frames.push(PrecalculatedFrame(p)))
-          evaluate(argsWithExpr, f.slot, precalculatedLimitOpt.getOrElse(l), if (correctFunctionCallScope) functionScopeBlocks else f.blocks)
-        }
-        .isDefined
+
+    // Replaces the call with a copy of the function body wrapped in blocks with the arguments, and evaluates it.
+    private def callUserFunction(f: CallFrame, l: Int, func: FUNC, precalculatedLimit: Option[Int], functionScopeBlocks: List[BLOCK_DEF]): Unit = {
+      val argsWithExpr =
+        (func.args zip f.fc.args)
+          .foldRight(EvaluationCopy(func.body)) { case ((argName, argValue), argsWithExpr) =>
+            BLOCK(LET(argName, argValue), argsWithExpr)
+          }
+      write(f.slot, argsWithExpr)
+      precalculatedLimit.foreach(p => frames.push(PrecalculatedFrame(p)))
+      evaluate(argsWithExpr, f.slot, precalculatedLimit.getOrElse(l), if (correctFunctionCallScope) functionScopeBlocks else f.blocks)
+    }
 
     private def evaluateConstructor(fc: FUNCTION_CALL, s: Slot, l: Int, name: String): Unit =
       ctx.ec.typeDefs.get(name) match {
@@ -336,7 +343,7 @@ object EvaluatorV2 {
   private final case class NewModeFrame(fc: FUNCTION_CALL, limit: Int) extends Frame
   private final case class PrecalculatedFrame(unused: Int)             extends Frame
 
-  // The blocks starting with the one that declares `key`, or Nil.
+  // The blocks starting with the one that declares `key`, or Nil: the caller needs both, and this allocates nothing on the hot path.
   @tailrec
   private def findLet(key: String, blocks: List[BLOCK_DEF]): List[BLOCK_DEF] =
     blocks match {
