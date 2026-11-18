@@ -79,9 +79,22 @@ lazy val `lang-testkit` = project
         Dependencies.scalaLogging
   )
 
+// crypto.Provider registers Conscrypt JVM-wide, from whichever test classloader loads it first. In sbt's own JVM that
+// loader is closed once its module's tests finish, and a later module then mixes Conscrypt classes from both loaders
+// (IllegalAccessError, ZombieClassLoader). A fork per module gives each its own registration. A fork does not inherit
+// sbt's .sbtopts, so it repeats the module access that node code needs (RocksDB direct buffers, AtomicLong fields).
+lazy val forkedTests = Seq(
+  Test / fork := true,
+  Test / javaOptions ++= Seq(
+    "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+    "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED"
+  )
+)
+
 lazy val `lang-tests` = project
   .in(file("lang/tests"))
   .dependsOn(`lang-testkit`)
+  .settings(forkedTests)
 
 lazy val `lang-tests-js` = project
   .in(file("lang/tests-js"))
@@ -105,11 +118,11 @@ lazy val testTmpDir = settingKey[File]("java.io.tmpdir of forked test JVMs, empt
 lazy val `node-tests` = project
   .in(file("node/tests"))
   .dependsOn(`node-testkit`)
+  .settings(forkedTests)
   .settings(
     libraryDependencies ++= Dependencies.logDeps,
     // In-process, a leaking or hung suite exhausts the heap of sbt itself, which then thrashes in GC until CI cancels
     // it, leaving nothing to diagnose. A fork confines that to its own JVM and dumps its heap on OOM.
-    Test / fork               := true,
     Test / testForkedParallel := true,
     // Uncached: the forwarded -Dlogback.test.level is read from sbt's own JVM, which the action cache does not track
     Test / javaOptions ++= Def.uncached {
@@ -121,8 +134,6 @@ lazy val `node-tests` = project
         "-XX:+ExitOnOutOfMemoryError",
         s"-XX:ErrorFile=$root/hs_err_pid%p.log",
         "-Dfile.encoding=UTF-8",
-        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-        "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED",
         s"-Djava.io.tmpdir=${(Test / testTmpDir).value}"
       ) ++ sys.props.get("logback.test.level").map(level => s"-Dlogback.test.level=$level")
     },
@@ -139,7 +150,7 @@ lazy val `node-tests` = project
   )
 
 lazy val `grpc-server` =
-  project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test")
+  project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test").settings(forkedTests)
 
 lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-testkit`)
 lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `node-testkit`)
@@ -169,6 +180,7 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
 
 lazy val `repl-jvm` = repl.jvm
   .dependsOn(`lang-jvm`, `lang-testkit`)
+  .settings(forkedTests)
   .settings(
     libraryDependencies ++= Seq(
       "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
