@@ -67,7 +67,6 @@ object Dependencies {
   val playJson = "org.playframework" %% "play-json" % "3.0.6"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.20" % Test
-  val scalaJsTest = Def.setting("com.lihaoyi" %% "utest" % "0.9.5" % Test)
 
   private def sttp3Module(module: String) = "com.softwaremill.sttp.client3" %% module % "3.11.0"
 

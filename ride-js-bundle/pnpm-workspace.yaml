@@ -1,0 +1,5 @@
+allowBuilds:
+  esbuild: false
+overrides:
+  serialize-javascript: ^7.0.3
+  glob: ^13.0.6
