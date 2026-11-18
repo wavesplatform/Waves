@@ -65,3 +65,7 @@ At mainnet height 4.58M RIDE `pow` (BigDecimalMath at 154 digits) was about 590 
 ## Snapshot import (`-s`)
 
 Applying snapshots skips `BlockDiffer.prepareCaches`, so every account the block touches is read with its own `RocksDB.get` in `Caches.append`, and those point reads mostly hit SST files. On the slice above that made snapshot import over four times slower than executing the transactions. Batch-loading the accounts named in the snapshots (balances, lease balances, order fills) brought it from 1343 s to 228 s; not merged yet.
+
+## The last imported block is not persisted
+
+`import -h N` appends block N, but it stays the liquid block (`ngState`) and is dropped on exit, so the persisted height is N - 1; to persist N, import to N + 1. The same holds when an append fails: if N + 1 is rejected (e.g. `InvalidStateHash`), N is never written, and a later run with another jar starts by re-applying N. Check which run wrote a height with `waves util state-hash <height>` (the `StateHash` key is written in the same batch as the block, so it is missing for blocks appended with `store-state-hashes` off).
