@@ -176,8 +176,8 @@ object FunctionalitySettings {
     unitsRegistryAddress = Some("3N9fwNGJcUcAbhh7YPr6mrpuGJD4tApZFsT"),
     maxValidEndorsers = 64,
     generationPeriodLength = 3000,
-    sponsoredInvokeFeeFixHeight = Int.MaxValue,
-    liquidGeneratingBalanceFixHeight = Int.MaxValue
+    sponsoredInvokeFeeFixHeight = 0,
+    liquidGeneratingBalanceFixHeight = 0
   )
 
   val STAGENET: FunctionalitySettings = apply(

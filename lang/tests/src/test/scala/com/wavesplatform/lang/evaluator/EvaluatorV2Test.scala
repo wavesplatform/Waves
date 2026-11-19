@@ -1,8 +1,14 @@
 package com.wavesplatform.lang.evaluator
 
 import cats.syntax.either.*
+import cats.{Eval, Id, Monad}
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.lang.Common
+import com.wavesplatform.lang.v1.compiler.Types.LONG
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, NativeFunction}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, Log}
+import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.{CoevalF, Common, ExecutionError, ThrownError}
+import monix.eval.Coeval
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.lazyContexts
@@ -977,6 +983,29 @@ class EvaluatorV2Test extends PropSpec with Inside {
     cost2 shouldBe 6
   }
 
+  property("let and function argument shadowing a global variable") {
+    def sum(a: EXPR, b: EXPR) = FUNCTION_CALL(FunctionHeader.Native(FunctionIds.SUM_LONG), List(a, b))
+    val expr =
+      BLOCK(
+        LET("a", REF("height")),
+        BLOCK(
+          LET("height", CONST_LONG(7)),
+          BLOCK(
+            FUNC("f", List("height"), sum(REF("height"), REF("a"))),
+            sum(sum(FUNCTION_CALL(FunctionHeader.User("f"), List(sum(REF("height"), CONST_LONG(10)))), REF("height")), REF("a"))
+          )
+        )
+      )
+    /*
+      let a = height                    # the global (1 in the test environment), first evaluated inside f, after `let height` was entered
+      let height = 7
+      func f(height: Int) = height + a
+      f(height + 10) + height + a       # (17 + 1) + 7 + 1
+     */
+    evalEither(expr, 100, newMode = true) shouldBe Right((CONST_LONG(26), 96))
+    evalEither(expr, 100, newMode = false) shouldBe Right((CONST_LONG(26), 90))
+  }
+
   property("big script randomly splitted") {
     val body =
       """
@@ -1332,6 +1361,95 @@ class EvaluatorV2Test extends PropSpec with Inside {
     first.map(_._1) shouldBe Right(CONST_LONG(34))
     evalEither(expr, 1000, newMode = true) shouldBe first
     expr shouldBe before
+  }
+
+  property("evaluation leaves IF branches unchanged, at the top level, in LET values and nested in branches") {
+    val expr = compile(
+      """
+        | let x = if (height > 0) then { if (height > 5) then 10 else 1 + 1 } else 3 * 3
+        | func f(a: Int) = if (a > 1) then a * 2 else a + 100
+        | if (x == 2) then {
+        |   if (f(x) == 4) then f(1) + x else 0
+        | } else {
+        |   x * 7
+        | }
+      """.stripMargin
+    )
+    val before = expr.deepCopy.value
+    val first  = evalEither(expr, 1000, newMode = true)
+    first.map(_._1) shouldBe Right(CONST_LONG(103))
+    evalEither(expr, 1000, newMode = true) shouldBe first
+    evalEither(expr, 1000, newMode = false).map(_._1) shouldBe Right(CONST_LONG(103))
+    expr shouldBe before
+  }
+
+  private def evalLogged(
+      ec: EvaluationContext[Environment, Id],
+      expr: EXPR,
+      limit: Int,
+      fixedThrownError: Boolean = true
+  ): Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])] =
+    EvaluatorV2
+      .applyLimitedCoeval(
+        expr,
+        LogExtraInfo(),
+        limit,
+        ec,
+        version,
+        correctFunctionCallScope = true,
+        newMode = true,
+        enableExecutionLog = true,
+        fixedThrownError = fixedThrownError
+      )
+      .value()
+
+  // The log keeps an error only once, so the LET that fails first is the one it names.
+  property("an error is logged against the innermost LET it passes through") {
+    val failing = FUNCTION_CALL(FunctionHeader.Native(FunctionIds.THROW), List(CONST_STRING("boom").explicitGet()))
+    val expr    = BLOCK(LET("outer", BLOCK(LET("inner", failing), REF("inner"))), REF("outer"))
+    inside(evalLogged(ctx.evaluationContext(environment), expr, 100)) { case Left((error, _, log)) =>
+      error.message shouldBe "boom"
+      log.collect { case (name @ ("inner" | "outer"), result) => (name, result) } shouldBe List("inner" -> Left(error))
+    }
+  }
+
+  property("an exception outside a native function fails the evaluation with its message and the whole limit") {
+    val ec      = ctx.evaluationContext(environment)
+    val failing = LazyVal.fromEval[Id](Eval.later(throw new IllegalStateException("lazy failure")))
+    inside(evalLogged(ec.copy(letDefs = ec.letDefs + ("failing" -> failing)), REF("failing"), 100)) { case Left((error, unused, _)) =>
+      error.message shouldBe "lazy failure"
+      unused shouldBe 100
+    }
+  }
+
+  property("before the fix a thrown error leaves no complexity from a simple function and the whole limit from an extended one") {
+    val simpleThrow = NativeFunction[Environment]("simpleThrow", 1L, 30001.toShort, LONG, ("x", LONG))(_ => Left(ThrownError("simple")))
+    val extendedThrow = NativeFunction.withEnvironment[Environment]("extendedThrow", 1L, 30002.toShort, LONG, ("x", LONG))(
+      new ContextfulNativeFunction.Extended[Environment]("extendedThrow", LONG, Seq(("x", LONG))) {
+        override def evaluate[F[_]: Monad](env: Environment[F], args: List[EVALUATED], availableComplexity: Int)(implicit
+            m: Monad[CoevalF[F]]
+        ): Coeval[F[(Either[ExecutionError, (EVALUATED, Log[F])], Int)]] =
+          Coeval.now(Monad[F].pure((Left(ThrownError("extended")), availableComplexity)))
+      }
+    )
+    val ec = ctx.evaluationContext(environment)
+    val ecWithThrows =
+      ec.copy(functions = ec.functions ++ Seq(simpleThrow, extendedThrow).map(f => f.header -> f))
+    // The argument costs 1, so the call starts with 99 of the 100 and the whole limit differs from what is left at the call.
+    def unused(f: NativeFunction[Environment], fixed: Boolean): Int =
+      evalLogged(ecWithThrows, FUNCTION_CALL(f.header, List(FUNCTION_CALL(FunctionHeader.Native(FunctionIds.SUM_LONG), List(CONST_LONG(1), CONST_LONG(1))))), 100, fixed)
+        .fold(_._2, r => fail(s"Expected an error, got $r"))
+
+    unused(simpleThrow, fixed = false) shouldBe 0
+    unused(extendedThrow, fixed = false) shouldBe 100
+    unused(simpleThrow, fixed = true) shouldBe 98
+    unused(extendedThrow, fixed = true) shouldBe 98
+  }
+
+  property("a value passes up through 100000 nested blocks without growing the call stack") {
+    val depth = 100000
+    val expr  = (1 to depth).foldLeft[EXPR](REF("x0"))((body, i) => BLOCK(LET(s"x$i", CONST_LONG(i)), body))
+    evalEither(BLOCK(LET("x0", CONST_LONG(42)), expr), 1000, newMode = true).map(_._1) shouldBe Right(CONST_LONG(42))
   }
 
   property("a reference finds the nearest declaration, and a function sees the declarations around its own definition") {

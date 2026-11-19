@@ -14,6 +14,11 @@ enablePlugins(
 
 libraryDependencies ++= Dependencies.node.value
 
+// UniversalDeployPlugin adds Universal / publishTo and UniversalDocs / publishTo, which delegate to ThisBuild / publishTo;
+// sbt 2.1 publish rejects a target name that occurs more than once in otherResolvers. Keep it in this .sbt file: it must
+// run after the plugin's settings. See "Publishing without Ivy" in docs/notes/build-tooling.md.
+otherResolvers := otherResolvers.value.distinct
+
 instrumentation := false
 debArchitecture := Arm64
 

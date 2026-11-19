@@ -2,12 +2,13 @@ package com.wavesplatform.utils
 
 import com.google.common.io.ByteStreams
 import com.wavesplatform.account.{KeyPair, PKKeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.api.http.DebugApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.explicitGet
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
 import com.wavesplatform.crypto.bls.{BlsKeyPair, BlsSignature}
 import com.wavesplatform.crypto.{P256Curve, Sha256}
-import com.wavesplatform.database.RDB
+import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.{Script, ScriptReader}
@@ -25,11 +26,12 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 import java.util
 import scala.annotation.nowarn
-import scala.util.{Random, Try}
+import scala.util.{Random, Try, Using}
 
 object UtilApp {
   enum Mode {
-    case CompileScript, DecompileScript, SignBytes, VerifySignature, CreateKeyPair, Hash, SerializeTx, SignTx, SmokeTest, TruncateCF, CompactTxMeta
+    case CompileScript, DecompileScript, SignBytes, VerifySignature, CreateKeyPair, Hash, SerializeTx, SignTx, SmokeTest, TruncateCF, RollbackTo,
+      StateHash, CompactTxMeta
   }
 
   case class CompileOptions(assetScript: Boolean = false)
@@ -57,7 +59,8 @@ object UtilApp {
       hashOptions: HashOptions = HashOptions(),
       keyPairOptions: KeyPairOptions = KeyPairOptions(),
       bindPopToSender: Boolean = false,
-      columnFamily: String = ""
+      columnFamily: String = "",
+      height: Option[Height] = None
   )
 
   private def maybeFindKeyPair(cmd: Command): Either[ValidationError, KeyPair] = {
@@ -66,6 +69,13 @@ object UtilApp {
     cmd.signOptions match {
       case signerAddress: String => Wallet(walletSettings).findPrivateKey(signerAddress)
       case kp: KeyPair           => Right(kp)
+    }
+  }
+
+  private def withRocksDBWriter[A](cmd: Command)(f: RocksDBWriter => A): A = {
+    val settings = Application.loadApplicationConfig(cmd.configFile.map(new File(_)))
+    Using.resource(RDB.open(settings.dbSettings)) { rdb =>
+      Using.resource(RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode))(f)
     }
   }
 
@@ -83,6 +93,8 @@ object UtilApp {
         case Mode.SignTx          => maybeFindKeyPair(cmd).flatMap(Actions.doSignTx(_, inBytes, cmd.bindPopToSender))
         case Mode.SmokeTest       => Actions.doSmokeTest()
         case Mode.TruncateCF      => Actions.doTruncateCF(Application.loadApplicationConfig(cmd.configFile.map(new File(_))), cmd.columnFamily)
+        case Mode.RollbackTo      => cmd.height.toRight("Height is required").flatMap(h => withRocksDBWriter(cmd)(Actions.doRollbackTo(_, h)))
+        case Mode.StateHash       => withRocksDBWriter(cmd)(Actions.doStateHash(_, cmd.height))
         case Mode.CompactTxMeta   => Actions.doCompactTxMeta(Application.loadApplicationConfig(cmd.configFile.map(new File(_))))
       }
 
@@ -237,6 +249,26 @@ object UtilApp {
               case cf => failure(s"Column family $cf can not be truncated, expected one of ${RDB.NonEssentialColumnFamilies.mkString(", ")}")
             }
         ),
+      cmd("rollback-to")
+        .text("Rolls the node state back to the given height (not below the safe rollback height); the node must be stopped")
+        .action((_, c) => c.copy(mode = Mode.RollbackTo, inputData = Input.Str("")))
+        .children(
+          arg[Int]("<height>")
+            .text("Target height")
+            .required()
+            .validate(h => if (h > 0) success else failure("Height must be positive"))
+            .action((h, c) => c.copy(height = Some(Height(h))))
+        ),
+      cmd("state-hash")
+        .text("Prints the debug state hash JSON (requires waves.db.store-state-hashes); the node must be stopped")
+        .action((_, c) => c.copy(mode = Mode.StateHash, inputData = Input.Str("")))
+        .children(
+          arg[Int]("<height>")
+            .text("Height, defaults to the top persisted height")
+            .optional()
+            .validate(h => if (h > 0) success else failure("Height must be positive"))
+            .action((h, c) => c.copy(height = Some(Height(h))))
+        ),
       cmd("compact-tx-meta")
         .text(
           s"Compacts the whole ${RDB.TxMetaCF} column family, whose auto compactions are disabled. The node must be stopped; needs free disk space about the current ${RDB.TxMetaCF} size"
@@ -250,7 +282,7 @@ object UtilApp {
     )
   }
 
-  private object Actions {
+  private[utils] object Actions {
     type ActionResult = Either[String, Array[Byte]]
 
     @nowarn("cat=deprecation")
@@ -330,6 +362,20 @@ object UtilApp {
     def doTruncateCF(settings: WavesSettings, cfName: String): ActionResult = runUnit(RDB.truncateColumnFamily(settings.dbSettings, cfName))
 
     def doCompactTxMeta(settings: WavesSettings): ActionResult = runUnit(RDB.compactTxMeta(settings.dbSettings))
+
+    def doStateHash(db: RocksDBWriter, height: Option[Height]): ActionResult = {
+      val h = height.getOrElse(Height(db.height))
+      DebugApiRoute
+        .stateHashJson(db, db, h.toInt)
+        .toRight(s"No state hash at height $h")
+        .map(Json.toBytes)
+    }
+
+    def doRollbackTo(db: RocksDBWriter, height: Height): ActionResult =
+      for {
+        _ <- Either.cond(height.toInt < db.height, (), s"Height $height is not below the current height ${db.height}")
+        _ <- db.rollbackTo(height)
+      } yield s"Rolled back to height ${db.height}\n".utf8Bytes
 
     def doSmokeTest(): ActionResult = {
       val message = Base64.decode(

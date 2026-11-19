@@ -1,0 +1,5 @@
+# pnpm 11 default, stated so the exclusions below have their rule next to them.
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  # Same-day release; remove after 2026-11-20 09:00 UTC.
+  - "@waves/ts-lib-crypto@1.5.3"

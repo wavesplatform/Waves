@@ -200,6 +200,10 @@ object Terms {
   }
 
   case class IF(var cond: EXPR, ifTrue: EXPR, ifFalse: EXPR) extends EXPR {
+    // The branches are still the original tree's: the evaluator copies the one it takes before evaluating it (EvaluationCopy). Not part of
+    // equality.
+    private[lang] var branchesShared: Boolean = false
+
     def toStr: Coeval[String] =
       for {
         c <- cond.toStr

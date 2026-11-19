@@ -24,8 +24,7 @@ ThisBuild / dependencyOverrides ++= Dependencies.overrides.value
 ThisBuild / pomIncludeRepository := { _ => false }
 ThisBuild / publishMavenStyle    := true
 ThisBuild / publishTo := {
-  val centralSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
-  if (isSnapshot.value) Some("central-snapshots" at centralSnapshots)
+  if (isSnapshot.value) Some(Resolver.sonatypeCentralSnapshots)
   else localStaging.value
 }
 
@@ -80,18 +79,28 @@ lazy val `lang-testkit` = project
         Dependencies.scalaLogging
   )
 
+// crypto.Provider registers Conscrypt JVM-wide, from whichever test classloader loads it first. In sbt's own JVM that
+// loader is closed once its module's tests finish, and a later module then mixes Conscrypt classes from both loaders
+// (IllegalAccessError, ZombieClassLoader). A fork per module gives each its own registration; checkTestLimits asserts
+// every module in jvmUnitTestModules forks. A fork inherits nothing from sbt's JVM, so this repeats .sbtopts' module
+// access (node code: RocksDB direct buffers, AtomicLong fields) and forwards -Dlogback.test.level.
+lazy val forkedTests = Seq(
+  Test / fork               := true,
+  Test / testForkedParallel := true,
+  // Uncached: the forwarded -Dlogback.test.level is read from sbt's own JVM, which the action cache does not track
+  Test / javaOptions ++= Def.uncached(
+    Seq(
+      "-Dfile.encoding=UTF-8",
+      "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+      "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED"
+    ) ++ sys.props.get("logback.test.level").map(level => s"-Dlogback.test.level=$level")
+  )
+)
+
 lazy val `lang-tests` = project
   .in(file("lang/tests"))
   .dependsOn(`lang-testkit`)
-
-lazy val `lang-tests-js` = project
-  .in(file("lang/tests-js"))
-  .enablePlugins(ScalaJSPlugin)
-  .dependsOn(`lang-js`)
-  .settings(
-    libraryDependencies += Dependencies.scalaJsTest.value,
-    testFrameworks += new TestFramework("utest.runner.Framework")
-  )
+  .settings(forkedTests)
 
 lazy val node = project.dependsOn(`lang-jvm`)
 
@@ -106,14 +115,11 @@ lazy val testTmpDir = settingKey[File]("java.io.tmpdir of forked test JVMs, empt
 lazy val `node-tests` = project
   .in(file("node/tests"))
   .dependsOn(`node-testkit`)
+  .settings(forkedTests)
   .settings(
     libraryDependencies ++= Dependencies.logDeps,
-    // In-process, a leaking or hung suite exhausts the heap of sbt itself, which then thrashes in GC until CI cancels
-    // it, leaving nothing to diagnose. A fork confines that to its own JVM and dumps its heap on OOM.
-    Test / fork               := true,
-    Test / testForkedParallel := true,
-    // Uncached: the forwarded -Dlogback.test.level is read from sbt's own JVM, which the action cache does not track
-    Test / javaOptions ++= Def.uncached {
+    // A leaking or hung suite must not thrash in GC until CI cancels it: fail fast and leave a heap dump to diagnose
+    Test / javaOptions ++= {
       val root = (ThisBuild / baseDirectory).value
       Seq(
         "-Xmx4g",
@@ -121,11 +127,8 @@ lazy val `node-tests` = project
         s"-XX:HeapDumpPath=$root",
         "-XX:+ExitOnOutOfMemoryError",
         s"-XX:ErrorFile=$root/hs_err_pid%p.log",
-        "-Dfile.encoding=UTF-8",
-        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-        "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED",
         s"-Djava.io.tmpdir=${(Test / testTmpDir).value}"
-      ) ++ sys.props.get("logback.test.level").map(level => s"-Dlogback.test.level=$level")
+      )
     },
     // Suites clean up after themselves, but a killed fork (cancel, SIGKILL, ExitOnOutOfMemoryError) cannot: keep its temp files (RocksDB
     // dirs, native libraries) out of the shared /tmp and wipe them before the next run
@@ -140,7 +143,7 @@ lazy val `node-tests` = project
   )
 
 lazy val `grpc-server` =
-  project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test")
+  project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test").settings(forkedTests)
 
 lazy val `ride-runner` = project.dependsOn(node, `grpc-server`, `node-testkit`)
 lazy val `node-it`     = project.dependsOn(`repl-jvm`, `grpc-server`, `node-testkit`)
@@ -170,6 +173,7 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
 
 lazy val `repl-jvm` = repl.jvm
   .dependsOn(`lang-jvm`, `lang-testkit`)
+  .settings(forkedTests)
   .settings(
     libraryDependencies ++= Seq(
       "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
@@ -192,7 +196,6 @@ lazy val `waves-node` = (project in file("."))
     `lang-js`,
     `lang-jvm`,
     `lang-tests`,
-    `lang-tests-js`,
     `lang-testkit`,
     `repl-js`,
     `repl-jvm`,
@@ -359,8 +362,15 @@ buildRIDERunnerForDocker := Def.uncached {
 
 // The ForkedTestGroup limit is what makes -Dwaves.it.max-parallel-suites mean anything, and it was missing because a
 // second Global assignment of concurrentRestrictions shadowed it. Assert it rather than trust a comment.
-lazy val checkTestLimits = taskKey[Unit]("Fails if Global/concurrentRestrictions no longer caps forked test groups")
+// Unit tests checkPR runs; the RIDE JS tests run under Vitest in ride-js-bundle
+lazy val jvmUnitTestModules = Seq[ProjectReference](`lang-tests`, `repl-jvm`, `grpc-server`, `node-tests`, `ride-runner`)
+lazy val jvmUnitTests        = ScopeFilter(inProjects(jvmUnitTestModules*))
+
+lazy val checkTestLimits = taskKey[Unit]("Fails if forked test groups lose their concurrency cap or a JVM unit test module stops forking")
 checkTestLimits := Def.uncached {
+  val inProcess = thisProject.all(jvmUnitTests).value.zip((Test / fork).all(jvmUnitTests).value).collect { case (p, false) => p.id }
+  if (inProcess.nonEmpty)
+    sys.error(s"${inProcess.mkString(", ")} must set Test / fork (forkedTests): see docs/notes/build-tooling.md")
   val limit     = (Global / maxParallelSuites).value
   val overLimit = Map[ConcurrentRestrictions.Tag, Int](Tags.ForkedTestGroup -> (limit + 1))
   if ((Global / concurrentRestrictions).value.forall(_(overLimit)))
@@ -393,9 +403,9 @@ checkPRRaw := Def.uncached(
       Def.sequential(
         // testFull, not test: sbt 2's test is incremental and reports success having run nothing it ran before.
         testFull.all(
-          ScopeFilter(inProjects(`lang-tests`, `repl-jvm`, `lang-tests-js`, `grpc-server`, `node-tests`, `ride-runner`), inConfigurations(Test))
+          ScopeFilter(inProjects(jvmUnitTestModules*), inConfigurations(Test))
         ),
-        fullOptJS.all(ScopeFilter(inProjects(`lang-js`, `repl-js`), inConfigurations(Compile))),
+        fullOptJS.all(ScopeFilter(inProjects(`repl-js`), inConfigurations(Compile))), // links lang-js too
         assembly.all(ScopeFilter(inProjects(node))),
         stageForDocker
       )

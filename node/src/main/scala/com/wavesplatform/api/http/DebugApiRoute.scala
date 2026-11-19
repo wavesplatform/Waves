@@ -253,15 +253,22 @@ case class DebugApiRoute(
     path("last")(stateHashAt(blockchain.height - 1)) ~ path(IntNumber)(stateHashAt)
   }
 
-  private def stateHashAt(height: Int): Route = {
-    val result = for {
+  private def stateHashAt(height: Int): Route =
+    DebugApiRoute.stateHashJson(blockchain, db, height) match {
+      case Some(value) => complete(value)
+      case None        => complete(StatusCodes.NotFound)
+    }
+}
+
+object DebugApiRoute {
+  def stateHashJson(blockchain: Blockchain, db: RocksDBWriter, height: Int): Option[JsObject] =
+    for {
       sh <- db.loadStateHash(Height(height))
       h  <- blockchain.blockHeader(height)
     } yield {
       val deterministicFinalityActivated =
         blockchain.isFeatureActivated(com.wavesplatform.features.BlockchainFeatures.DeterministicFinality, height)
-      val stateHashJson = StateHash.toJson(sh, deterministicFinalityActivated)
-      stateHashJson ++ Json.obj(
+      StateHash.toJson(sh, deterministicFinalityActivated) ++ Json.obj(
         "snapshotHash" -> db.snapshotStateHash(height),
         "blockId"      -> h.id().toString,
         "baseTarget"   -> h.header.baseTarget,
@@ -270,14 +277,6 @@ case class DebugApiRoute(
       )
     }
 
-    result match {
-      case Some(value) => complete(value)
-      case None        => complete(StatusCodes.NotFound)
-    }
-  }
-}
-
-object DebugApiRoute {
   implicit val assetsFormat: Format[Map[ByteStr, Long]] = Format[Map[ByteStr, Long]](
     {
       case JsObject(m) =>

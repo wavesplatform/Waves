@@ -37,8 +37,8 @@ class EvaluationCopyTest extends PropSpec {
         )
       )
 
-  // The evaluator writes into these nodes before it reaches them, so a copy must not share any of them with the original. Function bodies
-  // and LET values are left out: the evaluator copies those itself when it gets to them.
+  // The evaluator writes into these nodes before it reaches them, so a copy must not share any of them with the original. Function bodies,
+  // LET values and IF branches are left out: the evaluator copies those itself when it gets to them.
   private def mutableNodes(e: EXPR): List[AnyRef] = e match {
     case g: GETTER     => g :: mutableNodes(g.expr)
     case lb: LET_BLOCK => lb :: lb.let :: mutableNodes(lb.body)
@@ -47,7 +47,7 @@ class EvaluationCopyTest extends PropSpec {
         case l: LET => List(l)
         case _      => Nil
       }) ++ mutableNodes(b.body)
-    case i: IF             => i :: mutableNodes(i.cond) ++ mutableNodes(i.ifTrue) ++ mutableNodes(i.ifFalse)
+    case i: IF             => i :: mutableNodes(i.cond)
     case fc: FUNCTION_CALL => fc :: fc.args.flatMap(mutableNodes)
     case _                 => Nil
   }
@@ -69,6 +69,22 @@ class EvaluationCopyTest extends PropSpec {
           case _                                      => true
         }
         l.valueShared shouldBe needsCopy
+      }
+    }
+  }
+
+  property("shares the branches of every copied IF and marks it when a branch still needs copying") {
+    forAll(expr(6)) { e =>
+      mutableNodes(e).zip(mutableNodes(EvaluationCopy(e))).foreach {
+        case (original: IF, copied: IF) =>
+          copied.ifTrue should be theSameInstanceAs original.ifTrue
+          copied.ifFalse should be theSameInstanceAs original.ifFalse
+          def needsCopy(branch: EXPR) = branch match {
+            case _: REF | _: FAILED_EXPR | _: EVALUATED => false
+            case _                                      => true
+          }
+          copied.branchesShared shouldBe (needsCopy(original.ifTrue) || needsCopy(original.ifFalse))
+        case _ =>
       }
     }
   }
