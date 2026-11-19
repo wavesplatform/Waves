@@ -7,7 +7,7 @@ import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.utils.*
 import org.rocksdb.ColumnFamilyHandle
 
-import java.nio.file.Files
+import java.nio.file.{Files, Path}
 import scala.util.Using
 
 class TruncateColumnFamilySpec extends FreeSpec with DBCacheSettings {
@@ -58,5 +58,11 @@ class TruncateColumnFamilySpec extends FreeSpec with DBCacheSettings {
   "essential column family can not be truncated" in withDbSettings { settings =>
     Using.resource(RDB.open(settings))(_ => ())
     intercept[IllegalArgumentException](RDB.truncateColumnFamily(settings, RDB.TxCF))
+  }
+
+  "a missing database is not created" in withDbSettings { settings =>
+    val missing = Path.of(settings.directory, "missing")
+    intercept[IllegalStateException](RDB.truncateColumnFamily(settings.copy(directory = missing.toString), RDB.ApiCF))
+    Files.exists(missing) shouldBe false
   }
 }
