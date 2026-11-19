@@ -322,14 +322,4 @@ export type TNodeType =
   | "ANNOTATION";
 export type TDecl = ILet | IFunc;
 export type TExpr =
-  | IBlock
-  | IConstByteStr
-  | IIf
-  | IFunctionCall
-  | IConstLong
-  | IConstStr
-  | ITrue
-  | IFalse
-  | IGetter
-  | IMatch
-  | IRef;
+  IBlock | IConstByteStr | IIf | IFunctionCall | IConstLong | IConstStr | ITrue | IFalse | IGetter | IMatch | IRef;
