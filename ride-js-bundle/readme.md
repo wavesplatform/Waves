@@ -50,7 +50,7 @@ sbt replJS/fullOptJS        # from the Waves repo root: emits ride-js-bundle/sca
 cd ride-js-bundle
 pnpm install --frozen-lockfile
 pnpm run build              # build:ts -> build:browser (consumes the emitted artifact)
-pnpm test                   # tsc over src/ and test/, then the Vitest suite (compiles RIDE through the public API)
+pnpm test                   # build, tsc over test/, then Vitest: the public API, the packed tarball and ride.min.js
 pnpm run format             # Prettier; CI runs format:check
 ```
 

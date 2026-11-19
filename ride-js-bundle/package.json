@@ -13,7 +13,7 @@
     "typecheck": "tsc -p tsconfig.test.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "pretest": "npm run build:ts && npm run typecheck",
+    "pretest": "npm run build && npm run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build"
