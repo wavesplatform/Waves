@@ -9,21 +9,17 @@ import com.wavesplatform.database.protobuf.{BlockMeta, TransactionData}
 import com.wavesplatform.database.{KeyTag, RDB, readBlockMeta, toVanillaTransaction}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks}
 import com.wavesplatform.protobuf.toByteStr
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.utils.*
-import kamon.Kamon
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB}
 import scopt.OParser
 
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import java.util.HexFormat
 import scala.annotation.tailrec
-import scala.concurrent.Await
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.util.Using.Releasable
 import scala.util.{Failure, Success, Try, Using}
@@ -91,9 +87,6 @@ object Exporter extends ScorexLogging {
             }
           }
         }
-
-        Try(Await.result(Kamon.stopModules(), 10.seconds))
-        Metrics.shutdown()
     }
   }
 

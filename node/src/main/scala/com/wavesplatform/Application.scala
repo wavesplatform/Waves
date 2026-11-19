@@ -605,16 +605,7 @@ object Application extends ScorexLogging {
 
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-    if (config.getBoolean("kamon.enable")) {
-      Kamon.init(config)
-    } else {
-      Kamon.reconfigure(config)
-    }
-
-    sys.addShutdownHook {
-      Try(Await.result(Kamon.stop(), 30 seconds))
-      Metrics.shutdown()
-    }
+    Kamon.reconfigure(config)
 
     val DisabledHash = "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu"
     if (settings.restAPISettings.enable && settings.restAPISettings.apiKeyHash == DisabledHash) {
@@ -624,6 +615,19 @@ object Application extends ScorexLogging {
 
     settings
   }
+
+  /** Runs `body` with Kamon reporting on when `kamon.enable` is set. Kamon's module threads are non-daemon by design, so a tool that
+    * returns from `main` without stopping them never exits.
+    */
+  def withKamon[A](config: Config)(body: => A): A = {
+    startKamon(config)
+    try body
+    finally stopKamon()
+  }
+
+  private def startKamon(config: Config): Unit = if (config.getBoolean("kamon.enable")) Kamon.init(config)
+
+  private def stopKamon(): Unit = Try(Await.result(Kamon.stop(), 30 seconds)).failed.foreach(log.warn("Failed to stop Kamon", _))
 
   private[wavesplatform] def loadBlockAt(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater)(
       height: Height
@@ -674,6 +678,12 @@ object Application extends ScorexLogging {
   private def startNode(configFile: Option[String]): Unit = {
     import com.wavesplatform.settings.Constants
     val settings = loadApplicationConfig(configFile.map(new File(_)))
+    // The node is stopped by a signal, so the reporters stop in the shutdown hook rather than around a body.
+    startKamon(settings.config)
+    sys.addShutdownHook {
+      stopKamon()
+      Metrics.shutdown()
+    }
 
     val log      = Logger(LoggerFactory.getLogger(getClass))
     val modeInfo = if (settings.enableLightMode) "in light mode" else "in full mode"
