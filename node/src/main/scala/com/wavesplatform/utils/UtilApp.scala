@@ -31,7 +31,7 @@ import scala.util.{Random, Try, Using}
 object UtilApp {
   enum Mode {
     case CompileScript, DecompileScript, SignBytes, VerifySignature, CreateKeyPair, Hash, SerializeTx, SignTx, SmokeTest, TruncateCF, RollbackTo,
-      StateHash
+      StateHash, CompactTxMeta
   }
 
   case class CompileOptions(assetScript: Boolean = false)
@@ -95,6 +95,7 @@ object UtilApp {
         case Mode.TruncateCF      => Actions.doTruncateCF(Application.loadApplicationConfig(cmd.configFile.map(new File(_))), cmd.columnFamily)
         case Mode.RollbackTo      => cmd.height.toRight("Height is required").flatMap(h => withRocksDBWriter(cmd)(Actions.doRollbackTo(_, h)))
         case Mode.StateHash       => withRocksDBWriter(cmd)(Actions.doStateHash(_, cmd.height))
+        case Mode.CompactTxMeta   => Actions.doCompactTxMeta(Application.loadApplicationConfig(cmd.configFile.map(new File(_))))
       }
 
       result match {
@@ -268,6 +269,11 @@ object UtilApp {
             .validate(h => if (h > 0) success else failure("Height must be positive"))
             .action((h, c) => c.copy(height = Some(Height(h))))
         ),
+      cmd("compact-tx-meta")
+        .text(
+          s"Compacts the whole ${RDB.TxMetaCF} column family, whose auto compactions are disabled. The node must be stopped; needs free disk space about the current ${RDB.TxMetaCF} size"
+        )
+        .action((_, c) => c.copy(mode = Mode.CompactTxMeta, inputData = Input.Str(""))),
       help("help").hidden(),
       checkConfig(_.mode match {
         case null => failure("Command should be provided")
@@ -351,10 +357,11 @@ object UtilApp {
         .map(_.json().toString().getBytes())
     }
 
-    def doTruncateCF(settings: WavesSettings, cfName: String): ActionResult =
-      Try(RDB.truncateColumnFamily(settings.dbSettings, cfName)).toEither.left
-        .map(_.toString)
-        .map(_ => Array.emptyByteArray)
+    private def runUnit(f: => Unit): ActionResult = Try(f).toEither.left.map(_.toString).map(_ => Array.emptyByteArray)
+
+    def doTruncateCF(settings: WavesSettings, cfName: String): ActionResult = runUnit(RDB.truncateColumnFamily(settings.dbSettings, cfName))
+
+    def doCompactTxMeta(settings: WavesSettings): ActionResult = runUnit(RDB.compactTxMeta(settings.dbSettings))
 
     def doStateHash(db: RocksDBWriter, height: Option[Height]): ActionResult = {
       val h = height.getOrElse(Height(db.height))
