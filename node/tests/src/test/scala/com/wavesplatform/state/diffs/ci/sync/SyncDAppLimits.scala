@@ -111,9 +111,9 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
     }
   }
 
-  property("The deepest allowed chain of inner invokes runs on a 1 MB thread stack") {
-    // Each inner invoke evaluates its script in a nested run on the same thread, so the call stack grows with the depth of the chain.
-    // Nodes with different stack sizes must not disagree on a valid transaction.
+  property("The deepest allowed chain of inner invokes runs on a 256 KB thread stack") {
+    // Inner invokes must not nest on the call stack: nodes with different stack sizes would disagree on a valid transaction.
+    // 256 KB fits a single invoke with room to spare, far from the depth 100 nested runs need.
     withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice)) { d =>
       d.appendBlock(setSelfInvokingScript)
       val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(100)), invoker = alice, fee = 1.waves)
@@ -122,7 +122,7 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
       val append: Runnable = () =>
         try d.appendBlock(invokeTx)
         catch { case t: Throwable => failure = Some(t) }
-      val thread = new Thread(null, append, "small-stack", 1L << 20)
+      val thread = new Thread(null, append, "small-stack", 256L << 10)
       thread.start()
       thread.join()
 

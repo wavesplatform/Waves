@@ -8,7 +8,8 @@ object EvaluationCopy {
   private object Rebuild
 
   /** Copies only what the evaluator writes into before reaching it, in a loop over explicit stacks. Leaves and function declarations are
-    * shared; a LET is a new node whose value is shared and marked `valueShared`. See docs/notes/ride-evaluator.md.
+    * shared; a LET is a new node whose value is shared and marked `valueShared`, an IF a new node whose branches are shared and marked
+    * `branchesShared`. See docs/notes/ride-evaluator.md.
     */
   def apply(root: EXPR): EXPR = {
     val work   = new java.util.ArrayDeque[AnyRef]()
@@ -36,10 +37,10 @@ object EvaluationCopy {
           case _: BLOCK =>
             val body = copy[EXPR]
             BLOCK(copy, body)
-          case _: IF =>
-            val ifFalse = copy[EXPR]
-            val ifTrue  = copy[EXPR]
-            IF(copy, ifTrue, ifFalse)
+          case i: IF =>
+            val copied = IF(copy, i.ifTrue, i.ifFalse)
+            copied.branchesShared = !isShared(i.ifTrue) || !isShared(i.ifFalse)
+            copied
           case fc: FUNCTION_CALL =>
             var args = List.empty[EXPR]
             fc.args.foreach(_ => args = copy[EXPR] :: args)
@@ -59,7 +60,7 @@ object EvaluationCopy {
           case g: GETTER         => work.push(g.expr)
           case lb: LET_BLOCK     => work.push(lb.body)
           case b: BLOCK          => work.push(b.body); work.push(b.dec)
-          case i: IF             => work.push(i.ifFalse); work.push(i.ifTrue); work.push(i.cond)
+          case i: IF             => work.push(i.cond)
           case fc: FUNCTION_CALL => fc.args.reverseIterator.foreach(work.push)
           case other             => throw new IllegalStateException(s"Unexpected node $other")
         }
