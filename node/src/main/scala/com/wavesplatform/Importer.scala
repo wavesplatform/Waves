@@ -32,7 +32,6 @@ import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.*
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
-import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -398,141 +397,141 @@ object Importer extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val importOptions = parseOptions(args)
     val settings      = loadSettings(importOptions.configFile)
+    Application.withKamon(settings.config) {
+      def initFileStream(file: String, offset: Long): InputStream = {
+        log.info(s"Opening import file: $file, offset=$offset")
+        file match {
+          case "-" =>
+            System.in
 
-    def initFileStream(file: String, offset: Long): InputStream = {
-      log.info(s"Opening import file: $file, offset=$offset")
-      file match {
-        case "-" =>
-          System.in
+          case _ =>
+            System.setProperty("http.agent", s"waves-node/${Version.VersionString}")
+            val uri    = new URI(file)
+            val scheme = Option(uri.getScheme).map(_.toLowerCase(Locale.ROOT))
+            if (scheme.exists(Set("http", "https"))) {
+              new ResumableInputStream(ResumableInputStream.openHttp(uri.toURL, HttpTimeout), offset, HttpMaxRetries, HttpRetryDelay)
+            } else if (scheme.exists(_ != "file")) {
+              // Other URL schemes have no Range request, so read up to the offset instead.
+              val in = uri.toURL.openStream()
+              ByteStreams.skipFully(in, offset)
+              in
+            } else {
+              val fs = new FileInputStream(file)
+              if (offset > 0) fs.skip(offset)
+              fs
+            }
+        }
+      }
 
-        case _ =>
-          System.setProperty("http.agent", s"waves-node/${Version.VersionString}")
-          val uri    = new URI(file)
-          val scheme = Option(uri.getScheme).map(_.toLowerCase(Locale.ROOT))
-          if (scheme.exists(Set("http", "https"))) {
-            new ResumableInputStream(ResumableInputStream.openHttp(uri.toURL, HttpTimeout), offset, HttpMaxRetries, HttpRetryDelay)
-          } else if (scheme.exists(_ != "file")) {
-            // Other URL schemes have no Range request, so read up to the offset instead.
-            val in = uri.toURL.openStream()
-            ByteStreams.skipFully(in, offset)
-            in
-          } else {
-            val fs = new FileInputStream(file)
-            if (offset > 0) fs.skip(offset)
-            fs
+      val scheduler = Schedulers.singleThread("appender")
+      val time      = Time(settings.ntpServer)
+
+      val rdb = RDB.open(settings.dbSettings)
+      val (blockchainUpdater, rdbWriter) =
+        StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
+      ImportProbe.watch(rdb, () => rdbWriter.cacheStats)
+      val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
+      val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
+      val extAppender: AppendBlock = {
+        val append =
+          BlockAppender(blockchainUpdater, time, utxPool, pos, BlockEndorser.Disabled, scheduler, importOptions.verify, txSignParCheck = false)
+        (block, snapshot) =>
+          append(block, snapshot).map { result =>
+            // The appended block is the liquid one, and its snapshot sums the complexity of its transactions.
+            if (result.isRight) ImportProbe.blockApplied(blockchainUpdater.bestLiquidSnapshot.fold(0L)(_.scriptsComplexity))
+            result
           }
       }
-    }
 
-    val scheduler = Schedulers.singleThread("appender")
-    val time      = Time(settings.ntpServer)
+      val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb)
+      checkGenesis(settings, blockchainUpdater, Miner.StrictDisabledMiner)
 
-    val rdb = RDB.open(settings.dbSettings)
-    val (blockchainUpdater, rdbWriter) =
-      StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
-    ImportProbe.watch(rdb, () => rdbWriter.cacheStats)
-    val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
-    val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-    val extAppender: AppendBlock = {
-      val append =
-        BlockAppender(blockchainUpdater, time, utxPool, pos, BlockEndorser.Disabled, scheduler, importOptions.verify, txSignParCheck = false)
-      (block, snapshot) =>
-        append(block, snapshot).map { result =>
-          // The appended block is the liquid one, and its snapshot sums the complexity of its transactions.
-          if (result.isRight) ImportProbe.blockApplied(blockchainUpdater.bestLiquidSnapshot.fold(0L)(_.scriptsComplexity))
-          result
-        }
-    }
-
-    val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb)
-    checkGenesis(settings, blockchainUpdater, Miner.StrictDisabledMiner)
-
-    val blocksFileOffset = importOptions.format match {
-      case Formats.Binary =>
-        var blocksOffset = 0L
-        rdb.db.iterateOver(KeyTag.BlockInfoAtHeight) { e =>
-          e.getKey match {
-            case Array(_, _, 0, 0, 0, 1) => // Skip genesis
-            case _ =>
-              val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
-              blocksOffset += meta.size + 4
+      val blocksFileOffset = importOptions.format match {
+        case Formats.Binary =>
+          var blocksOffset = 0L
+          rdb.db.iterateOver(KeyTag.BlockInfoAtHeight) { e =>
+            e.getKey match {
+              case Array(_, _, 0, 0, 0, 1) => // Skip genesis
+              case _ =>
+                val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
+                blocksOffset += meta.size + 4
+            }
           }
-        }
-        blocksOffset
+          blocksOffset
 
-      case _ => 0
-    }
-
-    val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)
-    val snapshotsInputStream = importOptions.snapshotsFile.map { file =>
-      val inputStream = new BufferedInputStream(initFileStream(file, 0), 20 * 1024 * 1024)
-      val sizeBytes   = new Array[Byte](Ints.BYTES)
-      (2 to blockchainUpdater.height).foreach { _ =>
-        ByteStreams.read(inputStream, sizeBytes, 0, 4)
-        val snapshotsSize = Ints.fromByteArray(sizeBytes)
-        ByteStreams.skipFully(inputStream, snapshotsSize)
+        case _ => 0
       }
-      inputStream
-    }
 
-    sys.addShutdownHook {
-      quit = true
-      lock.synchronized {
-        if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG) && blockchainUpdater.liquidBlockMeta.nonEmpty) {
-          // Force store liquid block in rocksdb
-          val lastHeader = blockchainUpdater.lastBlockHeader.get.header
-          val pseudoBlock = Block(
-            BlockHeader(
-              blockchainUpdater.blockVersionAt(blockchainUpdater.height),
-              System.currentTimeMillis(),
-              blockchainUpdater.lastBlockId.get,
-              lastHeader.baseTarget,
-              lastHeader.generationSignature,
-              lastHeader.generator,
-              featureVotes = Nil,
-              rewardVote = 0,
-              transactionsRoot = ByteStr.empty,
-              stateHash = None,
-              challengedHeader = None,
-              finalizationVoting = None
-            ),
-            ByteStr.empty,
-            Nil
-          )
-          // On the appender, like every other write: BlockchainUpdaterImpl validates outside its write lock, so writers must not overlap
-          Await.result(
-            Task(blockchainUpdater.processBlock(pseudoBlock, hitSource = ByteStr.empty, snapshot = None, generatorSet = Seq.empty, verify = false))
-              .runAsyncLogErr(using scheduler),
-            Duration.Inf
-          )
+      val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)
+      val snapshotsInputStream = importOptions.snapshotsFile.map { file =>
+        val inputStream = new BufferedInputStream(initFileStream(file, 0), 20 * 1024 * 1024)
+        val sizeBytes   = new Array[Byte](Ints.BYTES)
+        (2 to blockchainUpdater.height).foreach { _ =>
+          ByteStreams.read(inputStream, sizeBytes, 0, 4)
+          val snapshotsSize = Ints.fromByteArray(sizeBytes)
+          ByteStreams.skipFully(inputStream, snapshotsSize)
         }
-
-        // Terminate appender
-        scheduler.shutdown()
-        scheduler.awaitTermination(10 seconds)
-
-        // Terminate extensions
-        Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
-
-        utxPool.close()
-        blockchainUpdater.shutdown()
-        rdbWriter.close()
-        ImportProbe.unwatch()
-        rdb.close()
+        inputStream
       }
-      blocksInputStream.close()
-      snapshotsInputStream.foreach(_.close())
-    }
 
-    startImport(
-      blocksInputStream,
-      snapshotsInputStream,
-      blockchainUpdater,
-      extAppender,
-      importOptions,
-      blocksFileOffset == 0,
-      scheduler
-    )
-    Await.result(Kamon.stopModules(), 10.seconds)
+      sys.addShutdownHook {
+        quit = true
+        lock.synchronized {
+          if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG) && blockchainUpdater.liquidBlockMeta.nonEmpty) {
+            // Force store liquid block in rocksdb
+            val lastHeader = blockchainUpdater.lastBlockHeader.get.header
+            val pseudoBlock = Block(
+              BlockHeader(
+                blockchainUpdater.blockVersionAt(blockchainUpdater.height),
+                System.currentTimeMillis(),
+                blockchainUpdater.lastBlockId.get,
+                lastHeader.baseTarget,
+                lastHeader.generationSignature,
+                lastHeader.generator,
+                featureVotes = Nil,
+                rewardVote = 0,
+                transactionsRoot = ByteStr.empty,
+                stateHash = None,
+                challengedHeader = None,
+                finalizationVoting = None
+              ),
+              ByteStr.empty,
+              Nil
+            )
+            // On the appender, like every other write: BlockchainUpdaterImpl validates outside its write lock, so writers must not overlap
+            Await.result(
+              Task(blockchainUpdater.processBlock(pseudoBlock, hitSource = ByteStr.empty, snapshot = None, generatorSet = Seq.empty, verify = false))
+                .runAsyncLogErr(using scheduler),
+              Duration.Inf
+            )
+          }
+
+          // Terminate appender
+          scheduler.shutdown()
+          scheduler.awaitTermination(10 seconds)
+
+          // Terminate extensions
+          Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
+
+          utxPool.close()
+          blockchainUpdater.shutdown()
+          rdbWriter.close()
+          ImportProbe.unwatch()
+          rdb.close()
+        }
+        blocksInputStream.close()
+        snapshotsInputStream.foreach(_.close())
+      }
+
+      startImport(
+        blocksInputStream,
+        snapshotsInputStream,
+        blockchainUpdater,
+        extAppender,
+        importOptions,
+        blocksFileOffset == 0,
+        scheduler
+      )
+    }
   }
 }

@@ -54,10 +54,6 @@ import scala.util.{Failure, Success, Using}
   *    )
   *  }
   *  generator.generateBinaryFile(genBlocks)
-  *
-  *  // only if you use Application.loadApplicationConfig method to create WavesSettings object
-  *  Try(Await.result(Kamon.stopModules(), 10.seconds))
-  *  Metrics.shutdown()
   * }
   * </pre>
   */
