@@ -7,16 +7,16 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.diffs.FeeValidation.FeeUnit
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.{Height, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{TransactionType, TxHelpers}
 
 class UpdateAssetInfoTransactionDiffTest extends PropSpec with WithDomain {
   private val interval = 3
-  private val minFee   = FeeUnit
+  private val minFee   = FeeConstants(TransactionType.UpdateAssetInfo) * FeeUnit
   private val issuer   = TxHelpers.signer(1)
   private val other    = TxHelpers.signer(2)
   private val settings = RideV6.configure(_.copy(minAssetInfoUpdateInterval = interval))
@@ -44,6 +44,22 @@ class UpdateAssetInfoTransactionDiffTest extends PropSpec with WithDomain {
     }
   }
 
+  property("an update blocks further updates of that asset for the interval, but not of other assets") {
+    withIssuer { d =>
+      val (a, b) = (TxHelpers.issue(issuer, name = "assetA"), TxHelpers.issue(issuer, name = "assetB"))
+      d.appendBlock(a, b)
+      appendEmptyBlocks(d, interval)
+      d.appendAndAssertSucceed(update(a.id()))
+      val updateHeight = d.blockchain.height
+      d.blockchain.assetDescription(a.asset).get.lastUpdatedAt shouldBe Height(updateHeight)
+
+      d.appendBlockE(update(a.id(), "secondName")) should produce(
+        s"Can't update info of asset with id=${a.id()} before ${updateHeight + interval} block"
+      )
+      d.appendAndAssertSucceed(update(b.id()))
+    }
+  }
+
   property("updating a smart asset requires the script extra fee") {
     withIssuer { d =>
       val issue = TxHelpers.issue(issuer, script = Some(TestCompiler(V6).compileAsset("true")))
@@ -63,6 +79,7 @@ class UpdateAssetInfoTransactionDiffTest extends PropSpec with WithDomain {
       d.appendBlock(issue)
       appendEmptyBlocks(d, interval)
 
+      d.commonApi.calculateFee(update(ByteStr.fill(32)(1))) shouldBe ((Waves, minFee, minFee))
       d.appendBlockE(update(issue.id(), fee = minFee - 1)) should produce(
         s"Fee for UpdateAssetInfoTransaction (${minFee - 1} in WAVES) does not exceed minimal value of $minFee WAVES"
       )
@@ -75,7 +92,9 @@ class UpdateAssetInfoTransactionDiffTest extends PropSpec with WithDomain {
       d.appendBlock(nft)
       appendEmptyBlocks(d, interval)
 
+      val balance = d.balance(issuer.toAddress)
       d.appendAndAssertSucceed(update(nft.id()))
+      d.balance(issuer.toAddress) shouldBe balance - minFee
       nameAndDescription(d, nft.id()) shouldBe ("newName", "newDesc")
     }
   }
@@ -106,6 +125,7 @@ class UpdateAssetInfoTransactionDiffTest extends PropSpec with WithDomain {
       val issueHeight = d.blockchain.height
       appendEmptyBlocks(d, interval)
       d.appendAndAssertSucceed(update(issue.id()))
+      d.blockchain.assetDescription(issue.asset).get.lastUpdatedAt shouldBe Height(d.blockchain.height)
 
       d.rollbackTo(d.blockchain.height - 1)
       nameAndDescription(d, issue.id()) shouldBe ("name", "desc")
@@ -116,10 +136,9 @@ class UpdateAssetInfoTransactionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property("rolling back the issue counts the interval from the new issue height, not from the discarded update") {
+  property("rolling back the issue also discards the interval set by the update") {
     withIssuer { d =>
       val issue = TxHelpers.issue(issuer)
-      d.appendBlock()
       d.appendBlock(issue)
       val issueHeight = d.blockchain.height
       appendEmptyBlocks(d, interval)
