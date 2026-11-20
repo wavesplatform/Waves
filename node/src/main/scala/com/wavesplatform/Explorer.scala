@@ -33,7 +33,8 @@ import scala.util.{Try, Using}
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
-  case class Stats(entryCount: Long, totalKeySize: Long, totalValueSize: Long)
+  // largeValueSize: bytes in values of at least 1 KiB, i.e. what a BlobDB min_blob_size of 1 KiB would move out
+  case class Stats(entryCount: Long, totalKeySize: Long, totalValueSize: Long, largeValueSize: Long)
 
   def portfolio(db: RocksDB, blockchain: Blockchain, address: Address): Portfolio =
     Portfolio(
@@ -230,8 +231,14 @@ object Explorer extends ScorexLogging {
         case "S" =>
           log.info("Collecting DB stats")
 
-          val result = new util.HashMap[Short, Stats]
-          Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txSnapshotHandle.handle, rdb.txMetaHandle.handle).foreach { cf =>
+          val result = new util.LinkedHashMap[(String, Short), Stats]
+          Seq(
+            "default" -> rdb.db.getDefaultColumnFamily,
+            "tx"      -> rdb.txHandle.handle,
+            "tx-snap" -> rdb.txSnapshotHandle.handle,
+            "tx-meta" -> rdb.txMetaHandle.handle,
+            "api"     -> rdb.apiHandle.handle
+          ).foreach { (cfName, cf) =>
             Using.Manager { use =>
               val ro       = use(new ReadOptions().setTotalOrderSeek(true).setVerifyChecksums(false))
               val iterator = use(rdb.db.newIterator(cf, ro))
@@ -241,12 +248,14 @@ object Explorer extends ScorexLogging {
                 val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
                 val valueLength = iterator.value().length
                 val keyLength   = iterator.key().length
+                val large       = if (valueLength >= 1024) valueLength else 0
                 result.compute(
-                  keyPrefix,
+                  (cfName, keyPrefix),
                   (_, maybePrev) =>
                     maybePrev match {
-                      case null => Stats(1, keyLength, valueLength)
-                      case prev => Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength)
+                      case null => Stats(1, keyLength, valueLength, large)
+                      case prev =>
+                        Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength, prev.largeValueSize + large)
                     }
                 )
                 iterator.next()
@@ -254,10 +263,10 @@ object Explorer extends ScorexLogging {
             }
           }
 
-          log.info("key-space,entry-count,total-key-size,total-value-size")
-          for ((prefix, stats) <- result.asScala) {
+          log.info("cf,key-space,entry-count,total-key-size,total-value-size,value-size-of-1k-plus")
+          for (((cfName, prefix), stats) <- result.asScala) {
             log.info(
-              s"${Try(KeyTag.fromOrdinal(prefix)).getOrElse(prefix.toString)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}"
+              s"$cfName,${Try(KeyTag.fromOrdinal(prefix)).getOrElse(prefix.toString)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize},${stats.largeValueSize}"
             )
           }
 
