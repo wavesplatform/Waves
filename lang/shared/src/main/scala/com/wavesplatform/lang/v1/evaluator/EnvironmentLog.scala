@@ -26,9 +26,9 @@ object EnvironmentLog {
 
   private[evaluator] def sameArgs(a: Seq[Any], b: Seq[Any]): Boolean =
     a.length == b.length && a.lazyZip(b).forall {
-      case (x: Array[Byte], y: Array[Byte]) => java.util.Arrays.equals(x, y)
+      case (x: Array[Byte], y: Array[Byte])             => java.util.Arrays.equals(x, y)
       case (Some(x: Array[Byte]), Some(y: Array[Byte])) => java.util.Arrays.equals(x, y)
-      case (x, y) => x == y
+      case (x, y)                                       => x == y
     }
 }
 
@@ -39,23 +39,23 @@ final class RecordingEnvironment(underlying: Environment[Id], log: EnvironmentLo
     result
   }
 
-  override def chainId: Byte                         = underlying.chainId
-  override def inputEntity: Environment.InputEntity  = underlying.inputEntity
-  override def tthis: Environment.Tthis              = underlying.tthis
-  override def multiPaymentAllowed: Boolean          = underlying.multiPaymentAllowed
-  override def txId: ByteStr                         = underlying.txId
-  override def dAppAlias: Boolean                    = underlying.dAppAlias
-  override def height: Long                          = record("height")(underlying.height)
+  override def chainId: Byte                                = underlying.chainId
+  override def inputEntity: Environment.InputEntity         = underlying.inputEntity
+  override def tthis: Environment.Tthis                     = underlying.tthis
+  override def multiPaymentAllowed: Boolean                 = underlying.multiPaymentAllowed
+  override def txId: ByteStr                                = underlying.txId
+  override def dAppAlias: Boolean                           = underlying.dAppAlias
+  override def height: Long                                 = record("height")(underlying.height)
   override def transactionById(id: Array[Byte]): Option[Tx] = record("transactionById", id)(underlying.transactionById(id))
   override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer] =
     record("transferTransactionById", id)(underlying.transferTransactionById(id))
-  override def transactionHeightById(id: Array[Byte]): Option[Long] = record("transactionHeightById", id)(underlying.transactionHeightById(id))
+  override def transactionHeightById(id: Array[Byte]): Option[Long]    = record("transactionHeightById", id)(underlying.transactionHeightById(id))
   override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo] = record("assetInfoById", id)(underlying.assetInfoById(id))
-  override def lastBlockOpt(): Option[BlockInfo]                        = record("lastBlockOpt")(underlying.lastBlockOpt())
-  override def blockInfoByHeight(height: Int): Option[BlockInfo] = record("blockInfoByHeight", height)(underlying.blockInfoByHeight(height))
+  override def lastBlockOpt(): Option[BlockInfo]                       = record("lastBlockOpt")(underlying.lastBlockOpt())
+  override def blockInfoByHeight(height: Int): Option[BlockInfo]       = record("blockInfoByHeight", height)(underlying.blockInfoByHeight(height))
   override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any] =
     record("data", addressOrAlias, key, dataType)(underlying.data(addressOrAlias, key, dataType))
-  override def hasData(addressOrAlias: Recipient): Boolean = record("hasData", addressOrAlias)(underlying.hasData(addressOrAlias))
+  override def hasData(addressOrAlias: Recipient): Boolean         = record("hasData", addressOrAlias)(underlying.hasData(addressOrAlias))
   override def resolveAlias(name: String): Either[String, Address] = record("resolveAlias", name)(underlying.resolveAlias(name))
   override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] =
     record("accountBalanceOf", addressOrAlias, assetId)(underlying.accountBalanceOf(addressOrAlias, assetId))
@@ -67,7 +67,8 @@ final class RecordingEnvironment(underlying: Environment[Id], log: EnvironmentLo
     record("addressFromString", address)(underlying.addressFromString(address))
   override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address] =
     record("addressFromPublicKey", publicKey)(underlying.addressFromPublicKey(publicKey))
-  override def accountScript(addressOrAlias: Recipient): Option[Script] = record("accountScript", addressOrAlias)(underlying.accountScript(addressOrAlias))
+  override def accountScript(addressOrAlias: Recipient): Option[Script] =
+    record("accountScript", addressOrAlias)(underlying.accountScript(addressOrAlias))
   override def calculateDelay(generator: ByteStr, balance: Long): Long =
     record("calculateDelay", generator, balance)(underlying.calculateDelay(generator, balance))
   override def callScript(
@@ -82,10 +83,14 @@ final class RecordingEnvironment(underlying: Environment[Id], log: EnvironmentLo
     // The slot is taken now, so that the order of calls is the order they were made in, not the order their results arrived in.
     val index = log.calls.length
     log.calls += EnvironmentLog.Call("callScript", callArgs, null)
-    underlying.callScript(dApp, func, args, payments, availableComplexity, reentrant).materialize.map { result =>
-      log.calls(index) = EnvironmentLog.Call("callScript", callArgs, result)
-      result
-    }.dematerialize
+    underlying
+      .callScript(dApp, func, args, payments, availableComplexity, reentrant)
+      .materialize
+      .map { result =>
+        log.calls(index) = EnvironmentLog.Call("callScript", callArgs, result)
+        result
+      }
+      .dematerialize
   }
 }
 
@@ -105,28 +110,30 @@ final class ReplayingEnvironment(underlying: Environment[Id], log: EnvironmentLo
     } else {
       val call = log.calls(next)
       if (call.method != method || !EnvironmentLog.sameArgs(call.args, args))
-        throw new IllegalStateException(s"Environment call $method(${args.mkString(", ")}) replayed where ${call.method}(${call.args.mkString(", ")}) was made")
+        throw new IllegalStateException(
+          s"Environment call $method(${args.mkString(", ")}) replayed where ${call.method}(${call.args.mkString(", ")}) was made"
+        )
       next += 1
       call.result.asInstanceOf[A]
     }
 
-  override def chainId: Byte                         = underlying.chainId
-  override def inputEntity: Environment.InputEntity  = underlying.inputEntity
-  override def tthis: Environment.Tthis              = underlying.tthis
-  override def multiPaymentAllowed: Boolean          = underlying.multiPaymentAllowed
-  override def txId: ByteStr                         = underlying.txId
-  override def dAppAlias: Boolean                    = underlying.dAppAlias
-  override def height: Long                          = replay("height")(underlying.height)
+  override def chainId: Byte                                = underlying.chainId
+  override def inputEntity: Environment.InputEntity         = underlying.inputEntity
+  override def tthis: Environment.Tthis                     = underlying.tthis
+  override def multiPaymentAllowed: Boolean                 = underlying.multiPaymentAllowed
+  override def txId: ByteStr                                = underlying.txId
+  override def dAppAlias: Boolean                           = underlying.dAppAlias
+  override def height: Long                                 = replay("height")(underlying.height)
   override def transactionById(id: Array[Byte]): Option[Tx] = replay("transactionById", id)(underlying.transactionById(id))
   override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer] =
     replay("transferTransactionById", id)(underlying.transferTransactionById(id))
-  override def transactionHeightById(id: Array[Byte]): Option[Long] = replay("transactionHeightById", id)(underlying.transactionHeightById(id))
+  override def transactionHeightById(id: Array[Byte]): Option[Long]    = replay("transactionHeightById", id)(underlying.transactionHeightById(id))
   override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo] = replay("assetInfoById", id)(underlying.assetInfoById(id))
-  override def lastBlockOpt(): Option[BlockInfo]                        = replay("lastBlockOpt")(underlying.lastBlockOpt())
-  override def blockInfoByHeight(height: Int): Option[BlockInfo] = replay("blockInfoByHeight", height)(underlying.blockInfoByHeight(height))
+  override def lastBlockOpt(): Option[BlockInfo]                       = replay("lastBlockOpt")(underlying.lastBlockOpt())
+  override def blockInfoByHeight(height: Int): Option[BlockInfo]       = replay("blockInfoByHeight", height)(underlying.blockInfoByHeight(height))
   override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any] =
     replay("data", addressOrAlias, key, dataType)(underlying.data(addressOrAlias, key, dataType))
-  override def hasData(addressOrAlias: Recipient): Boolean = replay("hasData", addressOrAlias)(underlying.hasData(addressOrAlias))
+  override def hasData(addressOrAlias: Recipient): Boolean         = replay("hasData", addressOrAlias)(underlying.hasData(addressOrAlias))
   override def resolveAlias(name: String): Either[String, Address] = replay("resolveAlias", name)(underlying.resolveAlias(name))
   override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] =
     replay("accountBalanceOf", addressOrAlias, assetId)(underlying.accountBalanceOf(addressOrAlias, assetId))
@@ -138,7 +145,8 @@ final class ReplayingEnvironment(underlying: Environment[Id], log: EnvironmentLo
     replay("addressFromString", address)(underlying.addressFromString(address))
   override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address] =
     replay("addressFromPublicKey", publicKey)(underlying.addressFromPublicKey(publicKey))
-  override def accountScript(addressOrAlias: Recipient): Option[Script] = replay("accountScript", addressOrAlias)(underlying.accountScript(addressOrAlias))
+  override def accountScript(addressOrAlias: Recipient): Option[Script] =
+    replay("accountScript", addressOrAlias)(underlying.accountScript(addressOrAlias))
   override def calculateDelay(generator: ByteStr, balance: Long): Long =
     replay("calculateDelay", generator, balance)(underlying.calculateDelay(generator, balance))
   override def callScript(

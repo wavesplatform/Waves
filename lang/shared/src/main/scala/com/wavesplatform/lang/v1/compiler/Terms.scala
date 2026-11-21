@@ -357,7 +357,10 @@ object Terms {
     // must be with fixArrIndentation = false, because of makeString behavior before RideV6 (NODE-2370)
     override def toString: String = TermPrinter().string(this)
 
-    override val weight: Long = OBJ_WEIGHT + FIELD_WEIGHT * fields.size + fields.map(_._2.weight).sum
+    override val weight: Long = OBJ_WEIGHT + FIELD_WEIGHT * fields.size + (fields match {
+      case f: LazyLongFields => f.valuesWeight
+      case _                 => fields.map(_._2.weight).sum
+    })
 
     override val getType: REAL =
       if (caseType.name == runtimeTupleType.name)
@@ -371,6 +374,31 @@ object Terms {
       case CaseObj(`caseType`, `fields`) => true
       case _                             => false
     }
+  }
+
+  /** Fields of a case object holding Longs that are computed when first read. The weight of a Long is fixed, so building the object
+    * computes nothing; reading a field, comparing, hashing or printing the object computes what it touches.
+    */
+  final class LazyLongFields(names: IndexedSeq[String], values: IndexedSeq[() => Long])
+      extends scala.collection.immutable.AbstractMap[String, EVALUATED] {
+    private val computed = new Array[EVALUATED](names.size)
+
+    private def value(i: Int): EVALUATED = {
+      if (computed(i) == null) computed(i) = CONST_LONG(values(i)())
+      computed(i)
+    }
+
+    val valuesWeight: Long = names.size * CONST_LONG(0).weight
+
+    override def get(key: String): Option[EVALUATED] = names.indexOf(key) match {
+      case -1 => None
+      case i  => Some(value(i))
+    }
+    override def iterator: Iterator[(String, EVALUATED)]                       = names.indices.iterator.map(i => names(i) -> value(i))
+    override def removed(key: String): Map[String, EVALUATED]                  = Map.from(iterator).removed(key)
+    override def updated[V1 >: EVALUATED](key: String, v: V1): Map[String, V1] = Map.from(iterator).updated(key, v)
+    override def size: Int                                                     = names.size
+    override def knownSize: Int                                                = names.size
   }
 
   object CaseObj {

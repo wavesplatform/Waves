@@ -71,7 +71,12 @@ object Common {
       Seq.empty[BaseFunction[NoContext]]
     )
 
-  def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Environment.InputEntity] = Coeval(???), nByte: Byte = 'T'): Environment[Id] =
+  def emptyBlockchainEnvironment(
+      h: Int = 1,
+      in: Coeval[Environment.InputEntity] = Coeval(???),
+      nByte: Byte = 'T',
+      wavesBalance: Recipient => Either[String, Environment.BalanceDetails] = _ => ???
+  ): Environment[Id] =
     new Environment[Id] {
       def height: Long  = h
       def chainId: Byte = nByte
@@ -87,7 +92,7 @@ object Common {
       def hasData(recipient: Recipient): Boolean                                          = false
       def resolveAlias(name: String): Either[String, Recipient.Address]                   = ???
       def accountBalanceOf(a: Recipient, b: Option[Array[Byte]]): Either[String, Long]    = ???
-      def accountWavesBalanceOf(a: Recipient): Either[String, Environment.BalanceDetails] = ???
+      def accountWavesBalanceOf(a: Recipient): Either[String, Environment.BalanceDetails] = wavesBalance(a)
       def tthis: Environment.Tthis                                                        = Address(ByteStr.empty)
       def multiPaymentAllowed: Boolean                                                    = true
       def txId: ByteStr                                                                   = ???

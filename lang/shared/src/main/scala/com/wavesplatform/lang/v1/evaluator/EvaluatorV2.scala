@@ -461,7 +461,18 @@ object EvaluatorV2 {
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] =
     ScopeEvaluator.mode match {
       case ScopeEvaluator.Mode.V2 =>
-        applyLimitedCoevalV2(expr, logExtraInfo, limit, ctx, stdLibVersion, correctFunctionCallScope, newMode, checkConstructorArgsTypes, enableExecutionLog, fixedThrownError)
+        applyLimitedCoevalV2(
+          expr,
+          logExtraInfo,
+          limit,
+          ctx,
+          stdLibVersion,
+          correctFunctionCallScope,
+          newMode,
+          checkConstructorArgsTypes,
+          enableExecutionLog,
+          fixedThrownError
+        )
       case mode =>
         ScopeEvaluator.applyLimitedCoeval(
           expr,

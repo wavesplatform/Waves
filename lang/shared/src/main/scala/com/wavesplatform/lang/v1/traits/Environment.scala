@@ -10,7 +10,10 @@ import com.wavesplatform.lang.v1.traits.domain.*
 import monix.eval.Coeval
 
 object Environment {
-  case class BalanceDetails(available: Long, regular: Long, generating: Long, effective: Long)
+  // `generating` walks up to 1000 blocks of balance history and scripts rarely read it, so it is computed on first use.
+  final class BalanceDetails(val available: Long, val regular: Long, generatingBalance: => Long, val effective: Long) {
+    lazy val generating: Long = generatingBalance
+  }
 
   type InputEntity = Tx | Ord | PseudoTx
 

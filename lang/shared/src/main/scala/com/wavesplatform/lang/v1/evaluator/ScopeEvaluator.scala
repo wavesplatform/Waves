@@ -420,26 +420,37 @@ object ScopeEvaluator {
         replaying = new ReplayingEnvironment(environment, environmentLog, strict)
         replaying
       }
-      EvaluatorV2.applyLimitedCoevalV2(
-        expr,
-        logExtraInfo,
-        limit,
-        replayingCtx,
-        stdLibVersion,
-        correctFunctionCallScope,
-        newMode,
-        checkConstructorArgsTypes,
-        enableExecutionLog,
-        fixedThrownError
-      ).map { result =>
-        if (replaying != null && strict && replaying.unreplayed != 0)
-          onMismatch(s"EvaluatorV2 made ${replaying.unreplayed} environment calls fewer for $expr")
-        result
-      }
+      EvaluatorV2
+        .applyLimitedCoevalV2(
+          expr,
+          logExtraInfo,
+          limit,
+          replayingCtx,
+          stdLibVersion,
+          correctFunctionCallScope,
+          newMode,
+          checkConstructorArgsTypes,
+          enableExecutionLog,
+          fixedThrownError
+        )
+        .map { result =>
+          if (replaying != null && strict && replaying.unreplayed != 0)
+            onMismatch(s"EvaluatorV2 made ${replaying.unreplayed} environment calls fewer for $expr")
+          result
+        }
     }
 
     val evaluator =
-      new ScopeEvaluator(loggedCtx, stdLibVersion, limit, correctFunctionCallScope, newMode, enableExecutionLog, checkConstructorArgsTypes, fixedThrownError)
+      new ScopeEvaluator(
+        loggedCtx,
+        stdLibVersion,
+        limit,
+        correctFunctionCallScope,
+        newMode,
+        enableExecutionLog,
+        checkConstructorArgsTypes,
+        fixedThrownError
+      )
     Coeval
       .defer {
         EvaluatorV2.logCall(loggedCtx, logExtraInfo, expr, enableExecutionLog)
@@ -466,7 +477,7 @@ object ScopeEvaluator {
   }
 
   private def difference(actual: Result, expected: Result): String = {
-    def parts(r: Result) = r.fold({ case (e, u, l) => (Left(e), u, l) }, { case (v, u, l) => (Right(v), u, l) })
+    def parts(r: Result)                             = r.fold({ case (e, u, l) => (Left(e), u, l) }, { case (v, u, l) => (Right(v), u, l) })
     val (actualValue, actualUnused, actualLog)       = parts(actual)
     val (expectedValue, expectedUnused, expectedLog) = parts(expected)
     if (actualValue != expectedValue) s"ScopeEvaluator returned $actualValue where EvaluatorV2 returned $expectedValue"

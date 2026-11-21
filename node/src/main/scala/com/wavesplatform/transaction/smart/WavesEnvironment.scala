@@ -166,13 +166,12 @@ class WavesEnvironment(
       portfolio = currentBlockchain().wavesPortfolio(address)
       isBanned  = currentBlockchain().hasBannedEffectiveBalance(address)
       effectiveBalance <- portfolio.effectiveBalance(isBanned)
+      // Taken now: the generating balance is computed lazily, and a nested invoke replaces currentBlockchain() meanwhile.
+      generatingBlockchain = if (blockchain.isFeatureActivated(LightNode)) currentBlockchain() else blockchain
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out - portfolio.generationDeposit,
       portfolio.balance,
-      if (blockchain.isFeatureActivated(LightNode))
-        currentBlockchain().generatingBalance(address)
-      else
-        blockchain.generatingBalance(address),
+      generatingBlockchain.generatingBalance(address),
       effectiveBalance
     )
   }

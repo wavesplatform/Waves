@@ -499,11 +499,9 @@ object Functions {
                         _.map(b =>
                           CaseObj(
                             balanceDetailsType,
-                            Map(
-                              "available"  -> CONST_LONG(b.available),
-                              "regular"    -> CONST_LONG(b.regular),
-                              "generating" -> CONST_LONG(b.generating),
-                              "effective"  -> CONST_LONG(b.effective)
+                            LazyLongFields(
+                              Vector("available", "regular", "generating", "effective"),
+                              Vector(() => b.available, () => b.regular, () => b.generating, () => b.effective)
                             )
                           )
                         ).leftMap(CommonError(_))
