@@ -100,7 +100,7 @@ class EvaluatorV2(
     def resumeWith(outcome: Either[Throwable, (Either[ExecutionError, EVALUATED], Int)]): Unit = {
       val call = suspended
       suspended = null
-      completeNativeCall(call.slot, nativeResult(call.function, outcome.fold(throw _, identity)))
+      completeNativeCall(call.slot, nativeResult(call.function, outcome.fold(throw _, identity), limit, fixedThrownError))
     }
 
     private def evaluate(e: EXPR, s: Slot, l: Int, b: List[BLOCK_DEF]): Unit = {
@@ -263,7 +263,7 @@ class EvaluatorV2(
                   }
                 suspended = SuspendedCall(native, s, coeval)
               case f: Simple[Environment] =>
-                completeNativeCall(s, nativeResult(native, (f.evaluate(ctx.ec.environment, args), l - cost)))
+                completeNativeCall(s, nativeResult(native, (f.evaluate(ctx.ec.environment, args), l - cost), limit, fixedThrownError))
             }
           }
       }
@@ -274,33 +274,6 @@ class EvaluatorV2(
           write(s, value)
           done(u)
         case Left((e, u)) => fail(e, u)
-      }
-
-    // What a native call leaves, with the unused complexity; `outcome` is evaluated here, so an exception it throws becomes the call's error.
-    private def nativeResult(
-        function: NativeFunction[Environment],
-        outcome: => (Either[ExecutionError, EVALUATED], Int)
-    ): Either[(ExecutionError, Int), (EVALUATED, Int)] =
-      try {
-        val (result, evaluatedComplexity) = outcome
-        result.bimap(
-          {
-            // The whole limit of the evaluation, not the complexity left at this call: changing it would change past results.
-            case e: ThrownError if !fixedThrownError && function.ev.isInstanceOf[Extended[Environment]] => (e, EvaluatorV2.this.limit)
-            case e: ThrownError if !fixedThrownError                                                    => (e, 0)
-            case e                                                                                      => (e, evaluatedComplexity)
-          },
-          (_, evaluatedComplexity)
-        )
-      } catch {
-        case _: SecurityException =>
-          Left((CommonError(s"""An access to ${function.ev} is denied"""), 0))
-        case NonFatal(e) =>
-          val error = e.getMessage match {
-            case null => e.toString
-            case msg  => msg
-          }
-          Left((CommonError(s"""An error during run ${function.ev}: ${e.getClass} $error"""), 0))
       }
 
     // A function of the context, or one declared in the enclosing blocks, with its precalculated limit and the blocks it sees.
@@ -418,7 +391,36 @@ object EvaluatorV2 {
       case Nil                                             => None
     }
 
-  private def constructorArgsTypesError(objectType: CASETYPEREF, passedArgs: List[EVALUATED]): Option[String] = {
+  // What a native call leaves, with the unused complexity; `outcome` is evaluated here, so an exception it throws becomes the call's error.
+  private[evaluator] def nativeResult(
+      function: NativeFunction[Environment],
+      outcome: => (Either[ExecutionError, EVALUATED], Int),
+      limit: Int,
+      fixedThrownError: Boolean
+  ): Either[(ExecutionError, Int), (EVALUATED, Int)] =
+    try {
+      val (result, evaluatedComplexity) = outcome
+      result.bimap(
+        {
+          // The whole limit of the evaluation, not the complexity left at this call: changing it would change past results.
+          case e: ThrownError if !fixedThrownError && function.ev.isInstanceOf[Extended[Environment]] => (e, limit)
+          case e: ThrownError if !fixedThrownError                                                    => (e, 0)
+          case e                                                                                      => (e, evaluatedComplexity)
+        },
+        (_, evaluatedComplexity)
+      )
+    } catch {
+      case _: SecurityException =>
+        Left((CommonError(s"""An access to ${function.ev} is denied"""), 0))
+      case NonFatal(e) =>
+        val error = e.getMessage match {
+          case null => e.toString
+          case msg  => msg
+        }
+        Left((CommonError(s"""An error during run ${function.ev}: ${e.getClass} $error"""), 0))
+    }
+
+  private[evaluator] def constructorArgsTypesError(objectType: CASETYPEREF, passedArgs: List[EVALUATED]): Option[String] = {
     def str[T](l: List[T]) = l.mkString("(", ", ", ")")
 
     if (objectType.fields.size != passedArgs.size)
@@ -432,6 +434,7 @@ object EvaluatorV2 {
     }
   }
 
+  /** Evaluates `expr` with the evaluator `ScopeEvaluator.mode` names; they agree on every result, see docs/notes/ride-evaluator.md. */
   def applyLimitedCoeval(
       expr: EXPR,
       logExtraInfo: LogExtraInfo,
@@ -442,6 +445,37 @@ object EvaluatorV2 {
       newMode: Boolean,
       checkConstructorArgsTypes: Boolean = false,
       enableExecutionLog: Boolean = false,
+      fixedThrownError: Boolean
+  ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] =
+    ScopeEvaluator.mode match {
+      case ScopeEvaluator.Mode.V2 =>
+        applyLimitedCoevalV2(expr, logExtraInfo, limit, ctx, stdLibVersion, correctFunctionCallScope, newMode, checkConstructorArgsTypes, enableExecutionLog, fixedThrownError)
+      case mode =>
+        ScopeEvaluator.applyLimitedCoeval(
+          expr,
+          logExtraInfo,
+          limit,
+          ctx,
+          stdLibVersion,
+          correctFunctionCallScope,
+          newMode,
+          checkConstructorArgsTypes,
+          enableExecutionLog,
+          fixedThrownError,
+          check = mode == ScopeEvaluator.Mode.Check
+        )
+    }
+
+  private[evaluator] def applyLimitedCoevalV2(
+      expr: EXPR,
+      logExtraInfo: LogExtraInfo,
+      limit: Int,
+      ctx: EvaluationContext[Environment, Id],
+      stdLibVersion: StdLibVersion,
+      correctFunctionCallScope: Boolean,
+      newMode: Boolean,
+      checkConstructorArgsTypes: Boolean,
+      enableExecutionLog: Boolean,
       fixedThrownError: Boolean
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] = {
     val log = ListBuffer[LogItem[Id]]()
@@ -532,7 +566,7 @@ object EvaluatorV2 {
       fixedThrownError
     )
 
-  private def logCall(
+  private[evaluator] def logCall(
       loggedCtx: LoggedEvaluationContext[Environment, Id],
       logExtraInfo: LogExtraInfo,
       exprCopy: EXPR,
@@ -565,7 +599,7 @@ object EvaluatorV2 {
     }
   }
 
-  private def logFunc(
+  private[evaluator] def logFunc(
       fc: FUNCTION_CALL,
       ctx: LoggedEvaluationContext[Environment, Id],
       stdLibVersion: StdLibVersion,

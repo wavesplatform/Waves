@@ -83,17 +83,18 @@ lazy val `lang-testkit` = project
 // loader is closed once its module's tests finish, and a later module then mixes Conscrypt classes from both loaders
 // (IllegalAccessError, ZombieClassLoader). A fork per module gives each its own registration; checkTestLimits asserts
 // every module in jvmUnitTestModules forks. A fork inherits nothing from sbt's JVM, so this repeats .sbtopts' module
-// access (node code: RocksDB direct buffers, AtomicLong fields) and forwards -Dlogback.test.level.
+// access (node code: RocksDB direct buffers, AtomicLong fields) and forwards -Dlogback.test.level and -Dwaves.evaluator.
 lazy val forkedTests = Seq(
   Test / fork               := true,
   Test / testForkedParallel := true,
-  // Uncached: the forwarded -Dlogback.test.level is read from sbt's own JVM, which the action cache does not track
+  // Uncached: the forwarded properties are read from sbt's own JVM, which the action cache does not track
   Test / javaOptions ++= Def.uncached(
     Seq(
       "-Dfile.encoding=UTF-8",
       "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
       "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED"
     ) ++ sys.props.get("logback.test.level").map(level => s"-Dlogback.test.level=$level")
+      ++ sys.props.get("waves.evaluator").map(evaluator => s"-Dwaves.evaluator=$evaluator")
   )
 )
 
