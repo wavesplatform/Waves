@@ -80,7 +80,7 @@ object Dependencies {
   val cryptoProviders = Seq(
     // Windows x86_64, Windows x86, macOS x86_64, linux x86_64
     // Backs consensus P-256 checks (p256Verify, validateCertificateChain); bump only with proof of identical results
-    "org.conscrypt" % "conscrypt-openjdk-uber" % "2.8.0",
+    "org.conscrypt" % "conscrypt-openjdk-uber" % "2.9.0",
     // macOS aarch64
     amazonCorretto("osx-aarch_64"),
     // fallback Java
