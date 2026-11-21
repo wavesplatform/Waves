@@ -287,7 +287,7 @@ final class ScopeEvaluator(
                 case null => evaluateConstructor(args, u, name)
                 case entry =>
                   val bodyScope = if (correctFunctionCallScope) entry.next else f.scope
-                  evaluate(entry.func.body, bindArgs(entry.func.args, args, bodyScope), u)
+                  evaluate(entry.declaration.body, bindArgs(entry.declaration.args, args, bodyScope), u)
               }
           }
       }
@@ -489,10 +489,16 @@ object ScopeEvaluator {
   private final val INCOMPLETE = 3
 
   // A scope is a chain of declarations, innermost first, like EvaluatorV2's list of enclosing blocks; null is the empty scope.
-  private sealed abstract class Scope(val next: Scope)
+  private sealed abstract class Scope(val next: Scope) {
+    // The nearest LET and FUNC from here on, so that a lookup of either skips the other: dApps interleave hundreds of both.
+    val let: LetCell
+    val func: FuncEntry
+  }
 
   // A LET entered in a scope: evaluated at most once, in the scope it was declared in, like the LET node EvaluatorV2 writes its value into.
   private final class LetCell(val name: String, val expr: EXPR, next: Scope) extends Scope(next) {
+    val let: LetCell        = this
+    val func: FuncEntry     = if (next == null) null else next.func
     val hash: Int           = name.hashCode
     var value: EVALUATED    = null
     var evaluating: Boolean = false
@@ -505,8 +511,10 @@ object ScopeEvaluator {
     def logKey_=(let: LET): Unit = key = let
   }
 
-  private final class FuncEntry(val func: FUNC, next: Scope) extends Scope(next) {
-    val hash: Int = func.name.hashCode
+  private final class FuncEntry(val declaration: FUNC, next: Scope) extends Scope(next) {
+    val let: LetCell    = if (next == null) null else next.let
+    val func: FuncEntry = this
+    val hash: Int       = declaration.name.hashCode
   }
 
   private sealed abstract class Frame
@@ -566,26 +574,16 @@ object ScopeEvaluator {
   }
 
   private def findLet(key: String, hash: Int, scope: Scope): LetCell = {
-    var s = scope
-    while (s != null) {
-      s match {
-        case cell: LetCell if cell.hash == hash && cell.name.equals(key) => return cell
-        case _                                 => s = s.next
-      }
-    }
-    null
+    var cell = if (scope == null) null else scope.let
+    while (cell != null && !(cell.hash == hash && cell.name.equals(key))) cell = if (cell.next == null) null else cell.next.let
+    cell
   }
 
   private def findUserFunction(name: String, scope: Scope): FuncEntry = {
-    val hash = name.hashCode
-    var s    = scope
-    while (s != null) {
-      s match {
-        case entry: FuncEntry if entry.hash == hash && entry.func.name.equals(name) => return entry
-        case _                                           => s = s.next
-      }
-    }
-    null
+    val hash  = name.hashCode
+    var entry = if (scope == null) null else scope.func
+    while (entry != null && !(entry.hash == hash && entry.declaration.name.equals(name))) entry = if (entry.next == null) null else entry.next.func
+    entry
   }
 
 }

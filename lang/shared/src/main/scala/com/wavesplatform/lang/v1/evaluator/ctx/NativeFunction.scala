@@ -24,8 +24,22 @@ sealed abstract class BaseFunction[C[_[_]]] {
 
   val costByLibVersionMap: SortedMap[StdLibVersion, Long]
 
-  // Asked for every function call a script makes; rangeTo(version).last built a new tree each time.
-  def costByLibVersion(version: StdLibVersion): Long =
+  // Asked for every function call a script makes, so the cost per version is kept by version id; -1 where the map has none.
+  private lazy val costsById: Array[Long] = {
+    val versions = DirectiveDictionary[StdLibVersion].all
+    val costs    = Array.fill(versions.map(_.id).max + 1)(-1L)
+    versions.foreach { v =>
+      costByLibVersionMap.get(v).orElse(costByLibVersionMap.maxBefore(v).map(_._2)).foreach(cost => costs(v.id) = cost)
+    }
+    costs
+  }
+
+  def costByLibVersion(version: StdLibVersion): Long = {
+    val costs = costsById
+    if (version.id < costs.length && costs(version.id) >= 0) costs(version.id) else costOf(version)
+  }
+
+  private def costOf(version: StdLibVersion): Long =
     costByLibVersionMap.get(version) match {
       case Some(cost) => cost
       case None =>
