@@ -16,6 +16,7 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.evaluator.ScopeEvaluator
 import com.wavesplatform.metrics.ImportProbe
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.BlockSnapshotResponse
@@ -397,6 +398,12 @@ object Importer extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val importOptions = parseOptions(args)
     val settings      = loadSettings(importOptions.configFile)
+    log.info(s"RIDE evaluator: ${ScopeEvaluator.mode}")
+    // A mismatch thrown inside an invoke can end up as a failed transaction, and the import would go on with a different state.
+    if (ScopeEvaluator.mode == ScopeEvaluator.Mode.Check) ScopeEvaluator.onMismatch = { message =>
+      log.error(s"Evaluator mismatch: ${message.take(20000)}")
+      Runtime.getRuntime.halt(3)
+    }
     Application.withKamon(settings.config) {
       def initFileStream(file: String, offset: Long): InputStream = {
         log.info(s"Opening import file: $file, offset=$offset")

@@ -9,13 +9,14 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.LogKeys.*
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.{constructorArgsTypesError, logFunc, nativeResult}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.{constructorArgsTypesError, logFunc, nativeError, nativeException, nativeResult}
 import com.wavesplatform.lang.v1.evaluator.ScopeEvaluator.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.traits.Environment
 import monix.eval.Coeval
 
 import scala.collection.mutable.ListBuffer
+import scala.util.control.NonFatal
 
 /** Evaluates a script against chains of scopes instead of rewriting a copy of its tree, with the same results, complexity and log as
   * EvaluatorV2 for every evaluation that completes or fails. Where EvaluatorV2 would stop with an incomplete result, this one gives up
@@ -61,6 +62,17 @@ final class ScopeEvaluator(
     private var error: ExecutionError = null
 
     private var suspended: Suspended = null
+
+    // A bit per hash bucket of every name this run has bound. Every scope is made of cells this run created, so a name whose bit is clear
+    // is in none of them and a reference to it is a global: that skips the longest walks, those for `this`, `height` or `unit`.
+    private val boundNames = new Array[Long](BoundNamesWords)
+
+    private def bind(cell: LetCell): LetCell = {
+      boundNames((cell.hash >>> 6) & (BoundNamesWords - 1)) |= 1L << cell.hash
+      cell
+    }
+
+    private def mayBeBound(hash: Int): Boolean = (boundNames((hash >>> 6) & (BoundNamesWords - 1)) & (1L << hash)) != 0
 
     // The log dedupes by LET node. EvaluatorV2 had one node per LET of the script tree outside function bodies, the one logCall logs the
     // invocation argument with, and a fresh one per call inside them.
@@ -138,7 +150,7 @@ final class ScopeEvaluator(
         case block: BLOCK_DEF =>
           block.dec match {
             case let: LET =>
-              val cell = new LetCell(let.name, let.value, scope)
+              val cell = bind(new LetCell(let.name, let.value, scope))
               if (rootLets != null && rootLets.containsKey(let)) cell.logKey = let
               scope = cell
             case func: FUNC => scope = new FuncEntry(func, scope)
@@ -146,10 +158,13 @@ final class ScopeEvaluator(
           }
           expr = block.body
         case REF(key) =>
-          findLet(key, scope) match {
-            case null => evaluateGlobalVar(key)
-            case cell => evaluateRef(cell)
-          }
+          val hash = key.hashCode
+          if (!mayBeBound(hash)) evaluateGlobalVar(key)
+          else
+            findLet(key, hash, scope) match {
+              case null => evaluateGlobalVar(key)
+              case cell => evaluateRef(cell)
+            }
         case i: IF =>
           push(new IfFrame(i, scope))
           expr = i.cond
@@ -182,6 +197,7 @@ final class ScopeEvaluator(
           case ev                        => fail(s"GETTER of non-case-object $ev with field '${f.field}", budget)
         }
       case f: NewModeFrame =>
+        if (enableExecutionLog) logLetAhead()
         if (budget == f.limit) {
           if (budget >= 1 && f.function.isInstanceOf[FunctionHeader.User] && enableExecutionLog) {
             ctx.log(LET(s"${f.function.funcName}.$Complexity", TRUE), CONST_LONG(1).asRight[ExecutionError])
@@ -189,7 +205,9 @@ final class ScopeEvaluator(
           }
           budget -= 1
         }
-      case f: PrecalculatedFrame => budget = f.unused
+      case f: PrecalculatedFrame =>
+        if (enableExecutionLog) logLetAhead()
+        budget = f.unused
     }
 
     private def evaluateRef(cell: LetCell): Unit =
@@ -200,6 +218,16 @@ final class ScopeEvaluator(
         push(new LetFrame(cell))
         evaluate(cell.expr, cell.next, budget)
       }
+
+    // EvaluatorV2 wrote a call's value into the LET it is the value of, which logs it, before the frames that only adjust complexity ran.
+    private def logLetAhead(): Unit = {
+      var i = depth - 1
+      while (i >= 0 && (frames(i).isInstanceOf[NewModeFrame] || frames(i).isInstanceOf[PrecalculatedFrame])) i -= 1
+      if (i >= 0) frames(i) match {
+        case f: LetFrame => ctx.log(f.cell.logKey, Right(value))
+        case _           =>
+      }
+    }
 
     // The value of a LET reaching the expression that referenced it, as EvaluatorV2's LetFrame passes it on.
     private def letValue(cell: LetCell): Unit = {
@@ -265,6 +293,21 @@ final class ScopeEvaluator(
       }
     }
 
+    // Arguments are LETs holding their values, the later shadowing the earlier, as EvaluatorV2 wraps the function body in blocks.
+    private def bindArgs(names: List[String], values: List[EVALUATED], scope: Scope): Scope = {
+      var s  = scope
+      var ns = names
+      var vs = values
+      while (ns.nonEmpty && vs.nonEmpty) {
+        val cell = bind(new LetCell(ns.head, vs.head, s))
+        cell.value = vs.head
+        s = cell
+        ns = ns.tail
+        vs = vs.tail
+      }
+      s
+    }
+
     private def evaluateNativeFunction(fc: FUNCTION_CALL, args: List[EVALUATED], u: Int): Unit =
       ctx.ec.functions.get(fc.function) match {
         case None => fail(s"function '${fc.function}' not found", u)
@@ -285,7 +328,19 @@ final class ScopeEvaluator(
                   }
                 suspended = Suspended(native, coeval)
               case f: Simple[Environment] =>
-                completeNative(nativeResult(native, (f.evaluate(ctx.ec.environment, args), u - cost), limit, fixedThrownError))
+                // nativeResult without the tuple and closure it takes the outcome in
+                var thrown: ExecutionError = null
+                val result =
+                  try f.evaluate(ctx.ec.environment, args)
+                  catch { case NonFatal(e) => thrown = nativeException(native, e); null }
+                if (thrown != null) fail(thrown, 0)
+                else
+                  result match {
+                    case Right(v) => returnValue(v, u - cost)
+                    case Left(e) =>
+                      val (error, unused) = nativeError(native, e, u - cost, limit, fixedThrownError)
+                      fail(error, unused)
+                  }
             }
           }
       }
@@ -426,6 +481,8 @@ object ScopeEvaluator {
     }
   }
 
+  private final val BoundNamesWords = 16 // a power of 2
+
   private final val EVAL       = 0
   private final val RETURN     = 1
   private final val ERROR      = 2
@@ -436,6 +493,7 @@ object ScopeEvaluator {
 
   // A LET entered in a scope: evaluated at most once, in the scope it was declared in, like the LET node EvaluatorV2 writes its value into.
   private final class LetCell(val name: String, val expr: EXPR, next: Scope) extends Scope(next) {
+    val hash: Int           = name.hashCode
     var value: EVALUATED    = null
     var evaluating: Boolean = false
 
@@ -447,7 +505,9 @@ object ScopeEvaluator {
     def logKey_=(let: LET): Unit = key = let
   }
 
-  private final class FuncEntry(val func: FUNC, next: Scope) extends Scope(next)
+  private final class FuncEntry(val func: FUNC, next: Scope) extends Scope(next) {
+    val hash: Int = func.name.hashCode
+  }
 
   private sealed abstract class Frame
   private final class CallFrame(val fc: FUNCTION_CALL, val scope: Scope) extends Frame {
@@ -505,11 +565,11 @@ object ScopeEvaluator {
     lets
   }
 
-  private def findLet(key: String, scope: Scope): LetCell = {
+  private def findLet(key: String, hash: Int, scope: Scope): LetCell = {
     var s = scope
     while (s != null) {
       s match {
-        case cell: LetCell if cell.name == key => return cell
+        case cell: LetCell if cell.hash == hash && cell.name.equals(key) => return cell
         case _                                 => s = s.next
       }
     }
@@ -517,28 +577,15 @@ object ScopeEvaluator {
   }
 
   private def findUserFunction(name: String, scope: Scope): FuncEntry = {
-    var s = scope
+    val hash = name.hashCode
+    var s    = scope
     while (s != null) {
       s match {
-        case entry: FuncEntry if entry.func.name == name => return entry
+        case entry: FuncEntry if entry.hash == hash && entry.func.name.equals(name) => return entry
         case _                                           => s = s.next
       }
     }
     null
   }
 
-  // Arguments are LETs holding their values, the later shadowing the earlier, as EvaluatorV2 wraps the function body in blocks.
-  private def bindArgs(names: List[String], values: List[EVALUATED], scope: Scope): Scope = {
-    var s  = scope
-    var ns = names
-    var vs = values
-    while (ns.nonEmpty && vs.nonEmpty) {
-      val cell = new LetCell(ns.head, vs.head, s)
-      cell.value = vs.head
-      s = cell
-      ns = ns.tail
-      vs = vs.tail
-    }
-    s
-  }
 }

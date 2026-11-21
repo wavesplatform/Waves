@@ -400,24 +400,36 @@ object EvaluatorV2 {
   ): Either[(ExecutionError, Int), (EVALUATED, Int)] =
     try {
       val (result, evaluatedComplexity) = outcome
-      result.bimap(
-        {
-          // The whole limit of the evaluation, not the complexity left at this call: changing it would change past results.
-          case e: ThrownError if !fixedThrownError && function.ev.isInstanceOf[Extended[Environment]] => (e, limit)
-          case e: ThrownError if !fixedThrownError                                                    => (e, 0)
-          case e                                                                                      => (e, evaluatedComplexity)
-        },
-        (_, evaluatedComplexity)
-      )
+      result.bimap(nativeError(function, _, evaluatedComplexity, limit, fixedThrownError), (_, evaluatedComplexity))
     } catch {
-      case _: SecurityException =>
-        Left((CommonError(s"""An access to ${function.ev} is denied"""), 0))
-      case NonFatal(e) =>
+      case NonFatal(e) => Left((nativeException(function, e), 0))
+    }
+
+  // The error a native call returned, with the complexity left after it.
+  private[evaluator] def nativeError(
+      function: NativeFunction[Environment],
+      e: ExecutionError,
+      evaluatedComplexity: Int,
+      limit: Int,
+      fixedThrownError: Boolean
+  ): (ExecutionError, Int) =
+    e match {
+      // The whole limit of the evaluation, not the complexity left at this call: changing it would change past results.
+      case e: ThrownError if !fixedThrownError && function.ev.isInstanceOf[Extended[Environment]] => (e, limit)
+      case e: ThrownError if !fixedThrownError                                                    => (e, 0)
+      case e                                                                                      => (e, evaluatedComplexity)
+    }
+
+  // The error a non-fatal exception thrown by a native call becomes; it leaves no complexity.
+  private[evaluator] def nativeException(function: NativeFunction[Environment], e: Throwable): ExecutionError =
+    e match {
+      case _: SecurityException => CommonError(s"""An access to ${function.ev} is denied""")
+      case e =>
         val error = e.getMessage match {
           case null => e.toString
           case msg  => msg
         }
-        Left((CommonError(s"""An error during run ${function.ev}: ${e.getClass} $error"""), 0))
+        CommonError(s"""An error during run ${function.ev}: ${e.getClass} $error""")
     }
 
   private[evaluator] def constructorArgsTypesError(objectType: CASETYPEREF, passedArgs: List[EVALUATED]): Option[String] = {
