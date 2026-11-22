@@ -481,7 +481,9 @@ abstract class Caches extends Blockchain, Storage, StrictLogging {
     leaseBalanceCache.putAll(leaseBalances.asJava)
     scriptCache.putAll(snapshot.accountScriptsByAddress.asJava)
     assetScriptCache.putAll(snapshot.assetScripts.view.mapValues(Some(_)).toMap.asJava)
-    accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
+    // Blind writes would evict entries scripts read; a skipped key is reloaded from the DB, which already holds it. No load can be in flight
+    // here (readers hold the read lock, append the write lock), so a skipped key cannot be cached with the value before this block.
+    accountDataCache.putAll(updatedDataWithNodes.collect { case (key, (value, _)) if cachedEntries.contains(key) => (key, value) }.asJava)
 
     this.generationPeriodOf(current.height).foreach { currPeriod =>
       committedGeneratorsCache = committedGeneratorsCache.view.filterKeys(_ >= currPeriod).toMap
