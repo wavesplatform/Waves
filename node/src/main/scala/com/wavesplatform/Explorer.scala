@@ -417,31 +417,20 @@ object Explorer extends ScorexLogging {
           log.info(s"Entry at $requestedHeight: $problematicEntry")
         case "DHC" =>
           log.info("Looking for data entry history corruptions")
-          var thisAddressId = 0L
-          var prevHeight    = Height(0)
-          var key           = ""
-          var addressCount  = 0
+          val prefixLength = KeyTag.DataHistory.prefixBytes.length
+          var nodeCount    = 0L
           rdb.db.iterateOver(KeyTag.DataHistory.prefixBytes, None) { e =>
-            val addressIdFromKey = Longs.fromByteArray(e.getKey.slice(2, 10))
-            val heightFromKey    = Height(Ints.fromByteArray(e.getKey.takeRight(4)))
-            val keyFromKey       = new String(e.getKey.drop(10).dropRight(4), "utf-8")
-            if (addressIdFromKey != thisAddressId) {
-              thisAddressId = addressIdFromKey
-              key = keyFromKey
-              addressCount += 1
-            } else if (key != keyFromKey) {
-              key = keyFromKey
-            } else {
-              val node = readDataNode(key)(e.getValue)
-              if (node.prevHeight != prevHeight) {
-                val address = rdb.db.get(Keys.idToAddress(AddressId(thisAddressId)))
-                log.warn(s"$address/$key@$heightFromKey: node.prevHeight=${node.prevHeight}, actual=$prevHeight")
-
-              }
+            val heightFromKey = Height(Ints.fromByteArray(e.getKey.slice(prefixLength, prefixLength + Ints.BYTES)))
+            val rest          = e.getKey.drop(prefixLength + Ints.BYTES)
+            val prevHeight    = Height(Ints.fromByteArray(e.getValue.take(Ints.BYTES)))
+            if (prevHeight > Height(0) && rdb.db.get(KeyTag.DataHistory.prefixBytes ++ prevHeight.toByteArray ++ rest) == null) {
+              val address = rdb.db.get(Keys.idToAddress(AddressId.fromByteArray(rest.take(Longs.BYTES))))
+              val key     = new String(rest.drop(Longs.BYTES), "utf-8")
+              log.warn(s"$address/$key@$heightFromKey: no node at prevHeight=$prevHeight")
             }
-            prevHeight = heightFromKey
+            nodeCount += 1
           }
-          log.info(s"Checked $addressCount addresses")
+          log.info(s"Checked $nodeCount nodes")
         case "ABHC" =>
           log.info("Looking for asset balance history corruptions")
           var thisAddressId = 0L

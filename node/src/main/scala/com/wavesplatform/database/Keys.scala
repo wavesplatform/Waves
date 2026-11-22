@@ -133,8 +133,11 @@ object Keys {
   def data(addressId: AddressId, key: String): Key[CurrentData] =
     Key(Data, addressId.toByteArray ++ key.utf8Bytes, readCurrentData(key), writeCurrentData)
 
+  // Height first: the nodes of one height are the keys changed at it, so rollback and cleanup iterate them by prefix
   def dataAt(addressId: AddressId, key: String)(height: Height): Key[DataNode] =
-    Key(DataHistory, hBytes(addressId.toByteArray ++ key.utf8Bytes, height), readDataNode(key), writeDataNode)
+    Key(DataHistory, h(height) ++ addressId.toByteArray ++ key.utf8Bytes, readDataNode(key), writeDataNode)
+
+  def dataHistoryAtPrefix(height: Height): Array[Byte] = KeyTag.DataHistory.prefixBytes ++ h(height)
 
   def sponsorshipHistory(asset: IssuedAsset): Key[Seq[Height]] = historyKey(SponsorshipHistory, asset.id.arr)
   def sponsorship(asset: IssuedAsset)(height: Height): Key[SponsorshipValue] =
@@ -150,9 +153,6 @@ object Keys {
 
   val safeRollbackHeight: Key[Height] = heightKey(SafeRollbackHeight)
   val lastCleanupHeight: Key[Height]  = heightKey(LastCleanupHeight)
-
-  def changedDataKeys(height: Height, addressId: AddressId): Key[Seq[String]] =
-    Key(ChangedDataKeys, hBytes(addressId.toByteArray, height), readStrings, writeStrings)
 
   def blockMetaAt(height: Height): Key[Option[PBBlockMeta]] =
     Key.opt(BlockInfoAtHeight, h(height), readBlockMeta, writeBlockMeta)

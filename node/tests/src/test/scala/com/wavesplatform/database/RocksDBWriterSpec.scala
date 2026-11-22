@@ -401,7 +401,6 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     KeyTag.ChangedWavesBalances,
     KeyTag.WavesBalanceHistory,
     KeyTag.AssetBalanceHistory,
-    KeyTag.ChangedDataKeys,
     KeyTag.DataHistory,
     KeyTag.ChangedAddresses
   )
@@ -450,7 +449,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
           readAddressIds(bytes.getValue)
         )
 
-      case KeyTag.WavesBalanceHistory | KeyTag.AssetBalanceHistory | KeyTag.ChangedDataKeys =>
+      case KeyTag.WavesBalanceHistory | KeyTag.AssetBalanceHistory =>
         (
           bytes.getKey.takeRight(Ints.BYTES),
           Seq(AddressId.fromByteArray(bytes.getKey.dropRight(Ints.BYTES).takeRight(Longs.BYTES)))
@@ -458,8 +457,8 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
 
       case KeyTag.DataHistory =>
         (
-          bytes.getKey.takeRight(Ints.BYTES),
-          Seq(AddressId.fromByteArray(bytes.getKey.drop(Shorts.BYTES)))
+          bytes.getKey.slice(Shorts.BYTES, Shorts.BYTES + Ints.BYTES),
+          Seq(AddressId.fromByteArray(bytes.getKey.slice(Shorts.BYTES + Ints.BYTES, Shorts.BYTES + Ints.BYTES + Longs.BYTES)))
         )
 
       case _ => throw new IllegalArgumentException(s"$tag")
