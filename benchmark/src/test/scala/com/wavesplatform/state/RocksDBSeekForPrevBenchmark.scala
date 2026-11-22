@@ -46,7 +46,7 @@ class RocksDBSeekForPrevBenchmark {
   @Benchmark
   def get(st: BaseSt, bh: Blackhole): Unit = {
     bh.consume {
-      readCurrentData(st.keyString)(st.rdb.db.get(st.currentDataKey)).prevHeight
+      readCurrentData(st.keyString)(st.rdb.db.get(st.currentDataKey)).height
     }
   }
 }
@@ -76,7 +76,7 @@ object RocksDBSeekForPrevBenchmark {
 
     Using.Manager { use =>
       val wb = use(new WriteBatch())
-      wb.put(currentDataKey, writeCurrentData(CurrentData(dataEntry, Height(10000), Height(9999))))
+      wb.put(currentDataKey, writeCurrentData(CurrentData(dataEntry, Height(10000))))
       (1 to 1000).foreach { h =>
         wb.put(dataNodeKey(Height(h)), writeDataNode(DataNode(dataEntry, Height(h - 1))))
       }

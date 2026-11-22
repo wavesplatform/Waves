@@ -43,9 +43,10 @@ object LeaseBalanceNode {
   val Empty: LeaseBalanceNode = LeaseBalanceNode(0, 0, Height(0))
 }
 
-case class CurrentData(entry: DataEntry[?], height: Height, prevHeight: Height)
+// The height of the previous entry is kept only in the history node, which rollback and cleanup read
+case class CurrentData(entry: DataEntry[?], height: Height)
 object CurrentData {
-  def empty(key: String): CurrentData = CurrentData(EmptyDataEntry(key), Height(0), Height(0))
+  def empty(key: String): CurrentData = CurrentData(EmptyDataEntry(key), Height(0))
 }
 
 case class DataNode(entry: DataEntry[?], prevHeight: Height)

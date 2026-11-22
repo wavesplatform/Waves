@@ -416,7 +416,7 @@ abstract class Caches extends Blockchain, Storage, StrictLogging {
       (k, heightOfPreviousEntry) <- cachedEntries.view.mapValues(_.height) ++ loadedPrevEntryHeights
       newEntry                   <- newEntries.get(k)
     } yield k -> (
-      CurrentData(newEntry, Height(height), heightOfPreviousEntry),
+      CurrentData(newEntry, Height(height)),
       DataNode(newEntry, heightOfPreviousEntry)
     )).toMap
 

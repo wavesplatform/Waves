@@ -125,7 +125,6 @@ object RocksDBWriter extends ScorexLogging {
     loop(whs.head, whs.tail, lhs.head, lhs.tail, dhs.head, dhs.tail, ArrayBuffer.empty).toSeq
   }
 
-
   def apply(
       rdb: RDB,
       settings: BlockchainSettings,
@@ -1181,7 +1180,7 @@ class RocksDBWriter(
       if (prevHeight > Height(0)) {
         val prevDataNode = rw.get(Keys.dataAt(addressId, key)(prevHeight))
         log.trace(s"PUT $address($addressId)/$key@$currentHeight => ${prevDataNode.entry}@$prevHeight>${prevDataNode.prevHeight}")
-        rw.put(currentDataKey, CurrentData(prevDataNode.entry, prevHeight, prevDataNode.prevHeight))
+        rw.put(currentDataKey, CurrentData(prevDataNode.entry, prevHeight))
       } else {
         log.trace(s"DEL $address($addressId)/$key@$currentHeight")
         rw.delete(currentDataKey)

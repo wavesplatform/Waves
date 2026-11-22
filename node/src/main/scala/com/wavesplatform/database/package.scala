@@ -328,14 +328,10 @@ package object database {
 
   def readCurrentData(key: String)(bs: Array[Byte]): CurrentData = if (bs == null) CurrentData.empty(key)
   else
-    CurrentData(
-      readDataEntry(key)(bs.drop(8)),
-      Height(Ints.fromByteArray(bs.take(4))),
-      Height(Ints.fromByteArray(bs.slice(4, 8)))
-    )
+    CurrentData(readDataEntry(key)(bs.drop(Ints.BYTES)), Height(Ints.fromByteArray(bs.take(Ints.BYTES))))
 
   def writeCurrentData(cdn: CurrentData): Array[Byte] =
-    cdn.height.toByteArray ++ cdn.prevHeight.toByteArray ++ writeDataEntry(cdn.entry)
+    cdn.height.toByteArray ++ writeDataEntry(cdn.entry)
 
   def readDataNode(key: String)(bs: Array[Byte]): DataNode = if (bs == null) DataNode.empty(key)
   else
