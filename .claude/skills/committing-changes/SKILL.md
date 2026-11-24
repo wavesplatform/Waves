@@ -6,7 +6,14 @@ allowed-tools: Read, Bash(git status *), Bash(git diff *), Bash(git log *), Bash
 
 ## Workflow
 
-1. **Branch in a worktree.** The default branch is `version-1.6.x` and the main checkout stays on it. Start every new branch in its own worktree from an up-to-date `version-1.6.x`, never with `git checkout -b` in the main checkout:
+1. **Branch in a worktree.** The default branch is `version-1.6.x` and the main checkout stays on it.
+
+   Ensure relative paths are enabled for the repo:
+   ```
+   git config --local worktree.useRelativePaths true
+   ```
+   Start every new branch in its own worktree from an up-to-date `version-1.6.x`, never with `git checkout -b` in the main checkout:
+
    ```
    git worktree add .claude/worktrees/<description> -b <type>/<description> <version-1.6.x commit>
    ```
