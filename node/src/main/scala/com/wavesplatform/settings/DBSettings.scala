@@ -10,10 +10,12 @@ case class DBSettings(
     storeInvokeScriptResults: Boolean,
     storeStateHashes: Boolean,
     maxCacheSize: Int,
+    maxDataCacheSize: Int,
     maxRollbackDepth: Int,
     cleanupInterval: Option[Int] = None,
     txBloomFilterSize: Int,
-    rocksdb: RocksDBSettings
+    rocksdb: RocksDBSettings,
+    updateIfPresent: Boolean = true
 )
 
 object DBSettings {

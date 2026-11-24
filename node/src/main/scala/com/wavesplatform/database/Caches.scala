@@ -177,7 +177,7 @@ abstract class Caches extends Blockchain, Storage, StrictLogging {
     newAddresses.getOrElse(address, addressIdCache.get(address).get)
 
   private val accountDataCache: LoadingCache[(Address, String), CurrentData] = cache(
-    dbSettings.maxCacheSize * 10,
+    dbSettings.maxDataCacheSize,
     { case (k, v) =>
       loadAccountData(k, v)
     }
@@ -483,7 +483,7 @@ abstract class Caches extends Blockchain, Storage, StrictLogging {
     assetScriptCache.putAll(snapshot.assetScripts.view.mapValues(Some(_)).toMap.asJava)
     // Blind writes would evict entries scripts read; a skipped key is reloaded from the DB, which already holds it. No load can be in flight
     // here (readers hold the read lock, append the write lock), so a skipped key cannot be cached with the value before this block.
-    accountDataCache.putAll(updatedDataWithNodes.collect { case (key, (value, _)) if cachedEntries.contains(key) => (key, value) }.asJava)
+    accountDataCache.putAll(updatedDataWithNodes.collect { case (key, (value, _)) if cachedEntries.contains(key) || !dbSettings.updateIfPresent => (key, value) }.asJava)
 
     this.generationPeriodOf(current.height).foreach { currPeriod =>
       committedGeneratorsCache = committedGeneratorsCache.view.filterKeys(_ >= currPeriod).toMap
