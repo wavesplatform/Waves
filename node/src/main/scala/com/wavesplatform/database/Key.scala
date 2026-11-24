@@ -2,11 +2,22 @@ package com.wavesplatform.database
 
 import com.google.common.base.CaseFormat
 import com.google.common.io.BaseEncoding
-import com.google.common.primitives.{Bytes, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Shorts}
 import org.rocksdb.ColumnFamilyHandle
 
-abstract class Key[V](prefix: Short, val name: String, val suffix: Array[Byte], val columnFamilyHandle: Option[ColumnFamilyHandle] = None) {
-  val keyBytes: Array[Byte] = Bytes.concat(Shorts.toByteArray(prefix), suffix)
+/** @param heightFirst
+  *   the suffix starts with a 4-byte height, which goes before the tag, so that keys of several tags in one column family are ordered by height
+  */
+abstract class Key[V](
+    prefix: Short,
+    val name: String,
+    val suffix: Array[Byte],
+    val columnFamilyHandle: Option[ColumnFamilyHandle] = None,
+    heightFirst: Boolean = false
+) {
+  val keyBytes: Array[Byte] =
+    if (heightFirst) Bytes.concat(suffix.take(Ints.BYTES), Shorts.toByteArray(prefix), suffix.drop(Ints.BYTES))
+    else Bytes.concat(Shorts.toByteArray(prefix), suffix)
   def parse(bytes: Array[Byte]): V
   def encode(v: V): Array[Byte]
 
@@ -29,9 +40,10 @@ object Key {
       keySuffix: Array[Byte],
       parser: Array[Byte] => V,
       encoder: V => Array[Byte],
-      cfh: Option[ColumnFamilyHandle] = None
+      cfh: Option[ColumnFamilyHandle] = None,
+      heightFirst: Boolean = false
   ): Key[V] =
-    new Key[V](keyTag.ordinal.toShort, keyTagToStr(keyTag.ordinal), keySuffix, cfh) {
+    new Key[V](keyTag.ordinal.toShort, keyTagToStr(keyTag.ordinal), keySuffix, cfh, heightFirst) {
       override def parse(bytes: Array[Byte]): V = parser(bytes)
       override def encode(v: V): Array[Byte]    = encoder(v)
     }
@@ -41,13 +53,15 @@ object Key {
       keySuffix: Array[Byte],
       parser: Array[Byte] => V,
       encoder: V => Array[Byte],
-      cfh: Option[ColumnFamilyHandle] = None
+      cfh: Option[ColumnFamilyHandle] = None,
+      heightFirst: Boolean = false
   ): Key[Option[V]] =
     apply[Option[V]](
       keyTag,
       keySuffix,
       Option(_).map(parser),
       _.fold[Array[Byte]](Array.emptyByteArray)(encoder),
-      cfh
+      cfh,
+      heightFirst
     )
 }

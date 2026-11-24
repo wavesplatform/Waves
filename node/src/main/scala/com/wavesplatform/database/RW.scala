@@ -28,9 +28,14 @@ class RW private[database] (db: RocksDB, readOptions: ReadOptions, batch: WriteB
 
   def delete(key: Array[Byte]): Unit = ops += Delete(db.getDefaultColumnFamily, key)
 
+  def delete(cfh: ColumnFamilyHandle, key: Array[Byte]): Unit = ops += Delete(cfh, key)
+
   def delete[V](key: Key[V]): Unit = ops += Delete(cf(key), key.keyBytes)
 
-  def deleteRange[V](fromInclusive: Key[V], toExclusive: Key[V]): Unit = deleteRange(fromInclusive.keyBytes, toExclusive.keyBytes)
+  def deleteRange[V](fromInclusive: Key[V], toExclusive: Key[V]): Unit = {
+    hasRangeDelete = true
+    ops += DeleteRange(cf(fromInclusive), fromInclusive.keyBytes, toExclusive.keyBytes)
+  }
 
   // Deletes in range [from, to)
   // Keep in mind, that bytes in Java are signed.

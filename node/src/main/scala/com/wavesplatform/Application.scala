@@ -52,7 +52,6 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.Http.ServerBinding
 import org.influxdb.dto.Point
-import org.rocksdb.RocksDB
 import org.slf4j.LoggerFactory
 
 import java.io.File
@@ -271,7 +270,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override val blocksApi: CommonBlocksApi = CommonBlocksApi(
         settings.synchronizationSettings.maxRollback,
         blockchainUpdater,
-        loadBlockMetaAt(rdb.db, blockchainUpdater),
+        loadBlockMetaAt(rdb, blockchainUpdater),
         loadBlockInfoAt(rdb, blockchainUpdater)
       )
       override val accountsApi: CommonAccountsApi =
@@ -637,16 +636,16 @@ object Application extends ScorexLogging {
   private[wavesplatform] def loadBlockInfoAt(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater)(
       height: Height
   ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
-    loadBlockMetaAt(rdb.db, blockchainUpdater)(height).map { meta =>
+    loadBlockMetaAt(rdb, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
         .getOrElse(database.loadTransactions(height, rdb))
     }
 
-  private[wavesplatform] def loadBlockMetaAt(db: RocksDB, blockchainUpdater: CompleteBlockchainUpdater)(height: Height): Option[BlockMeta] =
+  private[wavesplatform] def loadBlockMetaAt(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater)(height: Height): Option[BlockMeta] =
     blockchainUpdater.liquidBlockMeta
       .filter(_ => blockchainUpdater.height == height.toInt)
-      .orElse(db.get(Keys.blockMetaAt(height)).flatMap(BlockMeta.fromPb))
+      .orElse(rdb.db.get(Keys.blockMetaAt(height, rdb.byHeightHandle)).flatMap(BlockMeta.fromPb))
       .map { blockMeta =>
         val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height.toInt, blockMeta.header.generator.toAddress, blockchainUpdater)
         blockMeta.copy(

@@ -151,9 +151,10 @@ object Exporter extends ScorexLogging {
     val blockMetaIterator: DataIterator[BlockMeta] =
       new DataIterator[BlockMeta](
         rdb.db,
-        rdb.db.getDefaultColumnFamily,
+        rdb.byHeightHandle.handle,
         KeyTag.BlockInfoAtHeight.prefixBytes,
-        readBlockMeta
+        readBlockMeta,
+        heightFirst = true
       )
     val txIterator: DataIterator[TransactionData] = {
       val prefixBytes = KeyTag.NthTransactionInfoAtHeight.prefixBytes
@@ -229,7 +230,8 @@ object Exporter extends ScorexLogging {
       db: RocksDB,
       cfHandle: ColumnFamilyHandle,
       prefixBytes: Array[Byte],
-      parseDataF: Array[Byte] => A
+      parseDataF: Array[Byte] => A,
+      heightFirst: Boolean = false // keys are height ++ tag, mixed with other tags, as in the by-height column family
   ) extends AbstractIterator[(Int, A)] {
     private val snapshot = db.getSnapshot
     // Each block is read once: caching it only churns the LRU cache, and a large readahead replaces a pread per (small) data block.
@@ -241,17 +243,23 @@ object Exporter extends ScorexLogging {
       .setTotalOrderSeek(true)
     private val dbIterator = db.newIterator(cfHandle, readOptions)
 
-    // Keys are the prefix followed by the height; `key()` copies over JNI, so it's read once.
+    // Keys are the prefix followed by the height (or the reverse when heightFirst); `key()` copies over JNI, so it's read once.
+    private val tagOffset = if (heightFirst) Ints.BYTES else 0
+    private val hOffset   = if (heightFirst) 0 else prefixBytes.length
     private def hasPrefix(key: Array[Byte]): Boolean =
-      key.length >= prefixBytes.length && java.util.Arrays.equals(key, 0, prefixBytes.length, prefixBytes, 0, prefixBytes.length)
+      key.length >= tagOffset + prefixBytes.length &&
+        java.util.Arrays.equals(key, tagOffset, tagOffset + prefixBytes.length, prefixBytes, 0, prefixBytes.length)
 
-    dbIterator.seek(prefixBytes)
+    if (heightFirst) dbIterator.seekToFirst() else dbIterator.seek(prefixBytes)
 
     @tailrec
     override final def computeNext(): (Int, A) = {
       val key = if (dbIterator.isValid) dbIterator.key() else null
-      if (key != null && hasPrefix(key)) {
-        val p = prefixBytes.length
+      if (key != null && heightFirst && !hasPrefix(key)) {
+        dbIterator.next()
+        computeNext()
+      } else if (key != null && hasPrefix(key)) {
+        val p = hOffset
         if (key.length < p + Ints.BYTES) throw new IllegalStateException(s"Corrupted key without a height: ${HexFormat.of().formatHex(key)}")
         val h = Ints.fromBytes(key(p), key(p + 1), key(p + 2), key(p + 3))
         if (h > 1) {

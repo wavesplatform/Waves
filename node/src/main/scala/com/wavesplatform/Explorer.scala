@@ -107,10 +107,9 @@ object Explorer extends ScorexLogging {
 
           var actualTotalReward = 0L
           var blocksRecords     = 0
-          rdb.db.iterateOver(KeyTag.BlockInfoAtHeight) { e =>
-            val height = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
-            val key    = Keys.blockMetaAt(height)
-            actualTotalReward += key.parse(e.getValue).fold(0L)(_.reward)
+          rdb.db.iterateOverByHeight(KeyTag.BlockInfoAtHeight, rdb.byHeightHandle) { (height, value) =>
+            val key = Keys.blockMetaAt(height, rdb.byHeightHandle)
+            actualTotalReward += key.parse(value).fold(0L)(_.reward)
             blocksRecords += 1
           }
 
@@ -149,8 +148,8 @@ object Explorer extends ScorexLogging {
             val blockHeightBytes = rdb.db.get(kBlockHeight.keyBytes)
             val maybeBlockHeight = kBlockHeight.parse(blockHeightBytes)
             maybeBlockHeight.foreach { h =>
-              val kBlock     = Keys.blockInfoBytesAt(Height(h))
-              val blockBytes = rdb.db.get(kBlock.keyBytes)
+              val kBlock     = Keys.blockInfoBytesAt(Height(h), rdb.byHeightHandle)
+              val blockBytes = rdb.db.get(kBlock).orNull
               log.info(s"BlockId=${maybeBlockId.get} at h=$h: ${Base64.encode(blockBytes)}")
             }
           } else log.error("No block ID was provided")
@@ -233,11 +232,14 @@ object Explorer extends ScorexLogging {
 
           val result = new util.LinkedHashMap[(String, Short), Stats]
           Seq(
-            "default" -> rdb.db.getDefaultColumnFamily,
-            "tx"      -> rdb.txHandle.handle,
-            "tx-snap" -> rdb.txSnapshotHandle.handle,
-            "tx-meta" -> rdb.txMetaHandle.handle,
-            "api"     -> rdb.apiHandle.handle
+            "default"           -> rdb.db.getDefaultColumnFamily,
+            "tx"                -> rdb.txHandle.handle,
+            "tx-snap"           -> rdb.txSnapshotHandle.handle,
+            "tx-meta"           -> rdb.txMetaHandle.handle,
+            "api"               -> rdb.apiHandle.handle,
+            RDB.DataHistoryCF   -> rdb.dataHistoryHandle.handle,
+            RDB.InvokeResultsCF -> rdb.invokeResultsHandle.handle,
+            RDB.ByHeightCF      -> rdb.byHeightHandle.handle
           ).foreach { (cfName, cf) =>
             Using.Manager { use =>
               val ro       = use(new ReadOptions().setTotalOrderSeek(true).setVerifyChecksums(false))
@@ -245,7 +247,7 @@ object Explorer extends ScorexLogging {
               iterator.seekToFirst()
 
               while (iterator.isValid) {
-                val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
+                val keyPrefix   = ByteBuffer.wrap(iterator.key(), if (cfName == RDB.ByHeightCF) Ints.BYTES else 0, Shorts.BYTES).getShort
                 val valueLength = iterator.value().length
                 val keyLength   = iterator.key().length
                 val large       = if (valueLength >= 1024) valueLength else 0
@@ -380,7 +382,7 @@ object Explorer extends ScorexLogging {
           val targetHeight = Height(argument(1, "height").toInt)
           log.info(s"Loading state hash at $targetHeight")
           val deterministicFinalityActivated = reader.isFeatureActivated(BlockchainFeatures.DeterministicFinality, targetHeight.toInt)
-          rdb.db.get(Keys.stateHash(targetHeight)).foreach { sh =>
+          rdb.db.get(Keys.stateHash(targetHeight, rdb.byHeightHandle)).foreach { sh =>
             println(StateHash.toJson(sh, deterministicFinalityActivated).toString())
           }
         case "CTI" =>
@@ -413,17 +415,22 @@ object Explorer extends ScorexLogging {
           log.info(s"Collecting data history for key $key on $address ($addressId)")
           val currentEntry = rdb.db.get(Keys.data(addressId, key))
           log.info(s"Current entry: $currentEntry")
-          val problematicEntry = rdb.db.get(Keys.dataAt(addressId, key)(requestedHeight))
+          val problematicEntry = rdb.db.get(Keys.dataAt(addressId, key, rdb.dataHistoryHandle)(requestedHeight))
           log.info(s"Entry at $requestedHeight: $problematicEntry")
         case "DHC" =>
           log.info("Looking for data entry history corruptions")
           val prefixLength = KeyTag.DataHistory.prefixBytes.length
           var nodeCount    = 0L
-          rdb.db.iterateOver(KeyTag.DataHistory.prefixBytes, None) { e =>
+          rdb.db.iterateOver(KeyTag.DataHistory.prefixBytes, Some(rdb.dataHistoryHandle.handle)) { e =>
             val heightFromKey = Height(Ints.fromByteArray(e.getKey.slice(prefixLength, prefixLength + Ints.BYTES)))
             val rest          = e.getKey.drop(prefixLength + Ints.BYTES)
             val prevHeight    = Height(Ints.fromByteArray(e.getValue.take(Ints.BYTES)))
-            if (prevHeight > Height(0) && rdb.db.get(KeyTag.DataHistory.prefixBytes ++ prevHeight.toByteArray ++ rest) == null) {
+            if (
+              prevHeight > Height(0) && rdb.db.get(
+                rdb.dataHistoryHandle.handle,
+                KeyTag.DataHistory.prefixBytes ++ prevHeight.toByteArray ++ rest
+              ) == null
+            ) {
               val address = rdb.db.get(Keys.idToAddress(AddressId.fromByteArray(rest.take(Longs.BYTES))))
               val key     = new String(rest.drop(Longs.BYTES), "utf-8")
               log.warn(s"$address/$key@$heightFromKey: no node at prevHeight=$prevHeight")

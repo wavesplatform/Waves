@@ -28,7 +28,7 @@ package object common {
       def loadISR(t: Transaction) =
         maybeDiff
           .flatMap { case (_, diff) => diff.scriptResults.get(t.id()) }
-          .orElse(loadInvokeScriptResult(rdb.db, rdb.apiHandle, m.height, txNum))
+          .orElse(loadInvokeScriptResult(rdb.db, rdb.invokeResultsHandle, m.height, txNum))
 
       def loadETM(t: Transaction) =
         maybeDiff
@@ -90,7 +90,7 @@ package object common {
       ist =>
         maybeSnapshot
           .flatMap { case (_, s) => s.scriptResults.get(ist.id()) }
-          .orElse(loadInvokeScriptResult(rdb.db, rdb.txMetaHandle, rdb.apiHandle, ist.id())),
+          .orElse(loadInvokeScriptResult(rdb.db, rdb.txMetaHandle, rdb.invokeResultsHandle, ist.id())),
       et =>
         maybeSnapshot
           .flatMap { case (_, s) => s.ethereumTransactionMeta.get(et.id()) }

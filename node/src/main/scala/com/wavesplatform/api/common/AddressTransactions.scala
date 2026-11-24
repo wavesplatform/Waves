@@ -36,19 +36,24 @@ object AddressTransactions {
   private def loadInvokeScriptResult(
       resource: DBResource,
       txMetaHandle: RDB.TxMetaHandle,
-      apiHandle: RDB.ApiHandle,
+      invokeResultsHandle: RDB.InvokeResultsHandle,
       txId: ByteStr
   ): Option[InvokeScriptResult] =
     for {
       tm           <- resource.get(Keys.transactionMetaById(TransactionId(txId), txMetaHandle))
-      scriptResult <- resource.get(Keys.invokeScriptResult(Height(tm.height), TxNum(tm.num.toShort), apiHandle))
+      scriptResult <- resource.get(Keys.invokeScriptResult(Height(tm.height), TxNum(tm.num.toShort), invokeResultsHandle))
     } yield scriptResult
 
-  def loadInvokeScriptResult(db: RocksDB, txMetaHandle: RDB.TxMetaHandle, apiHandle: RDB.ApiHandle, txId: ByteStr): Option[InvokeScriptResult] =
-    db.withResource(r => loadInvokeScriptResult(r, txMetaHandle, apiHandle, txId))
+  def loadInvokeScriptResult(
+      db: RocksDB,
+      txMetaHandle: RDB.TxMetaHandle,
+      invokeResultsHandle: RDB.InvokeResultsHandle,
+      txId: ByteStr
+  ): Option[InvokeScriptResult] =
+    db.withResource(r => loadInvokeScriptResult(r, txMetaHandle, invokeResultsHandle, txId))
 
-  def loadInvokeScriptResult(db: RocksDB, apiHandle: RDB.ApiHandle, height: Height, txNum: TxNum): Option[InvokeScriptResult] =
-    db.get(Keys.invokeScriptResult(height, txNum, apiHandle))
+  def loadInvokeScriptResult(db: RocksDB, invokeResultsHandle: RDB.InvokeResultsHandle, height: Height, txNum: TxNum): Option[InvokeScriptResult] =
+    db.get(Keys.invokeScriptResult(height, txNum, invokeResultsHandle))
 
   def loadEthereumMetadata(db: RocksDB, txMetaHandle: RDB.TxMetaHandle, apiHandle: RDB.ApiHandle, txId: ByteStr): Option[EthereumTransactionMeta] =
     db.withResource { resource =>

@@ -177,7 +177,7 @@ abstract class Caches extends Blockchain, Storage, StrictLogging {
     newAddresses.getOrElse(address, addressIdCache.get(address).get)
 
   private val accountDataCache: LoadingCache[(Address, String), CurrentData] = cache(
-    dbSettings.maxCacheSize,
+    dbSettings.maxCacheSize * 10,
     { case (k, v) =>
       loadAccountData(k, v)
     }

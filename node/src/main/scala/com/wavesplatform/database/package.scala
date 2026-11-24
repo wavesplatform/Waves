@@ -581,6 +581,13 @@ package object database {
       }
     }
 
+    /** Visits the values of one tag in the by-height column family, in height order, skipping the other tags of each height */
+    def iterateOverByHeight(tag: KeyTag, cfh: RDB.ByHeightHandle)(f: (Height, Array[Byte]) => Unit): Unit =
+      iterateOver(Array.emptyByteArray, Some(cfh.handle)) { e =>
+        val (height, keyTag) = Keys.parseByHeightKey(e.getKey)
+        if (keyTag == tag.ordinal.toShort) f(height, e.getValue)
+      }
+
     def resourceObservable: Observable[DBResource] =
       Observable.resource(Task(new DBResource(db, None)))(r => Task(r.close()))
 
@@ -729,7 +736,7 @@ package object database {
 
   def loadBlock(height: Height, rdb: RDB): Option[Block] =
     for {
-      meta <- rdb.db.get(Keys.blockMetaAt(height))
+      meta <- rdb.db.get(Keys.blockMetaAt(height, rdb.byHeightHandle))
     } yield createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, loadTransactions(height, rdb).map(_._2))
 
   def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Height]], valueKey: Height => Key[A]): Option[A] =

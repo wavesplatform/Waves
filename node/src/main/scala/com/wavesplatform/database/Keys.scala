@@ -1,6 +1,6 @@
 package com.wavesplatform.database
 
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
@@ -85,12 +85,12 @@ object Keys {
   def assetDetails(asset: IssuedAsset)(height: Height): Key[(AssetInfo, AssetVolumeInfo)] =
     Key(AssetDetails, hBytes(asset.id.arr, height), readAssetDetails, writeAssetDetails)
 
-  def issuedAssets(height: Height): Key[Seq[IssuedAsset]] =
-    Key(IssuedAssets, h(height), d => readAssetIds(d).map(IssuedAsset(_)), ias => writeAssetIds(ias.map(_.id)))
-  def updatedAssets(height: Height): Key[Seq[IssuedAsset]] =
-    Key(UpdatedAssets, h(height), d => readAssetIds(d).map(IssuedAsset(_)), ias => writeAssetIds(ias.map(_.id)))
-  def sponsorshipAssets(height: Height): Key[Seq[IssuedAsset]] =
-    Key(SponsoredAssets, h(height), d => readAssetIds(d).map(IssuedAsset(_)), ias => writeAssetIds(ias.map(_.id)))
+  def issuedAssets(height: Height, cfh: RDB.ByHeightHandle): Key[Seq[IssuedAsset]] =
+    byHeight(IssuedAssets, height, d => readAssetIds(d).map(IssuedAsset(_)), ias => writeAssetIds(ias.map(_.id)), cfh)
+  def updatedAssets(height: Height, cfh: RDB.ByHeightHandle): Key[Seq[IssuedAsset]] =
+    byHeight(UpdatedAssets, height, d => readAssetIds(d).map(IssuedAsset(_)), ias => writeAssetIds(ias.map(_.id)), cfh)
+  def sponsorshipAssets(height: Height, cfh: RDB.ByHeightHandle): Key[Seq[IssuedAsset]] =
+    byHeight(SponsoredAssets, height, d => readAssetIds(d).map(IssuedAsset(_)), ias => writeAssetIds(ias.map(_.id)), cfh)
   def leaseBalanceAt(addressId: AddressId, height: Height): Key[LeaseBalanceNode] =
     Key(LeaseBalanceHistory, hBytes(addressId.toByteArray, height), readLeaseBalanceNode, writeLeaseBalanceNode)
 
@@ -135,8 +135,8 @@ object Keys {
     Key(Data, addressId.toByteArray ++ key.utf8Bytes, readCurrentData(key), writeCurrentData)
 
   // Height first: the nodes of one height are the keys changed at it, so rollback and cleanup iterate them by prefix
-  def dataAt(addressId: AddressId, key: String)(height: Height): Key[DataNode] =
-    Key(DataHistory, h(height) ++ addressId.toByteArray ++ key.utf8Bytes, readDataNode(key), writeDataNode)
+  def dataAt(addressId: AddressId, key: String, cfh: RDB.DataHistoryHandle)(height: Height): Key[DataNode] =
+    Key(DataHistory, h(height) ++ addressId.toByteArray ++ key.utf8Bytes, readDataNode(key), writeDataNode, Some(cfh.handle))
 
   def dataHistoryAtPrefix(height: Height): Array[Byte] = KeyTag.DataHistory.prefixBytes ++ h(height)
 
@@ -144,7 +144,8 @@ object Keys {
   def sponsorship(asset: IssuedAsset)(height: Height): Key[SponsorshipValue] =
     Key(Sponsorship, hBytes(asset.id.arr, height), readSponsorship, writeSponsorship)
 
-  def carryFee(height: Height): Key[Long] = Key(CarryFee, h(height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+  def carryFee(height: Height, cfh: RDB.ByHeightHandle): Key[Long] =
+    byHeight(CarryFee, height, Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray, cfh)
 
   def assetScriptHistory(asset: IssuedAsset): Key[Seq[Height]] = historyKey(AssetScriptHistory, asset.id.arr)
   def assetScript(asset: IssuedAsset)(height: Height): Key[Option[AssetScriptInfo]] =
@@ -155,15 +156,17 @@ object Keys {
   val safeRollbackHeight: Key[Height] = heightKey(SafeRollbackHeight)
   val lastCleanupHeight: Key[Height]  = heightKey(LastCleanupHeight)
 
-  def blockMetaAt(height: Height): Key[Option[PBBlockMeta]] =
-    Key.opt(BlockInfoAtHeight, h(height), readBlockMeta, writeBlockMeta)
+  def blockMetaAt(height: Height, cfh: RDB.ByHeightHandle): Key[Option[PBBlockMeta]] =
+    Key.opt(BlockInfoAtHeight, h(height), readBlockMeta, writeBlockMeta, Some(cfh.handle), heightFirst = true)
 
-  def blockInfoBytesAt(height: Height): Key[Option[Array[Byte]]] =
+  def blockInfoBytesAt(height: Height, cfh: RDB.ByHeightHandle): Key[Option[Array[Byte]]] =
     Key.opt(
       BlockInfoAtHeight,
       h(height),
       identity,
-      unsupported("Can not explicitly write block bytes")
+      unsupported("Can not explicitly write block bytes"),
+      Some(cfh.handle),
+      heightFirst = true
     )
 
   def transactionAt(height: Height, n: TxNum, cfHandle: RDB.TxHandle): Key[Option[(TxMeta, Transaction)]] =
@@ -217,7 +220,7 @@ object Keys {
       Some(cfh.handle)
     )
 
-  def invokeScriptResult(height: Height, txNum: TxNum, cfh: RDB.ApiHandle): Key[Option[InvokeScriptResult]] =
+  def invokeScriptResult(height: Height, txNum: TxNum, cfh: RDB.InvokeResultsHandle): Key[Option[InvokeScriptResult]] =
     Key.opt(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes, Some(cfh.handle))
 
   val disabledAliases: Key[Set[Alias]] = Key(
@@ -239,11 +242,11 @@ object Keys {
   def nftAt(addressId: AddressId, index: Int, assetId: IssuedAsset, cfh: RDB.ApiHandle): Key[Option[Unit]] =
     Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray, Some(cfh.handle))
 
-  def stateHash(height: Height): Key[Option[StateHash]] =
-    Key.opt(StateHash, h(height), readStateHash, writeStateHash)
+  def stateHash(height: Height, cfh: RDB.ByHeightHandle): Key[Option[StateHash]] =
+    Key.opt(StateHash, h(height), readStateHash, writeStateHash, Some(cfh.handle), heightFirst = true)
 
-  def blockStateHash(height: Height): Key[ByteStr] =
-    Key(BlockStateHash, h(height), Option(_).fold(TxStateSnapshotHashBuilder.InitStateHash)(ByteStr(_)), _.arr)
+  def blockStateHash(height: Height, cfh: RDB.ByHeightHandle): Key[ByteStr] =
+    byHeight(BlockStateHash, height, Option(_).fold(TxStateSnapshotHashBuilder.InitStateHash)(ByteStr(_)), _.arr, cfh)
 
   def ethereumTransactionMeta(height: Height, txNum: TxNum, cfh: RDB.ApiHandle): Key[Option[EthereumTransactionMeta]] =
     Key.opt(EthereumTransactionMetaTag, hNum(height, txNum), EthereumTransactionMeta.parseFrom, _.toByteArray, Some(cfh.handle))
@@ -259,12 +262,15 @@ object Keys {
     _.fold(Array.emptyByteArray)(_.toByteArray)
   )
 
-  def finalizedHeightAt(at: Height): Key[Option[Height]] = Key(
-    FinalizedBlockHeightAt,
-    keySuffix = h(at),
-    readFinalizedHeight,
-    _.fold(Array.emptyByteArray)(_.toByteArray)
-  )
+  def finalizedHeightAt(at: Height, cfh: RDB.ByHeightHandle): Key[Option[Height]] =
+    byHeight(FinalizedBlockHeightAt, at, readFinalizedHeight, _.fold(Array.emptyByteArray)(_.toByteArray), cfh)
+
+  private def byHeight[V](tag: KeyTag, height: Height, parser: Array[Byte] => V, encoder: V => Array[Byte], cfh: RDB.ByHeightHandle): Key[V] =
+    Key(tag, h(height), parser, encoder, Some(cfh.handle), heightFirst = true)
+
+  /** The height and tag of a by-height column family key */
+  def parseByHeightKey(key: Array[Byte]): (Height, Short) =
+    (com.wavesplatform.state.Height(Ints.fromByteArray(key)), Shorts.fromBytes(key(Ints.BYTES), key(Ints.BYTES + 1)))
 
   private def readFinalizedHeight(bytes: Array[Byte]): Option[Height] =
     Option(bytes).collect { case bs if bs.length == Ints.BYTES => com.wavesplatform.state.Height(Ints.fromByteArray(bytes)) }

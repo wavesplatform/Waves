@@ -155,7 +155,7 @@ object Importer extends ScorexLogging {
             CommonBlocksApi(
               settings.synchronizationSettings.maxRollback,
               blockchainUpdater,
-              Application.loadBlockMetaAt(rdb.db, blockchainUpdater),
+              Application.loadBlockMetaAt(rdb, blockchainUpdater),
               Application.loadBlockInfoAt(rdb, blockchainUpdater)
             )
           override def accountsApi: CommonAccountsApi =
@@ -398,6 +398,7 @@ object Importer extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val importOptions = parseOptions(args)
     val settings      = loadSettings(importOptions.configFile)
+    log.info(s"Importer ${Version.VersionString}")
     log.info(s"RIDE evaluator: ${ScopeEvaluator.mode}")
     // A mismatch thrown inside an invoke can end up as a failed transaction, and the import would go on with a different state.
     if (ScopeEvaluator.mode == ScopeEvaluator.Mode.Check) ScopeEvaluator.onMismatch = { message =>
@@ -456,12 +457,10 @@ object Importer extends ScorexLogging {
       val blocksFileOffset = importOptions.format match {
         case Formats.Binary =>
           var blocksOffset = 0L
-          rdb.db.iterateOver(KeyTag.BlockInfoAtHeight) { e =>
-            e.getKey match {
-              case Array(_, _, 0, 0, 0, 1) => // Skip genesis
-              case _ =>
-                val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
-                blocksOffset += meta.size + 4
+          rdb.db.iterateOverByHeight(KeyTag.BlockInfoAtHeight, rdb.byHeightHandle) { (height, value) =>
+            if (height.toInt > 1) { // Skip genesis
+              val meta = com.wavesplatform.database.readBlockMeta(value)
+              blocksOffset += meta.size + 4
             }
           }
           blocksOffset

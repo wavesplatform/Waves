@@ -1,7 +1,7 @@
 package com.wavesplatform.database
 
 import com.typesafe.scalalogging.StrictLogging
-import com.wavesplatform.database.RDB.{ApiHandle, TxHandle, TxMetaHandle, TxSnapshotHandle}
+import com.wavesplatform.database.RDB.{ApiHandle, ByHeightHandle, DataHistoryHandle, InvokeResultsHandle, TxHandle, TxMetaHandle, TxSnapshotHandle}
 import com.wavesplatform.settings.{DBSettings, SizeInBytes}
 import com.wavesplatform.utils.*
 import org.rocksdb.*
@@ -18,6 +18,9 @@ final class RDB(
     val txHandle: TxHandle,
     val txSnapshotHandle: TxSnapshotHandle,
     val apiHandle: ApiHandle,
+    val dataHistoryHandle: DataHistoryHandle,
+    val invokeResultsHandle: InvokeResultsHandle,
+    val byHeightHandle: ByHeightHandle,
     acquiredResources: Seq[RocksObject]
 ) extends AutoCloseable {
   def statistics: Option[Statistics] = acquiredResources.collectFirst { case s: Statistics => s }
@@ -33,14 +36,21 @@ object RDB extends StrictLogging {
   final class TxHandle private[RDB] (val handle: ColumnFamilyHandle)
   final class TxSnapshotHandle private[RDB] (val handle: ColumnFamilyHandle)
   final class ApiHandle private[RDB] (val handle: ColumnFamilyHandle)
+  final class DataHistoryHandle private[RDB] (val handle: ColumnFamilyHandle)
+  final class InvokeResultsHandle private[RDB] (val handle: ColumnFamilyHandle)
+  final class ByHeightHandle private[RDB] (val handle: ColumnFamilyHandle)
 
-  val TxMetaCF     = "tx-meta"
-  val TxCF         = "tx"
-  val TxSnapshotCF = "tx-snapshot"
-  val ApiCF        = "api"
+  val TxMetaCF        = "tx-meta"
+  val TxCF            = "tx"
+  val TxSnapshotCF    = "tx-snapshot"
+  val ApiCF           = "api"
+  val DataHistoryCF   = "data-history"
+  val InvokeResultsCF = "invoke-results"
+  // Keys written once per height, laid out height first (see Key.heightFirst) so that every flush appends past the existing data
+  val ByHeightCF = "by-height"
 
   /** Column families that only contain data derived from the blockchain and can be truncated without losing the state */
-  val NonEssentialColumnFamilies: Seq[String] = Seq(TxSnapshotCF, ApiCF)
+  val NonEssentialColumnFamilies: Seq[String] = Seq(TxSnapshotCF, ApiCF, InvokeResultsCF)
 
   case class OptionsWithResources[A](options: A, resources: Seq[RocksObject])
 
@@ -54,14 +64,23 @@ object RDB extends StrictLogging {
     dbDir.getParentFile.mkdirs()
 
     val handles = new util.ArrayList[ColumnFamilyHandle]()
+    // Split out of default and api, so they share those caches and the memory budget stays the same
+    val mainCache       = new LRUCache(settings.rocksdb.mainCacheSize.longValue, -1, false, 0.6)
+    val apiCache        = newCache(settings.rocksdb.apiCacheSize)
+    val txMetaCache     = newCache(settings.rocksdb.txMetaCacheSize)
+    val txCache         = newCache(settings.rocksdb.txCacheSize)
+    val txSnapshotCache = newCache(settings.rocksdb.txSnapshotCacheSize)
     val defaultCfOptions =
-      newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
+      newColumnFamilyOptions(12.0, 16 << 10, mainCache, settings.rocksdb.writeBufferSize)
     val txMetaCfOptions =
-      newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-    val txCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+      newColumnFamilyOptions(10.0, 2 << 10, txMetaCache, settings.rocksdb.writeBufferSize)
+    val txCfOptions = newColumnFamilyOptions(10.0, 2 << 10, txCache, settings.rocksdb.writeBufferSize)
     val txSnapshotCfOptions =
-      newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-    val apiCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.apiCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+      newColumnFamilyOptions(10.0, 2 << 10, txSnapshotCache, settings.rocksdb.writeBufferSize)
+    val apiCfOptions           = newColumnFamilyOptions(10.0, 2 << 10, apiCache, settings.rocksdb.writeBufferSize)
+    val dataHistoryCfOptions   = newColumnFamilyOptions(12.0, 16 << 10, mainCache, settings.rocksdb.writeBufferSize)
+    val invokeResultsCfOptions = newColumnFamilyOptions(10.0, 2 << 10, apiCache, settings.rocksdb.writeBufferSize)
+    val byHeightCfOptions      = newColumnFamilyOptions(10.0, 4 << 10, mainCache, settings.rocksdb.writeBufferSize, tagFirst = false)
     val db = RocksDB.open(
       dbOptions.options,
       settings.directory,
@@ -93,6 +112,21 @@ object RDB extends StrictLogging {
           ApiCF.utf8Bytes,
           apiCfOptions.options
             .setCfPaths(Seq(new DbPath(new File(dbDir, ApiCF).toPath, 0L)).asJava)
+        ),
+        new ColumnFamilyDescriptor(
+          DataHistoryCF.utf8Bytes,
+          dataHistoryCfOptions.options
+            .setCfPaths(Seq(new DbPath(new File(dbDir, DataHistoryCF).toPath, 0L)).asJava)
+        ),
+        new ColumnFamilyDescriptor(
+          InvokeResultsCF.utf8Bytes,
+          invokeResultsCfOptions.options
+            .setCfPaths(Seq(new DbPath(new File(dbDir, InvokeResultsCF).toPath, 0L)).asJava)
+        ),
+        new ColumnFamilyDescriptor(
+          ByHeightCF.utf8Bytes,
+          byHeightCfOptions.options
+            .setCfPaths(Seq(new DbPath(new File(dbDir, ByHeightCF).toPath, 0L)).asJava)
         )
       ).asJava,
       handles
@@ -104,8 +138,12 @@ object RDB extends StrictLogging {
       new TxHandle(handles.get(2)),
       new TxSnapshotHandle(handles.get(3)),
       new ApiHandle(handles.get(4)),
+      new DataHistoryHandle(handles.get(5)),
+      new InvokeResultsHandle(handles.get(6)),
+      new ByHeightHandle(handles.get(7)),
       dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources ++
-        txSnapshotCfOptions.resources ++ apiCfOptions.resources
+        txSnapshotCfOptions.resources ++ apiCfOptions.resources ++ dataHistoryCfOptions.resources ++ invokeResultsCfOptions.resources ++
+        byHeightCfOptions.resources ++ Seq(mainCache, apiCache, txMetaCache, txCache, txSnapshotCache)
     )
   }
 
@@ -114,9 +152,10 @@ object RDB extends StrictLogging {
     */
   def truncateColumnFamily(settings: DBSettings, cfName: String): Unit = {
     val handleOf: RDB => ColumnFamilyHandle = cfName match {
-      case TxSnapshotCF => _.txSnapshotHandle.handle
-      case ApiCF        => _.apiHandle.handle
-      case _            => throw new IllegalArgumentException(s"$cfName is not one of ${NonEssentialColumnFamilies.mkString(", ")}")
+      case TxSnapshotCF    => _.txSnapshotHandle.handle
+      case ApiCF           => _.apiHandle.handle
+      case InvokeResultsCF => _.invokeResultsHandle.handle
+      case _               => throw new IllegalArgumentException(s"$cfName is not one of ${NonEssentialColumnFamilies.mkString(", ")}")
     }
 
     Using.resource(openExisting(settings)) { rdb =>
@@ -145,16 +184,19 @@ object RDB extends StrictLogging {
     if (Files.exists(Path.of(settings.directory, "CURRENT"))) open(settings)
     else throw new IllegalStateException(s"No database at ${settings.directory}")
 
+  private def newCache(capacity: SizeInBytes): LRUCache = new LRUCache(capacity.longValue, -1, false, 0.9)
+
+  // The caller closes blockCache: it may be shared between column families
   private def newColumnFamilyOptions(
       bitsPerKey: Double,
       blockSize: Long,
-      cacheCapacity: SizeInBytes,
-      highPriPoolRatio: Double,
-      writeBufferSize: SizeInBytes
+      blockCache: Cache,
+      writeBufferSize: SizeInBytes,
+      tagFirst: Boolean = true
   ): OptionsWithResources[ColumnFamilyOptions] = {
-    val bloomFilter           = new BloomFilter(bitsPerKey)
-    val blockCache            = new LRUCache(cacheCapacity.longValue, -1, false, highPriPoolRatio)
-    val sstPartitionerFactory = new SstPartitionerFixedPrefixFactory(2)
+    val bloomFilter = new BloomFilter(bitsPerKey)
+    // Cuts compaction output at the 2-byte key tag; meaningless when the key starts with a height instead
+    val sstPartitionerFactory = Option.when(tagFirst)(new SstPartitionerFixedPrefixFactory(2))
 
     val options = new ColumnFamilyOptions()
       .setTableFormatConfig(
@@ -183,9 +225,9 @@ object RDB extends StrictLogging {
       .useCappedPrefixExtractor(10)
       .setMemtablePrefixBloomSizeRatio(0.25)
       .setCompressionType(CompressionType.LZ4_COMPRESSION)
-      .setSstPartitionerFactory(sstPartitionerFactory)
+    sstPartitionerFactory.foreach(options.setSstPartitionerFactory)
 
-    OptionsWithResources(options, Seq(options, bloomFilter, blockCache, sstPartitionerFactory))
+    OptionsWithResources(options, Seq(options, bloomFilter) ++ sstPartitionerFactory)
   }
 
   private def createDbOptions(settings: DBSettings): OptionsWithResources[DBOptions] = {
