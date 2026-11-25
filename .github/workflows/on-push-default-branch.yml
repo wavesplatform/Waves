@@ -19,7 +19,7 @@ jobs:
           # Resolves only part of the build and compiles nothing (no protoc): if it saved the cache for a new key, every
           # PR would restore that and fetch the rest from Maven Central again. publish-snapshot saves it instead.
           cache-read-only: true
-      - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
+      - uses: sbt/setup-sbt@7e114eae4f32ec3f93c851c2793376a77f384409 # v1.5.15
       - uses: scalacenter/sbt-dependency-submission@d84eef4c09e633bcf5f113bcad7fd5e9af1baee9 # v3.2.3
         with:
           configs-ignore: test compile-internal provided
@@ -34,7 +34,7 @@ jobs:
           java-version: '17'
           cache: 'sbt'
           gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
-      - uses: sbt/setup-sbt@67d461eba2c4753196c230e02da850757ba4775e # v1.5.14
+      - uses: sbt/setup-sbt@7e114eae4f32ec3f93c851c2793376a77f384409 # v1.5.15
       # This job saves the sbt cache PRs restore: resolve the modules publish skips (node-it, benchmark, ...) too, and do it
       # without the publishing secrets in the environment
       - name: Resolve dependencies of all modules
