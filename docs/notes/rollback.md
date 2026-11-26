@@ -6,9 +6,9 @@ purpose: Implementation notes for rollback depth (max-rollback-depth, the safe r
 
 ## What the safe rollback height protects
 
-Every append sets `SafeRollbackHeight` to `height - max-rollback-depth` (`RocksDBWriter.doAppend`). `rollbackTo`, `BlockchainUpdaterImpl.removeAfter` and `waves util rollback-to` refuse to go below it, because history behind it is pruned in two ways:
+Every append sets `SafeRollbackHeight` to `height - max-rollback-depth` (`RocksDBWriter.doAppend`). `rollbackTo`, `BlockchainUpdaterImpl.removeAfter` and `waves util rollback-to` refuse to go below it, because history behind it is pruned:
 
-- Keys kept through `updateHistory` (`AssetDetails`, `LeaseDetails`, `AddressScript`, `AssetScript`, `Sponsorship`): on each update of a key, every entry below the threshold except the newest one is deleted, both the value and its height in the `*History` list. `CarryFee(threshold - 1)` is deleted on every append, so only the last `max-rollback-depth + 1` carry fees exist.
+- `LeaseDetails` keeps a per-lease height list and prunes older versions on update, retaining the newest one below the cutoff. `AssetDetails`, `AddressScript`, `AssetScript`, and `Sponsorship` use current head pointers and linked versions. When a successor passes below the cutoff, its predecessor is deleted using the persisted `LinkedHistoryPrune` record for the successor height. `CarryFee(threshold - 1)` is deleted on each append.
 - With `cleanup-interval` set (off by default), the background cleanup also deletes WAVES balance, asset balance and account data nodes behind the safe height. A rollback past it is then unrecoverable.
 
 An offline rollback (`waves util rollback-to`, or a repair as below) calls `RocksDBWriter.rollbackTo` directly, so BlockchainUpdates subscribers get no ROLLBACK event: the extension's own DB rolls back to the node height on the next start, but a consumer resuming from its stored height must re-check block ids.
@@ -19,7 +19,7 @@ Forcing a rollback below the safe height (by lowering the `SafeRollbackHeight` k
 
 ## Repairing a DB rolled back past the safe height
 
-Possible only with `cleanup-interval` off. Done once on testnet (2026-11, 7683 blocks back to 4336649, verified against the original state hashes):
+Possible only with `cleanup-interval` off. The following procedure was tested with the former list-based history layout on testnet (2026-11, 7683 blocks back to 4336649, verified against the original state hashes):
 
 1. Pick the target T and list damaged keys: scan each `*History` keyspace for keys whose remaining heights are all above T, then keep those whose object existed at T (`AssetStaticInfo` issue height at or below T for assets, sponsorship and asset scripts; creation height for leases; first balance height of the address for address scripts). Because pruning keeps the newest entry below the threshold, a key with any surviving entry at or below T is intact. A target just before the damaged objects were issued often leaves nothing to repair: 5 assets were damaged at 4339234, none at 4336649.
 2. Dump `StateHash` for T+1 up to the last good height first; the rollback deletes them and they are the reference for the check in step 6. This needs `store-state-hashes` on in the original run.
@@ -30,6 +30,6 @@ Possible only with `cleanup-interval` off. Done once on testnet (2026-11, 7683 b
 
 ## Choosing max-rollback-depth
 
-Pruning saves little: on testnet at height 4.34M (66.7 GB of keys and values, depth 2000) it had removed about 0.4 GB over the whole chain, about 0.6% (address scripts about 290 MB at about 8 KB each, carry fees about 60 MB, asset details about 45 MB, the rest a few MB). A larger depth costs elsewhere: `blockHeightCache` is sized `max-rollback-depth + 1000` and an import fills it, and each `*History` list holds every update within the depth and is rewritten in full on each update (the hottest asset had 528 entries within 2000 blocks, so about 2.6k at 10000 and about 26k, 100 KB per rewrite, at 100000). Raising the depth protects only blocks appended after the change; entries already pruned do not come back.
+Pruning saves little: on testnet at height 4.34M (66.7 GB of keys and values, depth 2000) it had removed about 0.4 GB over the whole chain, about 0.6% (address scripts about 290 MB at about 8 KB each, carry fees about 60 MB, asset details about 45 MB, the rest a few MB). A larger depth costs elsewhere: `blockHeightCache` is sized `max-rollback-depth + 1000` and an import fills it, and older versions and their prune records are retained longer. In the former list-based format the hottest asset had 528 entries within 2000 blocks, so a larger depth also increased the bytes rewritten per update. Raising the depth protects only blocks appended after the change; entries already pruned do not come back.
 
 Keep 2000 on nodes, where forks are far shorter. For imports and benchmarks, where a jar may be swapped mid-run, use 10000 (about a week of blocks at one per minute). Better still, take a RocksDB checkpoint of `data` before switching jars; that covers any depth.

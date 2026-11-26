@@ -1,7 +1,16 @@
 package com.wavesplatform.database
 
 import com.typesafe.scalalogging.StrictLogging
-import com.wavesplatform.database.RDB.{ApiHandle, ByHeightHandle, DataHistoryHandle, InvokeResultsHandle, TxHandle, TxMetaHandle, TxSnapshotHandle}
+import com.wavesplatform.database.RDB.{
+  ApiHandle,
+  BlockMetaHandle,
+  ByHeightHandle,
+  DataHistoryHandle,
+  InvokeResultsHandle,
+  TxHandle,
+  TxMetaHandle,
+  TxSnapshotHandle
+}
 import com.wavesplatform.settings.{DBSettings, SizeInBytes}
 import com.wavesplatform.utils.*
 import org.rocksdb.*
@@ -21,6 +30,7 @@ final class RDB(
     val dataHistoryHandle: DataHistoryHandle,
     val invokeResultsHandle: InvokeResultsHandle,
     val byHeightHandle: ByHeightHandle,
+    val blockMetaHandle: BlockMetaHandle,
     acquiredResources: Seq[RocksObject]
 ) extends AutoCloseable {
   def statistics: Option[Statistics] = acquiredResources.collectFirst { case s: Statistics => s }
@@ -39,6 +49,7 @@ object RDB extends StrictLogging {
   final class DataHistoryHandle private[RDB] (val handle: ColumnFamilyHandle)
   final class InvokeResultsHandle private[RDB] (val handle: ColumnFamilyHandle)
   final class ByHeightHandle private[RDB] (val handle: ColumnFamilyHandle)
+  final class BlockMetaHandle private[RDB] (val handle: ColumnFamilyHandle)
 
   val TxMetaCF        = "tx-meta"
   val TxCF            = "tx"
@@ -46,8 +57,8 @@ object RDB extends StrictLogging {
   val ApiCF           = "api"
   val DataHistoryCF   = "data-history"
   val InvokeResultsCF = "invoke-results"
-  // Keys written once per height, laid out height first (see Key.heightFirst) so that every flush appends past the existing data
-  val ByHeightCF = "by-height"
+  val ByHeightCF      = "by-height"
+  val BlockMetaCF     = "block-meta"
 
   /** Column families that only contain data derived from the blockchain and can be truncated without losing the state */
   val NonEssentialColumnFamilies: Seq[String] = Seq(TxSnapshotCF, ApiCF, InvokeResultsCF)
@@ -55,8 +66,10 @@ object RDB extends StrictLogging {
   case class OptionsWithResources[A](options: A, resources: Seq[RocksObject])
 
   def open(settings: DBSettings): RDB = {
+    RocksDB.loadLibrary()
     val file = new File(settings.directory)
     checkDbDir(file.toPath)
+    checkColumnFamilies(file.toPath)
     logger.debug(s"Open DB at ${settings.directory}")
 
     val dbOptions = createDbOptions(settings)
@@ -81,6 +94,7 @@ object RDB extends StrictLogging {
     val dataHistoryCfOptions   = newColumnFamilyOptions(12.0, 16 << 10, mainCache, settings.rocksdb.writeBufferSize)
     val invokeResultsCfOptions = newColumnFamilyOptions(10.0, 2 << 10, apiCache, settings.rocksdb.writeBufferSize)
     val byHeightCfOptions      = newColumnFamilyOptions(10.0, 4 << 10, mainCache, settings.rocksdb.writeBufferSize, tagFirst = false)
+    val blockMetaCfOptions     = newColumnFamilyOptions(10.0, 4 << 10, mainCache, settings.rocksdb.writeBufferSize)
     val db = RocksDB.open(
       dbOptions.options,
       settings.directory,
@@ -127,12 +141,17 @@ object RDB extends StrictLogging {
           ByHeightCF.utf8Bytes,
           byHeightCfOptions.options
             .setCfPaths(Seq(new DbPath(new File(dbDir, ByHeightCF).toPath, 0L)).asJava)
+        ),
+        new ColumnFamilyDescriptor(
+          BlockMetaCF.utf8Bytes,
+          blockMetaCfOptions.options
+            .setCfPaths(Seq(new DbPath(new File(dbDir, BlockMetaCF).toPath, 0L)).asJava)
         )
       ).asJava,
       handles
     )
 
-    new RDB(
+    val rdb = new RDB(
       db,
       new TxMetaHandle(handles.get(1)),
       new TxHandle(handles.get(2)),
@@ -141,10 +160,16 @@ object RDB extends StrictLogging {
       new DataHistoryHandle(handles.get(5)),
       new InvokeResultsHandle(handles.get(6)),
       new ByHeightHandle(handles.get(7)),
+      new BlockMetaHandle(handles.get(8)),
       dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources ++
         txSnapshotCfOptions.resources ++ apiCfOptions.resources ++ dataHistoryCfOptions.resources ++ invokeResultsCfOptions.resources ++
-        byHeightCfOptions.resources ++ Seq(mainCache, apiCache, txMetaCache, txCache, txSnapshotCache)
+        byHeightCfOptions.resources ++ blockMetaCfOptions.resources ++ Seq(mainCache, apiCache, txMetaCache, txCache, txSnapshotCache)
     )
+    if (hasLegacyHistoryIndexes(rdb)) {
+      rdb.close()
+      throw new IllegalStateException(s"Database at ${dbDir.getAbsolutePath} uses the old history layout. Import or sync into a fresh database.")
+    }
+    rdb
   }
 
   /** Removes all the data from a non-essential column family by dropping it. It is re-created on the next [[open]], because the DB is opened
@@ -249,6 +274,28 @@ object RDB extends StrictLogging {
       )
     } else OptionsWithResources(dbOptions, Seq(dbOptions))
   }
+
+  private def checkColumnFamilies(dbPath: Path): Unit =
+    if (Files.exists(dbPath.resolve("CURRENT"))) {
+      val hasBlockMeta = Using.resource(new Options()) { options =>
+        val name = BlockMetaCF.utf8Bytes
+        RocksDB.listColumnFamilies(options, dbPath.toString).asScala.exists(java.util.Arrays.equals(_, name))
+      }
+      if (!hasBlockMeta)
+        throw new IllegalStateException(s"Database at ${dbPath.toAbsolutePath} uses the old key layout. Import or sync into a fresh database.")
+    }
+
+  // The head tags keep their original ordinals so the old height-zero indexes are detectable.
+  private def hasLegacyHistoryIndexes(rdb: RDB): Boolean =
+    Using.resource(new ReadOptions().setTotalOrderSeek(true)) { options =>
+      Using.resource(rdb.db.newIterator(rdb.byHeightHandle.handle, options)) { iterator =>
+        Seq(KeyTag.AssetDetailsHead, KeyTag.AddressScriptHead, KeyTag.AssetScriptHead, KeyTag.SponsorshipHead).exists { tag =>
+          val prefix = Keys.heightTagPrefix(com.wavesplatform.state.Height(0), tag)
+          iterator.seek(prefix)
+          iterator.isValid && iterator.key().startsWith(prefix)
+        }
+      }
+    }
 
   private def checkDbDir(dbPath: Path): Unit =
     if (Files.exists(dbPath)) {

@@ -95,7 +95,7 @@ object RocksDBWriterBenchmark {
         meta -> database.loadTransactions(height, rawDB)
       }
 
-    def loadBlockMetaAt(height: Height): Option[BlockMeta] = rawDB.db.get(Keys.blockMetaAt(height)).flatMap(BlockMeta.fromPb)
+    def loadBlockMetaAt(height: Height): Option[BlockMeta] = rawDB.db.get(Keys.blockMetaAt(height, rawDB.blockMetaHandle)).flatMap(BlockMeta.fromPb)
 
     val cba = CommonBlocksApi(wavesSettings.synchronizationSettings.maxRollback, db, loadBlockMetaAt, loadBlockInfoAt)
 

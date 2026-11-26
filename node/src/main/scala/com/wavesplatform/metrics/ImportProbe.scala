@@ -23,8 +23,8 @@ object ImportProbe {
   private val HeightRange = 50_000
   // The agent polls every telemetry once per second, one after another; one sample serves them all.
   private val SampleNanos = 500_000_000L
-  private val CfCount     = 8
-  // The column families after these share their block caches (data-history and by-height with default, invoke-results with api)
+  private val CfCount     = 9
+  // The column families after these share their block caches (data-history, by-height and block-meta with default, invoke-results with api)
   private val OwnCacheCfCount = 5
 
   private enum Rate(val read: Statistics => Long) {
@@ -64,7 +64,7 @@ object ImportProbe {
     case Memtables         extends CfGauge(_.getLongProperty(_, "rocksdb.cur-size-all-mem-tables"))
   }
 
-  // In the order of RDB's column families: default, tx-meta, tx, tx-snapshot, api, data-history, invoke-results, by-height.
+  // In the order of RDB's column families: default, tx-meta, tx, tx-snapshot, api, data-history, invoke-results, by-height, block-meta.
   private final class Source(val db: RocksDB, val statistics: Option[Statistics], val cfs: IndexedSeq[ColumnFamilyHandle])
 
   // Written by the importer's thread only.
@@ -130,7 +130,8 @@ object ImportProbe {
         rdb.apiHandle.handle,
         rdb.dataHistoryHandle.handle,
         rdb.invokeResultsHandle.handle,
-        rdb.byHeightHandle.handle
+        rdb.byHeightHandle.handle,
+        rdb.blockMetaHandle.handle
       )
     )
     s.statistics.foreach(st => Rate.values.foreach(r => lastRates(r.ordinal) = r.read(st)))
@@ -266,6 +267,7 @@ object ImportProbe {
   @static @Telemetry(value = L0, line = "data-history") def l0DataHistory(): Int     = cf(CfGauge.L0Files, 5)
   @static @Telemetry(value = L0, line = "invoke-results") def l0InvokeResults(): Int = cf(CfGauge.L0Files, 6)
   @static @Telemetry(value = L0, line = "by-height") def l0ByHeight(): Int           = cf(CfGauge.L0Files, 7)
+  @static @Telemetry(value = L0, line = "block-meta") def l0BlockMeta(): Int         = cf(CfGauge.L0Files, 8)
 
   private final val Pending = "RocksDB pending compaction, MB"
   @static @Telemetry(value = Pending, line = "default") def pendingDefault(): Int =
@@ -284,6 +286,8 @@ object ImportProbe {
     cfMb(CfGauge.PendingCompaction, 6)
   @static @Telemetry(value = Pending, line = "by-height") def pendingByHeight(): Int =
     cfMb(CfGauge.PendingCompaction, 7)
+  @static @Telemetry(value = Pending, line = "block-meta") def pendingBlockMeta(): Int =
+    cfMb(CfGauge.PendingCompaction, 8)
 
   private final val Jobs                                                               = "RocksDB background jobs"
   @static @Telemetry(value = Jobs, line = "compactions") def runningCompactions(): Int = { sample(); compactions.toInt }

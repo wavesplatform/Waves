@@ -47,7 +47,8 @@ class AssetsRouteSpec
 
   def routeTest[A](
       settings: WavesSettings = DomainPresets.RideV4.addFeatures(BlockchainFeatures.ReduceNFTFee),
-      balances: Seq[AddrWithBalance] = Seq.empty
+      balances: Seq[AddrWithBalance] = Seq.empty,
+      maxDistributionDepth: Int = MaxDistributionDepth
   )(f: (Domain, Route) => A): A =
     withDomain(settings, balances) { d =>
       f(
@@ -62,7 +63,7 @@ class AssetsRouteSpec
             TestTime(),
             d.accountsApi,
             d.assetsApi,
-            MaxDistributionDepth,
+            maxDistributionDepth,
             new RouteTimeout(60.seconds)(using sharedScheduler)
           ).route
         )
@@ -288,7 +289,7 @@ class AssetsRouteSpec
     }
   }
 
-  routePath("/{assetId}/distribution/{height}/limit/{limit}") in routeTest() { (d, route) =>
+  routePath("/{assetId}/distribution/{height}/limit/{limit}") in routeTest(maxDistributionDepth = 2) { (d, route) =>
     val issuer           = testWallet.generateNewAccount().get
     val issueTransaction = TxHelpers.issue(issuer, 100_0000, 4, "PA_01")
     d.appendBlock(TxHelpers.genesis(issuer.toAddress, 10.waves))
@@ -306,6 +307,7 @@ class AssetsRouteSpec
       )
     )
 
+    d.appendBlock(TxHelpers.transfer(issuer, recipients.head.toAddress, 1, issueTransaction.asset))
     d.appendBlock()
     Get(routePath(s"/${issueTransaction.id()}/distribution/2/limit/$MaxAddressesPerRequest")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -322,7 +324,7 @@ class AssetsRouteSpec
     Get(routePath(s"/${issueTransaction.id()}/distribution/1/limit/1")) ~> route ~> check {
       responseAs[JsObject] shouldBe Json.obj(
         "error"   -> 199,
-        "message" -> s"Unable to get distribution past height ${d.blockchain.height - MaxDistributionDepth}"
+        "message" -> s"Unable to get distribution past height ${d.blockchain.height - 2}"
       )
     }
   }

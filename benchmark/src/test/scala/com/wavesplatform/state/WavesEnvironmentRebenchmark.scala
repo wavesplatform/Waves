@@ -146,7 +146,7 @@ object WavesEnvironmentRebenchmark {
 
     lazy val allAssets: Vector[Array[Byte]] = {
       val builder = Vector.newBuilder[Array[Byte]]
-      rdb.db.iterateOver(KeyTag.AssetDetailsHistory) { e =>
+      rdb.db.iterateOver(KeyTag.AssetDetailsHead) { e =>
         builder += e.getKey.drop(2)
       }
       builder.result()
@@ -162,7 +162,7 @@ object WavesEnvironmentRebenchmark {
 
     lazy val allTransactions: IndexedSeq[Array[Byte]] = {
       val txCountAtHeight =
-        Map.empty[Int, Int].withDefault(h => rdb.db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
+        Map.empty[Int, Int].withDefault(h => rdb.db.get(Keys.blockMetaAt(Height(h), rdb.blockMetaHandle)).fold(0)(_.transactionCount))
 
       1.to(environment.height.toInt, 100)
         .flatMap { h =>
@@ -176,7 +176,7 @@ object WavesEnvironmentRebenchmark {
 
     lazy val dataEntries: IndexedSeq[(DataEntry[?], Recipient.Address)] = {
       val txCountAtHeight =
-        Map.empty[Int, Int].withDefault(h => rdb.db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
+        Map.empty[Int, Int].withDefault(h => rdb.db.get(Keys.blockMetaAt(Height(h), rdb.blockMetaHandle)).fold(0)(_.transactionCount))
 
       1.to(environment.height.toInt, 10)
         .flatMap { h =>
@@ -198,7 +198,7 @@ object WavesEnvironmentRebenchmark {
 
     lazy val transferTransactions: IndexedSeq[ByteStr] = {
       val txCountAtHeight =
-        Map.empty[Int, Int].withDefault(h => rdb.db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
+        Map.empty[Int, Int].withDefault(h => rdb.db.get(Keys.blockMetaAt(Height(h), rdb.blockMetaHandle)).fold(0)(_.transactionCount))
 
       1.to(environment.height.toInt, 100)
         .flatMap { h =>

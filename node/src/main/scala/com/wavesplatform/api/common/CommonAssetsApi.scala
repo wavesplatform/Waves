@@ -2,13 +2,11 @@ package com.wavesplatform.api.common
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAssetsApi.AssetInfo
-import com.wavesplatform.crypto
-import com.wavesplatform.database.{AddressId, KeyTag}
+import com.wavesplatform.database.{KeyTag, Keys, RDB}
 import com.wavesplatform.state.{AssetDescription, Blockchain, StateSnapshot, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import monix.reactive.Observable
-import org.rocksdb.RocksDB
 
 trait CommonAssetsApi {
   def description(assetId: IssuedAsset): Option[AssetDescription]
@@ -25,7 +23,7 @@ trait CommonAssetsApi {
 object CommonAssetsApi {
   final case class AssetInfo(description: AssetDescription, issueTransaction: Option[IssueTransaction], sponsorBalance: Option[Long])
 
-  def apply(snapshot: () => StateSnapshot, db: RocksDB, blockchain: Blockchain): CommonAssetsApi = new CommonAssetsApi {
+  def apply(snapshot: () => StateSnapshot, rdb: RDB, blockchain: Blockchain): CommonAssetsApi = new CommonAssetsApi {
     def description(assetId: IssuedAsset): Option[AssetDescription] =
       blockchain.assetDescription(assetId)
 
@@ -58,23 +56,21 @@ object CommonAssetsApi {
 
     override def wavesDistribution(height: Int, after: Option[Address]): Observable[(Address, Long)] =
       balanceDistribution(
-        db,
+        rdb,
         height,
         after,
         if (height == blockchain.height) snapshot().balances else Map(),
-        KeyTag.WavesBalanceHistory.prefixBytes,
-        bs => AddressId.fromByteArray(bs.slice(2, bs.length - 4)),
+        KeyTag.WavesBalance.prefixBytes,
         Waves
       )
 
     override def assetDistribution(asset: IssuedAsset, height: Int, after: Option[Address]): Observable[(Address, Long)] =
       balanceDistribution(
-        db,
+        rdb,
         height,
         after,
         if (height == blockchain.height) snapshot().balances else Map(),
-        KeyTag.AssetBalanceHistory.prefixBytes ++ asset.id.arr,
-        bs => AddressId.fromByteArray(bs.slice(2 + crypto.DigestLength, bs.length - 4)),
+        Keys.assetBalanceHolderPrefix(asset),
         asset
       )
   }

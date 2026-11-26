@@ -10,7 +10,12 @@ class DBResource(db: RocksDB, iteratorCfHandle: Option[ColumnFamilyHandle] = Non
   // checksum verification is **very** expensive, so it's explicitly disabled
   private val readOptions = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
 
-  def get[V](key: Key[V]): V = key.parse(db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), readOptions, key.keyBytes))
+  def get[V](key: Key[V]): V = key.parse(read(key))
+
+  def getOpt[V](key: Key[V]): Option[V] = Option(read(key)).map(key.parse)
+
+  private def read(key: Key[?]): Array[Byte] =
+    db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), readOptions, key.keyBytes)
 
   def get(key: Array[Byte]): Array[Byte] = db.get(readOptions, key)
 

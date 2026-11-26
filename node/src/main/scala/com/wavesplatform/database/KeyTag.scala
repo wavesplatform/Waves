@@ -10,7 +10,7 @@ enum KeyTag {
     WavesBalanceHistory,
     AssetBalanceHistory,
     AssetBalance,
-    AssetDetailsHistory,
+    AssetDetailsHead,
     AssetDetails,
     LeaseBalanceHistory,
     LeaseBalance,
@@ -26,16 +26,16 @@ enum KeyTag {
     LastAddressId,
     AddressId,
     IdToAddress,
-    AddressScriptHistory,
+    AddressScriptHead,
     AddressScript,
     ApprovedFeatures,
     ActivatedFeatures,
     DataHistory,
     Data,
-    SponsorshipHistory,
+    SponsorshipHead,
     Sponsorship,
     CarryFee,
-    AssetScriptHistory,
+    AssetScriptHead,
     AssetScript,
     SafeRollbackHeight,
     LastCleanupHeight,
@@ -64,7 +64,9 @@ enum KeyTag {
     CommittedGenerators,
     ConflictGenerators,
     CommitmentTransactions,
-    GeneratorBalances
+    GeneratorBalances,
+    AssetBalanceHolder,
+    LinkedHistoryPrune
 
   def prefixBytes: Array[Byte] = Shorts.toByteArray(ordinal.toShort)
 }

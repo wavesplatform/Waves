@@ -8,10 +8,14 @@ import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, RocksIterator}
 import scala.util.Using
 
 class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
-  def get[V](key: Key[V]): V = {
+  def get[V](key: Key[V]): V = key.parse(read(key))
+
+  def getOpt[V](key: Key[V]): Option[V] = Option(read(key)).map(key.parse)
+
+  private def read(key: Key[?]): Array[Byte] = {
     val bytes = db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), readOptions, key.keyBytes)
     RocksDBStats.read.recordTagged(key, bytes)
-    key.parse(bytes)
+    bytes
   }
 
   def multiGetOpt[V](keys: collection.IndexedSeq[Key[Option[V]]], valBufferSize: Int): Seq[Option[V]] =

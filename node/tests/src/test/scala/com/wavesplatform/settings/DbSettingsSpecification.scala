@@ -54,6 +54,7 @@ class DbSettingsSpecification extends FlatSpec {
       storeInvokeScriptResults = true,
       storeStateHashes = false,
       maxCacheSize = 100000,
+      maxDataCacheSize = 1000000,
       maxRollbackDepth = 2000,
       cleanupInterval = Some(500),
       txBloomFilterSize = 23000,

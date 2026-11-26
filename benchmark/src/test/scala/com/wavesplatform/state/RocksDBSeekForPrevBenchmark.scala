@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.google.common.primitives.{Bytes, Shorts}
+import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.{
   AddressId,
@@ -67,8 +67,9 @@ object RocksDBSeekForPrevBenchmark {
 
     val keyString                          = "key"
     val currentDataKey: Array[Byte]        = Keys.data(addressId, keyString).keyBytes
-    val dataNodeKey: Height => Array[Byte] = Keys.dataAt(addressId, "key")(_).keyBytes
-    val dataNodeKeyPrefix: Array[Byte] = Bytes.concat(Shorts.toByteArray(KeyTag.DataHistory.ordinal.toShort), addressId.toByteArray, keyString.getBytes)
+    // This benchmark measures the old key-first layout against a point lookup.
+    val dataNodeKeyPrefix: Array[Byte] = Bytes.concat(KeyTag.DataHistory.prefixBytes, addressId.toByteArray, keyString.getBytes)
+    def dataNodeKey(height: Height): Array[Byte] = Bytes.concat(dataNodeKeyPrefix, Ints.toByteArray(height.toInt))
 
     private val dataEntry: StringDataEntry = StringDataEntry(keyString, "value")
 

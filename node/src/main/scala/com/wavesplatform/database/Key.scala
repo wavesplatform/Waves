@@ -5,6 +5,8 @@ import com.google.common.io.BaseEncoding
 import com.google.common.primitives.{Bytes, Ints, Shorts}
 import org.rocksdb.ColumnFamilyHandle
 
+import java.nio.ByteBuffer
+
 /** @param heightFirst
   *   the suffix starts with a 4-byte height, which goes before the tag, so that keys of several tags in one column family are ordered by height
   */
@@ -16,7 +18,13 @@ abstract class Key[V](
     heightFirst: Boolean = false
 ) {
   val keyBytes: Array[Byte] =
-    if (heightFirst) Bytes.concat(suffix.take(Ints.BYTES), Shorts.toByteArray(prefix), suffix.drop(Ints.BYTES))
+    if (heightFirst)
+      ByteBuffer
+        .allocate(suffix.length + Shorts.BYTES)
+        .put(suffix, 0, Ints.BYTES)
+        .putShort(prefix)
+        .put(suffix, Ints.BYTES, suffix.length - Ints.BYTES)
+        .array()
     else Bytes.concat(Shorts.toByteArray(prefix), suffix)
   def parse(bytes: Array[Byte]): V
   def encode(v: V): Array[Byte]

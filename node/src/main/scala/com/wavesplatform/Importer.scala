@@ -10,7 +10,7 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
 import com.wavesplatform.consensus.{CachedVrf, PoSSelector}
-import com.wavesplatform.database.{DBExt, KeyTag, RDB}
+import com.wavesplatform.database.{DBExt, RDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
@@ -161,7 +161,7 @@ object Importer extends ScorexLogging {
           override def accountsApi: CommonAccountsApi =
             CommonAccountsApi(() => blockchainUpdater.snapshotBlockchain, rdb, blockchainUpdater)
           override def assetsApi: CommonAssetsApi =
-            CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.orEmpty, rdb.db, blockchainUpdater)
+            CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.orEmpty, rdb, blockchainUpdater)
           override def generatorsApi: CommonGeneratorsApi =
             CommonGeneratorsApi(rdb, blockchainUpdater)
         }
@@ -457,11 +457,8 @@ object Importer extends ScorexLogging {
       val blocksFileOffset = importOptions.format match {
         case Formats.Binary =>
           var blocksOffset = 0L
-          rdb.db.iterateOverByHeight(KeyTag.BlockInfoAtHeight, rdb.byHeightHandle) { (height, value) =>
-            if (height.toInt > 1) { // Skip genesis
-              val meta = com.wavesplatform.database.readBlockMeta(value)
-              blocksOffset += meta.size + 4
-            }
+          rdb.db.iterateBlockMeta(rdb.blockMetaHandle) { (height, meta) =>
+            if (height.toInt > 1) blocksOffset += meta.size + 4 // Skip genesis
           }
           blocksOffset
 

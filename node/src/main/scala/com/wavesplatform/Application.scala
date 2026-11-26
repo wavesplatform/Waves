@@ -276,7 +276,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override val accountsApi: CommonAccountsApi =
         CommonAccountsApi(() => blockchainUpdater.snapshotBlockchain, rdb, blockchainUpdater)
       override val assetsApi: CommonAssetsApi =
-        CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.orEmpty, rdb.db, blockchainUpdater)
+        CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.orEmpty, rdb, blockchainUpdater)
       override def generatorsApi: CommonGeneratorsApi =
         CommonGeneratorsApi(rdb, blockchainUpdater)
     }
@@ -645,7 +645,7 @@ object Application extends ScorexLogging {
   private[wavesplatform] def loadBlockMetaAt(rdb: RDB, blockchainUpdater: CompleteBlockchainUpdater)(height: Height): Option[BlockMeta] =
     blockchainUpdater.liquidBlockMeta
       .filter(_ => blockchainUpdater.height == height.toInt)
-      .orElse(rdb.db.get(Keys.blockMetaAt(height, rdb.byHeightHandle)).flatMap(BlockMeta.fromPb))
+      .orElse(rdb.db.get(Keys.blockMetaAt(height, rdb.blockMetaHandle)).flatMap(BlockMeta.fromPb))
       .map { blockMeta =>
         val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height.toInt, blockMeta.header.generator.toAddress, blockchainUpdater)
         blockMeta.copy(

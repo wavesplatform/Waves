@@ -1,13 +1,12 @@
 package com.wavesplatform.db
 
 import cats.syntax.traverse.*
-import com.google.common.primitives.Shorts
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.{GenesisBlockVersion, GenesisGenerationSignature, GenesisGenerator, GenesisReference}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.database.{KeyTag, RDB, RocksDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.database.{RDB, RocksDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -54,8 +53,18 @@ trait WithState extends BeforeAndAfterAll with ClosesAfterRun with DBCacheSettin
 
   override protected def closeAfterRun(): Unit = TestHelpers.closeAll(() => super.closeAfterRun(), () => tempRdb.close())
 
-  private val MaxKey = Shorts.toByteArray(KeyTag.values.length.toShort)
-  private val MinKey = new Array[Byte](2)
+  private def clearDb(): Unit =
+    Seq(
+      rdb.db.getDefaultColumnFamily,
+      rdb.txMetaHandle.handle,
+      rdb.txHandle.handle,
+      rdb.txSnapshotHandle.handle,
+      rdb.apiHandle.handle,
+      rdb.dataHistoryHandle.handle,
+      rdb.invokeResultsHandle.handle,
+      rdb.byHeightHandle.handle,
+      rdb.blockMetaHandle.handle
+    ).foreach(rdb.db.deleteRange(_, Array.emptyByteArray, Array[Byte](-1)))
 
   protected def tempDb[A](f: RDB => A): A =
     Using.resource(TempRDB(s"rocks-temp-tmp-${getClass.getSimpleName}", dbSettings))(db => f(db.rdb))
@@ -70,9 +79,7 @@ trait WithState extends BeforeAndAfterAll with ClosesAfterRun with DBCacheSettin
       )
       Using.resource(rdw)(test)
     } finally {
-      Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txMetaHandle.handle, rdb.apiHandle.handle).foreach { cfh =>
-        rdb.db.deleteRange(cfh, MinKey, MaxKey)
-      }
+      clearDb()
     }
   }
 
@@ -92,9 +99,7 @@ trait WithState extends BeforeAndAfterAll with ClosesAfterRun with DBCacheSettin
       )
       Using.resource(rdw)(test(bcu, _))
     } finally {
-      Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txMetaHandle.handle).foreach { cfh =>
-        rdb.db.deleteRange(cfh, MinKey, MaxKey)
-      }
+      clearDb()
     }
   }
 
@@ -432,8 +437,19 @@ trait WithDomain extends WithState { suite: Suite =>
       try {
         val wrappedDb = wrapDB(rdb.db)
         assert(wrappedDb.getNativeHandle == rdb.db.getNativeHandle, "wrap function should not create new database instance")
-        domain =
-          Domain(new RDB(wrappedDb, rdb.txMetaHandle, rdb.txHandle, rdb.txSnapshotHandle, rdb.apiHandle, Seq.empty), bcu, blockchain, settings, time)
+        val wrappedRdb = new RDB(
+          wrappedDb,
+          rdb.txMetaHandle,
+          rdb.txHandle,
+          rdb.txSnapshotHandle,
+          rdb.apiHandle,
+          rdb.dataHistoryHandle,
+          rdb.invokeResultsHandle,
+          rdb.byHeightHandle,
+          rdb.blockMetaHandle,
+          Seq.empty
+        )
+        domain = Domain(wrappedRdb, bcu, blockchain, settings, time)
         val genesis = balances.map { case AddrWithBalance(address, amount) =>
           TxHelpers.genesis(address, amount)
         }

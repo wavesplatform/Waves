@@ -564,7 +564,7 @@ case class Domain(
   }
 
   val blocksApi: CommonBlocksApi = {
-    def loadBlockMetaAt(db: RocksDB, blockchainUpdater: CompleteBlockchainUpdater)(height: Height): Option[BlockMeta] =
+    def loadBlockMetaAt(db: RDB, blockchainUpdater: CompleteBlockchainUpdater)(height: Height): Option[BlockMeta] =
       Application.loadBlockMetaAt(db, blockchainUpdater)(height)
 
     def loadBlockInfoAt(db: RDB, blockchainUpdater: CompleteBlockchainUpdater)(
@@ -575,7 +575,7 @@ case class Domain(
     CommonBlocksApi(
       settings.synchronizationSettings.maxRollback,
       blockchainUpdater,
-      loadBlockMetaAt(rdb.db, blockchainUpdater),
+      loadBlockMetaAt(rdb, blockchainUpdater),
       loadBlockInfoAt(rdb, blockchainUpdater)
     )
   }
@@ -636,7 +636,7 @@ case class Domain(
 
   val assetsApi: CommonAssetsApi = CommonAssetsApi(
     () => blockchainUpdater.bestLiquidSnapshot.orEmpty,
-    rdb.db,
+    rdb,
     blockchain
   )
 

@@ -3,7 +3,7 @@ package com.wavesplatform
 import com.google.common.collect.{Interners, Maps}
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -347,6 +347,22 @@ package object database {
   def writeCurrentBalance(balance: CurrentBalance): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ balance.height.toByteArray ++ balance.prevHeight.toByteArray
 
+  def findBalanceAtHeight(current: CurrentBalance, height: Int, load: Height => Option[BalanceNode]): Option[(Int, Long)] = {
+    @tailrec
+    def find(at: Height, balance: Long, prevHeight: Height): Option[(Int, Long)] =
+      if (at <= Height(0)) None
+      else if (at.toInt <= height) Some(at.toInt -> balance)
+      else if (prevHeight <= Height(0) || prevHeight >= at) None
+      else {
+        load(prevHeight) match {
+          case Some(node) => find(prevHeight, node.balance, node.prevHeight)
+          case None       => None
+        }
+      }
+
+    find(current.height, current.balance, current.prevHeight)
+  }
+
   def readBalanceNode(bs: Array[Byte]): BalanceNode = if (bs != null && bs.length == BalanceNode.SizeInBytes)
     BalanceNode(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.takeRight(4))))
   else BalanceNode.Empty
@@ -581,11 +597,23 @@ package object database {
       }
     }
 
-    /** Visits the values of one tag in the by-height column family, in height order, skipping the other tags of each height */
-    def iterateOverByHeight(tag: KeyTag, cfh: RDB.ByHeightHandle)(f: (Height, Array[Byte]) => Unit): Unit =
-      iterateOver(Array.emptyByteArray, Some(cfh.handle)) { e =>
-        val (height, keyTag) = Keys.parseByHeightKey(e.getKey)
-        if (keyTag == tag.ordinal.toShort) f(height, e.getValue)
+    def iterateOverByHeight(tag: KeyTag, cfh: RDB.ByHeightHandle)(f: DBEntry => Unit): Unit =
+      withReadOptions { ro =>
+        val iterator = db.newIterator(cfh.handle, ro.setTotalOrderSeek(true))
+        try {
+          iterator.seek(Keys.heightTagPrefix(Height(0), tag))
+          while (iterator.isValid) {
+            val key = iterator.key()
+            if (Shorts.fromBytes(key(Ints.BYTES), key(Ints.BYTES + 1)) == tag.ordinal.toShort)
+              f(Maps.immutableEntry(key, iterator.value()))
+            iterator.next()
+          }
+        } finally iterator.close()
+      }
+
+    def iterateBlockMeta(cfh: RDB.BlockMetaHandle)(f: (Height, pb.BlockMeta) => Unit): Unit =
+      iterateOver(KeyTag.BlockInfoAtHeight, Some(cfh.handle)) { e =>
+        f(Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES))), readBlockMeta(e.getValue))
       }
 
     def resourceObservable: Observable[DBResource] =
@@ -736,7 +764,7 @@ package object database {
 
   def loadBlock(height: Height, rdb: RDB): Option[Block] =
     for {
-      meta <- rdb.db.get(Keys.blockMetaAt(height, rdb.byHeightHandle))
+      meta <- rdb.db.get(Keys.blockMetaAt(height, rdb.blockMetaHandle))
     } yield createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, loadTransactions(height, rdb).map(_._2))
 
   def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Height]], valueKey: Height => Key[A]): Option[A] =
@@ -744,12 +772,14 @@ package object database {
       h <- resource.get(historyKey).headOption
     } yield resource.get(valueKey(h))
 
-  def loadAssetDescription(resource: DBResource, asset: IssuedAsset): Option[AssetDescription] =
+  def loadAssetDescription(resource: DBResource, asset: IssuedAsset, cfh: RDB.ByHeightHandle): Option[AssetDescription] = {
+    def latest[A](history: LinkedHistory[A]): Option[A] = history.read(resource.get(history.head), resource.get)
+
     for {
       pbStaticInfo       <- resource.get(Keys.assetStaticInfo(asset))
-      (info, volumeInfo) <- fromHistory(resource, Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
-      sponsorship = fromHistory(resource, Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
-      script      = fromHistory(resource, Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
+      (info, volumeInfo) <- latest(Keys.assetDetails(asset, cfh))
+      sponsorship = latest(Keys.sponsorship(asset, cfh)).fold(0L)(_.minFee)
+      script      = latest(Keys.assetScript(asset, cfh))
     } yield AssetDescription(
       TransactionId(pbStaticInfo.sourceId.toByteStr),
       PublicKey(pbStaticInfo.issuerPublicKey.toByteStr),
@@ -766,36 +796,39 @@ package object database {
       Height(pbStaticInfo.height)
     )
 
-  def loadActiveLeases(rdb: RDB, fromHeight: Height, toHeight: Height): Map[ByteStr, LeaseDetails] = rdb.db.withResource { r =>
-    (for {
-      id         <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
-      newDetails <- loadLease(r, id)
-      if newDetails.isActive
-    } yield (id, newDetails)).toMap
   }
 
-  def loadLease(resource: DBResource, id: ByteStr): Option[LeaseDetails] =
-    fromHistory(resource, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id)).flatten
+  def loadActiveLeases(rdb: RDB, fromHeight: Height, toHeight: Height): Map[ByteStr, LeaseDetails] =
+    rdb.db.withResource(rdb.byHeightHandle.handle) { r =>
+      (for {
+        id         <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
+        newDetails <- loadLease(r, id, rdb.byHeightHandle)
+        if newDetails.isActive
+      } yield (id, newDetails)).toMap
+    }
+
+  def loadLease(resource: DBResource, id: ByteStr, cfh: RDB.ByHeightHandle): Option[LeaseDetails] =
+    fromHistory(resource, Keys.leaseDetailsHistory(id, cfh), Keys.leaseDetails(id, cfh)).flatten
 
   def loadLeaseIds(resource: DBResource, fromHeight: Height, toHeight: Height, includeCancelled: Boolean): Set[ByteStr] = {
     val leaseIds = mutable.Set.empty[ByteStr]
     val iterator = resource.fullIterator
 
-    @inline
-    def keyInRange(): Boolean = {
-      val actualKey = iterator.key()
-      actualKey.startsWith(KeyTag.LeaseDetails.prefixBytes) && Height(Ints.fromByteArray(actualKey.slice(2, 6))) <= toHeight
-    }
-
-    iterator.seek(KeyTag.LeaseDetails.prefixBytes ++ fromHeight.toByteArray)
-    while (iterator.isValid && keyInRange()) {
-      val leaseId = ByteStr(iterator.key().drop(6))
-      if (includeCancelled || readLeaseDetails(iterator.value()).isActive)
-        leaseIds += leaseId
-      else
-        leaseIds -= leaseId
-
-      iterator.next()
+    val prefix       = Keys.heightTagPrefix(fromHeight, KeyTag.LeaseDetails)
+    val singleHeight = fromHeight == toHeight
+    iterator.seek(prefix)
+    var inRange = true
+    while (iterator.isValid && inRange) {
+      val key = iterator.key()
+      inRange = if (singleHeight) key.startsWith(prefix) else Ints.fromByteArray(key) <= toHeight.toInt
+      if (inRange) {
+        if (Shorts.fromBytes(key(Ints.BYTES), key(Ints.BYTES + 1)) == KeyTag.LeaseDetails.ordinal.toShort) {
+          val leaseId = ByteStr(key.drop(prefix.length))
+          if (includeCancelled || readLeaseDetails(iterator.value()).isActive) leaseIds += leaseId
+          else leaseIds -= leaseId
+        }
+        iterator.next()
+      }
     }
 
     leaseIds.toSet

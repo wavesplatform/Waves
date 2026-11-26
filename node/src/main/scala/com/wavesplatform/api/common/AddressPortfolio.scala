@@ -1,17 +1,15 @@
 package com.wavesplatform.api.common
 
 import com.google.common.collect.AbstractIterator
-import com.google.common.primitives.Ints
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.NFTIterator.BatchSize
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.database.{AddressId, CurrentBalance, DBResource, Key, KeyTag, Keys, readCurrentBalance}
-import com.wavesplatform.state.{AssetDescription, StateSnapshot}
+import com.wavesplatform.database.{AddressId, CurrentBalance, DBResource, Key, KeyTag, Keys, RDB, readCurrentBalance}
+import com.wavesplatform.state.{AssetDescription, Height, StateSnapshot}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
-import java.nio.ByteBuffer
 import scala.collection.immutable.VectorMap
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
@@ -76,21 +74,20 @@ class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends A
     }(endOfData())
 }
 
-class WavesBalanceIterator(addressId: AddressId, resource: DBResource) extends AbstractIterator[(Int, Long)] {
-  private val prefixBytes: Array[Byte] = KeyTag.WavesBalanceHistory.prefixBytes ++ addressId.toByteArray
-  private val lastHeight: Int          = resource.get(Keys.wavesBalance(addressId)).height.toInt
-
-  resource.withSafePrefixIterator(_.seekForPrev(prefixBytes ++ Ints.toByteArray(lastHeight)))(())
+class WavesBalanceIterator(addressId: AddressId, resource: DBResource, cfh: RDB.ByHeightHandle) extends AbstractIterator[(Int, Long)] {
+  private var nextHeight = resource.get(Keys.wavesBalance(addressId)).height
 
   override def computeNext(): (Int, Long) =
-    resource.withSafePrefixIterator { dbIterator =>
-      if (dbIterator.isValid) {
-        val h       = ByteBuffer.wrap(dbIterator.key().drop(prefixBytes.length)).getInt
-        val balance = ByteBuffer.wrap(dbIterator.value()).getLong
-        dbIterator.prev()
-        h -> balance
-      } else endOfData()
-    }(endOfData())
+    if (nextHeight <= Height(0)) endOfData()
+    else {
+      val height = nextHeight
+      resource.getOpt(Keys.wavesBalanceAt(addressId, height, cfh)) match {
+        case Some(node) =>
+          nextHeight = node.prevHeight
+          height.toInt -> node.balance
+        case None => endOfData()
+      }
+    }
 }
 
 class BalanceIterator(

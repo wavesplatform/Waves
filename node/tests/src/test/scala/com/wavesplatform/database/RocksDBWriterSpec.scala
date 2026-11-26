@@ -138,6 +138,30 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     d.blockchain.hasAccountScript(scriptOwner.toAddress) shouldBe false
   }
 
+  "linked asset history prunes old versions and preserves the rollback boundary" in {
+    val settings = DomainPresets.RideV6
+    withDomain(settings.copy(dbSettings = settings.dbSettings.copy(maxRollbackDepth = 3)), AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
+      val issue = TxHelpers.issue(amount = 100)
+      d.appendBlock(issue)
+      d.appendBlock(TxHelpers.reissue(issue.asset, amount = 10))
+      d.appendBlock()
+      d.appendBlock(TxHelpers.reissue(issue.asset, amount = 20))
+      (6 to 8).foreach(_ => d.appendBlock())
+
+      val history = Keys.assetDetails(issue.asset, d.rdb.byHeightHandle)
+      d.rocksDBWriter.safeRollbackHeight shouldBe H(4)
+      d.rdb.db.get(history.at(H(2))) shouldBe None
+      d.rdb.db.get(history.at(H(3))).map(_.value._2.volume) shouldBe Some(BigInt(110))
+      d.blockchain.assetDescription(issue.asset).value.totalVolume shouldBe BigInt(130)
+
+      d.rollbackTo(4)
+      d.rdb.db.get(history.head) shouldBe H(3)
+      d.rdb.db.get(history.at(H(5))) shouldBe None
+      d.rdb.db.get(Keys.linkedHistoryPrune(H(5))) shouldBe empty
+      d.blockchain.assetDescription(issue.asset).value.totalVolume shouldBe BigInt(110)
+    }
+  }
+
   private val settingsWithGenesis: WavesSettings = DomainPresets.NG.setFeaturesHeight(BlockchainFeatures.BlockReward -> 2)
   private val genesisBalance: Long               = 10 * 100.waves
 
@@ -429,13 +453,19 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     val addressIds = addresses.map(getAddressId(d, _))
     HistoricalKeyTags.foreach { keyTag =>
       withClue(s"$keyTag:") {
-        d.rdb.db.iterateOver(keyTag) { e =>
+        def check(e: DBEntry): Unit = {
           val (affectedHeight, affectedAddressIds) = getHeightAndAddressIds(keyTag, e)
           if (affectedAddressIds.exists(addressIds.contains)) {
             withClue(s"$addresses: ") {
               affectedHeight should be >= sinceHeight
             }
           }
+        }
+
+        keyTag match {
+          case KeyTag.WavesBalanceHistory | KeyTag.AssetBalanceHistory => d.rdb.db.iterateOverByHeight(keyTag, d.rdb.byHeightHandle)(check)
+          case KeyTag.DataHistory                                     => d.rdb.db.iterateOver(keyTag, Some(d.rdb.dataHistoryHandle.handle))(check)
+          case _                                                      => d.rdb.db.iterateOver(keyTag)(check)
         }
       }
     }
@@ -451,8 +481,8 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
 
       case KeyTag.WavesBalanceHistory | KeyTag.AssetBalanceHistory =>
         (
-          bytes.getKey.takeRight(Ints.BYTES),
-          Seq(AddressId.fromByteArray(bytes.getKey.dropRight(Ints.BYTES).takeRight(Longs.BYTES)))
+          bytes.getKey,
+          Seq(AddressId.fromByteArray(bytes.getKey.takeRight(Longs.BYTES)))
         )
 
       case KeyTag.DataHistory =>
